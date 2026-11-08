@@ -13,10 +13,12 @@ struct MemoryHistoryWorkflow {
     private static let archive = InternalTool(path: "History.Conversation.startNew")
     private static let title = InternalTool(path: "History.Conversation.summarize", required: ["id"])
     private static let deletion = InternalTool(path: "History.Conversation.delete", required: ["id"])
+    private static let clearLogs = InternalTool(path: "History.Conversation.clearLogs", optional: ["requestID"])
     private static let presentation = InternalTool(path: "UI.HistoryPresentation.showHistory")
     static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {
         try capabilities.adding(internalTools: [
-            presentation, deletion, archive, title, InternalTool(path: "History.Conversation.readFull"),
+            presentation, deletion, archive, title, clearLogs,
+            InternalTool(path: "History.Conversation.readFull"),
         ])
     }
 
@@ -106,6 +108,12 @@ struct MemoryHistoryWorkflow {
             guard pending == nil else { throw CommunicationError.capacityExceeded }
             let call = try Self.title.call(["id": id])
             pending = (input, call.id, .title)
+            outputs.append(StepOutput(output: .toolCall(call), input: input))
+        case .clearLogs(let id):
+            guard input.metadata.source == "user", pending == nil else { throw CommunicationError.unauthorized }
+            let call = try Self.clearLogs.call(
+                id.map { ["requestID": $0] } ?? [:])
+            pending = (input, call.id, .deletion)
             outputs.append(StepOutput(output: .toolCall(call), input: input))
         case .delete(let id):
             guard input.metadata.source == "user" || AgentFixedTaskInput.isTrusted(input) else {

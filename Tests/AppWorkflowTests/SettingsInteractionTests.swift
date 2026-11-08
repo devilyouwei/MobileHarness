@@ -156,3 +156,120 @@ func restoringSettingsAgainPreservesUnsavedFormEdits() async throws {
     #expect(state.writerProviderID == nil && state.writerModel.isEmpty)
     await controls.shutdown()
 }
+
+@MainActor private final class WelcomeSettingsFixture: SettingsOperating {
+    var stored = CloudSettingsDraft(enabled: false, url: "https://api.openai.com/v1", key: "", model: "default")
+    var failsRestore = false
+    var failsSave = false
+    var saves = 0
+    var pending: CheckedContinuation<Void, Never>?
+    var holdsSave = false
+    func restore() async throws -> CloudSettingsDraft {
+        if failsRestore { throw WelcomeFixtureError.failed }
+        return stored
+    }
+    func discover(_ draft: CloudSettingsDraft) async throws -> [String] { [] }
+    func save(_ draft: CloudSettingsDraft) async throws {
+        saves += 1
+        if holdsSave { await withCheckedContinuation { pending = $0 } }
+        if failsSave { throw WelcomeFixtureError.failed }
+        stored = draft
+    }
+}
+private enum WelcomeFixtureError: Error { case failed }
+
+@Test @MainActor func welcomeRequiresSuccessfulRestoreAndDoesNotReplaceAnExistingProvider() async throws {
+    let fixture = WelcomeSettingsFixture()
+    let state = SettingsState(initial: fixture.stored)
+    let controls = SettingsFormController(state: state, operations: fixture, defaultModel: "default")
+    #expect(!controls.needsWelcome)
+    #expect(await !controls.saveWelcomeProvider(url: "", key: "fixture-key"))
+    fixture.failsRestore = true
+    await #expect(throws: WelcomeFixtureError.self) { try await controls.restore() }
+    #expect(!controls.needsWelcome && fixture.saves == 0)
+    fixture.failsRestore = false
+    fixture.stored.providers = [
+        .init(enabled: false, url: "https://existing.test/v1", key: "fixture-key", model: "", name: "Existing")
+    ]
+    try await controls.restore()
+    #expect(!controls.needsWelcome)
+    #expect(await !controls.saveWelcomeProvider(url: "", key: "another-fixture-key"))
+    #expect(state.providers == fixture.stored.providers && fixture.saves == 0)
+}
+
+@Test(arguments: ["  \n", "  https://custom.test/v1  "])
+@MainActor func welcomeSavesProviderAndSurvivesASettingsRestart(url: String) async throws {
+    let fixture = WelcomeSettingsFixture()
+    let state = SettingsState(initial: fixture.stored)
+    let controls = SettingsFormController(state: state, operations: fixture, defaultModel: "default")
+    try await controls.restore()
+    #expect(controls.needsWelcome)
+    #expect(await controls.saveWelcomeProvider(url: url, key: "  fixture-key\n"))
+    let saved = try #require(fixture.stored.providers.first)
+    #expect(saved.url == (url.contains("custom") ? "https://custom.test/v1" : "https://api.openai.com/v1"))
+    #expect(saved.key == "fixture-key" && !saved.id.isEmpty)
+    #expect(!state.isEnabled && state.writerProviderID == nil)
+    #expect(saved.model.isEmpty && !controls.needsWelcome)
+    let reloaded = SettingsState(initial: .init(enabled: false, url: "", key: "", model: ""))
+    let restarted = SettingsFormController(state: reloaded, operations: fixture, defaultModel: "default")
+    try await restarted.restore()
+    #expect(!restarted.needsWelcome && reloaded.providers == [saved])
+}
+
+@Test @MainActor func welcomeRejectsInvalidInputAndKeepsItsDraftRetryableAfterSaveFailure() async throws {
+    let fixture = WelcomeSettingsFixture()
+    let state = SettingsState(initial: fixture.stored)
+    let controls = SettingsFormController(state: state, operations: fixture, defaultModel: "default")
+    try await controls.restore()
+    for (url, key) in [("", " \n"), ("not a URL", "fixture-key"), ("", String(repeating: "x", count: 4097))] {
+        #expect(await !controls.saveWelcomeProvider(url: url, key: key))
+        #expect(state.error != nil && state.providers.isEmpty && fixture.saves == 0)
+    }
+    fixture.failsSave = true
+    #expect(await !controls.saveWelcomeProvider(url: "", key: "fixture-key"))
+    #expect(controls.needsWelcome && state.providers.isEmpty && !state.isSaving && state.error != nil)
+    fixture.failsSave = false
+    #expect(await controls.saveWelcomeProvider(url: "", key: "fixture-key"))
+    #expect(!controls.needsWelcome && state.error == nil && fixture.saves == 2)
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor func welcomeAdmitsOnlyOneSaveAndDoesNotPublishAfterShutdown() async throws {
+    let fixture = WelcomeSettingsFixture()
+    fixture.holdsSave = true
+    let state = SettingsState(initial: fixture.stored)
+    let controls = SettingsFormController(state: state, operations: fixture, defaultModel: "default")
+    try await controls.restore()
+    let save = Task { await controls.saveWelcomeProvider(url: "", key: "fixture-key") }
+    while fixture.pending == nil { await Task.yield() }
+    #expect(state.isSaving && state.providers.isEmpty)
+    #expect(await !controls.saveWelcomeProvider(url: "", key: "other-fixture-key"))
+    #expect(await !controls.save())
+    #expect(fixture.saves == 1)
+    await controls.shutdown()
+    fixture.pending?.resume()
+    #expect(await save.value)
+    #expect(state.providers.isEmpty && !controls.needsWelcome)
+    #expect(fixture.stored.providers.first?.key == "fixture-key")
+}
+
+@Test @MainActor func welcomeProviderKeepsItsKeyWhenOnlyWriterUsesCloud() async throws {
+    let fixture = WelcomeSettingsFixture()
+    let state = SettingsState(initial: fixture.stored)
+    let controls = SettingsFormController(state: state, operations: fixture, defaultModel: "default")
+    try await controls.restore()
+    #expect(await controls.saveWelcomeProvider(url: "", key: "fixture-key"))
+    let provider = try #require(state.providers.first)
+    // The disabled Assistant retains the default URL and empty key; Writer selects independently.
+    #expect(state.url == provider.url && state.key.isEmpty && !state.isEnabled)
+    state.selectWriterProvider(provider.id)
+    state.writerModel = "writer-model"
+    #expect(await controls.save())
+    #expect(!fixture.stored.enabled && fixture.stored.writerProviderID == provider.id)
+    #expect(fixture.stored.writerModel == "writer-model")
+    #expect(fixture.stored.providers.first?.key == "fixture-key")
+    let restored = SettingsState(initial: .init(enabled: false, url: "", key: "", model: ""))
+    let restarted = SettingsFormController(state: restored, operations: fixture, defaultModel: "default")
+    try await restarted.restore()
+    #expect(!restarted.needsWelcome && restored.providers.first?.key == "fixture-key")
+    #expect(restored.writerProviderID == provider.id && restored.writerModel == "writer-model")
+}

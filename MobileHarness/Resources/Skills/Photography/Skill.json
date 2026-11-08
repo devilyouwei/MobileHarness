@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "photography",
-  "revision": 37,
+  "revision": 40,
   "description": "Photo/video capture, camera controls and media save/ignore. Tracking: application-control.",
   "dependencies": [],
   "useActions": [
@@ -124,6 +124,18 @@
       "callType": "action",
       "alias": "Island.setPresentation",
       "channel": "Display"
+    },
+    {
+      "path": "Camera.Capture.loadPreviewImage",
+      "callType": "action",
+      "alias": "loadPreviewImage",
+      "channel": "Camera"
+    },
+    {
+      "path": "Camera.Capture.unloadPreviewImage",
+      "callType": "action",
+      "alias": "unloadPreviewImage",
+      "channel": "Camera"
     }
   ],
   "useStates": [
@@ -132,7 +144,8 @@
     "ui.album",
     "ui.windows",
     "platform.vision.camera",
-    "ui.island"
+    "ui.island",
+    "actions.camera.preview"
   ],
   "useInstructions": [
     "Instructions.md"

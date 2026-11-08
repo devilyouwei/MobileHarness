@@ -148,7 +148,6 @@ actor ResourceTestPreferences: ModelResourcePreferencesCapability {
         case .message(let id): value = .message(id)
         case .page(let id, let after, let task): value = .page(id, after, task)
         case .archives(let before): value = .archives(before)
-        case .photo(let id, let input): value = .photo(id, input)
         }
         return try await submit(value)
     }
@@ -171,14 +170,14 @@ actor ResourceTestPreferences: ModelResourcePreferencesCapability {
     func detachTracking(sessionID: String) async { await host.detachTracking(sessionID: sessionID) }
     @discardableResult func perform(
         _ operation: PhotographerCameraIntent.Operation,
-        facing: PhotographerCameraIntent.Facing? = nil, mediaID: String? = nil
+        facing: PhotographerCameraIntent.Facing? = nil, previewID: String? = nil
     ) async throws -> String? {
         try await prepareForInteraction()
         guard let kind = CameraInput.Operation(rawValue: operation.rawValue) else {
             throw CommunicationError.unauthorized
         }
         return try await camera.requests.submit(
-            .init(kind, facing: facing.map { $0 == .front ? .front : .back }, mediaID: mediaID))
+            .init(kind, facing: facing.map { $0 == .front ? .front : .back }, previewID: previewID))
     }
 }
 

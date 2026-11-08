@@ -103,7 +103,7 @@ setSceneActive只调用原生场景服务的失活/加入端口，不暂停Actio
 
 ## Web operations
 
-[Web](Web/README.md) owns remote browsing, inspection, navigation and screenshot execution. [Artifacts](Artifacts/README.md) owns project storage, streaming edit transactions, immutable versions and multi-window presentation. ActionsBusinessAssembly injects foundation ports and returns a task-bound streaming continuation; short literal patches validate fresh read ownership and unique matches before atomic replacement; no development model runs inside Actions. Writer selects explicit rendering or per-edit streaming previews; Artifacts performs bounded native file operations and reports render evidence without deciding creative policy.
+[Web](Web/README.md) owns remote browsing, inspection, navigation and screenshot execution. [Artifacts](Artifacts/README.md) owns project storage, streaming edit transactions, immutable versions and multi-window presentation. ActionsBusinessAssembly injects foundation ports and returns a task-bound streaming continuation; short literal patches validate fresh read ownership and unique matches before atomic replacement; no development model runs inside Actions. Writer reaches keyword workspace search and existing-work presentation through native tools. Assistant delegates the goal. Explicit creation or entry prepares the editing session before file operations. Writer selects explicit rendering or per-edit streaming previews. Artifacts performs bounded native file operations and reports render evidence. Actions owns and joins scene preview restoration separately from scene admission, and a failed restoration is reported at its window.
 
 Camera与Web在创建UI窗口时显式提供各自图标。Actions只选择显示身份，UI.Window拥有图标接纳、最小化尺寸和原生渲染；不新增函数参数或资源访问链路。
 
@@ -126,3 +126,15 @@ Artifacts拥有作品窗口的简洁标题/操作副标题、每项目最新快�
 Artifacts receives the shared SQLite WorkspaceRepository through ActionsDependencies; Actions owns file/SQL publication ordering, editing and rendering, while Storage owns relational persistence. Generic value results have no single-result byte quota; model context remains an Agent concern.
 
 Artifacts consumes the neutral StorageDatabase.Workspaces contracts/coordinator and StorageFiles primitives. It never imports SQLite/GRDB; formats, rendering and acceptance remain Actions responsibilities.
+
+Camera owns memory-only photo capture, automatic latest and explicit image selections, and save/ignore by previewID. Its scoped State reader supplies immutable image attachments; ordinary inspection remains metadata-only. Storage owns bytes/persistence, Agents owns Skill selection, and App binds the interfaces.
+
+History validates recorded attachment identity and reads logged request bytes only. Clearing logs removes their images and generation metadata. No history read loads State or triggers model feedback.
+
+Camera uses memory-only preview_N references within one window lifetime, independently of saved media_N. Private resource bindings fence reused labels. Save/ignore retain flagged cache entries; window close clears them, while minimization/background only suspends model delivery.
+
+History.Conversation.clearLogs为用户日志管理提供内部业务函数：按request_N或共享全库物理删除可选日志。Memory拥有调用与结果处理，Storage保留对话、消息和业务请求记录，UI仅刷新Prompts可用性。
+
+Task Actions expose foreground task.start/end and independent task.delegate; agent_id on task.send/cancel selects communication, without selecting the receiver's workspace. History reads role-owned messages and shared log details. Prompt images decode only logged request bytes; no history-to-camera-cache or history-to-album fallback port is assembled.
+
+历史 UI facade 只注入真实读取、分页、摘要、删除及日志清理端口；不注入对旧回复重新解析的 execution preview formatter。

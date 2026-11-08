@@ -185,11 +185,15 @@ public protocol ConversationHistoryControlling: AnyObject {
     func summarize(_ id: String)
     func delete(_ id: String)
     func cancel()
-    func preview(_ turn: HistoryTurn) -> String
     func imageData(_ id: String, for turnID: String) async throws -> Data?
+    func clearRequestLogs(requestID: String?) async throws
 }
 
+/// A temporary history attachment has been released and cannot be retried.
+public enum HistoryImageAvailabilityError: Error { case expired }
+
 public struct HistoryMessage: Codable, Sendable, Equatable {
+    public var toolName: String? = nil
     public enum Role: String, Codable, Sendable { case system, user, assistant, tool }
     public let role: Role
     public let content: String
@@ -206,10 +210,12 @@ public struct HistoryMessage: Codable, Sendable, Equatable {
 }
 
 public struct HistoryImageReference: Codable, Sendable, Equatable, Identifiable {
+    public let resourceScope: String?
     public let id: String
     public let mimeType: String
     public let byteCount: Int
-    public init(id: String, mimeType: String, byteCount: Int) {
+    public init(id: String, mimeType: String, byteCount: Int, resourceScope: String? = nil) {
+        self.resourceScope = resourceScope
         self.id = id
         self.mimeType = mimeType
         self.byteCount = byteCount
@@ -226,6 +232,7 @@ public struct HistoryNativeToolCall: Codable, Sendable, Equatable {
 }
 
 public struct HistoryDecisionMetadata: Codable, Sendable {
+    public var states: [String]? = nil
     public var delegateID: String? = nil
     public var taskGoal: String? = nil
     public var execution: String? = nil
@@ -254,6 +261,14 @@ public struct HistoryRuntimeEffect: Codable, Sendable, Identifiable {
     public let resultsJSON: String
 }
 public struct HistoryModelRequest: Codable, Sendable, Identifiable {
+    public var producerMetadata: [String: String]? = nil
+    public var model: String? = nil
+    public var maximumOutputTokens: Int? = nil
+    public var temperature: Double? = nil
+    public var inputMessages: [HistoryMessage]? = nil
+    public var requestParametersJSON: String? = nil
+    public var responseEventsJSON: String? = nil
+    public var logsCleared: Bool? = nil
     public var messageID: String? = nil
     public var isObservation: Bool? = nil
     public var historyOrder: UInt64 = 0
@@ -314,6 +329,9 @@ public struct HistoryToolCall: Codable, Sendable, Identifiable {
 }
 
 public struct HistoryTurn: Codable, Sendable, Identifiable {
+    public var requestParametersJSON: String? = nil
+    public var responseEventsJSON: String? = nil
+    public var logsCleared: Bool? = nil
     public var generationRounds: [HistoryRuntimeEffect]? = nil
     public var messageID: String? = nil
     public var historyOrder: UInt64? = nil
@@ -363,6 +381,20 @@ public struct HistoryConversation: Codable, Sendable, Identifiable {
         archivedAt = nil
         summaryTitle = nil
         titleError = nil
+    }
+    /// Assistant pages may carry foreground summaries; Writer pages contain only their own rounds.
+    public init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        createdAt = try values.decode(Date.self, forKey: .createdAt)
+        archivedAt = try values.decodeIfPresent(Date.self, forKey: .archivedAt)
+        summaryTitle = try values.decodeIfPresent(String.self, forKey: .summaryTitle)
+        titleError = try values.decodeIfPresent(String.self, forKey: .titleError)
+        nextPosition = try values.decodeIfPresent(UInt64.self, forKey: .nextPosition)
+        turnCount = try values.decodeIfPresent(Int.self, forKey: .turnCount)
+        latestUser = try values.decodeIfPresent(String.self, forKey: .latestUser)
+        turns = try values.decode([HistoryTurn].self, forKey: .turns)
+        taskCompressions = try values.decodeIfPresent([HistoryTaskCompression].self, forKey: .taskCompressions) ?? []
     }
     /// Append a SQL preview/source page without dropping the summaries needed to render Task cards.
     public mutating func appendPage(_ page: HistoryConversation) throws {
@@ -500,15 +532,18 @@ public enum HistoryInput: Sendable {
     case refresh, startNew
     case summarize(String)
     case delete(String)
+    case clearLogs(String?)
     case conversation(String)
     case message(String)
     case page(String, UInt64, String?)
     case archives(Int64)
-    case photo(String, String)
 }
 public enum HistoryReply: Sendable {
     case completed
     case conversation(HistoryConversation)
     case archives([HistoryConversation])
-    case photo(Data?)
+}
+
+extension ConversationHistoryControlling {
+    public func clearRequestLogs(requestID: String?) async throws { throw HistoryDetailError.unavailable }
 }

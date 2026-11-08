@@ -43,6 +43,8 @@ Root组合功能视图与公共组件，功能拥有自身状态和输入类型�
 
 UIContainer.stateSnapshot只返回自身生命周期事实及十二子能力的路径索引；各owner只投影已有事实，不采样设备、不递归读取其他owner。密钥、本地URL、草稿、字幕和媒体字节不进入公开快照；业务操作失败与UI呈现健康分别表达。
 
+Writer 记录使用 UI 自有 WriterRecordsControlling 和分页 DTO 接收明确的下一游标；Settings 页面拥有已加载快照与导航返回保留，业务提供方拥有记录查询。详见 [Writer 记录](Settings/README.md#writer-记录与作品)。
+
 ## 生命周期与完成
 
 构造/start不请求权限、不启动设备或模型。invalidate使旧实时凭证失效、关闭实时呈现并解除动画等待；stop幂等取消并加入UI自有工作，清理资源和回调，旧根不能重启。会话/轮次、设置revision、媒体generation和领域序号独立于根代际。
@@ -84,3 +86,11 @@ Window提供可更新标题/副标题及宿主预留身份，Root把副标题组
 Writer请求行编号徽章默认灰色，仅失败为红色，并呈现调用方给定操作标题；状态中文标签与时间并排。UI不访问工具参数或请求模型命名，完整规则见[Settings](Settings/README.md)。
 
 记录入口和列表使用My Assistant/My Writer命名；Settings目录内共用记录行几何与紧凑日期显示，不增加存储读取或把会话创建时间推断成活跃时间。默认historyTitle为My Assistant，仍支持宿主显式覆盖。
+
+Conversation-history image presentation distinguishes missing or cleared request-log images from read/decode failures. The workflow supplies the outcome through the UI-owned HistoryImageAvailabilityError contract; UI does not access the Camera cache or select model images.
+
+Camera gallery renders supplied session catalog metadata and scoped read results, with bounded stack thumbnails and zoomable current/adjacent pages. CameraState owns presentation only; closing/eviction and model selection belong to Actions. Shutter controls overlay the live image with a translucent gradient.
+
+Settings历史详情支持清空单条请求日志，历史列表支持清空Assistant/Writer共享全库。确认后 Prompts 和 Generation Meta 显示“已清空”，回复、Action 和工具结果等业务区块保留。新历史图片来自完整模型请求中的Base64，与Camera缓存寿命独立。
+
+首次云端配置由 Root 组合 Settings 的 WelcomeProviderView：恢复完成后按实际 Provider 列表判断展示；表单通过既有 SettingsControlling/SettingsOperating 提交，业务持久化仍由外部 Actions 拥有。成功后进入模型选择，UI 不推定服务支持的模型，也不访问钥匙串或网络。

@@ -114,7 +114,7 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     #expect(config.version == 7 && config.agentID == .assistant)
     #expect(config.capabilities.actions.contains { $0.alias == "express" })
-    #expect(config.capabilities.actions.contains { $0.alias == "startTask" })
+    #expect(config.capabilities.actions.contains { $0.alias == "task.start" })
     #expect(config.capabilities.tools.isEmpty)
     var skills = AgentTaskSkillState()
     let maximum = try AssistantAgent.runtimeCapabilities(config.capabilities)
@@ -122,8 +122,8 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     let active = try skills.registry(fixed: maximum)
     #expect(active.tools.isEmpty)
     #expect(!active.actions.contains { $0.path.domain == "Camera" })
-    #expect(active.actions.contains { $0.alias == "startTask" })
-    #expect(active.actions.filter { $0.path.domain == "Agent" && $0.path.module == "Task" }.count == 6)
+    #expect(active.actions.contains { $0.alias == "task.start" })
+    #expect(active.actions.filter { $0.path.domain == "Agent" && $0.path.module == "Task" }.count == 7)
     let agent = try AssistantAgent(
         stateContext: try publicStateFixture(),
         chat: FixedTextChat(),
@@ -562,4 +562,43 @@ func skillUseStateRejectsInvalidDeclarations(_ mutation: String) throws {
     var old = document()
     old["version"] = 6
     #expect(throws: AgentConfigurationError.self) { try decode(old) }
+}
+
+@Test(.actionCatalog) func bundledAgentResourceDescriptionsProjectToExistingFunctionContract() throws {
+    for name in [
+        "Assistant", "Writer", "Memory", "Photographer", "ApplicationControl", "SpeechPerception", "SpeechSynthesis",
+        "VisionPerception",
+    ] {
+        let configuration = try AgentConfigurations.load(named: name)
+        let data = try AgentConfigurations.data("Agents/" + name + "/Agent.json")
+        let resource = try AgentConfigurations.decodeResource(data, expectedID: configuration.agentID)
+        #expect(resource.version == 8 && configuration.version == 7)
+        #expect(!resource.description.isEmpty && resource.description.utf8.count <= 2048)
+        #expect(try AgentConfigurations.publicDescription(named: name) == resource.description)
+    }
+}
+
+@Test(
+    .actionCatalog,
+    arguments: [
+        "missing", "empty", "blank", "wrongType", "oversize", "multibyteOversize", "oldVersion", "unknownField",
+        "wrongID",
+    ])
+func invalidPublicAgentDescriptionsFailExplicitly(failure: String) throws {
+    let data = try AgentConfigurations.data("Agents/Writer/Agent.json")
+    var resource = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    switch failure {
+    case "missing": resource.removeValue(forKey: "description")
+    case "empty": resource["description"] = ""
+    case "blank": resource["description"] = " \n\t"
+    case "wrongType": resource["description"] = ["text": "writer"]
+    case "oversize": resource["description"] = String(repeating: "a", count: 2049)
+    case "multibyteOversize": resource["description"] = String(repeating: "写", count: 683)
+    case "oldVersion": resource["version"] = 7
+    case "unknownField": resource["privateInstructions"] = "must not be public"
+    case "wrongID": resource["id"] = "assistant"
+    default: Issue.record("Unknown fixture")
+    }
+    let mutated = try JSONSerialization.data(withJSONObject: resource)
+    #expect(throws: (any Error).self) { try AgentConfigurations.decodeResource(mutated, expectedID: .writer) }
 }

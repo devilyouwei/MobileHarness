@@ -5,7 +5,7 @@ import StorageFiles
 
 public enum ArtifactWorkspaceError: String, Error, Sendable, CustomStringConvertible {
     case invalidPath, missingFile, existingFile, ambiguousMatch, readRequired, missingProject, conflict, busy
-    case invalidReadRange, readReferenceLimit, relatedContextLimit, savepointLimit, invalidTitle, invalidQuery
+    case invalidReadRange, invalidInstruction, invalidTitle, invalidQuery
     case renderRequired, closed
     case archiveFormatLimit
     public var description: String {
@@ -15,13 +15,10 @@ public enum ArtifactWorkspaceError: String, Error, Sendable, CustomStringConvert
         case .ambiguousMatch:
             detail =
                 "oldText must be nonempty and match exactly once inside the fresh read range; reread or narrow the range. No file changed."
-        case .invalidReadRange: detail = "Use an existing line/offset and the declared read page size."
-        case .readReferenceLimit: detail = "This editing session already retains 128 read references."
-        case .relatedContextLimit:
-            detail = "Select at most eight read references and 24000 UTF-8 bytes of related context."
-        case .savepointLimit: detail = "This editing session has eight savepoints; reuse a returned savepoint."
-        case .invalidTitle: detail = "Use a nonempty title of at most 160 UTF-8 bytes."
-        case .invalidQuery: detail = "Use a nonempty query of at most 1024 UTF-8 bytes."
+        case .invalidReadRange: detail = "Use a valid line/offset and a positive read count."
+        case .invalidInstruction: detail = "Supply a nonempty edit instruction."
+        case .invalidTitle: detail = "Use a nonempty title."
+        case .invalidQuery: detail = "Use a nonempty literal query."
         case .archiveFormatLimit:
             detail = "This export requires ZIP64, which is unsupported; share source files separately."
         default: return rawValue
@@ -39,7 +36,7 @@ public struct ArtifactDraft: Codable, Equatable, Sendable {
         try validate()
     }
     public static func validatePath(_ path: String) throws {
-        guard path.utf8.count <= 160, !path.isEmpty,
+        guard !path.isEmpty,
             path.split(separator: "/", omittingEmptySubsequences: false).allSatisfy({
                 !$0.isEmpty && $0 != "." && $0 != ".." && !$0.hasPrefix(".")
                     && $0.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || "._-".contains($0)) }
@@ -60,7 +57,7 @@ public struct ArtifactDraft: Codable, Equatable, Sendable {
     public mutating func read(_ path: String, offset: Int = 0, limit: Int = 12_000) throws -> String {
         try Self.validatePath(path)
         guard let text = files[path] else { throw ArtifactWorkspaceError.missingFile }
-        guard offset >= 0, (1...12_000).contains(limit), offset <= text.count else {
+        guard offset >= 0, limit > 0, offset <= text.count else {
             throw ArtifactWorkspaceError.invalidReadRange
         }
         observed.insert(path)
@@ -131,12 +128,21 @@ public actor ArtifactWorkspace {
         return result
     }
     public func inventory() async throws -> [[String: String]] {
-        try await catalog.directory().filter { !$0.deleting }.map {
-            [
-                "agentID": $0.id.agent, "taskID": $0.id.taskID, "workspaceID": $0.id.rawValue, "title": $0.title,
-                "entry": $0.entry, "state": $0.hasDraft ? "draft" : "saved",
-            ]
-        }
+        try await catalog.directory().filter { !$0.deleting }.map(Self.metadata)
+    }
+    func search(_ query: String, before: String?) async throws -> WorkspaceMatches {
+        let page = try await catalog.search(query, before: before)
+        return WorkspaceMatches(matches: page.matches.map(Self.metadata), nextBefore: page.nextBefore)
+    }
+    struct WorkspaceMatches: Encodable, Sendable {
+        let matches: [[String: String]]
+        let nextBefore: String?
+    }
+    private static func metadata(_ item: WorkspaceSummary) -> [String: String] {
+        [
+            "agentID": item.id.agent, "taskID": item.id.taskID, "workspaceID": item.id.rawValue, "title": item.title,
+            "entry": item.entry, "state": item.hasDraft ? "draft" : "saved",
+        ]
     }
     public func published(_ id: WorkspaceID) async throws -> ArtifactProject? {
         guard let (info, files) = try await store.read(id), let token = info.revision else { return nil }
@@ -155,9 +161,10 @@ public actor ArtifactWorkspace {
     ) async throws -> ArtifactProject {
         try draft.validate()
         try ArtifactDraft.validatePath(entry)
-        guard let content = draft.files[entry], !content.isEmpty, !title.isEmpty, title.utf8.count <= 160 else {
+        guard let content = draft.files[entry], !content.isEmpty else {
             throw ArtifactWorkspaceError.missingFile
         }
+        guard !title.isEmpty else { throw ArtifactWorkspaceError.invalidTitle }
         do {
             let info = try await store.write(
                 id, expecting: token, title: title, entry: entry, files: draft.files, published: true)

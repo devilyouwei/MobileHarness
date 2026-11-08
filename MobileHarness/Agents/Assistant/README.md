@@ -15,7 +15,7 @@ Assistant 是 `AgentChatWorker<AssistantContextState>` 的角色绑定，负责�
 | UIHomeContainer | 直接订阅 home.requests；聆听控制由 SpeechPerception 单独订阅 |
 | ChatCapability／chatProvider | ModelKit.language：按请求选择并使用模型 |
 | AgentStateContext | 读取 Skill.useStates 指定容器事实；Task从私有上下文生成 |
-| ConversationHistoryStore／TaskRepository | Storage 数据库领域接口；会话、消息与任务提交 |
+| AssistantHistoryStore／AssistantTaskRepository／AgentMessageRepository | Storage 数据库领域接口；会话、消息与任务提交 |
 | 照片读取、prepareJPEG 回调 | 装配时注入 Actions.Camera 的只读 readPhoto 闭包与 PlatformKit JPEG 准备能力；角色制定预算，不持有相机控制器 |
 | AgentContextRepository／配置与目录 | Agents 私有 Context、Skill 状态与 AgentCore 不可变执行声明 |
 
@@ -81,7 +81,7 @@ flowchart LR
  M["ModelKit.language.ChatCapability"]:::model
  S["Storage · Chat / Task repositories"]:::storage
  P["PlatformKit：JPEG 准备"]:::platform
- RD["Actions.Camera：注入只读 readPhoto 闭包"]:::action
+ RD["注入 readPhoto：读取已存储 Web 截图"]:::action
  end
  subgraph Owned["Assistant"]
  I["类型化文本／最终识别 → Decision"]:::agent
@@ -94,8 +94,8 @@ flowchart LR
  S <--> C
  K --> D
  D <--> M
- RD -->|"真实照片读取"| C
- P -->|"受预算约束的照片"| C
+ RD -->|"Web 截图读取"| C
+ P -->|"受预算约束的 Web 图片"| C
  O --> G["Gateway：端点／租约／取消"]:::gateway
  G --> X["当前 Skill 绑定的可扩展 Actions"]:::action
  G --> PR["UI.Caption.beginReplyTurn<br/>UI.Caption.print<br/>UI.Expression.setReplyWaiting<br/>Speech.Playback.speak"]:::action
@@ -138,7 +138,7 @@ block-beta
 
     C["Resources/Catalog.json<br/>→ 各 Skill.json<br/>提取 id / description，排序"] space S3["③ AVAILABLE SKILLS<br/>所有已登记 Skill 的简要说明<br/>固定；不随 load/release 改变"]
 
-    D["Resources/Agents/Assistant/<br/>Prompts.json · delegation<br/>渲染职责说明模板"] space S4["④ INDEPENDENT AGENT<br/>RESPONSIBILITIES<br/>其他 Agent 的职责：固定"]
+    D["各 Agent.json · description<br/>真实委派适配＋实例通信权限<br/>筛选并组装公开介绍"] space S4["④ DELEGATABLE AGENTS<br/>角色自有公开用途<br/>按当前授权和可用函数筛选"]
 
     E["Agent.json · baseSkills<br/>＋当前状态中的 loaded<br/>展开依赖，读取 Instructions.md"] space S5["⑤ LOADED SKILL INSTRUCTIONS<br/>当前已加载 Skill 的完整教学<br/>基础项常驻，其他项动态增减"]
 
@@ -166,13 +166,13 @@ block-beta
     classDef mixed fill:#f0eaff,stroke:#9170bc,color:#493269,stroke-dasharray:6 4
     classDef heading fill:transparent,stroke:transparent
 
-    class B,C,D,G,S2,S3,S4,S7 fixed
-    class E,F,S5,S6 dynamic
+    class B,C,G,S2,S3,S7 fixed
+    class D,E,F,S4,S5,S6 dynamic
     class A,S1 mixed
     class H1,H2 heading
 ```
 
-资源由 [AgentConfigurations](../Support/AgentConfigurations.swift) 按打包 Bundle 中的 [Catalog.json](../../Resources/Catalog.json) 显式映射读取并缓存，不扫描目录或热更新。协议与短检查来自 [FunctionTokenPrompts.json](../Support/Core/Generation/FunctionTokenPrompts.json)，角色来自 [Instructions.md](../../Resources/Agents/Assistant/Instructions.md)，独立 Agent 职责来自 [Prompts.json](../../Resources/Agents/Assistant/Prompts.json) 的 delegation。Skill 概览读取各 Skill.json 的 id/description，按 ID 排序，总预算 4 KiB，必要时截短描述并保留 ID。
+资源由 [AgentConfigurations](../Support/AgentConfigurations.swift) 按打包 Bundle 中的 [Catalog.json](../../Resources/Catalog.json) 显式映射读取并缓存，不扫描目录或热更新。协议与短检查来自 [FunctionTokenPrompts.json](../Support/Core/Generation/FunctionTokenPrompts.json)，角色来自 [Instructions.md](../../Resources/Agents/Assistant/Instructions.md)，可委派角色职责来自各自 Agent.json.description，经 AgentTaskDelegation 与实例通信权限筛选；总量最多 8192 UTF-8 字节，超限明确失败。Skill 概览读取各 Skill.json 的 id/description，按 ID 排序，总预算 4 KiB，必要时截短描述并保留 ID。
 
 基础列表来自 [Agent.json](../../Resources/Agents/Assistant/Agent.json) 的 baseSkills；[AgentSkillLoader](../Support/AgentSkillLoader.swift) 展开当前激活项的依赖并合并函数绑定，⑤拼接对应 Instructions.md，⑥通过 [CapabilityContextBuilder](../Support/Core/Capability/CapabilityContextBuilder.swift) 渲染当前 Action 目录。别名/Channel 来自 Skill 绑定，描述、参数与约束来自真实 @Action 声明；⑦由同一目录渲染器追加。实际请求的独立 system 数据消息同时包含 AGENT CONTEXT 和 CURRENT STATE；放置规则见上文 Context 与 Builder。
 
@@ -182,7 +182,7 @@ block-beta
 
 基础 Skill 为 basic-skill、expression-interaction。机械臂 robot-interaction 为可发现的按需 Skill，加载后才注入动作、教学及 actions.robot/actions.robot.motion 观察；可按近期/Task 生命周期释放。无 Task 的加载/合法使用将近期项计数重置为 5，每次完整闲置用户 Decision 扣 1；Task 等待期间暂停无关近期项计数。Task 只接管指定、加载或实际使用的项，等待用户时保留，终态屏障后回收。生命周期合图及容量/LRU、依赖与原子回滚见 [Context](../Support/Context/README.md#task-and-skill-lifecycle)。
 
-已注册 Camera 函数不要求 Task。单次拍照、保存/忽略当前预览或相机控制可直接使用 Skill；必须先确认当前目录存在函数，缺失才加载 photography。媒体引用来自实际捕获结果或当前 displayedMediaID，忽略别名为 ignorePhoto。
+已注册 Camera 函数不要求 Task。单次拍照、保存/忽略当前预览或相机控制可直接使用 Skill；必须先确认当前目录存在函数，缺失才加载 photography。预览引用来自实际捕获结果或 actions.camera.preview 目录，忽略别名为 ignorePhoto。
 
 教学只允许以当前活跃且匹配的 Task/目标决定 finishTask/cancelTask。无 Task 操作完成直接回复；不确定是否放弃旧目标时先询问并保留 Task，明确切换时关闭旧目标或释放无关近期 Skill。finishTask 通常结束决策，显式 continueDecision=true 才继续同一输入剩余新目标，cancelTask 结束该决策。Skill 释放不代表保存、忽略或关闭相机。
 
@@ -192,15 +192,15 @@ Assistant 拥有用户意图、委托请求和面向用户的沟通；执行 Age
 
 | 阶段 | Assistant 与运行时契约 |
 | --- | --- |
-| 发起 | `startTask(goal, execution=background, executor, …)` 走 Control Channel 的 XML Action；Actions 校验后调用注入的 Task 控制端口。运行时检查目标通信权限、业务契约与能力，持久化 UUID `delegateID`，再发送绑定 requester/executor/session 的 `task.request`。 |
-| 接纳 | 执行者验证来源、scope 与自身容量，并绑定其拥有的业务任务；回执只确认接纳。后台委托不切换 Assistant 前台 Task 或有效 Skill 目录；`finishTask` 只结束当前前台目标。 |
+| 发起 | `task.delegate(agent_id, description)` 走 Control Channel 的 XML Action；Actions 校验后调用注入的 Task 控制端口。运行时检查目标通信权限、业务契约与能力，在 agent_messages 持久化请求 UUID，再发送绑定 requester/executor/session 的 `task.request`。 |
+| 接纳 | 执行者验证来源、scope 与自身容量，并绑定其拥有的业务任务；回执只确认接纳。后台委托不切换 Assistant 前台 Task 或有效 Skill 目录；`task.end` 只结束当前前台目标。 |
 | 观察 | `task.progress`/`task.result` 由共享 Chat 更新关联控制状态；是否进入用户回复由具体业务事件政策决定，不能将所有进度当成新的用户指令。公开状态仍由当前 Skill 的 `useStates` 选择。 |
-| 补充与取消 | 使用 `executor + taskID` 定位已绑定任务；运行时解析当前委托，回答追问时还校验本次输入捕获的问题身份。模型不提供 delegate/event/interaction UUID。取消接纳只表示已递送，必须等待执行者清理及终态证据。 |
+| 补充与取消 | 使用 `agent_id` 指定通信目标；运行时解析唯一活跃通信链，回答追问时还校验本次输入捕获的问题身份。模型不提供 delegate/event/interaction UUID。取消接纳只表示已递送，必须等待执行者清理及终态证据。 |
 | 失败 | 配置、权限、接纳、持久化和递送失败显式返回；回执成功不等于业务完成，回报事实不授予重试、重新委托或改变前台 Task 的权限。 |
 
 通信输出由 [Support 独立消费者](../Support/README.md#lifetime-bounds-and-failures) 持续递送，不受等待该 Task Action 的模型轮次屏障阻塞。角色根拥有消费者及其取消/加入；通信队列与输出队列各自有界，溢出明确失败。消息值与固定任务准入见 [Communication](../Support/Communication/README.md)，执行参数见 [Task Actions](../../Actions/System/Task/README.md)。
 
-当前公开创作执行者是 Writer；通用 `startTask` 路径只向已声明且授权的目标开放，并不表示所有 Agent 都支持后台业务。当前 `sendMessage` 的补充输入适配也仅支持 Writer。Writer 的单行目标/原始输入、忙碌与替代、长期作品任务、普通进度合并、追问 FIFO 和独立持久终态通知见 [Writer 委托与主动事件](../Writer/README.md#委托与主动事件)。其运行不随 Assistant 聆听停止、语音打断或对话关闭而取消；这属于该执行角色的生命周期契约，不能推定为所有角色的统一行为。
+当前公开创作执行者是 Writer；`task.delegate` 路径只向已声明且授权的目标开放，并不表示所有 Agent 都支持后台业务。当前 `task.send` 的补充输入适配也仅支持 Writer。Writer 的单行目标/原始输入、忙碌与取消、长期作品任务、普通进度合并、追问 FIFO 和独立持久终态通知见 [Writer 委托与主动事件](../Writer/README.md#委托与主动事件)。其运行不随 Assistant 聆听停止、语音打断或对话关闭而取消；这属于该执行角色的生命周期契约，不能推定为所有角色的统一行为。
 
 ## ReACT、历史与失败
 
@@ -216,14 +216,11 @@ Task/dialog/message 身份先经注入仓库提交；delta、Skill 计数、在�
 
 AssistantContextState.sessionControl 解释 AssistantSessionControl，并映射为通用 Chat 的 interrupt／close 意图。共享 Worker 不识别 assistant.control 字符串或 Assistant 私有类型，仍验证本地 runtime 来源后执行中断／关闭屏障。默认 Chat Context 不解释其他角色控制协议。
 
-## Model photo preparation policy
+## Image context ownership
 
-AssistantPhotoInputPolicy in AssistantProcessing.swift owns analysis budgets: maximum dimension 1568, maximum pixels 1,048,576, maximum JPEG bytes 1 MiB and initial quality 0.82. photoObservations checks successful takePhoto evidence and model image support, reads the original, validates photo identity, invokes an injected prepareJPEG(Data, policy) capability and constructs the JPEG ChatImage itself. photoObservationHandler builds the worker callback inside Agents from those injected capabilities. Raw read and preparation are separate required capabilities; there is no implicit/no-op production preparation fallback. App only binds capabilities, while PlatformKit retains Image I/O internals. Agent code imports no native codec/framework.
+Camera previews come from Photography's actions.camera.preview State. Camera prepares bytes and owns latest/explicit selection; shared Chat rebuilds attachments on the original current user input on every request, including new user turns and Action continuations. The system State manifest supplies source/ID/size and attachment-order mapping. Assistant does not interpret takePhoto receipts or own a second photo cache. Ephemeral bytes are excluded from durable model-request logs.
 
-Check cancellation before reading, before preparation and before retaining results. Native preparation failure/cancellation propagates through the current decision; empty/over-budget results reject without uploading the original. The worker invokes observations after the round barrier and retains prepared images in ReACT requests, so later business-result continuations do not recompress. Original storage, preview and album import remain independent.
-
-These are Assistant-owned analysis and transport budgets. Native image conversion is described in [PlatformKit/Vision](../../PlatformKit/Vision/README.md#native-image-compression).
-
+AssistantWebImagePolicy and its observation callback remain for Web.Page browse/snapshot/navigate only, enforcing1568px/1MP/1MiB JPEG preparation and unsupported-model reporting. They never load Camera previews or album images.
 
 ## Container 上下文
 
@@ -243,13 +240,13 @@ Skill.useStates is the sole exact-path observation selection. AssistantStateBind
 
 ## Photography state selection
 
-Photography loads capture/video Actions and settings/recording fields from actions.camera: mode, delaySeconds, flash, supportedFlash, zoom, maximumZoom, durationSeconds, countdown, recordingPhase and recordingID. Native platform.vision.camera independently supplies actual running/recording/lens/zoom. State selection does not activate the camera or confer permission. Photo/video instructions require separate configuration/start receipts, real media IDs and window cleanup before matching Task completion.
+Photography loads capture/video Actions and settings/recording fields from actions.camera: mode, delaySeconds, flash, supportedFlash, zoom, maximumZoom, durationSeconds, countdown, recordingPhase and recordingID. Native platform.vision.camera independently supplies actual running/recording/lens/zoom. State selection does not activate the camera or confer permission. Photo/video instructions require separate configuration/start receipts, real preview/video identities and window cleanup before matching Task completion.
 
 ui.island投影包含活动身份、标题、系统选择及提交状态；前台目标展开与localStatus可读，系统实际几何未知，不携带频谱或设备权威状态。Island.setPresentation设置前台compact/expanded，expanded要求已提供的detail；系统可见性/时长仍由iOS决定；实际摄影/录像仍调用Camera声明。
 
 ## Web image observations
 
-The existing photo observation hook also recognizes successful Web.Page browse/snapshot/navigate receipts. It resolves their mediaID through the same scope-bound image read and image preparation port. The user image message labels the payload as untrusted data. Unsupported image models receive an explicit unavailable observation and can use the bounded page text in the Action result. Generated code and the Writer transcript never enter the Assistant parser or history.
+The scoped web observation hook recognizes successful Web.Page browse/snapshot/navigate receipts. It resolves their mediaID through the same scope-bound image read and image preparation port. The user image message labels the payload as untrusted data. Unsupported image models receive an explicit unavailable observation and can use the bounded page text in the Action result. Generated code and the Writer transcript never enter the Assistant parser or history.
 
 WebBrowsing通过ui.web读取content（empty/local/remote）及有界远程url，并通过ui.windows读取窗口身份。统一resolver按Skill声明读取这两个来源；本地文件路径与WebKit运行指标不进入Assistant上下文。
 
@@ -266,3 +263,11 @@ SpeechPerception的speech.phase(speaking)由Assistant作为控制输入处理，
 前台Task灵动岛通过GatewayOutputConsumer.executeInternal调用已声明的UI.Island内部工具，
 其结果只由AssistantExecutionSession的呈现worker消费。独立呈现会话不生成Assistant输入或
 回复占用；任务/模型会话与呈现会话保持独立。内部字幕/等待态的执行回执不触发模型ReACT。
+
+## 前台与 Writer 入口选择
+
+task.start 保留 Assistant 自己执行的前台目标；task.delegate 将目标交给平级 Agent。写作、绘图、文件修改、作品搜索/打开/删除直接委派 Writer，不先创建前台包装任务或加载 Skill。两个独立目标可并存，后台委派不改变已有前台 scope。Writing 不属于可加载 Skill，Assistant 不拥有 Artifacts.Workspace.perform；实际作品身份、文件操作与完成由 Writer 负责。
+
+## 提示词所有权
+
+Assistant/Instructions.md 只维护自身用户对话、协调、输出和事实汇报责任，Prompts.json 只维护证据模板。AssistantContextState 组合 Core 协议、Skill 教学和目录、有效 Action 目录，以及各 Agent 自己的公开 description；DELEGATABLE AGENTS 根据实际实例权限和已实现适配过滤，不包含其他角色私有提示词。start/delegate 平级教学归 BasicSkill，Writer 业务用途和委派条件归 Writer/Agent.json。

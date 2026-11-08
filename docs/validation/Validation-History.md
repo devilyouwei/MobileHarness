@@ -1867,7 +1867,7 @@ Every row passed the shared structure, graph, link, navigation and current-desig
 | 94 | [MobileHarness/PlatformKit/Connectivity/NexArm/README.md](../../MobileHarness/PlatformKit/Connectivity/NexArm/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 95 | [MobileHarness/Storage/README.md](../../MobileHarness/Storage/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
 | 96 | [MobileHarness/Storage/Audio/README.md](../../MobileHarness/Storage/Cache/Audio/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
-| 97 | [MobileHarness/Storage/Chat/README.md](../../MobileHarness/Storage/Database/Chat/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 97 | [MobileHarness/Storage/Chat/README.md](../../MobileHarness/Storage/Database/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 98 | [MobileHarness/UI/README.md](../../MobileHarness/UI/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
 | 99 | [MobileHarness/UI/Camera/README.md](../../MobileHarness/UI/Camera/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 100 | [MobileHarness/UI/Components/README.md](../../MobileHarness/UI/Components/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
@@ -3573,3 +3573,52 @@ Rechecked 32 concrete Containers and published backend/logical/resource nodes. C
 Separated gravity-upright capture/inference/photo orientation from actual-interface preview geometry. Shared Metal image/skeleton/gaze mapping keeps portrait framing stable when the phone rotates, preserving the existing iPhone portrait policy. Final standalone check.sh passed (regular UI/integration 125/923 and isolated runtime 225), four Simulator schemes and signed device build passed. An existing notification fixture timeout during concurrent builds passed unchanged on the standalone rerun. Device installation/physical rotation acceptance is pending reconnecting the unavailable iPhone. [Evidence](Camera-Preview-Orientation.md).
 
 2026-10-31 camera preview follow-up: the repair was installed successfully on iPhone 17 Pro, and the user subsequently confirmed the reported rotation/enlargement defect is fixed. This is user-reported acceptance of the original issue; the broader physical regression matrix remains individually unreported. See [device result](Camera-Preview-Orientation.md#user-confirmed-device-result--2026-10-31).
+
+## 2026-11-06 — 多模态照片 State 版本真机安装
+
+签名构建 0.1.0 / 2026110606、最终资源和 Live Activity 校验通过。已覆盖安装到 iPhone 17 Pro，设备应用清单确认新版；保留应用数据。启动因手机锁定被系统拒绝，未确认进程启动、照片多轮理解或原生体验。详见[安装证据](Preview-Image-State.md#2026-11-06-真机安装)。
+
+## 2026-11-06 — 预览图片历史读取修复
+
+历史详情补齐 preview_UUID 校验与 Camera 缓存／已保存原图读取。定向回归、全量检查（主集成 1060、原生／时序 227）、四个 Simulator 构建及签名真机构建通过。2026110607 首次因 RSD 通道错误安装失败，重试后安装成功并由设备清单确认；启动因手机锁定被拒绝，未做真机页面验收。未增加未保存照片的持久副本。详见[专项证据](Preview-History-Images.md)。
+
+
+## 2026-11-06 — Readable preview references and merged user image input
+
+- Implemented durable preview_N numbering independently of album media_N, numeric live references with UUID history-only compatibility, and shared request attachment of fresh State images to the original user input. A system manifest maps attachment positions to short IDs and image metadata. No unsaved image bytes are persisted.
+- Main integration 1066 and LiveRuntimeTests 227 explicitly pass after correcting three test JSON-boundary assumptions. Four Simulator builds and signed device build 2026110608 pass with signature, Skill and Live Activity validation.
+- check.sh exits 0 but logs one native macOS window visibility failure without a suite completion; the isolated renderer recheck also lacks a completion record. These are not passing native acceptance. The iPhone is unavailable; installation fails with CoreDeviceError 4016. No new device update or actual UI/model acceptance is claimed.
+- Detailed failures, command logs and scope: [Readable preview context](Readable-Preview-Context.md).
+
+
+## 2026-11-06 — Installed readable preview context on iPhone
+
+- On renewed user request, verified the existing signed 0.1.0 / 2026110608 app and current input timestamps, strict signature, 30 Agent/Skill assets and Live Activity packaging.
+- Installed in place on Youwei’s iPhone 17 Pro (sequence 6152), independently confirmed build 2026110608 and launched successfully. No uninstall or data reset.
+- No code change or new test run; actual photo/history/model acceptance is for the user's follow-up. The earlier offline installation failure remains historical evidence. See [preview context validation](Readable-Preview-Context.md#2026-11-06--设备恢复连接后的安装).
+
+## 2026-11-07 — Camera 会话图片缓存与多图预览
+
+Camera采用独立内存会话编号与20张FIFO缓存，保存/忽略保留标记和原图、卸载模型State；私有会话引用隔离历史和排队操作，关闭加入任务后释放，最小化/后台保留。界面加入叠图入口、窗口内翻页/缩放和全画面半透明控制区。最终主集成1069项、时序227项通过，check.sh退出0；NativePresentationTests缺少完整结束记录，不计作全部通过。签名真机包2026110702已原地安装并启动，设备查询确认版本。真实模型和手势/视觉验收仍待完成，需求保持未归档。构建、失败修正和设备证据见[专项验证记录](Camera-Session-Gallery.md)。
+
+### 2026-11-07 — 取消预览到相册的持久关联
+
+按用户更新后的规则移除 collectedPhoto/readCollectedPhoto 及 Camera 的旧历史相册回查；保存不再传递预览/相机会话身份。历史只读匹配会话缓存，释放或缺少scope即显示已释放；相册继续按media_N读取。定向SQLite/State回归通过，四个iOS构建通过。全量检查的原有状态采样超时及独立复核、原生测试完成性限制保留在[专项记录](Camera-Session-Gallery.md#2026-11-07--remove-persistent-preview-associations)。本轮不涉及数据库迁移或真机更新。
+
+## 2026-11-07 — Complete model request logs
+
+[Evidence](Complete-Request-Logs.md): submitted model images now persist in independent request logs; per-request/global physical clearing preserves business records and Writer continuation. Main 1,072-test suite and other ordinary suites pass after fixture updates; LiveRuntimeTests explicitly completed 227 tests. Four iOS simulator schemes and packaging checks pass. NativePresentationTests lacks completion evidence; real-model and physical-device acceptance remain unclaimed.
+
+## 2026-11-07 — Database table ownership and single-log clear regression
+
+- Fixed Memory's missing optional requestID tool contract, which rejected the detail-page single-log command before SQL. Reorganized StorageSQLite into eleven table-owned GRDB records/schema/operations while keeping shared transaction boundaries and public ports. Original normalized DDL remains identical across 34 schema objects.
+- Seven focused tests and full ordinary checks passed (main group 1,075 tests); LiveRuntimeTests completed 227 tests. NativePresentationTests again has startup without completion, so is not counted as passed. Four iOS schemes built successfully.
+- Signed and installed 0.1.0 / 2026110704 in place on iPhone 17 Pro; independent inventory confirmed it. Launch was denied because the phone was locked; startup, native button interaction and real model acceptance remain unverified. See [detailed validation](Database-Table-Ownership.md).
+
+## 2026-11-09 — 全部工作区改动提交前验证
+
+- 范围：Agent 独立消息与任务存储、共享请求日志、Writer 委托与作品库流程、提示词所有权、相机与设置界面，以及对应测试、测量资料和技术文档整理。
+- 通过：`./scripts/check.sh`（退出码 0），含架构边界、6 项 Python 测试、Swift 严格格式检查、两阶段 Swift 测试及工程/资源 plist 检查；串行 LiveRuntimeTests 阶段 228 项通过。
+- 通过：`./scripts/build-ios.sh`（退出码 0），MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero 四个 iOS Simulator 目标构建及脚本内资源验证。
+- 通过：提交内容的 `git diff --cached --check`。本次未运行真实模型、手机原生界面或物理设备验收；已有测量资料保留其原始范围与结论。
+- 本机完整日志：`/tmp/mobileharness-precommit-check.log`、`/tmp/mobileharness-precommit-ios.log`；临时日志不随仓库提交。

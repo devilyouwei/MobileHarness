@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "automaticFinal": {
+    "qwen3.8-max": "28/30",
+    "gpt-6.1-sol": "28/30"
+  },
+  "baselineComparable": {
+    "scope": "composite baseline, 28 original cases + 2 original-prompt fixture reruns; thousands separators accepted on review",
+    "qwen3.8-max": "24/30",
+    "gpt-6.1-sol": "28/30"
+  },
+  "manualFindings": [
+    {
+      "model": "qwen3.8-max",
+      "case": "C02-markdown-minutes",
+      "finding": "Added unsupported meeting date and deadline year; original automatic assertions do not detect this."
+    }
+  ],
+  "visualReview": {
+    "scope": "Offline actual published files in native macOS WebKit, 390x844; not model inputs or iOS acceptance",
+    "cases": [
+      "C04-flowchart",
+      "C05-data-chart"
+    ],
+    "models": [
+      "qwen3.8-max",
+      "gpt-6.1-sol"
+    ],
+    "result": "Requested topology, branch direction, numeric labels and proportions visually correct in all four final images."
+  },
+  "reviewToolSHA256": "48155cbc8810b6d9028c489d255044d5697cb6e3f7335ba5811446cfaa51a263",
+  "credentialScan": {
+    "files": 17,
+    "plaintextCredentialMatches": 0
+  },
+  "localReportLinksValid": true,
+  "closeoutSourceDrift": [
+    {
+      "path": "MobileHarness/Agents/Writer/WriterContainer.swift",
+      "evaluatedSHA256": "953a3888dc2b62052591dd540e0b19983420e6c956009787805dbdb01e40ea3c",
+      "closeoutSHA256": "8d195cb94f1c250a86163323d91c707ad5f4e5953e4d1ea09921eb9d753a8eee",
+      "modifiedAt": "2026-11-08T16:11:39.079075+08:00"
+    },
+    {
+      "path": "MobileHarness/Agents/Writer/WriterHistory.swift",
+      "evaluatedSHA256": "f56d8c1e546e69a005e7c3b0d9ade8514aebc7f54b9bfa90f922ae622e2e07f3",
+      "closeoutSHA256": "7bf23b9ca03f761a7989ed12d54901d69a985ef5777be3d661a8057939f87f86",
+      "modifiedAt": "2026-11-08T16:10:24.685703+08:00"
+    },
+    {
+      "path": "MobileHarness/Agents/Writer/WriterWorkflow.swift",
+      "evaluatedSHA256": "d430094b80cafa0239c738cde7ddcfea776bb7acb8812732dcf863720d0c21a1",
+      "closeoutSHA256": "3780bac594dc9270cb08cb5a568704ccd2f777b0f37a05cb107a3b92a3e67134",
+      "modifiedAt": "2026-11-08T16:10:24.701890+08:00"
+    }
+  ],
+  "writerResourcesStillMatchEvaluation": true,
+  "scopeNote": "Production Swift drift occurred after the full model experiment and after check.sh, outside this task edits. Preserve concurrent work; do not extend these model/test claims to the changed production sources."
+}

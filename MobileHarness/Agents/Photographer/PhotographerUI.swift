@@ -62,17 +62,12 @@ extension PhotographerAgent {
                 cameraFactSequence += 1
                 let sequence = cameraFactSequence
                 let fact = await MainActor.run {
-                    let displayedID: String?
-                    #if os(iOS)
-                        displayedID = value.capturedPhoto?.id
-                    #else
-                        displayedID = nil
-                    #endif
+                    let displayedID = value.previews.last?.id
                     return CameraStateObservation(
                         sequence: sequence,
                         enabled: value.isEnabled, visible: value.isVisible, busy: value.isBusy || value.photoBusy,
                         needsSettings: value.needsSettings, facing: value.facing == .front ? .front : .back,
-                        displayedMediaID: displayedID, savedMediaID: value.savedMediaID, failure: value.message)
+                        displayedPreviewID: displayedID, savedMediaID: value.savedMediaID, failure: value.message)
                 }
                 do { try await receive(fact.input(sessionID: sessionID)) } catch { cameraObservationFailure(error) }
             }
@@ -86,7 +81,7 @@ extension PhotographerAgent {
         let consumer = try uiExecution.begin(context.requestID)
         defer { uiExecution.finish(context.requestID) }
         let intent = PhotographerCameraIntent(
-            operation, facing: value.facing.map { $0 == .front ? .front : .back }, mediaID: value.mediaID,
+            operation, facing: value.facing.map { $0 == .front ? .front : .back }, previewID: value.previewID,
             settings: value.settings.map {
                 CameraCaptureSettings(
                     mode: $0.mode, delaySeconds: $0.delaySeconds, flash: $0.flash, zoom: $0.zoom,
@@ -99,9 +94,11 @@ extension PhotographerAgent {
             var outcome: OutputExecutionResult?
             for _ in 0..<8 {
                 try Task.checkCancellation()
-                guard let envelope = try uiExecution.next(context.requestID, maximumCalls: 1) else {
+                guard let pendingEnvelope = try uiExecution.next(context.requestID, maximumCalls: 1) else {
                     throw CommunicationError.invalidPayload
                 }
+                let envelope = pendingEnvelope.bindingResources(
+                    value.previewSession.map { ["actions.camera.preview": $0] } ?? [:])
                 let result: OutputExecutionResult
                 if case .toolCall = envelope.output {
                     result = try await consumer.executeReturning(envelope)

@@ -31,7 +31,7 @@ ForegroundPreparation is root-owned and active only for visible foreground home.
 
 ## System facts and context injection
 
-App binds the existing complete classified State inspection read into Agents. It does not mirror native facts or generate model context. Passive native observation follows Platform lifecycle; Agents requests selected snapshots while its own request admission is live. See [composition](Composition/README.md#native-state-capability-binding) and the [overall State path](../README.md#container-state-read-path).
+App binds the existing complete classified State inspection read into Agents. It also connects Camera-owned scoped preview snapshots/reset to generic multimodal State, and injects the root Storage cache into Camera. It does not mirror native facts or generate model context. Passive native observation follows Platform lifecycle; Agents requests selected snapshots while its own request admission is live. See [composition](Composition/README.md#native-state-capability-binding) and the [overall State path](../README.md#container-state-read-path).
 
 Application observations flow to the Agents-owned summary source; App does not bind a generic environment-query callback into Actions. Navigation is read from its existing UI State owner. See [composition](Composition/README.md#observation-and-query-composition).
 

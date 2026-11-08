@@ -11,6 +11,12 @@ public struct CameraModule: CapabilityModule {
     public var definitions: [ActionFunction] {
         [
             PhotoAlbumActions.function(using: album),
+            CameraActions.loadPreviewImageDefinition(completing: { [camera] in
+                .value(try await CameraActions.loadPreviewImage(invocation: $0, using: camera))
+            }),
+            CameraActions.unloadPreviewImageDefinition(completing: { [camera] in
+                .value(try await CameraActions.unloadPreviewImage(invocation: $0, using: camera))
+            }),
             CameraActions.startRecordingDefinition(completing: { [camera] in
                 .value(try await CameraActions.startRecording(invocation: $0, using: camera))
             }),

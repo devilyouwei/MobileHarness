@@ -349,7 +349,7 @@ private func historyFixture(extra: [String: Any]) throws -> HistoryConversation 
     return try JSONDecoder().decode(HistoryConversation.self, from: JSONSerialization.data(withJSONObject: value))
 }
 
-@Test func historyImageReferencesUseOnlyStructuredMetadataWithoutEmbeddingBytes() throws {
+@Test func historyMessageMetadataCannotRestoreImagesWithoutRequestLogs() throws {
     let image = HistoryImageReference(id: UUID().uuidString, mimeType: "image/jpeg", byteCount: 8)
     let marker = "\nImage attachments (bytes omitted): \(image.id) image/jpeg 8 bytes"
     let textOnly = HistoryMessage(role: .user, content: "photo" + marker)
@@ -363,7 +363,7 @@ private func historyFixture(extra: [String: Any]) throws -> HistoryConversation 
         "request": try JSONSerialization.jsonObject(with: Data(messages.utf8)), "user": "photo" + marker,
     ])
     let row = try #require(turn.turns.first)
-    #expect(row.attachedImages == [image] && row.displayInput == "photo" + marker)
+    #expect(row.attachedImages.isEmpty && row.displayInput == "photo" + marker)
     #expect(row.request.first?.content.contains("bytes omitted") == true)
 }
 
@@ -606,20 +606,18 @@ func historyFunctionCatalogRejectsCorruptSnapshotsRatherThanInventingEmptyGroups
     } catch is CancellationError {}
 }
 
-@Test func writerTaskElapsedFreezesCompletedRunsAndExtendsOnlyActiveRun() {
+@Test func writerTaskSummaryExportsDatesAndCountsWithoutExecutionStatus() throws {
     var task = WriterTaskItem(
-        id: "task_1", dialogID: "dialog_1", goal: "test", workspaceID: nil, delegateID: "task_2",
-        status: "running", failure: nil, updatedAt: Date(timeIntervalSince1970: 100))
-    task.completedDuration = 62
-    task.activeSince = Date(timeIntervalSince1970: 100)
-    #expect(task.elapsed(at: Date(timeIntervalSince1970: 110)) == 72)
-    #expect(task.elapsed(at: Date(timeIntervalSince1970: 99)) == 62)
-    task.activeSince = nil
-    #expect(task.elapsed(at: Date(timeIntervalSince1970: 9000)) == 62)
-    #expect(WriterRecordPresentation.duration(62) == "1 分 2 秒")
-    #expect(WriterRecordPresentation.duration(3662) == "1 小时 1 分 2 秒")
-    task.completedDuration = nil
-    #expect(WriterRecordPresentation.duration(task.elapsed(at: Date())) == "未知")
+        id: "task_1", dialogID: "writer/task_1", goal: "test", workspaceID: nil,
+        updatedAt: Date(timeIntervalSince1970: 200))
+    task.startedAt = Date(timeIntervalSince1970: 100)
+    task.requestCount = 7
+    let data = try JSONEncoder().encode(task)
+    let fields = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    #expect(fields["status"] == nil && fields["phase"] == nil && fields["failure"] == nil)
+    #expect(fields["completedDuration"] == nil && fields["activeSince"] == nil)
+    let restored = try JSONDecoder().decode(WriterTaskItem.self, from: data)
+    #expect(restored.startedAt == task.startedAt && restored.updatedAt == task.updatedAt && restored.requestCount == 7)
 }
 @Test func writerRequestTimingDistinguishesUnknownActiveAndCompleted() {
     var request = HistoryModelRequest(
@@ -660,4 +658,176 @@ func historyFunctionCatalogRejectsCorruptSnapshotsRatherThanInventingEmptyGroups
     #expect(HistoryListPresentation.date(previous, relativeTo: now, calendar: calendar) == "2025/12/31 23:59")
     calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
     #expect(HistoryListPresentation.date(current, relativeTo: now, calendar: calendar) == "12/31 16:05")
+}
+
+@Test func historyLogDeletionPreservesBusinessStatesAndRemovesCachedLogsFromExport() throws {
+    var turn = try taskReferenceFixture(owner: "task_1", snapshot: "task_1")
+    turn.decisionMetadata?.states = ["ui.navigation", "platform.device"]
+    turn.requestParametersJSON = #"{"model":"fixture","messages":[]}"#
+    turn.responseEventsJSON = "raw response evidence"
+    turn.messageID = "request_1"
+    let cleared = ConversationHistoryPresentation.clearingLogs(turn)
+    #expect(cleared.logsCleared == true && cleared.request.isEmpty && cleared.attachedImages.isEmpty)
+    #expect(cleared.requestJSON == nil && cleared.requestParametersJSON == nil && cleared.responseEventsJSON == nil)
+    #expect(cleared.tokenUsage == nil && cleared.firstTokenAt == nil && cleared.firstTokenLatency == nil)
+    #expect(cleared.generationRounds == nil && cleared.modelRequests == nil && cleared.model.isEmpty)
+    #expect(cleared.id == turn.id && cleared.messageID == turn.messageID && cleared.response == turn.response)
+    #expect(
+        cleared.historyTaskID == turn.historyTaskID && cleared.decisionMetadata?.skills == turn.decisionMetadata?.skills
+    )
+    #expect(cleared.decisionMetadata?.states == ["ui.navigation", "platform.device"])
+    #expect(cleared.decisionMetadata?.catalogJSON == turn.decisionMetadata?.catalogJSON)
+    let exported = try JSONDecoder().decode(HistoryTurn.self, from: ConversationHistoryPresentation.jsonData(cleared))
+    #expect(exported.logsCleared == true && exported.responseEventsJSON == nil && exported.request.isEmpty)
+    #expect(exported.decisionMetadata?.states == ["ui.navigation", "platform.device"])
+}
+
+@Test func historyStateSelectionDistinguishesUnrecordedFromEmpty() throws {
+    var turn = try taskReferenceFixture(owner: nil, snapshot: "task_1")
+    #expect(turn.decisionMetadata?.states == nil)
+    turn.decisionMetadata?.states = []
+    let restored = try JSONDecoder().decode(HistoryTurn.self, from: ConversationHistoryPresentation.jsonData(turn))
+    #expect(restored.decisionMetadata?.states == [])
+}
+
+@Test(arguments: [
+    #"{"messages":[{"role":"system","content":"rules"},{"role":"user","content":"old"},{"role":"assistant","content":null,"tool_calls":[{"id":"call_1","type":"function","function":{"name":"workspace","arguments":"{\"command\":\"read\"}"}}]},{"role":"tool","tool_call_id":"call_1","content":"file result"},{"role":"user","content":"revise"}]}"#,
+    #"{"input":[{"role":"system","content":[{"type":"input_text","text":"rules"}]},{"role":"user","content":[{"type":"input_text","text":"old"}]},{"type":"function_call","call_id":"call_1","name":"workspace","arguments":"{\"command\":\"read\"}"},{"type":"function_call_output","call_id":"call_1","output":"file result"},{"role":"user","content":[{"type":"input_text","text":"revise"}]}]}"#,
+    #"[{"role":"system","content":"rules"},{"role":"user","content":"old"},{"role":"assistant","content":"","toolCalls":[{"id":"call_1","name":"workspace","argumentsJSON":"{\"command\":\"read\"}"}]},{"role":"tool","toolCallID":"call_1","content":"file result"},{"role":"user","content":"revise"}]"#,
+])
+func writerFormattedPromptsKeepToolPairsAndSelectOnlyCurrentInput(_ json: String) throws {
+    var request = try #require(conversation(user: "stored goal").turns.first?.modelRequests?.first)
+    request.requestParametersJSON = json
+    let messages = WriterRecordPresentation.promptMessages(request)
+    #expect(messages.count == 5)
+    #expect(messages[2].toolCalls?.first?.name == "workspace" && messages[2].toolCalls?.first?.id == "call_1")
+    #expect(messages[2].toolCalls?.first?.argumentsJSON == #"{"command":"read"}"#)
+    let current = WriterRecordPresentation.inputMessages(messages)
+    #expect(current.map(\.content) == ["file result", "revise"])
+    #expect(current.first?.role == .tool && current.first?.toolCallID == "call_1")
+    request.logsCleared = true
+    #expect(WriterRecordPresentation.promptMessages(request).isEmpty)
+}
+
+@Test func writerClearingLogsPreservesTextToolResultsAndRuntimeBusinessEvidence() throws {
+    let call: [String: Any] = [
+        "id": "execution_1", "providerID": "call_1", "name": "workspace", "argumentsJSON": "{}",
+        "state": "completed", "output": "saved file",
+    ]
+    let source = try historyFixture(extra: [
+        "modelRequests": [
+            [
+                "id": "request_1", "date": 0, "historyOrder": 1, "input": "full input", "requestJSON": "[]",
+                "producerMetadata": ["path": "styles/main.css", "phase": "文件内容请求"],
+                "inputMessages": [
+                    ["role": "tool", "content": "read file", "toolCallID": "earlier", "toolName": "workspace"]
+                ],
+                "requestParametersJSON": #"{"input":[]}"#, "responseEventsJSON": "raw events",
+                "model": "fixture", "temperature": 0.2, "maximumOutputTokens": 100,
+                "response": "generated content", "toolCalls": [call], "state": "completed",
+                "decisionMetadata": [
+                    "mode": "control", "skills": [:],
+                    "catalogJSON":
+                        #"{"actions":[],"tools":[{"alias":"workspace","path":"Artifacts.Workspace.perform","required":[],"optional":[],"definitionJSON":"definition"}]}"#,
+                ],
+                "tokenUsage": ["input": 1, "generated": 2, "total": 3], "firstTokenLatency": 0.5,
+            ]
+        ]
+    ])
+    let recorded = try #require(source.turns.first?.modelRequests?.first)
+    var detail = WriterRequestDetails(
+        summary: .init(
+            id: "request_1", position: 1, number: 1, delegateID: "run", phase: "control", path: nil,
+            attempt: 1, date: recorded.date, state: "completed"),
+        request: recorded, fallbackInput: "full input", toolSources: ["earlier": "request_0"],
+        finalization: .init(state: .completed, result: "committed file", error: nil))
+    detail.clearLogs()
+    let request = try #require(detail.request)
+    #expect(request.logsCleared == true && request.state == .completed)
+    #expect(detail.summary.state == "completed" && detail.toolSources == ["earlier": "request_0"])
+    #expect(request.input == "full input" && request.response == "generated content")
+    #expect(WriterRecordPresentation.contentPath(request) == "styles/main.css")
+    #expect(request.inputMessages?.first?.content == "read file")
+    #expect(request.inputMessages?.first?.toolName == "workspace")
+    #expect(try WriterRecordPresentation.tools(request)?.first?.alias == "workspace")
+    #expect(try WriterRecordPresentation.tools(request)?.first?.definitionJSON == "definition")
+    #expect(request.toolCalls.first?.output == "saved file" && request.toolCalls.first?.providerID == "call_1")
+    #expect(detail.finalization?.result == "committed file")
+    #expect(request.requestParametersJSON == nil && request.responseEventsJSON == nil && request.requestJSON == "[]")
+    #expect(request.tokenUsage == nil && request.firstTokenLatency == nil)
+    #expect(request.model == nil && request.temperature == nil && request.maximumOutputTokens == nil)
+}
+
+@Test func writerRequestInputSummarizesRecordedDraftChangesAndBoundsOtherPreviews() {
+    let input =
+        #"[{"status":"draft edited; render before finish","beforeBytes":"0","firstChangedLine":"1","afterBytes":"5464","path":"index.html"}]"#
+    let summary = WriterRecordPresentation.inputSummary(input, isTool: true)
+    #expect(summary == "index.html · 草稿已修改，待渲染\n0 → 5464 字节 · 首个变化行 1")
+    #expect(WriterRecordPresentation.inputSummary(input, isTool: false) == input)
+    #expect(WriterRecordPresentation.inputSummary(String(repeating: "字", count: 250), isTool: true).count == 241)
+}
+
+@Test func writerRequestToolsDistinguishMissingEmptyAndMalformedCatalogs() throws {
+    var request = try #require(conversation(user: "input").turns.first?.modelRequests?.first)
+    request.decisionMetadata = nil
+    #expect(try WriterRecordPresentation.tools(request) == nil)
+    request.decisionMetadata = .init(
+        taskID: nil, mode: "content", skills: [:], catalogJSON: #"{"actions":[],"tools":[]}"#)
+    #expect(try WriterRecordPresentation.tools(request)?.isEmpty == true)
+    request.decisionMetadata = .init(
+        taskID: nil, mode: "control", skills: [:],
+        catalogJSON:
+            #"{"actions":[],"tools":[{"alias":"workspace","path":"Artifacts.Workspace.perform","required":["command"],"optional":[],"definitionJSON":"native declaration"}]}"#
+    )
+    request.logsCleared = true
+    // The business catalog remains available even when prompt logs are removed.
+    #expect(try WriterRecordPresentation.tools(request)?.first?.definitionJSON == "native declaration")
+    request.decisionMetadata = .init(taskID: nil, mode: "control", skills: [:], catalogJSON: "invalid")
+    #expect(throws: (any Error).self) { try WriterRecordPresentation.tools(request) }
+}
+
+private struct WriterPageFixture: Identifiable, Sendable {
+    let id: Int
+    var title: String = "original"
+}
+
+@Test func writerRecordPagesKeepLoadedRowsAndTerminalCursorAcrossNavigationAndPolling() throws {
+    var pages = WriterRecordPages<WriterPageFixture, Int>()
+    #expect(!pages.hasLoaded)
+    try pages.apply((1...20).map { .init(id: $0) }, next: 20, reset: true)
+    try pages.apply((21...40).map { .init(id: $0) }, next: nil, reset: false)
+    // Reappearing pages use hasLoaded rather than replaying their initial read.
+    #expect(pages.hasLoaded && pages.items.count == 40 && pages.next == nil)
+    for _ in 0..<3 {
+        try pages.apply((21...40).map { .init(id: $0, title: "updated") }, next: nil, reset: false)
+    }
+    #expect(pages.items.map(\.id) == Array(1...40) && pages.next == nil)
+    #expect(pages.items.first?.title == "original" && pages.items.last?.title == "updated")
+    // New rows found by tail polling can advertise a real following page.
+    try pages.apply((21...40).map { .init(id: $0) }, next: 40, reset: false)
+    try pages.apply([.init(id: 41)], next: nil, reset: false)
+    #expect(pages.items.map(\.id) == Array(1...41) && pages.next == nil)
+    try pages.apply([.init(id: 1)], next: nil, reset: true)
+    #expect(pages.hasLoaded && pages.items.map(\.id) == [1])
+    try pages.apply([], next: nil, reset: true)
+    #expect(pages.hasLoaded && pages.items.isEmpty && pages.next == nil)
+}
+
+@Test func writerRecordPagesRejectCancelledRefreshWithoutDroppingLoadedRows() async throws {
+    var initial = WriterRecordPages<WriterPageFixture, Int>()
+    try initial.apply((1...40).map { .init(id: $0) }, next: 40, reset: true)
+    let snapshot = initial
+    let worker = Task {
+        var pages = snapshot
+        withUnsafeCurrentTask { $0?.cancel() }
+        #expect(throws: CancellationError.self) {
+            try pages.apply([.init(id: 1)], next: nil, reset: true)
+        }
+        return pages
+    }
+    let preserved = await worker.value
+    #expect(preserved.hasLoaded && preserved.items.count == 40 && preserved.next == 40)
+    var retry = preserved
+    try retry.apply([.init(id: 41)], next: nil, reset: false)
+    #expect(retry.items.map(\.id) == Array(1...41) && retry.next == nil)
 }

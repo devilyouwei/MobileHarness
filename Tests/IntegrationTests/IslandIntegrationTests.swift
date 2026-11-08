@@ -345,11 +345,12 @@ private actor WriterIslandPublicationProbe {
     try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
     #expect(AssistantExecutionSession.taskContent(skills) == nil)
     let input = UUID().uuidString
-    _ = try skills.control("startTask", arguments: ["goal": "测试前台目标"], inputID: input, fixed: fixed, taskID: "task_1")
+    _ = try skills.control(
+        "task.start", arguments: ["description": "测试前台目标"], inputID: input, fixed: fixed, taskID: "task_1")
     let content = try #require(AssistantExecutionSession.taskContent(skills))
     #expect(content.detail?.text == "测试前台目标")
     #expect(content.expansionID == skills.activeTaskID)
-    _ = try skills.control("finishTask", arguments: ["summary": "完成"], inputID: input, fixed: fixed)
+    _ = try skills.control("task.end", arguments: ["summary": "完成"], inputID: input, fixed: fixed)
     try skills.decisionCompleted(failed: false, fixed: fixed)
     #expect(AssistantExecutionSession.taskContent(skills) == nil)
 }
@@ -374,7 +375,8 @@ private actor WriterIslandPublicationProbe {
     let fixed = agent.descriptor.capabilities
     try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
     _ = try skills.control(
-        "startTask", arguments: ["goal": "Assistant 独立前台目标"], inputID: UUID().uuidString, fixed: fixed, taskID: "task_1"
+        "task.start", arguments: ["description": "Assistant 独立前台目标"], inputID: UUID().uuidString, fixed: fixed,
+        taskID: "task_1"
     )
     await session.presentTaskState(skills)
     let deadline = ContinuousClock.now + .seconds(5)

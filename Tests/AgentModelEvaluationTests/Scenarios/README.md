@@ -21,3 +21,13 @@ Design goals: explicit ownership, capability boundaries and no duplicate product
 Robot-prefixed cases cover motor anatomy, signed relative angles, native parameters, ambiguous absolute angle origins, axis limits, readiness, ordered multi-motor/gesture composition and conditional failure. `robotSequence` asserts the exact count, order, axis and required parameters of every NexArm call; it is evaluation data and is never injected into model prompts. The full fixture is bounded to 96 scenarios.
 
 writer-window-discover-read/maximize从默认目录开始；公开Writer artifact窗口身份来自合成State。用户只要求看文字或放大，断言按需加载与指定ID的XML Action，不把评分字段注入请求。
+
+skill-discovery 场景覆盖默认目录的“浏览b站”和直接 URL、已加载浏览不重载、访问失败不重试、普通网站知识不联网及未提供的视频控制。用例不把 Skill ID 写入用户输入；必需调用、轮次隔离、次数和 Task 状态仅用于评分。Web 返回值由执行替身提供，实际模型回复的能力边界仍需审阅证据。
+
+basic-task-confirm-completion 使用等待用户选择的通用前台目标，用户明确选择并确认完成后检查 task.end 和真实终态，不依赖摄影预览或保存夹具；评分字段不进入模型输入。旧 task-continue 的媒体参数适配限制保留在 BasicSkill 控制教学验证记录中。
+
+## Writer prompt matrix
+
+writer-workflows.json owns 28 scenario groups (30 independently executed cases), synthetic saved works, user goals, host events and assertions. writer-evaluation.json owns the two-model experiment selection, thinking policy and evaluation bounds; credentials remain in ignored local configuration. Assertions are never appended to model prompts. Explicit continuation receives a real saved-work reference; lookup/edit cases receive no preselected target.
+
+Runtime matrix polling and artifact inspection resolve the current task through the request association after Writer selects an existing work. Selection is performed by the production Writer tool, not by scenario title matching or caller binding.

@@ -1,0 +1,734 @@
+{
+  "date": "2026-11-08",
+  "runs": [
+    {
+      "label": "pilot",
+      "basicSkillRevision": 50,
+      "sourceUnchanged": true,
+      "scope": "Real Qwen / OpenAI Responses, production Agent/Gateway, synthetic device/storage executors",
+      "models": [
+        "qwen3.8-max"
+      ],
+      "cases": [
+        {
+          "id": "camera-open-cold",
+          "passed": true,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction",
+                "photography"
+              ],
+              "calls": [
+                {
+                  "alias": "loadSkills",
+                  "parameters": {
+                    "skills": "[\"photography\"]"
+                  },
+                  "round": "08197498-966B-48B6-BE12-D87CDC19B816"
+                },
+                {
+                  "alias": "openCamera",
+                  "parameters": {},
+                  "round": "ABC1C1C5-3FF5-4C12-ABA3-901C82E95A49"
+                }
+              ]
+            }
+          ],
+          "requests": [
+            {
+              "response": "<loadSkills skills=\"[&quot;photography&quot;]\"/>",
+              "requestSHA256": "877c2462abb8fdacef37a654ba7039861bf7ac4ac2c2ea50159f38474f4b2f0d"
+            },
+            {
+              "response": "<openCamera/>",
+              "requestSHA256": "17208a36f0b2decae8576c6340c3fedd017bed696b054a1f31edaaaa02192679"
+            },
+            {
+              "response": "摄像头已打开，当前使用的是前置镜头。",
+              "requestSHA256": "96e9a746fd9a06a4da4f9570a872998f0a185a0e8e5331a1957a4ccce3d24626"
+            }
+          ]
+        },
+        {
+          "id": "camera-no-reload",
+          "passed": false,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [
+                "missing:closeCamera"
+              ],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction",
+                "photography"
+              ],
+              "calls": []
+            }
+          ],
+          "requests": [
+            {
+              "response": "摄像头当前没有打开，无需关闭。",
+              "requestSHA256": "186e72252870f7d1750bd8dc45f3699e0216d6d53610408867289063f94a2928"
+            }
+          ]
+        },
+        {
+          "id": "capture-only-cold",
+          "passed": false,
+          "runtimeIssues": [
+            "agent.error: malformedMarkup"
+          ],
+          "turns": [
+            {
+              "issues": [
+                "missing:loadSkills",
+                "missing:openCamera",
+                "missing:takePhoto",
+                "count:takePhoto expected 1"
+              ],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction"
+              ],
+              "calls": []
+            }
+          ],
+          "requests": [
+            {
+              "response": "<loadSkills skills=\"[\"photography\"]\"/>",
+              "requestSHA256": "4022add10795624fb2c7940ad649dcb3d25da546268f48fd0b4b53a402057134"
+            }
+          ]
+        },
+        {
+          "id": "task-aside-keeps-goal",
+          "passed": true,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction",
+                "photography"
+              ],
+              "calls": []
+            }
+          ],
+          "requests": [
+            {
+              "response": "我是你的智能助手，没有特别的名字，你可以按你喜欢的方式称呼我。照片已经拍好了，要保存到 App 相册，还是忽略？",
+              "requestSHA256": "b832814b3ae8494e44ea019381eb39299f8c410b443223f0149928b99aee336c"
+            }
+          ]
+        },
+        {
+          "id": "task-explicit-cancel",
+          "passed": true,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction"
+              ],
+              "calls": [
+                {
+                  "alias": "task.cancel",
+                  "parameters": {
+                    "reason": "用户取消"
+                  },
+                  "round": "00A7F52E-DAEB-481D-8635-A554D73122E5"
+                }
+              ]
+            }
+          ],
+          "requests": [
+            {
+              "response": "<task.cancel reason=\"用户取消\"/>",
+              "requestSHA256": "eaaa777bdeb5d56cd9a9f2e329dfee1a0a936743844ca6eaff021dbb598a2723"
+            }
+          ]
+        },
+        {
+          "id": "task-continue",
+          "passed": false,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [
+                "missing:task.end",
+                "taskPresence:false"
+              ],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction",
+                "photography"
+              ],
+              "calls": [
+                {
+                  "alias": "savePhoto",
+                  "parameters": {
+                    "previewID": "media_41"
+                  },
+                  "round": "02B3D313-19DA-4E28-8237-F12E6A882D98"
+                }
+              ]
+            }
+          ],
+          "requests": [
+            {
+              "response": "<savePhoto previewID=\"media_41\"/>",
+              "requestSHA256": "fe357be543a6e8d3405955c7ec718bebb0269bf7d1640d8ea843b4730baec0b7"
+            },
+            {
+              "response": "这张照片已经被忽略或替换了，当前没有可保存的照片。需要重新拍一张吗？",
+              "requestSHA256": "b36220a5ee08bae4afdc12ba8bdcd7f11a36380eb823a94803f1519ff073b0c4"
+            }
+          ]
+        },
+        {
+          "id": "robot-single-gesture",
+          "passed": false,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [
+                "missing:loadSkills",
+                "missing:nodHead",
+                "parameters:nodHead",
+                "first:loadSkills",
+                "notLoaded:robot-interaction"
+              ],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction"
+              ],
+              "calls": [
+                {
+                  "alias": "express",
+                  "parameters": {
+                    "emotion": "smile"
+                  },
+                  "round": "C4EE3FCD-F906-4173-9A33-2574E35A9AA0"
+                }
+              ]
+            }
+          ],
+          "requests": [
+            {
+              "response": "<express emotion=\"smile\"/>",
+              "requestSHA256": "4dcc0fdebe50741d19baf3d238f717441d8483719be4152b546f80a246637884"
+            }
+          ]
+        },
+        {
+          "id": "web-discover-url",
+          "passed": true,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction",
+                "web-browsing"
+              ],
+              "calls": [
+                {
+                  "alias": "loadSkills",
+                  "parameters": {
+                    "skills": "[\"web-browsing\"]"
+                  },
+                  "round": "C2FAA9B5-1538-4740-ADFE-B24B388C6D7E"
+                },
+                {
+                  "alias": "Web.browse",
+                  "parameters": {
+                    "url": "https://example.com"
+                  },
+                  "round": "60C7BD7D-4319-464C-82A8-5AC2500A8215"
+                }
+              ]
+            }
+          ],
+          "requests": [
+            {
+              "response": "<loadSkills skills='[\"web-browsing\"]'/>",
+              "requestSHA256": "31749d51a314b3c42403bb24b46789266536e078e2813e22473ee9228028ed31"
+            },
+            {
+              "response": "<Web.browse url=\"https://example.com\"/>",
+              "requestSHA256": "dfcb05391dcbba2b5cf0623dfbc2c413a3bd8b103aceecb0d9fe27e70984c364"
+            },
+            {
+              "response": "已打开 example.com。",
+              "requestSHA256": "d1a1596ee0245454e69cdcc8fe6ea74ec04f57c12092d78786b4c5bd1a320e3e"
+            }
+          ]
+        },
+        {
+          "id": "web-knowledge-no-load",
+          "passed": true,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction"
+              ],
+              "calls": []
+            }
+          ],
+          "requests": [
+            {
+              "response": "“B站”是哔哩哔哩（bilibili）的昵称，其中的“B”取自它英文名 bilibili 的首字母。这个名字最初来源于日本动漫《魔法禁书目录》里男主角对女主角御坂美琴的称呼“biribiri”，形容电击发出的声音，后来被创始人用来命名这个以二次元文化起家的视频网站。",
+              "requestSHA256": "7f5983c2a9056505ccfd1a19fbfd74b41c993d67910d65017569c9f5b3a29fd5"
+            }
+          ]
+        }
+      ],
+      "selectedSourceHashes": {
+        "MobileHarness/Resources/Skills/ApplicationControl/Instructions.md": "5d14e26b0b04913691367403cb855dba4e182ffc622fe0f24cb96b6497190473",
+        "MobileHarness/Resources/Skills/ApplicationControl/Skill.json": "61c1d3791a55d01f7570391a96ca7ba31e8df910f20f2c2692b8e83ff844f714",
+        "MobileHarness/Resources/Skills/BasicSkill/Instructions.md": "2595dde7000e650559db77cd76fd8c92d4631415a4a2588fe6115fb7e5675cfa",
+        "MobileHarness/Resources/Skills/BasicSkill/Skill.json": "ce3eafcb98476780f8c7580ff842382c55414d8963ed901685f967e0e47be50a",
+        "MobileHarness/Resources/Skills/ExpressionInteraction/Instructions.md": "812b62d5dcc52d0334d64e91b059951a04808ff888a391ff64ad66b90118e837",
+        "MobileHarness/Resources/Skills/ExpressionInteraction/Skill.json": "5e804b7e5caf5db0ad1b9fdc52b6f8c233a5122256f03a6e82dd653a173e0d17",
+        "MobileHarness/Resources/Skills/HistoryQuery/Instructions.md": "50a3add6c4aa9ef98e5394f785f9531fd58f516898150e3516f1f2c7e2933516",
+        "MobileHarness/Resources/Skills/HistoryQuery/Skill.json": "94d9a4d8e98786d0630d5697ca50020b4dfb0218e392e8a940384972f1820574",
+        "MobileHarness/Resources/Skills/Photography/Instructions.md": "3fee1e4066838d30490a2665ed876c08b64101dcef15c7ddfa40f7efab39d0e6",
+        "MobileHarness/Resources/Skills/Photography/Skill.json": "33394a86ac074c78f4ef3712fc4c6efe57bb82b5fd22f7003269cbbe4d38c02f",
+        "MobileHarness/Resources/Skills/README.md": "99341966b192ee6d6e36980c5601656343c9a3d213f8d1d7c61df51c8d0cd9cc",
+        "MobileHarness/Resources/Skills/RobotInteraction/Instructions.md": "7920d88ffacded98076f75003c0a1655c7c1de568c249272ea318f5f546f5e48",
+        "MobileHarness/Resources/Skills/RobotInteraction/Skill.json": "52fe2460ee628fc663ce7f87d851bda840a508dcd0a50ca7aa1cb309a094c147",
+        "MobileHarness/Resources/Skills/WebBrowsing/Instructions.md": "758722f3883acc07ba6f39ac37a04aac096712a0e22bc1279aa06f05c4a9da4d",
+        "MobileHarness/Resources/Skills/WebBrowsing/Skill.json": "01a793edd334b2f857e6777917017aa532dbfe399c808612213d1eceb734d778",
+        "Tests/AgentModelEvaluationTests/Scenarios/qwen-workflows.json": "1cbf1ba9df4e4f96c15617c9e5064cac550f957fc5800a7490ac0827149633c9",
+        "Tests/IntegrationTests/QwenWorkflowEvaluationTests.swift": "7cbef479cd9313505c9c32912834cf2278ca32bf227f7f7a8e72ba029eb198bf"
+      },
+      "rawEvidence": "/tmp/basic-skill50-model-qwen3.8-max.json"
+    },
+    {
+      "label": "final",
+      "basicSkillRevision": 50,
+      "sourceUnchanged": true,
+      "scope": "Real Qwen / OpenAI Responses, production Agent/Gateway, synthetic device/storage executors",
+      "models": [
+        "qwen3.8-max"
+      ],
+      "cases": [
+        {
+          "id": "camera-open-cold",
+          "passed": true,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction",
+                "photography"
+              ],
+              "calls": [
+                {
+                  "alias": "loadSkills",
+                  "parameters": {
+                    "skills": "[\"photography\"]"
+                  },
+                  "round": "4041687B-87B4-4344-9DED-11911810BD2A"
+                },
+                {
+                  "alias": "openCamera",
+                  "parameters": {},
+                  "round": "745C033E-55E9-42A8-B2E3-9E6720B50C3E"
+                }
+              ]
+            }
+          ],
+          "requests": [
+            {
+              "response": "<loadSkills skills='[\"photography\"]'/>",
+              "requestSHA256": "cc2103e05de65af19f0735cd6e6df309217e15299dc61dee3674c1921f2a2f3d"
+            },
+            {
+              "response": "<openCamera/>",
+              "requestSHA256": "d49e3bf4d7796e06de4bafe4800f999f14c4851d7c08d6c4179f1a59adf708b0"
+            },
+            {
+              "response": "摄像头已打开，当前是前置镜头预览。需要拍照或录像请告诉我。",
+              "requestSHA256": "9222888e969334df7df8e558ff7d257b2d5e72f8e14c59aa26a82dae73a94f7a"
+            }
+          ]
+        },
+        {
+          "id": "camera-no-reload",
+          "passed": true,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction",
+                "photography"
+              ],
+              "calls": [
+                {
+                  "alias": "closeCamera",
+                  "parameters": {},
+                  "round": "40845FD5-3713-4F89-9D35-FD1C44EEFA13"
+                }
+              ]
+            }
+          ],
+          "requests": [
+            {
+              "response": "<closeCamera/>",
+              "requestSHA256": "401df58839994b31c3265eedf1298aa89063c88a588bbb0dbb717992bcafcdee"
+            },
+            {
+              "response": "摄像头已关闭。",
+              "requestSHA256": "40c1bbb472d012277ad1ac7af8de61031ceb113a5618a5cd1df4eaf345e73d1f"
+            }
+          ]
+        },
+        {
+          "id": "capture-only-cold",
+          "passed": false,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [
+                "count:takePhoto expected 1"
+              ],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction",
+                "photography"
+              ],
+              "calls": [
+                {
+                  "alias": "loadSkills",
+                  "parameters": {
+                    "skills": "[\"photography\"]"
+                  },
+                  "round": "2006C489-3339-46DD-A94A-83BDE050E4B7"
+                },
+                {
+                  "alias": "takePhoto",
+                  "parameters": {},
+                  "round": "016ADDB3-150C-4B69-8C68-1E1B10EBD4E7"
+                },
+                {
+                  "alias": "openCamera",
+                  "parameters": {},
+                  "round": "23EF0261-C38D-44DE-A37A-4FECD5702BE9"
+                },
+                {
+                  "alias": "takePhoto",
+                  "parameters": {},
+                  "round": "803F4517-4BB1-40E5-9E49-E186E10B4F61"
+                }
+              ]
+            }
+          ],
+          "requests": [
+            {
+              "response": "<loadSkills skills='[\"photography\"]'/>",
+              "requestSHA256": "b51b208dbcbd17ff74ae6f95cd7682e5c406d5030d1f69e6be871cb3f819e342"
+            },
+            {
+              "response": "<takePhoto/>",
+              "requestSHA256": "84cc3e05814ebc5ec3311430fe97e6659aa8007933170a269bd635d3385e7510"
+            },
+            {
+              "response": "<openCamera/>",
+              "requestSHA256": "30cafea1001c6ae48ec3c36239399a26f8a632fd7c5a2ab7b673ed239bf0bcd9"
+            },
+            {
+              "response": "<takePhoto/>",
+              "requestSHA256": "e46694cb0cb599756fc860b61170536ec6e6118f854ca49cd986b1af728f5734"
+            },
+            {
+              "response": "拍好了。",
+              "requestSHA256": "4be66649d296e666e2dd2c2822f72df71793c4ecb5bbb0bc3eab428723bbaf36"
+            }
+          ]
+        },
+        {
+          "id": "task-aside-keeps-goal",
+          "passed": true,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction",
+                "photography"
+              ],
+              "calls": []
+            }
+          ],
+          "requests": [
+            {
+              "response": "照片已经拍好了，要保存到 App 相册还是忽略？我是你的语音助手，目前没有特定的名字，你可以按自己的喜好称呼我。",
+              "requestSHA256": "29c2172fe1c3d8cbfabb15b008f0c89746c37433e9001a77003012fec64acf5a"
+            }
+          ]
+        },
+        {
+          "id": "task-explicit-cancel",
+          "passed": true,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction"
+              ],
+              "calls": [
+                {
+                  "alias": "task.cancel",
+                  "parameters": {
+                    "reason": "用户取消"
+                  },
+                  "round": "F7A35BCF-646E-40F7-80EA-9B1F9FE5D3B2"
+                }
+              ]
+            }
+          ],
+          "requests": [
+            {
+              "response": "<task.cancel reason=\"用户取消\"/>",
+              "requestSHA256": "76c45565161bce0e502cdc81229086527d2997f5b057473e3c32f8b35a4811cf"
+            }
+          ]
+        },
+        {
+          "id": "robot-single-gesture",
+          "passed": false,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [
+                "missing:loadSkills",
+                "missing:nodHead",
+                "parameters:nodHead",
+                "first:loadSkills",
+                "notLoaded:robot-interaction"
+              ],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction"
+              ],
+              "calls": [
+                {
+                  "alias": "express",
+                  "parameters": {
+                    "emotion": "happy"
+                  },
+                  "round": "0A39CACA-1124-4347-9932-91F58E087CD1"
+                }
+              ]
+            }
+          ],
+          "requests": [
+            {
+              "response": "<express emotion=\"happy\"/>",
+              "requestSHA256": "43c760c7cd4c8c5eeada4f9f9c4f8e0f2e89447a7384964eaa92e047418e27eb"
+            }
+          ]
+        },
+        {
+          "id": "web-discover-url",
+          "passed": true,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction",
+                "web-browsing"
+              ],
+              "calls": [
+                {
+                  "alias": "loadSkills",
+                  "parameters": {
+                    "skills": "[\"web-browsing\"]"
+                  },
+                  "round": "31752AF3-D624-45DF-87D5-21D66361F109"
+                },
+                {
+                  "alias": "Web.browse",
+                  "parameters": {
+                    "url": "https://example.com"
+                  },
+                  "round": "086A8087-71FB-4F80-9AE1-C6B580FDA64E"
+                }
+              ]
+            }
+          ],
+          "requests": [
+            {
+              "response": "<loadSkills skills='[\"web-browsing\"]'/>",
+              "requestSHA256": "65a98a1d55a8d9223f4de4180a63c7b197de617e573850510646ee95e736e9e4"
+            },
+            {
+              "response": "<Web.browse url=\"https://example.com\"/>",
+              "requestSHA256": "4192792fd0f61216d5d63a99f8303ae3f7411816e5a39da8cc44f8358d051af9"
+            },
+            {
+              "response": "已打开 example.com。",
+              "requestSHA256": "52b094b3607453082150e7f34bb560dd6b21a8b4cef02a681edbc87682e556d5"
+            }
+          ]
+        },
+        {
+          "id": "web-knowledge-no-load",
+          "passed": true,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction"
+              ],
+              "calls": []
+            }
+          ],
+          "requests": [
+            {
+              "response": "“B站”是哔哩哔哩（bilibili）的常用简称，因为英文名首字母是 B。这个名字来源于日本动漫《魔法禁书目录》里女主角御坂美琴的外号“Biribiri”，意思是电击发出的滋滋声。",
+              "requestSHA256": "b8a9a12140bc2f8032cbd42c9a0e5596901abbb60da138bfeb706566d0b582b6"
+            }
+          ]
+        },
+        {
+          "id": "basic-task-confirm-completion",
+          "passed": true,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction"
+              ],
+              "calls": [
+                {
+                  "alias": "task.end",
+                  "parameters": {
+                    "summary": "用户已选定方案一，选择任务完成"
+                  },
+                  "round": "EBA65BFF-69DC-4E6A-8962-8E9FB070608F"
+                }
+              ]
+            }
+          ],
+          "requests": [
+            {
+              "response": "好的，已确认你选择方案一。\n\n<task.end summary=\"用户已选定方案一，选择任务完成\"/>",
+              "requestSHA256": "b2addf3c2d75429390a176cd77447ac804c89009b4e0f9cecb9663349610bf89"
+            }
+          ]
+        }
+      ],
+      "selectedSourceHashes": {
+        "MobileHarness/Resources/Skills/ApplicationControl/Instructions.md": "5d14e26b0b04913691367403cb855dba4e182ffc622fe0f24cb96b6497190473",
+        "MobileHarness/Resources/Skills/ApplicationControl/Skill.json": "61c1d3791a55d01f7570391a96ca7ba31e8df910f20f2c2692b8e83ff844f714",
+        "MobileHarness/Resources/Skills/BasicSkill/Instructions.md": "4fc931d533fe5958db3c522f6699fc0fefa6188411d119d9eba920299fa9451d",
+        "MobileHarness/Resources/Skills/BasicSkill/Skill.json": "ce3eafcb98476780f8c7580ff842382c55414d8963ed901685f967e0e47be50a",
+        "MobileHarness/Resources/Skills/ExpressionInteraction/Instructions.md": "812b62d5dcc52d0334d64e91b059951a04808ff888a391ff64ad66b90118e837",
+        "MobileHarness/Resources/Skills/ExpressionInteraction/Skill.json": "5e804b7e5caf5db0ad1b9fdc52b6f8c233a5122256f03a6e82dd653a173e0d17",
+        "MobileHarness/Resources/Skills/HistoryQuery/Instructions.md": "50a3add6c4aa9ef98e5394f785f9531fd58f516898150e3516f1f2c7e2933516",
+        "MobileHarness/Resources/Skills/HistoryQuery/Skill.json": "94d9a4d8e98786d0630d5697ca50020b4dfb0218e392e8a940384972f1820574",
+        "MobileHarness/Resources/Skills/Photography/Instructions.md": "3fee1e4066838d30490a2665ed876c08b64101dcef15c7ddfa40f7efab39d0e6",
+        "MobileHarness/Resources/Skills/Photography/Skill.json": "33394a86ac074c78f4ef3712fc4c6efe57bb82b5fd22f7003269cbbe4d38c02f",
+        "MobileHarness/Resources/Skills/README.md": "99341966b192ee6d6e36980c5601656343c9a3d213f8d1d7c61df51c8d0cd9cc",
+        "MobileHarness/Resources/Skills/RobotInteraction/Instructions.md": "7920d88ffacded98076f75003c0a1655c7c1de568c249272ea318f5f546f5e48",
+        "MobileHarness/Resources/Skills/RobotInteraction/Skill.json": "52fe2460ee628fc663ce7f87d851bda840a508dcd0a50ca7aa1cb309a094c147",
+        "MobileHarness/Resources/Skills/WebBrowsing/Instructions.md": "758722f3883acc07ba6f39ac37a04aac096712a0e22bc1279aa06f05c4a9da4d",
+        "MobileHarness/Resources/Skills/WebBrowsing/Skill.json": "01a793edd334b2f857e6777917017aa532dbfe399c808612213d1eceb734d778",
+        "Tests/AgentModelEvaluationTests/Scenarios/qwen-workflows.json": "6974904a5fca07bed9a1376ac82c0aa7eb90176fa3f3d1ae22170377dcdf696b",
+        "Tests/IntegrationTests/QwenWorkflowEvaluationTests.swift": "7cbef479cd9313505c9c32912834cf2278ca32bf227f7f7a8e72ba029eb198bf"
+      },
+      "rawEvidence": "/tmp/basic-skill50-model-final-qwen3.8-max.json"
+    }
+  ],
+  "deviceInstallation": {
+    "date": "2026-11-08",
+    "device": "iPhone 17 Pro",
+    "scheme": "MobileHarness",
+    "configuration": "Debug",
+    "bundleID": "dev.mobileharness.app",
+    "version": "0.1.0",
+    "previousBuild": "2026110806",
+    "installedBuild": "2026110807",
+    "basicSkillRevision": 50,
+    "buildExitCode": 0,
+    "strictDeepSignatureExitCode": 0,
+    "agentResourcesExitCode": 0,
+    "islandResourcesExitCode": 0,
+    "installExitCode": 0,
+    "independentInstalledVersionCheck": true,
+    "installationSequence": 6360,
+    "launchExitCode": 1,
+    "launchFailure": "Device locked; FBSOpenApplicationErrorDomain code 7. Application startup was not verified.",
+    "actions": "In-place install; no uninstall, explicit data clearing, provider configuration or signing configuration edits.",
+    "scope": "Installation only; no real-model or device interaction acceptance.",
+    "rawEvidence": [
+      {
+        "path": "/tmp/basic-skill50-device-build.log",
+        "sha256": "6e75e32844da3b07e18b468adc1fbea48fa9e4c6d213f156c585e2bf4b00a163"
+      },
+      {
+        "path": "/tmp/basic-skill50-device-signature.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/tmp/basic-skill50-device-resources.log",
+        "sha256": "28fa827647550c5c38173e55e55d295155d408502925c7e1cea2bef6e48204a2"
+      },
+      {
+        "path": "/tmp/basic-skill50-device-island.log",
+        "sha256": "50f9e22361e776b89aa0be989bf0ae4e56354934eebe83808fa2812638a56786"
+      },
+      {
+        "path": "/tmp/basic-skill50-device-before.json",
+        "sha256": "5e7a0eefe330418b744c815999281fd9ba964d0980131f2aa41c96c625e3ea0e"
+      },
+      {
+        "path": "/tmp/basic-skill50-device-install.json",
+        "sha256": "97bc7de6b202f3b32f0e61346f8de0367ebc488c72c7504eea3f6ab6cb1ec1d9"
+      },
+      {
+        "path": "/tmp/basic-skill50-device-after.json",
+        "sha256": "c1bd3731c45cfe29261e41254603e2c74b8d0e32acc33d64e3d3d29f8e647acf"
+      },
+      {
+        "path": "/tmp/basic-skill50-device-launch.json",
+        "sha256": "cda3361b7b065e90462dbb09d44534abe0431078f3d0e3c978c8bb25876ae5df"
+      },
+      {
+        "path": "/tmp/basic-skill50-device-launch.log",
+        "sha256": "a62bf16fcbfdf531bac755fc73330b956a0ddc6bfe8b11836e9714e23644acf5"
+      }
+    ],
+    "basicSkillPackagedHashes": {
+      "Skill.json": "ce3eafcb98476780f8c7580ff842382c55414d8963ed901685f967e0e47be50a",
+      "Instructions.md": "4fc931d533fe5958db3c522f6699fc0fefa6188411d119d9eba920299fa9451d"
+    }
+  }
+}

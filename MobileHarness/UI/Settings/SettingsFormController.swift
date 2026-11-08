@@ -41,6 +41,32 @@ import Foundation
         }
         restored = true
     }
+    /// Only a successful restore can establish that no cloud provider is configured.
+    public var needsWelcome: Bool { restored && !stopped && state.providers.isEmpty }
+
+    public func saveWelcomeProvider(url: String, key: String) async -> Bool {
+        guard needsWelcome, !state.isSaving else { return false }
+        do {
+            var editor = ProviderEditorDraft(provider: nil, existing: state.providers)
+            editor.url = url
+            editor.key = key
+            var provider = try editor.validated(existing: state.providers)
+            guard !provider.key.isEmpty else { throw ProviderEditorError.missingKey }
+            if let host = URL(string: provider.url)?.host, host.utf8.count <= 128 { provider.name = host }
+            var value = draft
+            value.providers = [provider]
+            guard await save(value) else { return false }
+            // Publish only after the existing configuration/credential transaction succeeds.
+            guard !stopped, state.isPresentationAvailable else { return true }
+            state.providers = value.providers
+            state.invalidateRevision()
+            return true
+        } catch {
+            state.present(.error(error.localizedDescription))
+            return false
+        }
+    }
+
     public func refreshModels() {
         var ids = Set<String>()
         if state.isEnabled, let provider = state.providers.first(where: { $0.url == state.url }) {
@@ -100,16 +126,19 @@ import Foundation
     }
     public func save() async -> Bool {
         guard !stopped, state.canSave else { return false }
+        var value = draft
+        if value.enabled, let index = value.providers.firstIndex(where: { $0.url == value.url }) {
+            value.providers[index].key = value.key
+            value.providers[index].model = value.model
+        }
+        return await save(value)
+    }
+    private func save(_ value: CloudSettingsDraft) async -> Bool {
         state.present(.isSaving(true))
         state.present(.error(nil))
         state.present(.notice(nil))
         defer { state.present(.isSaving(false)) }
         do {
-            var value = draft
-            if let index = value.providers.firstIndex(where: { $0.url == value.url }) {
-                value.providers[index].key = value.key
-                value.providers[index].model = value.model
-            }
             try await operations.save(value)
             restored = true
             if !operations.presentsResults { state.present(.notice("已保存智能体大脑配置")) }

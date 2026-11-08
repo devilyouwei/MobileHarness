@@ -2191,7 +2191,7 @@ sequenceDiagram
 
 ## MobileHarness/Storage/Chat/README.md
 
-[现行 README](../../MobileHarness/Storage/Database/Chat/README.md)
+[现行 README](../../MobileHarness/Storage/Database/README.md)
 
 ````markdown
 ## Task, queries and archives
@@ -2217,7 +2217,7 @@ sequenceDiagram
 
 ## MobileHarness/Storage/Media/README.md
 
-[现行 README](../../MobileHarness/Storage/Database/Media/README.md)
+[现行 README](../../MobileHarness/Storage/Database/MediaFiles/README.md)
 
 ````markdown
 ## Outstanding work
@@ -2287,7 +2287,7 @@ sequenceDiagram
 
 ## MobileHarness/Storage/Support/Persistence/SQLite/README.md
 
-[现行 README](../../MobileHarness/Storage/Database/SQLite/README.md)
+[现行 README](../../MobileHarness/Storage/Database/README.md)
 
 ````markdown
 ## Outstanding work
@@ -2307,7 +2307,7 @@ sequenceDiagram
 
 ## MobileHarness/Storage/Tasks/README.md
 
-[现行 README](../../MobileHarness/Storage/Database/Tasks/README.md)
+[现行 README](../../MobileHarness/Storage/Database/README.md)
 
 ````markdown
 ## Outstanding work

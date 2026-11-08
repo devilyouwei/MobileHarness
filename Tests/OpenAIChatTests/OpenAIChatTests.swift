@@ -254,11 +254,29 @@ private final class StubProtocol: URLProtocol, @unchecked Sendable {
     var request = try ChatRequest(messages: [.init(role: .user, content: "Hi")])
     let timing = ChatTiming()
     request.timing = timing
+    let captured = Mutex<[ChatTransportEvent]>([])
+    request.transportCapture = { event in captured.withLock { $0.append(event) } }
     let session = try await capability.chat(request)
     #expect(session.context == request.context)
     var events: [ChatEvent] = []
     for try await event in session.events { events.append(event) }
     #expect(events == [.text("Hello"), .finished(.stop)])
+    let wire = captured.withLock { $0 }
+    guard case .request(let method, let url, let headers, let body, _) = wire.first else {
+        Issue.record("Missing HTTP request")
+        return
+    }
+    #expect(method == "POST" && url.contains("responses"))
+    #expect(headers["Authorization"] != "Bearer test-only")
+    #expect(String(decoding: body, as: UTF8.self).contains("input"))
+    let bytes = wire.reduce(into: Data()) { data, event in if case .bytes(let value, _) = event { data.append(value) } }
+    #expect(String(decoding: bytes, as: UTF8.self).contains("data: {\"type\":\"response.output_text.delta\""))
+    guard case .finished(_, let error) = wire.last else {
+        Issue.record("Missing HTTP EOF")
+        return
+    }
+    #expect(error == nil)
+
     let measured = try #require(timing.snapshot)
     #expect(measured.firstTokenAt != nil && measured.firstTokenLatency != nil)
     #expect(measured.firstTokenLatency! >= 0)
@@ -1137,7 +1155,7 @@ private final class ReusableProtocol: URLProtocol, @unchecked Sendable {
 @Test func responsesDoesNotPromoteOptionalTaskFieldsToRequired() throws {
     let declaration = try ChatToolDefinition(
         declaration: Data(
-            #"{"type":"function","function":{"name":"startTask","parameters":{"type":"object","additionalProperties":false,"properties":{"goal":{"type":"string"},"target":{"type":"string"}},"required":["goal"]}}}"#
+            #"{"type":"function","function":{"name":"task.start","parameters":{"type":"object","additionalProperties":false,"properties":{"goal":{"type":"string"},"target":{"type":"string"}},"required":["goal"]}}}"#
                 .utf8))
     let request = try config().request(
         ChatRequest(messages: [.init(role: .user, content: "Take a photo")], tools: [declaration]))

@@ -65,9 +65,9 @@ After Gateway admission, Skill permissions are not queried again. Revocation exp
 
 ### Assistant delegation and executor ownership
 
-Assistant's scheduled `startTask(execution=background, executor=…)` enters the injected Task controller, which validates the target/contract, persists a UUID delegation and sends an authenticated TaskSignal through Gateway. The executor admits its own business task and owns execution/cleanup; the receipt only establishes acceptance. Foreground Task/Skills remain separate. Public controls use executor + taskID, while runtime delegation/question identities stay private. See the [cross-module sequence](../README.md#assistant-agent-delegation) and [Assistant contract](Assistant/README.md#对其他-agent-的委托).
+Assistant's scheduled `task.delegate(agent_id,description)` enters the injected Task controller, which validates the target/contract, persists a UUID communication request in agent_messages and sends an authenticated TaskSignal through Gateway. The executor admits its own business task and owns execution/cleanup; the receipt only establishes acceptance. Foreground Task/Skills remain separate. Public controls use agent_id to resolve the active communication, while runtime delegation/question identities stay private. See the [cross-module sequence](../README.md#assistant-agent-delegation) and [Assistant contract](Assistant/README.md#对其他-agent-的委托).
 
-Writer is the current public creative executor. It owns its control/content model workflow, stable task/dialog/workspace, input checkpoints and independent report delivery; Gateway direct calls reach Actions.Artifacts for deterministic file work. WriterContainer exposes records to UI and joins role-owned workers. Recovery, progress/reply policy, persistent terminal notifications and task-specific limits belong to [Writer](Writer/README.md), with shared consumers in [Chat](Support/Chat/README.md). They are not implicit capabilities of every Agent or Gateway transport.
+Writer is the current public creative executor. It owns its control/content model workflow, local task/workspace selection within the accepted request, input checkpoints and independent report delivery; Gateway direct calls reach Actions.Artifacts for deterministic file work. WriterContainer exposes records to UI and joins role-owned workers. Recovery, progress/reply policy, persistent terminal notifications and task-specific limits belong to [Writer](Writer/README.md), with shared consumers in [Chat](Support/Chat/README.md). They are not implicit capabilities of every Agent or Gateway transport.
 
 Writer's admitted edits continue through an injected ArtifactStreaming port rather than per-chunk Gateway calls. Cancel/pause/stop revoke that continuation and join model, preview and Actions release before finishing or resuming the run. Gateway tool completion only acknowledges its finite operation; it does not end the creative task. The detailed contract belongs to [Writer](Writer/README.md) and its direct execution counterpart [Artifacts](../Actions/Artifacts/README.md#执行与续写生命周期).
 
@@ -114,3 +114,19 @@ Agent task presentation belongs to the executing role: Writer publishes its crea
 SpeechPerception owns recognition-caption onset; Assistant independently handles the speaking control fact and clears only its own reply without inference. Final ASR text retains the formal FIFO. A failed perception round emits the existing empty-phase fact and joins presentation cleanup; Assistant releases that recognition binding. Restoration follows capture/consent/reply occupancy, preserving the original recognition error. Caption lifetime is not inferred by UI from playback completion. See [SpeechPerception](SpeechPerception/README.md) and [Assistant](Assistant/README.md#输入开始与自有回复字幕).
 
 各角色均通过自己绑定的 Gateway consumer 调用内部灵动岛工具：SpeechPerception 拥有聆听/识别，SpeechSynthesis 拥有合成/真实播放，Photographer 沿既有相机输入处理摄影，ApplicationControl 沿连接输入处理蓝牙提示；Assistant 仅管理自身任务、推理等待和本身输出。Actions 不设集中 UI 状态观察器代发。内部调用结果（含异常）由所属执行者处理，只有显式 LLM 调用反馈能触发 ReACT；共享机制见 [Support/Chat](Support/Chat/README.md)。
+
+Skill-selected State can carry immutable images. Camera preview policy stays in Actions; shared Context/Chat handles scope reset, request assembly, budget protection and metadata-only audit. New user input retains images; a new dialog releases explicit selections through the owner callback.
+
+Shared Chat combines typed State images with the original current user input and emits their identity/order/size metadata in system State. Roles do not generate a second image-only user message.
+
+Shared output execution carries private resource-scope bindings outside model messages. Photographer captures the UI camera session before queuing photo operations; Actions validates it. New camera history references retain private scope metadata to prevent preview_N reuse from resolving another session.
+
+Agent startup binds the shared communication repository to its output router before any role accepts work. Assistant owns foreground scopes and its conversation messages; Writer owns workspace tasks and its own messages. Cross-role control and completion travel through authenticated communication records, while HTTP transport evidence uses the shared deletable log. History presentation never reads another role's private task state to decide execution.
+
+Assistant 的 start 与 delegate 是按所有者选择的平级入口，Writer 工作不建立前台包装任务。Writer 在作品库域按关键词分页查询，显式创建或进入后切到隔离的工作区域。纯查看使用只读呈现域。职责、延迟准备与完成边界见 [Writer](Writer/README.md#作品库与工作区分域)。
+
+## Prompt ownership and discovery
+
+Each role owns its public description in Resources/Agents/<Role>/Agent.json and its private model instructions in its own resource directory. Support validates resource schema v8 and projects the existing v7 compiled contract. Assistant combines its own identity with generic Core/Skill rules and a public peer directory filtered by the actual instance communication policy and the shared executable delegation adapter. Public descriptions create no permissions and expose no private instructions. Writer owns its content-format templates; deterministic roles do not require artificial model prompts. See [resource contracts](../Resources/Agents/README.md).
+
+Writer 运行以委托入口为身份，workspace 是可选编辑目标；前序与 workspace 消息保持同一请求链，界面分别查询。

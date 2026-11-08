@@ -404,12 +404,14 @@ public struct ActionsStateSnapshot: Codable, Sendable {
                 repository: dependencies.media,
                 files: { try dependencies.files.file(dependencies.files.photos) })
             let assembly = ActionsBusinessAssembly(
-                actions: root, files: dependencies.files, workspaces: dependencies.workspaces,
+                actions: root, files: dependencies.files, cache: dependencies.cache,
+                workspaces: dependencies.workspaces,
                 model: dependencies.model, platform: dependencies.platform, ui: dependencies.ui,
-                photos: photos, bluetooth: bluetooth, previewHistory: dependencies.previewHistory,
+                photos: photos, bluetooth: bluetooth,
                 makeCameraRuntime: dependencies.makeCameraRuntime, connectVision: dependencies.connectVision)
             root.businessOwner = assembly
             root.cleanup = [
+                { try await assembly.camera.previews.close() },
                 { try await assembly.camera.shutdown() },
                 { try await assembly.bluetooth.shutdown() }, { await assembly.stopInteractions() },
             ]

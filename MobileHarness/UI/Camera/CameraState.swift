@@ -40,6 +40,8 @@ public enum CameraDirection: Sendable { case front, back }
 @MainActor
 @Observable
 public final class CameraState {
+    public internal(set) var gallerySession: String?
+    public internal(set) var previews: [CameraPreviewItem] = []
     @ObservationIgnored var presentationAdmission: UIPresentationAdmission?
     public var isPresentationAvailable: Bool { presentationAdmission.map { $0.started && !$0.stopped } ?? true }
     #if os(iOS)
@@ -51,6 +53,7 @@ public final class CameraState {
     public internal(set) var countdown: Int?
     public internal(set) var photoBusy = false
     public internal(set) var photoMessage: String?
+    public internal(set) var savedPreviewID: String?
     public internal(set) var savedMediaID: String?
     public internal(set) var isEnabled = false
     public internal(set) var perceptionEnabled = false
@@ -213,9 +216,13 @@ public final class CameraState {
         case .recording(let value): recording = value
         case .recordedVideo(let value): recordedVideo = value
         case .settings(let value): settings = value
+        case .gallery(let session, let items):
+            gallerySession = session
+            previews = items
         case .countdown(let value): countdown = value
         case .photoBusy(let value): photoBusy = value
         case .photoMessage(let value): photoMessage = value
+        case .savedPreviewID(let value): savedPreviewID = value
         case .savedMediaID(let value): savedMediaID = value
         case .isEnabled(let value): isEnabled = value
         case .perceptionEnabled(let value): perceptionEnabled = value
@@ -251,6 +258,7 @@ public final class CameraState {
 /// User controls only; capture, permission and inference lifetimes belong to module services.
 @MainActor
 public protocol CameraControlling: AnyObject {
+    func previewImage(_ id: String, session: String) async throws -> Data
     func startRecording()
     func stopRecording()
     func saveVideo(_ id: String)
@@ -270,12 +278,14 @@ public protocol CameraControlling: AnyObject {
 }
 
 public enum CameraPresentationUpdate {
+    case gallery(String?, [CameraPreviewItem])
     case recording(CameraRecordingPresentation)
     case recordedVideo(CameraRecordedVideo?)
     case settings(CameraSettings)
     case countdown(Int?)
     case photoBusy(Bool)
     case photoMessage(String?)
+    case savedPreviewID(String?)
     case savedMediaID(String?)
     case isEnabled(Bool)
     case perceptionEnabled(Bool)
@@ -355,6 +365,7 @@ private final class CameraMediaExpiry {
 }
 
 extension CameraControlling {
+    public func previewImage(_ id: String, session: String) async throws -> Data { throw UIRequestError.unavailable }
     public func startRecording() {}
     public func stopRecording() {}
     public func saveVideo(_ id: String) {}
@@ -365,4 +376,32 @@ extension CameraControlling {
     public func togglePerception() {}
     public func retryPerception() {}
     public func switchPerceptionCamera() {}
+}
+
+public struct CameraPreviewItem: Sendable, Equatable, Identifiable {
+    public let id: String
+    public let status: String
+    public let mediaID: String?
+    public init(id: String, status: String, mediaID: String? = nil) {
+        self.id = id
+        self.status = status
+        self.mediaID = mediaID
+    }
+}
+
+/// Stable gallery identity is independent of its changing FIFO position.
+public enum CameraGalleryNavigation {
+    public static let maximumZoom: CGFloat = 4
+    public static func index(_ selected: String?, in ids: [String]) -> Int {
+        selected.flatMap { ids.firstIndex(of: $0) } ?? max(0, ids.count - 1)
+    }
+    public static func retainedSelection(_ selected: String?, in ids: [String]) -> String? {
+        guard let selected else { return nil }
+        return ids.contains(selected) ? selected : ids.first
+    }
+    public static func moved(_ selected: String?, by delta: Int, in ids: [String]) -> String? {
+        guard delta == -1 || delta == 1 else { return nil }
+        let next = index(selected, in: ids) + delta
+        return ids.indices.contains(next) ? ids[next] : nil
+    }
 }

@@ -2,6 +2,7 @@ import Actions
 import Foundation
 import Gateway
 import PlatformKit
+import StorageFiles
 import StorageMedia
 import StorageTasks
 import Testing
@@ -18,56 +19,63 @@ import Testing
 
 @Test func sqliteBusinessIDsAreCommittedIndependentAndNeverReused() async throws {
     let db = try SQLiteRepositories.temporary()
-    let dialog = try await db.chat.current(agent: "fixture")
+    let dialog = try await db.assistantConversations.current()
     #expect(dialog.id == "dialog_1")
     let device = try db.devices.device(nativeID: UUID().uuidString, name: "fixture")
     #expect(device == "device_1")
-    let ids = try await withThrowingTaskGroup(of: String.self) { group in
+    let ids = await withTaskGroup(of: String?.self) { group in
         for _ in 0..<64 {
-            group.addTask { try await db.tasks.createTask(dialog: dialog.id, agent: "fixture", goal: "goal") }
+            group.addTask {
+                try? await db.assistantTasks.createTask(dialog: dialog.id, agent: "assistant", goal: "goal")
+            }
         }
         var result: [String] = []
-        for try await id in group { result.append(id) }
+        for await id in group { if let id { result.append(id) } }
         return result
     }
-    #expect(Set(ids).count == 64)
-    _ = try db.chat.rotate(dialog.id, agent: "fixture")
-    try db.chat.deleteDialog(dialog.id)
-    #expect(try await db.chat.current(agent: "fixture").id == "dialog_2")
-    let next = try await db.tasks.createTask(dialog: nil, agent: "fixture", goal: "new")
-    #expect(BusinessRecordID(rawValue: next)?.number == 65)
+    #expect(ids.count == 1)
+    try await db.assistantTasks.endTask(try #require(ids.first), status: "cancelled")
+    let nextDialog = try db.assistantConversations.rotate(dialog.id)
+    try db.assistantConversations.deleteDialog(dialog.id)
+    #expect(nextDialog.id == "dialog_2")
+    let next = try await db.assistantTasks.createTask(dialog: nextDialog.id, agent: "assistant", goal: "new")
+    #expect(BusinessRecordID(rawValue: next)?.number == 2)
 }
 
 @Test func sqliteArchivedDialogsUseTwentyItemPages() async throws {
     let db = try SQLiteRepositories.temporary()
-    let records = try ConversationRecordStore(repository: db.chat, tasks: db.tasks)
-    var current = try await db.chat.current(agent: "assistant")
-    for _ in 0..<21 { current = try db.chat.rotate(current.id, agent: "assistant") }
+    let records = try AssistantRecordStore(
+        repository: db.assistantMessages, tasks: db.assistantTasks, conversations: db.assistantConversations,
+        logs: db.logs)
+    var current = try await db.assistantConversations.current()
+    for _ in 0..<21 { current = try db.assistantConversations.rotate(current.id) }
     let first = try await records.list()
     #expect(first.count == 20 && first.first?.id == "dialog_21" && first.last?.id == "dialog_2")
     let second = try await records.list(before: 2)
     #expect(second.count == 1 && second.first?.id == "dialog_1")
-    #expect(try db.chat.listDialogs(agent: "assistant").count == 20)
+    #expect(try db.assistantConversations.listDialogs().count == 20)
 }
 
-@Test func sqliteRollbackDoesNotPublishMessagesOrAdvanceRecovery() async throws {
+@Test func sqliteRollbackDoesNotPublishMessagesOrAdvanceRevision() async throws {
     let db = try SQLiteRepositories.temporary()
-    let dialog = try await db.chat.current(agent: "fixture")
-    let message = MessageRecord(
+    let dialog = try await db.assistantConversations.current()
+    let message = AssistantMessageRecord(
         clientID: UUID().uuidString, inputID: UUID().uuidString, role: "assistant", kind: "response",
         order: 1, date: Date(), body: "must roll back", state: "completed", taskID: "task_999999",
         detail: Data("{}".utf8))
     #expect(throws: (any Error).self) {
-        try db.chat.save(dialog: dialog.id, revision: 7, recovery: Data([1]), messages: [message], summaries: [])
+        try db.assistantMessages.save(dialog: dialog.id, revision: 7, messages: [message], summaries: [])
     }
-    #expect(try db.chat.previews(dialog: dialog.id).isEmpty)
-    #expect(try await db.chat.dialog(dialog.id).revision == 0)
+    #expect(try db.assistantMessages.previews(dialog: dialog.id).isEmpty)
+    #expect(try await db.assistantConversations.dialog(dialog.id).revision == 0)
 }
 
 @Test func sqliteReACTCommitsEachMessageAndDeltaDoesNotWrite() async throws {
     let db = try SQLiteRepositories.temporary()
-    let adapter = try ConversationRecordStore(repository: db.chat, tasks: db.tasks)
-    let store = ConversationHistoryStore(records: adapter)
+    let adapter = try AssistantRecordStore(
+        repository: db.assistantMessages, tasks: db.assistantTasks, conversations: db.assistantConversations,
+        logs: db.logs)
+    let store = AssistantHistoryStore(records: adapter)
     let input = UUID().uuidString
     let snapshot = try await store.readCurrent()
     _ = try await store.begin(id: input, user: "hello", request: [], expecting: snapshot.token, model: "fixture")
@@ -82,21 +90,24 @@ import Testing
     try await store.beginModelRequest(
         .init(id: second, input: "Execution observations: result", requestJSON: "[]"), for: input)
     #expect(await adapter.checkpointCount == 3)
-    let committed = try await db.chat.messages(dialog: snapshot.current.id)
+    let committed = try await db.assistantMessages.messages(dialog: snapshot.current.id)
     #expect(committed.map(\.kind) == ["input", "response", "observation", "response"])
     #expect(committed.last?.state == "generating" && committed.last?.body.isEmpty == true)
     #expect(committed.first { $0.role == "assistant" }?.body == "aaaaaaaaaa")
     // A fresh reader sees finished ReACT output despite the overall decision still running.
-    let reopened = ConversationHistoryStore(records: try ConversationRecordStore(repository: db.chat, tasks: db.tasks))
+    let reopened = AssistantHistoryStore(
+        records: try AssistantRecordStore(
+            repository: db.assistantMessages, tasks: db.assistantTasks, conversations: db.assistantConversations,
+            logs: db.logs))
     let history = try await reopened.snapshot()
     #expect(history.current.turns.first?.modelRequests?.first?.response == "aaaaaaaaaa")
     try await store.append("partial", to: input)
     try await store.finish(input, state: .cancelled)
-    let final = try await db.chat.messages(dialog: snapshot.current.id)
+    let final = try await db.assistantMessages.messages(dialog: snapshot.current.id)
     #expect(final.count == 4 && final.last?.state == "cancelled")
     let count = final.count
     try await store.checkpoint()
-    #expect(try await db.chat.messages(dialog: snapshot.current.id).count == count)
+    #expect(try await db.assistantMessages.messages(dialog: snapshot.current.id).count == count)
 }
 
 @Test func sqliteMediaUsesShortNamesAndRecoversPendingFiles() async throws {
@@ -120,7 +131,7 @@ import Testing
     let missing = try db.media.reserveMedia(
         bytes: bytes.count, source: owner.source, session: owner.session, input: owner.input, date: Date())
     let again = try fixtureMediaStore(root: root, repositories: db)
-    #expect(try await again.readForInput(missing.id, source: owner.source, input: owner.input) == nil)
+    await #expect(throws: FileStorageError.invalidFile) { try await again.read(missing.id, owner: owner) }
     #expect(try db.media.media(missing.id)?.state == "failed")
 }
 
@@ -149,13 +160,13 @@ import Testing
 @Test(.enabled(if: ProcessInfo.processInfo.environment["MH_STORAGE_BENCHMARK"] == "1"), .timeLimit(.minutes(3)))
 func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
     let db = try SQLiteRepositories.temporary()
-    let dialog = try await db.chat.current(agent: "fixture")
-    let task = try await db.tasks.createTask(dialog: dialog.id, agent: "fixture", goal: "benchmark")
+    let dialog = try await db.assistantConversations.current()
+    let task = try await db.assistantTasks.createTask(dialog: dialog.id, agent: "assistant", goal: "benchmark")
     let start = ContinuousClock.now
     for batch in 0..<100 {
         let messages = (0..<1000).map { offset in
             let position = batch * 1000 + offset + 1
-            return MessageRecord(
+            return AssistantMessageRecord(
                 clientID: "fixture-\(position)",
                 inputID: "fixture-\(position.isMultiple(of: 2) ? position-1 : position)",
                 role: position.isMultiple(of: 2) ? "assistant" : "user",
@@ -163,29 +174,29 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
                 order: UInt64(position), date: Date(), body: "response \(position)", state: "completed",
                 taskID: position.isMultiple(of: 2) ? task : nil, detail: Data("{}".utf8))
         }
-        try db.chat.save(
-            dialog: dialog.id, revision: UInt64(batch + 1), recovery: nil, messages: messages, summaries: [])
+        try db.assistantMessages.save(
+            dialog: dialog.id, revision: UInt64(batch + 1), messages: messages, summaries: [])
     }
     let seeded = ContinuousClock.now
     #if os(macOS)
         var initialUsage = rusage()
         #expect(getrusage(RUSAGE_SELF, &initialUsage) == 0)
     #endif
-    let page = try db.chat.previews(dialog: dialog.id, after: 99_800)
+    let page = try db.assistantMessages.previews(dialog: dialog.id, after: 99_800)
     #expect(page.count == 20 && page.first?.position == 99_802 && page.last?.position == 99_840)
-    let next = try db.chat.previews(dialog: dialog.id, after: try #require(page.last).position)
+    let next = try db.assistantMessages.previews(dialog: dialog.id, after: try #require(page.last).position)
     #expect(next.count == 20 && next.last?.position == 99_880)
     #expect(Set(page.map(\.id)).isDisjoint(with: Set(next.map(\.id))))
     let pageTime = ContinuousClock.now - seeded
-    let plan = try db.chat.previewQueryPlan(dialog: dialog.id, after: 99_900)
-    let taskPlan = try db.chat.previewQueryPlan(dialog: dialog.id, after: 99_900, taskID: task)
+    let plan = try db.assistantMessages.previewQueryPlan(dialog: dialog.id, after: 99_900)
+    let taskPlan = try db.assistantMessages.previewQueryPlan(dialog: dialog.id, after: 99_900, taskID: task)
     #expect(plan.contains { $0.contains("request_order") && $0.contains("position>?") })
     #expect(taskPlan.contains { $0.contains("request_order") && $0.contains("position>?") })
     #expect(!plan.contains { $0.contains("TEMP B-TREE") || $0.contains("SCAN m") })
     #expect(!taskPlan.contains { $0.contains("TEMP B-TREE") || $0.contains("SCAN m") })
     var maxPayloadBytes = 0
     for position in stride(from: 0, to: 100_000, by: 1000) {
-        let values = try db.chat.previews(dialog: dialog.id, after: UInt64(position))
+        let values = try db.assistantMessages.previews(dialog: dialog.id, after: UInt64(position))
         #expect(values.count == 20)
         let bytes = values.reduce(0) {
             $0 + $1.input.utf8.count + $1.response.utf8.count + $1.clientID.utf8.count + $1.id.utf8.count
@@ -193,15 +204,15 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
         maxPayloadBytes = max(maxPayloadBytes, bytes)
     }
     #expect(maxPayloadBytes < 64 * 1024)
-    let added = MessageRecord(
+    let added = AssistantMessageRecord(
         clientID: UUID().uuidString, inputID: UUID().uuidString, role: "assistant", kind: "response",
         order: 100_001, date: Date(), body: "one new message", state: "completed", detail: Data("{}".utf8))
-    try db.chat.save(dialog: dialog.id, revision: 101, recovery: nil, messages: [added], summaries: [])
+    try db.assistantMessages.save(dialog: dialog.id, revision: 101, messages: [added], summaries: [])
     let changedRows = db.lastWriteChanges
     #expect(changedRows <= 8)
-    #expect(try db.chat.storageStatistics().messages == 50_001)
-    try db.chat.save(dialog: dialog.id, revision: 101, recovery: nil, messages: [added], summaries: [])
-    #expect(try db.chat.storageStatistics().messages == 50_001)
+    #expect(try db.storageStatistics().messages == 50_001)
+    try db.assistantMessages.save(dialog: dialog.id, revision: 101, messages: [added], summaries: [])
+    #expect(try db.storageStatistics().messages == 50_001)
     #expect(db.lastWriteChanges <= 8)
     #if os(macOS)
         var usage = rusage()
@@ -218,10 +229,12 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
 
 @Test func sqliteContextWindowDoesNotTruncatePersistedDialogOrTaskSources() async throws {
     let db = try SQLiteRepositories.temporary()
-    let adapter = try ConversationRecordStore(repository: db.chat, tasks: db.tasks)
-    let store = ConversationHistoryStore(records: adapter)
+    let adapter = try AssistantRecordStore(
+        repository: db.assistantMessages, tasks: db.assistantTasks, conversations: db.assistantConversations,
+        logs: db.logs)
+    let store = AssistantHistoryStore(records: adapter)
     let dialog = try await store.readCurrent().current.id
-    let task = try await db.tasks.createTask(dialog: dialog, agent: "assistant", goal: "long task")
+    let task = try await db.assistantTasks.createTask(dialog: dialog, agent: "assistant", goal: "long task")
     for number in 0..<32 {
         let input = UUID().uuidString
         let token = try await store.readCurrent().token
@@ -235,10 +248,10 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
     let window = try await store.readCurrent().current
     #expect(window.turns.count == 10)
     #expect(await adapter.cachedFingerprintCount <= 24)
-    #expect(try await db.chat.dialog(dialog).count == 32)
-    #expect(try db.chat.timelineCount(dialog: dialog) == 32)
+    #expect(try await db.assistantConversations.dialog(dialog).count == 32)
+    #expect(try db.assistantMessages.timelineCount(dialog: dialog) == 32)
     let sources = window.turns.flatMap { turn in
-        (turn.modelRequests ?? []).map { ConversationHistoryReference(inputID: turn.id, requestID: $0.id) }
+        (turn.modelRequests ?? []).map { AssistantHistoryReference(inputID: turn.id, requestID: $0.id) }
     }
     var compressed = window
     compressed.taskCompressions = [
@@ -247,11 +260,11 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
             completedAt: Date(), sources: sources)
     ]
     try await adapter.saveCurrent(.init(conversation: compressed))
-    let summaries = try await db.chat.compressionData(dialog: dialog)
+    let summaries = try await db.assistantTasks.compressionData(dialog: dialog)
     #expect(
-        try JSONDecoder().decode(ConversationTaskCompression.self, from: try #require(summaries.first)).sources.count
+        try JSONDecoder().decode(AssistantTaskCompression.self, from: try #require(summaries.first)).sources.count
             == 32)
-    #expect(try db.chat.timelineCount(dialog: dialog) == 1)
+    #expect(try db.assistantMessages.timelineCount(dialog: dialog) == 1)
     let taskPage = try await adapter.page(dialog, taskID: task)
     #expect(taskPage.turns.count == 20)
     let taskRemainder = try await adapter.page(dialog, after: try #require(taskPage.nextPosition), taskID: task)
@@ -270,7 +283,9 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
     let remainingDisplay = try await HistoryPresentationAdapter.conversation(taskRemainder)
     try expanded.appendPage(remainingDisplay)
     #expect(ConversationHistoryPresentation.turns(expanded).count == 32)
-    let reopened = try ConversationRecordStore(repository: db.chat, tasks: db.tasks)
+    let reopened = try AssistantRecordStore(
+        repository: db.assistantMessages, tasks: db.assistantTasks, conversations: db.assistantConversations,
+        logs: db.logs)
     let reopenedPage = try await reopened.page(dialog)
     let reopenedDisplay = try await HistoryPresentationAdapter.conversation(reopenedPage)
     guard case .task(let saved, _) = try #require(ConversationHistoryPresentation.timeline(reopenedDisplay).first)
@@ -283,7 +298,10 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
 
 @Test func sqliteCompletedUserWithoutResponseRemainsReadableWithoutFabricatingResponse() async throws {
     let db = try SQLiteRepositories.temporary()
-    let store = ConversationHistoryStore(records: try ConversationRecordStore(repository: db.chat, tasks: db.tasks))
+    let store = AssistantHistoryStore(
+        records: try AssistantRecordStore(
+            repository: db.assistantMessages, tasks: db.assistantTasks, conversations: db.assistantConversations,
+            logs: db.logs))
     let snapshot = try await store.readCurrent()
     _ = try await store.begin(
         id: UUID().uuidString, user: "unfinished request", request: [], expecting: snapshot.token, model: "fixture")
@@ -299,10 +317,12 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
 
 @Test func sqliteTaskOnLaterHistoryPageFoldsExpandsAndSurvivesArchival() async throws {
     let db = try SQLiteRepositories.temporary()
-    let records = try ConversationRecordStore(repository: db.chat, tasks: db.tasks)
-    let store = ConversationHistoryStore(records: records)
+    let records = try AssistantRecordStore(
+        repository: db.assistantMessages, tasks: db.assistantTasks, conversations: db.assistantConversations,
+        logs: db.logs)
+    let store = AssistantHistoryStore(records: records)
     let dialog = try await store.readCurrent().current.id
-    let task = try await db.tasks.createTask(dialog: dialog, agent: "assistant", goal: "later Task")
+    let task = try await db.assistantTasks.createTask(dialog: dialog, agent: "assistant", goal: "later Task")
     for number in 0..<24 {
         let input = UUID().uuidString
         let read = try await store.readCurrent()
@@ -319,7 +339,7 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
     var window = try await store.readCurrent().current
     let sources = window.turns.flatMap { turn in
         (turn.modelRequests ?? []).filter { $0.historyTaskID == task }.map {
-            ConversationHistoryReference(inputID: turn.id, requestID: $0.id)
+            AssistantHistoryReference(inputID: turn.id, requestID: $0.id)
         }
     }
     window.taskCompressions = [
@@ -328,8 +348,8 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
             completedAt: Date(), sources: sources)
     ]
     try await records.saveCurrent(.init(conversation: window))
-    #expect(try db.chat.storageStatistics().messages == 24)
-    #expect(try db.chat.taskSources(task).count == 3)
+    #expect(try db.storageStatistics().messages == 24)
+    #expect(try db.assistantTasks.taskSources(task).count == 3)
     let first = try await records.page(dialog)
     var display = try await HistoryPresentationAdapter.conversation(first)
     #expect(display.turns.count == 20 && display.taskCompressions.isEmpty)
@@ -349,7 +369,9 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
     let detail = try await records.message(try #require(turns[1].messageID))
     #expect(detail.turns.first?.modelRequests?.first?.response == "response 22")
     _ = try await store.startNew()
-    let reopened = try ConversationRecordStore(repository: db.chat, tasks: db.tasks)
+    let reopened = try AssistantRecordStore(
+        repository: db.assistantMessages, tasks: db.assistantTasks, conversations: db.assistantConversations,
+        logs: db.logs)
     let archived = try await reopened.page(dialog, after: try #require(first.nextPosition))
     let archivedDisplay = try await HistoryPresentationAdapter.conversation(archived)
     guard case .task(let saved, _) = try #require(ConversationHistoryPresentation.timeline(archivedDisplay).last) else {
@@ -357,12 +379,12 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
         return
     }
     #expect(saved.taskID == task && saved.reportedSummary == "done")
-    #expect(try db.chat.storageStatistics().messages == 24)
+    #expect(try db.storageStatistics().messages == 24)
 }
 
 @Test func sqliteLargeSnapshotsKeepFullIndependentJSONAndExactUnicodeStrings() async throws {
     let db = try SQLiteRepositories.temporary()
-    let dialog = try await db.chat.current(agent: "fixture")
+    let dialog = try await db.assistantConversations.current()
     let prompt = String(repeating: "提示词🙂 with spaces\n", count: 2000)
     let catalog = String(repeating: "registered action / tool\n", count: 1000)
     var original: [String: String] = [:]
@@ -371,67 +393,96 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
         let detail = try JSONSerialization.data(withJSONObject: [
             "requestJSON": prompt + " user=\(index)", "catalogJSON": catalog,
         ])
-        try db.chat.save(
-            dialog: dialog.id, revision: UInt64(index), recovery: nil,
+        try db.assistantMessages.save(
+            dialog: dialog.id, revision: UInt64(index),
             messages: [
                 .init(
                     clientID: client, inputID: client, role: "assistant", kind: "response", order: UInt64(index + 1),
                     date: Date(), body: "answer", state: "completed", detail: detail)
             ], summaries: [])
-        let id = try #require(try db.chat.previews(dialog: dialog.id).last?.id)
+        let payload = String(
+            decoding: try JSONSerialization.data(withJSONObject: [
+                "prompt": prompt + " user=\(index)", "catalog": catalog,
+            ]), as: UTF8.self)
+        try await db.logs.writeRequestPayload(client, agent: "assistant", json: payload, response: "[]", initial: true)
+        let id = try #require(try db.assistantMessages.previews(dialog: dialog.id).last?.id)
         original[id] = prompt + " user=\(index)"
     }
     for (id, text) in original {
-        let detail = try #require(try db.chat.messageEvidence(id).first?.detail)
-        let json = try #require(try JSONSerialization.jsonObject(with: detail) as? [String: String])
-        #expect(json["requestJSON"] == text && json["catalogJSON"] == catalog)
+        let detail = try #require(try db.assistantMessages.messageEvidence(id).first?.detail)
+        let json = try #require(try JSONSerialization.jsonObject(with: detail) as? [String: Any])
+        #expect(json["requestJSON"] as? String == "[]")
+        let log = try #require(try await db.logs.requestPayload(id, agent: "assistant"))
+        let payload = try #require(JSONSerialization.jsonObject(with: Data(log.requestJSON.utf8)) as? [String: String])
+        #expect(payload["prompt"] == text && payload["catalog"] == catalog)
     }
-    let statistics = try db.chat.storageStatistics()
+    let statistics = try db.storageStatistics()
     #expect(statistics.requests == 3)
     #expect(statistics.requestLogBytes > (prompt.utf8.count + catalog.utf8.count) * 3)
 }
 
 @Test func sqliteAgentPartitionAndSharedEvidenceSurviveDeletion() async throws {
     let db = try SQLiteRepositories.temporary()
-    let first = try await db.chat.current(agent: "first")
-    let second = try await db.chat.current(agent: "second")
+    let first = try await db.assistantConversations.current()
+    _ = try await db.seedDelegation(
+        taskID: nil, goal: "independent", input: "work", sourceDialog: first.id, agent: "writer")
+    let second = try await db.writerMessages.current()
     let text = String(repeating: "shared Unicode🙂\n", count: 1000)
     let detail = try JSONSerialization.data(withJSONObject: ["requestJSON": text])
-    for dialog in [first, second] {
+    do {
         let client = UUID().uuidString
-        try db.chat.save(
-            dialog: dialog.id, revision: 1, recovery: nil,
+        try db.assistantMessages.save(
+            dialog: first.id, revision: 1,
             messages: [
                 .init(
                     clientID: client, inputID: client, role: "assistant", kind: "response", order: 1,
                     date: Date(), body: "response", state: "completed", detail: detail)
             ], summaries: [])
+        let payload = String(decoding: try JSONSerialization.data(withJSONObject: ["prompt": text]), as: UTF8.self)
+        try await db.logs.writeRequestPayload(client, agent: "assistant", json: payload, response: "[]", initial: true)
     }
-    let id = try #require(try db.chat.previews(dialog: second.id).first?.id)
-    let adapter = try ConversationRecordStore(repository: db.chat, tasks: db.tasks, agent: "first")
+    do {
+        let client = UUID().uuidString
+        try db.writerMessages.save(
+            task: second.id, revision: 1,
+            messages: [
+                .init(
+                    clientID: client, inputID: client, role: "assistant", kind: "response", order: 1,
+                    date: Date(), body: "response", state: "completed", detail: detail)
+            ])
+        let payload = String(decoding: try JSONSerialization.data(withJSONObject: ["prompt": text]), as: UTF8.self)
+        try await db.logs.writeRequestPayload(client, agent: "writer", json: payload, response: "[]", initial: true)
+    }
+    let id = try #require(try db.writerMessages.previews(task: second.id).first?.id)
+    let adapter = try AssistantRecordStore(
+        repository: db.assistantMessages, tasks: db.assistantTasks, conversations: db.assistantConversations,
+        logs: db.logs)
     await #expect(throws: RecordStorageError.missingRecord) { _ = try await adapter.message(id) }
-    _ = try db.chat.rotate(first.id, agent: "first")
-    try db.chat.deleteDialog(first.id)
-    let data = try #require(try db.chat.messageEvidence(id).first?.detail)
-    let restored = try #require(try JSONSerialization.jsonObject(with: data) as? [String: String])
-    #expect(restored["requestJSON"] == text)
+    _ = try db.assistantConversations.rotate(first.id)
+    try db.assistantConversations.deleteDialog(first.id)
+    let data = try #require(try db.writerMessages.messageEvidence(id).first?.detail)
+    let restored = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+    #expect(restored["requestJSON"] as? String == "[]")
+    let log = try #require(try await db.logs.requestPayload(id, agent: "writer"))
+    let payload = try #require(JSONSerialization.jsonObject(with: Data(log.requestJSON.utf8)) as? [String: Any])
+    #expect(payload["prompt"] as? String == text)
 }
 
 @Test func sqliteRawPagesUseHistoryPositionAndKeepTiedRows() async throws {
     let db = try SQLiteRepositories.temporary()
-    let dialog = try await db.chat.current(agent: "fixture")
+    let dialog = try await db.assistantConversations.current()
     let values = (1...6).reversed().map { number in
-        MessageRecord(
+        AssistantMessageRecord(
             clientID: "order-\(number)", inputID: "order-\(number)", role: "assistant", kind: "response",
             order: UInt64((number + 1) / 2), date: Date(), body: "body \(number)", state: "completed",
             detail: Data("{}".utf8))
     }
-    try db.chat.save(dialog: dialog.id, revision: 1, recovery: nil, messages: values, summaries: [])
+    try db.assistantMessages.save(dialog: dialog.id, revision: 1, messages: values, summaries: [])
     var cursor: Int64?
     var orders: [UInt64] = []
     var identifiers: Set<String> = []
     while true {
-        let page = try db.chat.messagePage(dialog: dialog.id, after: cursor, limit: 1)
+        let page = try db.assistantMessages.messagePage(dialog: dialog.id, after: cursor, limit: 1)
         for item in page.records where item.role == "assistant" {
             orders.append(item.order)
             #expect(identifiers.insert(try #require(item.id)).inserted)
@@ -445,77 +496,75 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
 
 @Test func sqlitePreviewsRemainSmallAndDetailKeepsFullBody() async throws {
     let db = try SQLiteRepositories.temporary()
-    let dialog = try await db.chat.current(agent: "fixture")
+    let dialog = try await db.assistantConversations.current()
     let body = String(repeating: "大正文🙂", count: 20_000)
     let input = UUID().uuidString
-    try db.chat.save(
-        dialog: dialog.id, revision: 1, recovery: Data(repeating: 7, count: 100_000),
+    try db.assistantMessages.save(
+        dialog: dialog.id, revision: 1,
         messages: [
             .init(
                 clientID: input, inputID: input, role: "assistant", kind: "response", order: 1, date: Date(),
                 body: body, state: "completed", detail: Data("{}".utf8))
         ], summaries: [])
-    let preview = try #require(try db.chat.previews(dialog: dialog.id).first)
+    let preview = try #require(try db.assistantMessages.previews(dialog: dialog.id).first)
     #expect(preview.response == String(body.prefix(240)))
-    #expect(try db.chat.messageEvidence(preview.id).first?.body == body)
-    #expect(try await db.chat.dialog(dialog.id, includingRecovery: false).recovery == nil)
-    #expect(try await db.chat.current(agent: "fixture", includingRecovery: false).recovery == nil)
-    #expect(try await db.chat.dialog(dialog.id).recovery?.count == 100_000)
+    #expect(try db.assistantMessages.messageEvidence(preview.id).first?.body == body)
 }
 
 @Test func sqliteMessageIdentityExistsBeforeGenerationAndDeltasNeverWrite() async throws {
     let db = try SQLiteRepositories.temporary()
-    let records = try ConversationRecordStore(repository: db.chat, tasks: db.tasks)
-    let store = ConversationHistoryStore(records: records)
+    let records = try AssistantRecordStore(
+        repository: db.assistantMessages, tasks: db.assistantTasks, conversations: db.assistantConversations,
+        logs: db.logs)
+    let store = AssistantHistoryStore(records: records)
     let read = try await store.readCurrent()
     let input = UUID().uuidString
     let writesBeforeAdmission = db.committedWriteCount
     let user = try await store.begin(id: input, user: "hello", request: [], expecting: read.token, model: "fixture")
     let userID = try #require(user.messageID)
     #expect(db.committedWriteCount == writesBeforeAdmission + 1)
-    let accepted = try await db.chat.messages(dialog: read.current.id)
+    let accepted = try await db.assistantMessages.messages(dialog: read.current.id)
     #expect(accepted.count == 1)
     #expect(accepted.first?.id == userID && accepted.first?.body == "hello")
     #expect(accepted.first?.state == "completed" && accepted.first?.detail.isEmpty == false)
     #expect(try await store.readCurrent().current.turns.first?.messageID == userID)
-    #expect(try await db.chat.dialog(read.current.id).count == 1)
+    #expect(try await db.assistantConversations.dialog(read.current.id).count == 1)
     try await store.checkpoint(inputID: input)
-    #expect(try await db.chat.messages(dialog: read.current.id).map(\.id) == [userID])
-    #expect(try await db.chat.dialog(read.current.id).count == 1)
+    #expect(try await db.assistantMessages.messages(dialog: read.current.id).map(\.id) == [userID])
+    #expect(try await db.assistantConversations.dialog(read.current.id).count == 1)
     let requestID = UUID().uuidString
     try await store.beginModelRequest(.init(id: requestID, input: "hello", requestJSON: "[]"), for: input)
     let request = try #require(try await store.snapshot().current.turns.first?.modelRequests?.first)
     let responseID = try #require(request.messageID)
     #expect(request.inputMessageID == userID && responseID != userID)
-    let identities = try await db.chat.messages(dialog: read.current.id)
+    let identities = try await db.assistantMessages.messages(dialog: read.current.id)
     #expect(identities.count == 2)
     #expect(identities.first?.state == "completed")
     #expect(identities.last?.id == responseID && identities.last?.state == "generating")
     #expect(identities.last?.body.isEmpty == true)
-    let header = try JSONDecoder().decode(ConversationModelRequest.self, from: #require(identities.last?.detail))
+    let header = try JSONDecoder().decode(AssistantModelRequest.self, from: #require(identities.last?.detail))
     #expect(header.id == requestID && header.requestJSON == "[]" && header.response.isEmpty)
     let writes = db.committedWriteCount
     for _ in 0..<100 { try await store.append("chunk", to: input) }
     #expect(db.committedWriteCount == writes)
-    #expect(try await db.chat.messages(dialog: read.current.id).last?.body == "")
+    #expect(try await db.assistantMessages.messages(dialog: read.current.id).last?.body == "")
     try await store.finishModelRequest(input, reason: "stop")
-    let completed = try await db.chat.messages(dialog: read.current.id)
+    let completed = try await db.assistantMessages.messages(dialog: read.current.id)
     #expect(completed.last?.id == responseID && completed.last?.state == "completed")
     #expect(completed.last?.body == String(repeating: "chunk", count: 100))
-    #expect(try await db.chat.dialog(read.current.id).recovery == nil)
     try await store.checkpoint()
-    #expect(try await db.chat.messages(dialog: read.current.id).map(\.id) == completed.map(\.id))
+    #expect(try await db.assistantMessages.messages(dialog: read.current.id).map(\.id) == completed.map(\.id))
 }
 
 private actor UserIdentityPublicationFixture {
-    private var value: ConversationArchive
+    private var value: AssistantArchive
     private var rejectIdentity = true
-    init(_ value: ConversationArchive) { self.value = value }
-    func load() -> ConversationArchive { value }
-    func commit(_ candidate: ConversationArchive) throws {
+    init(_ value: AssistantArchive) { self.value = value }
+    func load() -> AssistantArchive { value }
+    func commit(_ candidate: AssistantArchive) throws {
         if rejectIdentity, candidate.current.turns.contains(where: { $0.messageID != nil }) {
             rejectIdentity = false
-            throw ConversationHistoryError.conflict
+            throw AssistantHistoryError.conflict
         }
         value = candidate
     }
@@ -523,92 +572,93 @@ private actor UserIdentityPublicationFixture {
 
 @Test func sqliteCompletedUserInsertRetriesFailedIdentityPublicationWithoutDuplicates() async throws {
     let db = try SQLiteRepositories.temporary()
-    let records = try ConversationRecordStore(repository: db.chat, tasks: db.tasks)
-    let store = ConversationHistoryStore(records: records)
+    let records = try AssistantRecordStore(
+        repository: db.assistantMessages, tasks: db.assistantTasks, conversations: db.assistantConversations,
+        logs: db.logs)
+    let store = AssistantHistoryStore(records: records)
     let memory = UserIdentityPublicationFixture(try await store.snapshot())
     try await store.attachContext(
         identity: "fixture", load: { await memory.load() }, commit: { try await memory.commit($0) })
     let read = try await store.readCurrent()
     let input = UUID().uuidString
-    await #expect(throws: ConversationHistoryError.conflict) {
+    await #expect(throws: AssistantHistoryError.conflict) {
         _ = try await store.begin(
             id: input, user: "final transcript", request: [], expecting: read.token, model: "fixture")
     }
-    let committed = try #require(try await db.chat.messages(dialog: read.current.id).first)
+    let committed = try #require(try await db.assistantMessages.messages(dialog: read.current.id).first)
     #expect(committed.body == "final transcript" && committed.state == "completed")
     #expect(try await store.readCurrent().current.turns.first?.messageID == nil)
     #expect(await store.lastCheckpointError != nil)
     try await store.checkpoint()
     #expect(try await store.readCurrent().current.turns.first?.messageID == committed.id)
-    #expect(try await db.chat.messages(dialog: read.current.id).map(\.id) == [committed.id])
-    #expect(try await db.chat.dialog(read.current.id).count == 1)
+    #expect(try await db.assistantMessages.messages(dialog: read.current.id).map(\.id) == [committed.id])
+    #expect(try await db.assistantConversations.dialog(read.current.id).count == 1)
     #expect(await store.lastCheckpointError == nil)
 }
 
 @Test func sqliteReservedIdentityRetryAndCrashRecoveryKeepTheSameID() async throws {
     let db = try SQLiteRepositories.temporary()
-    let dialog = try await db.chat.current(agent: "assistant")
-    let identity = MessageIdentity(
+    let dialog = try await db.assistantConversations.current()
+    let identity = AssistantMessageIdentity(
         clientID: "response", inputID: "input", role: "assistant", kind: "response", order: 1, date: Date())
-    let id = try await db.chat.beginMessage(dialog: dialog.id, identity: identity)
-    #expect(try await db.chat.beginMessage(dialog: dialog.id, identity: identity) == id)
-    #expect(try await db.chat.messages(dialog: dialog.id).count == 1)
+    let id = try await db.assistantMessages.beginMessage(dialog: dialog.id, identity: identity)
+    #expect(try await db.assistantMessages.beginMessage(dialog: dialog.id, identity: identity) == id)
+    #expect(try await db.assistantMessages.messages(dialog: dialog.id).count == 1)
     try db.recoverInFlight()
-    let interrupted = try #require(try await db.chat.messages(dialog: dialog.id).first)
+    let interrupted = try #require(try await db.assistantMessages.messages(dialog: dialog.id).first)
     #expect(interrupted.id == id && interrupted.state == "interrupted")
-    #expect(interrupted.body.isEmpty && interrupted.detail.isEmpty)
+    #expect(interrupted.body.isEmpty && !interrupted.detail.isEmpty)
 }
 
-@Test func sqliteCrashClosesTaskAndBuildsCompressionFromNormalizedSources() async throws {
+@Test func sqliteCrashClosesTaskAndRetainsSourcesWithoutInventingSummary() async throws {
     let db = try SQLiteRepositories.temporary()
-    let dialog = try await db.chat.current(agent: "assistant")
-    let task = try await db.tasks.createTask(dialog: dialog.id, agent: "assistant", goal: "unfinished goal")
-    let identity = MessageIdentity(
+    let dialog = try await db.assistantConversations.current()
+    let task = try await db.assistantTasks.createTask(dialog: dialog.id, agent: "assistant", goal: "unfinished goal")
+    let identity = AssistantMessageIdentity(
         clientID: "response", inputID: "input", role: "assistant", kind: "response", order: 1, date: Date(),
         taskID: task)
-    let id = try await db.chat.beginMessage(dialog: dialog.id, identity: identity)
+    let id = try await db.assistantMessages.beginMessage(dialog: dialog.id, identity: identity)
     try db.recoverInFlight()
-    let data = try #require(try await db.chat.compressionData(dialog: dialog.id).first)
-    let compression = try JSONDecoder().decode(ConversationTaskCompression.self, from: data)
-    #expect(compression.taskID == task && compression.status == .interrupted)
-    #expect(compression.sources == [.init(inputID: "input", requestID: "response")])
-    #expect(try await db.chat.messages(dialog: dialog.id).first?.id == id)
-    #expect(try await db.chat.dialog(dialog.id).recovery == nil)
+    #expect(try await db.assistantTasks.compressionData(dialog: dialog.id).isEmpty)
+    #expect(try await db.assistantTasks.taskSources(task).map(\.requestID) == ["response"])
+    #expect(try await db.assistantMessages.messages(dialog: dialog.id).first?.id == id)
     try db.recoverInFlight()
-    #expect(try await db.chat.compressionData(dialog: dialog.id).count == 1)
+    #expect(try await db.assistantTasks.compressionData(dialog: dialog.id).isEmpty)
 }
 
 @Test func sqliteORMCompletionPreservesIdentityOrderAndDate() async throws {
     let db = try SQLiteRepositories.temporary()
-    let dialog = try await db.chat.current(agent: "assistant")
+    let dialog = try await db.assistantConversations.current()
     let date = Date(timeIntervalSince1970: 1_700_000_000)
-    let id = try db.chat.beginMessage(
+    let id = try db.assistantMessages.beginMessage(
         dialog: dialog.id,
         identity: .init(
             clientID: "response", inputID: "input", role: "assistant", kind: "response", order: 7, date: date))
-    let final = MessageRecord(
+    let final = AssistantMessageRecord(
         clientID: "response", inputID: "input", role: "assistant", kind: "response",
         order: 999, date: date.addingTimeInterval(99), body: "finished", state: "completed", detail: Data("{}".utf8),
         id: id)
-    try db.chat.save(dialog: dialog.id, revision: 1, recovery: nil, messages: [final], summaries: [])
-    let row = try #require(try await db.chat.messages(dialog: dialog.id).first)
+    try db.assistantMessages.save(dialog: dialog.id, revision: 1, messages: [final], summaries: [])
+    let row = try #require(try await db.assistantMessages.messages(dialog: dialog.id).first)
     #expect(row.id == id && row.order == 7 && row.date == date)
     #expect(row.body == "finished" && row.state == "completed")
 }
 
 @Test func sqliteEmptyUserIdentityDoesNotPoisonContextAndSourcelessTaskHasNoCompression() async throws {
     let db = try SQLiteRepositories.temporary()
-    let dialog = try await db.chat.current(agent: "assistant")
-    _ = try await db.tasks.createTask(dialog: dialog.id, agent: "assistant", goal: "never activated")
-    let id = try db.chat.beginMessage(
+    let dialog = try await db.assistantConversations.current()
+    _ = try await db.assistantTasks.createTask(dialog: dialog.id, agent: "assistant", goal: "never activated")
+    let id = try db.assistantMessages.beginMessage(
         dialog: dialog.id,
         identity: .init(
             clientID: "lost-input", inputID: "lost-input", role: "user", kind: "input", order: 1, date: Date()))
     try db.recoverInFlight()
-    let records = try ConversationRecordStore(repository: db.chat, tasks: db.tasks)
+    let records = try AssistantRecordStore(
+        repository: db.assistantMessages, tasks: db.assistantTasks, conversations: db.assistantConversations,
+        logs: db.logs)
     #expect(try await records.window(dialog.id).turns.isEmpty)
     let page = try await records.page(dialog.id)
     #expect(page.turns.count == 1 && page.turns.first?.modelRequests?.first?.messageID == id)
     #expect(page.turns.first?.state == .interrupted)
-    #expect(try await db.chat.compressionData(dialog: dialog.id).isEmpty)
+    #expect(try await db.assistantTasks.compressionData(dialog: dialog.id).isEmpty)
 }

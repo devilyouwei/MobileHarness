@@ -43,7 +43,7 @@ Assistant reads the owning ApplicationControl Business facts through agents.appl
 
 AgentContainerLifecycle retains actual execution/cleanup failure independently from ordinary unavailable/stopped/cancelled controls. ContainerFailureRecord retains first occurrence alongside the existing latest occurrence and repeat count; publication/suppression remains unchanged. This journal is historical evidence, not a second authority for current domain health. Current role snapshots read their owned status/context directly.
 
-Assistant-specific State selection lives in AssistantStateBindings, outside shared Support. AgentStateContext enforces registration/session/size contracts only. Camera/device lifecycle ports no longer carry model-only context methods; App injects the complete State inspector separately.
+Assistant-specific State selection lives in AssistantStateBindings, outside shared Support. AgentStateContext enforces registration/session/size contracts and assembles typed multimodal snapshots from selected owners. App injects the complete State inspector for ordinary facts and a Camera-owned scoped preview snapshot/reset port for ephemeral images; shared Support owns request assembly, not Camera selection policy.
 
 AgentGatewayAssembly accepts SignalTransport and GatewayAdmission capabilities, prepares AgentManager/InputGateway and result conversion, and exposes GatewayConfiguration. App calls GatewayContainer.configureExecution; bind accepts returned capabilities and observation access to construct OutputGateway. No Agent assembly receives or configures the Gateway root. AgentCameraAccess/AgentDeviceAccess exclude scene foreground, shutdown and native idle joins.
 
@@ -75,3 +75,9 @@ GatewayOutputConsumer区分模型/Agent协议反馈与内部完成结果。execu
 成功的运行时维护调用混入业务记录；用户打开内部动作后可查看。失败仍沿现有诊断策略可见。
 
 AgentIslandPublication.permissions和bind(consumer:source:)只复用内部工具声明、可信身份接入及结果检查。内容、时机和终态仍在角色目录；成功/错误/异常在调用者自己的发布循环处理。SpeechPerception/SpeechSynthesis/Photographer/ApplicationControl复用相同机制，互不代发。App绑定的播放事实回调只报告实际audioID开始/结束，不包含角色展示策略。
+
+OutputGateway binds only AgentMessageRepository for durable Agent communication. Task/workspace ownership APIs are not exposed through this dependency.
+
+## Agent 公开元数据
+
+AgentConfigurations 校验 Catalog 索引的 v8 Agent 资源（description、身份、通信、baseSkills 和后台契约），再投影为 AgentCore v7 的函数/通信配置。公开 description 由各角色维护，单条最多 2048 UTF-8 字节。delegationOverview 与任务执行共用 Communication/AgentTaskDelegation 的真实适配和调用者权限；总目录最多 8192 字节，超限或无效配置明确失败。它只组装公开介绍，不加载同伴私有指令；模型上下文采用当前实例的通信策略，实时可用性由 State 提供。

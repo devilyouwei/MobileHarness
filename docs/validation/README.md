@@ -4,8 +4,17 @@
 
 ## 当前验收入口
 
+[BasicSkill 控制教学](BasicSkill-Control-Teaching.md)：六部分通用教学、九项动作效果、完整检查、资源打包和实模通过/失败边界。
+
+[Skill 发现与能力拒绝教学](Skill-Discovery-Before-Denial.md)：加载前决策教学、浏览回归场景与当前工作区构建阻塞，区分静态检查与尚未执行的模型/设备验收。
+
 | 文档 | 职责 |
 | --- | --- |
+| [Database 按表整理与日志清空](Database-Table-Ownership.md) | 早期 11 表整理记录，以及后续十表独立 Agent 重构、回归、构建与清洁安装证据。 |
+| [Camera 会话图片缓存与多图浏览](Camera-Session-Gallery.md) | 会话短编号、20 张 FIFO、处置保留、历史隔离、浏览与关闭回归及真机验收边界。 |
+| [可读预览编号与合并输入](Readable-Preview-Context.md) | 历史版本的持久编号、合并输入与安装证据；编号策略已由 Camera 会话方案替代。 |
+| [预览照片历史读取](Preview-History-Images.md) | previewID 历史展示回归、缓存／已保存原图解析、过期提示及真机证据。
+| [预览图片与多模态 State](Preview-Image-State.md) | 内存缓存、跨轮图片选择、请求附件和日志脱敏的自动验证及原生验收边界。
 | [全局灵动岛](Global-In-App-Island.md) | 设置/记录/相册中的全局状态与展开偏好、导航及生命周期回归、原生界面验收限制。 |
 | [原生音视频故障诊断](Native-Media-Failure-Diagnosis.md) | 保存照片后媒体服务重置的现场证据、错误保真回归及真机调查限制。 |
 | [Writer 执行与续写生命周期](Writer-Execution-Lifetime.md) | 工具接纳后的续写权限、取消/清理并发回归、Simulator 构建与历史失败记录。 |
@@ -117,3 +126,29 @@
 refactor, Agent-only model recording, current-file recovery and automated/build/native acceptance limits.
 
 - [Agent 展示调用与反馈所有权](Agent-Presentation-Ownership.md)：角色独立灵动岛、内部调用与模型反馈隔离、回归及构建证据。
+
+- [Complete request logs](Complete-Request-Logs.md): independent full image/request evidence, physical deletion, business preservation, migration and validation boundaries.
+
+- [Database 三层目录与接口职责](Database-Directory-Responsibilities.md)：核心根目录、Shared 中立机制、两侧私有历史接口及独立日志/通信接入的验证。
+
+- [Welcome 云端服务配置](Welcome-Provider-Setup.md)：首次判断、粘贴表单、事务保存与恢复回归；原生验收范围独立记录。
+
+- [Assistant 对话详情](Assistant-Conversation-Detail.md)：同级 State 选择证据、日志清空后的呈现与导出，以及界面验收边界。
+
+- [Writer 任务与请求详情](Writer-Record-Detail.md)。任务信息、五区块详情、来源调用、宿主收尾和日志清除的验证。
+
+- [Assistant / Writer 任务路由](Assistant-Writer-Task-Routing.md)：平级入口、Writer 作品库归属与只查询不创建文件的回归及手机复验。
+
+- [提示词所有权](Prompt-Ownership.md)：Agent 自描述、实际权限目录、私有指令隔离、模板与构建证据。
+
+- [Writer 双模型提示词优化](Writer-Prompt-Optimization.md)：HTML/Markdown/TXT、绘图、作品查改、窗口、追问与边界；保留真实模型结果、评估器修正和产品能力限制。
+
+- [Writer 执行内聚](Writer-Execution-Cohesion.md)：同请求选择作品、无文件完成、渲染后发布恢复与双模型复测。
+
+- [task.start 初始 Skill](Task-Start-Initial-Skills.md)：启动携带单项/多项 Skill 的教学、原子加载与下一轮能力可用性。
+
+- [Writer 记录分页](Writer-Record-Pagination.md)：整页末尾、自动刷新、详情返回保留及验证边界。
+
+- [task_7 委托分组调查](Writer-Task7-Delegation-Diagnosis.md)：手机 SQLite 真实请求与虚假分组、顺序回落和归属回退证据。
+
+- [Writer 委托与 Workspace 解耦验证](Writer-Workspace-Separation.md)：真实 SQLite 回归、构建及独立原生页面验收。

@@ -305,6 +305,33 @@ for source in (ROOT / 'MobileHarness/PlatformKit').rglob('*.swift'):
 for source in (ROOT / 'MobileHarness/Gateway').rglob('*.swift'):
     if re.search(r'\b(?:UIActions|SpeechPlayback|UITools|SystemTools|CameraTools)\b', source.read_text()):
         errors.append(f'Gateway directly uses a concrete behavior: {source.relative_to(ROOT)}')
+# Database root is core/assembly; shared business and table owners are explicit.
+database_root = ROOT / 'MobileHarness/Storage/Database'
+allowed_database_core = {'DatabaseStorage.swift', 'SQLiteDatabase.swift', 'SQLiteDatabaseStorage.swift', 'SQLiteRepositories.swift', 'SQLiteSchema.swift'}
+for source in database_root.glob('*.swift'):
+    if source.name not in allowed_database_core:
+        errors.append(f'Database business implementation at core root: {source.name}')
+if (database_root / 'SQLite').exists():
+    errors.append('Database core belongs at the root, not a nested SQLite directory.')
+core_connection = (database_root / 'SQLiteDatabase.swift').read_text()
+if re.search(r'\b(?:SQLiteSchema|AssistantTaskRow|WriterWorkspaceRow|AgentMessageRow|SQLiteRecordKey)\b', core_connection):
+    errors.append('SQLite connection core must receive initialization without business schema/identity dependencies.')
+communication_gateway = (ROOT / 'MobileHarness/Agents/Support/OutputGateway.swift').read_text()
+if 'any TaskRepository' in communication_gateway:
+    errors.append('Agent OutputGateway must use the narrow communication repository.')
+
+# Shared mechanisms must not reintroduce Agent business routing or unified repositories.
+for source in (database_root / 'Shared').glob('*.swift'):
+    if re.search(r'Conversation|Dialog|TaskRepository|assistant_messages|writer_messages', source.read_text()):
+        errors.append(f'Agent business leaked into Database/Shared: {source.name}')
+for source in database_root.rglob('*.swift'):
+    if re.search(r'\b(?:ChatRepository|TaskRepository|SQLiteChatRepository|SQLiteTaskRepository)\b', source.read_text()):
+        errors.append(f'Retired aggregate database interface: {source.name}')
+for role, other in [('Assistant', 'Writer'), ('Writer', 'Assistant')]:
+    for source in (database_root / (role + 'Messages')).glob('*.swift'):
+        if re.search(r'\b(?:SQLite)?' + other + r'(?:MessageRepository|RecordStore|HistoryStore|TaskRepository)\b', source.read_text()):
+            errors.append(f'Cross-Agent private repository dependency: {source.name}')
+
 # Storage graph: independent mechanisms, narrow domain ports and one concrete SQL target.
 expected_storage = {
     'StorageCore': set(),
@@ -355,7 +382,7 @@ for source in (ROOT / 'MobileHarness/Storage').rglob('*.swift'):
         errors.append(f'Storage contains presentation or synthesis policy: {source.relative_to(ROOT)}')
     if any(word in text for word in ('新对话', '待生成标题')):
         errors.append(f'Storage contains localized title fallback: {source.relative_to(ROOT)}')
-chat_source = (ROOT / 'MobileHarness/Storage/Database/Chat/ConversationHistory.swift').read_text()
+chat_source = (ROOT / 'MobileHarness/Storage/Database/AssistantMessages/AssistantHistoryStore.swift').read_text()
 if re.search(r'\.suffix\(10\)|public var title:', chat_source):
     errors.append('StorageChat must not select model context or presentation titles')
 # Verify every storage source has one and only one compiler owner.
@@ -408,7 +435,7 @@ for source in (ROOT / 'MobileHarness/UI').rglob('*.swift'):
     for imported in re.findall(r'\bimport\s+(\w+)', content):
         if imported not in allowed_ui | native_ui_imports.get(str(source.relative_to(ROOT / 'MobileHarness/UI')), set()):
             errors.append(f'Forbidden UI import {imported}: {source.relative_to(ROOT)}')
-    if re.search(r'\b(?:VoiceSessionCoordinator|CameraCoordinator|ApplicationRuntime|AppContainer|AppAssembly|ConversationHistoryStore|FileDocumentStore|MemoryLeaseStore)\b', content):
+    if re.search(r'\b(?:VoiceSessionCoordinator|CameraCoordinator|ApplicationRuntime|AppContainer|AppAssembly|AssistantHistoryStore|FileDocumentStore|MemoryLeaseStore)\b', content):
         errors.append(f'UI uses a runtime/service implementation: {source.relative_to(ROOT)}')
 for folder in ('App', 'UI'):
     for path, directories, files in os.walk(ROOT / 'MobileHarness' / folder):
@@ -1128,7 +1155,7 @@ if targets['Agents'].get('path') != 'MobileHarness' or targets['Agents'].get('so
     errors.append('Agents must compile only Agents sources while packaging shared assets')
 asset_root = ROOT / 'MobileHarness/Resources'
 asset_catalog = json.loads((asset_root / 'Catalog.json').read_text())
-for group, version in [('agents', 7), ('skills', 3)]:
+for group, version in [('agents', 8), ('skills', 3)]:
     for name, relative in asset_catalog[group].items():
         source = asset_root / relative
         parts = Path(relative).parts
@@ -1141,6 +1168,9 @@ for group, version in [('agents', 7), ('skills', 3)]:
         if configuration.get('version') != version:
             errors.append(f'Invalid {group} version: {relative}')
         if group == 'agents':
+            description = configuration.get('description')
+            if not isinstance(description, str) or not description.strip() or len(description.encode('utf-8')) > 2048:
+                errors.append(f'Invalid Agent public description: {relative}')
             actor = ROOT / 'MobileHarness/Agents' / name / f'{name}Agent.swift'
             if not actor.is_file(): errors.append(f'Missing canonical Agent: {name}')
             if 'permissions' in configuration or (source.parent / 'Permissions.json').exists():

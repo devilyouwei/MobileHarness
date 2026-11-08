@@ -195,7 +195,9 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
                 failures: failures)
             return StorageContainer(
                 database: SQLiteDatabaseFactory.make(
-                    databaseURL: self.root.appendingPathComponent("records.sqlite"), failures: failures),
+                    databaseURL: self.root.appendingPathComponent("records.sqlite"),
+                    resetWriterFilesAt: self.root.appendingPathComponent("ArtifactWorkspaces", isDirectory: true),
+                    failures: failures),
                 files: files, failures: failures)
         }.cached
     }

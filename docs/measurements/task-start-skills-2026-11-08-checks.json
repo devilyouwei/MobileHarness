@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "createdAtUTC": "2026-11-08T11:06:45.878941+00:00",
+  "scope": "BasicSkill prompt/config, regression tests and documentation; no production Swift changes",
+  "basicSkillRevision": 46,
+  "focused": {
+    "passed": 8,
+    "log": "/tmp/task-start-skills-focused.log",
+    "sha256": "42eaf126ba84fdec4fda9c00f73855253005c33a086f2a4db449484caaa1903e"
+  },
+  "checks": [
+    {
+      "command": "./scripts/check.sh",
+      "startUTC": "2026-11-08T10:56:35.595136+00:00",
+      "endUTC": "2026-11-08T11:02:56.199801+00:00",
+      "exitCode": 0,
+      "log": "/tmp/task-start-skills-check.log",
+      "logSHA256": "38f3d7d1a1d6341f47ef149cd35c16fbc9fc80f48d5b9df40e86b4e68bbb06a5"
+    },
+    {
+      "command": "./scripts/build-ios.sh",
+      "startUTC": "2026-11-08T11:02:56.204328+00:00",
+      "endUTC": "2026-11-08T11:05:52.520395+00:00",
+      "exitCode": 0,
+      "log": "/tmp/task-start-skills-build-ios.log",
+      "logSHA256": "c7361c2d66de0568789457931cb2109a3a222bf994cd6facc06682c3590c31d9"
+    }
+  ],
+  "integrationTestsPassed": 1095,
+  "nativeRuntimeTestsPassed": 227,
+  "simulatorBuildSchemes": [
+    "MobileHarnessSimulator",
+    "ModelKitRuntime",
+    "ModelKitNemotron",
+    "ModelKitSilero"
+  ],
+  "sourceHashes": {
+    "MobileHarness/Resources/Skills/BasicSkill/Instructions.md": "8e1d839ae5f78e65095afc60fc462c92f8c4c00a3928bd7e11547c9465738c8f",
+    "MobileHarness/Resources/Skills/BasicSkill/Skill.json": "5f4b495cb59326742d1a743a51e5a1a545255f2e58b1becc36d4ce56922c1358",
+    "Tests/IntegrationTests/PromptTemplateTests.swift": "042cd16de606da4e11bd5f0d0d2f37748ee1c9f8f4f91d9954730c59701381f2"
+  },
+  "beforeHashes": {
+    "MobileHarness/Resources/Skills/BasicSkill/Instructions.md": "9b30459e48d7bd1257d7a4290cb0b540628f35b02dd64c844d4854c786d122a8",
+    "MobileHarness/Resources/Skills/BasicSkill/Skill.json": "2241628eda6f19941f23a81f11693bb4c8355e41450240f692a9d2c7778cd854",
+    "Tests/IntegrationTests/PromptTemplateTests.swift": "0fdd0d7787a0c78cd0e500122e127b921ba133e8dc50facb8a6d422887444bfd"
+  },
+  "limits": [
+    "Scripted models and camera effects in integration tests; no real-provider evaluation",
+    "No physical-device acceptance"
+  ]
+}

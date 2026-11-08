@@ -29,7 +29,7 @@
             }
             view.update(
                 frame: state.videoFrame, pose: showsPose ? state.skeleton : nil, mirrored: state.facing == .front,
-                generation: generation, fitsImage: !showsPose)
+                generation: generation, fitsImage: false)
         }
         public static func dismantleUIView(_ view: CameraFrameSurface, coordinator: ()) { view.stopRenderer() }
     }

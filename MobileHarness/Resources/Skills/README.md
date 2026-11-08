@@ -62,7 +62,7 @@ BasicSkill读取agents.applicationcontrol、agents.writer、ui.navigation、全�
 2. **前置检查**：依赖哪些事实、权限、设备或产物；未知状态先读取，不由模型猜测。
 3. **执行流程**：分步骤说明使用哪些已注册函数、依赖关系、需要等待结果的节点。涉及先后顺序遵守 Core wait / Channel 规则。
 4. **反馈与 ReACT**：以真实 Action / Tool 结果决定下一步；失败保留真实效果，不自动重复有副作用动作。
-5. **用户交互**：明确何时询问、等待什么答案。等待用户保留 Task，不因模型回复结束而 finishTask。
+5. **用户交互**：明确何时询问、等待什么答案。等待用户保留 Task，不因模型回复结束而 task.end。
 6. **完成、取消与异常**：明确可确认的完成条件、需要的清理和摘要。Skill 释放不等于设备清理；清理通过已实现的 Action 和任务屏障完成。
 7. **例子（必要时）**：以“当前条件/用户输入 → 本轮精确输出 → 真实反馈后的下一轮”组织。可执行回复单独放在 `xml` 代码块中，不把条件、步骤编号、引号或解释拼进模型输出；参数来自 canonical 元数据。示例反馈须标明为假设数据，mediaID 等标识仅用于该示例，运行时使用真实返回值。
 
@@ -98,9 +98,15 @@ BasicSkill读取agents.applicationcontrol、agents.writer、ui.navigation、全�
 
 ## 加载、释放与 Task 生命周期
 
-默认基础能力由 Agent 的 baseSkills 初始化。`loadSkills` / `releaseSkills` 是 Control Channel Action Call；`startTask(goal, skills, ...)` 可在创建任意目标任务时同时加载 Skill 组。输入参数及数组编码以 Agent.Task canonical 元数据为准。
+BasicSkill Instructions 按概念、上下文、决策、控制动作效果、生命周期、反馈/失败组织。Skill 明确提供教学、函数、State 选择及依赖；Task 保留持续目标和完成条件，单次工作的多次模型请求不构成创建 Task 的充分理由。九项控制 Action 的教学与注册对应：加载/释放影响后续请求，start 可携带初始能力，end/cancel 先进入收尾再终态，delegate 的接纳不等于完成，send 只补充已有目标，聆听控制独立于 Task。参数和协议由 canonical 声明与 Core 拥有，JSON 只注册现有绑定、状态及指令来源。
 
-BasicSkill Instructions.md先检查CURRENT STATE：已有足够事实直接回答，不加载Skill或重复查询；确需执行单步控制/查询/拍摄且函数缺失时才使用loadSkills，多轮持续目标使用startTask。一次拍照且无后续操作不强制创建Task。直接加载只扩展能力，不建立任务目标；默认决策链可包含多次模型请求；无 Task 的 Skill 跨链保留，加载/合法调用重置为 5，未使用的完整用户决策扣 1。Task 先设定目标及可判断的完成条件，等待用户时持续保留；模型根据真实结果判断目标达成或用户明确替换目标后使用 finishTask，并如实记录结果；用户取消使用 cancelTask。可恢复动作失败不等于任务结束；运行时决策异常进入 failed，重启进入 interrupted。在已有 Task 中 loadSkills 仅补充任务能力，不创建或替换目标。一次性历史查询仅在所需函数缺失时直接加载，多轮筛选与确认示例使用 Task。
+显式 releaseSkills 可移除确认不再需要且允许释放的近期或任务非基础根，Task 本身继续存在；基础项、非根依赖和仍被其他根依赖的指定 Skill 拒绝释放。通常保留目标需要的能力并在终态清理，不能把使用建议写成运行时禁止。加载/释放失败原子保留先前能力状态；Task 替换预校验、旧目标收尾、新目标创建是分阶段流程，不能承诺收尾后的创建失败会自动恢复旧目标。
+
+BasicSkill 在加载前按用户目标匹配 AVAILABLE SKILLS / DELEGATABLE AGENTS 的公开 description。当前函数目录只是已加载子集；函数缺失不能直接作为不支持该能力的依据。事实已足够时直接回答，已声明函数直接按教学使用，缺失且匹配的单次能力通过 loadSkills 获取；新持续目标通过 task.start(skills) 获取。加载成功后的下一请求才读取新增私有教学并执行，不把加载与业务动作拼在一轮。拒绝能力前检查公开目录；实际未提供的操作或加载/执行失败仍如实报告，不重复加载。BasicSkill 只描述通用能力发现流程，不包含具体业务场景或业务 Skill ID 示例；业务教学由对应 Skill 拥有。只有公开目录没有相关 Skill 或可委托 Agent 时，才能说明能力未提供；加载或执行失败须报告具体阻塞，不能等同于能力不存在。
+
+默认基础能力由 Agent 的 baseSkills 初始化。`loadSkills` / `releaseSkills` 是 Control Channel Action Call；`task.start(description, skills?)` 在创建本 Agent 的前台目标任务时同时加载所需 Skill 组；BasicSkill 教学要求携带已知必要的初始 Skill 数组，成功反馈后下一轮使用提交后的函数，无需再 loadSkills。已有 Skill 可随启动转为任务持有；后续出现新的缺失能力才额外加载。输入参数及数组编码以 Agent.Task canonical 元数据为准。
+
+BasicSkill Instructions.md先检查CURRENT STATE：已有足够事实直接回答，不加载Skill或重复查询；确需执行单步控制/查询/拍摄且函数缺失时才使用loadSkills，多轮持续目标使用startTask。一次拍照且无后续操作不强制创建Task。直接加载只扩展能力，不建立任务目标；默认决策链可包含多次模型请求；无 Task 的 Skill 跨链保留，加载/合法调用重置为 5，未使用的完整用户决策扣 1。Task 先设定目标及可判断的完成条件，等待用户时持续保留；模型根据真实结果判断目标达成或用户明确替换目标后使用 task.end，并如实记录结果；用户取消使用 task.cancel。可恢复动作失败不等于任务结束；运行时决策异常进入 failed，重启进入 interrupted。在已有 Task 中 loadSkills 仅补充任务能力，不创建或替换目标。一次性历史查询仅在所需函数缺失时直接加载，多轮筛选与确认示例使用 Task。
 
 加载先展开依赖，再验证资源、canonical 函数、别名和 Channel，全部成功后提交；任一失败保持原状态。依赖链最多 8 层，展开后最多 16 个 Skill，有效函数含内部能力最多 128 项，Channel 最多 16 个。
 
@@ -135,9 +141,9 @@ BasicSkill Instructions.md先检查CURRENT STATE：已有足够事实直接回�
 
 ## 当前流程规则
 
-Photography 的匹配摄影 Task 在保存／忽略成功且不重拍后，单独执行 closeCamera，收到 operation=close、enabled=false 后才 finishTask；取消和替换同样先完成窗口收尾，BasicSkill 的终态规则与示例遵守该次序。未处置照片保留窗口内保存／忽略／取消决策，关闭失败或取消不结束 Task、不重放已成功的处置。Capture 关闭不关闭背景视觉。独立拍照／保存／忽略操作不创建 Task，也不自动关窗；重拍保留原 Task 和窗口。
+Photography 的匹配摄影 Task 在保存／忽略成功且不重拍后，单独执行 closeCamera，收到 operation=close、enabled=false 后才 task.end；取消和替换同样先完成窗口收尾，该次序遵循 BasicSkill 先确认完成再结束 Task 的通用规则。未处置照片保留窗口内保存／忽略／取消决策，关闭失败或取消不结束 Task、不重放已成功的处置。Capture 关闭不关闭背景视觉。独立拍照／保存／忽略操作不创建 Task，也不自动关窗；重拍保留原 Task 和窗口。
 
-BasicSkill 要求以 AGENT CONTEXT task 和匹配目标判断关闭：无 Task 单步完成只回复，不生成 finishTask/cancelTask。明确目标切换可释放无关非基础近期 Skill；不确定是否放弃旧目标时先问是否继续实际 Task，保持等待状态。明确替换或正常目标完成不重复询问。continueDecision 只继续同一输入剩余新目标；释放 Skill 不代表相机/照片清理。Photography 与 HistoryQuery 的完成示例遵循同一规则。
+BasicSkill 要求以 AGENT CONTEXT task 和匹配目标判断关闭：无 Task 单步完成只回复，不生成 task.end/task.cancel。明确目标切换可释放无关非基础近期 Skill；不确定是否放弃旧目标时先问是否继续实际 Task，保持等待状态。明确替换或正常目标完成不重复询问。continueDecision 只继续同一输入剩余新目标；释放 Skill 不代表相机/照片清理。Photography 与 HistoryQuery 的完成示例遵循同一规则。
 
 历史查询只复制 list 返回的完整 dialog_number；notFound 允许一次重新 list 和一次基于实际 ID 的修正 read，不猜测 ID 或无限重试。业务参数与 media_N 等引用来自真实反馈。语法、Channel/wait 和资源冲突由 Core/Gateway 契约决定，Skill 不重复定义。
 
@@ -212,8 +218,14 @@ Photography与ApplicationControl增加Island.setPresentation以及ui.island事�
 ## Web skills
 
 
-BasicSkill 默认暴露统一 startTask、前台 finishTask、支持后台 taskID 的 cancelTask 及输入专用 sendMessage，教学 foreground/current Agent 与 background/executor 的区别。后台 Writer 无需先建立前台任务或加载 Skill，单任务忙碌需确认替代，用户补充由运行时关联 interactionID。Writing 提供 Artifact_library 与项目管理教学，不重复注册委托入口。Writer 独立后台执行；Assistant 不生成源码。浏览仍由 WebBrowsing 承担。Assistant 当前所有 Skills 均声明 action 和显式 Channel；Writer 的原生工具目录由自身工作流拥有。通用 Skill schema 保留 tool 能力，但不用于 Assistant 当前资源。
+BasicSkill 默认暴露前台 task.start/end、独立 task.delegate、支持可选 agent_id 的 task.cancel/send，教学前台 scope 与后台通信的区别。同一目标的 start/delegate 是按所有者选择的平级入口；其他 Agent 用途和输入要求从 DELEGATABLE AGENTS 读取，BasicSkill 不维护角色职责清单。忙碌、补充、取消清理与接纳不等于完成采用通用规则。Catalog 没有 Writing Skill 或 Artifact_library；Writer 原生工具目录与作品业务由该角色自己拥有。Assistant 当前 Skills 均声明 Action 和显式 Channel；通用 Skill schema 保留 tool 能力。
 
-BasicSkill的Writer教学要求将阶段事实、追问和终态简短汇报给用户，不由通知重委托；运行时拥有播放排空后的启听衔接，不靠模型生成startListening。
+BasicSkill 要求将同伴报告视为证据，不由通知重委托；运行时拥有播放排空后的启听衔接，不靠模型生成startListening。
 
-Skill description是未加载时的能力发现索引，说明触发场景与职责边界。BasicSkill默认观察全窗口摘要；web-browsing增加根/Writer页面观察、定向截图和导航，application-control增加通用窗口控制，writing管理已保存作品。没有加载Skill不等于不存在可加载能力；指令要求根据可用目录加载后再判断可见性，State摘要与实际正文/截图证据明确区分。
+Skill description是未加载时的能力发现索引，说明触发场景与职责边界。BasicSkill默认观察全窗口摘要；web-browsing提供远程页面观察、定向截图和导航；application-control 提供通用窗口控制；跨边界目标根据拥有者公开 description 路由，不在其他 Skill 重复角色用途。没有加载Skill不等于不存在可加载能力；指令要求根据可用目录加载后再判断可见性，State摘要与实际正文/截图证据明确区分。
+
+Photography selects actions.camera.preview and exposes loadPreviewImage/unloadPreviewImage. Teaching distinguishes temporary previewID from persistent mediaID, default latest from explicit selections, and actual image attachments from metadata. Skill absence stops transmission without disposing of cached photos.
+
+Photography teaches actual numeric preview_N references and system-State attachment-order mapping for images merged into the current user input.
+
+Photography describes the20-image FIFO window session, stable local preview_N labels, retained saved/ignored entries, reload and close expiry. Model-visible selection remains latest plus three explicit images; UI paging does not select model evidence.

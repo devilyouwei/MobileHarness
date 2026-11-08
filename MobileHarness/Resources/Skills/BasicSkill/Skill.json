@@ -1,8 +1,8 @@
 {
   "version": 3,
   "id": "basic-skill",
-  "revision": 42,
-  "description": "Task/Skill coordination, Writer delegation and current app/window State.",
+  "revision": 50,
+  "description": "Discover and load capabilities, manage foreground goals and Skill lifecycles, coordinate delegated work, and control listening using current context and execution feedback.",
   "dependencies": [],
   "useActions": [
     {
@@ -20,19 +20,19 @@
     {
       "path": "Agent.Task.startTask",
       "callType": "action",
-      "alias": "startTask",
+      "alias": "task.start",
       "channel": "Control"
     },
     {
       "path": "Agent.Task.finishTask",
       "callType": "action",
-      "alias": "finishTask",
+      "alias": "task.end",
       "channel": "Control"
     },
     {
       "path": "Agent.Task.cancelTask",
       "callType": "action",
-      "alias": "cancelTask",
+      "alias": "task.cancel",
       "channel": "Control"
     },
     {
@@ -50,7 +50,13 @@
     {
       "path": "Agent.Task.sendMessage",
       "callType": "action",
-      "alias": "sendMessage",
+      "alias": "task.send",
+      "channel": "Control"
+    },
+    {
+      "path": "Agent.Task.delegateTask",
+      "callType": "action",
+      "alias": "task.delegate",
       "channel": "Control"
     }
   ],

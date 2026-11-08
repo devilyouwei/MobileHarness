@@ -216,7 +216,7 @@ private enum PhotoPreparationTestFailure: Error { case expected }
     let input = AgentInput(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("web"))
     let bytes = try compressionFixture(width: 80, height: 40)
     for path in ["browse", "snapshot", "navigate"] {
-        let messages = try await AssistantContextBuilder.photoObservations(
+        let messages = try await AssistantContextBuilder.webImageObservations(
             [
                 .init(
                     path: "Web.Page." + path,
@@ -233,31 +233,31 @@ private enum PhotoPreparationTestFailure: Error { case expected }
     }
 }
 
-@Test func assistantPhotoPreparationRejectsErrorsInvalidOutputAndForeignIdentity() async throws {
+@Test func assistantWebImagePreparationRejectsErrorsInvalidOutputAndForeignIdentity() async throws {
     let id = "media_1"
     let input = AgentInput(
         id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("photo"))
     let observation = AgentChatObservation(
-        path: "Camera.Capture.takePhoto",
+        path: "Web.Page.snapshot",
         result: ToolResult(callID: UUID().uuidString, value: "{\"mediaID\":\"\(id)\"}"))
     let original = try compressionFixture(width: 80, height: 40)
     let read: @Sendable (String, AgentInput) async throws -> ChatImage = { id, _ in
         try ChatImage(id: id, data: original)
     }
     await #expect(throws: PhotoPreparationTestFailure.expected) {
-        try await AssistantContextBuilder.photoObservations(
+        try await AssistantContextBuilder.webImageObservations(
             [observation], input: input, chat: CompressedPhotoModel(), read: read,
             prepareJPEG: { _, _ in throw PhotoPreparationTestFailure.expected })
     }
     for output in [Data(), Data(repeating: 1, count: 1024 * 1024 + 1)] {
         await #expect(throws: CapabilityError.self) {
-            try await AssistantContextBuilder.photoObservations(
+            try await AssistantContextBuilder.webImageObservations(
                 [observation], input: input, chat: CompressedPhotoModel(), read: read,
                 prepareJPEG: { _, _ in output })
         }
     }
     await #expect(throws: CommunicationError.invalidPayload) {
-        try await AssistantContextBuilder.photoObservations(
+        try await AssistantContextBuilder.webImageObservations(
             [observation], input: input, chat: CompressedPhotoModel(),
             read: { _, _ in try ChatImage(id: UUID().uuidString, data: original) },
             prepareJPEG: { _, _ in
@@ -266,7 +266,7 @@ private enum PhotoPreparationTestFailure: Error { case expected }
             })
     }
     let cancelled = Task {
-        try await AssistantContextBuilder.photoObservations(
+        try await AssistantContextBuilder.webImageObservations(
             [observation], input: input, chat: CompressedPhotoModel(), read: read,
             prepareJPEG: { data, _ in
                 withUnsafeCurrentTask { $0?.cancel() }
@@ -276,31 +276,31 @@ private enum PhotoPreparationTestFailure: Error { case expected }
     await #expect(throws: CancellationError.self) { try await cancelled.value }
 }
 
-@Test func assistantPhotoPreparationSkipsUnsupportedModelsAndNonPhotoResults() async throws {
+@Test func assistantWebImagePreparationSkipsUnsupportedModelsAndNonPhotoResults() async throws {
     let id = "media_1"
     let input = AgentInput(
         id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("photo"))
     let observation = AgentChatObservation(
-        path: "Camera.Capture.takePhoto",
+        path: "Web.Page.snapshot",
         result: ToolResult(callID: UUID().uuidString, value: "{\"mediaID\":\"\(id)\"}"))
     let read: @Sendable (String, AgentInput) async throws -> ChatImage = { _, _ in
         Issue.record("Skipped observations must not read a photo")
         throw PhotoPreparationTestFailure.expected
     }
-    let prepare: @Sendable (Data, AssistantPhotoInputPolicy) async throws -> Data = { _, _ in
+    let prepare: @Sendable (Data, AssistantWebImagePolicy) async throws -> Data = { _, _ in
         Issue.record("Skipped observations must not prepare a photo")
         throw PhotoPreparationTestFailure.expected
     }
-    let unavailable = try await AssistantContextBuilder.photoObservations(
+    let unavailable = try await AssistantContextBuilder.webImageObservations(
         [observation], input: input, chat: CompressedPhotoModel(supportsImages: false), read: read,
         prepareJPEG: prepare)
     #expect(unavailable.count == 1 && unavailable.first?.images == nil)
     #expect(unavailable.first?.content.contains("image analysis is unavailable") == true)
-    let ignored = try await AssistantContextBuilder.photoObservations(
+    let ignored = try await AssistantContextBuilder.webImageObservations(
         [
             .init(path: "Camera.Capture.savePhoto", result: observation.result),
             .init(
-                path: "Camera.Capture.takePhoto",
+                path: "Web.Page.snapshot",
                 result: .init(callID: observation.result.callID, value: "failed", isError: true)),
         ], input: input, chat: CompressedPhotoModel(), read: read, prepareJPEG: prepare)
     #expect(ignored.isEmpty)
@@ -316,9 +316,9 @@ private enum PhotoPreparationTestFailure: Error { case expected }
     let store = try fixtureMediaStore(root: directory)
     let id = try await store.save(original, owner: owner)
     let observation = AgentChatObservation(
-        path: "Camera.Capture.takePhoto",
+        path: "Web.Page.snapshot",
         result: ToolResult(callID: UUID().uuidString, value: "{\"mediaID\":\"\(id)\"}"))
-    let handler = AssistantContextBuilder.photoObservationHandler(
+    let handler = AssistantContextBuilder.webImageObservationHandler(
         read: { id, _ in
             try await ChatImage(id: id, data: store.read(id, owner: owner))
         },
@@ -352,5 +352,4 @@ private enum PhotoPreparationTestFailure: Error { case expected }
     #expect(wireImage["detail"] as? String == "auto")
     let reopened = try fixtureMediaStore(root: directory)
     #expect(try await reopened.read(id, owner: owner) == original)
-    #expect(try await reopened.readForInput(id, source: "assistant", input: input.id) == original)
 }

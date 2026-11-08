@@ -313,7 +313,7 @@ private actor WriterFailureProbe {
 @Test func invalidReadRangesDoNotMasqueradeAsStorageCapacity() async throws {
     let editor = ArtifactEditing(draft: try ArtifactDraft(files: ["index.html": "hello"]))
     await #expect(throws: ArtifactWorkspaceError.invalidReadRange) {
-        try await editor.readLines(path: "index.html", line: 1, count: 101)
+        try await editor.readLines(path: "index.html", line: 1, count: 0)
     }
     await #expect(throws: ArtifactWorkspaceError.invalidReadRange) {
         try await editor.read(path: "index.html", offset: 6)

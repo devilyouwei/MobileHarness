@@ -5,6 +5,19 @@ import UI
 
 /// History.Conversation function ownership.
 extension HistoryActions {
+    @Action(domain: "History", module: "Conversation", title: "clearLogs")
+    public static func clearLogs(invocation: any FunctionInput, using history: any HistoryMutationCapability)
+        async throws -> String
+    {
+        try ActionArguments(invocation.call.parameters).validateAllowedKeys(["requestID"])
+        let input = invocation.call.parameters["requestID"]
+        guard input == nil || BusinessRecordID(rawValue: input ?? "")?.kind == .request else {
+            throw ActionArguments.ValidationError.invalidValue("requestID")
+        }
+        try await history.clearRequestLogs(requestID: input)
+        return "{\"cleared\":true}"
+    }
+
     @Action(domain: "History", module: "Conversation", title: "startNew")
     public static func startNew(invocation: any FunctionInput, using history: any HistoryMutationCapability)
         async throws -> String
@@ -130,7 +143,6 @@ extension HistoryActions {
                     case .message(let id): query = .message(id)
                     case .page(let id, let after, let taskID): query = .page(id: id, after: after, taskID: taskID)
                     case .archives(let before): query = .archives(before: before)
-                    case .photo(let id, let input): query = .photo(id: id, inputID: input)
                     default: throw HistoryQueryError.missingConversation
                     }
                     let result = try await reads.read(query)
@@ -141,7 +153,6 @@ extension HistoryActions {
                     case .archives(let values):
                         reply = .archives(
                             try await MainActor.run { try values.map(HistoryPresentationAdapter.conversation) })
-                    case .photo(let value): reply = .photo(value)
                     }
                     try await request.complete(reply)
                 } catch {

@@ -39,7 +39,7 @@ Task 压缩行以实际 historyTaskID、input/request 来源对及 historyOrder 
 
 ## 历史展示与导出
 
-Task／ReACT 标签、状态、来源数量及分层缩进分别表达真实证据；详情保留原始输入、模型请求、执行、元数据和 Functions/Skills。结构化 Function Catalog 只解析记录时的 schema，一次解析并保留错误与原 JSON，不回退为当前注册表或虚构空结果。
+Task／ReACT 标签、状态、来源数量及分层缩进分别表达真实证据；Assistant 详情依次展示 User Request、Assistant Response、Tasks、Skills、States、Function Catalog、Prompts、Generation Meta 与页尾日志清空按钮。Tasks、Skills、States、Function Catalog 位于同一个业务 Section，按同级内容组排列，分别使用蓝色 checklist、紫色 square.stack.3d.up、橙色 square.stack.3d.down.right、绿色 function 图标。States 展示该轮记录的实际选择路径，缺少证据显示 Not recorded，记录为空显示 None。Prompts 只显示格式化消息、图片和工具定义；不展示完整请求/模型返回日志原始 JSON，也没有 Action Execution 区块。结构化 Function Catalog 只解析记录时的 schema，一次解析并保留错误与原 JSON，不回退为当前注册表或虚构空结果。
 
 Function Catalog 为独立平铺 Form 行，展开状态为页面局部值，避免嵌套交互行接管点击。Token 用量只显示已报告的值，包括可选缓存读写；零与缺失不同。
 
@@ -126,9 +126,10 @@ SettingsInput/Reply、ResourcesInput/Reply、HistoryInput/Reply、DeviceInput分
 
 ## Writer 记录与作品
 
-UIHistoryContainer owns Assistant conversations. WriterRecordsView displays 20-item task pages with a purple icon, goal, task ID, canonical status, update time and full request count. WriterRequestItem provides lightweight pages; full text, native calls/results and errors load only on request-detail navigation. Visible state refreshes every two seconds without reopening loaded source.
+UIHistoryContainer owns Assistant conversations. My Writer 的上方入口显示真实委托总数，详情展示来源、原始输入、状态、结果、前序消息与 workspace 链接；下方是 workspace 列表，使用 workspace 标题和消息数量。Workspace 详情没有委托分段；单条消息保留来源身份。Writer 返回精确分页游标，页面快照保留已加载行与成功标志，返回子详情不重置，下拉刷新成功后替换，失败/取消保留。末页轮询去重更新尾页。完整模型证据按消息身份按需加载。
 
-Task goals and Assistant conversation titles use the same HistoryRecordRow: a vertically centered 20pt icon in a 24pt column, body title with two-line tail truncation, 6pt gap, caption metadata and 12pt vertical padding. Assistant icons are blue; Writer icons are muted purple. Titles use primary text and separators begin at the text column. My Assistant keeps Current Conversation/Past Conversations and New Conversation; My Writer opens the task list directly. Assistant metadata shows actual turnCount (falling back to loaded turns only when absent) and createdAt, never an inferred last-active date. Writer metadata shows stable task ID, cumulative requestCount, short latest-status capsule and updatedAt. Success is green, failure red, active blue and cancelled/interrupted/unknown neutral; waiting/paused remain distinct labels. Metadata and dates share a line where space permits and stack at narrow widths/large text sizes without dropping fields. HistoryListPresentation formats dates in the supplied/current calendar and time zone as MM/dd HH:mm or yyyy/MM/dd HH:mm across years. Task header combines a vertically centered purple icon with a text column: small secondary monospaced task ID above the full wrapping goal. First start, cumulative duration, total rounds, latest status and existing file/export actions follow in their original order. Request-row number badges use smaller subheadline digits and remain gray, red only for failed requests; titles, retries, timestamps and state capsules remain unchanged. WriterArtifactsControlling owns snapshot reads, native previews and source/ZIP/PDF export.
+
+Task goals and Assistant conversation titles use the same HistoryRecordRow: a vertically centered 20pt icon in a 24pt column, body title with two-line tail truncation, 6pt gap, caption metadata and 12pt vertical padding. Assistant icons are blue; Writer icons are muted purple. Titles use primary text and separators begin at the text column. My Assistant keeps Current Conversation/Past Conversations and New Conversation; My Writer opens the task list directly. Assistant metadata shows actual turnCount (falling back to loaded turns only when absent) and createdAt, never an inferred last-active date. Writer metadata shows stable task ID, cumulative requestCount and updatedAt; a reusable task has no latest-execution status badge. Metadata and dates share a line where space permits and stack at narrow widths/large text sizes without dropping fields. HistoryListPresentation formats dates in the supplied/current calendar and time zone as MM/dd HH:mm or yyyy/MM/dd HH:mm across years. Task header combines a vertically centered purple icon with a text column: small secondary monospaced task ID above the full wrapping goal. Start time, update time, total rounds and file browsing follow in that order. Task conversation export is an icon button in the top-right toolbar, retaining the existing share and failure flow. Request-row number badges use smaller subheadline digits and remain gray, red only for failed requests; titles, retries, timestamps and state capsules remain unchanged. WriterArtifactsControlling owns snapshot reads, native previews and source/ZIP/PDF export.
 
 模型发现按稳定 Provider ID 缓存，页面进入刷新两个已选 Provider，切换 Provider 和编辑凭据自动查询；同 Provider 可共享列表而不共享 Agent 的模型选择。返回值经 ApplicationControl/Gateway 后由表单控制器呈现，凭据快照/请求 ID 阻止迟到覆盖。最多 32 个查询（包括尚未退出的取消任务），溢出明确显示错误；离页取消，根关闭加入。刷新不清空已保存模型，失败提供重试。保存仍走既有业务事务，密钥留钥匙串。
 
@@ -138,12 +139,25 @@ Writer请求与工具详情消费UI自有HistoryFailureDiagnostic，展示消息
 
 Writer云模型区提供深度思考开关，草稿默认false，编辑递增revision，通过既有保存/还原端口传递。UI仅保存布尔值，不解释Provider推理参数；保存后对新建/续作委托生效，当前执行不变。本地选择隐藏此云端选项。
 
-Writer请求详情展示Provider首个公开token延迟和请求总耗时；缺失采样显示未知，不以UI接收时间代替。完成时间冻结，进行中显示读取快照时的耗时。文件内容响应及工具参数/结果默认DisclosureGroup折叠，展开后保留完整文本和复制。任务执行时长由Writer提供各run累计值与当前run开始时间，UI只做格式化，随既有2秒摘要刷新推进。
+Writer 请求详情依次展示本轮概览、本轮输入、本轮工具调用、本轮产出和调试日志。详情通过 WriterRecordsControlling.requestDetail 按稳定记录 ID 加载，概览展示轮次、操作、阶段、路径、重试、时间、可复制的请求 ID 和独立的模型、工具状态。委托来源集中展示于委托详情。前序和 Workspace 请求通过系统返回回到各自入口，工具来源链接只指向已验证的较早请求。下拉刷新更新在途记录，单页的读取与清日志互斥，刷新失败保留已显示数据。
+
+输入优先使用本轮持久化的 user/tool 快照，其次是日志中的最后一组 user/tool，再回退到业务输入文本。工具反馈显示简短摘要并可展开原文；已匹配的工具来源提供跳转。工具目录来自本轮保存的定义，默认收起，区分空目录、未记录和读取失败。调用卡直接展示命令、目标、状态和错误，参数及结果默认收起。产出按存在性显示已保存的模型文本或文件路径，以及该模型调用的宿主收尾状态和证据，均按需展开。
+
+调试日志中的完整 Prompts 和生成指标默认收起。Prompts 与 Assistant 共用 HistoryPromptItems，支持应用消息、Chat Completions 和 Responses 的结构化呈现。生成指标使用当前调用的模型、参数、首 token、时长、结束原因、用量及失败信息，缺少的参数标为未记录。
 
 Writer任务列表和详情目标标题使用系统primary正文色，Writer图标独立使用紫色；颜色不从Label父级传递到整段目标文字。深浅模式和高对比度由系统语义正文色适配，编号徽章默认灰色、失败红色，状态标签保留独立语义配色。
 
-Writer task records represent agent-owned workspaces; status is the latest delegation result. Delegation groups use local display ordinals, never UUID text. Internal delegateID remains available only in full evidence/export, while window/file controls use readable owner/task and window_N references.
+Writer task records represent agent-owned workspaces; runtime delegation states are not task-level presentation fields. Delegation groups use local display ordinals, never UUID text. Internal delegateID remains available only in full evidence/export, while window/file controls use readable owner/task and window_N references.
 
 历史缩略图使用固定112×84预览容器持有异步加载任务，加载身份包含请求、媒体和重试次数；
-占位、图片和失败按钮的切换不替换任务所有者。缺失字节、读取和解码失败显示重试，取消不提交
-空白完成状态；原图查看仍保留原始字节，并通过Actions验证原输入的图片引用。
+占位、图片和失败状态的切换不替换任务所有者。临时图片已释放时显示“图片已释放”，读取或解码失败保留重试；取消不提交空白完成状态。新日志图片直接解码完整请求的Base64，内容是实际发给模型的图片，可能经过缩放；不依赖Camera缓存、相册或当前State。日志缺少字节或已清理时不回退缓存、相册或业务字段。读取不改变模型选图。
+
+Assistant 对话详情和 Writer 请求详情提供单条日志清空按钮及确认，历史列表提供共享全库清空。删除成功后就地移除日志副本并隐藏删除按钮，Writer 的调试日志区显示「日志已清空」。Writer 的概览、已持久化输入、工具目录、工具调用/结果、模型正文和宿主收尾仍可查看。Writer 详情加载请求体用于 Prompts，任务导出可读取请求体和响应体。列表不承载 Base64，HistoryRecordedImages 负责有界字节解码和缩略图引用。
+
+历史详情只消费 UI 投影。Assistant 页可携带前台任务摘要；Writer 页只携带本侧消息轮次，解码时缺少 taskCompressions 表示空摘要列表，不要求 Writer 存储提供 Assistant 字段。消息身份、创建时间和轮次结构仍是必需数据。
+
+WelcomeProviderView 提供可选 URL（空值使用 OpenAI）与必填 SecureField API key，两项均使用用户主动触发的系统 PasteButton。SettingsFormController.needsWelcome 仅在恢复成功且 Provider 列表为空时成立；saveWelcomeProvider 复用现有 URL/长度校验及设置保存事务，成功后发布 Provider 列表，失败保留输入和错误。保存时阻止重复提交、编辑和关闭；停止后不发布新 Provider。Welcome 创建独立服务配置，不预设自定义服务的模型 ID，随后由现有智能体大脑页面分别选择 Assistant/Writer 模型。稍后设置不写持久化标记。
+
+保存配置仅在 Assistant 启用云端时将其草稿 key/model 同步到选中 Provider；Assistant 为本地时保持 Provider 列表的独立凭据，Writer 单独选择云端不会被 Assistant 的空草稿覆盖。
+
+Assistant 详情在实际删除成功后生成去日志的内存副本，保留业务信息，移除请求、图片来源与生成 meta，导出同一副本；无需通过二次读取才能确认已提交的删除。删除失败保留原详情并显示错误，忙态阻止重复提交。

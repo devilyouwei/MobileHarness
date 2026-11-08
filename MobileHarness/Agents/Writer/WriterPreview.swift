@@ -46,7 +46,7 @@ actor WriterPreview {
                     try Task.checkCancellation()
                     guard epoch == token else { return }
                     let fields = try? JSONDecoder().decode([String: String].self, from: Data(value.utf8))
-                    if fields?["status"] == "unavailable" {
+                    if fields?["status"] == "unavailable", fields?["reason"] != "minimized" {
                         unavailable = true
                         pending = false
                         return

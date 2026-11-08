@@ -9,6 +9,7 @@ import ModelKit
 import PlatformKit
 import StorageChat
 import StorageCore
+import StorageSQLite
 import Testing
 
 @testable import Agents
@@ -61,11 +62,15 @@ struct HistoryReadFixture: HistoryFullReadCapability {
         function: HistoryActions.summarizeDefinition(completing: { invocation in
             .value(try await HistoryActions.summarize(invocation: invocation, using: mutations))
         }), protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
+    let clearLogs = ActionBinding(
+        function: HistoryActions.clearLogsDefinition(completing: { invocation in
+            .value(try await HistoryActions.clearLogs(invocation: invocation, using: mutations))
+        }), protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
     let gateway = await OutputGateway(
         manager: manager, requests: input,
         tools: try ToolRegistry(modules: [
             HistoryPresentationModule(
-                definitions: [definition, deletion, archive, title]
+                definitions: [definition, deletion, archive, title, clearLogs]
                     + (reads.map {
                         [
                             ActionBinding(
@@ -87,7 +92,7 @@ struct HistoryReadFixture: HistoryFullReadCapability {
 
 @Test(.actionCatalog) @MainActor func historyRefreshTravelsThroughBothGatewaysWithoutVoiceOrModels() async throws {
     let session = UUID().uuidString
-    let store = ConversationHistoryStore()
+    let store = AssistantHistoryStore()
     let state = ConversationHistoryState()
     let runtime = try await intentRuntime(
         sessionID: session, presentation: HistoryPresentationAdapter(state: state, store: store, sessionID: session))
@@ -174,7 +179,7 @@ private actor HeldHistoryPresentation: HistoryPresentationCapability {
 @Test(.actionCatalog) @MainActor func historyPresentationRejectsForeignScopeWithoutChangingState() async throws {
     let state = ConversationHistoryState()
     let adapter = HistoryPresentationAdapter(
-        state: state, store: ConversationHistoryStore(), sessionID: UUID().uuidString)
+        state: state, store: AssistantHistoryStore(), sessionID: UUID().uuidString)
     let invocation = ActionInvocation(
         call: ToolRequest(id: UUID().uuidString, toolPath: "UI.HistoryPresentation.showHistory"),
         context: ActionExecutionContext(
@@ -183,7 +188,7 @@ private actor HeldHistoryPresentation: HistoryPresentationCapability {
     #expect(state.archive == nil)
 }
 
-private func archivedHistory(_ store: ConversationHistoryStore) async throws -> String {
+private func archivedHistory(_ store: AssistantHistoryStore) async throws -> String {
     let read = try await store.readCurrent()
     let turn = UUID().uuidString
     _ = try await store.begin(id: turn, user: "archive", request: [], expecting: read.token, model: "fixture")
@@ -193,7 +198,7 @@ private func archivedHistory(_ store: ConversationHistoryStore) async throws -> 
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func historyDeleteUsesCorrelatedRuntimeResultBeforePresentation() async throws {
-    let store = ConversationHistoryStore()
+    let store = AssistantHistoryStore()
     let id = try await archivedHistory(store)
     let session = UUID().uuidString
     let state = ConversationHistoryState()
@@ -213,7 +218,7 @@ func historyDeleteUsesCorrelatedRuntimeResultBeforePresentation() async throws {
 func historyDeleteRejectsCurrentAndMissingIDsAndAllowsRefreshAfterFailure()
     async throws
 {
-    let store = ConversationHistoryStore()
+    let store = AssistantHistoryStore()
     let session = UUID().uuidString
     let state = ConversationHistoryState()
     let runtime = try await intentRuntime(
@@ -233,7 +238,7 @@ private actor HeldHistoryMutation: HistoryMutationCapability {
     nonisolated let cancelled = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     private let mutations: HistoryMutationService
     private var release: CheckedContinuation<Void, Never>?
-    init(store: ConversationHistoryStore) {
+    init(store: AssistantHistoryStore) {
         mutations = HistoryMutationService(store: store, summarizeTitle: { _ in "Unused fixture title" })
     }
     func startNew() async throws -> String? { try await mutations.startNew() }
@@ -259,7 +264,7 @@ private actor HeldHistoryMutation: HistoryMutationCapability {
 func historyDeleteCancellationJoinsCleanupWithoutRollingBackCommittedData()
     async throws
 {
-    let store = ConversationHistoryStore()
+    let store = AssistantHistoryStore()
     let id = try await archivedHistory(store)
     let session = UUID().uuidString
     let state = ConversationHistoryState()
@@ -380,8 +385,8 @@ private actor ControlledTitle: ChatCapability {
     }
 }
 
-private func completedConversation() async throws -> ConversationHistoryStore {
-    let store = ConversationHistoryStore()
+private func completedConversation() async throws -> AssistantHistoryStore {
+    let store = AssistantHistoryStore()
     let id = UUID().uuidString
     let read = try await store.readCurrent()
     _ = try await store.begin(
@@ -440,7 +445,7 @@ func rootShutdownCancelsTitleAndPreservesArchiveRetryState() async throws {
 func emptyHistoryArchiveDoesNotInferOrReplaceCurrentConversation()
     async throws
 {
-    let store = ConversationHistoryStore()
+    let store = AssistantHistoryStore()
     let current = try await store.snapshot().current.id
     let state = ConversationHistoryState()
     let session = UUID().uuidString
@@ -461,7 +466,7 @@ func emptyHistoryArchiveDoesNotInferOrReplaceCurrentConversation()
 @Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor func titleFailureRefreshesRetryStateAndAllowsNewAttempt()
     async throws
 {
-    let store = ConversationHistoryStore()
+    let store = AssistantHistoryStore()
     let id = try await archivedHistory(store)
     let state = ConversationHistoryState()
     let chat = ControlledTitle()
@@ -487,7 +492,7 @@ func emptyHistoryArchiveDoesNotInferOrReplaceCurrentConversation()
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func summarizeRejectsCurrentAndMissingArchivesWithoutInference() async throws {
-    let store = ConversationHistoryStore()
+    let store = AssistantHistoryStore()
     let session = UUID().uuidString
     let state = ConversationHistoryState()
     let runtime = try await intentRuntime(
@@ -601,7 +606,7 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
     try await agent.start()
     let input = UUID().uuidString
     _ = try await agent.controlTask(
-        "startTask", arguments: ["goal": "拍照并等待保存", "skills": "[\"photography\"]"],
+        "task.start", arguments: ["description": "拍照并等待保存", "skills": "[\"photography\"]"],
         source: "assistant", sessionID: session, inputID: input, decisionID: nil)
     let read = try await store.readCurrent()
     _ = try await store.begin(id: input, user: "帮我拍照", request: [], expecting: read.token, model: "fixture")
@@ -624,7 +629,7 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
         ConversationHistoryPresentation.turns(currentRecords).filter { $0.historyTaskID == historyTaskID }
             .count == 1)
     _ = try await agent.controlTask(
-        "cancelTask", arguments: ["reason": "用户开始新对话"], source: "assistant", sessionID: session,
+        "task.cancel", arguments: ["reason": "用户开始新对话"], source: "assistant", sessionID: session,
         inputID: UUID().uuidString, decisionID: nil)
     let archived = try #require(try await store.startNew())
     #expect(archived.turns.first?.id == input)
@@ -647,7 +652,7 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
 }
 
 @Test(.actionCatalog) @MainActor func historyReadQueryIsAdmittedByMemoryWithoutPresentationOrModel() async throws {
-    let store = ConversationHistoryStore()
+    let store = AssistantHistoryStore()
     let current = try await store.readCurrent()
     let reads = HistoryReadFixture { query in
         guard case .conversation(let id) = query else { throw CommunicationError.invalidPayload }
@@ -700,18 +705,18 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
             entered.continuation.yield(())
             for await _ in release.stream { break }
             try Task.checkCancellation()
-            return .photo(nil)
+            return .archives([])
         } onCancel: {
             cancelled.continuation.yield(())
         }
     }
-    let store = ConversationHistoryStore()
+    let store = AssistantHistoryStore()
     let session = UUID().uuidString
     let runtime = try await intentRuntime(
         sessionID: session,
         presentation: HistoryPresentationAdapter(state: ConversationHistoryState(), store: store, sessionID: session),
         reads: reads)
-    let operation = Task { try await runtime.query(.photo(id: "media_1", inputID: "input")) }
+    let operation = Task { try await runtime.query(.archives(before: 20)) }
     for await _ in entered.stream { break }
     operation.cancel()
     for await _ in cancelled.stream { break }
@@ -728,7 +733,7 @@ private enum HistoryReadFixtureFailure: Error, Equatable { case unavailable }
     let session = UUID().uuidString
     let runtime = try await intentRuntime(
         sessionID: session,
-        presentation: HistoryPresentationAdapter(state: state, store: ConversationHistoryStore(), sessionID: session),
+        presentation: HistoryPresentationAdapter(state: state, store: AssistantHistoryStore(), sessionID: session),
         reads: reads)
     await #expect(throws: HistoryReadFixtureFailure.unavailable) { try await runtime.query(.archives(before: 10)) }
     #expect(state.archive == nil)
@@ -745,7 +750,7 @@ func protectedHistoryReadsKeepFourWorkersAndJoinRootStop() async throws {
         try Task.checkCancellation()
         return .archives([])
     }
-    let store = ConversationHistoryStore()
+    let store = AssistantHistoryStore()
     let runtime = try await intentRuntime(
         sessionID: "bounded-reads",
         presentation: HistoryPresentationAdapter(
@@ -802,7 +807,7 @@ func cancellingAUIReadJoinsWorkAndKeepsTheAgentConsumerAvailable() async throws 
     let runtime = try await intentRuntime(
         sessionID: "ui-read-cancel",
         presentation: HistoryPresentationAdapter(
-            state: ui.history.presentation, store: ConversationHistoryStore(), sessionID: "ui-read-cancel"),
+            state: ui.history.presentation, store: AssistantHistoryStore(), sessionID: "ui-read-cancel"),
         reads: HistoryReadFixture { try await gate.read($0) }, uiHistory: ui.history)
     try await runtime.prepareForInteraction()
     let first = Task { try await ui.history.requests.submit(.archives(0)) }
@@ -822,4 +827,56 @@ func cancellingAUIReadJoinsWorkAndKeepsTheAgentConsumerAvailable() async throws 
     #expect(ui.history.requests.outstanding == 0)
     await runtime.shutdown()
     await ui.stop()
+}
+
+@Test(.actionCatalog) @MainActor func logClearingTravelsFromUIThroughMemoryAndActionsToSQLite() async throws {
+    let database = try SQLiteRepositories.temporary()
+    let records = try AssistantRecordStore(
+        repository: database.assistantMessages, tasks: database.assistantTasks,
+        conversations: database.assistantConversations, logs: database.logs)
+    let store = AssistantHistoryStore(records: records)
+    var requestIDs: [String] = []
+    for number in 1...2 {
+        let input = "clear-input-\(number)"
+        _ = try await store.begin(
+            id: input, user: input, request: [], expecting: store.readCurrent().token, model: "fixture")
+        try await store.beginModelRequest(.init(id: UUID().uuidString, input: input, requestJSON: "[]"), for: input)
+        try await store.recordModelExchange(requestJSON: "{\"messages\":[]}", response: "[]", for: input, initial: true)
+        try await store.append("reply-\(number)", to: input)
+        try await store.finishModelRequest(input, reason: "stop")
+        try await store.finish(input, state: .completed)
+        requestIDs.append(
+            try #require(try await store.readCurrent().current.turns.last?.modelRequests?.last?.messageID))
+    }
+    let ui = UIContainer()
+    try ui.start()
+    let session = UUID().uuidString
+    let mutations = HistoryMutationService(store: store, summarizeTitle: { _ in "unused" })
+    let runtime = try await intentRuntime(
+        sessionID: session,
+        presentation: HistoryPresentationAdapter(state: ui.history.presentation, store: store, sessionID: session),
+        mutations: mutations,
+        reads: HistoryReadFixture { query in
+            guard case .message(let id) = query else { throw CommunicationError.invalidPayload }
+            return .conversation(try await store.message(id))
+        }, uiHistory: ui.history)
+    try await runtime.prepareForInteraction()
+    _ = try await ui.history.requests.submit(.clearLogs(requestIDs[0]))
+    guard case .conversation(let detail) = try await ui.history.requests.submit(.message(requestIDs[0])) else {
+        Issue.record("Expected reloaded detail after clear")
+        return
+    }
+    let display = try #require(ConversationHistoryPresentation.turns(detail).first)
+    #expect(display.logsCleared == true && display.raw == "reply-1")
+    #expect(try await database.logs.requestPayload(requestIDs[1], agent: "assistant") != nil)
+    // Omitted optional parameter is the explicit whole-library command.
+    _ = try await ui.history.requests.submit(.clearLogs(nil))
+    #expect(try await database.logs.requestPayload(requestIDs[1], agent: "assistant") == nil)
+    #expect(try database.storageStatistics().messages == 2)
+    #expect(try database.storageStatistics().requests == 2)
+    #expect(ui.history.requests.outstanding == 0)
+    await runtime.shutdown()
+    await ui.stop()
+    await mutations.shutdown()
+    try await database.shutdown()
 }

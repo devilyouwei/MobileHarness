@@ -17,8 +17,8 @@ public enum HistoryQueryError: Error, Equatable, Sendable, ActionExecutionFailur
 
 /// Read-only business projection. No new store, queue, title inference or effect replay.
 public struct HistoryQueryService: HistoryQueryCapability {
-    private let store: ConversationHistoryStore
-    public init(store: ConversationHistoryStore) { self.store = store }
+    private let store: AssistantHistoryStore
+    public init(store: AssistantHistoryStore) { self.store = store }
 
     private struct Text: Encodable {
         let value: String
@@ -44,7 +44,7 @@ public struct HistoryQueryService: HistoryQueryCapability {
     }
     private struct Turn: Encodable {
         let id: String
-        let state: ConversationRecord.State
+        let state: AssistantRecord.State
         let kind: String
         let taskID: String?
         let inputID: String?
@@ -91,10 +91,10 @@ public struct HistoryQueryService: HistoryQueryCapability {
             throw ActionArguments.ValidationError.invalidValue("id")
         }
         try Task.checkCancellation()
-        let page: (items: [ConversationHistoryItem], total: Int)
+        let page: (items: [AssistantHistoryItem], total: Int)
         do {
             page = try await store.timelinePage(id.rawValue, offset: offset, limit: limit)
-        } catch ConversationHistoryError.missingTurn { throw HistoryQueryError.missingConversation }
+        } catch AssistantHistoryError.missingTurn { throw HistoryQueryError.missingConversation }
         let items = page.items
         let turns = items.map { item -> Turn in
             switch item {

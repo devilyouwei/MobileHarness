@@ -21,7 +21,7 @@ private func historyRequest(_ path: String, _ arguments: [String: String]) -> Ac
 private func historyObject(_ json: String) throws -> [String: Any] {
     try #require(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
 }
-private func historyTurn(_ store: ConversationHistoryStore, user: String, response: String) async throws {
+private func historyTurn(_ store: AssistantHistoryStore, user: String, response: String) async throws {
     let read = try await store.readCurrent()
     let id = UUID().uuidString
     _ = try await store.begin(id: id, user: user, request: [], expecting: read.token, model: "fixture")
@@ -32,7 +32,7 @@ private func historyTurn(_ store: ConversationHistoryStore, user: String, respon
 }
 
 @Test(.actionCatalog) func historyToolsPageRawRecordsWithoutMutationOrReplay() async throws {
-    let store = ConversationHistoryStore()
+    let store = AssistantHistoryStore()
     try await historyTurn(store, user: "past", response: "<express emotion=\"happy\"/>")
     let archived = try #require(try await store.startNew())
     try await store.setTitle("Saved summary", for: archived.id)
@@ -62,7 +62,7 @@ private func historyTurn(_ store: ConversationHistoryStore, user: String, respon
 }
 
 @Test(.actionCatalog) func historyToolsReportTruncationAndRejectMissingOrOversizedResults() async throws {
-    let store = ConversationHistoryStore()
+    let store = AssistantHistoryStore()
     try await historyTurn(store, user: String(repeating: "中", count: 100), response: String(repeating: "答", count: 200))
     let read = try await store.readCurrent()
     let history = HistoryQueryService(store: store)
@@ -74,7 +74,7 @@ private func historyTurn(_ store: ConversationHistoryStore, user: String, respon
     await #expect(throws: HistoryQueryError.missingConversation) {
         try await history.read(reference: .init(id: "dialog_999999"), offset: 0, limit: 1)
     }
-    let crowded = ConversationHistoryStore()
+    let crowded = AssistantHistoryStore()
     for _ in 0..<2 {
         try await historyTurn(
             crowded, user: String(repeating: "\u{1}", count: 80), response: String(repeating: "\u{1}", count: 160))
@@ -134,9 +134,9 @@ private actor HistoryQueryProbe: HistoryQueryCapability {
     #expect(call.toolPath == "History.Conversation.list" && call.id == id)
     let registry = try BehaviorAssembly(capabilityModules: [
         HistoryModule(
-            history: HistoryQueryService(store: ConversationHistoryStore()),
+            history: HistoryQueryService(store: AssistantHistoryStore()),
             mutations: HistoryMutationService(
-                store: ConversationHistoryStore(), summarizeTitle: { _ in "Unused fixture title" })
+                store: AssistantHistoryStore(), summarizeTitle: { _ in "Unused fixture title" })
         )
     ]).tools
     let input = AgentInput(
@@ -150,7 +150,7 @@ private actor HistoryQueryProbe: HistoryQueryCapability {
 @Test(.actionCatalog) func historyCanonicalIDReadsAfterArchiveAndReopen() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
-    let store = ConversationHistoryStore(records: try testConversationRecords(directory: directory))
+    let store = AssistantHistoryStore(records: try testConversationRecords(directory: directory))
     try await historyTurn(store, user: "recorded input", response: "actual answer")
     let history = HistoryQueryService(store: store)
     let listed = try #require(try historyObject(await history.list(offset: 0, limit: 1))["items"] as? [[String: Any]])
@@ -158,7 +158,7 @@ private actor HistoryQueryProbe: HistoryQueryCapability {
     #expect(id.hasPrefix("dialog_"))
     #expect(listed[0]["ref"] == nil)
     _ = try await store.startNew()
-    let reopened = ConversationHistoryStore(records: try testConversationRecords(directory: directory))
+    let reopened = AssistantHistoryStore(records: try testConversationRecords(directory: directory))
     let reader = HistoryQueryService(store: reopened)
     let result = try await HistoryActions.read(
         invocation: historyRequest("History.Conversation.read", ["id": id, "offset": "0", "limit": "2"]),

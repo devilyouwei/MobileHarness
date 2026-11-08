@@ -67,7 +67,7 @@ public struct ProviderEditorDraft: Identifiable {
     }
 }
 public enum ProviderEditorError: LocalizedError {
-    case name, url, duplicate, capacity, key
+    case name, url, duplicate, capacity, key, missingKey
     public var errorDescription: String? {
         switch self {
         case .name: return "请输入名称（最多 128 字节）"
@@ -75,6 +75,7 @@ public enum ProviderEditorError: LocalizedError {
         case .duplicate: return "此 URL 已存在，请编辑已有 Provider"
         case .capacity: return "最多可保存 32 个 Provider"
         case .key: return "API Key 过长"
+        case .missingKey: return "请输入 API key"
         }
     }
 }
@@ -89,6 +90,8 @@ public protocol SettingsOperating: AnyObject {
 
 @MainActor
 public protocol SettingsControlling: AnyObject {
+    var needsWelcome: Bool { get }
+    func saveWelcomeProvider(url: String, key: String) async -> Bool
     func restore() async throws
     func loadModels(providerID: String)
     func refreshModels()

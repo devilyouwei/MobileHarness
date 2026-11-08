@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "models": [
+    {
+      "id": "qwen3.8-max",
+      "provider": "aliyun",
+      "thinking": "minimum"
+    },
+    {
+      "id": "gpt-6.1-sol",
+      "provider": "openai",
+      "thinking": "minimum"
+    }
+  ],
+  "scenarioFile": "Tests/AgentModelEvaluationTests/Scenarios/writer-workflows.json",
+  "caseSeconds": 300,
+  "requestLimit": 24,
+  "scope": "real Writer/Gateway/Artifacts/SQLite and macOS WebKit with production window state; simulated animation acknowledgements, not iOS device acceptance"
+}

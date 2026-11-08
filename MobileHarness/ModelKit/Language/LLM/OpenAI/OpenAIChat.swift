@@ -47,29 +47,40 @@ public actor OpenAIChat: ChatCapability {
         let task = Task {
             defer { control.finish() }
             var transportStage = ChatFailureDiagnostic.Stage.http
+            var capture = HTTPByteCapture(sink: request.transportCapture)
             do {
                 try Task.checkCancellation()
                 request.timing?.start()
+                await request.transportCapture?(
+                    .request(
+                        method: http.httpMethod ?? "GET", url: HTTPLogSanitizer.url(http.url),
+                        headers: HTTPLogSanitizer.headers(http.allHTTPHeaderFields ?? [:]),
+                        body: http.httpBody ?? Data(), at: Date()))
                 let (bytes, response) = try await network.bytes(for: http)
                 control.installHTTP(bytes.task)
                 guard let response = response as? HTTPURLResponse else {
                     throw OpenAIChatError.responseFailure(.init(.invalidHTTPResponse, stage: .http))
                 }
-                guard (200..<300).contains(response.statusCode) else {
-                    var body = Data()
-                    do {
-                        for try await byte in bytes {
-                            try Task.checkCancellation()
-                            guard body.count < 16_384 else { break }
-                            body.append(byte)
-                        }
-                    } catch {
+                await request.transportCapture?(
+                    .response(
+                        status: response.statusCode,
+                        headers: HTTPLogSanitizer.headers(
+                            Dictionary(
+                                uniqueKeysWithValues: response.allHeaderFields.map {
+                                    (String(describing: $0.key), String(describing: $0.value))
+                                })), at: Date()))
+                if !(200..<300).contains(response.statusCode) || response.mimeType?.lowercased() != "text/event-stream"
+                {
+                    var diagnosticBody = Data()
+                    for try await byte in bytes {
                         try Task.checkCancellation()
-                        // The received HTTP status remains authoritative even if its optional body cannot finish.
+                        await capture.append(byte)
+                        if diagnosticBody.count < 16_384 { diagnosticBody.append(byte) }
                     }
-                    throw configuration.httpFailure(response, body: body)
-                }
-                guard response.mimeType?.lowercased() == "text/event-stream" else {
+                    await capture.finish(error: nil)
+                    if !(200..<300).contains(response.statusCode) {
+                        throw configuration.httpFailure(response, body: diagnosticBody)
+                    }
                     throw OpenAIChatError.responseFailure(.init(.unexpectedContentType, stage: .http))
                 }
                 transportStage = .stream
@@ -78,17 +89,20 @@ public actor OpenAIChat: ChatCapability {
                 var finish: ChatEvent?
                 for try await byte in bytes {
                     try Task.checkCancellation()
+                    await capture.append(byte)
                     for event in try decoder.consume(byte) {
                         if case .text(let delta) = event { request.timing?.recordText(delta) }
                         if case .finished = event { finish = event } else { try await emitter.yieldSuspending(event) }
                     }
                 }
+                await capture.finish(error: nil)
                 guard let finish else { throw OpenAIChatError.truncatedStream }
                 try Task.checkCancellation()
                 try await emitter.yieldSuspending(finish)
                 await resource.release(lease.id)
                 emitter.finish()
             } catch {
+                await capture.finish(error: Task.isCancelled ? "cancelled" : "Transport or parsing stopped before EOF")
                 control.cancelHTTP()
                 await resource.release(lease.id)
                 if Task.isCancelled || error is CancellationError {
@@ -151,4 +165,54 @@ final class ChatNetworkSession: Sendable {
         session = URLSession(configuration: configuration, delegate: NoRedirects(), delegateQueue: nil)
     }
     deinit { session.invalidateAndCancel() }
+}
+
+/// One 64 KiB chunk per request; awaiting the sink supplies backpressure without an unbounded queue.
+private struct HTTPByteCapture {
+    let sink: (@Sendable (ChatTransportEvent) async -> Void)?
+    private var buffer = Data()
+    private var firstByte: Date?
+    private var ended = false
+    init(sink: (@Sendable (ChatTransportEvent) async -> Void)?) { self.sink = sink }
+    mutating func append(_ byte: UInt8) async {
+        guard sink != nil, !ended else { return }
+        if buffer.isEmpty { firstByte = Date() }
+        buffer.append(byte)
+        if buffer.count == 65_536 { await flush() }
+    }
+    private mutating func flush() async {
+        guard !buffer.isEmpty, let firstByte else { return }
+        await sink?(.bytes(buffer, at: firstByte))
+        buffer.removeAll(keepingCapacity: true)
+        self.firstByte = nil
+    }
+    mutating func finish(error: String?) async {
+        guard !ended else { return }
+        await flush()
+        ended = true
+        await sink?(.finished(at: Date(), error: error))
+    }
+}
+
+private enum HTTPLogSanitizer {
+    static func sensitive(_ name: String) -> Bool {
+        let key = name.lowercased()
+        return ["authorization", "cookie", "key", "token", "secret", "password", "credential", "signature"].contains {
+            key.contains($0)
+        }
+    }
+    static func headers(_ values: [String: String]) -> [String: String] {
+        values.mapValues { $0 }.reduce(into: [:]) { result, entry in
+            result[entry.key] = sensitive(entry.key) ? "[redacted]" : entry.value
+        }
+    }
+    static func url(_ url: URL?) -> String {
+        guard let url, var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return "" }
+        parts.user = nil
+        parts.password = nil
+        parts.queryItems = parts.queryItems?.map {
+            sensitive($0.name) ? URLQueryItem(name: $0.name, value: "[redacted]") : $0
+        }
+        return parts.string ?? ""
+    }
 }

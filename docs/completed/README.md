@@ -1,5 +1,12 @@
 # 已完成需求归档
 
+- [独立 Agent 业务、纯通信与 HTTP 日志](Message-Agent-Business-Separation.md)（2026-11-07）：Assistant/Writer 独立十表、按表目录、业务与历史 UI 改造、旧代码清理和真机清洁安装。
+- [Database 表归属与日志清空](Database-Table-Ownership.md)（2026-11-07）：表目录与仓库归属、清空日志入口及后续独立表结构。
+- [完整请求日志与独立清空](Complete-Request-Logs.md)（2026-11-07）：原始 HTTP/图片/generation meta 可删除日志，业务记录独立保留；以独立 Agent 后续设计为当前边界。
+
+- [可读预览编号与合并图片输入](Readable-Preview-Context.md)（2026-11-06）：preview_N、独立持久 ID、原始用户输入内的 State 图片和 system 元信息关联。
+- [预览图片历史读取修复](Preview-History-Images.md)（2026-11-06）：缓存与已保存原图读取、引用校验、过期提示及真机安装。
+- [预览缓存与多模态 State](Preview-Image-State.md)（2026-11-06）：三层图片存储、跨轮按需加载、Camera 自有选择／处置和请求日志脱敏。
 - [Writer 执行与续写生命周期](Writer-Execution-Lifetime.md)（2026-11-06）：工具接纳与直接续写的边界、撤销、互斥、加入清理、根关闭及自动验证。
 
 本目录集中保存原定范围已经全部完成的需求与实施计划。归档的是一次明确的交付范围，后续独立 bug 修复或 feature 扩展不影响原需求的完成状态。当前实现以源码 README 为准，归档文档保留当时的目标、决策和实施记录。
@@ -91,3 +98,19 @@
 [角色内聚展示与调用来源隔离](Agent-Presentation-Ownership-Plan.md)：语音/相机/连接角色自有灵动岛、共享机制边界及仅模型调用可反馈续轮；完整检查与四项 iOS 构建通过，见 [验证记录](../validation/Agent-Presentation-Ownership.md)。
 
 - [App 内灵动岛全局显示](Global-In-App-Island.md)：保持顶部位置，所有页面共享实时状态与展开偏好；验证及设备限制见专项记录。
+
+- [Database 目录与私有接口解耦](Database-Directory-Responsibilities.md)：Assistant/Writer 分别拥有历史与任务接口，共享日志和通信；检查与 iOS 构建见[验证记录](../validation/Database-Directory-Responsibilities.md)。
+
+- [首次 Welcome 云端服务配置](Welcome-Provider-Setup.md)：默认 OpenAI、URL/密钥粘贴、事务保存与独立模型选择；检查结果和验收边界见[验证记录](../validation/Welcome-Provider-Setup.md)。
+
+- [Assistant 对话详情精简](Assistant-Conversation-Detail.md)：独立 Task/Skill/State 展示、删除冗余执行预览与日志清空呈现；验证见[记录](../validation/Assistant-Conversation-Detail.md)。
+
+- [Writer 任务与请求详情](Writer-Record-Detail.md)（2026-11-08）：任务信息、业务区块、工具目录及按文件路径折叠的 Content；[验证记录](../validation/Writer-Record-Detail.md)。
+
+- [Writer 请求详情布局与接口](Writer-Request-Detail-Layout.md)（2026-11-08）。独立详情接口、五区块布局、工具来源和宿主收尾。
+
+- [Writer 请求与作品选择内聚](Writer-Execution-Cohesion.md)（2026-11-08）：同一通信请求内自选作品、历史原子接续、无文件完成与渲染后发布恢复；双模型和构建证据独立归档。
+
+- [前台任务启动加载 Skill](Task-Start-Initial-Skills.md)（2026-11-08）：单次 task.start 携带必要 Skill 的教学、单项/多项示例与下一轮能力可用性回归。
+
+- [Writer 记录分页](Writer-Record-Pagination.md)：准确末页与导航返回保留；完整自动检查和 iOS 构建通过，原生交互另行复验。

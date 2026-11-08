@@ -52,7 +52,7 @@ Agents packages Agents/, Skills/ and Catalog.json from this shared source root; 
 
 ## 职责与组织
 
-纯随 App 打包的配置与文本，由 Catalog.json 显式索引。Agents 保存 v7 身份、角色指令、通信契约、baseSkills、backgroundTasks 支持声明；Skills 保存 v2 配置、revision、流程说明和函数引用。Task 目标仅作为运行时数据。
+纯随 App 打包的配置与文本，由 Catalog.json 显式索引。Agents 保存 v8 身份、角色自有公开 description、私有角色指令、通信契约、baseSkills、backgroundTasks 支持声明；Skills 保存 v3 配置、revision、流程说明和函数引用。Task 目标仅作为运行时数据。
 
 这里不包含 Swift、脚本、函数实现、凭据或用户媒体。Actions 独立提供实现，FunctionContracts 提供中立元数据。Catalog 是唯一资源索引。
 
@@ -124,3 +124,5 @@ Assistant 的技术诊断输入声明属于 Agents 资源契约；container.fail
 ✅ ApplicationControl 配置声明 container.failure/runtime.failure 的 runtime 来源订阅；Assistant 保留被动容器诊断。内部呈现函数由代码授权，不加入模型 Skill 或改变资源 schema 版本。
 
 BasicSkill selects eight passive native platform.* State sources alongside UI navigation. Source schemas and native lifetime remain owned by [PlatformKit](../PlatformKit/README.md#native-state-port); [Skill declarations](Skills/README.md#basic-native-state-selection) select reads without starting hardware or granting execution authority.
+
+Assistant 身份只介绍自身。BasicSkill 拥有 start/delegate 平级选择的通用教学；各 Agent.json.description 维护各自用途，加载器按真实适配与实例通信权限生成公开目录。Catalog 不包含 writing；作品查找、打开与创作由 Writer 原生工具拥有。详见 [Skill 契约](Skills/README.md) 与 [角色配置](Agents/README.md)。

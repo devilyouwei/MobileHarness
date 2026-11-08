@@ -191,14 +191,11 @@
             self.preview = preview
         }
         public var body: some View {
-            VStack(spacing: 0) {
+            ZStack(alignment: .bottom) {
                 ZStack {
                     Color.black
                     if rendersPreview && camera.isEnabled && camera.isVisible && camera.recordedVideo == nil {
-                        preview().aspectRatio(camera.photoAspect, contentMode: .fit).allowsHitTesting(false)
-                    }
-                    if let photo = camera.capturedPhoto {
-                        CapturedPhotoView(photo: photo, camera: camera, controls: controls).id(photo.id)
+                        preview().frame(maxWidth: .infinity, maxHeight: .infinity).allowsHitTesting(false)
                     }
                     if let video = camera.recordedVideo, rendersPreview {
                         LocalVideoPlayer(file: video.file)
@@ -229,7 +226,8 @@
                                 Circle().fill(.red).frame(width: 8, height: 8)
                                 Text(started, style: .timer).monospacedDigit()
                                 Text("聆听已暂停").font(.caption)
-                            }.padding(8).background(.black.opacity(0.65), in: Capsule()).padding(8)
+                            }.padding(8).background(.black.opacity(0.65), in: Capsule()).padding(8).padding(
+                                .bottom, 140)
                         } else if let id = camera.recording.id,
                             camera.recording.phase == .ready || camera.recording.phase == .failed
                         {
@@ -237,7 +235,7 @@
                                 Button("保存视频") { controls.saveVideo(id) }
                                 Button("忽略") { controls.ignoreVideo(id) }
                             }.padding(12).background(.black.opacity(0.75), in: Capsule())
-                                .disabled(camera.controlBusy).padding(8)
+                                .disabled(camera.controlBusy).padding(8).padding(.bottom, 140)
                         }
                     }
                 VStack(spacing: 8) {
@@ -251,7 +249,7 @@
                             }
                             .foregroundStyle(camera.settings.mode == mode ? .yellow : .white)
                             .frame(minWidth: 52, minHeight: 44)
-                            .disabled(settingsLocked || camera.capturedPhoto != nil)
+                            .disabled(settingsLocked)
                         }
                         settingsMenu
                     }.font(.subheadline)
@@ -270,7 +268,16 @@
                                 width: 48, height: 48)
                         }.accessibilityLabel("变焦").disabled(settingsLocked)
                     }
-                }.buttonStyle(.plain).frame(height: 140)
+                }.buttonStyle(.plain).frame(height: 140).frame(maxWidth: .infinity)
+                    .background(
+                        LinearGradient(
+                            colors: [.black.opacity(0.15), .black.opacity(0.75)], startPoint: .top, endPoint: .bottom))
+                if rendersPreview {
+                    CameraGalleryView(camera: camera, controls: controls)
+                    if let photo = camera.capturedPhoto {
+                        CapturedPhotoView(photo: photo).id(photo.id)
+                    }
+                }
             }.foregroundStyle(.white).background(.black)
         }
         private var settingsLocked: Bool {

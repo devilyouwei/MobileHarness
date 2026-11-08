@@ -292,7 +292,12 @@ private enum ContainerTestFailure: Error { case startup, cleanup }
                 history: ui.history, devices: ui.devices, diagnostics: ui.diagnostics,
                 repositories: {
                     try AgentRepositories(
-                        chat: storage.database.chat, tasks: storage.database.tasks,
+                        assistantConversations: storage.database.assistantConversations,
+                        assistantMessages: storage.database.assistantMessages,
+                        assistantTasks: storage.database.assistantTasks,
+                        writerMessages: storage.database.writerMessages,
+                        writerExecutions: storage.database.writerExecutions,
+                        agentMessages: storage.database.agentMessages, logs: storage.database.logs,
                         media: storage.database.media, devices: storage.database.devices)
                 }, cache: storage.cache, files: storage.files, photos: photos,
                 camera: camera, cameraPresentation: presentation, cameraUI: ui.camera, albumUI: ui.album,

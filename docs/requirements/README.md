@@ -12,7 +12,7 @@
 
 ## 技术需求
 
-[Storage数据库与Workspace重构](Storage-Database-Refactor.md) 将对话回合、完整模型日志、前台任务与Writer委托归入十张业务表，源码使用无版本控制的当前目录；实施与验收见该计划。
+[Storage 数据库与 Workspace 重构](Storage-Database-Refactor.md) 记录早期实现及独立原生/模型验收；数据边界已由[独立 Agent 方案](../completed/Message-Agent-Business-Separation.md) 更新为两侧私有消息和任务、通用通信及原始 HTTP 日志。
 
 [四项核心架构改进](technical/Core-Architecture-Improvement-Plan.md) 中，通用内存状态机制与 App 结构迁移已实施；更多事实/Trigger/写入源治理、统一错误分类与分层展示及端到端验收仍待完成；第 4 项存储抽象接口已完成。原需求整份保留在本目录，不能按单项完成归档；独立的 [Storage 接口分离实施记录](../completed/Storage-Repository-Plan.md) 按其自身完整范围归档。
 

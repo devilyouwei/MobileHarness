@@ -63,8 +63,19 @@ private actor DiagnosticPublicationGate {
     }
 }
 private actor FailedDiagnosticDatabase: DatabaseStorage {
-    nonisolated var chat: any ChatRepository { get throws { throw RecordStorageError.notReady } }
-    nonisolated var tasks: any TaskRepository { get throws { throw RecordStorageError.notReady } }
+    nonisolated var assistantConversations: any AssistantConversationRepository {
+        get throws { throw RecordStorageError.notReady }
+    }
+    nonisolated var assistantMessages: any AssistantMessageRepository {
+        get throws { throw RecordStorageError.notReady }
+    }
+    nonisolated var assistantTasks: any AssistantTaskRepository & AssistantTaskSummaryRepository {
+        get throws { throw RecordStorageError.notReady }
+    }
+    nonisolated var writerMessages: any WriterMessageRepository { get throws { throw RecordStorageError.notReady } }
+    nonisolated var writerExecutions: any WriterExecutionRepository { get throws { throw RecordStorageError.notReady } }
+    nonisolated var agentMessages: any AgentMessageRepository { get throws { throw RecordStorageError.notReady } }
+    nonisolated var logs: any ModelRequestLogRepository { get throws { throw RecordStorageError.notReady } }
     nonisolated var workspaces: any WorkspaceRepository { get throws { throw RecordStorageError.notReady } }
     nonisolated var media: any MediaRepository { get throws { throw RecordStorageError.notReady } }
     nonisolated var devices: any DeviceRepository { get throws { throw RecordStorageError.notReady } }
@@ -182,7 +193,7 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
     #expect(!FileManager.default.fileExists(atPath: root.path))
     #expect(throws: StorageError.missing) { try storage.cache.buffers.get("missing") }
     #expect(throws: StorageError.forbidden) { try storage.files.file(other.storage().files.photos) }
-    #expect(throws: RecordStorageError.notReady) { try storage.database.chat }
+    #expect(throws: RecordStorageError.notReady) { try storage.database.assistantConversations }
     let display = registry.ui()
     display.camera.state.presentRendererFailure(
         "synthetic renderer failure", generation: display.camera.state.videoGeneration)

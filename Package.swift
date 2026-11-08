@@ -7,6 +7,114 @@ import PackageDescription
 let simulatorBuild = ProcessInfo.processInfo.environment["MOBILEHARNESS_BUILD_VARIANT"] == "simulator"
 let localChatDependencies: [Target.Dependency] = simulatorBuild ? [] : ["ModelKitGemma4"]
 
+// File placement follows table ownership; target membership preserves SQL-free public ports.
+let databaseTargetSources: [String: [String]] = [
+    "StorageTasks": [
+        "AgentMessages/AgentMessageRecord.swift",
+        "AgentMessages/AgentMessageRepository.swift",
+        "AssistantTasks/AssistantTaskRepository.swift",
+        "AssistantTasks/MemoryAssistantTaskRepository.swift",
+        "WriterMessages/WriterRequestRecord.swift",
+        "WriterWorkspaces/WriterWorkspaceRecord.swift",
+        "WriterMessages/WriterExecutionRepository.swift",
+    ],
+    "StorageChat": [
+        "AssistantConversations/AssistantConversationRecord.swift",
+        "AssistantConversations/AssistantConversationRepository.swift",
+        "AssistantMessages/AssistantHistoryStore.swift",
+        "AssistantMessages/AssistantMessageRecord.swift",
+        "AssistantMessages/AssistantMessageRepository.swift",
+        "AssistantMessages/AssistantRecordStore.swift",
+        "AssistantMessages/AssistantRecords.swift",
+        "AssistantTasks/AssistantTaskSummaryRepository.swift",
+        "AssistantTasks/TaskCompressionRecord.swift",
+        "ModelRequestLog/ModelEvidence.swift",
+        "ModelRequestLog/ModelRequestLog.swift",
+        "ModelRequestLog/ModelRequestLogRepository.swift",
+        "Shared/HistoryPaging.swift",
+        "WriterMessages/WriterHistoryMetadata.swift",
+        "WriterMessages/WriterHistoryStore.swift",
+        "WriterMessages/WriterMessageRecord.swift",
+        "WriterMessages/WriterMessageRepository.swift",
+        "WriterMessages/WriterRecordStore.swift",
+        "WriterMessages/WriterRecords.swift",
+    ],
+    "StorageMedia": [
+        "MediaFiles/AlbumRecord.swift",
+        "MediaFiles/MediaRepository.swift",
+        "MediaFiles/MediaStore.swift",
+    ],
+    "StorageDevices": [
+        "Devices/DeviceRepository.swift"
+    ],
+    "StorageDatabase": [
+        "DatabaseStorage.swift",
+        "WriterWorkspaces/WorkspaceRepository.swift",
+        "WriterWorkspaces/WorkspaceStore.swift",
+    ],
+    "StorageSQLite": [
+        "AgentMessages/AgentMessageRow.swift",
+        "AgentMessages/SQLiteAgentMessageRepository.swift",
+        "AssistantConversations/AssistantConversationRow.swift",
+        "AssistantConversations/SQLiteAssistantConversationRepository.swift",
+        "AssistantConversations/SQLiteAssistantConversations.swift",
+        "AssistantMessages/AssistantMessageRow.swift",
+        "AssistantMessages/SQLiteAssistantMessagePersistence.swift",
+        "AssistantMessages/SQLiteAssistantMessageQueries.swift",
+        "AssistantMessages/SQLiteAssistantMessageRepository.swift",
+        "AssistantTasks/AssistantTaskRow.swift",
+        "AssistantTasks/SQLiteAssistantTaskRepository.swift",
+        "AssistantTasks/SQLiteAssistantTaskSummaries.swift",
+        "AssistantTasks/SQLiteAssistantTasks.swift",
+        "Devices/DeviceRow.swift",
+        "Devices/SQLiteDeviceRepository.swift",
+        "MediaFiles/MediaFileRow.swift",
+        "MediaFiles/SQLiteMediaRepository.swift",
+        "ModelRequestLog/ModelRequestLogRow.swift",
+        "ModelRequestLog/SQLiteModelRequestLogRepository.swift",
+        "ModelRequestLog/SQLiteModelRequestLogs.swift",
+        "SQLiteDatabase.swift",
+        "SQLiteDatabaseStorage.swift",
+        "SQLiteRepositories.swift",
+        "SQLiteSchema.swift",
+        "Shared/SQLiteRecordCoding.swift",
+        "Shared/SQLiteRecordKey.swift",
+        "WorkspaceFiles/WorkspaceFileRow.swift",
+        "WriterMessages/SQLiteWriterMessagePersistence.swift",
+        "WriterMessages/SQLiteWriterMessageQueries.swift",
+        "WriterMessages/SQLiteWriterMessageRepository.swift",
+        "WriterMessages/WriterMessageRow.swift",
+        "WriterWorkspaces/SQLiteWorkspaceRepository.swift",
+        "WriterMessages/SQLiteWriterCompletion.swift",
+        "WriterMessages/SQLiteWriterHistory.swift",
+        "WriterMessages/SQLiteWriterExecutionRepository.swift",
+        "WriterMessages/SQLiteWriterExecutions.swift",
+        "WriterWorkspaces/WriterWorkspaceRow.swift",
+    ],
+]
+let databaseDocumentation = [
+    "Shared/README.md",
+    "AgentMessages/README.md",
+    "AssistantConversations/README.md",
+    "AssistantMessages/README.md",
+    "AssistantTasks/README.md",
+    "Devices/README.md",
+    "MediaFiles/README.md",
+    "ModelRequestLog/README.md",
+    "README.md",
+    "WorkspaceFiles/README.md",
+    "WriterMessages/README.md",
+    "WriterWorkspaces/README.md",
+]
+
+func databaseTarget(_ name: String, dependencies: [Target.Dependency]) -> Target {
+    let sources = databaseTargetSources[name]!
+    return .target(
+        name: name, dependencies: dependencies, path: "MobileHarness/Storage/Database",
+        exclude: databaseDocumentation + databaseTargetSources.filter { $0.key != name }.flatMap(\.value),
+        sources: sources)
+}
+
 let package = Package(
     name: "HarnessKit",
     platforms: [.iOS("26.0"), .macOS("26.0")],
@@ -223,38 +331,25 @@ let package = Package(
             ], sources: ["StorageFailure.swift", "Support/Contracts", "Support/Memory"]),
         .target(
             name: "StorageCache", dependencies: ["StorageCore"], path: "MobileHarness/Storage/Cache",
-            exclude: ["README.md", "Audio/README.md"]),
+            exclude: ["README.md", "Audio/README.md", "Image/README.md"]),
         .target(
             name: "StorageFiles", dependencies: ["StorageCore"], path: "MobileHarness/Storage/Files",
             exclude: ["README.md"]),
-        .target(
-            name: "StorageTasks", dependencies: ["StorageCore"], path: "MobileHarness/Storage/Database/Tasks",
-            exclude: ["README.md"]),
-        .target(
-            name: "StorageChat", dependencies: ["StorageCore", "StorageTasks"],
-            path: "MobileHarness/Storage/Database/Chat", exclude: ["README.md"]),
-        .target(
-            name: "StorageMedia", dependencies: ["StorageCore", "StorageFiles"],
-            path: "MobileHarness/Storage/Database/Media", exclude: ["README.md"]),
-        .target(
-            name: "StorageDevices", dependencies: ["StorageCore"], path: "MobileHarness/Storage/Database/Devices",
-            exclude: ["README.md"]),
-        .target(
-            name: "StorageDatabase",
+        databaseTarget("StorageTasks", dependencies: ["StorageCore"]),
+        databaseTarget("StorageChat", dependencies: ["StorageCore", "StorageTasks"]),
+        databaseTarget("StorageMedia", dependencies: ["StorageCore", "StorageFiles"]),
+        databaseTarget("StorageDevices", dependencies: ["StorageCore"]),
+        databaseTarget(
+            "StorageDatabase",
             dependencies: [
                 "StorageCore", "StorageFiles", "StorageChat", "StorageTasks", "StorageMedia", "StorageDevices",
-            ],
-            path: "MobileHarness/Storage/Database",
-            exclude: ["README.md", "Chat", "Tasks", "Media", "Devices", "SQLite", "Workspaces/README.md"],
-            sources: ["DatabaseStorage.swift", "Workspaces"]),
-        .target(
-            name: "StorageSQLite",
+            ]),
+        databaseTarget(
+            "StorageSQLite",
             dependencies: [
                 "StorageCore", "StorageDatabase", "StorageFiles", "StorageChat", "StorageTasks", "StorageMedia",
-                "StorageDevices",
-                .product(name: "GRDB", package: "GRDB.swift"),
-            ],
-            path: "MobileHarness/Storage/Database/SQLite", exclude: ["README.md"]),
+                "StorageDevices", .product(name: "GRDB", package: "GRDB.swift"),
+            ]),
         .target(
             name: "Storage",
             dependencies: ["StorageCore", "StorageCache", "StorageFiles", "StorageDatabase"],
@@ -393,6 +488,7 @@ let package = Package(
         .testTarget(
             name: "IntegrationTests",
             dependencies: [
+                .product(name: "GRDB", package: "GRDB.swift"),
                 "StorageFiles", "Storage", "StorageDatabase", "AppStorage",
                 "StorageCore",
                 "AppLifecycle", "UI",

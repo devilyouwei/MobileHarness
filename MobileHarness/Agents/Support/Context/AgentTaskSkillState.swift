@@ -205,16 +205,16 @@ public struct AgentTaskSkillState: Codable, Sendable {
         let allowed: Set<String>
         let required: Set<String>
         switch operation {
-        case "startTask":
-            allowed = ["goal", "skills", "execution"]
-            required = ["goal"]
+        case "task.start":
+            allowed = ["description", "skills"]
+            required = ["description"]
         case "loadSkills", "releaseSkills":
             allowed = ["skills"]
             required = allowed
-        case "finishTask":
+        case "task.end":
             allowed = ["summary", "continueDecision"]
             required = ["summary"]
-        case "cancelTask":
+        case "task.cancel":
             allowed = ["reason"]
             required = allowed
         default: throw HarnessError.forbiddenFunction
@@ -230,9 +230,8 @@ public struct AgentTaskSkillState: Codable, Sendable {
         var next = self
         let requested = try AgentTaskSkillIDs.decode(arguments["skills"])
         switch operation {
-        case "startTask":
-            guard activeTaskID == nil, arguments["execution"] == nil || arguments["execution"] == "foreground",
-                let goal = arguments["goal"]
+        case "task.start":
+            guard activeTaskID == nil, let goal = arguments["description"]
             else { throw CommunicationError.invalidPayload }
             next.taskSkillRoots = Set(requested).subtracting(try base(fixed: fixedCapabilities))
             for root in next.taskSkillRoots { next.recentSkills[root] = nil }
@@ -267,13 +266,13 @@ public struct AgentTaskSkillState: Codable, Sendable {
             try next.refreshLoaded()
             // A requested dependency still needed by another root cannot be released.
             guard requested.allSatisfy({ !next.loaded.contains($0) }) else { throw CommunicationError.unauthorized }
-        case "finishTask", "cancelTask":
+        case "task.end", "task.cancel":
             guard let id = activeTaskID, let index = next.tasks.firstIndex(where: { $0.id == id }),
                 ["running", "waitingUser"].contains(next.tasks[index].status)
             else { throw CommunicationError.scopeClosed }
-            next.tasks[index].status = operation == "finishTask" ? "finishing" : "cancelling"
-            next.tasks[index].continueDecision = operation == "finishTask" && arguments["continueDecision"] == "true"
-            next.tasks[index].summary = arguments[operation == "finishTask" ? "summary" : "reason"]
+            next.tasks[index].status = operation == "task.end" ? "finishing" : "cancelling"
+            next.tasks[index].continueDecision = operation == "task.end" && arguments["continueDecision"] == "true"
+            next.tasks[index].summary = arguments[operation == "task.end" ? "summary" : "reason"]
         default: throw HarnessError.forbiddenFunction
         }
         try next.recordChanges(

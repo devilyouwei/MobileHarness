@@ -9,6 +9,7 @@
     import ModelKitRuntime
     import PlatformKit
     import StorageChat
+    import StorageCache
     import StorageCore
     import StorageFiles
     import StorageMedia
@@ -19,6 +20,7 @@
     final class ActionsBusinessAssembly {
         unowned let actions: ActionsContainer
         let workspaces: @Sendable () throws -> any WorkspaceRepository
+        let cache: CacheContainer
         let files: FilesContainer
         let model: ModelContainer
         let platform: PlatformContainer
@@ -26,22 +28,21 @@
         let photos: MediaStore
         let bluetooth: BluetoothWorkflow
         let device: NexArmDeviceAdapter
-        let previewHistory: @MainActor (HistoryTurn) -> String
         lazy var facades = makeUIFacades()
         var stopInteractions: @MainActor () async -> Void = {}
         private let makeCameraRuntime: @MainActor () throws -> CameraRuntimeDependencies
         private let connectVision: @MainActor (String, Bool, any CameraOutputHandling) async throws -> Void
         private var endpoints: ActionEndpoints?
         init(
-            actions: ActionsContainer, files: FilesContainer,
+            actions: ActionsContainer, files: FilesContainer, cache: CacheContainer,
             workspaces: @escaping @Sendable () throws -> any WorkspaceRepository, model: ModelContainer,
             platform: PlatformContainer, ui: UIContainer, photos: MediaStore, bluetooth: BluetoothWorkflow,
-            previewHistory: @escaping @MainActor (HistoryTurn) -> String,
             makeCameraRuntime: @escaping @MainActor () throws -> CameraRuntimeDependencies,
             connectVision: @escaping @MainActor (String, Bool, any CameraOutputHandling) async throws -> Void
         ) {
             self.actions = actions
             self.workspaces = workspaces
+            self.cache = cache
             self.files = files
             self.model = model
             self.platform = platform
@@ -49,14 +50,13 @@
             self.photos = photos
             self.bluetooth = bluetooth
             self.device = NexArmDeviceAdapter(bluetooth: bluetooth)
-            self.previewHistory = previewHistory
             self.makeCameraRuntime = makeCameraRuntime
             self.connectVision = connectVision
         }
         private var observedCamera: CameraCoordinator?
         lazy var camera: CameraCoordinator = {
             let owner = CameraCoordinator(
-                camera: platform.vision.camera, presentation: ui.camera, photos: photos,
+                camera: platform.vision.camera, presentation: ui.camera, photos: photos, cache: cache,
                 photoCues: platform.audio.cue(.camera), windows: ui.windows,
                 makeRuntime: { [weak self] in
                     guard let self else { throw ActionsContainerError.stopped }
@@ -81,7 +81,16 @@
                     .init(path: "actions.camera", runtime: ["created": .flag(false)])
                 }
             }
+            readers["actions.camera.preview"] = ActionsStateSnapshot.reader(of: self) {
+                try await $0.previewStateSnapshot()
+            }
             return readers
+        }
+        private func previewStateSnapshot() throws -> ActionsStateSnapshot {
+            guard let camera = observedCamera else { return .init(path: "actions.camera.preview") }
+            let snapshot = try camera.previewSnapshot(scope: "inspection")
+            let value = try JSONDecoder().decode([String: ActionsStateSnapshot.Value].self, from: snapshot.facts)
+            return .init(path: "actions.camera.preview", business: value)
         }
         func prepare(_ request: ActionsBusinessRequest) throws -> ActionsBusinessBindings {
             let files = self.files
@@ -180,10 +189,7 @@
                 historyPresentation: history, camera: endpoints.camera,
                 history: HistoryQueryService(store: request.conversations),
                 historyMutations: mutations,
-                fullHistory: HistoryFullReadService(
-                    store: request.conversations,
-                    photo: { [photos] id, input in try await photos.readForInput(id, source: "assistant", input: input)
-                    }),
+                fullHistory: HistoryFullReadService(store: request.conversations),
                 album: album, windows: windowExecution, web: web, artifacts: artifacts, island: island,
                 modelResources: resourceAdapter,
                 resourcePreferences: preferences,
@@ -206,6 +212,7 @@
                 cleanup: [
                     { await mutations.shutdown() }, { await windowExecution.stop() }, { await web.stop() },
                     { try await artifacts.shutdown() },
+                    { await artifactPresentation.setSceneActive(false) },
                     {
                         island.stop()
                     },
@@ -222,9 +229,9 @@
                     if active {
                         camera.setForeground(true)
                         bluetooth.setForeground(true)
-                        try await artifactPresentation.setSceneActive(true)
+                        await artifactPresentation.setSceneActive(true)
                     } else {
-                        try await artifactPresentation.setSceneActive(false)
+                        await artifactPresentation.setSceneActive(false)
                         var failure: (any Error)?
                         do { try await camera.shutdown() } catch { failure = error }
                         await bluetooth.waitUntilIdle()
@@ -233,7 +240,7 @@
                 })
             return ActionsBusinessBindings(
                 executor: actions.execution, catalog: try actions.catalog(),
-                artifactStreaming: artifacts, writerArtifacts: exports, writerPhotos: photos,
+                artifactStreaming: artifacts, writerArtifacts: exports,
                 writerModel: { [model] in
                     let selected = try await providerService.writerConfiguration()
                     let configuration =
@@ -323,6 +330,10 @@
         let camera: CameraCoordinator
         init(_ camera: CameraCoordinator) { self.camera = camera }
         func pauseVisionForModelMaintenance() async { await camera.pauseVisionForModelMaintenance() }
+        func previewSnapshot(scope: String) async throws -> MultimodalContextSnapshot {
+            try camera.previewSnapshot(scope: scope)
+        }
+        func resetPreviewSelection(scope: String) async { camera.previews.reset(scope: scope) }
         func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data {
             try await camera.readPhoto(id, source: source, sessionID: sessionID, inputID: inputID)
         }

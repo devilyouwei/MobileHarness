@@ -93,3 +93,5 @@ ContainerContext.swift 定义 ContainerContextProviding 异步只读协议、泛
 ## Read-only container context interfaces
 
 ContainerContextSource is the single type-erased snapshot reader. Its generic initializer encodes an Encodable value; its explicit `encoded:` initializer passes existing JSON Data through unchanged. The source owns no facts, cache or lifecycle. Agents/Support/Context performs bounded JSON collection and session fencing; actual owners produce and validate snapshots.
+
+ContainerContext exposes the shared multimodal snapshot/image contracts through AgentCore aliases. These request-time values do not put image bytes into the private AgentContext journal.

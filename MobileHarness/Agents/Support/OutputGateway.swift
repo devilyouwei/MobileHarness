@@ -2,6 +2,7 @@ import AgentCore
 import Foundation
 import FunctionContracts
 import Gateway
+import StorageTasks
 
 private enum GatewayOutputMode: Sendable { case protocolFeedback, returningFeedback, internalCompletion }
 
@@ -48,6 +49,16 @@ private enum OutputDispatchOwnership {
 
 /// Validates, routes and dispatches output while preserving the existing execution contract.
 public actor OutputGateway {
+    private var communications: (any AgentMessageRepository)?
+    public func bindCommunications(_ repository: any AgentMessageRepository) throws {
+        if let communications {
+            guard communications.storageScope == repository.storageScope else {
+                throw CommunicationError.invalidPayload
+            }
+            return
+        }
+        communications = repository
+    }
     public typealias Sink = @Sendable (OutputEnvelope) async -> Void
     private var failures: [OutputFailureRecord] = []
     private var failureRevision: UInt64 = 0
@@ -261,16 +272,18 @@ public actor OutputGateway {
     }
     private func emit(
         _ observation: AgentMessage, parent: AgentInput, source: AgentID,
-        incarnation: String, target: AgentID?
+        incarnation: String, target: AgentID?, messageID: String? = nil
     ) async throws -> DeliveryReport {
         try await emit(
             observation, inputID: parent.id, sessionID: parent.sessionID,
-            metadata: parent.metadata, turn: parent.turn, source: source, incarnation: incarnation, target: target)
+            metadata: parent.metadata, turn: parent.turn, source: source, incarnation: incarnation, target: target,
+            messageID: messageID)
     }
 
     private func emit(
         _ observation: AgentMessage, inputID: String, sessionID: String,
-        metadata: InputMetadata, turn: AgentTurn?, source: AgentID, incarnation: String, target: AgentID?
+        metadata: InputMetadata, turn: AgentTurn?, source: AgentID, incarnation: String, target: AgentID?,
+        messageID: String? = nil
     ) async throws -> DeliveryReport {
         if let task = observation.content(as: AgentTaskSignal.self), task.kind == .cancel || task.kind == .result {
             guard !closed else { throw CommunicationError.scopeClosed }
@@ -351,8 +364,20 @@ public actor OutputGateway {
             guard generatedCommand || !metadata.expired else { throw CommunicationError.expired }
             sequences[source, default: 0] += 1
             let payload = InputPayload.observation(observation)
+            let communicationID = task?.kind == .request ? task?.scope.id : messageID
+            let durableID = communicationID ?? UUID().uuidString
+            if let communications, let target, let task, task.scope.execution == .background,
+                try await communications.agentMessage(durableID) == nil
+            {
+                try await communications.enqueueAgentMessage(
+                    .init(
+                        id: durableID, sender: source.rawValue, receiver: target.rawValue,
+                        contract: observation.contract, payload: observation.encodedContent(),
+                        correlationID: task.scope.id,
+                        replyTo: task.kind == .request ? nil : task.scope.id, dedupeKey: durableID))
+            }
             let input = AgentInput(
-                id: UUID().uuidString,
+                id: durableID,
                 sessionID: sessionID, payload: payload,
                 metadata: InputMetadata(
                     payload: payload, source: source.rawValue, incarnation: incarnation, origin: .agent,
@@ -392,6 +417,11 @@ public actor OutputGateway {
             try await manager.validate(source, incarnation: incarnation, sessionID: input.sessionID)
             guard !input.metadata.expired else { throw CommunicationError.expired }
             let report = targets.isEmpty ? DeliveryReport() : try await requests.sendInternal(input, targets: targets)
+            if let communications, let target, task?.scope.execution == .background,
+                report.delivered.contains(target)
+            {
+                try await communications.receiveAgentMessage(durableID, receiver: target.rawValue, consumed: false)
+            }
             if let task {
                 if task.kind == .result, report.delivered.isEmpty || !report.rejected.isEmpty {
                     await failTaskCompletion(
@@ -805,7 +835,7 @@ public actor OutputGateway {
                         id: envelope.inputID,
                         sessionID: envelope.sessionID, payload: .observation(call.message),
                         metadata: envelope.inputMetadata, turn: envelope.turn), source: envelope.source,
-                    incarnation: owner.incarnation, target: call.target)
+                    incarnation: owner.incarnation, target: call.target, messageID: call.id)
             } catch is CancellationError {
                 if let task = call.message.content(as: AgentTaskSignal.self) {
                     if task.kind == .result {

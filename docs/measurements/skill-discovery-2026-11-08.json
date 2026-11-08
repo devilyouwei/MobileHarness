@@ -1,0 +1,479 @@
+{
+  "date": "2026-11-08",
+  "runs": [
+    {
+      "basicSkillRevision": 48,
+      "sourceUnchanged": true,
+      "scope": "Real Qwen / OpenAI Responses, production Agent/Gateway, synthetic device/storage executors",
+      "models": [
+        "qwen3.8-max"
+      ],
+      "cases": [
+        {
+          "id": "camera-open-cold",
+          "passed": false,
+          "runtimeIssues": [
+            "controlMustBeOnlyOutput:loadSkills"
+          ],
+          "turns": [
+            {
+              "issues": [],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction",
+                "photography"
+              ],
+              "calls": [
+                {
+                  "alias": "loadSkills",
+                  "parameters": {
+                    "skills": "[\"photography\"]"
+                  },
+                  "round": "97C38D27-A924-461B-AC90-E74F55A81D74"
+                },
+                {
+                  "alias": "openCamera",
+                  "parameters": {},
+                  "round": "E20837B2-2888-4A8F-BCA0-9AE7F68FA4E6"
+                }
+              ]
+            }
+          ],
+          "requests": [
+            {
+              "response": "I need to load the photography skill first to access camera controls.\n\n<loadSkills skills='[\"photography\"]'/>",
+              "requestSHA256": "fe583856af9bf5d3c0ca0c5baf187b2b3ed0d494a31d6431cb4b4da37bf9b93a"
+            },
+            {
+              "response": "<openCamera/>",
+              "requestSHA256": "11b71aba7dab945e65f768f21317f1a48aa9d2e1fd9d13a1f627c16a502859f6"
+            },
+            {
+              "response": "摄像头已打开，当前使用的是前置镜头。",
+              "requestSHA256": "48a0a10624c30f20a7c701726471d6cdb3584e45d4ba0415001e43565277fb53"
+            }
+          ]
+        },
+        {
+          "id": "robot-single-gesture",
+          "passed": false,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [
+                "missing:loadSkills",
+                "missing:nodHead",
+                "parameters:nodHead",
+                "first:loadSkills",
+                "notLoaded:robot-interaction"
+              ],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction"
+              ],
+              "calls": [
+                {
+                  "alias": "express",
+                  "parameters": {
+                    "emotion": "smile"
+                  },
+                  "round": "14E2EDCA-FFEB-4601-8AA1-D7CBEFBF84F9"
+                }
+              ]
+            }
+          ],
+          "requests": [
+            {
+              "response": "<express emotion=\"smile\"/>",
+              "requestSHA256": "7feebe574ab2f7a1489f7ad7a0f58698a86598c799708b749373a6fd94cada18"
+            }
+          ]
+        },
+        {
+          "id": "web-discover-bilibili",
+          "passed": true,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction",
+                "web-browsing"
+              ],
+              "calls": [
+                {
+                  "alias": "loadSkills",
+                  "parameters": {
+                    "skills": "[\"web-browsing\"]"
+                  },
+                  "round": "2F52969D-88C1-4ABE-8986-282C0C47D12F"
+                },
+                {
+                  "alias": "Web.browse",
+                  "parameters": {
+                    "url": "https://www.bilibili.com"
+                  },
+                  "round": "6405A531-F38E-4542-A327-690EFB4F82ED"
+                }
+              ]
+            }
+          ],
+          "requests": [
+            {
+              "response": "<loadSkills skills=\"[&quot;web-browsing&quot;]\"/>",
+              "requestSHA256": "576b5a18c071d0fdb2989fb9e55fdfd890f0f2055ece8a45ca0047da8cb56b2b"
+            },
+            {
+              "response": "<Web.browse url=\"https://www.bilibili.com\"/>",
+              "requestSHA256": "456bb4aba79be5d43e0ef5907fb2c370a109618082e1efc458c2a2877b7344d2"
+            },
+            {
+              "response": "已打开 B 站。",
+              "requestSHA256": "9199fb1814d1682ba39d01fae6be666828ae2b8803543c5f11f000d92320d8ea"
+            }
+          ]
+        },
+        {
+          "id": "web-discover-url",
+          "passed": true,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction",
+                "web-browsing"
+              ],
+              "calls": [
+                {
+                  "alias": "loadSkills",
+                  "parameters": {
+                    "skills": "[\"web-browsing\"]"
+                  },
+                  "round": "6CF61BC4-5C7F-44A3-8145-6F8905B2827E"
+                },
+                {
+                  "alias": "Web.browse",
+                  "parameters": {
+                    "url": "https://example.com"
+                  },
+                  "round": "1963B3A4-456F-4D02-9740-5EBF7A390A86"
+                }
+              ]
+            }
+          ],
+          "requests": [
+            {
+              "response": "<loadSkills skills='[\"web-browsing\"]'/>",
+              "requestSHA256": "69e026acf89651a68538a88166de1c3a97e0145c824d3638098f989bfe2572c0"
+            },
+            {
+              "response": "<Web.browse url=\"https://example.com\"/>",
+              "requestSHA256": "36674d54ca7ddc073ae4d214ad45446923f4c02bc41be63dbc0a9c1195781a4e"
+            },
+            {
+              "response": "已打开 example.com。",
+              "requestSHA256": "a9861dafb911419d0beddd80f40e93ae7cd587c346b242fea5d18eda48e533c2"
+            }
+          ]
+        },
+        {
+          "id": "web-already-loaded",
+          "passed": true,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction",
+                "web-browsing"
+              ],
+              "calls": [
+                {
+                  "alias": "Web.browse",
+                  "parameters": {
+                    "url": "https://www.bilibili.com"
+                  },
+                  "round": "1E217314-336B-4054-88EA-323CD1863A32"
+                }
+              ]
+            }
+          ],
+          "requests": [
+            {
+              "response": "<Web.browse url=\"https://www.bilibili.com\"/>",
+              "requestSHA256": "8ca45c7bb1547593d17de9778a68bd446e6c8da476b3f34ce276e34b8ed2d0ac"
+            },
+            {
+              "response": "已打开哔哩哔哩。",
+              "requestSHA256": "1d8c31520873f9e6130ef3996fbbc3f2fa7ecc40efe1458c04c65aa196d0c8b7"
+            }
+          ]
+        },
+        {
+          "id": "web-load-failure-no-retry",
+          "passed": true,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction",
+                "web-browsing"
+              ],
+              "calls": [
+                {
+                  "alias": "loadSkills",
+                  "parameters": {
+                    "skills": "[\"web-browsing\"]"
+                  },
+                  "round": "656B1D26-2232-4D0D-8E55-5E836DC932FB"
+                },
+                {
+                  "alias": "Web.browse",
+                  "parameters": {
+                    "url": "https://www.bilibili.com"
+                  },
+                  "round": "A6F4E488-363A-4E33-93C8-48924454B0E2"
+                }
+              ]
+            }
+          ],
+          "requests": [
+            {
+              "response": "<loadSkills skills='[\"web-browsing\"]'/>",
+              "requestSHA256": "2e8f9250bfe434e90a9c435020cc668d5a08b2cec49e558290330c5c67800451"
+            },
+            {
+              "response": "<Web.browse url=\"https://www.bilibili.com\"/>",
+              "requestSHA256": "b9baafb32ca895382177fd547ededba5c44ec7dfad5d437f65111696aba0f787"
+            },
+            {
+              "response": "抱歉，打开B站时遇到了问题，页面未能成功加载。请检查网络连接后再试一次。",
+              "requestSHA256": "69946f1e802396ee4a79475312cb607a253bd68b21a217888260f503484efcaa"
+            }
+          ]
+        },
+        {
+          "id": "web-knowledge-no-load",
+          "passed": true,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction"
+              ],
+              "calls": []
+            }
+          ],
+          "requests": [
+            {
+              "response": "“B站”是哔哩哔哩（bilibili）的昵称。字母“B”取自它的英文名首字母，“站”就是网站的意思，合起来指代这个以动漫、游戏和年轻人文化起家的视频平台。",
+              "requestSHA256": "49ed69e02be056095a06820cb8af774793eb3ee7a913c500caa99ea357dad483"
+            }
+          ]
+        }
+      ],
+      "selectedSourceHashes": {
+        "MobileHarness/Resources/Skills/ApplicationControl/Instructions.md": "5d14e26b0b04913691367403cb855dba4e182ffc622fe0f24cb96b6497190473",
+        "MobileHarness/Resources/Skills/ApplicationControl/Skill.json": "61c1d3791a55d01f7570391a96ca7ba31e8df910f20f2c2692b8e83ff844f714",
+        "MobileHarness/Resources/Skills/BasicSkill/Instructions.md": "6d03bbe4c372539e2999f11eba61876ccd5c7f24189ae7937f2443f20e479ae8",
+        "MobileHarness/Resources/Skills/BasicSkill/Skill.json": "007837e9cee950a56f649b0dc9ba6167584631bf4d04b312156175afd80e50ad",
+        "MobileHarness/Resources/Skills/ExpressionInteraction/Instructions.md": "812b62d5dcc52d0334d64e91b059951a04808ff888a391ff64ad66b90118e837",
+        "MobileHarness/Resources/Skills/ExpressionInteraction/Skill.json": "5e804b7e5caf5db0ad1b9fdc52b6f8c233a5122256f03a6e82dd653a173e0d17",
+        "MobileHarness/Resources/Skills/HistoryQuery/Instructions.md": "50a3add6c4aa9ef98e5394f785f9531fd58f516898150e3516f1f2c7e2933516",
+        "MobileHarness/Resources/Skills/HistoryQuery/Skill.json": "94d9a4d8e98786d0630d5697ca50020b4dfb0218e392e8a940384972f1820574",
+        "MobileHarness/Resources/Skills/Photography/Instructions.md": "3fee1e4066838d30490a2665ed876c08b64101dcef15c7ddfa40f7efab39d0e6",
+        "MobileHarness/Resources/Skills/Photography/Skill.json": "33394a86ac074c78f4ef3712fc4c6efe57bb82b5fd22f7003269cbbe4d38c02f",
+        "MobileHarness/Resources/Skills/README.md": "e47f573fd52a8325f2597c6237111d4b15a84e6575eea3137241d2417caedbbf",
+        "MobileHarness/Resources/Skills/RobotInteraction/Instructions.md": "7920d88ffacded98076f75003c0a1655c7c1de568c249272ea318f5f546f5e48",
+        "MobileHarness/Resources/Skills/RobotInteraction/Skill.json": "52fe2460ee628fc663ce7f87d851bda840a508dcd0a50ca7aa1cb309a094c147",
+        "MobileHarness/Resources/Skills/WebBrowsing/Instructions.md": "758722f3883acc07ba6f39ac37a04aac096712a0e22bc1279aa06f05c4a9da4d",
+        "MobileHarness/Resources/Skills/WebBrowsing/Skill.json": "01a793edd334b2f857e6777917017aa532dbfe399c808612213d1eceb734d778",
+        "Tests/AgentModelEvaluationTests/Scenarios/qwen-workflows.json": "1cbf1ba9df4e4f96c15617c9e5064cac550f957fc5800a7490ac0827149633c9",
+        "Tests/IntegrationTests/QwenWorkflowEvaluationTests.swift": "7cbef479cd9313505c9c32912834cf2278ca32bf227f7f7a8e72ba029eb198bf"
+      },
+      "rawEvidence": "/tmp/skill-discovery-generic-model-qwen3.8-max.json"
+    },
+    {
+      "basicSkillRevision": 49,
+      "sourceUnchanged": true,
+      "scope": "Real Qwen / OpenAI Responses, production Agent/Gateway, synthetic device/storage executors",
+      "models": [
+        "qwen3.8-max"
+      ],
+      "cases": [
+        {
+          "id": "camera-open-cold",
+          "passed": true,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction",
+                "photography"
+              ],
+              "calls": [
+                {
+                  "alias": "loadSkills",
+                  "parameters": {
+                    "skills": "[\"photography\"]"
+                  },
+                  "round": "9E237A50-2A32-4B74-8AFC-37F74EFB021F"
+                },
+                {
+                  "alias": "openCamera",
+                  "parameters": {},
+                  "round": "9CDC7C3D-E601-4E98-A01D-42D8C1571B3C"
+                }
+              ]
+            }
+          ],
+          "requests": [
+            {
+              "response": "<loadSkills skills='[\"photography\"]'/>",
+              "requestSHA256": "f82c895007d454bf26065c1430167d248320326a0f8bb8a08951edd342f9c5d2"
+            },
+            {
+              "response": "<openCamera/>",
+              "requestSHA256": "731209d384902e8629cc0f148b6cde27188d0862d287cceeabb26556c1d8d3c7"
+            },
+            {
+              "response": "摄像头已打开，当前使用前置镜头。",
+              "requestSHA256": "d9ea7bf36c28fd9be0947555753ff30cda214a534d42009eb61318179be4aca0"
+            }
+          ]
+        },
+        {
+          "id": "robot-single-gesture",
+          "passed": false,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [
+                "missing:loadSkills",
+                "missing:nodHead",
+                "parameters:nodHead",
+                "first:loadSkills",
+                "notLoaded:robot-interaction"
+              ],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction"
+              ],
+              "calls": [
+                {
+                  "alias": "express",
+                  "parameters": {
+                    "emotion": "smile"
+                  },
+                  "round": "E8F6F1A7-EE7F-4C42-A714-3710D12E0241"
+                }
+              ]
+            }
+          ],
+          "requests": [
+            {
+              "response": "<express emotion=\"smile\"/>",
+              "requestSHA256": "8293a850d7edbec445d275e9fd6a2ce28db65573d64f1301ade75f1ea3b63c9c"
+            }
+          ]
+        },
+        {
+          "id": "web-discover-url",
+          "passed": true,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction",
+                "web-browsing"
+              ],
+              "calls": [
+                {
+                  "alias": "loadSkills",
+                  "parameters": {
+                    "skills": "[\"web-browsing\"]"
+                  },
+                  "round": "60E19330-46E8-49B2-9E24-4C4A1DC6E3C4"
+                },
+                {
+                  "alias": "Web.browse",
+                  "parameters": {
+                    "url": "https://example.com"
+                  },
+                  "round": "2A11755E-8B86-4B36-A5EB-93708702F990"
+                }
+              ]
+            }
+          ],
+          "requests": [
+            {
+              "response": "<loadSkills skills='[\"web-browsing\"]'/>",
+              "requestSHA256": "db9c2a35dae173e13f89b91b04f58ef7ab4abd9e7e7a13a8892261f4ab68a562"
+            },
+            {
+              "response": "<Web.browse url=\"https://example.com\"/>",
+              "requestSHA256": "8291826cf95afc66e936aae5cf6bfcbde5f6338e66b6de7f1086a0d6d7fe3009"
+            },
+            {
+              "response": "已打开 example.com。",
+              "requestSHA256": "719ec033896a5ae852ae414fac70d083134784b0f875973b67f8af8c02bfcf15"
+            }
+          ]
+        },
+        {
+          "id": "web-knowledge-no-load",
+          "passed": true,
+          "runtimeIssues": [],
+          "turns": [
+            {
+              "issues": [],
+              "loaded": [
+                "basic-skill",
+                "expression-interaction"
+              ],
+              "calls": []
+            }
+          ],
+          "requests": [
+            {
+              "response": "B站是“哔哩哔哩”（bilibili）的简称。名字来源于日本动漫《魔法禁书目录》中角色御坂美琴的绰号“Biribiri”，意思是电击发出的滋滋声，早期网站主要面向二次元爱好者，因此沿用了这个名字。",
+              "requestSHA256": "7d7c5206fc0b9bd627016dac5f6cc076467635cec95faf454183b91b08d3602f"
+            }
+          ]
+        }
+      ],
+      "selectedSourceHashes": {
+        "MobileHarness/Resources/Skills/ApplicationControl/Instructions.md": "5d14e26b0b04913691367403cb855dba4e182ffc622fe0f24cb96b6497190473",
+        "MobileHarness/Resources/Skills/ApplicationControl/Skill.json": "61c1d3791a55d01f7570391a96ca7ba31e8df910f20f2c2692b8e83ff844f714",
+        "MobileHarness/Resources/Skills/BasicSkill/Instructions.md": "a2056600ee9c6efbc3b681f7437ae337d94201b9e3fae71844deeb27996308ca",
+        "MobileHarness/Resources/Skills/BasicSkill/Skill.json": "f825476a067c09dea4fd0a249eb05d7b69bf7dda84da406b01ecd0c7ac5493f1",
+        "MobileHarness/Resources/Skills/ExpressionInteraction/Instructions.md": "812b62d5dcc52d0334d64e91b059951a04808ff888a391ff64ad66b90118e837",
+        "MobileHarness/Resources/Skills/ExpressionInteraction/Skill.json": "5e804b7e5caf5db0ad1b9fdc52b6f8c233a5122256f03a6e82dd653a173e0d17",
+        "MobileHarness/Resources/Skills/HistoryQuery/Instructions.md": "50a3add6c4aa9ef98e5394f785f9531fd58f516898150e3516f1f2c7e2933516",
+        "MobileHarness/Resources/Skills/HistoryQuery/Skill.json": "94d9a4d8e98786d0630d5697ca50020b4dfb0218e392e8a940384972f1820574",
+        "MobileHarness/Resources/Skills/Photography/Instructions.md": "3fee1e4066838d30490a2665ed876c08b64101dcef15c7ddfa40f7efab39d0e6",
+        "MobileHarness/Resources/Skills/Photography/Skill.json": "33394a86ac074c78f4ef3712fc4c6efe57bb82b5fd22f7003269cbbe4d38c02f",
+        "MobileHarness/Resources/Skills/README.md": "e47f573fd52a8325f2597c6237111d4b15a84e6575eea3137241d2417caedbbf",
+        "MobileHarness/Resources/Skills/RobotInteraction/Instructions.md": "7920d88ffacded98076f75003c0a1655c7c1de568c249272ea318f5f546f5e48",
+        "MobileHarness/Resources/Skills/RobotInteraction/Skill.json": "52fe2460ee628fc663ce7f87d851bda840a508dcd0a50ca7aa1cb309a094c147",
+        "MobileHarness/Resources/Skills/WebBrowsing/Instructions.md": "758722f3883acc07ba6f39ac37a04aac096712a0e22bc1279aa06f05c4a9da4d",
+        "MobileHarness/Resources/Skills/WebBrowsing/Skill.json": "01a793edd334b2f857e6777917017aa532dbfe399c808612213d1eceb734d778",
+        "Tests/AgentModelEvaluationTests/Scenarios/qwen-workflows.json": "1cbf1ba9df4e4f96c15617c9e5064cac550f957fc5800a7490ac0827149633c9",
+        "Tests/IntegrationTests/QwenWorkflowEvaluationTests.swift": "7cbef479cd9313505c9c32912834cf2278ca32bf227f7f7a8e72ba029eb198bf"
+      },
+      "rawEvidence": "/tmp/skill-discovery-generic-model-r49-direct-qwen3.8-max.json"
+    }
+  ]
+}

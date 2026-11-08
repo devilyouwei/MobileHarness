@@ -47,7 +47,7 @@ Stop reverses dependencies and retains ports through Agent, Gateway and Actions 
 
 ## Foreground, replacement and errors
 
-Initial startup requires an active Scene. Once running, model/platform/UI/Actions/Gateway/Agents declare background continuity: scene loss keeps voice, inference and accepted business work alive while UI detaches local surfaces and Actions/Agents stop camera, tracking and foreground device work. Full invalidation remains reserved for startup rollback, replacement and root shutdown. A successfully rolled-back startup interrupted by system inactivity waits for active before replacing its scope. One replacement task coalesces events; cleanup failure retains the old scope/error and prevents duplicate native owners.
+Initial startup requires an active Scene. Once running, model/platform/UI/Actions/Gateway/Agents declare background continuity: scene loss keeps voice, inference and accepted business work alive while UI detaches local surfaces and Actions/Agents stop camera, tracking and foreground device work. Actions resumes scene admission separately from its owned artifact preview restoration. Window recovery diagnostics belong to Actions rather than the root preparation state. Full invalidation remains reserved for startup rollback, replacement and root shutdown. A successfully rolled-back startup interrupted by system inactivity waits for active before replacing its scope. One replacement task coalesces events; cleanup failure retains the old scope/error and prevents duplicate native owners.
 
 Background URLSession completion can use the same model/storage scope before foreground startup. Replacement joins those roots even if they never reached the graph's started set. No camera/audio/UI inference is started by background restoration.
 
@@ -102,3 +102,7 @@ Settings uses independent assistantHistory/writerHistory routes to injected My A
 ActionsDependencies receives a lazy WorkspaceRepository getter from the existing Storage database, alongside media/device getters. It is resolved after foundation readiness and creates no parallel database or JSON catalog.
 
 ApplicationActionAssembly透传AgentVoiceHost.playbackChanged到ActionsVoiceHost。SpeechSynthesisContainer接收真实播放事实并在本角色内决定展示；App只连接接口，Actions不导入Agents，基础UI不接收业务接口。播放频谱仍直连UI的专用数据接口。
+
+Composition passes the root Storage cache to Actions and adapts scoped previewSnapshot/resetPreviewSelection through neutral host ports. It does not prepare images or own selections. Agents registers actions.camera.preview against the same Camera owner used by UI capture.
+
+ApplicationActionAssembly 不再向 Actions 注入 Memory 的历史执行预览函数；Assistant 详情直接消费既有 History 读取接口及已记录业务快照。

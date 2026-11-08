@@ -272,9 +272,6 @@ private actor RecordingCameraFixture: CameraCapturing {
     await #expect(throws: FileStorageError.invalidFile) { _ = try await store.videoURL(id) }
     await #expect(throws: FileStorageError.invalidFile) { _ = try await store.read(id, owner: owner) }
     await #expect(throws: FileStorageError.invalidFile) {
-        _ = try await store.readForInput(id, source: "assistant", input: "i")
-    }
-    await #expect(throws: FileStorageError.invalidFile) {
         _ = try await store.videoURL(id, owner: .init(namespace: "photos", source: "other", session: "s", input: "i"))
     }
     try await store.collectVideo(id, owner: owner)
@@ -506,7 +503,7 @@ private actor AutomaticCaptureProbe: CameraControlCapability {
     func takePhoto(invocation: any FunctionInput) throws -> CameraPhotoReceipt {
         trace.append("photo")
         if failCapture { throw CameraControlError.busy }
-        return try .init(mediaID: "media_151", width: 640, height: 480)
+        return try .init(previewID: "media_151", width: 640, height: 480)
     }
     func startRecording(durationSeconds: Int?, invocation: any FunctionInput) throws -> CameraVideoReceipt {
         trace.append("video:\(durationSeconds ?? 600)")
@@ -543,7 +540,7 @@ func cameraCompositeReturnsOnlyCaptureResultAndStopsOnPreparationFailure(_ kind:
             return
         }
         if kind == "photo" {
-            #expect(try JSONDecoder().decode(CameraPhotoReceipt.self, from: Data(value.utf8)).mediaID == "media_151")
+            #expect(try JSONDecoder().decode(CameraPhotoReceipt.self, from: Data(value.utf8)).previewID == "media_151")
             #expect(trace == ["open", "photo"])
         } else {
             let receipt = try JSONDecoder().decode(CameraVideoReceipt.self, from: Data(value.utf8))

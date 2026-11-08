@@ -24,17 +24,17 @@ public struct PhotographerCameraIntent: Codable, Sendable, Equatable {
     public enum Facing: String, Codable, Sendable { case front, back }
     public let recordingID: String?
     public let settings: CameraCaptureSettings?
-    public let mediaID: String?
+    public let previewID: String?
     public let facing: Facing?
     public let operation: Operation
     public let requestID: String
     public init(
-        _ operation: Operation, facing: Facing? = nil, mediaID: String? = nil, settings: CameraCaptureSettings? = nil,
+        _ operation: Operation, facing: Facing? = nil, previewID: String? = nil, settings: CameraCaptureSettings? = nil,
         recordingID: String? = nil, requestID: String
     ) {
         self.settings = settings
         self.recordingID = recordingID
-        self.mediaID = mediaID
+        self.previewID = previewID
         self.facing = facing
         self.operation = operation
         self.requestID = requestID
@@ -49,9 +49,9 @@ public struct PhotographerCameraIntent: Codable, Sendable, Equatable {
                         == (intent.recordingID != nil),
                     intent.recordingID.map({ UUID(uuidString: $0) != nil }) ?? true,
                     (intent.operation == .flip || intent.operation == .perceptionFlip) == (intent.facing != nil),
-                    intent.mediaID == nil || intent.operation == .savePhoto || intent.operation == .ignorePhoto,
+                    intent.previewID == nil || intent.operation == .savePhoto || intent.operation == .ignorePhoto,
                     !intent.requestID.isEmpty, intent.requestID.utf8.count <= 128,
-                    intent.mediaID.map({ !$0.isEmpty && $0.utf8.count <= 128 }) ?? true
+                    intent.previewID.map({ !$0.isEmpty && $0.utf8.count <= 128 }) ?? true
                 else {
                     throw CommunicationError.invalidPayload
                 }
@@ -80,12 +80,12 @@ public struct CameraStateObservation: Codable, Sendable, Equatable {
     public let busy: Bool
     public let needsSettings: Bool
     public let facing: PhotographerCameraIntent.Facing
-    public let displayedMediaID: String?
+    public let displayedPreviewID: String?
     public let savedMediaID: String?
     public let failure: String?
     public init(
         sequence: UInt64, observedAt: Date = Date(), enabled: Bool, visible: Bool, busy: Bool,
-        needsSettings: Bool, facing: PhotographerCameraIntent.Facing, displayedMediaID: String? = nil,
+        needsSettings: Bool, facing: PhotographerCameraIntent.Facing, displayedPreviewID: String? = nil,
         savedMediaID: String? = nil, failure: String? = nil
     ) {
         self.sequence = sequence
@@ -95,13 +95,13 @@ public struct CameraStateObservation: Codable, Sendable, Equatable {
         self.busy = busy
         self.needsSettings = needsSettings
         self.facing = facing
-        self.displayedMediaID = displayedMediaID
+        self.displayedPreviewID = displayedPreviewID
         self.savedMediaID = savedMediaID
         self.failure = failure
     }
     public func validate() throws {
         guard sequence > 0, observedAt.timeIntervalSince1970.isFinite,
-            [displayedMediaID, savedMediaID].allSatisfy({ $0.map { !$0.isEmpty && $0.utf8.count <= 128 } ?? true }),
+            [displayedPreviewID, savedMediaID].allSatisfy({ $0.map { !$0.isEmpty && $0.utf8.count <= 128 } ?? true }),
             (failure?.utf8.count ?? 0) <= 512
         else { throw CommunicationError.invalidPayload }
     }

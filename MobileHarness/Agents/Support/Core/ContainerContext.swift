@@ -19,3 +19,6 @@ public struct ContainerContextSource: ContainerContextProviding {
     }
     public func contextSnapshot() async throws -> Data { try await read() }
 }
+
+public typealias MultimodalContextSnapshot = FunctionContracts.MultimodalContextSnapshot
+public typealias ContextImage = FunctionContracts.ContextImage

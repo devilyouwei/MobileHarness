@@ -6,14 +6,18 @@ import StorageTasks
 /// Durable completion facts have a lifetime independent of creative work and execution grants.
 actor WriterNotifications {
     typealias Sender = @Sendable (AgentMessage, AgentTaskScope, Bool) async throws -> DeliveryReport
-    private let tasks: any TaskRepository
+    private let communications: any AgentMessageRepository
+    private let tasks: any WriterExecutionRepository
     private var sender: Sender?
     private var running = false
     private var workers: [Bool: Task<Void, Never>] = [:]
     private var revision: UInt64 = 0
     private var failures: [Bool: String] = [:]
     var lastFailure: String? { failures.values.sorted().last }
-    init(tasks: any TaskRepository) { self.tasks = tasks }
+    init(tasks: any WriterExecutionRepository, communications: any AgentMessageRepository) {
+        self.tasks = tasks
+        self.communications = communications
+    }
     func bind(_ sender: @escaping Sender) { self.sender = sender }
     func resume() {
         running = true
@@ -42,7 +46,7 @@ actor WriterNotifications {
             let observed = revision
             do {
                 let page = try await tasks.pendingTaskNotifications(
-                    agent: "writer", retirement: retirement, after: cursor, limit: 32)
+                    agent: "writer", retirement: retirement, after: cursor, limit: retirement ? 32 : 1)
                 if page.isEmpty {
                     if cursor != nil {
                         cursor = nil
@@ -50,13 +54,20 @@ actor WriterNotifications {
                         continue
                     }
                     if revision != observed { continue }
+                    if !retirement,
+                        let next = try await communications.nextAgentDelivery(
+                            sender: "writer", contract: "writer.completion")
+                    {
+                        try await Task.sleep(for: .seconds(max(0.05, min(1, next.timeIntervalSinceNow))))
+                        continue
+                    }
                     failures.removeValue(forKey: retirement)
                     return
                 }
                 for row in page {
-                    try Task.checkCancellation()
                     cursor = row.position
                     do {
+                        try Task.checkCancellation()
                         let completion = try JSONDecoder().decode(WriterTaskCompletion.self, from: row.data)
                         try completion.validate()
                         guard completion.signal.scope.id == row.delegateID,
@@ -73,17 +84,25 @@ actor WriterNotifications {
                         try await tasks.finishTaskNotification(
                             row.delegateID, agent: "writer", retirement: retirement,
                             completed: retirement || accepted,
-                            failure: accepted ? nil : rejected ?? "Assistant unavailable")
+                            failure: accepted ? nil : rejected ?? "Assistant unavailable", claimToken: row.claimToken)
                         if !accepted { failures[retirement] = rejected ?? "Assistant unavailable" }
                     } catch {
-                        try Task.checkCancellation()
+                        if Task.isCancelled {
+                            do {
+                                try await tasks.finishTaskNotification(
+                                    row.delegateID, agent: "writer", retirement: retirement,
+                                    completed: false, failure: "Delivery interrupted", claimToken: row.claimToken)
+                            } catch { failures[retirement] = String(describing: error) }
+                            return
+                        }
                         let message = String(String(describing: error).prefix(1024))
                         failures[retirement] = message
                         // A previous process's grant cannot be reopened. Retain the closed-grant
                         // evidence and continue delivering the independently authenticated fact.
                         try await tasks.finishTaskNotification(
                             row.delegateID, agent: "writer", retirement: retirement,
-                            completed: retirement && message.contains("scopeClosed"), failure: message)
+                            completed: retirement && message.contains("scopeClosed"), failure: message,
+                            claimToken: row.claimToken)
                     }
                 }
             } catch is CancellationError { return } catch {

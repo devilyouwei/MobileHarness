@@ -8,25 +8,25 @@ import UI
 @MainActor
 public final class HistoryPresentationAdapter: HistoryPresentationCapability {
     private let state: any HistoryPresenting
-    private let store: ConversationHistoryStore
+    private let store: AssistantHistoryStore
     private let sessionID: String
     public init(
-        state: any HistoryPresenting, store: ConversationHistoryStore, sessionID: String
+        state: any HistoryPresenting, store: AssistantHistoryStore, sessionID: String
     ) {
         self.state = state
         self.store = store
         self.sessionID = sessionID
     }
-    public static func presentationSnapshot(_ snapshot: ConversationArchive) throws -> HistorySnapshot {
+    public static func presentationSnapshot(_ snapshot: AssistantArchive) throws -> HistorySnapshot {
         try snapshot.validate()
         let data = try JSONEncoder().encode(snapshot)
-        guard data.count <= ConversationHistoryStore.maximumBytes else {
+        guard data.count <= AssistantHistoryStore.maximumBytes else {
             throw HistoryPresentationFailure.init("History snapshot exceeds limit")
         }
         return try JSONDecoder().decode(HistorySnapshot.self, from: data)
     }
-    public static func listPresentation(_ store: ConversationHistoryStore) async throws -> HistorySnapshot {
-        let records = try await store.listConversations().map { conversation -> StoredConversation in
+    public static func listPresentation(_ store: AssistantHistoryStore) async throws -> HistorySnapshot {
+        let records = try await store.listConversations().map { conversation -> AssistantConversation in
             var metadata = conversation
             metadata.turnCount = conversation.turnCount ?? conversation.turns.count
             metadata.latestUser = conversation.latestUser ?? conversation.turns.last.map { String($0.user.prefix(80)) }
@@ -35,12 +35,12 @@ public final class HistoryPresentationAdapter: HistoryPresentationCapability {
             return metadata
         }
         guard let current = records.first else { throw HistoryDetailError.unavailable }
-        var archive = ConversationArchive()
+        var archive = AssistantArchive()
         archive.current = current
         archive.past = Array(records.dropFirst())
         return try presentationSnapshot(archive)
     }
-    public static func conversation(_ value: StoredConversation) throws -> HistoryConversation {
+    public static func conversation(_ value: AssistantConversation) throws -> HistoryConversation {
         try JSONDecoder().decode(HistoryConversation.self, from: JSONEncoder().encode(value))
     }
     public func refreshAfterMutation(message: String?) async throws {

@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "recordedAtUTC": "2026-11-08T11:11:30.596960+00:00",
+  "device": "iPhone 17 Pro",
+  "bundleID": "dev.mobileharness.app",
+  "marketingVersion": "0.1.0",
+  "previousBuild": "2026110805",
+  "installedBuild": "2026110806",
+  "installationSequence": 6352,
+  "pid": 24957,
+  "processPathMatchesInstalledBundle": true,
+  "signedBuildSucceeded": true,
+  "strictSignatureVerified": true,
+  "agentSkillResourcesVerified": true,
+  "liveActivityVerified": true,
+  "installationMode": "in-place update; no uninstall, data deletion or provider configuration change",
+  "scope": "build, install, version and OS process launch; no model or interaction acceptance",
+  "evidence": {
+    "build.log": {
+      "path": "/tmp/task-start-skills-device-build.log",
+      "sha256": "e9e8b1a554afac6ef6e238b329a0acb08b99068aaa4106e0ca2ab0ff4cdf2014"
+    },
+    "before.json": {
+      "path": "/tmp/task-start-skills-device-before.json",
+      "sha256": "8e871adcdd239d919ee60621995a55c1483883ede8b8034c720bb348ddde9abd"
+    },
+    "install.json": {
+      "path": "/tmp/task-start-skills-device-install.json",
+      "sha256": "7623e2f8112d1d9d0c2e0f7fb254dcba2cb5a4c7f1d69d2ca223a54db9993cf4"
+    },
+    "after.json": {
+      "path": "/tmp/task-start-skills-device-after.json",
+      "sha256": "a29b55083d88a09b5433221d37cf058431d304af8b47435f97c8a97e44edec43"
+    },
+    "launch.json": {
+      "path": "/tmp/task-start-skills-device-launch.json",
+      "sha256": "8688f5c2536d39df626740fc0bbcdfb7ac0d83336701ad85e85840a9977a96b0"
+    },
+    "processes.json": {
+      "path": "/tmp/task-start-skills-device-processes.json",
+      "sha256": "dee8f87e3fd8fa4deae9bdf7bd88c01cb46e5a7a517c2371763883ab82ce45dc"
+    }
+  }
+}

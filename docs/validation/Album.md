@@ -1,6 +1,6 @@
 # 基础 App 相册验证
 
-日期：2026-10-25。当前契约见 [Camera](../../MobileHarness/Actions/Camera/README.md)、[Media](../../MobileHarness/Storage/Database/Media/README.md) 与 [UI Settings](../../MobileHarness/UI/Settings/README.md)。
+日期：2026-10-25。当前契约见 [Camera](../../MobileHarness/Actions/Camera/README.md)、[Media](../../MobileHarness/Storage/Database/MediaFiles/README.md) 与 [UI Settings](../../MobileHarness/UI/Settings/README.md)。
 
 ## 自动化与构建
 

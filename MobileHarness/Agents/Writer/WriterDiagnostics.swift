@@ -119,7 +119,7 @@ enum WriterDiagnostics {
                     ? storage.cleanupErrors.prefix(4).map { make($0, stage: "存储清理", depth: depth + 1) } : [])
         }
         if error is FileStorageError || error is DocumentStorageError || error is RecordStorageError
-            || error is ConversationHistoryError
+            || error is WriterHistoryError
         {
             let code = String(describing: error)
             evidence["storageCode"] = code
@@ -190,7 +190,7 @@ enum WriterDiagnostics {
 }
 
 extension WriterFailureDiagnostic {
-    var storageValue: ConversationFailureDiagnostic {
+    var storageValue: ModelFailureDiagnostic {
         .init(
             category: category, code: code, stage: stage, message: message,
             details: details, causes: causes.map(\.storageValue))

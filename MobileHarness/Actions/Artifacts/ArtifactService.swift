@@ -73,34 +73,34 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
     private func performAdmitted(invocation: any FunctionInput) async throws -> String {
         let args = invocation.call.parameters
         guard let command = args["command"] else { throw ArtifactWorkspaceError.missingFile }
-        if invocation.context.source == "assistant" {
-            switch command {
-            case "projects":
-                return try encode(await workspace.inventory())
-            case "open", "delete":
-                guard let owner = args["executor"], let task = args["taskID"],
-                    let id = WorkspaceID(agent: owner, taskID: task), !lockedProjects.contains(id)
-                else {
-                    throw ArtifactWorkspaceError.busy
-                }
-                lockedProjects.insert(id)
-                defer { lockedProjects.remove(id) }
-                if command == "delete" {
-                    try await prepare(id, true)
-                    try await workspace.delete(id)
-                    return "deleted"
-                }
-                try await prepare(id, false)
-                if let draft = try await workspace.checkpoint(for: id) {
-                    return try await present(id, draft.title, draft.entry, draft.draft.files, true)
-                }
-                let project = try await workspace.project(id)
-                return try await present(project.id, project.title, project.entry, project.files, false)
-            default: throw ActionExecutionError.invalidInvocation
-            }
-        }
         guard let delegateID = invocation.context.taskID, invocation.context.source == "writer" else {
             throw ActionExecutionError.invalidInvocation
+        }
+        if command == "searchWorkspaces" {
+            guard let query = args["query"] else { throw ArtifactWorkspaceError.invalidQuery }
+            return try encode(
+                await workspace.search(query.trimmingCharacters(in: .whitespacesAndNewlines), before: args["before"]))
+        }
+        if command == "open" || command == "delete" {
+            guard let task = args["taskID"], let id = WorkspaceID(agent: "writer", taskID: task) else {
+                throw ArtifactWorkspaceError.invalidPath
+            }
+            guard !lockedProjects.contains(id) else { throw ArtifactWorkspaceError.busy }
+            lockedProjects.insert(id)
+            defer { lockedProjects.remove(id) }
+            if command == "delete" {
+                try await prepare(id, true)
+                try await workspace.delete(id)
+                return try encode(["workspaceID": id.rawValue, "status": "deleted"])
+            }
+            try await prepare(id, false)
+            if let draft = try await workspace.checkpoint(for: id) {
+                let presentation = try await present(id, draft.title, draft.entry, draft.draft.files, true)
+                return try workspaceEvidence(id, title: draft.title, entry: draft.entry, presentation: presentation)
+            }
+            let project = try await workspace.project(id)
+            let presentation = try await present(id, project.title, project.entry, project.files, false)
+            return try workspaceEvidence(id, title: project.title, entry: project.entry, presentation: presentation)
         }
         switch command {
         case "start", "resume":
@@ -129,12 +129,14 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
                     throw ArtifactWorkspaceError.invalidPath
                 }
                 let title = args["title"] ?? checkpoint?.title ?? original?.title ?? "作品"
-                guard !title.isEmpty, title.utf8.count <= 160 else { throw ArtifactWorkspaceError.invalidTitle }
+                guard !title.isEmpty else { throw ArtifactWorkspaceError.invalidTitle }
                 let draft = try checkpoint?.draft ?? ArtifactDraft(files: original?.files ?? [:])
-                try await workspace.checkpoint(
-                    .init(
-                        workspaceID: id, baseRevision: original?.revision,
-                        title: title, entry: entry, draft: draft, interrupted: true))
+                if original == nil, checkpoint == nil {
+                    try await workspace.checkpoint(
+                        .init(
+                            workspaceID: id, baseRevision: nil, title: title, entry: entry, draft: draft,
+                            interrupted: true))
+                }
                 sessions[delegateID] = Session(
                     id: id, sessionID: invocation.context.sessionID,
                     title: title, entry: entry, editor: ArtifactEditing(draft: draft),
@@ -148,15 +150,12 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
                 }
                 let presentation = try await present(id, title, entry, visible, true)
                 try await describe(id, title, args["subtitle"])
-                let details = (try? JSONDecoder().decode([String: String].self, from: Data(presentation.utf8))) ?? [:]
-                return try encode(["workspaceID": id.rawValue, "entry": entry, "windowID": details["windowID"] ?? ""])
+                return try workspaceEvidence(id, title: title, entry: entry, presentation: presentation)
             } catch {
                 sessions.removeValue(forKey: delegateID)
                 lockedProjects.remove(id)
                 throw error
             }
-        case "projects":
-            return try encode(await workspace.inventory())
         default: break
         }
         guard var session = sessions[delegateID] else { throw ArtifactWorkspaceError.missingProject }
@@ -165,7 +164,7 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
             return "Presentation metadata accepted; closed windows remain closed."
         }
         if command == "rename" || command == "edit", let title = args["title"] {
-            guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, title.utf8.count <= 160 else {
+            guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw ArtifactWorkspaceError.invalidTitle
             }
             if command == "rename" {
@@ -213,9 +212,11 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
                 return try encode(
                     await session.editor.readLines(path: path, line: line, count: try integer(args, "limit", 60)))
             }
-            return try encode(await session.editor.read(path: path, offset: try integer(args, "offset", 0)))
+            return try encode(
+                await session.editor.read(
+                    path: path, offset: try integer(args, "offset", 0), limit: try integer(args, "limit", 2500)))
         case "search":
-            guard let query = args["query"], !query.isEmpty, query.utf8.count <= 1024 else {
+            guard let query = args["query"], !query.isEmpty else {
                 throw ArtifactWorkspaceError.invalidQuery
             }
             let offset = try integer(args, "offset", 0)
@@ -287,7 +288,6 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
                     nextOffset: offset + changes.count < paths.count ? offset + changes.count : nil))
         case "savepoint":
             guard session.stream == nil else { throw ArtifactWorkspaceError.busy }
-            guard session.savepoints.count < 8 else { throw ArtifactWorkspaceError.savepointLimit }
             let id = "savepoint_\(session.savepoints.count + 1)"
             session.savepoints[id] = (await session.editor.snapshot(), session.entry)
             sessions[delegateID] = session
@@ -304,9 +304,10 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
             try await save(session, draft)
             return "Savepoint restored. Render before finishing."
         case "edit":
-            guard let path = args["path"], let instruction = args["instruction"], !instruction.isEmpty,
-                instruction.utf8.count <= 2048
-            else { throw ArtifactWorkspaceError.invalidPath }
+            guard let path = args["path"] else { throw ArtifactWorkspaceError.invalidPath }
+            guard let instruction = args["instruction"], !instruction.isEmpty else {
+                throw ArtifactWorkspaceError.invalidInstruction
+            }
             let reference = args["reference"]
             if args["reference"] != nil && reference == nil { throw ArtifactWorkspaceError.readRequired }
             let rawRefs = (args["contextReferences"] ?? "").split(separator: ",").map {
@@ -595,6 +596,15 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
                 "status": "draft edited; render before finish",
             ]
         }
+    }
+    private func workspaceEvidence(_ id: WorkspaceID, title: String, entry: String, presentation: String) throws
+        -> String
+    {
+        let details = try? JSONDecoder().decode([String: String].self, from: Data(presentation.utf8))
+        return try encode([
+            "workspaceID": id.rawValue, "title": title, "entry": entry, "windowID": details?["windowID"] ?? "",
+            "presentationStatus": details?["status"] ?? "unverified", "presentation": presentation,
+        ])
     }
     private func encode<T: Encodable>(_ value: T) throws -> String {
         String(decoding: try JSONEncoder().encode(value), as: UTF8.self)

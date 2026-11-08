@@ -38,7 +38,7 @@ import FunctionContracts
         private let camera: any CameraCapturing
         private let presentation: any CameraPresenting
         private var state: CameraPresentationSnapshot { presentation.snapshot }
-        private let photos: MediaStore
+        private let previews: CameraPreviewStore
         private let photoCues: any CuePlaying
         private let isForeground: @MainActor () -> Bool
         private let captureRevision: @MainActor () -> Int
@@ -48,19 +48,18 @@ import FunctionContracts
         private let log = Logger(subsystem: "dev.mobileharness", category: "CameraPhotos")
         private var photoTask: Task<CameraPhotoReceipt, Error>?
         private var photoCommand: Task<CameraPhotoCommandReceipt, Error>?
-        private var photoOwner: (id: String, owner: StorageOwner)?
         private var presentationFinished: (id: String, success: Bool)?
         private var photoFeedbackContext: ActionExecutionContext?
         var isBusy: Bool { photoTask != nil || photoCommand != nil }
         init(
-            camera: any CameraCapturing, presentation: any CameraPresenting, photos: MediaStore,
+            camera: any CameraCapturing, presentation: any CameraPresenting, previews: CameraPreviewStore,
             photoCues: any CuePlaying,
             isForeground: @escaping @MainActor () -> Bool, captureRevision: @escaping @MainActor () -> Int,
             ensureCaptureAvailable: @escaping @MainActor () throws -> Void
         ) {
             self.camera = camera
             self.presentation = presentation
-            self.photos = photos
+            self.previews = previews
             self.photoCues = photoCues
             self.isForeground = isForeground
             self.captureRevision = captureRevision
@@ -75,30 +74,35 @@ import FunctionContracts
             _ = await photoTask?.result
             _ = await photoCommand?.result
         }
-        public func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data {
-            try await photos.read(
-                id, owner: StorageOwner(namespace: "photos", source: source, session: sessionID, input: inputID))
-        }
-
-        private func selectedPhoto(_ requested: String?) throws -> (id: String, owner: StorageOwner) {
-            guard let selected = photoOwner, state.capturedPhoto?.id == selected.id,
-                requested == nil || requested == selected.id,
-                state.capturedPhoto?.didReachThumbnail == true
-            else { throw CameraControlError.photoUnavailable }
-            return selected
-        }
-
         public func ignorePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt
+        {
+            try await dispose(id, save: false, invocation: invocation)
+        }
+        public func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
+            try await dispose(id, save: true, invocation: invocation)
+        }
+        private func dispose(_ id: String?, save: Bool, invocation: any FunctionInput) async throws
+            -> CameraPhotoCommandReceipt
         {
             try Task.checkCancellation()
             guard foreground else { throw CameraControlError.notForeground }
             guard photoTask == nil, photoCommand == nil else { throw CameraControlError.busy }
-            let selected = try selectedPhoto(id)
-            guard let photo = state.capturedPhoto else { throw CameraControlError.photoUnavailable }
+            guard let id else { throw CameraControlError.photoUnavailable }
             let task = Task<CameraPhotoCommandReceipt, Error> {
-                let issues = try await departPhoto(photo, kind: .discard, invocation: invocation, commit: {})
-                return CameraPhotoCommandReceipt(
-                    mediaID: selected.id, state: .ignored, feedbackIssues: issues.isEmpty ? nil : issues)
+                let receipt = try await previews.dispose(id, save: save)
+                if save {
+                    presentation.present(.savedPreviewID(id))
+                    presentation.present(.savedMediaID(receipt.mediaID))
+                }
+                var issues: [String] = []
+                if !receipt.alreadySaved {
+                    issues = await PhotoDispositionWorkflow.feedback {
+                        try await dispositionFeedback(save: save, invocation: invocation)
+                    }
+                }
+                return .init(
+                    previewID: id, mediaID: receipt.mediaID, state: receipt.state,
+                    alreadySaved: receipt.alreadySaved, feedbackIssues: issues.isEmpty ? nil : issues)
             }
             photoCommand = task
             presentation.present(.photoBusy(true))
@@ -113,89 +117,23 @@ import FunctionContracts
             }
         }
 
-        public func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
-            try Task.checkCancellation()
-            guard foreground else { throw CameraControlError.notForeground }
-            guard photoTask == nil, photoCommand == nil else { throw CameraControlError.busy }
-            if let id, state.savedMediaID == id {
-                return CameraPhotoCommandReceipt(mediaID: id, state: .saved, alreadySaved: true)
-            }
-            let selected = try selectedPhoto(id)
-            guard let photo = state.capturedPhoto else { throw CameraControlError.photoUnavailable }
-            presentation.present(.photoBusy(true))
-            presentation.present(.photoMessage("正在保存到 App 相册…"))
-            let task = Task<CameraPhotoCommandReceipt, Error> {
-                let issues = try await departPhoto(photo, kind: .save, invocation: invocation) { [self] in
-                    let data = try await photos.read(selected.id, owner: selected.owner)
-                    let info = try await NativeAlbumImage.inspect(data)
-                    try Task.checkCancellation()
-                    guard foreground, state.capturedPhoto?.id == selected.id else { throw CancellationError() }
-                    try await photos.collect(
-                        selected.id, owner: selected.owner,
-                        metadata: MediaMetadata(
-                            mime: info.mime, width: info.width, height: info.height, capturedAt: info.capturedAt,
-                            origin: "camera"))
-                    // App album collection remains committed if subsequent feedback fails.
-                    presentation.present(.savedMediaID(selected.id))
-                    presentation.present(.photoMessage("已保存到 App 相册"))
-                }
-                return CameraPhotoCommandReceipt(
-                    mediaID: selected.id, state: .saved, feedbackIssues: issues.isEmpty ? nil : issues)
-            }
-            photoCommand = task
-            defer {
-                photoCommand = nil
-                presentation.present(.photoBusy(false))
-            }
-            do {
-                return try await withTaskCancellationHandler {
-                    try await task.value
-                } onCancel: {
-                    task.cancel()
-                }
-            } catch {
-                presentation.present(
-                    .photoMessage(
-                        state.savedMediaID == selected.id
-                            ? "已保存到 App 相册，退场反馈已中断" : "保存失败：" + error.localizedDescription))
-                throw error
-            }
-        }
-
-        private func departPhoto(
-            _ photo: CapturedPhotoPresentation, kind: PhotoDeparture.Kind, invocation: any FunctionInput,
-            commit: @escaping @MainActor @Sendable () async throws -> Void
-        ) async throws -> [String] {
-            let cue: UIActions.Cue = kind == .save ? .save : .discard
+        private func dispositionFeedback(save: Bool, invocation: any FunctionInput) async throws {
             photoFeedbackContext = invocation.context
             defer { photoFeedbackContext = nil }
-            let issues = try await PhotoDispositionWorkflow.run(
-                commit: commit,
-                animation: { [presentation] in try await presentation.departPhoto(id: photo.id, kind: kind) },
-                sound: { [self] in
-                    guard
-                        let definition = UIModule.feedbackDefinitions(feedback: self).first(where: {
-                            $0.path.function == "playCue"
-                        })
-                    else { throw UIActions.FeedbackError.unavailable }
-                    let child = FunctionInvocation(
-                        call: FunctionRequest(
-                            actionPath: definition.path, parameters: ["cue": cue.rawValue, "volume": "0.85"]),
-                        context: invocation.context, executionID: UUID().uuidString,
-                        results: ActionReportStore())
-                    let completion = try await FunctionExecutor.perform(child, definition: definition)
-                    if case .report(let report) = completion, report.hasFailures || report.isCancelled {
-                        throw PhotoCueFailure(description: report.failureDescription ?? "Photo cue failed")
-                    }
-                },
-                remove: { [self] in
-                    guard state.capturedPhoto?.id == photo.id else { return }
-                    presentation.present(.capturedPhoto(nil))
-                    photoOwner = nil
-                    presentation.present(.photoMessage(nil))
+            guard
+                let definition = UIModule.feedbackDefinitions(feedback: self).first(where: {
+                    $0.path.function == "playCue"
                 })
-            if !issues.isEmpty { log.error("照片已处理，退场反馈异常：\(issues.joined(separator: "; "), privacy: .public)") }
-            return issues
+            else { throw UIActions.FeedbackError.unavailable }
+            let child = FunctionInvocation(
+                call: FunctionRequest(
+                    actionPath: definition.path,
+                    parameters: ["cue": save ? "save" : "discard", "volume": "0.85"]),
+                context: invocation.context, executionID: UUID().uuidString, results: ActionReportStore())
+            let completion = try await FunctionExecutor.perform(child, definition: definition)
+            if case .report(let report) = completion, report.hasFailures || report.isCancelled {
+                throw PhotoCueFailure(description: report.failureDescription ?? "Photo cue failed")
+            }
         }
         private struct PhotoCueFailure: Error, Sendable { let description: String }
         public func playCue(_ request: UIActions.CueRequest, invocation: any FunctionInput) async throws {
@@ -230,6 +168,10 @@ import FunctionContracts
                 try Task.checkCancellation()
                 guard foreground, revision == expectedRevision else { throw CancellationError() }
                 try ensureCaptureAvailable()
+                let id = try await previews.reserve()
+                defer { previews.cancelReservation(id) }
+                try Task.checkCancellation()
+                guard foreground, revision == expectedRevision else { throw CancellationError() }
                 let rotation = try await presentation.waitForPhotoCaptureRotation()
                 try Task.checkCancellation()
                 guard foreground, revision == expectedRevision else { throw CancellationError() }
@@ -240,38 +182,42 @@ import FunctionContracts
                 guard let image = UIImage(data: data), image.size.width > 0, image.size.height > 0 else {
                     throw CameraControlError.unavailable
                 }
-                let owner = StorageOwner(
-                    namespace: "photos", source: invocation.context.source,
-                    session: invocation.context.sessionID, input: invocation.context.inputID)
-                let id = try await photos.save(data, owner: owner)
-                // Durable capture is retained if subsequent presentation or turn delivery fails.
-                let receipt = try CameraPhotoReceipt(
-                    mediaID: id, width: Int(image.size.width * image.scale),
-                    height: Int(image.size.height * image.scale))
+                let width = Int(image.size.width * image.scale)
+                let height = Int(image.size.height * image.scale)
+                var analysisError: (any Error)?
+                do { try await previews.publish(data, id: id, width: width, height: height) } catch {
+                    // Preparation failure retains the original. A failed cache publication does not.
+                    guard previews.catalog.contains(where: { $0.previewID == id }) else { throw error }
+                    analysisError = error
+                }
+                let receipt = try CameraPhotoReceipt(previewID: id, width: width, height: height)
                 try Task.checkCancellation()
                 guard foreground, revision == expectedRevision else { throw CancellationError() }
                 presentationFinished = nil
-                photoOwner = (id, owner)
+                presentation.present(.savedPreviewID(nil))
                 presentation.present(.savedMediaID(nil))
                 presentation.present(.photoMessage(nil))
-                try presentation.presentPhoto(id: id, image: image) { [weak self] success in
-                    guard let self, self.state.capturedPhoto?.id == id else { return }
-                    self.presentationFinished = (id, success)
-                }
                 let deadline = ContinuousClock.now.advanced(by: .seconds(3))
                 do {
+                    try presentation.presentPhoto(id: id, image: image) { [weak self] success in
+                        guard let self, self.state.capturedPhoto?.id == id else { return }
+                        self.presentationFinished = (id, success)
+                    }
                     while presentationFinished?.id != id {
                         try Task.checkCancellation()
                         guard foreground, revision == expectedRevision else { throw CancellationError() }
-                        guard ContinuousClock.now < deadline else { throw CameraPhotoDisplayFailure(mediaID: id) }
+                        guard ContinuousClock.now < deadline else { throw CameraPhotoDisplayFailure(previewID: id) }
                         try await Task.sleep(for: .milliseconds(10))
                     }
-                    guard presentationFinished?.success == true else { throw CameraPhotoDisplayFailure(mediaID: id) }
+                    guard presentationFinished?.success == true else { throw CameraPhotoDisplayFailure(previewID: id) }
+                    presentation.present(.capturedPhoto(nil))
+                    if let analysisError {
+                        throw CameraPhotoAnalysisFailure(previewID: id, cause: String(describing: analysisError))
+                    }
                     return receipt
                 } catch {
                     if state.capturedPhoto?.id == id {
                         presentation.present(.capturedPhoto(nil))
-                        photoOwner = nil
                     }
                     throw error
                 }
@@ -295,9 +241,16 @@ import FunctionContracts
     }
 
     private struct CameraPhotoDisplayFailure: Error, LocalizedError, ActionExecutionFailureProviding {
-        public let mediaID: String
+        public let previewID: String
         public var executionFailureCode: ActionExecutionFailureCode { .init(rawValue: "photoPresentationFailed") }
-        public var errorDescription: String? { "Photo \(mediaID) was saved, but its presentation did not complete." }
+        public var errorDescription: String? {
+            "Preview \(previewID) is cached, but its presentation did not complete."
+        }
     }
 
+    private struct CameraPhotoAnalysisFailure: Error, LocalizedError {
+        let previewID: String
+        let cause: String
+        var errorDescription: String? { "Preview \(previewID) is cached; image analysis preparation failed: \(cause)" }
+    }
 #endif

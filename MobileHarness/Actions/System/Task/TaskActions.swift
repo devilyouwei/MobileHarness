@@ -3,19 +3,15 @@ import FunctionContracts
 extension SystemActions {
     @Action(
         domain: "Agent", module: "Task", title: "sendMessage",
-        doc:
-            "Send user input to background work.",
+        doc: "Send input to the foreground task or to a target Agent.",
         parameters: [
-            .init("taskID", description: "Actual background task ID"),
-            .init("text", description: "Relevant user answer or correction"),
-            .init(
-                "executor",
-                description: "Owning Agent ID, e.g. writer; runtime resolves delegation and pending question"),
+            .init("text", description: "Relevant input or correction"),
+            .init("agent_id", required: false, description: "Target Agent; omit for foreground"),
         ], timeout: .seconds(30))
     public static func sendMessage(_ input: any FunctionInput, capability: any TaskControlCapability) async throws
         -> ActionCompletion
     {
-        .value(try await capability.controlTask("sendMessage", arguments: input.call.parameters, invocation: input))
+        .value(try await capability.controlTask("task.send", arguments: input.call.parameters, invocation: input))
     }
     @Action(
         domain: "Agent", module: "Task", title: "loadSkills",
@@ -46,42 +42,16 @@ extension SystemActions {
     @Action(
         domain: "Agent", module: "Task", title: "startTask",
         doc:
-            "Start foreground here or delegate background; acceptance preserves foreground work.",
+            "Start a foreground goal owned by the calling Agent. Peer alternative to delegateTask, never its prerequisite.",
         parameters: [
-            .init(
-                "goal", type: .string, required: true,
-                description: "Goal; Writer: one line, <=1024 UTF-8 bytes, no code", constraints: "Bounded text"),
-            .init(
-                "skills", type: .string, required: false,
-                description: "JSON Skill IDs; omit for Writer",
-                constraints: "Bounded text"),
-            .init(
-                "execution", type: .string, required: false, description: "foreground (default) or background",
-                constraints: "Bounded text"),
-            .init(
-                "executor", type: .string, required: false,
-                description: "Background executor ID: writer",
-                constraints: "Bounded text"),
-            .init("taskID", required: false, description: "Writer only: actual saved task to resume"),
-            .init(
-                "replaceCurrent", type: .boolean, required: false,
-                description: "Writer only: authorized replacement after cleanup",
-                values: ["true", "false"]),
-            .init("title", required: false, description: "Writer work title"),
-            .init("entry", required: false, description: "Writer entry: index.html/document.md/document.txt"),
-            .init(
-                "businessContract", type: .string, required: false,
-                description: "Non-Writer background only: registered contract",
-                constraints: "Bounded text"),
-            .init(
-                "payload", type: .string, required: false,
-                description: "Non-Writer background only: contract JSON",
-                constraints: "Bounded text"),
-        ], completion: "Foreground committed, or background accepted", timeout: .seconds(30))
+            .init("description", description: "Foreground task description"),
+            .init("skills", required: false, description: "Optional JSON array of initial foreground Skill IDs"),
+        ],
+        completion: "Foreground task committed", timeout: .seconds(30))
     public static func startTask(_ input: any FunctionInput, capability: any TaskControlCapability) async throws
         -> ActionCompletion
     {
-        .value(try await capability.controlTask("startTask", arguments: input.call.parameters, invocation: input))
+        .value(try await capability.controlTask("task.start", arguments: input.call.parameters, invocation: input))
     }
     @Action(
         domain: "Agent", module: "Task", title: "finishTask",
@@ -99,25 +69,31 @@ extension SystemActions {
     public static func finishTask(_ input: any FunctionInput, capability: any TaskControlCapability) async throws
         -> ActionCompletion
     {
-        .value(try await capability.controlTask("finishTask", arguments: input.call.parameters, invocation: input))
+        .value(try await capability.controlTask("task.end", arguments: input.call.parameters, invocation: input))
     }
     @Action(
         domain: "Agent", module: "Task", title: "cancelTask",
-        doc:
-            "Cancel foreground; taskID requests background cleanup. Await its terminal.",
+        doc: "Cancel foreground or send cancellation to a target Agent.",
         parameters: [
-            .init(
-                "reason", type: .string, required: true, description: "User cancellation reason",
-                constraints: "Nonempty bounded text"),
-            .init(
-                "taskID", required: false,
-                description: "Agent-local background task_N; omit for current foreground Task"),
-            .init(
-                "executor", required: false, description: "Required with background taskID; owning Agent, e.g. writer"),
-        ], completion: "Foreground cancelled, or background cancellation delivered", timeout: .seconds(30))
+            .init("reason", description: "Cancellation reason"),
+            .init("agent_id", required: false, description: "Target Agent; omit for foreground"),
+        ], completion: "Cancellation accepted", timeout: .seconds(30))
     public static func cancelTask(_ input: any FunctionInput, capability: any TaskControlCapability) async throws
         -> ActionCompletion
     {
-        .value(try await capability.controlTask("cancelTask", arguments: input.call.parameters, invocation: input))
+        .value(try await capability.controlTask("task.cancel", arguments: input.call.parameters, invocation: input))
+    }
+    @Action(
+        domain: "Agent", module: "Task", title: "delegateTask",
+        doc:
+            "Directly delegate to a target from the available Agent directory. Peer alternative to startTask; no foreground prerequisite.",
+        parameters: [
+            .init("agent_id", description: "Target Agent ID"),
+            .init("description", description: "Task description; no code"),
+        ], completion: "Request accepted; not task completion", timeout: .seconds(30))
+    public static func delegateTask(_ input: any FunctionInput, capability: any TaskControlCapability) async throws
+        -> ActionCompletion
+    {
+        .value(try await capability.controlTask("task.delegate", arguments: input.call.parameters, invocation: input))
     }
 }

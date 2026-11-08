@@ -43,5 +43,5 @@ FilesContainer.workspaces is a separate opaque namespace, explicitly configured 
 DiskFileStore.replace atomically replaces an existing file or creates it, including empty text/CSS/JS.
 textFiles reads a confined directory in one actor turn, rejecting symbolic links, invalid UTF-8 and missing
 directories. Generic fileURL permits empty files; media-specific validators still reject invalid assets.
-Workspace contracts and file/index coordination belong to [Database/Workspaces](../Database/Workspaces/README.md),
+Workspace contracts and file/index coordination belong to [Database/WriterWorkspaces](../Database/WriterWorkspaces/README.md),
 not Files. Source files live at agent/task_N/relative-path; Files has no project, version or rendering policy.

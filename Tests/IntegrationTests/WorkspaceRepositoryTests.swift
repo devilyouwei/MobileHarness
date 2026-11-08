@@ -11,12 +11,37 @@ import Testing
 func workspaceFixtureRepositories(url: URL? = nil, count: Int = 1) async throws -> SQLiteRepositories {
     let records = try url.map { try SQLiteRepositories(url: $0) } ?? SQLiteRepositories.temporary()
     for number in 1...count {
-        if (try? await records.tasks.delegatedTask("task_\(number)", agent: "writer")) != nil { continue }
-        let task = try await records.tasks.seedDelegation(
+        if (try? await records.writerExecutions.task("task_\(number)", agent: "writer")) != nil { continue }
+        let task = try await records.seedDelegation(
             taskID: nil, goal: "Fixture \(number)", input: "Create", sourceDialog: nil, agent: "writer")
-        try await records.tasks.endSeedDelegation(task.delegateID, status: "completed")
+        try await records.endSeedDelegation(task.delegateID, status: "completed")
     }
     return records
+}
+
+@Test func workspaceSearchFiltersAndPagesMetadataInSQLite() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let records = try await workspaceFixtureRepositories(count: 16)
+    let workspace = ArtifactWorkspace(disk: try DiskFileStore(root: root), catalog: records.workspaces)
+    let draft = try ArtifactDraft(files: ["index.html": "private source"])
+    for number in 1...15 {
+        let id = try #require(WorkspaceID(agent: "writer", taskID: "task_\(number)"))
+        let title = number == 14 ? "Unrelated" : "神经流程图 \(number)"
+        _ = try await workspace.publish(id: id, expecting: nil, title: title, draft: draft)
+    }
+    let first = try await records.workspaces.search("流程图", before: nil)
+    #expect(first.matches.count == 12 && first.matches.allSatisfy { $0.title.contains("流程图") && $0.files.isEmpty })
+    let cursor = try #require(first.nextBefore)
+    let next = try await records.workspaces.search("流程图", before: cursor)
+    #expect(next.matches.map(\.id.taskID) == ["task_2", "task_1"] && next.nextBefore == nil)
+    let exact = try await records.workspaces.search("writer/task_14", before: nil)
+    #expect(exact.matches.map(\.title) == ["Unrelated"])
+    #expect(try await records.workspaces.search("Fixture 14", before: nil).matches.map(\.title) == ["Unrelated"])
+    #expect(try await records.workspaces.search("private source", before: nil).matches.isEmpty)
+    #expect(try await records.workspaces.search("%", before: nil).matches.isEmpty)
+    #expect(try await records.workspaces.search("", before: nil).matches.count == 12)
+    try await records.shutdown()
 }
 
 @Test func workspaceUsesCurrentFilesWithoutVersionHistory() async throws {
@@ -25,9 +50,11 @@ func workspaceFixtureRepositories(url: URL? = nil, count: Int = 1) async throws 
     let records = try await workspaceFixtureRepositories()
     let workspace = ArtifactWorkspace(disk: try DiskFileStore(root: root), catalog: records.workspaces)
     let id = try #require(WorkspaceID(agent: "writer", taskID: "task_1"))
+
     let first = try await workspace.publish(
         id: id, expecting: nil, title: "Graph",
         draft: ArtifactDraft(files: ["index.html": "<h1>First</h1>", "empty.css": ""]))
+
     let url = try await workspace.entry(first)
     #expect(url.path.hasSuffix("writer/task_1/index.html"))
     let next = try ArtifactDraft(files: ["index.html": "<h1>Second</h1>", "assets/style.css": "h1{color:red}"])
@@ -132,82 +159,85 @@ func workspaceFixtureRepositories(url: URL? = nil, count: Int = 1) async throws 
     try await records.shutdown()
 }
 
-extension TaskRepository {
+extension AgentMessageRepository {
+    func seedAgentRequest(
+        id: String, requester: String, executor: String, goal: String, input: String, sourceDialog: String?
+    ) async throws {
+        try await enqueueAgentMessage(
+            .init(
+                id: id, sender: requester, receiver: executor, contract: "task.request",
+                payload: JSONSerialization.data(withJSONObject: ["description": goal, "input": input]),
+                correlationID: id, senderContext: sourceDialog, dedupeKey: id))
+    }
+
+}
+
+extension SQLiteRepositories {
     func seedDelegation(taskID: String?, goal: String, input: String, sourceDialog: String?, agent: String) async throws
-        -> DelegatedTaskRecord
+        -> SeededWriterWorkspace
     {
         let delegate = UUID().uuidString
-        try await createDelegation(
+        try await agentMessages.seedAgentRequest(
             id: delegate, requester: "assistant", executor: agent, goal: goal, input: input, sourceDialog: sourceDialog)
-        return try await beginDelegation(
-            delegateID: delegate, taskID: taskID, goal: goal, input: input, sourceDialog: sourceDialog, agent: agent)
+        _ = try await writerExecutions.beginRequest(
+            delegateID: delegate, taskID: nil, goal: goal, input: input, sourceDialog: sourceDialog, agent: agent)
+        let workspace: WriterWorkspaceRecord
+        if let taskID {
+            workspace = try await writerExecutions.selectWorkspace(requestID: delegate, taskID: taskID)
+        } else {
+            workspace = try await writerExecutions.createWorkspace(requestID: delegate, title: goal)
+            try await writerExecutions.prepareWorkspace(
+                workspace.workspaceID, taskID: workspace.id, delegateID: delegate, agent: agent, ready: false)
+        }
+        return SeededWriterWorkspace(workspace: workspace, delegateID: delegate)
     }
     func endSeedDelegation(_ id: String, status: String, failure: String? = nil) async throws {
-        let row = try await delegation(id, agent: "writer")
-        try await completeDelegation(
-            .init(delegateID: id, agent: "writer", eventID: UUID().uuidString, data: Data()), status: status,
+        let row = try await writerExecutions.request(id, agent: "writer")
+
+        try await writerExecutions.completeRequest(
+            .init(delegateID: id, agent: "writer", eventID: UUID().uuidString, data: Data("{}".utf8)), status: status,
             failure: failure)
+
+        try await writerExecutions.finishTaskNotification(
+            id, agent: "writer", retirement: true, completed: true, failure: nil)
+
         _ = row
     }
 }
 
 @Test func agentOwnedTaskNumbersAndDelegationUUIDsAreIndependentAndDurable() async throws {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: root) }
-    let url = root.appendingPathComponent("records.sqlite")
-    let records = try SQLiteRepositories(url: url)
-    let source = try await records.chat.current(agent: "assistant")
-    let foreground = try await records.tasks.createTask(dialog: source.id, agent: "assistant", goal: "Talk")
+    let records = try SQLiteRepositories.temporary()
+    let source = try await records.assistantConversations.current()
+    let foreground = try await records.assistantTasks.createTask(dialog: source.id, agent: "assistant", goal: "Talk")
     #expect(foreground == "task_1")
     let id = UUID().uuidString
-    try await records.tasks.createDelegation(
+    try await records.agentMessages.seedAgentRequest(
         id: id, requester: "assistant", executor: "writer", goal: "Diagram", input: "Draw", sourceDialog: source.id)
-    #expect(try await records.tasks.delegatedTasks(agent: "writer", before: nil, limit: 20).isEmpty)
-    await #expect(throws: RecordStorageError.missingRecord) {
-        try await records.tasks.beginDelegation(
-            delegateID: id, taskID: nil, goal: "Diagram", input: "Draw", sourceDialog: nil, agent: "other")
-    }
-    let task = try await records.tasks.beginDelegation(
+    let first = try await records.writerExecutions.beginRequest(
         delegateID: id, taskID: nil, goal: "Diagram", input: "Draw", sourceDialog: nil, agent: "writer")
-    #expect(task.id == "task_1" && task.delegateID == id && task.workspaceID == "writer/task_1")
-    let again = try await records.tasks.beginDelegation(
+    let repeated = try await records.writerExecutions.beginRequest(
         delegateID: id, taskID: nil, goal: "Diagram", input: "Draw", sourceDialog: nil, agent: "writer")
-    #expect(again.id == task.id && again.dialogID == task.dialogID)
+    #expect(first.id == id && first.messageID == repeated.messageID && first.taskID.isEmpty)
+    #expect(try await records.writerExecutions.tasks(agent: "writer", before: nil, limit: 20).isEmpty)
+    let workspace = try await records.writerExecutions.createWorkspace(requestID: id, title: "Diagram")
+    try await records.writerExecutions.prepareWorkspace(
+        workspace.workspaceID, taskID: workspace.id, delegateID: id, agent: "writer")
+    #expect(workspace.id == "task_1")
+    try await records.endSeedDelegation(id, status: "completed")
+    let next = UUID().uuidString
+    try await records.agentMessages.seedAgentRequest(
+        id: next, requester: "assistant", executor: "writer", goal: "Edit", input: "Blue", sourceDialog: nil)
+    let second = try await records.writerExecutions.beginRequest(
+        delegateID: next, taskID: nil, goal: "Edit", input: "Blue", sourceDialog: nil, agent: "writer")
+    #expect(second.messageID > first.messageID && second.taskID.isEmpty)
+    _ = try await records.writerExecutions.selectWorkspace(requestID: next, taskID: workspace.id)
+    #expect(try await records.writerExecutions.request(next, agent: "writer").taskID == workspace.id)
     await #expect(throws: RecordStorageError.conflict) {
-        try await records.tasks.createDelegation(
-            id: id, requester: "assistant", executor: "writer", goal: "Changed", input: "Draw", sourceDialog: source.id)
+        try await records.writerExecutions.updateRequestPhase(requestID: id, phase: "running")
     }
-    let secondDelegate = UUID().uuidString
-    try await records.tasks.createDelegation(
-        id: secondDelegate, requester: "assistant", executor: "writer", goal: "Edit", input: "Blue",
-        sourceDialog: source.id)
-    await #expect(throws: RecordStorageError.conflict) {
-        try await records.tasks.beginDelegation(
-            delegateID: secondDelegate, taskID: task.id, goal: "Edit", input: "Blue", sourceDialog: nil, agent: "writer"
-        )
-    }
-    try await records.tasks.endSeedDelegation(id, status: "completed")
-    let resumed = try await records.tasks.beginDelegation(
-        delegateID: secondDelegate, taskID: task.id, goal: "Edit", input: "Blue", sourceDialog: nil, agent: "writer")
-    #expect(
-        resumed.id == task.id && resumed.workspaceID == task.workspaceID && resumed.dialogID == task.dialogID
-            && resumed.delegateID != id)
-    await #expect(throws: RecordStorageError.conflict) {
-        try await records.tasks.setDelegationPhase(taskID: task.id, delegateID: id, phase: "running", agent: "writer")
-    }
-    try await records.tasks.endSeedDelegation(secondDelegate, status: "completed")
-    let other = try await records.tasks.seedDelegation(
-        taskID: nil, goal: "Other", input: "Other", sourceDialog: nil, agent: "other")
-    #expect(other.id == "task_1" && other.workspaceID == "other/task_1")
-    let trace = try await records.chat.dialog(task.dialogID).traceID
+    try await records.endSeedDelegation(next, status: "completed")
+    #expect(try await records.writerExecutions.delegationCount() == 2)
     try await records.shutdown()
-    let reopened = try SQLiteRepositories(url: url)
-    #expect(try await reopened.chat.dialog(task.dialogID).traceID == trace)
-    let next = try await reopened.tasks.seedDelegation(
-        taskID: nil, goal: "New", input: "New", sourceDialog: nil, agent: "writer")
-    #expect(next.id == "task_2" && UUID(uuidString: next.delegateID) != nil)
-    try await reopened.shutdown()
 }
 
 @Test func workspaceIdentityRejectsTraversalAndMaterializesAgentTaskDirectory() async throws {
@@ -227,4 +257,50 @@ extension TaskRepository {
     #expect(url.path.contains("/writer/task_1/"))
     #expect(try String(contentsOf: url, encoding: .utf8).contains("Demo"))
     try await catalog.shutdown()
+}
+
+@Test func writerWorkspaceSelectionRejectsInvalidTargetAndCancelledRequestAtomically() async throws {
+    let records = try SQLiteRepositories.temporary()
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let workspace = ArtifactWorkspace(disk: try DiskFileStore(root: root), catalog: records.workspaces)
+    let old = try await records.seedDelegation(
+        taskID: nil, goal: "Existing", input: "seed", sourceDialog: nil, agent: "writer")
+    let target = try #require(WorkspaceID(rawValue: old.workspaceID))
+    let project = try await workspace.publish(
+        id: target, expecting: nil, title: "Existing", draft: ArtifactDraft(files: ["index.html": "KEEP"]))
+    try await records.endSeedDelegation(old.delegateID, status: "completed")
+    let current = try await records.seedDelegation(
+        taskID: nil, goal: "Locate", input: "query", sourceDialog: nil, agent: "writer")
+    await #expect(throws: (any Error).self) {
+        try await records.writerExecutions.selectWorkspace(requestID: current.delegateID, taskID: "task_999999")
+    }
+    #expect(try await records.writerExecutions.request(current.delegateID, agent: "writer").taskID == current.id)
+    let lease = UUID()
+    try await records.workspaces.claim(target, expecting: project.revision, lease: lease)
+    await #expect(throws: (any Error).self) {
+        try await records.writerExecutions.selectWorkspace(requestID: current.delegateID, taskID: old.id)
+    }
+    #expect(try await records.writerExecutions.request(current.delegateID, agent: "writer").taskID == current.id)
+    try await records.workspaces.release(target, lease: lease)
+    try await records.writerExecutions.updateRequestPhase(requestID: current.delegateID, phase: "cancelling")
+    await #expect(throws: (any Error).self) {
+        try await records.writerExecutions.selectWorkspace(requestID: current.delegateID, taskID: old.id)
+    }
+    #expect(try await records.writerExecutions.request(current.delegateID, agent: "writer").taskID == current.id)
+    #expect(try await records.writerExecutions.request(old.delegateID, agent: "writer").taskID == old.id)
+    #expect(try await workspace.project(target).files == ["index.html": "KEEP"])
+    try await records.shutdown()
+}
+
+/// Test setup explicitly creates both independent entities; production admission creates only a message.
+struct SeededWriterWorkspace {
+    let workspace: WriterWorkspaceRecord
+    let delegateID: String
+    var id: String { workspace.id }
+    var dialogID: String { workspace.dialogID }
+    var workspaceID: String { workspace.workspaceID }
+    var workspaceReady: Bool { workspace.workspaceReady }
+    var goal: String { workspace.goal }
+    var updatedAt: Date { workspace.updatedAt }
 }

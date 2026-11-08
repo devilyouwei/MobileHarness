@@ -13,23 +13,22 @@
             let devicesUI = ui.devices
             let camera = CameraInteractionWorkflow(
                 presentation: cameraUI,
+                readPreview: { [previews = self.camera.previews] id, scope in
+                    try previews.validateSession(scope)
+                    return try previews.original(id)
+                },
                 perform: { input in
                     _ = try await cameraUI.requests.submit(input)
                 })
             let history = ConversationHistoryWorkflow(
-                state: historyUI.presentation, prepare: {},
+                state: historyUI.presentation, clearLogs: { _ = try await historyUI.requests.submit(.clearLogs($0)) },
+                prepare: {},
                 refresh: { _ = try await historyUI.requests.submit(.refresh) },
                 deleteArchive: { _ = try await historyUI.requests.submit(.delete($0)) },
                 startNew: { _ = try await historyUI.requests.submit(.startNew) },
-                summarize: { _ = try await historyUI.requests.submit(.summarize($0)) }, previewOutput: previewHistory,
+                summarize: { _ = try await historyUI.requests.submit(.summarize($0)) },
                 readConversation: { id in
                     guard case .conversation(let value) = try await historyUI.requests.submit(.conversation(id)) else {
-                        throw UIRequestError.stale
-                    }
-                    return value
-                },
-                readPhoto: { id, input in
-                    guard case .photo(let value) = try await historyUI.requests.submit(.photo(id, input)) else {
                         throw UIRequestError.stale
                     }
                     return value

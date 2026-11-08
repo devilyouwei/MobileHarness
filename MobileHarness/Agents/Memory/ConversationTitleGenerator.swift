@@ -10,12 +10,13 @@ public enum ConversationTitleGenerator {
         return (0..<amount).map { amount == 1 ? 0 : $0 * (count - 1) / (amount - 1) }
     }
     public static func summarize(
-        _ conversation: StoredConversation, using chat: any ChatCapability,
-        journal: @escaping @Sendable (ConversationModelRequest) async throws -> Void = { _ in }
+        _ conversation: AssistantConversation, using chat: any ChatCapability,
+        journal: @escaping @Sendable (AssistantModelRequest) async throws -> Void = { _ in },
+        transport: @escaping @Sendable (String, ModelRequestLogUpdate) async throws -> Void = { _, _ in }
     ) async throws
         -> String
     {
-        guard !conversation.turns.isEmpty else { throw ConversationHistoryError.emptyConversation }
+        guard !conversation.turns.isEmpty else { throw AssistantHistoryError.emptyConversation }
         // Bounded excerpts cover the whole conversation, rather than only its final exchange.
         let selected = samplePositions(count: conversation.turns.count).map { conversation.turns[$0] }
         let templates = try PromptTemplates(data: AgentConfigurations.titlePromptData())
@@ -38,8 +39,13 @@ public enum ConversationTitleGenerator {
                 let journal = TitleRequestJournal(
                     input: excerpts, requestJSON: try audit.snapshot().requestJSON, audit: audit, persist: journal)
                 try await journal.begin()
+                let invocationID = await journal.id
+                var captured = prepared
+                captured.transportCapture = audit.transportRecorder { value in
+                    if let update = value.transport { try await transport(invocationID, update) }
+                }
                 do {
-                    let session = try await chat.chat(prepared)
+                    let session = try await chat.chat(captured)
                     defer { session.cancel() }
                     let result = try await session.withCleanup {
                         try await withTaskCancellationHandler {
@@ -94,13 +100,14 @@ public enum ConversationTitleGenerator {
 }
 
 private actor TitleRequestJournal {
-    private var record: ConversationModelRequest
+    private var record: AssistantModelRequest
     private let audit: AgentModelRequestRecording
-    private let persist: @Sendable (ConversationModelRequest) async throws -> Void
+    private let persist: @Sendable (AssistantModelRequest) async throws -> Void
+    var id: String { record.id }
     var text: String { record.response }
     init(
         input: String, requestJSON: String, audit: AgentModelRequestRecording,
-        persist: @escaping @Sendable (ConversationModelRequest) async throws -> Void
+        persist: @escaping @Sendable (AssistantModelRequest) async throws -> Void
     ) {
         self.audit = audit
         self.persist = persist

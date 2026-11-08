@@ -88,7 +88,7 @@ import StorageFiles
             business.tasks.handler = nil
         }
         private let assistantContext: AgentContextRepository<AssistantContextState>
-        let conversations: ConversationHistoryStore
+        let conversations: AssistantHistoryStore
         let observations: AgentObservationAccess
         let manager: AgentManager
         let input: InputGateway
@@ -105,22 +105,26 @@ import StorageFiles
             memoryContainer: MemoryContainer, photographerContainer: PhotographerContainer,
             writerContainer: WriterContainer,
             stateContext: AgentStateContext, cache: CacheContainer,
-            chatRecords: any ChatRepository, taskRecords: any TaskRepository,
+            repositories: AgentRepositories,
             cameraUI: UICameraContainer, albumUI: UIAlbumContainer? = nil, windowsUI: WindowState? = nil,
             settingsUI: UISettingsContainer,
             resourcesUI: UIModelResourcesContainer, devicesUI: UIDeviceSettingsContainer, historyUI: UIHistoryContainer,
             diagnosticsUI: UIDiagnosticsContainer, cameraControl: any AgentCameraAccess,
             resourceChanges: @escaping @MainActor @Sendable () async throws -> AsyncStream<UInt64>,
-            summarizeTitle: @escaping @Sendable (StoredConversation) async throws -> String,
+            summarizeTitle: @escaping @Sendable (AssistantConversation) async throws -> String,
             modelName: @escaping @Sendable () async throws -> String = { "Unspecified model" },
             chatProvider: @escaping @Sendable () async throws -> any ChatCapability
         ) throws -> AgentExecutionPreparation {
-            try writerContainer.configureHistory(chat: chatRecords, tasks: taskRecords)
+            try writerContainer.configureHistory(
+                messages: repositories.writerMessages, tasks: repositories.writerExecutions,
+                communications: repositories.agentMessages, logs: repositories.logs)
             let contextScope = UUID().uuidString
             let assistantContext = try AgentContextRepository(
                 agent: .assistant, scope: contextScope, state: AssistantContextState())
             let historyStore = try AssistantConversationStorage.store(
-                repository: assistantContext, chat: chatRecords, tasks: taskRecords)
+                repository: assistantContext, messages: repositories.assistantMessages,
+                tasks: repositories.assistantTasks, conversations: repositories.assistantConversations,
+                logs: repositories.logs)
             let applicationControlSessionID = UUID().uuidString
             let activity = ActionActivityWorkflow(state: home.activityPresentation)
             let conversations = historyStore
@@ -191,7 +195,7 @@ import StorageFiles
                                 throw CommunicationError.unavailableTarget
                             }
                             _ = try await control(
-                                "cancelTask", ["reason": "用户开始新对话"], "assistant",
+                                "task.cancel", ["reason": "用户开始新对话"], "assistant",
                                 applicationControlSessionID, UUID().uuidString, nil)
                         }
                     }, context: memoryContext)
@@ -246,7 +250,8 @@ import StorageFiles
                     try AgentRuntime(
                         facilities: facilities, business: business, contextScope: contextScope, home: home,
                         containerFailures: containerFailures, cache: cache, assistantContext: assistantContext,
-                        conversations: conversations, applicationControlSessionID: applicationControlSessionID,
+                        conversations: conversations, communications: repositories.agentMessages,
+                        applicationControlSessionID: applicationControlSessionID,
                         activity: activity, photographerAgent: photographerAgent,
                         applicationControlAgent: applicationControlAgent, historyAgent: historyAgent,
                         stateContext: stateContext, cameraControl: cameraControl, chatProvider: chatProvider,
@@ -259,7 +264,8 @@ import StorageFiles
         private init(
             facilities: AgentGatewayCapabilities, business: AgentBusinessBindings, contextScope: String,
             home: UIHomeContainer, containerFailures: ContainerFailureChannel, cache: CacheContainer,
-            assistantContext: AgentContextRepository<AssistantContextState>, conversations: ConversationHistoryStore,
+            assistantContext: AgentContextRepository<AssistantContextState>, conversations: AssistantHistoryStore,
+            communications: any AgentMessageRepository,
             applicationControlSessionID: String, activity: ActionActivityWorkflow, photographerAgent: PhotographerAgent,
             applicationControlAgent: ApplicationControlAgent, historyAgent: MemoryAgent,
             stateContext: AgentStateContext, cameraControl: any AgentCameraAccess,
@@ -291,7 +297,6 @@ import StorageFiles
                 throw WriterFailure.unavailable
             }
             writerContainer.bindArtifacts(business.writerArtifacts)
-            writerContainer.bindPhotos(business.writerPhotos)
             try writerContainer.install(manager: manager, output: gateway, model: writerModel, streaming: streaming)
             actionActivity = activity
             business.bindResources(resources, actions)
@@ -319,12 +324,18 @@ import StorageFiles
             let history = MemoryExecutionSession(
                 manager: manager, output: gateway, agent: historyAgent)
             memorySession = history
+            try stateContext.registerMedia(
+                "actions.camera.preview",
+                read: { scope in
+                    try await cameraControl.previewSnapshot(scope: scope)
+                }, reset: { scope in await cameraControl.resetPreviewSelection(scope: scope) })
             let main = try AssistantAgent(
                 stateContext: stateContext,
                 uiHome: home, uiSessionID: applicationControlSessionID,
                 reportsReplyActivity: true, chatProvider: chatProvider, conversations: conversations,
+                communications: communications,
                 modelName: modelName,
-                observations: AssistantContextBuilder.photoObservationHandler(
+                observations: AssistantContextBuilder.webImageObservationHandler(
                     read: { id, input in
                         try await ChatImage(
                             id: id,
@@ -341,7 +352,10 @@ import StorageFiles
             business.tasks.handler = { operation, arguments, source, session, input, decision in
                 try await main.controlTask(
                     operation, arguments: arguments, source: source, sessionID: session, inputID: input,
-                    decisionID: decision)
+                    decisionID: decision,
+                    beforeSuperseding: {
+                        try await facilities.actions.drainEffects(inputID: decision ?? input, source: source)
+                    })
             }
             let interaction = AssistantExecutionSession(
                 agent: main, manager: manager, output: gateway,

@@ -17,7 +17,7 @@ struct PhotographerCameraWorkflow {
             path: "Camera.Capture." + $0, required: $0 == "flip" ? ["facing"] : [],
             optional: $0 == "configure"
                 ? ["mode", "delaySeconds", "flash", "zoom", "durationSeconds"]
-                : $0 == "savePhoto" || $0 == "ignorePhoto" ? ["mediaID"] : [])
+                : $0 == "savePhoto" || $0 == "ignorePhoto" ? ["previewID"] : [])
     }
     private static let videoPermissions = ["startRecording", "stopRecording", "saveVideo", "ignoreVideo"].map {
         InternalTool(
@@ -84,7 +84,7 @@ struct PhotographerCameraWorkflow {
             // Interactive commands release the role/UI slot once native recording starts.
             if intent.operation == .startRecording { arguments["waitForCompletion"] = "false" }
             if let id = intent.recordingID { arguments["recordingID"] = id }
-            if let id = intent.mediaID { arguments["mediaID"] = id }
+            if let id = intent.previewID { arguments["previewID"] = id }
             let permitted = try permission.call(arguments)
             let call = ToolCall(id: intent.requestID, toolPath: permitted.toolPath, arguments: permitted.arguments)
             pending = Pending(requestID: intent.requestID, input: input)

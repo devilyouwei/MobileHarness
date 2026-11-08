@@ -2,7 +2,7 @@
 
 ## 职责与模块关系
 
-拥有历史查询、归档修改与结果呈现。HistoryModule 绑定预览、修改和内部完整读取；查询服务、请求结果槽、标题任务及 UI 投影分别拥有明确状态。所有服务共享注入的 ConversationHistoryStore。
+拥有历史查询、归档修改与结果呈现。HistoryModule 绑定预览、修改和内部完整读取；查询服务、请求结果槽、标题任务及 UI 投影分别拥有明确状态。所有服务共享注入的 AssistantHistoryStore。
 
 Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注入唯一基础能力和根生命周期。本域消费 FunctionContracts 及需要的基础能力，不导入 Agents、Gateway 实现或 App。全部域内源码由 Actions 单一目标编译。
 
@@ -14,7 +14,7 @@ Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注�
 | [ConversationHistoryWorkflow.swift](ConversationHistoryWorkflow.swift) | 历史浏览请求、取消加入与有界图片读取 |
 | [HistoryActions.swift](HistoryActions.swift) | 业务函数的参数校验、能力调用与完成值 |
 | [HistoryCapabilities.swift](HistoryCapabilities.swift) | 历史引用、查询／修改／呈现端口 |
-| [HistoryFullReadService.swift](HistoryFullReadService.swift) | 共享仓库的完整查询与照片读取 |
+| [HistoryFullReadService.swift](HistoryFullReadService.swift) | 共享仓库的完整消息与日志查询 |
 | [HistoryModule.swift](HistoryModule.swift) | 绑定预览、修改与完整读取函数 |
 | [HistoryMutationService.swift](HistoryMutationService.swift) | 归档、删除及单槽标题工作 |
 | [HistoryPresentationActions.swift](HistoryPresentationActions.swift) | 业务函数的参数校验、能力调用与完成值 |
@@ -58,6 +58,7 @@ HistoryPresentationAdapter 编译到 Actions，将共享仓库事实转换为 UI
 | startNew | 无 | archived ID 或 null |
 | summarize | 已归档会话 id | 标题提交后返回 summarized ID |
 | delete | 已归档会话 id | 删除提交后返回 deleted ID |
+| clearLogs | 可选 requestID（request_N）；省略为共享日志全库 | 物理删除完整日志后返回 cleared；不删除业务记录 |
 
 参数来自字符串传输，未知键被拒绝。list/read 结果最多 1800 UTF-8 字节，超过上限抛 resultTooLarge，不能裁掉 JSON 结构。页包含 items、total，存在更多内容时带 nextOffset；每次调用重新读取快照，不承诺跨调用分页稳定。
 
@@ -71,5 +72,10 @@ HistoryReadInvocation is ActionRequestSlot<UI.HistoryInput, UI.HistoryReply>. Hi
 
 ConversationHistoryWorkflow.records 为独立 Agent 仓库组合相同的分页/完整请求/图片展示；修改通过注入的 Agent 意图接口执行，不能直接从 UI workflow 删除仓库。Writer 的存储与 Agent 意图由 App 显式组合，不改变 Assistant 的 Memory 路径。
 
-历史图片读取先验证请求中保存的媒体引用，再按原始输入身份读取StorageMedia。引用存在但
-字节缺失时以missingImage明确失败，UI显示可重试状态，不把nil作为空白缩略图成功结果。
+历史图片读取先验证请求附件及原始输入身份，再从完整请求日志解码实际模型图片，单图上限4MiB。Camera关闭、淘汰不会影响已记录字节。清空日志经Memory内部History.Conversation.clearLogs执行，删除单条或Assistant/Writer共享全库，随后刷新详情缓存；Prompts 图片及 generation meta 随日志删除，不删除对话、回复或 Action 证据。records组合通过注入的mutate意图执行清空，不直接从UI工作流修改仓库。
+
+历史图片仅解码日志中的实际请求字节；不提供相册或预览缓存查询端口。清理后没有兼容读取路径。
+
+Assistant 历史投影透传 decisionMetadata.states 的已记录路径，与 Task/Skill 业务证据一起读取；日志清空不删除这些路径。Actions 不按当前 Skill 推算历史 State，不因 UI 隐藏原始请求 JSON 改变日志持有和清理职责。
+
+ConversationHistoryWorkflow 提供真实记录读取、分页、摘要、删除和日志清理；详情直接使用持久化输入、回复及业务快照。真实执行结果随原有记录保存。

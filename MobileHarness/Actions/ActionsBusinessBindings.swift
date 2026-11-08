@@ -9,11 +9,14 @@
     import StorageDatabase
     import StorageFiles
     import StorageMedia
+    import StorageCache
     import StorageCore
     import UI
 
     @MainActor public protocol ActionsCameraAccess: AnyObject {
         func pauseVisionForModelMaintenance() async
+        func previewSnapshot(scope: String) async throws -> MultimodalContextSnapshot
+        func resetPreviewSelection(scope: String) async
         func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data
     }
     @MainActor public protocol ActionsDeviceAccess: AnyObject {
@@ -29,6 +32,7 @@
         public let facades: ActionsUIFacades
     }
     @MainActor public struct ActionsDependencies {
+        let cache: CacheContainer
         let files: FilesContainer
         let model: ModelContainer
         let platform: PlatformContainer
@@ -36,18 +40,18 @@
         let workspaces: @Sendable () throws -> any WorkspaceRepository
         let media: @Sendable () throws -> any MediaRepository
         let devices: @Sendable () throws -> any DeviceRepository
-        let previewHistory: @MainActor (HistoryTurn) -> String
         let makeCameraRuntime: @MainActor () throws -> CameraRuntimeDependencies
         let connectVision: @MainActor (String, Bool, any CameraOutputHandling) async throws -> Void
         public init(
-            files: FilesContainer, model: ModelContainer, platform: PlatformContainer, ui: UIContainer,
+            files: FilesContainer, cache: CacheContainer = CacheContainer(), model: ModelContainer,
+            platform: PlatformContainer, ui: UIContainer,
             workspaces: @escaping @Sendable () throws -> any WorkspaceRepository,
             media: @escaping @Sendable () throws -> any MediaRepository,
             devices: @escaping @Sendable () throws -> any DeviceRepository,
-            previewHistory: @escaping @MainActor (HistoryTurn) -> String,
             makeCameraRuntime: @escaping @MainActor () throws -> CameraRuntimeDependencies,
             connectVision: @escaping @MainActor (String, Bool, any CameraOutputHandling) async throws -> Void
         ) {
+            self.cache = cache
             self.files = files
             self.model = model
             self.platform = platform
@@ -55,7 +59,6 @@
             self.workspaces = workspaces
             self.media = media
             self.devices = devices
-            self.previewHistory = previewHistory
             self.makeCameraRuntime = makeCameraRuntime
             self.connectVision = connectVision
         }
@@ -66,8 +69,8 @@
     >
 
     public typealias ActionsBusinessRequest = ActionAssemblyRequest<
-        ConversationHistoryStore, any ActivityPresenting,
-        any ExecutionFailureReporting, any ModelArtifactsManaging, StoredConversation
+        AssistantHistoryStore, any ActivityPresenting,
+        any ExecutionFailureReporting, any ModelArtifactsManaging, AssistantConversation
     >
     @MainActor public struct ActionsVoiceHost {
         public let sessionID: String
@@ -110,7 +113,6 @@
     @MainActor public struct ActionsBusinessBindings {
         public let artifactStreaming: (any ArtifactStreaming)?
         public let writerArtifacts: (any WriterArtifactsControlling)?
-        public let writerPhotos: MediaStore?
         public let writerModel: (@Sendable () async throws -> ChatModel)?
         public let executor: ActionsExecutionPort
         public let catalog: ActionCatalogSnapshot
@@ -137,7 +139,6 @@
             executor: ActionsExecutionPort, catalog: ActionCatalogSnapshot,
             artifactStreaming: (any ArtifactStreaming)? = nil,
             writerArtifacts: (any WriterArtifactsControlling)? = nil,
-            writerPhotos: MediaStore? = nil,
             writerModel: (@Sendable () async throws -> ChatModel)? = nil,
             settings: any ProviderSettingsStaging, discovery: any ProviderDiscoveryStaging,
             providerPresentation: any ProviderPresentationRegistering, tasks: any TaskControlBinding,
@@ -161,7 +162,6 @@
         ) {
             self.artifactStreaming = artifactStreaming
             self.writerArtifacts = writerArtifacts
-            self.writerPhotos = writerPhotos
             self.writerModel = writerModel
             self.executor = executor
             self.catalog = catalog

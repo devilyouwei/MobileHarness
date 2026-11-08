@@ -8,7 +8,7 @@
         {
           "user": "你好，今天心情不错。",
           "forbidden": [
-            "startTask",
+            "task.start",
             "loadSkills",
             "takePhoto",
             "Bluetooth.control"
@@ -27,7 +27,7 @@
             "openCamera"
           ],
           "forbidden": [
-            "startTask",
+            "task.start",
             "takePhoto"
           ],
           "loaded": [
@@ -47,7 +47,7 @@
             "closeCamera"
           ],
           "forbidden": [
-            "startTask"
+            "task.start"
           ],
           "loaded": [
             "photography"
@@ -67,7 +67,7 @@
           ],
           "forbidden": [
             "loadSkills",
-            "startTask"
+            "task.start"
           ]
         }
       ],
@@ -104,7 +104,7 @@
           ],
           "forbidden": [
             "loadSkills",
-            "startTask"
+            "task.start"
           ]
         }
       ],
@@ -124,8 +124,8 @@
             "takePhoto"
           ],
           "forbidden": [
-            "startTask",
-            "finishTask",
+            "task.start",
+            "task.end",
             "savePhoto",
             "ignorePhoto"
           ],
@@ -152,9 +152,9 @@
             "takePhoto"
           ],
           "forbidden": [
-            "startTask",
+            "task.start",
             "openCamera",
-            "finishTask",
+            "task.end",
             "savePhoto",
             "ignorePhoto"
           ],
@@ -175,13 +175,13 @@
         {
           "user": "帮我拍张照片，拍好后让我选择保存还是忽略。",
           "required": [
-            "startTask",
+            "task.start",
             "openCamera",
             "takePhoto"
           ],
           "task": true,
           "status": "waitingUser",
-          "first": "startTask",
+          "first": "task.start",
           "counts": {
             "takePhoto": 1
           },
@@ -196,7 +196,7 @@
           "user": "保存这张。",
           "required": [
             "savePhoto",
-            "finishTask"
+            "task.end"
           ],
           "parameters": {
             "savePhoto": {
@@ -217,7 +217,7 @@
         {
           "user": "拍张照片，等我决定是否保存。",
           "required": [
-            "startTask",
+            "task.start",
             "takePhoto"
           ],
           "task": true
@@ -226,7 +226,7 @@
           "user": "忽略这张。",
           "required": [
             "ignorePhoto",
-            "finishTask"
+            "task.end"
           ],
           "forbidden": [
             "savePhoto",
@@ -248,8 +248,8 @@
             "takePhoto"
           ],
           "forbidden": [
-            "startTask",
-            "finishTask"
+            "task.start",
+            "task.end"
           ],
           "ordered": [
             "ignorePhoto",
@@ -270,7 +270,7 @@
           "user": "保存新的。",
           "required": [
             "savePhoto",
-            "finishTask"
+            "task.end"
           ],
           "parameters": {
             "savePhoto": {
@@ -302,8 +302,8 @@
             }
           },
           "forbidden": [
-            "startTask",
-            "finishTask",
+            "task.start",
+            "task.end",
             "takePhoto"
           ],
           "task": false
@@ -330,8 +330,8 @@
             }
           },
           "forbidden": [
-            "startTask",
-            "finishTask",
+            "task.start",
+            "task.end",
             "takePhoto"
           ]
         }
@@ -352,7 +352,7 @@
             "savePhoto",
             "ignorePhoto",
             "takePhoto",
-            "startTask"
+            "task.start"
           ]
         }
       ],
@@ -387,7 +387,7 @@
             ]
           ],
           "forbidden": [
-            "startTask"
+            "task.start"
           ],
           "counts": {
             "takePhoto": 1
@@ -479,7 +479,7 @@
             "savePhoto": 1
           },
           "forbidden": [
-            "finishTask",
+            "task.end",
             "takePhoto"
           ],
           "task": true
@@ -524,8 +524,8 @@
         {
           "user": "顺便问一下，你叫什么名字？",
           "forbidden": [
-            "finishTask",
-            "cancelTask",
+            "task.end",
+            "task.cancel",
             "releaseSkills",
             "takePhoto"
           ],
@@ -550,10 +550,10 @@
         {
           "user": "昨天的聊天记录呢？",
           "forbidden": [
-            "finishTask",
-            "cancelTask",
+            "task.end",
+            "task.cancel",
             "releaseSkills",
-            "startTask"
+            "task.start"
           ],
           "task": true
         }
@@ -572,16 +572,16 @@
         {
           "user": "不拍了，结束这个拍照任务，改查昨天的聊天记录。",
           "required": [
-            "finishTask",
+            "task.end",
             "History.list"
           ],
           "parameters": {
-            "finishTask": {
+            "task.end": {
               "continueDecision": "true"
             }
           },
           "ordered": [
-            "finishTask",
+            "task.end",
             "History.list"
           ],
           "forbidden": [
@@ -604,10 +604,10 @@
         {
           "user": "取消当前任务。",
           "required": [
-            "cancelTask"
+            "task.cancel"
           ],
           "forbidden": [
-            "startTask",
+            "task.start",
             "savePhoto",
             "takePhoto"
           ],
@@ -629,10 +629,10 @@
           "user": "继续刚才的任务，保存这张照片。",
           "required": [
             "savePhoto",
-            "finishTask"
+            "task.end"
           ],
           "forbidden": [
-            "startTask",
+            "task.start",
             "takePhoto"
           ],
           "task": false
@@ -653,14 +653,14 @@
           "user": "保存这张。",
           "required": [
             "savePhoto",
-            "finishTask"
+            "task.end"
           ],
           "task": false
         },
         {
           "user": "再帮我拍一张，拍好后我再决定保存还是忽略。",
           "required": [
-            "startTask",
+            "task.start",
             "takePhoto"
           ],
           "counts": {
@@ -712,7 +712,7 @@
             "closeCamera"
           ],
           "forbidden": [
-            "startTask"
+            "task.start"
           ]
         }
       ],
@@ -780,7 +780,7 @@
         {
           "user": "创建一个持续的连接任务：扫描周围蓝牙设备并连接名为“机械币”的设备，确认连接成功再结束；遇到需要选择时等待我决定。",
           "required": [
-            "startTask",
+            "task.start",
             "Bluetooth.control",
             "Bluetooth.readStatus"
           ],
@@ -880,7 +880,7 @@
           },
           "forbidden": [
             "History.list",
-            "startTask"
+            "task.start"
           ]
         }
       ],
@@ -899,7 +899,7 @@
           ],
           "forbidden": [
             "openPage",
-            "startTask"
+            "task.start"
           ]
         }
       ],
@@ -960,7 +960,7 @@
             "ignorePhoto",
             "savePhoto",
             "takePhoto",
-            "startTask"
+            "task.start"
           ]
         }
       ],
@@ -976,7 +976,7 @@
           "user": "给我下载那个模型。",
           "forbidden": [
             "ModelResources.download",
-            "startTask"
+            "task.start"
           ]
         }
       ],
@@ -1047,7 +1047,7 @@
             }
           },
           "forbidden": [
-            "startTask",
+            "task.start",
             "moveMotor",
             "resetArm"
           ],
@@ -1155,7 +1155,7 @@
             ]
           ],
           "forbidden": [
-            "startTask"
+            "task.start"
           ]
         }
       ],
@@ -1196,7 +1196,7 @@
         {
           "user": "谢谢。",
           "forbidden": [
-            "startTask",
+            "task.start",
             "releaseSkills",
             "closeCamera",
             "openCamera",
@@ -1206,7 +1206,7 @@
         {
           "user": "今天心情很好。",
           "forbidden": [
-            "startTask",
+            "task.start",
             "releaseSkills",
             "closeCamera",
             "openCamera",
@@ -1216,7 +1216,7 @@
         {
           "user": "给我讲个短笑话。",
           "forbidden": [
-            "startTask",
+            "task.start",
             "releaseSkills",
             "closeCamera",
             "openCamera",
@@ -1226,7 +1226,7 @@
         {
           "user": "你叫什么名字？",
           "forbidden": [
-            "startTask",
+            "task.start",
             "releaseSkills",
             "closeCamera",
             "openCamera",
@@ -1236,7 +1236,7 @@
         {
           "user": "北京是中国的首都吗？",
           "forbidden": [
-            "startTask",
+            "task.start",
             "releaseSkills",
             "closeCamera",
             "openCamera",
@@ -1253,7 +1253,7 @@
             "closeCamera"
           ],
           "forbidden": [
-            "startTask"
+            "task.start"
           ]
         }
       ]
@@ -1269,7 +1269,7 @@
         {
           "user": "谢谢。",
           "forbidden": [
-            "startTask",
+            "task.start",
             "releaseSkills",
             "closeCamera",
             "takePhoto"
@@ -1278,7 +1278,7 @@
         {
           "user": "今天心情很好。",
           "forbidden": [
-            "startTask",
+            "task.start",
             "releaseSkills",
             "closeCamera",
             "takePhoto"
@@ -1287,7 +1287,7 @@
         {
           "user": "给我讲个短笑话。",
           "forbidden": [
-            "startTask",
+            "task.start",
             "releaseSkills",
             "closeCamera",
             "takePhoto"
@@ -1305,7 +1305,7 @@
         {
           "user": "谢谢。",
           "forbidden": [
-            "startTask",
+            "task.start",
             "releaseSkills",
             "openCamera",
             "takePhoto"
@@ -1314,7 +1314,7 @@
         {
           "user": "今天心情很好。",
           "forbidden": [
-            "startTask",
+            "task.start",
             "releaseSkills",
             "openCamera",
             "takePhoto"
@@ -1323,7 +1323,7 @@
         {
           "user": "给我讲个短笑话。",
           "forbidden": [
-            "startTask",
+            "task.start",
             "releaseSkills",
             "openCamera",
             "takePhoto"
@@ -1336,7 +1336,7 @@
           ],
           "forbidden": [
             "loadSkills",
-            "startTask"
+            "task.start"
           ]
         }
       ]
@@ -1358,8 +1358,8 @@
             "photography"
           ],
           "forbidden": [
-            "finishTask",
-            "cancelTask",
+            "task.end",
+            "task.cancel",
             "releaseSkills",
             "takePhoto",
             "ignorePhoto",
@@ -1373,8 +1373,8 @@
             "photography"
           ],
           "forbidden": [
-            "finishTask",
-            "cancelTask",
+            "task.end",
+            "task.cancel",
             "releaseSkills",
             "takePhoto",
             "ignorePhoto",
@@ -1388,8 +1388,8 @@
             "photography"
           ],
           "forbidden": [
-            "finishTask",
-            "cancelTask",
+            "task.end",
+            "task.cancel",
             "releaseSkills",
             "takePhoto",
             "ignorePhoto",
@@ -1403,8 +1403,8 @@
             "photography"
           ],
           "forbidden": [
-            "finishTask",
-            "cancelTask",
+            "task.end",
+            "task.cancel",
             "releaseSkills",
             "takePhoto",
             "ignorePhoto",
@@ -1418,8 +1418,8 @@
             "photography"
           ],
           "forbidden": [
-            "finishTask",
-            "cancelTask",
+            "task.end",
+            "task.cancel",
             "releaseSkills",
             "takePhoto",
             "ignorePhoto",
@@ -1430,11 +1430,11 @@
           "user": "继续拍照任务，保存这张。",
           "required": [
             "savePhoto",
-            "finishTask"
+            "task.end"
           ],
           "forbidden": [
             "loadSkills",
-            "startTask"
+            "task.start"
           ],
           "task": false
         }
@@ -1467,7 +1467,7 @@
           ],
           "forbidden": [
             "loadSkills",
-            "startTask",
+            "task.start",
             "Provider.readSettings",
             "openPage"
           ]
@@ -1491,11 +1491,11 @@
             "photography"
           ],
           "forbidden": [
-            "finishTask",
-            "cancelTask",
+            "task.end",
+            "task.cancel",
             "releaseSkills",
             "History.list",
-            "startTask",
+            "task.start",
             "savePhoto",
             "ignorePhoto",
             "takePhoto"
@@ -1514,11 +1514,11 @@
           ],
           "forbidden": [
             "setExpression",
-            "startTask",
+            "task.start",
             "loadSkills",
             "releaseSkills",
-            "finishTask",
-            "cancelTask"
+            "task.end",
+            "task.cancel"
           ],
           "counts": {
             "express": 4
@@ -1546,11 +1546,11 @@
           ],
           "forbidden": [
             "setExpression",
-            "startTask",
+            "task.start",
             "loadSkills",
             "releaseSkills",
-            "finishTask",
-            "cancelTask"
+            "task.end",
+            "task.cancel"
           ],
           "counts": {
             "express": 11
@@ -1585,11 +1585,11 @@
           ],
           "forbidden": [
             "setExpression",
-            "startTask",
+            "task.start",
             "loadSkills",
             "releaseSkills",
-            "finishTask",
-            "cancelTask"
+            "task.end",
+            "task.cancel"
           ],
           "counts": {
             "express": 3
@@ -1616,11 +1616,11 @@
           ],
           "forbidden": [
             "setExpression",
-            "startTask",
+            "task.start",
             "loadSkills",
             "releaseSkills",
-            "finishTask",
-            "cancelTask"
+            "task.end",
+            "task.cancel"
           ],
           "counts": {
             "express": 11
@@ -1655,11 +1655,11 @@
           ],
           "forbidden": [
             "setExpression",
-            "startTask",
+            "task.start",
             "loadSkills",
             "releaseSkills",
-            "finishTask",
-            "cancelTask"
+            "task.end",
+            "task.cancel"
           ],
           "counts": {
             "express": 4
@@ -1681,11 +1681,11 @@
           ],
           "forbidden": [
             "setExpression",
-            "startTask",
+            "task.start",
             "loadSkills",
             "releaseSkills",
-            "finishTask",
-            "cancelTask"
+            "task.end",
+            "task.cancel"
           ],
           "counts": {
             "express": 4
@@ -1713,11 +1713,11 @@
           ],
           "forbidden": [
             "setExpression",
-            "startTask",
+            "task.start",
             "loadSkills",
             "releaseSkills",
-            "finishTask",
-            "cancelTask"
+            "task.end",
+            "task.cancel"
           ],
           "counts": {
             "express": 3
@@ -2132,7 +2132,7 @@
             }
           },
           "forbidden": [
-            "startTask",
+            "task.start",
             "Web.browse"
           ],
           "first": "loadSkills",
@@ -2160,7 +2160,7 @@
             }
           },
           "forbidden": [
-            "startTask",
+            "task.start",
             "Web.browse"
           ],
           "first": "loadSkills",
@@ -2168,6 +2168,210 @@
             "application-control"
           ],
           "task": false
+        }
+      ]
+    },
+    {
+      "id": "web-discover-bilibili",
+      "category": "skill-discovery",
+      "turns": [
+        {
+          "user": "浏览b站",
+          "required": [
+            "loadSkills",
+            "Web.browse"
+          ],
+          "forbidden": [
+            "task.start",
+            "task.delegate",
+            "openPage",
+            "Web.snapshot",
+            "Web.inspect"
+          ],
+          "first": "loadSkills",
+          "counts": {
+            "Web.browse": 1,
+            "loadSkills": 1
+          },
+          "loaded": [
+            "web-browsing"
+          ],
+          "task": false,
+          "separateRounds": [
+            [
+              "loadSkills",
+              "Web.browse"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "web-discover-url",
+      "category": "skill-discovery",
+      "turns": [
+        {
+          "user": "打开 https://example.com",
+          "required": [
+            "loadSkills",
+            "Web.browse"
+          ],
+          "forbidden": [
+            "task.start",
+            "task.delegate",
+            "openPage",
+            "Web.snapshot",
+            "Web.inspect"
+          ],
+          "first": "loadSkills",
+          "counts": {
+            "Web.browse": 1,
+            "loadSkills": 1
+          },
+          "loaded": [
+            "web-browsing"
+          ],
+          "task": false,
+          "parameters": {
+            "Web.browse": {
+              "url": "https://example.com"
+            }
+          },
+          "separateRounds": [
+            [
+              "loadSkills",
+              "Web.browse"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "web-already-loaded",
+      "category": "skill-discovery",
+      "turns": [
+        {
+          "user": "打开哔哩哔哩",
+          "required": [
+            "Web.browse"
+          ],
+          "forbidden": [
+            "task.start",
+            "task.delegate",
+            "openPage",
+            "Web.snapshot",
+            "Web.inspect",
+            "loadSkills"
+          ],
+          "first": "Web.browse",
+          "counts": {
+            "Web.browse": 1
+          },
+          "loaded": [
+            "web-browsing"
+          ],
+          "task": false
+        }
+      ],
+      "skills": [
+        "web-browsing"
+      ]
+    },
+    {
+      "id": "web-load-failure-no-retry",
+      "category": "skill-discovery",
+      "turns": [
+        {
+          "user": "打开B站",
+          "required": [
+            "loadSkills",
+            "Web.browse"
+          ],
+          "forbidden": [
+            "task.start",
+            "task.delegate",
+            "openPage",
+            "Web.snapshot",
+            "Web.inspect"
+          ],
+          "first": "loadSkills",
+          "counts": {
+            "Web.browse": 1,
+            "loadSkills": 1
+          },
+          "loaded": [
+            "web-browsing"
+          ],
+          "task": false,
+          "separateRounds": [
+            [
+              "loadSkills",
+              "Web.browse"
+            ]
+          ]
+        }
+      ],
+      "failure": "webLoad"
+    },
+    {
+      "id": "web-knowledge-no-load",
+      "category": "skill-discovery",
+      "turns": [
+        {
+          "user": "B站这个名字是什么意思？不用联网。",
+          "forbidden": [
+            "loadSkills",
+            "task.start",
+            "task.delegate",
+            "Web.browse"
+          ],
+          "task": false
+        }
+      ]
+    },
+    {
+      "id": "web-unsupported-video-control",
+      "category": "skill-discovery",
+      "skills": [
+        "web-browsing"
+      ],
+      "turns": [
+        {
+          "user": "不要打开网页，只说你能不能直接控制网页里的视频播放、暂停和进度。",
+          "forbidden": [
+            "loadSkills",
+            "task.start",
+            "task.delegate",
+            "Web.browse",
+            "Web.navigate",
+            "Web.snapshot",
+            "Web.inspect"
+          ],
+          "task": false
+        }
+      ]
+    },
+    {
+      "id": "basic-task-confirm-completion",
+      "category": "task",
+      "taskGoal": "等待用户选定方案后结束选择任务",
+      "turns": [
+        {
+          "user": "我选方案一，这个选择任务完成了。",
+          "required": [
+            "task.end"
+          ],
+          "forbidden": [
+            "task.start",
+            "task.delegate",
+            "loadSkills",
+            "releaseSkills",
+            "task.cancel"
+          ],
+          "task": false,
+          "counts": {
+            "task.end": 1
+          }
         }
       ]
     }

@@ -24,7 +24,7 @@
 | ListeningActivationTests / ListeningCaptureWorkflowTests | 能力/权限准备→首帧收音→并行 cue/haptic、阶段失败保留实际效果、取消 join、同意/占用、半双工与快速切换 |
 | NativeInteractionWorkflowTests | UI 手势到 root intent、角色/会话围栏与取消；相机请求失活明确提示重试，保留已保存照片事实 |
 | CameraVisionRestartTests | camera/vision 代际替换、取消加入、失效回调和重启次序 |
-| PhotoDispositionWorkflowTests | 保存/忽略提交、原生退出/反馈、错误与已发生效果分离 |
+| PhotoDispositionWorkflowTests | 保存/忽略提交后的反馈失败与取消，不撤销已发生效果 |
 | HomeEffectsTests | notice/light/caption 的 owner、替换、时限及纯取消展示 |
 
 所有 façade 只观察注入的结果，不查询/拼装未授权的底层能力。偏好提交后的应用失败保留真实持久化结果；错误处理和状态轮询不得隐式重放效果。Root-owned 操作独立于页面，取消和替换必须加入实际清理。
@@ -156,3 +156,11 @@ Caption ownership regressions verify independent slot updates, retained final/us
 Writer regressions verify parameters above 64 KiB reach execution/next request intact, actual errors enter retry/subsequent context, and aborted content retry includes the failure cause.
 
 Workspace editing/UI regressions remain backend-independent. SQLite persistence, over-8MiB catalogs, concurrent CAS and deletion recovery live in IntegrationTests/WorkspaceRepositoryTests; Writer long-result tests distinguish complete execution evidence from model-only excerpts.
+
+Camera fixtures distinguish previewID from persistent mediaID and preserve committed-save reporting after a later request-completion failure.
+
+History image regressions cover persistent and preview identity validation, exact recorded attachment/input checks, released-preview presentation outcomes, retryable read errors and bounded cancellation-aware reads.
+
+Welcome 设置回归覆盖成功恢复前不提示、恢复失败不覆盖、已有 Provider 不重新引导、空 URL 默认 OpenAI、自定义 URL/Key 修剪、无效输入拒绝、保存失败重试、单次保存接纳、停止后不再发布以及重新创建控制器后的持久配置恢复。测试使用设置操作替身，不访问真实凭据或云端服务。
+
+首次配置后仅为 Writer 选择云端的回归，验证保存/恢复保留 Provider key，不被未启用 Assistant 的空凭据覆盖。

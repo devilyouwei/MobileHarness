@@ -1,5 +1,9 @@
 # 技术需求
 
+- [BasicSkill 控制教学](BasicSkill-Control-Teaching.md)：Task / Skill 概念、上下文、动作效果、生效时机和失败语义的通用教学重组。
+
+- [按意图发现 Skill](Skill-Discovery-Before-Denial.md)：避免将未加载的浏览等能力误判为不支持，覆盖加载前教学与模型回归。
+
 [原生音视频故障诊断](Native-Media-Failure-Diagnosis.md)：空间音频错误保真、原生通知回归及媒体服务重置的设备调查。
 
 本目录收录原范围尚未全部完成的架构、接口和运行机制需求。用户场景为主的需求归 [产品需求](../product/README.md)，无法独立拆分的交叉需求归 [requirements 根目录](../README.md#技术与产品交叉需求)。
@@ -49,3 +53,21 @@ Completed scope: [NexArm motor teaching and regression](../../completed/NexArm-R
 - [Container reflexivity](Container-Reflexivity.md): local state ownership, internal recursive reads and Skill-selected disclosure.
 
 - [Camera preview orientation](Camera-Preview-Orientation.md): separate gravity-based capture from interface-based preview, crop, skeleton and gaze geometry.
+
+Completed scope: [可读预览编号与合并图片输入](../../completed/Readable-Preview-Context.md)：递增短编号、历史兼容及原始 user 消息内的图片附件；原生／设备验收限制见验证记录。
+
+- [Camera 会话缓存与多图浏览](Camera-Session-Gallery.md)：20张FIFO、临时编号、按需State及叠图／缩放界面。
+
+- [Assistant / Writer 任务入口与作品归属](Assistant-Writer-Task-Routing.md)：平级入口教学、移除 Writing Skill、Writer 作品库与只读完成回归。
+
+- [提示词所有权与 Agent 自描述](Prompt-Ownership-Plan.md)：Agent 自描述、实际权限目录和 Writer 私有模板已实现；真实模型/手机验收另行记录。
+
+- [Writer 提示词优化](Writer-Prompt-Optimization-Plan.md)：两模型、JSON 场景、真实工作区与窗口状态证据；只调整 Writer 提示词，Swift 评估适配改动已先告知。
+
+已完成并归档：[Writer 请求与作品选择内聚](../../completed/Writer-Execution-Cohesion.md)，包含同请求作品选择、无文件完成、发布恢复及验证。
+
+已完成并归档：[前台任务启动加载 Skill](../../completed/Task-Start-Initial-Skills.md)，包含初始 Skill 教学、示例及回归验证。
+
+已完成并归档：[Writer 记录分页](../../completed/Writer-Record-Pagination.md)，包含准确末页、详情返回保留与回归验证。
+
+- [Writer 委托与 Workspace 解耦](Writer-Workspace-Separation.md)：统一消息、独立 workspace、开发重置及验收。

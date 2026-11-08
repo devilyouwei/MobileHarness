@@ -86,7 +86,7 @@ private struct QwenCaseResult: Codable, Sendable {
     let seconds: Double
     let turns: [QwenTurnResult]
     let runtimeIssues: [String]
-    let archive: ConversationArchive
+    let archive: AssistantArchive
     var passed: Bool { runtimeIssues.isEmpty && turns.allSatisfy { $0.issues.isEmpty } }
 }
 private struct QwenReport: Encodable {
@@ -135,6 +135,7 @@ private struct QwenWindowFacts: Encodable, Sendable {
 }
 private final class QwenFacts: Sendable {
     let camera: FixtureFactCell<FixtureCameraFact>
+    let web = FixtureFactCell(["content": "empty"])
     let robot: QwenRobotFact
     let writerWindow: Bool
     init(scenario: QwenCase) {
@@ -176,8 +177,8 @@ private final class QwenFacts: Sendable {
             })
         try context.register(
             "ui.web",
-            source: ContainerContextSource {
-                ContainerContextValue(["content": "empty"])
+            source: ContainerContextSource { [web] in
+                ContainerContextValue(web.read())
             })
         return context
     }
@@ -342,6 +343,15 @@ private actor QwenEffects {
         case "History.Conversation.read":
             guard args["id"] == "dialog_17" else { throw QwenEvalError.syntheticFailure }
             return .value(#"{"id":"dialog_17","turns":[{"user":"帮我拍张照","assistant":"照片已拍好"}],"nextOffset":null}"#)
+        case "Web.Page.browse":
+            if scenario.failure == "webLoad" { throw QwenEvalError.syntheticFailure }
+            // Synthetic text evidence only; this evaluator does not open WebKit or create an image.
+            facts.web.update { $0 = ["content": "remote", "url": args["url"] ?? ""] }
+            return .value(
+                try Self.json([
+                    "windowID": "window_1", "url": args["url"] ?? "", "title": "合成网站首页",
+                    "text": "测试网页已打开。", "diagnostics": "Synthetic evaluation page; no live website access.",
+                ]))
         case "Web.Page.inspect":
             guard scenario.writerWindow == true, args["windowID"] == QwenWindowFacts.id else {
                 throw QwenEvalError.syntheticFailure
@@ -480,7 +490,7 @@ private func qwenRun(_ scenario: QwenCase, provider: OpenAIChat) async throws ->
     let state = try facts.context()
     let configuration = try AgentConfigurations.load(named: "Assistant")
     let fixed = try AssistantAgent.runtimeCapabilities(configuration.capabilities)
-    let history = ConversationHistoryStore()
+    let history = AssistantHistoryStore()
     var initial = AssistantContextState()
     var skills = AgentTaskSkillState()
     try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
@@ -492,7 +502,7 @@ private func qwenRun(_ scenario: QwenCase, provider: OpenAIChat) async throws ->
         let encoded = String(decoding: try JSONEncoder().encode(scenario.skills ?? []), as: UTF8.self)
         let taskID = try await history.tasks.createTask(dialog: nil, agent: "assistant", goal: goal)
         _ = try skills.control(
-            "startTask", arguments: ["goal": goal, "skills": encoded], inputID: "setup", fixed: fixed,
+            "task.start", arguments: ["description": goal, "skills": encoded], inputID: "setup", fixed: fixed,
             taskID: taskID)
         skills.tasks[skills.tasks.count - 1].sessionID = session
         try skills.decisionCompleted(failed: false, fixed: fixed)
@@ -599,7 +609,7 @@ private func qwenRun(_ scenario: QwenCase, provider: OpenAIChat) async throws ->
     let archive = try await history.snapshot()
     let recordedCalls = await effects.calls
     for request in archive.current.turns.flatMap({ $0.modelRequests ?? [] }) {
-        for alias in ["startTask", "loadSkills", "releaseSkills"]
+        for alias in ["task.start", "loadSkills", "releaseSkills"]
         where recordedCalls.contains(where: { $0.round == request.id && $0.alias == alias }) {
             let text = request.response.trimmingCharacters(in: .whitespacesAndNewlines)
             if text.range(of: "^<\(alias)\\b[^<>]*/>$", options: .regularExpression) == nil {

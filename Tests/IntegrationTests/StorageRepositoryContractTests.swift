@@ -69,13 +69,28 @@ private struct ContractDocument: Codable, Sendable, Equatable { let text: String
     }
 }
 
-@Test func chatRepositoryRejectsTaskNamespaceMixing() throws {
+@Test @MainActor func privateHistoryStoresRejectDatabaseScopeMixing() async throws {
     let first = try SQLiteRepositories.temporary()
     let second = try SQLiteRepositories.temporary()
     #expect(throws: RecordStorageError.invalidRecord) {
-        _ = try ConversationRecordStore(repository: first.chat, tasks: second.tasks)
+        _ = try AssistantRecordStore(
+            repository: first.assistantMessages, tasks: second.assistantTasks,
+            conversations: first.assistantConversations, logs: first.logs)
     }
-    _ = try ConversationRecordStore(repository: first.chat, tasks: first.tasks)
+    #expect(throws: RecordStorageError.invalidRecord) {
+        _ = try WriterRecordStore(repository: first.writerMessages, logs: second.logs)
+    }
+    _ = try WriterRecordStore(repository: first.writerMessages, logs: first.logs)
+    #expect(throws: RecordStorageError.invalidRecord) {
+        try WriterContainer().configureHistory(
+            messages: first.writerMessages, tasks: first.writerExecutions,
+            communications: second.agentMessages, logs: first.logs)
+    }
+    _ = try AssistantRecordStore(
+        repository: first.assistantMessages, tasks: first.assistantTasks, conversations: first.assistantConversations,
+        logs: first.logs)
+    try await first.shutdown()
+    try await second.shutdown()
 }
 
 private actor PausedBinaryStore: FileStore {
@@ -118,7 +133,7 @@ private actor PausedBinaryStore: FileStore {
     }
     #expect(await files.publishing)
     let reads = (0..<16).map { _ in
-        Task { try await store.readForInput("media_1", source: owner.source, input: owner.input) }
+        Task { try await store.read("media_1", owner: owner) }
     }
     for _ in 0..<2000 {
         if await store.waitingOperationCount == 16 { break }
@@ -133,7 +148,7 @@ private actor PausedBinaryStore: FileStore {
     }
     #expect(try records.media.media("media_1")?.state == "pending")
     await #expect(throws: (any Error).self) {
-        _ = try await store.readForInput("media_1", source: owner.source, input: owner.input)
+        _ = try await store.read("media_1", owner: owner)
     }
     await files.resume()
     #expect(try await publication.value == "media_1")
@@ -143,8 +158,10 @@ private actor PausedBinaryStore: FileStore {
 
 @Test func cancelledCallerStillCommitsTheReceivedMessageAndTerminalState() async throws {
     let records = try SQLiteRepositories.temporary()
-    let adapter = try ConversationRecordStore(repository: records.chat, tasks: records.tasks)
-    let store = ConversationHistoryStore(records: adapter)
+    let adapter = try AssistantRecordStore(
+        repository: records.assistantMessages, tasks: records.assistantTasks,
+        conversations: records.assistantConversations, logs: records.logs)
+    let store = AssistantHistoryStore(records: adapter)
     let current = try await store.readCurrent()
     let input = UUID().uuidString
     _ = try await store.begin(
@@ -157,7 +174,7 @@ private actor PausedBinaryStore: FileStore {
         try await store.finish(input, state: .cancelled)
     }
     try await cancellation.value
-    let messages = try await records.chat.messages(dialog: current.current.id, after: nil)
+    let messages = try await records.assistantMessages.messages(dialog: current.current.id, after: nil)
     #expect(messages.last?.body == "received before cancellation")
     #expect(messages.last?.state == "cancelled")
     #expect(messages.first?.state == "completed")

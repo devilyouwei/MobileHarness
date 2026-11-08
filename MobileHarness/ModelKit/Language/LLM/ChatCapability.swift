@@ -207,7 +207,16 @@ public final class ChatTiming: Sendable {
     }
 }
 
+/// Application-layer HTTP evidence. The consumer owns persistence; providers never import business storage.
+public enum ChatTransportEvent: Sendable {
+    case request(method: String, url: String, headers: [String: String], body: Data, at: Date)
+    case response(status: Int, headers: [String: String], at: Date)
+    case bytes(Data, at: Date)
+    case finished(at: Date, error: String?)
+}
+
 public struct ChatRequest: Sendable {
+    public var transportCapture: (@Sendable (ChatTransportEvent) async -> Void)?
     public var timing: ChatTiming?
     public let context: InferenceContext
     public let messages: [ChatMessage]

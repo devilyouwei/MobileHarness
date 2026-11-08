@@ -1,5 +1,7 @@
 # Storage database and Writer workspace refactor
 
+后续边界（2026-11-07）：[独立 Agent 业务、纯通信与 HTTP 日志](../completed/Message-Agent-Business-Separation.md) 已替代下文共享 messages、agent_delegations、message_media 和仅中立请求日志的设计。当前十表为两侧私有消息/任务、通用通信、原始 HTTP 日志及独立文件/媒体/设备；用户明确授权清空旧数据、无兼容清洁安装。ModelKit 仅提供中立传输事件，不依赖 Storage，由 Agents 桥接持久化。下文保留此前范围与验证历史；当前设计以 Database README 为准，原独立原生/模型验收仍按验证记录跟进。
+
 ## Approved requirements
 
 Use one shared SQLite database and exactly ten domain tables: assistant_conversations, messages,

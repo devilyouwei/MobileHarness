@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import StorageCore
 
 /// Typed human/history host intent; never embedded in framework business enums.
 public enum MemoryHistoryIntent: Codable, Sendable, Equatable {
@@ -7,12 +8,17 @@ public enum MemoryHistoryIntent: Codable, Sendable, Equatable {
     case summarize(String)
     case refresh
     case delete(String)
+    case clearLogs(String?)
     case cancel(String)
     public static let contract = "history.intent"
     public func validate() throws {
         switch self {
         case .summarize(let id), .delete(let id), .cancel(let id):
             guard !id.isEmpty, id.utf8.count <= 128 else { throw CommunicationError.invalidPayload }
+        case .clearLogs(let id):
+            guard id == nil || BusinessRecordID(rawValue: id ?? "")?.kind == .request else {
+                throw CommunicationError.invalidPayload
+            }
         case .startNew, .refresh: break
         }
     }

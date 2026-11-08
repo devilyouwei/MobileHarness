@@ -40,14 +40,14 @@ AgentFixedTaskInput.unwrap 只接受 request／input，核对 requester 为 Assi
 
 准入检查成功后才调用执行角色提供的 decode，再验证返回消息的内容和大小。生成的角色输入使用原 rootID 作为处理身份，保留 session、source、incarnation、capturedAt、sequence、root／parent、hops、deadline、turn 与 taskScope。具体契约选择、私有取消／retire 的来源限制由所属角色负责，公共机制不建立角色载荷分派表。
 
-本目录的值不拥有消费任务、队列或原生资源。消息投递接纳与 Task 终态分别建模；注册、输出消费和停止加入由各角色 ExecutionSession 拥有。当前边界不包含远程传输或通用持久化投递；Writer在域内持有有界投递worker，并通过既有 TaskRepository 保存终态待送达事实。
+本目录的值不拥有消费任务、队列或原生资源。消息投递接纳与 Task 终态分别建模；注册、输出消费和停止加入由各角色 ExecutionSession 拥有。当前边界不包含远程传输或通用持久化投递；Writer在域内持有有界投递worker，并通过 WriterExecutionRepository 原子保存终态与通信 outbox，AgentMessageRepository 提供独立通信读取/投递接口。
 
 ## Native inputs and internal messages
 
 Native CameraFrame/PCM and typed UI/container observations reach their owning roles directly. This directory owns derived semantic messages and role-originated coordination, not a universal external-media Signal format. Perception and cognition use the same Agent communication boundary; neither denotes a new module or container. Execution requests are separate from role messages and share Gateway only for their respective transport/scheduling facilities. The cross-module view is maintained in the [overall input and Signal design](../../../README.md#native-input-and-internal-signals).
 
 
-writer.author 是 Writer 的生产后台任务契约。Assistant 通过默认 startTask(execution=background,executor=writer) 附加当前用户输入和单行目标，Writer 接纳后立即释放调用方；progress 回报运行阶段，result 退休执行权限。追加输入在文件检查点消费，显式 cancel 加入取消清理。
+writer.author 是 Writer 的生产后台任务契约。Assistant 通过默认 task.delegate(agent_id=writer,description) 附加当前用户输入和单行目标，Writer 接纳后立即释放调用方；progress 回报运行阶段，result 退休执行权限。追加输入在文件检查点消费，显式 cancel 加入取消清理。
 
 WriterTaskEvent 的可选 taskID 是长期作品任务，delegateID 必须匹配可信 scope.id；新版本回报携带两者，接收端同时校验业务绑定。每次续作创建新 scope，不重新打开已终止的通信任务。历史请求保存稳定身份，实时传输/去重使用执行身份。
 
@@ -59,6 +59,10 @@ WriterTaskEvent.request optionally carries WriterRequestProgress(inputID, number
 
 WriterRequestProgress用于关联实际请求及其累计计数。请求开始只在Writer内部呈现；Assistant普通progress的request字段关联刚完成步骤中的最新请求，可包含内容子请求。步骤汇报在该轮工具效果/持久结果与预览屏障之后发出，不表示下一请求已完成。
 
-Assistant creates the delegation UUID; Writer allocates its own Agent-local task on acceptance. AgentTaskScope.id is the delegation identity for background requests; event taskID is the stable Agent-local workspace task. Writer events retain internal event/interaction/delegate IDs for verification, while model input projects only Agent/task/goal/phase/window metadata. Public sendMessage/cancelTask uses executor + taskID; runtime injects current delegation and pending interaction after ownership and captured-question checks.
+Assistant creates the delegation UUID; Writer allocates its own Agent-local task on acceptance. AgentTaskScope.id is the delegation identity for background requests; event taskID is the stable Agent-local workspace task. Writer events retain internal event/interaction/delegate IDs for verification, while model input projects only Agent/task/goal/phase/window metadata. Public task.send/task.cancel uses agent_id; runtime injects current delegation and pending interaction after ownership and captured-question checks.
 
 WriterTaskEvent version 2 carries the stable task key, current goal and optional derived workspace/window metadata, alongside internal UUID delegation/event/question evidence. artifactID for Writer is a reference to the same derived workspace, not an independently allocated project identity.
+
+## 公开委派适配
+
+AgentTaskDelegation 是已实现公开任务适配的唯一查询入口，返回接收角色和业务契约；当前只有 assistant→writer / writer.author，并要求调用者具有 task.request 发送权限。AgentConfigurations 的发现目录和 ChatWorker 的 task.delegate 准入共同使用它。描述、注册或新增通信声明本身不会创建适配；底层 Gateway、接收端和后台契约仍分别执行认证校验。

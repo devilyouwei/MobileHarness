@@ -1,5 +1,6 @@
 import Foundation
 import FunctionContracts
+import OSLog
 import StorageCore
 import StorageFiles
 import UI
@@ -12,6 +13,7 @@ import UI
         private let disk: DiskFileStore
         private var bindings: [WorkspaceID: UUID] = [:]
         private var dismissed: Set<WorkspaceID> = []
+        private var pendingOpen: Set<WorkspaceID> = []
         private var slots: [WorkspaceID: Int] = [:]
         private struct Latest {
             var title: String
@@ -22,6 +24,9 @@ import UI
         }
         private var latest: [WorkspaceID: Latest] = [:]
         private var sceneActive = true
+        private var sceneRestore: Task<Void, Never>?
+        private var restoreFailures: Set<WorkspaceID> = []
+        private let log = Logger(subsystem: "dev.mobileharness", category: "ArtifactPresentation")
         private var serials: [WorkspaceID: Int] = [:]
         private var serial = 0
         public func describe(id: WorkspaceID, title: String?, subtitle: String?) {
@@ -40,23 +45,44 @@ import UI
                 windows.setPresentation(window, title: value.title + suffix, subtitle: value.subtitle)
             }
         }
-        public func setSceneActive(_ active: Bool) async throws {
-            guard sceneActive != active else { return }
-            sceneActive = active
-            guard active else { return }
-            var failure: (any Error)?
+        public func setSceneActive(_ active: Bool) async {
+            if !active {
+                sceneActive = false
+                let previous = sceneRestore
+                previous?.cancel()
+                await previous?.value
+                return
+            }
+            guard !sceneActive else { return }
+            sceneActive = true
+            let previous = sceneRestore
+            sceneRestore = Task { [weak self] in
+                await previous?.value
+                await self?.restoreVisibleWindows()
+            }
+        }
+        func waitForSceneRestoration() async { await sceneRestore?.value }
+
+        private func restoreVisibleWindows() async {
             for (id, value) in Array(latest) where !dismissed.contains(id) {
+                guard sceneActive, !Task.isCancelled else { return }
                 do {
+                    if pendingOpen.contains(id) { try await prepare(id: id, deleting: false) }
                     if let window = bindings[id], try windows.find(window).mode == .minimized { continue }
                     _ = try await present(
                         id: id, title: value.title, entry: value.entry, files: value.files, preview: value.preview,
                         restoring: true)
                 } catch {
-                    if let window = bindings[id] { windows.report(window, message: String(describing: error)) }
-                    if failure == nil { failure = error }
+                    guard sceneActive, !Task.isCancelled else { return }
+                    guard !dismissed.contains(id) else { continue }
+                    let reason = String(describing: error)
+                    log.error("Workspace preview restoration failed: \(reason, privacy: .private)")
+                    if let window = bindings[id] {
+                        restoreFailures.insert(id)
+                        windows.report(window, message: "作品预览恢复失败（\(reason)）")
+                    }
                 }
             }
-            if let failure { throw failure }
         }
         private var canRender: Bool { sceneActive && windows.available && pages.isAvailable }
 
@@ -124,6 +150,7 @@ import UI
                     status: "deferred", detail: "Scene hidden; files continue. Rendering deferred until foreground.")
             }
             let window: UUID
+            var interrupted = false
             if let existing = bindings[id], windows.windows.contains(where: { $0.id == existing }) {
                 window = existing
             } else {
@@ -147,19 +174,26 @@ import UI
                         return try report(
                             status: "deferred", detail: "Scene hidden during window presentation; files retained.")
                     }
-                    latest.removeValue(forKey: id)
-                    guard error as? WindowError == .interrupted else { throw error }
-                    dismissed.insert(id)
-                    return try report(
-                        status: "unavailable", detail: "Window closed; draft retained. Visual verification unavailable."
-                    )
+                    if dismissed.contains(id) {
+                        return try report(status: "unavailable", detail: "Window closed; draft retained.")
+                    }
+                    guard error as? WindowError == .interrupted else {
+                        latest.removeValue(forKey: id)
+                        throw error
+                    }
+                    guard retained else {
+                        return try report(status: "deferred", detail: "Window transition interrupted; draft retained.")
+                    }
+                    window = reserved
+                    interrupted = true
                 }
             }
             refreshLabels()
             let page = try pages.createSession(windowID: window, reference: windows.reference(for: window))
             guard try windows.find(window).mode != .minimized else {
                 return try report(
-                    status: "unavailable", detail: "Window minimized; draft retained. Visual verification unavailable.")
+                    status: "unavailable", detail: "Window minimized; draft retained. Visual verification unavailable.",
+                    reason: "minimized")
             }
             let slot = ((slots[id] ?? 0) + 1) % 2
             let slotRoot = "previews/" + id.rawValue + "/" + String(slot)
@@ -219,24 +253,33 @@ import UI
                 throw error
             }
             slots[id] = slot
+            if restoreFailures.remove(id) != nil { windows.report(window, message: nil) }
+            if interrupted {
+                return try report(
+                    status: "deferred", detail: "Window transition interrupted; entry content retained.",
+                    window: windows.reference(for: window) ?? "")
+            }
             return try report(
                 status: preview ? "preview" : (observation.diagnostics.isEmpty ? "observed" : "errors"),
                 detail: "", window: windows.reference(for: window) ?? "", text: observation.text,
                 diagnostics: observation.diagnostics)
         }
         private func report(
-            status: String, detail: String, window: String = "", text: String = "", diagnostics: String = ""
+            status: String, detail: String, window: String = "", text: String = "", diagnostics: String = "",
+            reason: String = ""
         ) throws -> String {
             String(
                 decoding: try JSONEncoder().encode([
-                    "status": status, "detail": detail, "windowID": window,
+                    "status": status, "detail": detail, "windowID": window, "reason": reason,
                     "text": String(text.prefix(1200)), "diagnostics": String(diagnostics.prefix(512)),
                 ]), as: UTF8.self)
         }
         public func prepare(id: WorkspaceID, deleting: Bool) async throws {
             dismissed.remove(id)
+            pendingOpen.remove(id)
             if deleting {
                 latest.removeValue(forKey: id)
+                restoreFailures.remove(id)
                 try await disk.remove("previews/" + id.rawValue)
                 if let window = bindings[id], windows.windows.contains(where: { $0.id == window }) {
                     try await windows.change(window, command: .close)
@@ -248,8 +291,15 @@ import UI
                 refreshLabels()
             } else if let window = bindings[id], !windows.windows.contains(where: { $0.id == window }) {
                 bindings.removeValue(forKey: id)
-            } else if !deleting, canRender, let window = bindings[id], try windows.find(window).mode == .minimized {
-                try await windows.change(window, command: .restore)
+            } else if let window = bindings[id] {
+                if canRender {
+                    if try windows.find(window).mode == .minimized {
+                        try await windows.change(window, command: .restore)
+                    }
+                    try windows.focus(window)
+                } else {
+                    pendingOpen.insert(id)
+                }
             }
         }
         public func snapshot(id: WorkspaceID) async throws -> Data? {
@@ -281,12 +331,16 @@ import UI
             guard let text = invocation.call.parameters["windowID"], let window = try? windows.resolve(reference: text)
             else { return }
             let projects = bindings.filter { $0.value == window }.map(\.key)
-            for project in projects { dismissed.insert(project) }
+            for project in projects {
+                dismissed.insert(project)
+                pendingOpen.remove(project)
+            }
             pages.removeSession(windowID: window)
             for project in projects {
                 try await acquire(project)
                 defer { release(project) }
                 latest.removeValue(forKey: project)
+                restoreFailures.remove(project)
                 bindings.removeValue(forKey: project)
                 slots.removeValue(forKey: project)
                 serials.removeValue(forKey: project)

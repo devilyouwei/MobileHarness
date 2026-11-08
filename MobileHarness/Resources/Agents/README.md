@@ -13,9 +13,11 @@ Assistant 是唯一面向用户的对话 Agent；摄影、历史查询、应用�
 | 文件 | 作用与要求 |
 | --- | --- |
 | `../Catalog.json` | 唯一显式资源索引。`version` 为 1；`agents` 的键为代码使用的配置名，如 `Assistant`，值为相对 Resources 的 `Agents/Assistant/Agent.json`；`skills` 由 [Skill 规范](../Skills/README.md) 定义。不得靠目录扫描或第二套配置生效。 |
-| `<AgentName>/Agent.json` | 必需。v7 身份、通信权限、基础 Skill 和后台执行契约声明。 |
-| `Assistant/Instructions.md` | Assistant 的身份、任务边界、前后台关系等基础指令。普通业务流程放 Skill，通用函数协议放 AgentCore。 |
+| `<AgentName>/Agent.json` | 必需。v8 身份、角色自有公开 description、通信权限、基础 Skill 和后台执行契约声明。 |
+| `Assistant/Instructions.md` | Assistant 自身的身份、用户沟通和如实汇报责任。普通业务流程放 Skill，通用函数协议放 AgentCore。 |
 | `Assistant/Prompts.json` | Assistant 请求与历史适配使用的命名模板，不是另一套函数注册。 |
+| `Writer/Instructions.md` | Writer 私有共用身份，仅供自己的控制请求。 |
+| `Writer/Prompts.json` | Writer 作品库、工作区编辑、查看和格式化内容输出的私有模板。 |
 | `Memory/TitlePrompts.json` | 标题生成事务的专用模板，不生成普通历史记录。其他确定性 Agent 不添加普通对话模板。 |
 
 目录和固定资源文件采用 UpperCamelCase；配置名与 Swift 角色一致，运行时 `id` 使用既有 lowerCamelCase。重命名目录不能顺带修改身份、历史键或通信源。资源路径必须相对 Resources，不得含绝对路径、反斜杠或 `.` / `..` 路径段。加载器以 Bundle 中的 `Catalog.json` 定位资源根，不再次追加 Resources。
@@ -26,11 +28,12 @@ Assistant 是唯一面向用户的对话 Agent；摄影、历史查询、应用�
 
 | 字段 | 类型 | 作用 |
 | --- | --- | --- |
-| `version` | integer | 资源 Schema 版本，当前固定为 7；不是角色发布版本。 |
+| `version` | integer | 资源 Schema 版本，当前固定为 8；不是角色发布版本。加载器投影为 AgentCore v7 函数/通信契约。 |
 | `id` | string | 实际 Agent 身份，用于执行所有权、通信和上下文隔离；必须与代码创建的身份一致且全局唯一。 |
+| `description` | string | 角色自己维护的公开用途、输入要求与对外约束；非空，最多 2048 UTF-8 字节。不包含私有执行指令，不授予权限。 |
 | `communication` | object | 输入接纳协议、广播订阅、发布权限和定向发送权限，见下表。 |
 | `baseSkills` | string array | 基础 Skill ID，无重复、最多 16 个；对支持 Skill 的角色用于初始化有效目录。确定性角色通常为空，不会因填写而自动获得 Skill worker。 |
-| `backgroundTasks` | object array | 该角色实际支持的后台业务契约，每项含 `contract` 和 `skills`；最多 32 项。当前生产配置均为空。 |
+| `backgroundTasks` | object array | 该角色实际支持的后台业务契约，每项含 `contract` 和 `skills`；最多 32 项。Writer 声明 writer.author，其余角色为空。 |
 
 `backgroundTasks[].contract` 是目标执行器支持的业务契约标识，`skills` 是该契约允许请求的 Skill ID 集合。后台请求必须匹配契约，请求的 Skill 集合必须是声明集合的子集；展开依赖后仍须通过 canonical 函数与组合冲突校验。它不会创建执行器、生命周期或调度能力。只有代码已实现相应后台业务，才能填写非空声明。
 
@@ -63,9 +66,9 @@ Skill.json 声明 path、callType、alias，以及 Action 的 channel。具体�
 
 ## 提示词与模板字段
 
-`Instructions.md` 是 UTF-8 的可信静态指令。应说明身份、职责、交互约束及与 Skill / 独立 Agent 的关系；不要写具体用户目标、历史任务、设备当前状态或执行结果。那些内容由结构化 Context Builder 作为数据组装。不要复制 Core 协议或 Skill 流程，避免重复指令和 token 膨胀。
+`Instructions.md` 是 UTF-8 的可信静态指令。只说明自身身份、职责与交互约束；其他角色用途读取各自 Agent.json.description；不要写具体用户目标、历史任务、设备当前状态或执行结果。那些内容由结构化 Context Builder 作为数据组装。不要复制 Core 协议或 Skill 流程，避免重复指令和 token 膨胀。
 
-Assistant/Instructions.md 已明确：无最少回复句数，遵守 Skill 要求的纯 Action 输出；已发送上下文中的重复话术不是新回复范例。Task 入口和 wait 的具体约束继续由 BasicSkill 拥有，业务分轮示例由 Photography 拥有，不增加结果去重或输出改写器。
+Assistant/Instructions.md 维护简短回复、如实汇报和自身输出边界。Task 入口和 wait 的具体约束继续由 BasicSkill 拥有，业务分轮示例由 Photography 拥有，不增加结果去重或输出改写器。
 
 模板 JSON 只有 `version` 和 `templates`：version 为 1，templates 为名称到字符串的映射，1–64 项；每段最多 16 KiB。变量写作 `{{name}}`，渲染调用提供的变量集合必须与模板完全一致；插入值不会再次作为模板解析。修改变量名必须同步修改调用点。单次模板渲染及 Assistant system 输出均最多 64 KiB。
 
@@ -73,18 +76,17 @@ Assistant 当前模板契约：
 
 | 模板 | 用途 | 变量 |
 | --- | --- | --- |
-| `delegation` | 独立 Agent 的职责概述 | 无 |
 | `executionObservations` | 当前执行观察数据 | `data` |
 | `historicalExecution` | 历史动作证据 | `name`、`state`、`arguments`、`result`、`error` |
 | `toolFailure` | 真实执行错误及输出 | `error`、`output` |
 
-当前 Builder 从 Instructions.md 注入唯一角色/风格说明，单独组合 Core 协议和 delegation；Prompts.json 不再包含 system 模板。任务报告模板渲染的是请求相关数据，不应把全部任务日志拼到 system。Memory 模板为 `title.system`（无变量）、`title.excerpt`（user / assistant）、`title.user`（excerpts）；仅供标题事务。
+当前 Builder 从 Instructions.md 注入唯一角色/风格说明，单独组合 Core 协议、通用 Skill 教学和由角色自有 description 生成的 DELEGATABLE AGENTS；Prompts.json 不再包含 system 模板。任务报告模板渲染的是请求相关数据，不应把全部任务日志拼到 system。Memory 模板为 `title.system`（无变量）、`title.excerpt`（user / assistant）、`title.user`（excerpts）；仅供标题事务。
 
 ## 新增与修改 Agent 的开发标准
 
 1. 先确定 Agent 是否必要。用户对话流程优先作为 Skill；独立感知、设备状态机、事务或后台流程才由独立 Agent 承担。先更新代码目录设计，说明上下文所有权、输入预处理、容量、取消、清理、失败和重启行为。
 2. 新目录必须按仓库规则取得批准。角色代码放 Agents，纯资源放本目录，索引登记到 Catalog；不新增顶层模块或第二套加载路径。
-3. 创建 v7 Agent.json，列出已实现的通信契约和固定函数；不创建 Permissions.json，不复制 Skill 的业务函数。配置名、运行时 id、代码身份、通信 source / target 分别核对，不能混用。
+3. 创建 v8 Agent.json，维护自身公开介绍并声明已实现的通信契约和基础 Skill；不创建 Permissions.json，不复制 Skill 的业务函数。配置名、运行时 id、代码身份、通信 source / target 分别核对，不能混用。
 4. 需要对话时遵守 Assistant + Skill 边界；确定性 Agent 不复制 Assistant Chat worker。需要标题等模型事务时使用事务专用模板，不创建普通历史记录。
 5. 能力变更更新 canonical 元数据、拥有者代码 README 和对应 Skills；同一函数绑定保持一致。身份和协议不兼容变更必须设计迁移，不能用改文件名隐式迁移持久化数据。
 6. 后台契约只有在执行器、权限、任务报告、取消和终态已实现后才能声明。不得把 send 接纳当完成，不得读取其他 Agent 私有上下文。
@@ -98,11 +100,11 @@ Catalog 最多 32 个 Agent / 64 个 Skill；单资源最多 64 KiB；资产缓�
 
 ## Action-owned documentation and Skill instruction contract
 
-Agent.json 保留身份、基础 Skill 与通信契约。App 安装各 Action 编译生成的中立目录后，加载器解析 canonical path 并生成模型目录。角色 Instructions 不包含函数示例；示例由加载 Skill 注入。
+Agent.json 保留身份、基础 Skill 与通信契约。App 安装各 Action 编译生成的中立目录后，加载器解析 canonical path 并生成模型目录。Assistant Instructions 不包含函数示例；其示例由加载 Skill 注入。Writer 私有工具操作教学归 Writer 自己。
 
 ## Task controls through Action Calls
 
-BasicSkill 的五个 Task/Skill 控制函数使用 Control Channel Action Call；运行集成通过 ChannelScheduler 返回已提交状态。startTask/loadSkills/releaseSkills 返回的已提交业务状态在结果屏障后重建目录并 ReACT，finishTask/cancelTask 加入回复及清理屏障后恢复默认。新目录仅影响后续请求，不允许加载轮提前调用新函数。可信固定调用复用同一实现。
+BasicSkill 的 Task/Skill 控制函数使用 Control Channel Action Call；运行集成通过 ChannelScheduler 返回已提交状态。task.start/loadSkills/releaseSkills 返回的已提交业务状态在结果屏障后重建目录并 ReACT，task.end/task.cancel 加入回复及清理屏障后恢复默认。新目录仅影响后续请求，不允许加载轮提前调用新函数。可信固定调用复用同一实现。
 
 ## Agent → Skill → Function registration
 
@@ -129,25 +131,31 @@ flowchart LR
 
 Assistant 的 Agent/Provider 异常终止当前 Decision 并保留历史/效果证据；真实业务失败通过 executionObservations 提供给后续推理。
 
-## 待实现
-
-- 生产后台任务契约仍为空；远程资源更新和多前台任务栈未实现。
-
-✅ 每轮状态数据由 CURRENT STATE 统一注入，删除独立 activeTask/taskReports/taskReport 模板；保留执行观察、历史证据及 Tool 失败模板。
+每轮状态数据由 CURRENT STATE 统一注入，删除独立 activeTask/taskReports/taskReport 模板；保留执行观察、历史证据及 Tool 失败模板。
 
 ## 统一容器异常通道
 
-✅ Assistant 配置显式声明 container.failure 标准输入及 runtime 来源订阅；不添加模型函数或 Skill 暴露。其他 Agent 可按能力声明订阅，不强制向不支持的角色投递。
+Assistant 配置显式声明 container.failure 标准输入及 runtime 来源订阅；不添加模型函数或 Skill 暴露。其他 Agent 可按能力声明订阅，不强制向不支持的角色投递。
 
 ## ApplicationControl 异常展示
 
-✅ ApplicationControl 的配置声明 container.failure/runtime.failure observation 输入和 runtime 来源订阅。Assistant 保留容器异常的被动订阅；异常呈现使用角色代码中的内部权限，不向模型扩展函数目录。
+ApplicationControl 的配置声明 container.failure/runtime.failure observation 输入和 runtime 来源订阅。Assistant 保留容器异常的被动订阅；异常呈现使用角色代码中的内部权限，不向模型扩展函数目录。
 
-✅ 通信注册表只保留 Agent 消息与执行反馈；删除本地 UI／媒体／环境／故障的历史 schema 和仅供外部来源的测试声明，本地类型自身继续验证。
+通信注册表只保留 Agent 消息与执行反馈；删除本地 UI／媒体／环境／故障的历史 schema 和仅供外部来源的测试声明，本地类型自身继续验证。
 
 
 Writer 是面向作品的独立生成角色，声明 writer.author 后台任务和向 Assistant 的 progress/result 通信；其工作流与原生工具目录由代码拥有，不加载 Assistant XML 提示词。
 
-Assistant身份Instruction说明独立Writer循环、会话/聆听关闭不取消委托，以及面向用户的阶段事实汇报；播放衔接和播毕启听属于运行时政策，模型不为自动衔接产生startListening。
+Writer 的公开 description 说明自身独立执行、委托生命周期和进度/问题/终态回报；Assistant 身份只维护面向用户的事实汇报责任。播放衔接和播毕启听属于运行时政策，模型不为自动衔接产生 startListening。
 
-Writer task_N is allocated by Writer on authenticated admission. Assistant creates internal UUID delegateID per logical assignment and only supplies optional owner-local taskID for continuation. Models address tasks by executor + taskID and windows by window_N; runtime carries delegation/event/question/trace identity. Writer workspace tasks persist after an assignment completes.
+Writer allocates task_N on explicit workspace creation after authenticated admission. Assistant creates an internal request UUID per communication; Writer alone chooses/reuses its task. Models address active background communication by agent_id and windows by window_N; runtime carries delegation/event/question/trace identity. Writer workspace tasks persist after an assignment completes.
+
+BasicSkill 统一教 start/delegate 平级与按目标所有者选择，不维护具体角色用途。Writer 自己的公开 description 拥有作品职责与委派条件。Catalog 不注册 writing，Assistant 无法加载作品库技能。Writer 工具与私有循环由 [Writer](../../Agents/Writer/README.md) 实现。
+
+## 公开目录装配与失败
+
+AgentConfigurations 按 Catalog 读取 v8 资源并校验必填字段、身份、通信声明与容量；缺失、未知字段、错误类型、旧版本和超限均明确失败，不用旧介绍兜底。最多 32 个角色，每条介绍最多 2048 UTF-8 字节，最终目录最多 8192 字节，超限不截断。
+
+Assistant 的实际请求传入实例 communicationPolicy；目录与 task.delegate 执行共用 AgentTaskDelegation 适配查询。当前只有 assistant→writer 适配，且必须有 task.request 发送权限、接收端 input 与 writer.author 后台支持。有效函数目录没有 delegateTask 时不展示目标。其他角色虽维护公开介绍，注册和描述本身不会创建委派入口。实时 busy、暂停和结果保持在 State/证据数据中。
+
+Writer 控制请求组合 Instructions.md 与 control.library、control.workspace 或 control.viewer。内容请求读取 content.base、content.web/markdown/json/svg/text 和可选 content.retry 模板。扩展名选择、请求顺序、工具参数 Schema、恢复和校验仍由 Writer 代码拥有。公开目录不读取这些私有文件；确定性角色没有为形式统一增加 Instructions。

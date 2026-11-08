@@ -6,6 +6,57 @@ import StorageCore
 
 /// Preserve provider call/result blocks when interleaving independent task rounds.
 public enum AgentChatContextBuilder {
+    struct StateImageProjection {
+        let messages: [ChatMessage]
+        let manifest: String?
+        let ephemeralIDs: Set<String>
+    }
+
+    /// Fresh State images belong to the current input, including continuations of that input.
+    /// The system manifest maps IDs to image positions without changing the user's text.
+    static func applyingStateImages(
+        _ images: [ContextImage], to messages: [ChatMessage], user: String, supportsImages: Bool
+    ) throws -> StateImageProjection {
+        guard !images.isEmpty else { return .init(messages: messages, manifest: nil, ephemeralIDs: []) }
+        guard let index = messages.lastIndex(where: { $0.role == .user && $0.content == user }) else {
+            throw CapabilityError.invalidRequest("Missing current user input for State images")
+        }
+        var result = messages
+        let input = messages[index]
+        var attachments = input.images ?? []
+        var entries: [[String: Any]] = []
+        for image in images {
+            var entry: [String: Any] = [
+                "id": image.id, "source": image.source ?? "state", "mimeType": image.mimeType,
+                "width": image.width, "height": image.height, "byteCount": image.data.count,
+            ]
+            if supportsImages {
+                guard !attachments.contains(where: { $0.id == image.id }) else {
+                    throw CapabilityError.invalidRequest("Duplicate current input image identity")
+                }
+                attachments.append(try ChatImage(id: image.id, mimeType: image.mimeType, data: image.data))
+                entry["position"] = attachments.count
+            }
+            entries.append(entry)
+        }
+        let manifest: [String: Any] = [
+            "message": "current_user_input", "content": "untrusted_image_data",
+            "delivery": supportsImages ? "attached" : "unsupported",
+            "images": entries,
+        ]
+        if supportsImages {
+            guard attachments.count <= 4 else { throw CapabilityError.invalidRequest("Too many current input images") }
+            result[index] = .init(
+                role: input.role, content: input.content, toolCalls: input.toolCalls,
+                toolCallID: input.toolCallID, images: attachments)
+        }
+        return .init(
+            messages: result,
+            manifest: String(
+                decoding: try JSONSerialization.data(withJSONObject: manifest, options: .sortedKeys), as: UTF8.self),
+            ephemeralIDs: supportsImages ? Set(images.map(\.id)) : [])
+    }
+
     /// Model-only projection. Causal IDs and full execution journals remain owned by the worker.
     static func actionObservation(
         index: Int, name: String, result: ToolResult, action: ActionResult? = nil,
@@ -86,7 +137,7 @@ public enum AgentChatContextBuilder {
     /// Retire oldest complete blocks in the model projection; durable history is unchanged.
     public static func retainingRecent(
         _ messages: [ChatMessage], preservingUser user: String, protectedSuffixCount: Int = 1,
-        reservingMessages: Int = 0, reservingBytes: Int = 0
+        reservingMessages: Int = 0, reservingBytes: Int = 0, protectedImageIDs: Set<String> = []
     ) throws -> [ChatMessage] {
         var groups: [[Int]] = []
         var index = 0
@@ -110,7 +161,10 @@ public enum AgentChatContextBuilder {
         let intent = messages.lastIndex { $0.role == .user && $0.content == user }
         let suffixStart = max(0, messages.count - protectedSuffixCount)
         func protected(_ group: [Int]) -> Bool {
-            group.contains { messages[$0].role == .system || $0 == intent || $0 >= suffixStart }
+            group.contains {
+                messages[$0].role == .system || $0 == intent || $0 >= suffixStart
+                    || (messages[$0].images ?? []).contains { protectedImageIDs.contains($0.id) }
+            }
         }
         while true {
             let selected = groups.flatMap { $0.map { messages[$0] } }
@@ -130,14 +184,14 @@ public enum AgentChatContextBuilder {
             + message.toolCalls.reduce(0) { $0 + $1.id.utf8.count + $1.name.utf8.count + $1.argumentsJSON.utf8.count }
     }
 
-    public static func project(_ messages: [ChatMessage]) -> [ConversationMessage] {
+    public static func project(_ messages: [ChatMessage]) -> [ModelMessage] {
         messages.compactMap {
-            guard let role = ConversationMessage.Role(rawValue: $0.role.rawValue) else { return nil }
-            return ConversationMessage(role: role, content: $0.content)
+            guard let role = ModelMessage.Role(rawValue: $0.role.rawValue) else { return nil }
+            return ModelMessage(role: role, content: $0.content)
         }
     }
     public static func request(
-        system: String, user: String, conversation: StoredConversation, nativeHistory: Bool = true,
+        system: String, user: String, conversation: AssistantConversation, nativeHistory: Bool = true,
         templates: PromptTemplates
     ) throws -> [ChatMessage] {
         var selected: [[ChatMessage]] = []
@@ -158,7 +212,7 @@ public enum AgentChatContextBuilder {
         return [ChatMessage(role: .system, content: system)] + selected.suffix(10).flatMap { $0 }
             + [ChatMessage(role: .user, content: user)]
     }
-    public static func compressionMessage(_ compression: ConversationTaskCompression) throws -> ChatMessage {
+    public static func compressionMessage(_ compression: AssistantTaskCompression) throws -> ChatMessage {
         var value = [
             "taskID": compression.taskID, "goal": compression.goal, "status": compression.status.rawValue,
         ]
@@ -173,7 +227,7 @@ public enum AgentChatContextBuilder {
     }
 
     public static func messages(
-        for invocation: ConversationModelRequest, nativeHistory: Bool = true, templates: PromptTemplates
+        for invocation: AssistantModelRequest, nativeHistory: Bool = true, templates: PromptTemplates
     ) throws -> [ChatMessage] {
         if !nativeHistory {
             let evidence = try invocation.toolCalls.map { call in
@@ -213,7 +267,7 @@ struct AgentChatRequestBuilder<State: AgentChatContextState>: ContextBuilder {
         let input: AgentInput
         let state: State
         let batch: SignalBatch
-        let conversation: StoredConversation
+        let conversation: AssistantConversation
         func messages(system: String, user: String) throws -> [ChatMessage] {
             try State.buildChatMessages(system: system, user: user, conversation: conversation)
         }

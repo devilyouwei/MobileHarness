@@ -118,7 +118,7 @@ private actor AlbumFailingRemoveStore: FileStore {
     let reopened = MediaStore(repository: records.media, files: files)
     #expect(try await reopened.albumPage().items.isEmpty)
     #expect(try records.media.media(id)?.state == "deleted")
-    #expect(try await reopened.readForInput(id, source: albumOwner.source, input: albumOwner.input) == nil)
+    await #expect(throws: FileStorageError.invalidFile) { try await reopened.read(id, owner: albumOwner) }
     try await records.shutdown()
 }
 
@@ -194,7 +194,7 @@ private actor AlbumFailingRemoveStore: FileStore {
 #if canImport(SQLite3)
     import SQLite3
 
-    @Test func oldSchemaIsDiscardedInsteadOfMigratingMediaAndHistory() async throws {
+    @Test func oldSchemaClearsMediaAndHistory() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".sqlite")
         defer { try? FileManager.default.removeItem(at: url) }
         var handle: OpaquePointer?
@@ -214,17 +214,23 @@ private actor AlbumFailingRemoveStore: FileStore {
         let seeded = sqlite3_exec(database, seed, nil, nil, nil)
         sqlite3_close(database)
         #expect(seeded == SQLITE_OK)
-        let records = try SQLiteRepositories(url: url)
-        let files = try MemoryFileStore()
-        try await files.putIfAbsent(Data([1, 2]), key: "legacy.jpg")
-        let store = MediaStore(repository: records.media, files: files)
-        #expect(try await store.albumPage().items.isEmpty)
-        #expect(try await store.readForInput("media_1", source: "assistant", input: "album-input") == nil)
-        #expect(try await records.chat.current(agent: "assistant").count == 0)
-        await #expect(throws: RecordStorageError.missingRecord) { try await records.chat.current(agent: "writer") }
-        #expect(try await records.tasks.delegatedTasks(agent: "writer", before: nil, limit: 50).isEmpty)
-        #expect(try await records.devices.selectedDevice() == nil)
-        try await records.shutdown()
+        let fresh = try SQLiteRepositories(url: url)
+        try await fresh.shutdown()
+        var reopened: OpaquePointer?
+        #expect(sqlite3_open(url.path, &reopened) == SQLITE_OK)
+        let retained = try #require(reopened)
+        defer { sqlite3_close(retained) }
+        let query = """
+            SELECT (SELECT COUNT(*) FROM media_files)=0
+            AND (SELECT COUNT(*) FROM devices)=0
+            AND (SELECT COUNT(*) FROM sqlite_schema WHERE name IN ('dialogs','tasks'))=0
+            """
+        var statement: OpaquePointer?
+        #expect(sqlite3_prepare_v2(retained, query, -1, &statement, nil) == SQLITE_OK)
+        let check = try #require(statement)
+        defer { sqlite3_finalize(check) }
+        #expect(sqlite3_step(check) == SQLITE_ROW)
+        #expect(sqlite3_column_int(check, 0) == 1)
     }
 #endif
 

@@ -3,60 +3,57 @@ import Foundation
 import ModelKit
 import StorageChat
 import StorageCore
-import StorageMedia
 
-/// Domain-owned audit journal; the shared Chat repository owns SQLite durability and recovery.
+/// Writer-owned audit journal backed by its private message store and the shared log port.
 public actor WriterHistory {
     private var progressValues: [String: WriterRequestProgress] = [:]
     private var calls: [String: String] = [:]
     private var reasons: [String: String] = [:]
-    private let photos: MediaStore?
-    let store: ConversationHistoryStore
+    let store: WriterHistoryStore
     let taskID: String
     let delegateID: String
     let goal: String
     let modelName: String
     public init(
-        store: ConversationHistoryStore, taskID: String, delegateID: String, goal: String,
-        photos: MediaStore? = nil, modelName: String? = nil
+        store: WriterHistoryStore, taskID: String, delegateID: String, goal: String,
+        modelName: String? = nil
     ) {
         self.modelName = modelName ?? "Writer (model name unavailable)"
-        self.photos = photos
         self.store = store
         self.taskID = taskID
         self.delegateID = delegateID
         self.goal = goal
     }
-    public func restoredContext() async throws -> [ChatMessage] {
+    public func restoredContext(domain: String? = nil) async throws -> [ChatMessage] {
         let archive = try await store.readCurrent()
         let controls = archive.current.turns.flatMap { $0.modelRequests ?? [] }.filter {
-            $0.decisionMetadata?.taskID == taskID && $0.decisionMetadata?.mode == "控制请求"
+            $0.decisionMetadata?.delegateID == delegateID && $0.decisionMetadata?.mode == "控制请求"
+                && (domain == nil || $0.producerMetadata?["controlDomain"] == domain)
         }
-        guard let last = controls.last,
-            let values = try JSONSerialization.jsonObject(with: Data(last.requestJSON.utf8)) as? [[String: Any]]
-        else { return [] }
+        guard let last = controls.last else { return [] }
         var messages: [ChatMessage] = []
-        for value in values where value["role"] as? String != "system" {
-            guard let raw = value["role"] as? String, let role = ChatMessage.Role(rawValue: raw) else { continue }
-            let calls = (value["toolCalls"] as? [[String: String]] ?? []).compactMap { item -> ChatToolCall? in
-                guard let id = item["id"], let name = item["name"], let args = item["argumentsJSON"] else { return nil }
-                return .init(id: id, name: name, argumentsJSON: args)
+        var previousInput: String?
+        for record in controls {
+            if record.input != previousInput {
+                messages.append(.init(role: .user, content: record.input))
+                previousInput = record.input
             }
-            messages.append(
-                .init(
-                    role: role, content: value["content"] as? String ?? "", toolCalls: calls,
-                    toolCallID: value["toolCallID"] as? String))
-        }
-        if last.toolCalls.allSatisfy({ $0.state != .received }) {
-            messages.append(
-                .init(
-                    role: .assistant, content: last.response,
-                    toolCalls: last.toolCalls.map {
-                        .init(id: $0.providerID, name: $0.name, argumentsJSON: $0.argumentsJSON)
-                    }))
-            for call in last.toolCalls {
-                messages.append(
-                    .init(role: .tool, content: call.output ?? call.error ?? "", toolCallID: call.providerID))
+            // Restore only complete call/result groups from durable business evidence.
+            if record.toolCalls.allSatisfy({ $0.state != .received }) {
+                if !record.response.isEmpty || !record.toolCalls.isEmpty {
+                    messages.append(
+                        .init(
+                            role: .assistant, content: record.response,
+                            toolCalls: record.toolCalls.map {
+                                .init(id: $0.providerID, name: $0.name, argumentsJSON: $0.argumentsJSON)
+                            }))
+                }
+                for call in record.toolCalls {
+                    messages.append(
+                        .init(role: .tool, content: call.output ?? call.error ?? "", toolCallID: call.providerID))
+                }
+            } else if !record.response.isEmpty {
+                messages.append(.init(role: .assistant, content: record.response))
             }
         }
         if last.state == .failed, let failure = last.failureDiagnostic {
@@ -69,16 +66,29 @@ public actor WriterHistory {
                 ))
         }
         // Trim whole assistant/tool groups; never keep an orphan tool response.
-        while messages.count > 24 || messages.reduce(0, { $0 + $1.content.utf8.count }) > 32000 {
+        while messages.count > 24
+            || messages.reduce(
+                0,
+                { total, message in
+                    total + message.content.utf8.count
+                        + message.toolCalls.reduce(0) {
+                            $0 + $1.argumentsJSON.utf8.count + $1.name.utf8.count + $1.id.utf8.count
+                        }
+                }) > 32000
+        {
             guard !messages.isEmpty else { break }
             messages.removeFirst()
             while messages.first?.role == .tool { messages.removeFirst() }
         }
         return messages
     }
-    public func begin(_ request: ChatRequest, phase: String, attempt: Int = 1, path: String? = nil) async throws
+    public func begin(
+        _ request: ChatRequest, phase: String, attempt: Int = 1, path: String? = nil, domain: String? = nil
+    ) async throws
         -> String
     {
+        // A query may have selected an existing work since this execution started.
+        let taskID = String(try await store.readCurrent().current.id.split(separator: "/").last ?? "")
         let id = UUID().uuidString
         let label = "\(phase) · \(taskID)\n" + String(goal.prefix(600))
         for attempt in 0..<4 {
@@ -89,10 +99,10 @@ public actor WriterHistory {
                     model: modelName, maximumOutputTokens: request.maximumOutputTokens, temperature: request.temperature
                 )
                 break
-            } catch ConversationHistoryError.conflict where attempt < 3 { continue }
+            } catch WriterHistoryError.conflict where attempt < 3 { continue }
         }
         do {
-            // Keep text/native pairs; media bytes use the same owned Storage media path as Assistant.
+            // Keep lightweight admission references; the shared recorder owns complete request bytes.
             var messages: [[String: Any]] = []
             for message in request.messages {
                 var value: [String: Any] = ["role": message.role.rawValue, "content": message.content]
@@ -102,11 +112,7 @@ public actor WriterHistory {
                 value["toolCallID"] = message.toolCallID
                 var references: [[String: Any]] = []
                 for image in message.images ?? [] {
-                    guard let photos else { throw WriterFailure.unavailable }
-                    let mediaID = try await photos.save(
-                        image.data,
-                        owner: StorageOwner(namespace: "photos", source: "writer", session: taskID, input: id))
-                    references.append(["id": mediaID, "mimeType": image.mimeType, "byteCount": image.data.count])
+                    references.append(["id": image.id, "mimeType": image.mimeType, "byteCount": image.data.count])
                 }
                 value["imageReferences"] = references
                 messages.append(value)
@@ -128,22 +134,30 @@ public actor WriterHistory {
             let catalog = String(
                 decoding: try JSONSerialization.data(withJSONObject: ["actions": [], "tools": registrations]),
                 as: UTF8.self)
-            var metadata = ConversationDecisionMetadata(
+            var metadata = WriterDecisionMetadata(
                 taskID: taskID, mode: phase, skills: [:], catalogJSON: catalog,
                 taskGoal: String(goal.prefix(1000)), execution: "background")
             metadata.delegateID = delegateID
-            let dialog = try await store.readCurrent().current.id
-            let number = try await store.requestCount(dialog)
+            let historyID = try await store.readCurrent().current.id
+            let number = try await store.requestCount(historyID)
             progressValues[id] = .init(inputID: id, number: number, phase: phase, attempt: attempt, path: path)
-            var record = ConversationModelRequest(
+            var record = WriterModelRequest(
                 id: UUID().uuidString, input: label, requestJSON: json, decisionMetadata: metadata)
+            let inputStart = request.messages.lastIndex(where: { $0.role == .assistant }).map { $0 + 1 } ?? 0
+            record.inputMessages = request.messages.dropFirst(inputStart).compactMap { message in
+                guard let role = WriterInputMessage.Role(rawValue: message.role.rawValue) else { return nil }
+                let name = request.messages.reversed().flatMap(\.toolCalls)
+                    .first { $0.id == message.toolCallID }?.name
+                return WriterInputMessage(
+                    role: role, content: message.content,
+                    toolCallID: message.toolCallID, toolName: name)
+            }
             record.producerMetadata = [
                 "number": String(number), "attempt": String(attempt), "phase": phase, "delegateID": delegateID,
             ]
             record.producerMetadata?["path"] = path
+            record.producerMetadata?["controlDomain"] = domain
             try await store.beginModelRequest(record, for: id)
-            try await store.recordToolDefinitions(
-                request.tools.map { String(decoding: $0.declaration, as: UTF8.self) }, for: id)
             try await store.checkpoint(inputID: id)
             return id
         } catch {
@@ -162,7 +176,7 @@ public actor WriterHistory {
         fields["result"] = result
         fields["error"] = error.map(String.init(describing:))
         let json = String(decoding: try JSONEncoder().encode(fields), as: UTF8.self)
-        try await store.recordGenerationRound(.init(id: UUID().uuidString, resultsJSON: json), for: id)
+        try await store.recordHostFinalization(json, for: id)
         try await store.checkpoint(inputID: id)
     }
     public func event(_ event: ChatEvent, id: String) async throws {
@@ -191,7 +205,12 @@ public actor WriterHistory {
         calls.removeValue(forKey: call)
     }
     public func recording(_ value: AgentModelRequestRecording.Snapshot, id: String) async throws {
-        try await store.recordModelExchange(requestJSON: value.requestJSON, response: value.responseJSON, for: id)
+        if let update = value.transport {
+            try await store.recordModelTransport(update, for: id)
+            return
+        }
+        try await store.recordModelExchange(
+            requestJSON: value.requestJSON, response: value.responseJSON, for: id, initial: value.initial)
     }
     public func timing(_ timing: ChatTiming.Snapshot, id: String) async throws {
         try await store.recordModelTiming(
@@ -200,7 +219,7 @@ public actor WriterHistory {
     public func finish(_ id: String, error: (any Error)? = nil, diagnostic: WriterFailureDiagnostic? = nil)
         async throws
     {
-        let state: ConversationRecord.State =
+        let state: WriterRecord.State =
             error == nil ? .completed : error is CancellationError ? .cancelled : .failed
         let failure = diagnostic ?? error.map { WriterDiagnostics.make($0, stage: "模型请求") }
         try await store.finish(

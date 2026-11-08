@@ -71,3 +71,9 @@ OpenAIChatConfiguration owns role-neutral Thinking.minimum/enabled. Minimum disa
 The caller selects minimum/enabled; this adapter applies the Provider-specific policy without Agent identity. Reasoning streams remain private parsed metadata, never public speech/source content. References: [OpenAI reasoning](https://developers.openai.com/api/docs/guides/reasoning), [OpenAI deployment compatibility](https://developers.openai.com/api/docs/guides/deployment-checklist), [Alibaba thinking](https://www.alibabacloud.com/help/en/model-studio/deep-thinking.md).
 
 The adapter never retries model generation itself. Writer owns classified bounded recovery above ChatCapability. Native arguments have no fixed byte ceiling; malformed argument shape, identity mismatch and call/result ordering still produce structured protocol diagnostics. Discovery-list bounds remain independent of generation.
+
+## HTTP 采集
+
+ChatRequest.transportCapture 是 ModelKit 定义的可选中立回调。OpenAI adapter 在发送前提供实际 method/URL/headers/body，接收 status/headers 后按最多 64 KiB 块提供响应应用层字节，包含 SSE 和非成功状态正文。回调逐块 await，形成背压；EOF 标完成，提前停止标 partial。采集不改变真实模型结果，业务层自行处理存储错误。
+
+凭据型 headers 和 URL 参数脱敏；URLSession 可见传输解码后的字节不宣称为 TLS 抓包。ModelKit 不导入 Storage、也不拥有日志表或 Agent 身份。

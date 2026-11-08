@@ -17,12 +17,13 @@ extension MemoryAgent {
     func stopUIInputs() async { await uiInputs.retire(for: descriptor.id)() }
     private func handleUI(_ value: HistoryInput, context: ProcessingContext) async throws -> HistoryReply {
         switch value {
-        case .conversation, .message, .page, .archives, .photo:
+        case .conversation, .message, .page, .archives:
             return try await readHistory(value, context: context)
         case .startNew:
             try await beforeNewConversation()
             try await mutateUI(.startNew, context: context)
         case .summarize(let id): try await mutateUI(.summarize(id), context: context)
+        case .clearLogs(let id): try await mutateUI(.clearLogs(id), context: context)
         case .delete(let id): try await mutateUI(.delete(id), context: context)
         case .refresh: try await mutateUI(.refresh, context: context)
         }

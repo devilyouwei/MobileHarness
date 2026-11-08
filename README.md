@@ -4,21 +4,27 @@
 
 <p align="center"><em>Your phone is the best robot brain!</em></p>
 
-MobileHarness is an Apple-native, bio-inspired multimodal Agent app that turns your iPhone into a harness for independent, stateful Agents. Built around a **Signal → Cognition → Action** loop, it coordinates the phone's hardware and sensors, such as its camera, microphone and speaker, so Agents can perceive the world, understand users, reason, converse and act. Its current robotic-body integration targets **NexArm**, allowing the phone to serve as the brain of an embodied Agent.
+MobileHarness is an Apple-native, bio-inspired multimodal Agent app that turns your iPhone into a harness for independent, stateful Agents. Built around a **Perception → Cognition → Action** loop, it coordinates the phone's hardware and sensors, such as its camera, microphone and speaker, so Agents can perceive the world, understand users, reason, converse and act. Its current robotic-body integration targets **NexArm**, allowing the phone to serve as the brain of an embodied Agent.
 
 <p align="center">
-  <img src="./agent-loop.svg" alt="Pastel blue Signal, lavender Cognition and peach Action form a counterclockwise triangular feedback loop.">
+  <img src="./agent-loop.svg" alt="Perception, Cognition and Action form a counterclockwise loop connected by Internal Signals. A dashed External Signal arrow enters Perception from outside the loop.">
 </p>
 
-**MobileHarness connects perception, cognition and execution through explicit module interfaces.** Native observations and local UI requests reach their responsible _Agents_ through typed ports. _Gateway_ carries inter-Agent _Signals_ and coordinates admitted _Action_ execution, scheduling, shared resources and correlated feedback. Agents interpret inputs through direct logic or model reasoning, then use the _Actions_ module to perform business operations through the phone's capabilities. Actual outcomes inform subsequent decisions, closing the loop.
+**Signals carry information through the Perception → Cognition → Action loop.** External Signals bring observations from the world and user interactions into perception; Internal Signals connect the three stages, carrying interpreted information, intent and feedback. Native inputs reach their responsible Agents through typed ports, while Gateway coordinates inter-Agent communication and Action execution. Agents interpret inputs, decide what to do and act through the phone's capabilities; actual outcomes feed back into the loop. See the [Signal flow design](MobileHarness/README.md#native-input-and-internal-signals) for delivery paths and execution feedback.
 
 <p align="center">
-  <img src="./agent-task-skill-action.svg" alt="An Agent manages a Task and loads Skills, which declare Instructions, Actions and on-demand States; Action results inform subsequent decisions.">
+  <img src="./agent-task-skill-action.svg" alt="An Agent manages a Task and loads Skills. Each Skill declares Actions, read-only States, Instructions and dependencies on other Skills.">
 </p>
 
-MobileHarness combines **Skills** and **Tasks** to support complex, long-horizon agent tasks. **Tasks** preserve goals, context and required Skills across conversation turns. **Skills** declare **Actions**, **States** and **Instructions**: callable operations, read-only views of current facts and workflow guidance. Loading a Skill progressively discloses its authorized functions and State views; selected facts are read again on each actual model request. Modules and their containers own the underlying state machines independently of Skill loading, so releasing a Skill changes visibility without stopping a capability.
+**Tasks** preserve goals and context across conversation turns, while **Skills** provide the capabilities needed to pursue them. Each Skill declares **Actions** (operations), **States** (current facts), **Instructions** (workflow guidance) and **dependencies** (other Skills). Agents load Skills as needed and use actual results to guide their next decisions.
 
-This gives Agents a form of **proprioception**: module snapshots distinguish business facts, runtime conditions and health, including effective expressions, robotic-arm targets versus measured positions, and unknown or stale feedback. Callers select their own State views. The **Assistant** sees selected business attributes only; runtime and engineering diagnostics remain available to internal callers. Skills explicitly name the State nodes they disclose; selecting a parent does not disclose its children. The **Assistant** manages user conversation and one foreground Task, loading Skills as needed. Actual business values and recoverable failures can continue a **ReACT** loop after execution completes; a successful void result does not automatically trigger another model request. See the [Agent design](MobileHarness/Agents/README.md), [Skill catalog](MobileHarness/Resources/Skills/README.md) and [State ownership](MobileHarness/README.md#container-state-read-path).
+States give Agents a form of **proprioception**: awareness of current capabilities and conditions, such as camera activity or a robotic arm's target and measured position. Selected facts refresh on each model request; the underlying modules retain ownership of live state. See the [Skill catalog](MobileHarness/Resources/Skills/README.md) and [Agent design](MobileHarness/Agents/README.md).
+
+<p align="center">
+  <img src="./agent-communication.svg" alt="Assistant delegates a goal and sends follow-up input to Writer through Gateway. Writer returns progress, questions and completion or failure while each Agent retains its own context and responsibilities.">
+</p>
+
+**Multi-Agent collaboration** lets specialized Agents exchange messages and delegate work through **Gateway**, within their declared communication permissions. For example, **Assistant** understands a user's request to write an illustrated article and delegates that goal to **Writer**, which owns its creation workflow, context and workspace. Assistant remains available for conversation and can forward the user's follow-up requirements; Writer sends progress, asks for clarification when needed and reports completion or failure so Assistant can respond to the user. Accepting a delegation means the work has been admitted, not that it is finished. Each Agent retains ownership of its own work, and Writer's delegation does not replace Assistant's foreground Task. See the [Agent communication flow](MobileHarness/README.md#assistant-agent-delegation).
 
 Biological inspiration runs throughout MobileHarness. **Agents** resemble specialized parts of the human brain, processing observations and **Signals** through capabilities such as speech recognition, visual pose detection and reasoning. **Gateway** provides nervous-system coordination for Agent communication and execution. **UI**, **PlatformKit**, **ModelKit** and **Storage** provide independent presentation, native I/O, inference and storage capabilities; **App** assembles the modules and owns their lifetimes.
 
@@ -71,7 +77,7 @@ Set `DEVELOPMENT_TEAM` and `PRODUCT_BUNDLE_IDENTIFIER` in the ignored local file
 
 Select the **MobileHarness** scheme, choose your connected iPhone, then build and run.
 
-- Open Settings → **音频识别 / 语音合成 / 大模型 / 视觉识别** to manage the relevant resources. Custom recognition/synthesis default off; Apple ASR/TTS can run without Nemotron/MOSS weights. Silero/Energy selection is independent of that switch.
+- Open Settings → **AI Models** to manage **Speech Recognition**, **Speech Synthesis**, **Agent Brains** and **Vision Recognition** resources. Custom recognition/synthesis default off; Apple ASR/TTS can run without Nemotron/MOSS weights. Silero/Energy selection is independent of that switch.
 - Download compatible **Gemma 4 E2B** for local text conversation, or explicitly configure a provider implementing the **Responses API**. A provider offering only Chat Completions is insufficient. Photo understanding requires an image-capable cloud model; local Gemma does not support images or native Tools. Cloud chat replaces chat only.
 - Camera preview starts off. Use the camera controls to open preview and grant permission; install YOLO for pose inference. Voice preparation is independent of camera preview. Saving a captured photo requests add-only Photos permission.
 - **Press and hold the companion's eyes for half a second** to enable continuous listening, prepare the selected speech capabilities and request microphone permission. Release after activation; speak, then pause to end the utterance. Partial captions become a final input and spoken reply.
@@ -93,6 +99,24 @@ For offline development and opt-in Mac/model tests, existing `scripts/download-*
 `check.sh` runs static dependency/ownership checks, Python provisioning tests, strict Swift formatting, shared-package tests and project/privacy/entitlement metadata checks. `build-ios.sh` builds four unsigned simulator schemes with full Xcode using the explicit simulator variant and validates packaged Agent/Skill resources after the app build. Build results and real-model/native/device acceptance are recorded separately; see the [State validation record](docs/validation/Container-Reflexivity.md).
 
 [Package.swift](Package.swift) maps the existing source tree into independent targets; tests live in [Tests](Tests/README.md). ModelKit, PlatformKit, Storage and UI are foundational modules; base capability targets have no upper-layer project dependencies, while domain/adaptor targets retain their explicit internal dependencies. AgentCore and FunctionContracts are independent contracts. The complete target map, queue limits, cancellation and completion rules belong to [MobileHarness/README.md](MobileHarness/README.md).
+
+## Features
+
+| Feature | What you can do today |
+| --- | --- |
+| **Everyday interaction** | Have multi-turn voice conversations with the Assistant, with live captions, spoken replies and expressive eyes and gaze. |
+| **Interactive UI** | Interact with generated pages, charts and small tools, manage content windows, and follow task progress in the in-app Island. |
+| **NexArm robotic-arm control** | Control a **NexArm** by voice, move individual joints, perform gestures such as nodding and waving, and aim using visual pose tracking. |
+| **Intelligent photography and album** | Take photos and videos by voice or on-screen controls, adjust countdown, flash and zoom, and use NexArm for pose-driven aiming. Browse, replay, export and delete saved photos and videos in the app album. |
+| **Writer text and visual authoring** | Create articles, illustrated layouts, diagrams and interactive content. Preview results as they develop, refine them through conversation, and reopen or export saved work. |
+| **Web browsing** | Ask the Assistant to open and read web pages, inspect page content and navigate in an in-app browser. |
+
+## Planned and Ongoing Work
+
+- **Full-duplex interaction:** Keep listening while the Assistant thinks or speaks, distinguish user interruptions from echo and noise, and hand over to a new utterance without losing its beginning. See [speech interaction plan](docs/requirements/product/Model-Web-Speech-Plan.md).
+- **Long-term memory:** Remember user preferences and important experiences, organize diary-style memories, and recall past conversations and creations. See [unified memory](docs/requirements/Unified-Memory-Plan.md).
+- **Autonomous photography:** Compose shots, follow subjects and move the camera according to the user's intent, with manual takeover when needed. See [photography plan](docs/requirements/Photographer-Proposal.md).
+- **Media understanding and search:** Describe and organize photos and videos, then find relevant images or video moments through natural-language requests. See [album extensions](docs/requirements/product/User-Album-Memory-Plan.md).
 
 ## Documentation
 

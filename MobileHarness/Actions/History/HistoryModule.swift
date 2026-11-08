@@ -15,6 +15,9 @@ public struct HistoryModule: CapabilityModule {
     }
     public var definitions: [ActionFunction] {
         var values = [
+            HistoryActions.clearLogsDefinition(completing: { [mutations] invocation in
+                .value(try await HistoryActions.clearLogs(invocation: invocation, using: mutations))
+            }),
             HistoryActions.startNewDefinition(completing: { [mutations] invocation in
                 .value(try await HistoryActions.startNew(invocation: invocation, using: mutations))
             }),

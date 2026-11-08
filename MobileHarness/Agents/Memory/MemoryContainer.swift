@@ -60,6 +60,5 @@
         }
         public var historyState: ConversationHistoryState { historyUI.state }
         public var history: any ConversationHistoryControlling { facades.history }
-        public static func previewHistory(_ turn: HistoryTurn) -> String { HistoryExecutionPreview.preview(turn) }
     }
 #endif

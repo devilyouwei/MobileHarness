@@ -139,9 +139,9 @@ UI原生框架白名单将WindowAppearance的AppKit字体测量和ImageIO图标�
 
 ## Writer 双模型回归
 
-`python3 scripts/evaluate-writer.py --output-prefix /tmp/writer-regression-unique` reads only `ALIYUN_API_URL` and `ALIYUN_API_KEY` from ignored `.env.local`; credentials enter test child environments, never logs/arguments. It runs the production Responses adapter with Writer thinking enabled and provider-default output tokens. Actual model IDs are `qwen3.8-max` and `deepseek-v4.1-flash`; the explicitly reported `deepseek4.1-flash` spelling maps to the latter, as verified by this provider's model inventory. There is no runtime model fallback.
+`python3 scripts/evaluate-writer.py --output-prefix /tmp/writer-regression-unique` reads only `ALIYUN_API_URL` and `ALIYUN_API_KEY` from ignored `.env.local`; credentials enter test child environments, never logs/arguments. The legacy six-case mode defaults to Qwen with thinking enabled and provider-default output tokens. It can explicitly select `qwen3.8-max` and `deepseek-v4.1-flash`; the explicitly reported `deepseek4.1-flash` spelling maps to the latter, as verified by this provider's model inventory. There is no runtime model fallback.
 
-The script builds the opt-in Swift tests, runs a no-model macOS WebKit resource-reload/click preflight, then executes both providers in separate processes. `--models`, `--cases`, `--seconds` and `--skip-build` select the experiment. Resume cases require `multifile` in the selection. New output prefixes prevent overwriting evidence. The 36-request and default 600-second per-case bounds apply only to the paid experiment, not production Writer or model output. An outer process timeout is recorded as exit124. Case results checkpoint immediately; `requests.json` updates during streams so incomplete cases remain diagnosable.
+The script builds the opt-in Swift tests, runs a no-model macOS WebKit resource-reload/click preflight, then executes selected models in separate processes. `--models`, `--cases`, `--seconds` and `--skip-build` select the experiment. Resume cases require `multifile` in the selection. New output prefixes prevent overwriting evidence. The 36-request and default 600-second per-case bounds apply only to the paid experiment, not production Writer or model output. An outer process timeout is recorded as exit124. Case results checkpoint immediately; `requests.json` updates during streams so incomplete cases remain diagnosable.
 
 Each model output contains `records.sqlite`, SQLite workspace catalog and version files, complete per-case history JSON, request timing/tool/usage traces, render DOM/errors and `report.json`; the prefix summary records hashes and whether sources changed during the run. Artifacts contain synthetic test content. Keep credentials and device/user databases out of reports. Detailed evidence and platform limitations belong to [validation](../docs/validation/Writer-Model-Regression.md).
 
@@ -154,3 +154,17 @@ Each model output contains `records.sqlite`, SQLite workspace catalog and versio
 Writer evaluator --thinking enabled/minimum changes only the paid experiment Provider configuration (default enabled). Reports record the actual value; production Writer configuration and provider output defaults are unchanged. Use the original diagram goal for latency comparisons.
 
 Writer UI acceptance seeds the shared SQLite catalog and copies agent/task_N workspace files. It does not copy a JSON workspace index; native task selection uses an actual task reference from the seeded list rather than a globally allocated task_6 assumption.
+
+## Agent public resource validation
+
+check-modelkit-boundaries.py validates bundled Agent resource schema v8 and required nonblank descriptions up to 2048 UTF-8 bytes. Runtime/tests additionally validate identities, full schema, peer discovery permissions and compiled v7 projection. Resource packaging includes each role's private instruction/template assets through the existing Resources bundle.
+
+## Writer prompt matrix runner
+
+`evaluate-writer.py --matrix` loads writer-evaluation.json and writer-workflows.json, selecting only qwen3.8-max and gpt-6.1-sol by default. Aliyun and OpenAI use their own keys/URLs from the ignored env file, passed only to the corresponding subprocess. `--cases` runs a subset and `--output-prefix` requires fresh outputs. `--skip-build --test-binary` uses a recorded binary, verifies all three packaged Writer resources against source, and runs no-model WebKit/window preflight. Source hashes include Writer resources and scenario/config JSON. Per-case time/request limits belong solely to the experiment; model output limits remain provider defaults. Reports preserve failures and distinguish desktop window state from iOS UI acceptance.
+
+`render-writer-review.swift` 是离线视觉证据工具：用 `swiftc -parse-as-library scripts/render-writer-review.swift -o /tmp/mh-writer-visual-review` 编译，传入已生成 HTML 的绝对路径和 PNG 输出路径。它在本机原生 WKWebView 的 390×844 视口加载真实本地文件，25 秒超时，不调用模型、不修改原文件。截图与矩阵中的模型渲染反馈独立；矩阵未挂载原生窗口时会如实记录截图不可用。
+
+Matrix source fingerprints also include WriterWorkspaces and WriterMessages Swift implementations so request/target/history changes are captured with the Writer runtime. The runner records source, binary and packaged-resource consistency separately from model case outcomes.
+
+Writer record UI acceptance can select `WRITER_UI_ONLY_TEST=testDelegationWorkspaceSeparation`; its seed is the temporary SQLite/workspaces fixture exported by the real-storage integration test through `WRITER_SEPARATION_UI_SEED`. This route validates native navigation without model credentials or a physical-device database.

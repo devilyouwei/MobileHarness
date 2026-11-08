@@ -9,6 +9,10 @@ import UI
 final class AppCameraAccess: AgentCameraAccess {
     let value: any ActionsCameraAccess
     init(_ value: any ActionsCameraAccess) { self.value = value }
+    func previewSnapshot(scope: String) async throws -> MultimodalContextSnapshot {
+        try await value.previewSnapshot(scope: scope)
+    }
+    func resetPreviewSelection(scope: String) async { await value.resetPreviewSelection(scope: scope) }
     func pauseVisionForModelMaintenance() async { await value.pauseVisionForModelMaintenance() }
     func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data {
         try await value.readPhoto(id, source: source, sessionID: sessionID, inputID: inputID)

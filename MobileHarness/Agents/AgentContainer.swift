@@ -272,7 +272,7 @@ import StorageFiles
                 assistantContainer: assistant, applicationControlContainer: applicationControl,
                 memoryContainer: memory, photographerContainer: photographer, writerContainer: writer,
                 stateContext: try makeStateContext(), cache: cacheStorage,
-                chatRecords: try repositories().chat, taskRecords: try repositories().tasks,
+                repositories: try repositories(),
                 cameraUI: cameraUI, albumUI: albumUI, windowsUI: windows, settingsUI: settingsUI,
                 resourcesUI: resourcesUI, devicesUI: devicesUI, historyUI: historyUI, diagnosticsUI: diagnosticsUI,
                 cameraControl: camera,
@@ -281,11 +281,16 @@ import StorageFiles
                     guard let self else { throw CancellationError() }
                     let chat = try await self.makeHistoryChat()
                     try Task.checkCancellation()
-                    let records = try self.repositories().chat
+                    let records = try self.repositories().assistantConversations
+                    let logs = try self.repositories().logs
                     return try await ConversationTitleGenerator.summarize(
                         conversation, using: chat,
                         journal: { request in
                             try await records.saveAuxiliaryRequest(dialog: conversation.id, request: request)
+                        },
+                        transport: { id, update in
+                            try await logs.writeRequestPayload(
+                                id, agent: "assistant", json: "", response: "", initial: false, update: update)
                         })
                 },
                 modelName: { [weak self] in
@@ -344,6 +349,7 @@ import StorageFiles
         private func startAgents() async throws {
             guard !isolatedPresentation else { return }
             let runtime = try runtime()
+            try await runtime.output.bindCommunications(try repositories().agentMessages)
             try await applicationControl.start()
             try await photographer.start()
             try await memory.start()

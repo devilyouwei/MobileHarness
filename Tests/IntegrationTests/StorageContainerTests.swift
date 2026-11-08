@@ -80,17 +80,17 @@ private func containerRoot() -> URL { FileManager.default.temporaryDirectory.app
         #expect(registry.files() === first.files)
         #expect(registry.cache() === first.cache)
         #expect(!FileManager.default.fileExists(atPath: root.path))
-        #expect(throws: RecordStorageError.notReady) { try first.database.chat }
+        #expect(throws: RecordStorageError.notReady) { try first.database.assistantConversations }
         try await first.start()
         let store = try first.files.document(String.self, in: first.files.settings, name: "settings.json")
         _ = try await store.save("value", expecting: nil)
-        let chat = try first.database.chat
-        _ = try await chat.current(agent: "fixture")
+        let chat = try first.database.assistantConversations
+        _ = try await chat.current()
         async let one: Void = first.stop()
         async let two: Void = first.stop()
         _ = try await (one, two)
         await #expect(throws: StorageError.closed) { try await store.load() }
-        await #expect(throws: RecordStorageError.closed) { try await chat.current(agent: "late") }
+        await #expect(throws: RecordStorageError.closed) { try await chat.current() }
         await #expect(throws: StorageFailure.self) { try await first.start() }
         try await second.stop()
     }
@@ -120,8 +120,19 @@ private func containerRoot() -> URL { FileManager.default.temporaryDirectory.app
 private actor FailingContainerDatabase: DatabaseStorage {
     private var starts = 0
     private var stops = 0
-    nonisolated var chat: any ChatRepository { get throws { throw RecordStorageError.notReady } }
-    nonisolated var tasks: any TaskRepository { get throws { throw RecordStorageError.notReady } }
+    nonisolated var assistantConversations: any AssistantConversationRepository {
+        get throws { throw RecordStorageError.notReady }
+    }
+    nonisolated var assistantMessages: any AssistantMessageRepository {
+        get throws { throw RecordStorageError.notReady }
+    }
+    nonisolated var assistantTasks: any AssistantTaskRepository & AssistantTaskSummaryRepository {
+        get throws { throw RecordStorageError.notReady }
+    }
+    nonisolated var writerMessages: any WriterMessageRepository { get throws { throw RecordStorageError.notReady } }
+    nonisolated var writerExecutions: any WriterExecutionRepository { get throws { throw RecordStorageError.notReady } }
+    nonisolated var agentMessages: any AgentMessageRepository { get throws { throw RecordStorageError.notReady } }
+    nonisolated var logs: any ModelRequestLogRepository { get throws { throw RecordStorageError.notReady } }
     nonisolated var workspaces: any WorkspaceRepository { get throws { throw RecordStorageError.notReady } }
     nonisolated var media: any MediaRepository { get throws { throw RecordStorageError.notReady } }
     nonisolated var devices: any DeviceRepository { get throws { throw RecordStorageError.notReady } }
@@ -171,8 +182,19 @@ extension StorageContainerTests {
 private actor WaitingContainerDatabase: DatabaseStorage {
     private var starting = false
     private var stopped = false
-    nonisolated var chat: any ChatRepository { get throws { throw RecordStorageError.notReady } }
-    nonisolated var tasks: any TaskRepository { get throws { throw RecordStorageError.notReady } }
+    nonisolated var assistantConversations: any AssistantConversationRepository {
+        get throws { throw RecordStorageError.notReady }
+    }
+    nonisolated var assistantMessages: any AssistantMessageRepository {
+        get throws { throw RecordStorageError.notReady }
+    }
+    nonisolated var assistantTasks: any AssistantTaskRepository & AssistantTaskSummaryRepository {
+        get throws { throw RecordStorageError.notReady }
+    }
+    nonisolated var writerMessages: any WriterMessageRepository { get throws { throw RecordStorageError.notReady } }
+    nonisolated var writerExecutions: any WriterExecutionRepository { get throws { throw RecordStorageError.notReady } }
+    nonisolated var agentMessages: any AgentMessageRepository { get throws { throw RecordStorageError.notReady } }
+    nonisolated var logs: any ModelRequestLogRepository { get throws { throw RecordStorageError.notReady } }
     nonisolated var workspaces: any WorkspaceRepository { get throws { throw RecordStorageError.notReady } }
     nonisolated var media: any MediaRepository { get throws { throw RecordStorageError.notReady } }
     nonisolated var devices: any DeviceRepository { get throws { throw RecordStorageError.notReady } }
@@ -225,8 +247,21 @@ extension SharedCacheTests {
 
 private actor StateReadSpyDatabase: DatabaseStorage {
     private var stateReads = 0
-    nonisolated var chat: any ChatRepository { get throws { throw ContainerFixtureError.invalid } }
-    nonisolated var tasks: any TaskRepository { get throws { throw ContainerFixtureError.invalid } }
+    nonisolated var assistantConversations: any AssistantConversationRepository {
+        get throws { throw ContainerFixtureError.invalid }
+    }
+    nonisolated var assistantMessages: any AssistantMessageRepository {
+        get throws { throw ContainerFixtureError.invalid }
+    }
+    nonisolated var assistantTasks: any AssistantTaskRepository & AssistantTaskSummaryRepository {
+        get throws { throw ContainerFixtureError.invalid }
+    }
+    nonisolated var writerMessages: any WriterMessageRepository { get throws { throw ContainerFixtureError.invalid } }
+    nonisolated var writerExecutions: any WriterExecutionRepository {
+        get throws { throw ContainerFixtureError.invalid }
+    }
+    nonisolated var agentMessages: any AgentMessageRepository { get throws { throw ContainerFixtureError.invalid } }
+    nonisolated var logs: any ModelRequestLogRepository { get throws { throw ContainerFixtureError.invalid } }
     nonisolated var workspaces: any WorkspaceRepository { get throws { throw ContainerFixtureError.invalid } }
     nonisolated var media: any MediaRepository { get throws { throw ContainerFixtureError.invalid } }
     nonisolated var devices: any DeviceRepository { get throws { throw ContainerFixtureError.invalid } }

@@ -303,7 +303,7 @@ public actor PhotographerAgent: Agent {
             OutputEnvelope(
                 source: descriptor.id, context: input.context,
                 output: envelope.output, sequence: outputSequence, roundID: envelope.roundID, callID: envelope.callID,
-                taskScope: input.taskScope))
+                taskScope: input.taskScope, resourceBindings: envelope.resourceBindings))
         if case .enqueued = result { return true }
         lifecycle = .failed
         continuation.finish()

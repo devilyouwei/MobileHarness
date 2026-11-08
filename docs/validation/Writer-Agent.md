@@ -453,3 +453,13 @@ scripts/build-ios.sh退出0，四个scheme均BUILD SUCCEEDED，Skill与Live Acti
 ### Agent任务身份改造真机安装
 
 2026-11-05，当前工作区构建MobileHarness真机Debug版本0.1.0（2026110507），/tmp/agent-identity-device-build.log显示BUILD SUCCEEDED。codesign严格校验、30项Skill和Live Activity资源检查通过。devicectl覆盖安装到iPhone17 Pro成功，回执sequence5964；终止旧进程并启动新版本成功，设备应用列表确认2026110507。未卸载应用、未手工修改设备数据库；新版schema沿已授权的开发期规则在启动时重建旧SQLite，不迁移旧ID。此记录证明构建、安装与启动，不代表Writer真实模型、语音、目录／窗口／历史等真机交互验收完成。
+
+## 2026-11-08 Writer 文件操作配额
+
+真机 SQLite 与 WAL 的只读快照中，首笔委托已接纳，三个 edit 的指令分别为 3855、3855、3722 个 UTF-8 字节。当时的 2048 字节检查统一返回 invalidPath。前两次路径为合法的 index.html，第三次另含非 ASCII 路径成分。没有开启内容流。SQLite 完整性与外键检查通过。
+
+自动化回归使用模型替身。Writer → Gateway → Artifacts 路径将相近长度的中文指令完整传入内容请求，再写入并发布作品。真实文件仓库覆盖超出旧门槛的相对路径、标题、搜索词、行数和字符数，以及 129 次额外读取、9 个关联引用和 9 个保存点。空编辑指令仍返回 invalidInstruction。标题回归改为验证自动生成的标题按完整字符截取。
+
+`scripts/check.sh` 退出 0。主集成 1103 项和独立 LiveRuntimeTests 227 项通过，边界、格式、Python 和 plist 检查通过。NativePresentationTests 在 cameraNativeMetalDrawStopAndLayerHandoff 开始后没有套件完成记录。
+
+`scripts/build-ios.sh` 退出 0。四个模拟器 scheme 均构建成功，App Agent/Skill 和 Live Activity 资源校验通过。最终生产源码再次构建 MobileHarnessSimulator 成功。本轮修复的验证使用本机测试及模拟器编译。

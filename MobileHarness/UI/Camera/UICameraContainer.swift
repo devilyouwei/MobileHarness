@@ -7,6 +7,8 @@ import Foundation
 /// Presentation facts only; state mutation stays behind CameraPresenting.
 @MainActor
 public struct CameraPresentationSnapshot: Sendable {
+    public let gallerySession: String?
+    public let previews: [CameraPreviewItem]
     public let photoCaptureRotation: Double?
     public let recording: CameraRecordingPresentation
     public let recordedVideo: CameraRecordedVideo?
@@ -22,12 +24,15 @@ public struct CameraPresentationSnapshot: Sendable {
     public let facing: CameraDirection
     public let message: String?
     public let needsSettings: Bool
+    public let savedPreviewID: String?
     public let savedMediaID: String?
     public let skeleton: PoseOverlay?
     #if os(iOS)
         public let capturedPhoto: CapturedPhotoPresentation?
     #endif
     init(_ state: CameraState) {
+        gallerySession = state.gallerySession
+        previews = state.previews
         photoCaptureRotation = state.photoCaptureRotation
         recording = state.recording
         recordedVideo = state.recordedVideo
@@ -43,6 +48,7 @@ public struct CameraPresentationSnapshot: Sendable {
         facing = state.facing
         message = state.message
         needsSettings = state.needsSettings
+        savedPreviewID = state.savedPreviewID
         savedMediaID = state.savedMediaID
         skeleton = state.skeleton
         #if os(iOS)
@@ -60,7 +66,6 @@ public protocol CameraPresenting: AnyObject, Sendable {
     func present(frame: CameraVideoFrame, pose: PoseOverlay, token: UIPresentationToken) throws
     #if os(iOS)
         func presentPhoto(id: String, image: UIImage, completed: @escaping @MainActor (Bool) -> Void) throws
-        func departPhoto(id: String, kind: PhotoDeparture.Kind) async throws
     #endif
     func present(_ update: CameraPresentationUpdate)
     func presentVideo(_ frame: CameraVideoFrame) throws
@@ -160,14 +165,8 @@ public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
     #if os(iOS)
         public func presentPhoto(id: String, image: UIImage, completed: @escaping @MainActor (Bool) -> Void) throws {
             try checkAdmission()
-            state.capturedPhoto?.departure.setAvailable(false)
             state.capturedPhoto?.finish()
             state.present(.capturedPhoto(CapturedPhotoPresentation(id: id, image: image, completed: completed)))
-        }
-        public func departPhoto(id: String, kind: PhotoDeparture.Kind) async throws {
-            try checkAdmission()
-            guard let photo = state.capturedPhoto, photo.id == id else { throw UIContainerError.stale }
-            try await photo.departure.perform(kind)
         }
     #endif
     public func presentVideo(_ frame: CameraVideoFrame) throws {
@@ -251,7 +250,6 @@ public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
         isAvailable = active
         if !active {
             #if os(iOS)
-                state.capturedPhoto?.departure.setAvailable(false)
                 state.capturedPhoto?.finish()
                 state.capturedPhoto = nil
             #endif
@@ -271,6 +269,7 @@ public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
 }
 
 public struct CameraInput: Sendable {
+    public let previewSession: String?
     public enum Operation: String, Sendable {
         case open, close, flip, retry, takePhoto, savePhoto, ignorePhoto, configure, cancelCapture, startRecording,
             stopRecording, saveVideo, ignoreVideo, perceptionOpen, perceptionClose,
@@ -280,15 +279,17 @@ public struct CameraInput: Sendable {
     public let recordingID: String?
     public let settings: CameraSettings?
     public let facing: CameraDirection?
-    public let mediaID: String?
+    public let previewID: String?
     public init(
-        _ operation: Operation, facing: CameraDirection? = nil, mediaID: String? = nil, settings: CameraSettings? = nil,
-        recordingID: String? = nil
+        _ operation: Operation, facing: CameraDirection? = nil, previewID: String? = nil,
+        settings: CameraSettings? = nil,
+        recordingID: String? = nil, previewSession: String? = nil
     ) {
+        self.previewSession = previewSession
         self.operation = operation
         self.settings = settings
         self.recordingID = recordingID
         self.facing = facing
-        self.mediaID = mediaID
+        self.previewID = previewID
     }
 }

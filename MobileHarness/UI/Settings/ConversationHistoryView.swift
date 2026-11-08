@@ -40,6 +40,7 @@ import Foundation
         let controls: any ConversationHistoryControlling
         @Environment(\.scenePhase) private var scenePhase
         @State private var deleting: HistoryConversation?
+        @State private var clearingLogs = false
         @State private var initialLoad = HistoryInitialLoad()
         var body: some View {
             List {
@@ -114,6 +115,22 @@ import Foundation
             .navigationTitle(state.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("清空请求日志", systemImage: "trash") { clearingLogs = true }
+                }
+            }
+            .confirmationDialog("清空整个请求日志库？", isPresented: $clearingLogs, titleVisibility: .visible) {
+                Button("清空全部日志", role: .destructive) {
+                    Task {
+                        do { try await controls.clearRequestLogs(requestID: nil) } catch {
+                            state.present(.status("日志清空失败：\(error)"))
+                        }
+                    }
+                }
+            } message: {
+                Text("删除 Assistant 和 Writer 的全部请求日志；保留对话、消息及其他详情。")
+            }
             .task {
                 guard initialLoad.begin() else { return }
                 await reload()
@@ -577,17 +594,19 @@ import Foundation
 
     @MainActor
     private struct ConversationTurnDetail: View {
-        let turn: HistoryTurn
+        @State private var turn: HistoryTurn
         let controls: any ConversationHistoryControlling
+        @State private var clearingLog = false
+        @State private var clearFailure: String?
         @State private var catalog: HistoryFunctionCatalog?
         @State private var catalogError: String?
         @State private var catalogSource: String?
-        @State private var interpretation = ""
+        @State private var isClearingLog = false
         @State private var catalogExpanded = false
         @State private var catalogRawExpanded = false
 
         init(turn: HistoryTurn, controls: any ConversationHistoryControlling) {
-            self.turn = turn
+            self._turn = State(initialValue: turn)
             self.controls = controls
         }
 
@@ -603,88 +622,77 @@ import Foundation
                     if !turn.raw.isEmpty || (turn.toolCalls ?? []).isEmpty { selectable(turn.raw) }
                     ForEach(turn.toolCalls ?? []) { call in selectable(call.responseReport) }
                 }
-                if turn.historyTaskID != nil || turn.decisionMetadata != nil {
-                    Section("Tasks and Skills") {
-                        ViewThatFits(in: .horizontal) {
-                            HStack(alignment: .top, spacing: 20) {
-                                taskInformation.frame(
-                                    minWidth: 220, idealWidth: 240, maxWidth: .infinity, alignment: .leading)
-                                if turn.decisionMetadata != nil {
-                                    Divider()
-                                    skillsInformation.frame(
-                                        minWidth: 200, idealWidth: 240, maxWidth: .infinity, alignment: .leading)
-                                }
-                            }
-                            VStack(alignment: .leading, spacing: 16) {
-                                taskInformation
-                                if turn.decisionMetadata != nil {
-                                    Divider()
-                                    skillsInformation
-                                }
-                            }
-                        }
-                        .padding(.vertical, 8)
-                        .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+                Section {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("Tasks", systemImage: "checklist").foregroundStyle(.blue)
+                            .font(.subheadline.weight(.semibold))
+                        taskInformation
+                    }
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("Skills", systemImage: "square.stack.3d.up").foregroundStyle(.purple)
+                            .font(.subheadline.weight(.semibold))
+                        skillsInformation
+                    }
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("States", systemImage: "square.stack.3d.down.right").foregroundStyle(.orange)
+                            .font(.subheadline.weight(.semibold))
+                        statesInformation
+                    }
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("Function Catalog", systemImage: "function").foregroundStyle(.green)
+                            .font(.subheadline.weight(.semibold))
                         if turn.decisionMetadata != nil {
                             functionCatalog
+                        } else {
+                            Text("Not recorded").foregroundStyle(.secondary)
                         }
                     }
-                }
-                Section("Prompts") {
-                    if !turn.attachedImages.isEmpty {
-                        ScrollView(.horizontal) {
-                            HStack(spacing: 12) {
-                                ForEach(turn.attachedImages) { reference in
-                                    HistoryImageThumbnail(reference: reference, turnID: turn.id, controls: controls)
+                }.accessibilityIdentifier("history.business.context")
+                if turn.logsCleared == true {
+                    Section {
+                        Text("Logs cleared").foregroundStyle(.secondary)
+                            .accessibilityIdentifier("history.prompts.cleared")
+                    }
+                } else {
+                    Section("Prompts") {
+                        if !turn.attachedImages.isEmpty {
+                            ScrollView(.horizontal) {
+                                HStack(spacing: 12) {
+                                    ForEach(turn.attachedImages) { reference in
+                                        HistoryImageThumbnail(reference: reference, turnID: turn.id, controls: controls)
+                                    }
+                                }
+                            }
+                        }
+                        if turn.request.isEmpty {
+                            Text("Prompt messages unavailable").foregroundStyle(.secondary)
+                        }
+                        HistoryPromptItems(messages: turn.request)
+                        if !turn.effectiveToolDefinitions.isEmpty {
+                            DisclosureGroup("Functions") {
+                                ForEach(Array(turn.effectiveToolDefinitions.enumerated()), id: \.offset) {
+                                    index, definition in
+                                    DisclosureGroup("Tool \(index + 1)") { selectable(definition) }
                                 }
                             }
                         }
                     }
-                    if turn.request.isEmpty, let json = turn.requestJSON { selectable(json) }
-                    ForEach(Array(turn.request.enumerated()), id: \.offset) { _, message in
-                        DisclosureGroup(message.role.rawValue) {
-                            selectable(message.displayContent)
-                            if let id = message.toolCallID { selectable("Tool Call ID: " + id) }
-                            ForEach(Array((message.toolCalls ?? []).enumerated()), id: \.offset) { _, call in
-                                selectable("Tool Call: \(call.name) · \(call.id)\n\(call.argumentsJSON)")
-                            }
-                        }
+                    Section("Generation Meta") {
+                        if let error = turn.error { selectable("Generation Error: " + error) }
+                        Text("Request ID: \(turn.id)").font(.caption).textSelection(.enabled)
+                        Text("Input ID: \(turn.ownerInputID ?? "")").font(.caption).textSelection(.enabled)
+                        Text("Model: \(turn.model)")
+                        Text(turn.firstTokenReport)
+                        Text("State: \(turn.stateReport); Finish Reason: \(turn.finishReason ?? "")")
+                        Text("Temperature: \(turn.temperature)")
+                        Text(turn.tokenReport)
                     }
-                    if !turn.effectiveToolDefinitions.isEmpty {
-                        DisclosureGroup("Functions") {
-                            ForEach(Array(turn.effectiveToolDefinitions.enumerated()), id: \.offset) {
-                                index, definition in
-                                DisclosureGroup("Tool \(index + 1)") { selectable(definition) }
-                            }
-                        }
+                    Section {
+                        if let clearFailure { Text(clearFailure).foregroundStyle(.red) }
+                        Button("清空此条请求日志", role: .destructive) { clearingLog = true }
+                            .disabled(isClearingLog || turn.messageID?.hasPrefix("request_") != true)
+                        if isClearingLog { ProgressView() }
                     }
-                }
-                Section("Action Execution") {
-                    if let calls = turn.toolCalls {
-                        ForEach(calls) { call in
-                            DisclosureGroup("Tool Call · \(call.name) · \(call.state.rawValue)") {
-                                selectable("Provider Call ID: " + call.providerID)
-                                selectable("Execution Call ID: " + call.id)
-                                Text("Arguments").font(.caption)
-                                selectable(call.argumentsJSON)
-                                Text("Result").font(.caption)
-                                selectable(call.output ?? "")
-                                if let error = call.error { selectable("Error: " + error) }
-                            }
-                        }
-                    }
-                    selectable(interpretation)
-                    if let error = turn.executionError { selectable("Execution Error: " + error) }
-                }
-                Section("Generation Meta") {
-                    if let error = turn.error { selectable("Generation Error: " + error) }
-                    Text("Request ID: \(turn.id)").font(.caption).textSelection(.enabled)
-                    Text("Input ID: \(turn.ownerInputID ?? "")").font(.caption).textSelection(.enabled)
-                    Text("Model: \(turn.model)")
-                    Text(turn.firstTokenReport)
-                    Text("State: \(turn.stateReport); Finish Reason: \(turn.finishReason ?? "")")
-                    Text("Temperature: \(turn.temperature)")
-                    Text(turn.tokenReport)
                 }
             }
             .navigationContext(.turn, itemID: turn.id)
@@ -694,7 +702,23 @@ import Foundation
                     HistoryJSONShareButton(value: turn, filename: "\(turn.id).json")
                 }
             }
-            .task { interpretation = controls.preview(turn) }
+            .confirmationDialog("清空此条请求日志？", isPresented: $clearingLog, titleVisibility: .visible) {
+                Button("清空日志", role: .destructive) {
+                    Task {
+                        guard !isClearingLog else { return }
+                        isClearingLog = true
+                        clearFailure = nil
+                        defer { isClearingLog = false }
+                        do {
+                            guard let id = turn.messageID else { throw HistoryDetailError.unavailable }
+                            try await controls.clearRequestLogs(requestID: id)
+                            turn = ConversationHistoryPresentation.clearingLogs(turn)
+                        } catch { clearFailure = "日志清空失败：\(error)" }
+                    }
+                }
+            } message: {
+                Text("完整请求及日志内图片将被删除；其他详情保留。")
+            }
             .task(id: turn.decisionMetadata?.catalogJSON) {
                 guard let source = turn.decisionMetadata?.catalogJSON, source != catalogSource else { return }
                 catalog = nil
@@ -714,7 +738,9 @@ import Foundation
 
         private var taskInformation: some View {
             VStack(alignment: .leading, spacing: 10) {
-                Label("Task", systemImage: "checklist").font(.subheadline.weight(.semibold)).foregroundStyle(.blue)
+                if turn.decisionMetadata == nil && turn.historyTaskID == nil {
+                    Text("Not recorded").foregroundStyle(.secondary)
+                }
                 if let metadata = turn.decisionMetadata {
                     Text(
                         metadata.execution.map { $0 == "foreground" ? "Foreground task" : "Background task" }
@@ -741,7 +767,7 @@ import Foundation
         @ViewBuilder private var functionCatalog: some View {
             HistoryCatalogToggle(isExpanded: $catalogExpanded) {
                 HStack {
-                    Text("Function Catalog")
+                    Text("Actions and Tools")
                     Spacer()
                     if let catalog {
                         Text("\(catalog.actions.count) Actions · \(catalog.tools.count) Tools")
@@ -776,19 +802,39 @@ import Foundation
 
         @ViewBuilder private var skillsInformation: some View {
             if let metadata = turn.decisionMetadata {
-                VStack(alignment: .leading, spacing: 10) {
-                    Label("Skills", systemImage: "square.stack.3d.up")
-                        .font(.subheadline.weight(.semibold)).foregroundStyle(.blue)
+                if metadata.skills.isEmpty {
+                    Text("None").foregroundStyle(.secondary)
+                } else {
                     HistorySkillFlowLayout(spacing: 8) {
                         ForEach(metadata.skills.keys.sorted(), id: \.self) { id in
                             Text("\(id) · v\(metadata.skills[id] ?? 0)")
                                 .font(.caption).textSelection(.enabled)
                                 .padding(.horizontal, 10).padding(.vertical, 6)
-                                .background(.blue.opacity(0.12), in: Capsule())
+                                .background(.purple.opacity(0.12), in: Capsule())
                         }
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Text("Not recorded").foregroundStyle(.secondary)
+            }
+        }
+
+        @ViewBuilder private var statesInformation: some View {
+            if let states = turn.decisionMetadata?.states {
+                if states.isEmpty {
+                    Text("None").foregroundStyle(.secondary)
+                } else {
+                    HistorySkillFlowLayout(spacing: 8) {
+                        ForEach(states, id: \.self) { path in
+                            Text(verbatim: path)
+                                .font(.caption).textSelection(.enabled)
+                                .padding(.horizontal, 10).padding(.vertical, 6)
+                                .background(.orange.opacity(0.12), in: Capsule())
+                        }
+                    }
+                }
+            } else {
+                Text("Not recorded").foregroundStyle(.secondary)
             }
         }
 
@@ -822,7 +868,7 @@ import Foundation
         }
     }
 
-    private struct HistoryCatalogEntryRow: View {
+    struct HistoryCatalogEntryRow: View {
         let entry: HistoryFunctionRegistration
         @State private var isExpanded = false
         @State private var definitionExpanded = false
@@ -915,6 +961,7 @@ import Foundation
         @State private var data: Data?
         @State private var thumbnail: UIImage?
         @State private var failed = false
+        @State private var expired = false
         @State private var loading = true
         @State private var retry = 0
         @State private var inspecting = false
@@ -930,10 +977,14 @@ import Foundation
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("查看发送给模型的图片")
+                    .accessibilityLabel("查看记录中的图片")
                     .accessibilityIdentifier("history.image.\(reference.id)")
                 } else if loading {
                     ProgressView().frame(width: 112, height: 84)
+                } else if expired {
+                    Label("图片已释放", systemImage: "photo")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .frame(width: 112, height: 84)
                 } else if failed {
                     Button("重试图片", systemImage: "arrow.clockwise") { retry += 1 }
                         .frame(width: 112, height: 84)
@@ -943,6 +994,7 @@ import Foundation
             .task(id: "\(turnID):\(reference.id):\(retry)") {
                 loading = true
                 failed = false
+                expired = false
                 do {
                     let bytes = try await controls.imageData(reference.id, for: turnID)
                     try Task.checkCancellation()
@@ -952,6 +1004,9 @@ import Foundation
                     try Task.checkCancellation()
                     data = bytes
                     thumbnail = image
+                } catch HistoryImageAvailabilityError.expired {
+                    guard !Task.isCancelled else { return }
+                    expired = true
                 } catch {
                     guard !Task.isCancelled else { return }
                     failed = true
@@ -1014,4 +1069,22 @@ import Foundation
     }
     private enum HistoryImageDecodeError: Error { case invalidImage }
 
+    /// Protocol message rows shared by Assistant and Writer record details.
+    struct HistoryPromptItems: View {
+        let messages: [HistoryMessage]
+        var body: some View {
+            ForEach(Array(messages.enumerated()), id: \.offset) { _, message in
+                DisclosureGroup(message.role.rawValue) {
+                    selectable(message.displayContent)
+                    if let id = message.toolCallID { selectable("Tool Call ID: " + id) }
+                    ForEach(Array((message.toolCalls ?? []).enumerated()), id: \.offset) { _, call in
+                        selectable("Tool Call: \(call.name) · \(call.id)\n\(call.argumentsJSON)")
+                    }
+                }
+            }
+        }
+        private func selectable(_ text: String) -> some View {
+            Text(verbatim: text).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+        }
+    }
 #endif

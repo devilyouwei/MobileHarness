@@ -826,7 +826,7 @@ extension LiveRuntimeTests {
 
 extension LiveRuntimeTests {
     @Test(.actionCatalog) func deletedHistoryErasesItsOwnedSignalEvidenceAndProtectsActiveWork() async throws {
-        let store = ConversationHistoryStore()
+        let store = AssistantHistoryStore()
         let repository = try AgentContextRepository(
             agent: .assistant, scope: UUID().uuidString, state: AssistantContextState()
         )
@@ -1072,7 +1072,7 @@ private struct ControlAgnosticChatState: AgentChatContextState {
     static let configurationName = "ControlAgnostic"
     static func preprocess(_ input: AgentInput, state: Self) throws -> SignalDisposition { .enqueue(priority: 0) }
     static func systemPrompt(_ capabilities: CapabilityRegistry) throws -> String { "fixture" }
-    var history = ConversationArchive()
+    var history = AssistantArchive()
     var admissionSequence: UInt64 = 0
     var taskViews: [String: AgentTaskView]?
     init() {}

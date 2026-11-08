@@ -127,7 +127,7 @@ Action 正文含原轮次 call 序号、当前 action 别名、真实 status 与
 
 历史按单调 historyOrder 排序，完整 native 配对一起保留；failed/interrupted/unresolved 请求只作为文本历史证据。终态 Task 在首个来源位置替换为摘要，运行 Task/普通背景仍在窗口内，原记录可查询。选取最近十个投影块，再应用消息/字节/图片限制。
 
-用户文本接纳在历史仓库单次原子操作中选择当前会话并建立 awaitingModel 记录；模型请求校验精确快照 token。Task 创建先验证候选、提交业务身份，再绑定运行时上下文，绑定失败显式关闭该身份。完整模型消息、观察和终态按各自边界 checkpoint；delta 和队列在内存。持久化失败阻止依赖后续步骤，不把本地投影当作已落盘。真实数据库访问通过注入 Chat/Task 仓库，重启不重放效果。
+用户文本接纳在历史仓库单次原子操作中选择当前会话并建立 awaitingModel 记录；模型请求校验精确快照 token。Task 创建先验证候选、提交业务身份，再绑定运行时上下文，绑定失败显式关闭该身份。完整模型消息、观察和终态按各自边界 checkpoint；delta 和队列在内存。持久化失败阻止依赖后续步骤，不把本地投影当作已落盘。真实数据库访问通过注入 AssistantHistoryStore、前台任务仓库与独立通信端口，重启不重放效果。
 
 ## Bounds and overflow
 
@@ -197,7 +197,7 @@ residentContext() exposes only the repository’s initialized committed in-memor
 
 
 
-Task 控制的默认 XML Action startTask 通过 execution=foreground/background 分流；后台 executor=writer 支持单任务委托，sendMessage 仅补充输入，cancelTask(taskID) 请求取消。前台只接受 goal/skills/execution，后台不经过前台 Skill 状态转移。委托不创建前台 Task，独立任务没有前台 parent；短目标与当前真实输入进入 Writer。通知不能修改不属于它的前台 Task，也不进入该 Task 的历史压缩来源。
+Task 控制通过 task.start/end 管理 Assistant 前台 scope，task.delegate(agent_id,description) 发送独立请求；task.send/cancel 带 agent_id 时发送消息，不带时作用于前台。目标自主选择 task/workspace，外部不提供 taskID。连续 start 排空旧 scope 副作用并取消旧任务后建立新任务；等待用户仍保留活跃 scope。
 
 Writer started/progress events update durable control facts and one latest pending summary. Only admitted summaries, userInput and terminal reports enter the common 32-item FIFO with final speech/text. Duplicate sequences do not trigger another reply. Summary admission waits for current playback and peer replies; terminal reports keep their independent persistent delivery. Reports never import private source-dialog context or restart Writer.
 
@@ -230,15 +230,11 @@ ChatDriver scopes request consumption with InferenceSession.withCleanup, joining
 
 Assistant在receive控制路径接纳新的speech.phase(speaking)时发布独立的clearReply内部Action，不经模型生成、正式输入FIFO或当前round调用登记。会话／source incarnation／turn去重有32会话上限，关闭会话删除标记。begunInputID绑定当前回复请求并作为清理目标传出，避免迟到clear删除新请求或旧请求继续打开已退休字幕。正式ASR final、用户文本及Writer消息的FIFO不变。
 
-Background startTask persists an Assistant-generated UUID delegation request without precreating the executor task. Acceptance returns the executor-owned task_N through the trusted repository binding. Writer event model input contains Agent/task/window/goal/stage facts, not delegate/event/interaction UUIDs. sendMessage and background cancelTask require executor + taskID; the runtime resolves the current delegation and, for answers, validates the question captured for that Assistant input.
+Background task.delegate persists a request in agent_messages without creating a target task. Assistant reconciles authenticated communication facts; Writer owns its private task and workspace. Task send/cancel resolve agent_id to the active communication, with pending-question matching for answers. No caller-supplied task/workspace selection is accepted.
 
 ## Model request recording
 
-Agents owns AgentModelRequestRecording over existing ChatRequest/ChatEvent values. Complete submitted
-messages, tools, sampling parameters, context identity and all exposed response events are persisted in
-model_request_log alongside actual model identity, timing, errors and local tool outcomes. ModelKit has
-no history/audit interface or storage hooks. Raw HTTP/SSE and unexposed adapter options or reasoning
-are outside this record; normalized events are never presented as raw provider bodies.
+Agents 的 AgentModelRequestRecording 将 ModelKit 中立 HTTP 采集回调桥接到共享 model_request_log，记录实际请求、响应/SSE、图片和 generation meta。非 HTTP 调用标 local。业务输入、回复和工具结果分别在 assistant_messages / writer_messages；清日志不会删除业务消息，图片与生成信息随日志删除。后续采集仅 UPDATE，不重建已清除日志。
 
 Assistant reply-activity snapshots retain the latest admitted final-speech acknowledgment for the
 interaction session. Later text, Writer, task-feedback and terminal publications carry that same root;
@@ -248,3 +244,18 @@ Occupancy and explicit listening consent remain independent; no task waiting sta
 restart or bypasses playback drain.
 
 内部执行与模型观察按每次调用的modelGenerated来源分开，不能根据internalActions/internalTools目录或路径推测。AgentGenerator将代码的自然文本展开标记为runtimeAction；显式模型Action、Tool及解析拒绝保持模型来源。字幕/播放/等待态可加入本轮执行屏障和历史留证，但内部值、失败、异常不进入ReACT观察，也不触发续轮；内部执行失败由worker按运行失败处理。未关联的Tool反馈拒绝，不作为新输入启动推理。共享Chat提供等待事实回调，角色决定展示文案和调用。
+
+## Request-only State images
+
+Each executeRound reads a fresh typed snapshot selected by effective Skills. AgentChatContextBuilder merges selected images into the original current user input, preserving its text and any existing attachments, including XML Action and native Tool continuations. No image-only user message is added. The system State image manifest maps one-based image positions in that input to ID/source/MIME/dimensions/byte count; image data remains untrusted. Unsupported delivery is explicit in that system manifest and adds no image bytes. Missing current input, ambiguous identities or an oversized current attachment set fail explicitly. Native call/result groups remain contiguous. Attachments do not enter the retained ReACT/history base, preventing accumulation. Current intent/results/images are protected during trimming. Driver records actual submitted images in the independent full log; retained conversation context stays lightweight. Web observations retain their independent behavior.
+
+The request-only system State message extends the protected suffix before context trimming, preserving the current complete Action/tool result group and the current user intent alongside selected images. If these protected values alone exceed the request budget, assembly fails explicitly.
+
+Private resourceBindings from each typed snapshot accompany OutputEnvelope and ActionExecutionContext; they are not serialized into model State. ContextImage.resourceScope also travels through separate imageScopes into initial lightweight references. Provider ChatImage/manifest keeps only short IDs; new full-history reads use logged bytes independently of cache scope. Each round replaces bindings rather than retaining another session.
+
+Database 根目录拥有连接、schema 装配与生命周期；Shared 只保存编码、ID 与分页机制。Assistant 和 Writer 分别拥有消息/任务接口、历史 DTO、窗口及 SQL 实现。日志和 Agent 通信通过独立共享端口注入，不经统一 Chat/Task 门面。详见 [Database](../../../Storage/Database/README.md)。
+每轮 Assistant 模型请求记录实际传给 multimodalSnapshot 的 State 路径到 AssistantDecisionMetadata.states，与请求时的 Task/Skill/Catalog 快照一起保存。状态内容仍只进入完整请求日志，不把图片或事实副本放入业务元数据；历史展示不读取当前 State 来重建旧选择。
+
+## 公开能力目录与实例权限
+
+AgentChatContextState 的 systemPrompt(capabilities,skills,communication) 接收当前实例 communicationPolicy；初始请求与 executeRound 每轮重建两处装配路径都显式传入。Assistant 通过该入口组合自己的身份、Core 协议、Skill 目录/教学、有效函数及权限过滤后的 Agent 自有公开介绍。默认协议实现兼容不使用该目录的状态类型。两参数便利入口使用角色默认配置；真实请求不通过该入口绕过权限收窄。

@@ -95,7 +95,7 @@ flowchart LR
 
 ## 请求、事实与跟踪
 
-`PhotographerUI.swift` 在 start 建立请求与事实消费，按真实 Camera Tool 结果推进 open/close/flip/retry/save/ignore。回执在原生结果及角色终态完成后结束，媒体处理使用真实 mediaID；取消加入调用后 retire 状态。事实不通过 camera.state Signal 镜像；相机上下文在模型请求时读取所属容器快照。
+`PhotographerUI.swift` 在 start 建立请求与事实消费，按真实 Camera Tool 结果推进 open/close/flip/retry/save/ignore。回执在原生结果及角色终态完成后结束，照片处置使用真实 previewID，保存回执另含持久 mediaID；取消加入调用后 retire 状态。事实不通过 camera.state Signal 镜像；相机上下文在模型请求时读取所属容器快照。
 
 Assistant 的 photography Skill 可以直接调用 Camera Actions，不必须委派 Photographer Task。跟踪另行消费 VisionPerception 的 `vision.pose`：前台、连接与准入满足且姿态新鲜才发内部 aim。输出使用 PlatformKit 的位置更新建议间隔 50 ms，最多 20 Hz（实际受姿态产出频率限制）；滤波采用按观测时间计算的 120 ms 时间常数，积分使用实际目标间隔且至多 0.2 秒，画面中心立即停止累加，重复/倒退时间不推进。角色保留画面死区、构图窗口和追随增益，提供 base/pitch 目标；这些是摄影策略，设备编码器范围、运行参数和通信上限由 PlatformKit 拥有，Actions/NexArm 编译有限位置包。角色不转换速度方向位、不切换舵机模式。资源冲突与执行生命周期仍归 Actions/NexArm；设备位置模式为运行前提，软件限位不等于硬件保护。
 
@@ -134,3 +134,7 @@ CameraInput maps to a bounded PhotographerCameraIntent containing optional compl
 ## 自有摄影岛
 
 Photographer在既有camera.observeFacts输入中选择倒计时、照片处理、录像和待处置内容，以自身Gateway身份调用内部Island工具。没有独立的跨角色UI观察器；具体内容在PhotographerUI，通用发布/重试机制在Support。暂停输入撤下活动；停止在权限退休前加入最终end，presentationFailure在角色和容器runtime可查。相机窗口、保存/忽略退场及提示音仍是Camera Action事务的一部分，实际执行回执不由展示推断。
+
+Photo disposition intents carry previewID. UI and model captures share Camera-owned preview State without Assistant delegation. Persistent savedMediaID is separate. Disposing of an older cached image does not change another image currently displayed by UI.
+
+UI camera requests capture previewSession before admission. Photographer attaches it to the internal Tool envelope for Camera validation, preserving the user-owned result flow without model feedback. Gallery byte reads remain a typed Camera-owned read capability; browsing is not a model input.

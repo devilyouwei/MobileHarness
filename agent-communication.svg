@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="840" height="350" viewBox="0 0 840 350" role="img" aria-labelledby="title description">
+  <title id="title">Multi-Agent communication: Assistant and Writer</title>
+  <desc id="description">Assistant and Writer are independent Agents communicating through Gateway. Assistant delegates a goal and sends follow-up input. Writer owns its creation workflow and workspace, returning progress, questions and completion or failure through Gateway. Assistant retains the user conversation and its own foreground task. Acceptance of a delegation is separate from completion.</desc>
+  <defs>
+    <marker id="request" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7470a3"/>
+    </marker>
+    <marker id="reply" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#54816a"/>
+    </marker>
+  </defs>
+  <rect width="840" height="350" rx="16" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="24" y="24" width="212" height="100" rx="20" fill="#ede9fe" stroke="#a397c6"/>
+    <rect x="324" y="24" width="192" height="100" rx="20" fill="#ffedd5" stroke="#c7a17b"/>
+    <rect x="604" y="24" width="212" height="100" rx="20" fill="#dcfce7" stroke="#80af94"/>
+  </g>
+  <g fill="none" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="4 5">
+    <path d="M 130 124 V 286"/>
+    <path d="M 420 124 V 286"/>
+    <path d="M 710 124 V 286"/>
+  </g>
+  <g fill="none" stroke="#7470a3" stroke-width="2" marker-end="url(#request)">
+    <path d="M 130 180 H 420"/>
+    <path d="M 432 180 H 710"/>
+  </g>
+  <g fill="none" stroke="#54816a" stroke-width="2" marker-end="url(#reply)">
+    <path d="M 710 254 H 420"/>
+    <path d="M 408 254 H 130"/>
+  </g>
+  <g font-family="-apple-system, BlinkMacSystemFont, sans-serif" text-anchor="middle" dominant-baseline="middle">
+    <g fill="#1e293b" font-size="21" font-weight="600">
+      <text x="130" y="52">Assistant</text>
+      <text x="420" y="52">Gateway</text>
+      <text x="710" y="52">Writer</text>
+    </g>
+    <g fill="#475569" font-size="14">
+      <text x="130" y="82">User conversation</text>
+      <text x="130" y="104">Own foreground task</text>
+      <text x="420" y="82">Route messages</text>
+      <text x="420" y="104">Between bound Agents</text>
+      <text x="710" y="82">Creation workflow</text>
+      <text x="710" y="104">Own workspace + context</text>
+      <text x="420" y="314">Delegation acceptance and task completion are separate outcomes.</text>
+    </g>
+    <g font-size="16" font-weight="500">
+      <text x="420" y="158" fill="#595580">Delegate a goal · Send follow-up input</text>
+      <text x="420" y="232" fill="#426b55">Progress · Questions · Completion or failure</text>
+    </g>
+  </g>
+</svg>

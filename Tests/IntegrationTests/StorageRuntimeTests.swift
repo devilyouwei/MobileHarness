@@ -40,7 +40,7 @@ private func waitForStorageClosed(_ storage: SQLiteDatabaseStorage) async throws
             for _ in 0..<8 {
                 group.addTask {
                     try await storage.start()
-                    return try storage.repositories().tasks.storageScope
+                    return try storage.repositories().writerExecutions.storageScope
                 }
             }
             var scopes = Set<UUID>()
@@ -59,12 +59,13 @@ private func waitForStorageClosed(_ storage: SQLiteDatabaseStorage) async throws
         await #expect(throws: RecordStorageError.closed) { try await storage.start() }
         await #expect(throws: RecordStorageError.closed) { try await repositories.devices.nativeDevice(device) }
         await #expect(throws: RecordStorageError.closed) {
-            try await repositories.tasks.createTask(dialog: nil, agent: "fixture", goal: "late")
+            try await repositories.assistantTasks.createTask(dialog: "dialog_1", agent: "assistant", goal: "late")
         }
         let replacement = SQLiteDatabaseFactory.make(databaseURL: url)
         try await replacement.start()
         #expect(try await replacement.repositories().devices.nativeDevice(device) == "fixture")
-        #expect(try replacement.repositories().tasks.storageScope != repositories.tasks.storageScope)
+        #expect(
+            try replacement.repositories().writerExecutions.storageScope != repositories.writerExecutions.storageScope)
         try await replacement.stop()
     }
 
@@ -74,21 +75,21 @@ private func waitForStorageClosed(_ storage: SQLiteDatabaseStorage) async throws
         defer { try? FileManager.default.removeItem(at: root) }
         let url = root.appendingPathComponent("records.sqlite")
         let seed = try SQLiteRepositories(url: url)
-        let dialog = try await seed.chat.current(agent: "fixture")
-        let task = try await seed.tasks.createTask(dialog: dialog.id, agent: "fixture", goal: "interrupted")
-        let identity = MessageIdentity(
+        let dialog = try await seed.assistantConversations.current()
+        let task = try await seed.assistantTasks.createTask(dialog: dialog.id, agent: "assistant", goal: "interrupted")
+        let identity = AssistantMessageIdentity(
             clientID: "old-response", inputID: "old-input", role: "assistant", kind: "response", order: 1,
             date: Date(), taskID: task)
-        let id = try seed.chat.beginMessage(dialog: dialog.id, identity: identity)
+        let id = try seed.assistantMessages.beginMessage(dialog: dialog.id, identity: identity)
         try await seed.shutdown()
         let storage = SQLiteDatabaseFactory.make(databaseURL: url)
         try await storage.start()
-        let chat = try storage.repositories().chat
+        let chat = try storage.repositories().assistantMessages
         let message = try #require(try await chat.messages(dialog: dialog.id, after: nil).first)
         #expect(message.id == id && message.state == "interrupted")
-        let data = try #require(try await chat.compressionData(dialog: dialog.id).first)
-        let compression = try JSONDecoder().decode(ConversationTaskCompression.self, from: data)
-        #expect(compression.taskID == task && compression.status == .interrupted)
+        let data = try await storage.repositories().assistantTasks.compressionData(dialog: dialog.id)
+        #expect(data.isEmpty)
+        #expect(try await storage.repositories().assistantTasks.taskSources(task).map(\.requestID) == ["old-response"])
         let live = try await chat.beginMessage(
             dialog: dialog.id,
             identity: .init(
@@ -238,8 +239,9 @@ private func waitForStorageClosed(_ storage: SQLiteDatabaseStorage) async throws
             .init(
                 id: "consumer", dependencies: ["storage"], start: { throw StorageRuntimeFixtureError.consumer },
                 stop: {
-                    cleanupTask = try await storage.repositories().tasks.createTask(
-                        dialog: nil, agent: "fixture", goal: "cleanup")
+                    cleanupTask = try await storage.repositories().assistantTasks.createTask(
+                        dialog: try await storage.repositories().assistantConversations.current().id,
+                        agent: "assistant", goal: "cleanup")
                 }),
         ])
         do {

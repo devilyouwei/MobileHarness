@@ -1,32 +1,18 @@
-# The Design of MobileHarness
+# MobileHarness Technical Design
 
-This document has three parts: **Overall Architecture** explains the core biomimetic design philosophy, the framework and its architectural boundaries; **Module Design** describes module responsibilities, interfaces and relationships; **Key Workflows** explains the principal workflows, usually spanning multiple modules. Detailed implementation design belongs in the owning module and nested directory READMEs.
+This document has three parts:
 
-1. [Part I — Overall Architecture](#part-i--overall-architecture)
-2. [Part II — Module Design](#part-ii--module-responsibilities)
-3. [Part III — Key Workflows](#part-iii--cross-module-technical-design)
+1. [Part I — Architecture](#part-i--architecture) — Explains the biomimetic design philosophy, framework and architectural boundaries.
+2. [Part II — Module Design](#part-ii--module-responsibilities) — Describes module responsibilities, interfaces and relationships.
+3. [Part III — Key Workflows](#part-iii--cross-module-technical-design) — Explains the principal workflows across modules.
 
-All technical documentation under `MobileHarness/`, including this document and module and nested directory documentation, describes implemented designs only. Requirements, proposed designs, implementation plans, outstanding work and validation evidence belong in [docs](../docs/README.md). Implementation status markers are not used in these technical documents.
-
-<a id="part-i--overall-architecture"></a>
+Detailed implementation design belongs in the owning module and nested directory READMEs.
 
 ## Part I — Architecture
 
 ### 1. Biomimetic design
 
-MobileHarness draws on the perception–cognition–action feedback loop: it observes its environment, interprets information, coordinates behavior, acts through available capabilities and uses the observed outcomes to inform subsequent decisions. This biomimetic idea guides the separation of responsibilities and the flow of feedback across the system.
-
-**Agents provide perception and cognition.** Perception roles process native audio, visual observations and other typed inputs into meaningful information. Cognitive roles interpret observations and intent, maintain goals and context, select behavior and coordinate specialized roles. Agents own role policy and Skill/Task scope. They use deterministic processing or model inference as needed; ModelKit supplies inference as a capability within this cognitive process.
-
-**Gateway provides nervous-system coordination.** It relays Agent messages and execution feedback, validates transport identity and admission, and coordinates scheduling and shared resources. It connects decisions to execution while preserving the identity and lifecycle of each request. Business goals and role policy belong to Agents; business operations belong to Actions.
-
-**Actions provide business execution.** Like the effector side of the loop, they turn admitted requests into operations through the available capabilities. They validate business inputs and preconditions, perform the operation and report its actual completion or failure. These outcomes feed back through Gateway so cognition can decide what to do next.
-
-**Four independent foundations supply the underlying capabilities.** UI supports interaction and expression; PlatformKit connects native sensors, devices and operating-system services; ModelKit supplies inference; Storage provides temporary and durable data facilities. Each foundation owns reusable mechanisms and exposes public interfaces; Agents and Actions compose those capabilities for a particular goal.
-
-**App assembles the system and governs its lifetime.** It constructs the module roots, injects their interfaces and orders startup, foreground transitions, shutdown and replacement. Long-running work belongs to explicit module owners, with cancellation and cleanup governed by their lifecycle contracts independently of individual pages.
-
-Agents receive three classes of **Signal**: external world and screen IO, internal Agent-to-Agent messages, and Action execution feedback. External inputs use injected subscriptions/request ports; internal communication and execution feedback use Gateway coordination. Agents process these Signals and produce messages or authorized execution requests, forming the perception–cognition–action loop. The [Signal flow](#native-input-and-internal-signals) defines the three input paths and their ownership.
+MobileHarness follows a **perception–cognition–action feedback loop**: observations inform decisions, decisions lead to actions, and observed outcomes inform subsequent decisions. This design **separates understanding a goal from carrying it out**, with coordination connecting the two. **Completion and failure feed back into cognition** so subsequent decisions reflect what actually happened.
 
 ### 2. Framework
 
@@ -74,21 +60,13 @@ flowchart TB
     linkStyle 8 stroke:#3985a4,stroke-width:1.5px
 ```
 
-**Reading the diagram.** Modules retain the same colors throughout this document: blue for App, purple for Agents, amber for Gateway, rose for Actions, cyan for UI, green for PlatformKit, indigo for ModelKit and sand for Storage. Outer frames group the application host, coordinated behavior and independent foundations.
+**App constructs the module roots**, connects their public interfaces through **dependency injection** and coordinates startup, foreground transitions, shutdown and replacement. **Each module owns its internal services and long-running work**; cancellation and cleanup follow that owner's lifecycle independently of individual pages.
 
-| Runtime relationship | Line convention |
-| --- | --- |
-| Composition and lifecycle | Long-dashed gray arrow |
-| Local requests and native observations | Thin blue solid arrow |
-| Cognitive capability and data access | Thin indigo solid arrow |
-| Execution requests and capability operations | Thick amber solid arrow |
-| Execution outcomes and delivered communication | Dotted green arrow |
+**UI requests and native observations enter the responsible Agents directly**. **Perception roles** process audio, images and device observations; **cognitive roles** interpret intent, maintain goals and context, manage **Skill/Task scope** and coordinate specialized roles. Agents use deterministic processing or model inference to decide which operations to request.
 
-Across the workflow figures, thin blue arrows carry requests or observations, thick amber arrows invoke execution/capabilities, dotted green arrows return outcomes, and long-dashed gray arrows control lifecycle. Indigo arrows describe model/context data. Sequence figures use solid requests and dashed returns, with colored participant frames defining ownership. The dependency figure in Part II uses its own explicit import convention.
+**Gateway delivers Agent messages**, validates identity and admission, and coordinates execution permissions, scheduling and shared resources. **Actions validates business inputs and preconditions**, performs the admitted operations and returns completion or failure through Gateway to the requesting Agent. **Request identity is preserved through execution and feedback** so the Agent can relate each outcome to its goal and decide what to do next.
 
-The figure shows runtime relationships. Lifecycle arrows to a frame apply to its module roots. Capability arrows to the foundation frame select only the interfaces needed by that consumer; its return input arrow represents UI requests and native observations, not traffic from every foundation. App owns module-root lifetime; the IoC section in Part II defines container ownership and injected interfaces, and Part III defines startup and shutdown order.
-
-The nervous-system analogy describes coordination, not a universal data funnel. Local UI requests and native observations reach their responsible Agents directly. Gateway carries Agent communication and governs executable output and feedback; raw sensor streams do not need to travel through it. Local presentation mechanics remain within UI.
+Agents and Actions use **four independent foundations** through injected capabilities: **ModelKit runs inference**, **Storage provides temporary and durable data facilities**, **PlatformKit supplies native device and operating-system access**, and **UI handles interaction and presentation**. Local rendering stays within UI; each foundation exposes reusable mechanisms that the business modules compose for a particular goal.
 
 ### 3. Principles
 
@@ -134,17 +112,17 @@ MobileHarness/
 └── Resources/     # Packaged declarations, configuration and assets
 ```
 
-| Logical group | Owning directory | Module responsibility | Direct relationships |
-| --- | --- | --- | --- |
-| Lifecycle host | [App](App/README.md) | Construct scoped roots, connect public interfaces and coordinate application lifetime. | Receives OS lifecycle events; assembles module roots and invokes their public lifecycle interfaces. |
-| Cognition | [Agents](Agents/README.md) | Interpret inputs, own goals and private context, select behavior and coordinate roles. | Consumes required foundation capabilities; submits messages and output to Gateway; receives read-only catalog metadata and App-bound host ports through neutral contracts. |
-| Communication and execution mediation | [Gateway](Gateway/README.md) | Own an App-scoped GatewayContainer for neutral endpoint communication, admission, scheduling, resources and correlated feedback. | Receives canonical calls and opaque endpoint messages; invokes ActionsContainer through its injected neutral preparation/execution port. |
-| Business execution | [Actions](Actions/README.md) | Implement callable domain operations, validate execution preconditions and report actual outcomes. | Receives authorized invocations; uses required foundation capabilities and explicit domain ports. |
-| Foundation | [UI](UI/README.md) | Own typed interaction requests, presentation state, rendering and display receipts. | Exposes public request sources and presentation capabilities to injected consumers. |
-| Foundation | [PlatformKit](PlatformKit/README.md) | Own native I/O, platform permissions, device transport and native observations. | Exposes native operations and factual observations through its own interfaces. |
-| Foundation | [ModelKit](ModelKit/README.md) | Own inference, provider integration and model/artifact lifecycle. | Exposes typed model capabilities and SDK-owned integration ports. |
-| Foundation | [Storage](Storage/README.md) | Own bounded temporary data, controlled files and durable domain repositories. | Exposes storage contracts and commit results without interpreting application policy. |
-| Packaged definitions | [Resources](Resources/README.md) | Organize declarative Agent/Skill configuration, model metadata, privacy declarations and assets. | Build tooling packages declarations; owning runtime modules validate and interpret them. |
+| Logical group                         | Owning directory                     | Module responsibility                                                                                                            | Direct relationships                                                                                                                                                       |
+| ------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lifecycle host                        | [App](App/README.md)                 | Construct scoped roots, connect public interfaces and coordinate application lifetime.                                           | Receives OS lifecycle events; assembles module roots and invokes their public lifecycle interfaces.                                                                        |
+| Cognition                             | [Agents](Agents/README.md)           | Interpret inputs, own goals and private context, select behavior and coordinate roles.                                           | Consumes required foundation capabilities; submits messages and output to Gateway; receives read-only catalog metadata and App-bound host ports through neutral contracts. |
+| Communication and execution mediation | [Gateway](Gateway/README.md)         | Own an App-scoped GatewayContainer for neutral endpoint communication, admission, scheduling, resources and correlated feedback. | Receives canonical calls and opaque endpoint messages; invokes ActionsContainer through its injected neutral preparation/execution port.                                   |
+| Business execution                    | [Actions](Actions/README.md)         | Implement callable domain operations, validate execution preconditions and report actual outcomes.                               | Receives authorized invocations; uses required foundation capabilities and explicit domain ports.                                                                          |
+| Foundation                            | [UI](UI/README.md)                   | Own typed interaction requests, presentation state, rendering and display receipts.                                              | Exposes public request sources and presentation capabilities to injected consumers.                                                                                        |
+| Foundation                            | [PlatformKit](PlatformKit/README.md) | Own native I/O, platform permissions, device transport and native observations.                                                  | Exposes native operations and factual observations through its own interfaces.                                                                                             |
+| Foundation                            | [ModelKit](ModelKit/README.md)       | Own inference, provider integration and model/artifact lifecycle.                                                                | Exposes typed model capabilities and SDK-owned integration ports.                                                                                                          |
+| Foundation                            | [Storage](Storage/README.md)         | Own bounded temporary data, controlled files and durable domain repositories.                                                    | Exposes storage contracts and commit results without interpreting application policy.                                                                                      |
+| Packaged definitions                  | [Resources](Resources/README.md)     | Organize declarative Agent/Skill configuration, model metadata, privacy declarations and assets.                                 | Build tooling packages declarations; owning runtime modules validate and interpret them.                                                                                   |
 
 Resources is a packaging owner rather than an executable service. At repository level, [Package.swift](../Package.swift) and the Xcode project define build units; `Config/`, `Tests/` and `scripts/` own build configuration, automated coverage and developer checks respectively. [docs](../docs/README.md) owns requirements and evidence. Internal directory maps remain in the linked READMEs.
 
@@ -240,15 +218,15 @@ Inversion of Control (IoC) separates dependency assembly from capability use. Ap
 
 **Module containers are capability and lifecycle owners.** They expose related capabilities and retain their internal services. They are not additional FactoryKit registries. Child containers belong to their module root; App's convenience factories project those existing instances rather than constructing independent copies.
 
-| App-owned module root | Containerized capabilities within the root |
-| --- | --- |
-| AgentContainer | Assistant, ApplicationControl, Memory, Photographer, SpeechPerception, SpeechSynthesis and VisionPerception role containers |
-| GatewayContainer | Bound communication endpoints, scheduling, resources and correlated feedback services |
-| ActionsContainer | Function catalogs, validation and execution services; business domains and individual functions remain library declarations without separate containers |
-| UIContainer | Home, Camera, Settings, ModelResources, Navigation, Album, History, Devices and Diagnostics containers |
-| PlatformContainer | AudioContainer, VisionContainer and ConnectivityContainer |
-| ModelContainer | ModelLanguageContainer, ModelSpeechContainer, ModelVisionContainer and ModelArtifactsContainer |
-| StorageContainer | CacheContainer, FilesContainer and the injected DatabaseStorage backend interface |
+| App-owned module root | Containerized capabilities within the root                                                                                                              |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AgentContainer        | Assistant, ApplicationControl, Memory, Photographer, SpeechPerception, SpeechSynthesis and VisionPerception role containers                             |
+| GatewayContainer      | Bound communication endpoints, scheduling, resources and correlated feedback services                                                                   |
+| ActionsContainer      | Function catalogs, validation and execution services; business domains and individual functions remain library declarations without separate containers |
+| UIContainer           | Home, Camera, Settings, ModelResources, Navigation, Album, History, Devices and Diagnostics containers                                                  |
+| PlatformContainer     | AudioContainer, VisionContainer and ConnectivityContainer                                                                                               |
+| ModelContainer        | ModelLanguageContainer, ModelSpeechContainer, ModelVisionContainer and ModelArtifactsContainer                                                          |
+| StorageContainer      | CacheContainer, FilesContainer and the injected DatabaseStorage backend interface                                                                       |
 
 The table describes ownership; module READMEs define child interfaces and internal lifecycle. ContainerFailureChannel, executionBindings and ForegroundPreparation are supporting lifecycle services, not additional module roots.
 
@@ -308,17 +286,17 @@ Agents uses Gateway communication and scheduling ports; Gateway invokes the neut
 
 The following rules are normative placement and review criteria. A new feature must have one explicit policy owner and one explicit execution owner; the same concern must not acquire competing implementations across modules.
 
-| Module | Required development rules | Excluded responsibilities |
-| --- | --- | --- |
-| **App** | Create and retain scoped roots; inject narrow public interfaces; select application backends; order startup and joined shutdown; complete old-owner cleanup before replacement. Keep dependency registration in the composition scope. | Intent interpretation, business request consumption, per-frame forwarding, domain data conversion and per-function business registration. |
-| **Agents** | Keep input interpretation, private goal/context state and role policy with the responsible role. Consume local typed inputs directly; use models only when needed. Submit executable output and role communication through bound Gateway interfaces. Own subscriptions and decision work independently of pages. | Native device implementations, duplicated Action logic, direct business-effect bypasses, global root lookup and access to another role's private state. |
-| **Gateway** | Let App configure, start and stop the unique scoped root; never tie global Gateway lifetime to a role. Preserve real producer identity and causality; validate endpoint identity, execution scope, envelopes and admission; coordinate routing, ordering, resources, cancellation and result delivery through neutral contracts. Keep scheduling distinct from domain success. | Goal selection, semantic interpretation of observations, model inference, device algorithms, UI policy and raw-media forwarding. |
-| **Actions** | Own canonical business function declarations and implementations. Validate arguments, session/business preconditions and execution permits; use injected public capabilities; return real results and retain partial effects or cleanup failures. Share implementations across supported call protocols. | Agent goals, reasoning loops, transport admission policy, application lifetime and duplicate implementations for different call syntaxes. |
-| **UI** | Enforce foundation isolation. Define UI-owned request values and public presentation interfaces; own local interaction, navigation and rendering state. Distinguish request acceptance, state changes and actual display completion. | Calling or importing Agents, choosing domain policy, loading models, writing business repositories or directly controlling devices. |
-| **PlatformKit** | Enforce foundation isolation. Use public platform APIs; validate capabilities and permissions; own native handles, capture/connection generations, bounded observations and native cleanup. Expose actual platform/device facts and failures. | Agent identity, Task/Skill authorization, business motion policy, inferred device success and model-driven recovery. |
-| **ModelKit** | Enforce foundation isolation. Own typed inference contracts, providers, artifacts and model lifecycle. Keep model-specific processing with its provider and use SDK-owned ports for external facilities. Make selection, readiness, inference and shutdown outcomes explicit. | Application Task/Skill management, conversation policy, capture/playback orchestration, page state and silent provider replacement after execution failure. |
-| **Storage** | Enforce foundation isolation. Own bounded cache leases, controlled file access, repository contracts and backend consistency. Report actual commit and recovery outcomes; keep backend selection in application composition. | Mirrors of other containers’ runtime state, model-context generation, application decisions, automatic device-effect replay and fabricated persistence through undocumented fallback. |
-| **Resources** | Keep Agent/Skill declarations catalog-indexed and validated by Agents; keep model metadata, privacy declarations and assets under their respective packaging contracts. Keep declarations consistent with registered capabilities and preserve reproducible packaging. | Executable business logic, secrets, downloaded model weights, user media and configuration that grants unregistered authority. |
+| Module          | Required development rules                                                                                                                                                                                                                                                                                                                                                     | Excluded responsibilities                                                                                                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **App**         | Create and retain scoped roots; inject narrow public interfaces; select application backends; order startup and joined shutdown; complete old-owner cleanup before replacement. Keep dependency registration in the composition scope.                                                                                                                                         | Intent interpretation, business request consumption, per-frame forwarding, domain data conversion and per-function business registration.                                             |
+| **Agents**      | Keep input interpretation, private goal/context state and role policy with the responsible role. Consume local typed inputs directly; use models only when needed. Submit executable output and role communication through bound Gateway interfaces. Own subscriptions and decision work independently of pages.                                                               | Native device implementations, duplicated Action logic, direct business-effect bypasses, global root lookup and access to another role's private state.                               |
+| **Gateway**     | Let App configure, start and stop the unique scoped root; never tie global Gateway lifetime to a role. Preserve real producer identity and causality; validate endpoint identity, execution scope, envelopes and admission; coordinate routing, ordering, resources, cancellation and result delivery through neutral contracts. Keep scheduling distinct from domain success. | Goal selection, semantic interpretation of observations, model inference, device algorithms, UI policy and raw-media forwarding.                                                      |
+| **Actions**     | Own canonical business function declarations and implementations. Validate arguments, session/business preconditions and execution permits; use injected public capabilities; return real results and retain partial effects or cleanup failures. Share implementations across supported call protocols.                                                                       | Agent goals, reasoning loops, transport admission policy, application lifetime and duplicate implementations for different call syntaxes.                                             |
+| **UI**          | Enforce foundation isolation. Define UI-owned request values and public presentation interfaces; own local interaction, navigation and rendering state. Distinguish request acceptance, state changes and actual display completion.                                                                                                                                           | Calling or importing Agents, choosing domain policy, loading models, writing business repositories or directly controlling devices.                                                   |
+| **PlatformKit** | Enforce foundation isolation. Use public platform APIs; validate capabilities and permissions; own native handles, capture/connection generations, bounded observations and native cleanup. Expose actual platform/device facts and failures.                                                                                                                                  | Agent identity, Task/Skill authorization, business motion policy, inferred device success and model-driven recovery.                                                                  |
+| **ModelKit**    | Enforce foundation isolation. Own typed inference contracts, providers, artifacts and model lifecycle. Keep model-specific processing with its provider and use SDK-owned ports for external facilities. Make selection, readiness, inference and shutdown outcomes explicit.                                                                                                  | Application Task/Skill management, conversation policy, capture/playback orchestration, page state and silent provider replacement after execution failure.                           |
+| **Storage**     | Enforce foundation isolation. Own bounded cache leases, controlled file access, repository contracts and backend consistency. Report actual commit and recovery outcomes; keep backend selection in application composition.                                                                                                                                                   | Mirrors of other containers’ runtime state, model-context generation, application decisions, automatic device-effect replay and fabricated persistence through undocumented fallback. |
+| **Resources**   | Keep Agent/Skill declarations catalog-indexed and validated by Agents; keep model metadata, privacy declarations and assets under their respective packaging contracts. Keep declarations consistent with registered capabilities and preserve reproducible packaging.                                                                                                         | Executable business logic, secrets, downloaded model weights, user media and configuration that grants unregistered authority.                                                        |
 
 A model call, a Skill declaration and an available device are separate facts. Resources may describe a capability, Agents may choose it, Gateway may admit and schedule it, Actions may execute it, and a foundation may supply its mechanism. Each owner must preserve its own boundary rather than infer that another stage guarantees success.
 
@@ -378,12 +356,12 @@ At executionBindings, App sequences **Agents preparation → Actions business/ca
 
 #### Lifecycle
 
-| Transition | Cross-module contract |
-| --- | --- |
-| Initial startup | Wait for an active Scene; validate the static dependency graph before starting services. |
-| Scene hidden / restored | Retain model, platform, UI, Actions, Gateway and Agents roots. Owners stop camera/tracking and foreground device work, detach local rendering, and restore visible capabilities on activation. Voice, inference and admitted business work retain their owners under OS execution and permission limits. |
-| Startup failure / interruption | Invalidate admission, cancel startup, clean the partially started service, then stop started services in reverse order. Preserve primary and cleanup failures. |
-| Root stop / replacement | Invalidate admission, cancel and join startup/scene workers, then stop services in reverse order. Each root joins its owned work; cleanup must complete before scope replacement. |
+| Transition                     | Cross-module contract                                                                                                                                                                                                                                                                                    |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Initial startup                | Wait for an active Scene; validate the static dependency graph before starting services.                                                                                                                                                                                                                 |
+| Scene hidden / restored        | Retain model, platform, UI, Actions, Gateway and Agents roots. Owners stop camera/tracking and foreground device work, detach local rendering, and restore visible capabilities on activation. Voice, inference and admitted business work retain their owners under OS execution and permission limits. |
+| Startup failure / interruption | Invalidate admission, cancel startup, clean the partially started service, then stop started services in reverse order. Preserve primary and cleanup failures.                                                                                                                                           |
+| Root stop / replacement        | Invalidate admission, cancel and join startup/scene workers, then stop services in reverse order. Each root joins its owned work; cleanup must complete before scope replacement.                                                                                                                        |
 
 Shutdown runs **homePreparation → agents → gateway → actions → executionBindings → ui → platform → model → storage → diagnostics**. Execution bindings and cleanup ports remain available until Agents, Gateway and Actions finish draining. Repeated stop requests join the same shutdown; failed cleanup retains the scope and blocks replacement. Reactivation does not replay device effects.
 
@@ -447,7 +425,7 @@ Solid arrows carry the three classes of incoming Signal; dashed arrows carry out
 
 <a id="assistant-agent-delegation"></a>
 
-Assistant owns the user goal and delegation request. The selected executor owns admitted business work, progress, cancellation cleanup and terminal evidence. Background delegation preserves Assistant's foreground Task and Skills.
+Assistant owns the user goal and chooses between peer `task.start` and `task.delegate` entries: start retains its own foreground work; writing, drawing, file changes and saved-work search/open/delete go directly to Writer. An unrelated foreground Task and its Skills may coexist with delegation. The selected executor owns admitted business work, progress, cancellation cleanup and terminal evidence.
 
 ```mermaid
 sequenceDiagram
@@ -457,32 +435,36 @@ sequenceDiagram
     participant H as Agents · Task controller
     participant S as Storage · Task repository
     participant E as Agents · Executor
-    A->>G: startTask(background, executor, goal)
+    A->>G: task.delegate(agent_id, description)
     G->>X: Scheduled Task Action
     X->>H: Validated request through injected port
     H->>H: Check target, contract and permission
-    H->>S: Persist delegation UUID and request
+    H->>S: Persist agent_messages request
     H->>G: Bound task.request
     G->>E: Authenticated delivery
     E->>E: Validate request and capacity
     alt Accepted
-        E->>S: Bind executor-owned task to delegation
+        E->>S: Persist delegation entry and correlate request
         E-->>G: Acceptance
     else Rejected
         E-->>G: Explicit failure
     end
     G-->>H: Admission receipt
-    H-->>X: Task reference or failure
+    H-->>X: Admission receipt or failure
     X-->>G: Action result
     G-->>A: Delegation admission outcome
     opt Accepted delegation
+        E->>E: Resolve goal and select own work target
+        opt Existing work selected by Writer
+            E->>S: Bind selected workspace without moving earlier messages
+        end
         E->>G: Progress / request for input
         G->>H: Correlated task facts
         H-->>A: Control state / receiver-defined reply
         opt User supplement or cancellation
             A->>G: Scheduled supplement or cancellation
             G->>X: Task control Action
-            X->>H: Resolve executor + taskID
+            X->>H: Resolve agent_id and active communication
             H->>G: Bound task.input / task.cancel
             G->>E: Deliver control request
         end
@@ -498,9 +480,9 @@ sequenceDiagram
     end
 ```
 
-Task Actions validate and forward control through injected Agents ports. Independent communication consumers deliver messages while the scheduled Action waits for admission. Public controls use `executor + task_N`; runtime resolves the current delegation and captured question identity. Late events remain fenced to their original execution. Admission, execution cleanup, scope retirement and user reporting have separate completion boundaries.
+Task Actions validate and forward control through injected Agents ports. Independent communication consumers deliver messages while the scheduled Action waits for admission. Public controls use `agent_id`; runtime resolves the current communication and captured question identity. The caller does not allocate the target role’s local task/workspace. Late events remain fenced to their original execution. Admission, execution cleanup, scope retirement and user reporting have separate completion boundaries.
 
-Background targets require a registered business contract and communication permission. Writer is the current public creative executor, and `sendMessage` currently adapts Writer input. Its workspace lifetime, progress coalescing and durable terminal notifications belong to the [Writer contract](Agents/Writer/README.md#委托与主动事件).
+Background targets require a registered business contract and communication permission. Writer is the current public creative executor, and `sendMessage` currently adapts Writer input. There is no Writing Skill or Assistant artifact-library Action. Writer calls Actions' native workspace tools through Gateway: search reads library metadata, open presents saved work, and explicit create initializes an empty directory before subsequent scoped file operations. Its library/workspace domains belong to [Writer](Agents/Writer/README.md#作品库与工作区分域), deterministic file validation/rendering/export to [Artifacts](Actions/Artifacts/README.md), and progress coalescing and durable terminal notifications to the [Writer communication contract](Agents/Writer/README.md#委托与主动事件).
 
 [Assistant delegation](Agents/Assistant/README.md#对其他-agent-的委托) · [Task Actions](Actions/System/Task/README.md) · [Task message values](Agents/Support/Communication/README.md) · [Independent output consumers](Agents/Support/README.md#lifetime-bounds-and-failures)
 
@@ -607,7 +589,7 @@ UI owns geometry, focus, stacking and presentation completion. Camera owns devic
 
 Remote browsing follows Assistant → Gateway → Actions.Web → UI WebKit. Browse, navigation and snapshot receipts retain source-scoped Storage media references for Assistant image analysis; page text and screenshots are untrusted observations. UIContainer keeps the remote browser separate from per-window artifact pages. WindowState owns the cross-creator `window_N` index, and WebPageContainer owns page summaries by window identity. BasicSkill selects `ui.windows`; WebBrowsing selects `ui.web` and exposes scheduled page queries. Observing another Agent's page does not expose its source files or private context.
 
-Local creation follows [Agent delegation](#assistant-agent-delegation) into the creative owner, whose authorized direct tools invoke Actions.Artifacts. Artifacts owns deterministic edits, drafts, immutable publication, preview/export business operations and file/SQL compensation; Storage owns confined files, the shared SQLite workspace catalog and version CAS. App injects these ports without owning the workspace index. Raw source flows through a backpressured content port rather than Assistant's XML protocol or history. The role-specific control/content loop belongs to [Writer](Agents/Writer/README.md).
+Local creation follows [Agent delegation](#assistant-agent-delegation) into the creative owner, whose authorized direct tools invoke Actions.Artifacts. Artifacts owns deterministic edits, drafts, immutable publication, preview/export business operations and file/SQL compensation; Storage owns confined files, the shared SQLite workspace catalog and version CAS. App injects these ports without owning the workspace index. Raw source flows through a backpressured content port rather than Assistant's XML protocol or history. The role-specific control/content loop belongs to [Writer](Agents/Writer/README.md). Writer accepts a goal without caller-assigned task/workspace identity, then searches the SQLite catalog by keyword and explicitly enters, opens or creates a workspace. Entry requests a preview window and switches Writer to a separate system prompt and tool catalog. The control request that entered the workspace retains its original history identity; communication authentication and Assistant foreground tasks do not choose the file target.
 
 Writer and Assistant share Gateway coordination without sharing a role workflow. Writer start/edit/preview/render/finish commands use Gateway direct execution; edit completion creates a stream, while host-bound append/complete/abort continue that admitted edit under its delegate/stream identity. File completion is distinct from task completion. Writer cancellation or root suspension revokes ordinary continuation admission and joins model/preview work plus Actions release before terminal reporting or resumption. Actions independently joins its tracked effects and editors on root shutdown. Per-chunk data does not create synthetic Gateway calls; details and capacity belong to [Artifacts](Actions/Artifacts/README.md#执行与续写生命周期).
 
@@ -679,7 +661,7 @@ Manual navigation uses App-injected callbacks and AgentContainer forwarding with
 
 UI owns NavigationStack and path generations. A path change enters transitioning; a matching visible-page acknowledgment settles it. Settled does not mean data, animation or GPU completion. Details, object IDs, pickers and confirmation sheets remain distinct from the top-level path. Stale callbacks cannot overwrite the current detail.
 
-Face remains a persistent sibling of navigation. WindowHost overlays only the retained home surface, below NavigationStack and the local Island. Navigation pages cover the home windows: UIContainer synchronously projects home visibility into window visibility while retaining window identity. The root-owned local Island stays above all pages in one scene overlay, retaining live updates, status-bar presentation and interactive expansion preferences across navigation. Settings/history/album preserve Face rendering and listening; the Camera window lifecycle controls capture independently of navigation. Minimize hides window rendering while retaining capture/recording demand; restore confirms current readiness; background clears capture intent and foreground requires an explicit reopen. `useStates` supplies page facts to subsequent decisions; execution checks live conditions. See [UI](UI/README.md) and [navigation](Actions/UI/Navigation/README.md).
+Face remains a persistent sibling of navigation. WindowHost overlays only the retained home surface, below NavigationStack and the local Island. Navigation pages cover the home windows: UIContainer synchronously projects home visibility into window visibility while retaining window identity. The root-owned local Island stays above all pages in one scene overlay, retaining live updates, status-bar presentation and interactive expansion preferences across navigation. Writer record queries return explicit next-page cursors through UI-owned DTOs; Writer determines pagination from bounded Storage lookahead, while UI retains loaded pages across child navigation. See [Writer records](UI/Settings/README.md#writer-记录与作品). Settings/history/album preserve Face rendering and listening; the Camera window lifecycle controls capture independently of navigation. Minimize hides window rendering while retaining capture/recording demand; restore confirms current readiness; background clears capture intent and foreground requires an explicit reopen. `useStates` supplies page facts to subsequent decisions; execution checks live conditions. See [UI](UI/README.md) and [navigation](Actions/UI/Navigation/README.md).
 
 ### 5. Skill composition, Task and model context
 
@@ -740,16 +722,20 @@ Skill v3 selects function bindings with `useActions`, read capabilities with `us
 
 The model receives two different kinds of system content:
 
-| Request content | Source and meaning |
-| --- | --- |
-| Instruction/catalog prefix | Role identity and protocol, available Skill overview, loaded Skill teaching and effective function metadata. Available Skills describe choices; only the effective catalog permits current calls. The prefix changes when its selected Skills/catalog change. |
-| AGENT CONTEXT | The same private snapshot's current loaded Skill IDs and matching active Task's goal/status. No matching Task produces `task: null`; this is not a dump of task records, grants, input bindings or retention counters. |
-| CURRENT STATE | Fresh owner-defined facts selected by the loaded Skills' `useStates`, sampled separately through read-only capabilities. These are data, not instructions or execution permits. |
-| History, feedback and latest input | Bounded conversation evidence, real Action/Tool outcomes and current user input or continuation observation. Current Task evidence remains in the history window; terminal Task history can be projected as a summary. |
+| Request content                    | Source and meaning                                                                                                                                                                                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Instruction/catalog prefix         | Role identity and protocol, available Skill overview, loaded Skill teaching and effective function metadata. Available Skills describe choices; only the effective catalog permits current calls. The prefix changes when its selected Skills/catalog change. |
+| AGENT CONTEXT                      | The same private snapshot's current loaded Skill IDs and matching active Task's goal/status. No matching Task produces `task: null`; this is not a dump of task records, grants, input bindings or retention counters.                                        |
+| CURRENT STATE                      | Fresh owner-defined facts selected by the loaded Skills' `useStates`, sampled separately through read-only capabilities. These are data, not instructions or execution permits.                                                                               |
+| History, feedback and latest input | Bounded conversation evidence, real Action/Tool outcomes and current user input or continuation observation. Current Task evidence remains in the history window; terminal Task history can be projected as a summary.                                        |
 
 The ordinary request order is **instruction/catalog system → selected history → dynamic system data (AGENT CONTEXT, then CURRENT STATE) → latest user input/observation**. If the request ends in native Tool results, the dynamic system message follows the complete call/result group. Previous dynamic system messages are removed before fresh facts are inserted. Native Tool definitions are a separate ChatRequest field. ModelKit receives the finished request; it does not discover containers or assemble Agent Task/Skill state.
 
 Each actual model request, including an internal ReACT continuation, samples again. The private snapshot and the business reads are not a single atomic transaction. Model-visible Task/Skill data is private to the responsible Agent; the production conversational owner is Assistant with one foreground continuing goal. Generic task registries and delegated-role views support runtime correlation, but are not serialized wholesale into AGENT CONTEXT and do not imply an exposed background-work Skill. Detailed message selection, budgets and continuation rules belong in [Chat](Agents/Support/Chat/README.md#request-state-assembly); private transitions belong in [Context](Agents/Support/Context/README.md#container-context-read-path).
+
+#### Prompt ownership and public discovery
+
+Each Agent owns its public purpose in its resource description and its private execution instructions separately. Assistant's identity describes only itself; BasicSkill teaches generic Task/Skill choices and TaskActions owns callable contracts. Agents Support assembles descriptions using the actual requester communication policy and the same implemented delegation adapter as execution; metadata never grants authority. Writer privately loads its control and content-format templates. Generic Core protocol remains business-neutral. See [Agent resource contracts](Resources/Agents/README.md).
 
 ### 6. State ownership, state machines and model observations
 
@@ -840,12 +826,12 @@ sequenceDiagram
 
 The configuration phase is part of [executionBindings and root startup](#1-containerization-dependencies-startup-and-lifecycle). The execution phase has three distinct validity questions: **Agents decides whether this role may request the function; Gateway decides whether the bound work can be admitted and coordinated; Actions decides whether this invocation is valid and can execute under current business conditions.**
 
-| Owner | Managed responsibility | Validation and authority |
-| --- | --- | --- |
-| App | Scoped roots, constructor/configuration injection, readiness order, foreground transitions, reverse joined stop and failed-start rollback. | Keeps required bindings and module lifetimes available through cleanup. Function registration stays inside Actions; Skill/Task permission stays inside Agents. |
-| Agents | Role instances, fixed and effective Skill catalogs, private Task/context, call resolution, communication policy, authorization revocation and cognitive interpretation of outcomes. | Checks actual producer/incarnation/session, allowed output/function, frozen decision capabilities and Task grants before submission. Parsing/alias checks use the exposed catalog; authoritative business decoding belongs to Actions. Coverage validation proves registered support, not permission for every future call. |
-| Gateway | Neutral endpoints and Signal envelopes, execution scopes, bounded admission, Channel/wait, resource arbitration, cancellation/join, execution evidence and result delivery. | Checks bound endpoint/context/scope, envelope/scheduling structure and capacity. Enforces injected generic resource policies, lease validity and live permits. It does not resolve roles, query Skills/Tasks or authorize business-function use. |
-| ActionsContainer and its business library | Compiled canonical definitions, registry/catalog, pure preparation, resources/budgets, actual invocation, input/output contracts and business/native cleanup. | Rejects duplicate/invalid registration and unsupported functions/protocols; validates arguments, budget/resource resolution and one-use root/catalog-bound preparation. Checks live permits, current service/session/business preconditions and completion contracts. Functions and domain services implement their own business checks; the module root coordinates them without acquiring role policy. |
+| Owner                                     | Managed responsibility                                                                                                                                                              | Validation and authority                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| App                                       | Scoped roots, constructor/configuration injection, readiness order, foreground transitions, reverse joined stop and failed-start rollback.                                          | Keeps required bindings and module lifetimes available through cleanup. Function registration stays inside Actions; Skill/Task permission stays inside Agents.                                                                                                                                                                                                                                           |
+| Agents                                    | Role instances, fixed and effective Skill catalogs, private Task/context, call resolution, communication policy, authorization revocation and cognitive interpretation of outcomes. | Checks actual producer/incarnation/session, allowed output/function, frozen decision capabilities and Task grants before submission. Parsing/alias checks use the exposed catalog; authoritative business decoding belongs to Actions. Coverage validation proves registered support, not permission for every future call.                                                                              |
+| Gateway                                   | Neutral endpoints and Signal envelopes, execution scopes, bounded admission, Channel/wait, resource arbitration, cancellation/join, execution evidence and result delivery.         | Checks bound endpoint/context/scope, envelope/scheduling structure and capacity. Enforces injected generic resource policies, lease validity and live permits. It does not resolve roles, query Skills/Tasks or authorize business-function use.                                                                                                                                                         |
+| ActionsContainer and its business library | Compiled canonical definitions, registry/catalog, pure preparation, resources/budgets, actual invocation, input/output contracts and business/native cleanup.                       | Rejects duplicate/invalid registration and unsupported functions/protocols; validates arguments, budget/resource resolution and one-use root/catalog-bound preparation. Checks live permits, current service/session/business preconditions and completion contracts. Functions and domain services implement their own business checks; the module root coordinates them without acquiring role policy. |
 
 Registration, exposure and authorization are different facts. Actions registers an implementation; Agents selects the functions visible/available to a role or decision; only an authorized request reaches Gateway. A valid authorization does not bypass capacity, ordering, resource conflicts or live business conditions. Required platform permissions remain enforced by the owning foundation APIs invoked by Actions.
 
@@ -897,13 +883,13 @@ flowchart TB
 
 The model-output path is **ModelKit stream → Agents parsing and catalog resolution → ordered call/scheduling events → Gateway admission → Actions execution → correlated results**. ModelKit supplies output fragments; Agents interprets their protocol using the frozen decision catalog. Gateway receives resolved requests and scheduling boundaries, not raw model XML.
 
-| Boundary | Contract |
-| --- | --- |
-| Function Token syntax | Natural text mixed with restricted XML, without a document root. Self-closing Action tags name catalog aliases; paired channel scopes select routing; paired wait scopes emit scheduling boundaries. |
-| FunctionToken | An Agent-local parsed text, action, boundary or scheduling event. Its boundary is independent of provider tokenizer tokens and network fragments. Incremental parsing handles incomplete UTF-8 and markup across fragments. |
-| ActionCall | A resolved actionPath, channel and string parameter map. Agents resolves aliases and parameters against its effective catalog; text mapping, when configured, produces ordered calls through the same generation pipeline. |
-| Scheduling events | beginWait/endWait travel in order with calls. Channel scope changes resolve each call's effective Channel; closing a scope restores its enclosing/default routing. Dropping wait events changes execution semantics. |
-| Execution envelope | OutputEnvelope supplies producer and processing correlation separately from ActionCall. Agents' Gateway adapter translates authorized intent into neutral execution requests; Gateway checks admission and coordinates execution through ActionsExecutionPort. |
+| Boundary              | Contract                                                                                                                                                                                                                                                       |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Function Token syntax | Natural text mixed with restricted XML, without a document root. Self-closing Action tags name catalog aliases; paired channel scopes select routing; paired wait scopes emit scheduling boundaries.                                                           |
+| FunctionToken         | An Agent-local parsed text, action, boundary or scheduling event. Its boundary is independent of provider tokenizer tokens and network fragments. Incremental parsing handles incomplete UTF-8 and markup across fragments.                                    |
+| ActionCall            | A resolved actionPath, channel and string parameter map. Agents resolves aliases and parameters against its effective catalog; text mapping, when configured, produces ordered calls through the same generation pipeline.                                     |
+| Scheduling events     | beginWait/endWait travel in order with calls. Channel scope changes resolve each call's effective Channel; closing a scope restores its enclosing/default routing. Dropping wait events changes execution semantics.                                           |
+| Execution envelope    | OutputEnvelope supplies producer and processing correlation separately from ActionCall. Agents' Gateway adapter translates authorized intent into neutral execution requests; Gateway checks admission and coordinates execution through ActionsExecutionPort. |
 
 For example, when the current catalog includes the ExpressionInteraction Skill's `express` alias, permits the Display Channel and the role configures natural-text mapping:
 
@@ -1158,6 +1144,8 @@ UI owns actual surface ordering, safe-area geometry and presentation completion.
 
 ### 14. Photo/video capture, App album and system export
 
+Camera photos enter the session-owned Storage Image cache with memory-only preview_N identities. Each Camera window lifetime starts at1 and keeps the newest20 originals; successful append retires the oldest without renumbering. Camera owns latest/explicit model selections and disposition policy; save publishes independent album media_N, while save/ignore mark and unload but retain cached originals. Closing joins work and clears the session; minimizing/background retains bytes but pauses model image delivery. Shared Context/Chat merges selected images into the original user input and keeps public metadata in system State. Private resource-scope bindings fence queued operations against reused labels without entering model context. Request logs preserve actual submitted image bytes independently of the Camera session; deleting logs removes those history images with no cache or album fallback. Album persistence receives no preview or camera-session identity; no database mapping is used. UI receives typed catalog/scoped reads for its stack and zoomable gallery, independently of model selection. See [Camera](Actions/Camera/README.md#session-previews-state-and-gallery), [Image cache](Storage/Cache/Image/README.md) and [UI Camera](UI/Camera/README.md).
+
 ```mermaid
 flowchart TB
     subgraph Interaction["UI"]
@@ -1167,6 +1155,7 @@ flowchart TB
     style Interaction fill:#e7f6fc,stroke:#3985a4,color:#1f4c60
     subgraph Cognition["AGENTS"]
         A["Photographer · authorization"]:::agent
+        Context["Shared Chat · Skill-selected<br/>fresh multimodal State per request"]:::agent
     end
     style Cognition fill:#f0eaff,stroke:#8261b5,color:#463065
     subgraph Coordination["GATEWAY"]
@@ -1175,6 +1164,7 @@ flowchart TB
     style Coordination fill:#fff2d9,stroke:#bf842c,color:#694511
     subgraph Execution["ACTIONS"]
         Camera["Capture / savePhoto /<br/>ignorePhoto"]:::action
+        Preview["CameraPreviewStore · latest /<br/>explicit selections"]:::action
         Album["PhotoAlbumService · browse /<br/>import / delete / export"]:::action
     end
     style Execution fill:#ffecef,stroke:#b86178,color:#6b2b3d
@@ -1185,6 +1175,7 @@ flowchart TB
     style Native fill:#eaf7ed,stroke:#56936a,color:#2c573a
     subgraph Persistence["STORAGE"]
         Store["Photo bytes / metadata / App<br/>album records"]:::storage
+        Cache["Bounded preview memory<br/>originals / prepared JPEG"]:::storage
     end
     style Persistence fill:#faf3e4,stroke:#a18a4e,color:#61512a
     subgraph External["SYSTEM PHOTOS"]
@@ -1197,7 +1188,7 @@ flowchart TB
     G ==>|"private album Tool"| Album
     Camera ==>|"takePhoto"| Capture
     Capture -.->|"photo bytes ready"| Camera
-    Camera ==>|"publish bytes / commit<br/>App inclusion"| Store
+    Camera ==>|"explicit save: publish original /<br/>commit App inclusion"| Store
     Camera ==>|"preview / disposition<br/>presentation"| View
     Album ==>|"read / import / delete"| Store
     Album ==>|"explicit export only"| Export
@@ -1207,6 +1198,9 @@ flowchart TB
     Camera -.->|"actual capture result"| G
     Album -.->|"actual album result"| G
     G -.->|"correlated evidence"| A
+    Camera --> Preview
+    Preview --> Cache
+    Preview -.->|"metadata + selected image bytes"| Context
     classDef action fill:#ffecef,stroke:#b86178,color:#6b2b3d
     classDef agent fill:#f0eaff,stroke:#8261b5,color:#463065
     classDef gateway fill:#fff2d9,stroke:#bf842c,color:#694511
@@ -1236,7 +1230,7 @@ Photo bytes ready, current preview, formal App album inclusion and a system Phot
 
 Album browse/import/export/delete uses UI.album → Photographer authorization → Gateway → the internal album function. Original reads, thumbnails and mutations have separate bounds; imports retain per-item successes. The root owns admitted changes across navigation and joins them at shutdown. The ordinary Photography Skill does not expose system export or album deletion.
 
-System export waits for the actual Photos transaction. Denied permission or write failure preserves the App original. Each explicit click creates a copy without automatic export, retry or synchronization. App deletion commits the logical record before file cleanup and retains recovery evidence; system copies remain independent. Chat originals may become unavailable. Model/history media reads retain source/session/input ownership and bounded image preparation. See [Camera album](Actions/Camera/README.md), [UI Settings](UI/Settings/README.md), [Media](Storage/Database/Media/README.md) and [Platform Vision](PlatformKit/Vision/README.md).
+System export waits for the actual Photos transaction. Denied permission or write failure preserves the App original. Each explicit click creates a copy without automatic export, retry or synchronization. App deletion commits the logical record before file cleanup and retains recovery evidence; system copies remain independent. Live model media reads retain source/session/input ownership and bounded image preparation. Historical Prompt images come exclusively from captured request logs and disappear when those logs are cleared. See [Camera album](Actions/Camera/README.md), [UI Settings](UI/Settings/README.md), [Media](Storage/Database/MediaFiles/README.md) and [Platform Vision](PlatformKit/Vision/README.md).
 
 #### Recording, microphone handoff and media completion
 
@@ -1246,7 +1240,7 @@ takePhoto/startRecording compose the canonical camera-open step with capture und
 
 Before recording, Actions automatically prepares video mode in the Camera window, preserving lens/zoom/photo delay and applying an optional duration limit; configuration failure joins rollback and never starts capture. Actions then blocks new voice audio playback, joins VoiceSessionCoordinator's microphone pause and full native audio-owner release, and retains the prior listening generation. AppleCamera then reserves PlatformKit.Audio's native owner, adds microphone/movie output to its existing graph and waits for didStart. didFinish removes/releases native audio; Actions validates/publishes a pending local file through StorageMedia before resuming valid foreground listening intent and offers save/ignore. Model startRecording defaults to awaiting that terminal receipt under the original execution identity; only then does its ready result trigger ReAct with mediaID, fileName and actual duration. Photographer's interactive start Tool explicitly requests startup-only acknowledgement and releases its UI request slot. The UI stop Tool bypasses ChannelScheduler and joins the same recording completion; it does not independently notify the Assistant, so manual stop produces one original-call terminal observation. Cancellation joins matching native stop/finalization rather than leaving an orphan recording. Collection into the App album is a separate commit. Album playback uses a bounded local URL; system export joins a Photos transaction through VisionContainer. No movie is passed into model/history image decoding.
 
-The recording owner survives minimized/hidden content; recording locks lens switching on both surfaces. Close stops/joins before media decisions; background stops/finalizes and preserves the pending clip without automatic foreground recording. Actual native recording facts belong to PlatformKit, business phase/settings to Actions, display/geometry to UI, and durable inclusion to Storage. Detailed limits/failures live in [Camera Actions](Actions/Camera/README.md), [Platform Vision](PlatformKit/Vision/README.md), [Listening](Actions/Speech/Listening/README.md) and [Media](Storage/Database/Media/README.md).
+The recording owner survives minimized/hidden content; recording locks lens switching on both surfaces. Close stops/joins before media decisions; background stops/finalizes and preserves the pending clip without automatic foreground recording. Actual native recording facts belong to PlatformKit, business phase/settings to Actions, display/geometry to UI, and durable inclusion to Storage. Detailed limits/failures live in [Camera Actions](Actions/Camera/README.md), [Platform Vision](PlatformKit/Vision/README.md), [Listening](Actions/Speech/Listening/README.md) and [Media](Storage/Database/MediaFiles/README.md).
 
 Camera opening awaits both native running and a fresh UI preview-geometry receipt before the composed capture step can run. Photo/movie execution rechecks that receipt at capture time and freezes the UI camera window’s sensor-to-interface angle and passes it to PlatformKit’s validated output connection. Perception retains independent gravity-upright frame coordinates; encoded photo metadata/movie transforms determine later media display. No Foundation dependency on UI or Actions is introduced.
 
@@ -1405,6 +1399,8 @@ flowchart TB
     linkStyle 8 stroke:#438463,stroke-width:1.5px,stroke-dasharray:2 3
 ```
 
+First-run Welcome is composed by UI Root after settings restore confirms an empty Provider list. Its URL/key draft submits through the same settings request chain; Actions persists credentials and configuration, then UI opens independent Assistant/Writer model selection. Restore/save failures remain visible and cannot create a successful onboarding state. See [Settings](UI/Settings/README.md).
+
 UI owns drafts/revisions and typed requests. ApplicationControl owns cognitive admission; Actions Provider/ModelResources services own input validation, application, persistence and result presentation through injected ModelKit/Storage interfaces. Failures cannot become empty configuration, an undocumented old-model fallback or fabricated success. Primary and cleanup errors remain distinct.
 
 Download, installation, preference selection and model residency are separate states. Opening a page does not start transfers; pages do not poll to drive downloads. Root observers coalesce artifact revisions and read real state. Actions supplies application adapters to ModelKit-owned storage/download ports. Removing an artifact first quiesces actual consumers; background URLSession completion belongs to the artifact owner. Actions also owns UI interaction workers and joins them during shutdown. See [ApplicationControl](Agents/ApplicationControl/README.md), [Provider](Actions/System/Provider/README.md), [ModelResources](Actions/System/ModelResources/README.md) and [Management](ModelKit/Support/Management/README.md).
@@ -1435,7 +1431,7 @@ flowchart TB
     end
     style Execution fill:#ffecef,stroke:#b86178,color:#6b2b3d
     subgraph Persistence["STORAGE"]
-        Store["ConversationHistoryStore /<br/>chat / task repositories"]:::storage
+        Store["Role-specific records /<br/>shared request logs"]:::storage
     end
     style Persistence fill:#faf3e4,stroke:#a18a4e,color:#61512a
     subgraph Inference["MODELKIT"]
@@ -1476,25 +1472,29 @@ flowchart TB
 
 Agents records real input, model request/context, response, calls, terminal evidence and usage at their own boundaries. UI summaries/pages are not the full model request, and private Agent context is not the database. Model-visible queries return bounded previews; UI full reads carry private typed results, without a global attachment table.
 
-Memory authorizes history requests; Actions owns queries, mutations and presentation through the injected ConversationHistoryStore. Archive/delete waits for real commits. Root-owned title generation does not block a new conversation. Title computation and failure-record commit can fail together; cancellation does not undo an archive. Restart marks unfinished records interrupted without resuming native execution or replaying the last action.
+Agents bridges ModelKit’s neutral transport callback into the shared `model_request_log`, capturing actual application-level HTTP requests, responses/SSE, images and generation metadata; non-HTTP calls are marked local. Clearing logs removes Prompts, images and generation details while preserving business inputs, replies and tool results. Late callbacks cannot recreate cleared logs. Storage owns persistence without inference scheduling or Agent orchestration. See [request recording](Agents/Support/Chat/README.md) and [Database schema](Storage/Database/README.md).
 
-| Data | Owner and restart meaning |
-| --- | --- |
-| Active Task/Skill, decisions and queues | Private Agent memory; no guarantee of restoring execution. |
-| Current model facts | Actual container memory, sampled per request; no persistent StorageState mirror. |
-| PCM and temporary buffers | Bounded Storage.cache sessions and leases; not durable creations. |
-| Conversation, task, media and device records | Storage repositories with actual commit/recovery contracts. |
-| Photos, settings and model artifact files | Controlled Storage.files namespaces; pending/ready/compensation rather than cross-backend atomic transactions. |
+Memory authorizes history requests; Actions owns queries, mutations and presentation through the injected AssistantHistoryStore. Assistant records the selected State paths with its per-request Task/Skill/Catalog business snapshot; Actions passes that evidence to UI without reading current State. Full State facts and images remain in deletable request logs. Clearing logs preserves those business selections; Assistant detail hides Prompts/Generation Meta and displays Logs cleared. Archive/delete waits for real commits. Root-owned title generation does not block a new conversation. Title computation and failure-record commit can fail together; cancellation does not undo an archive. Restart marks unfinished records interrupted without resuming native execution or replaying the last action.
+
+| Data                                         | Owner and restart meaning                                                                                      |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Active Task/Skill, decisions and queues      | Private Agent memory; no guarantee of restoring execution.                                                     |
+| Current model facts                          | Actual container memory, sampled per request; no persistent StorageState mirror.                               |
+| PCM and temporary buffers                    | Bounded Storage.cache sessions and leases; not durable creations.                                              |
+| Conversation, task, media and device records | Storage repositories with actual commit/recovery contracts.                                                    |
+| Photos, settings and model artifact files    | Controlled Storage.files namespaces; pending/ready/compensation rather than cross-backend atomic transactions. |
 
 See [Memory](Agents/Memory/README.md), [History](Actions/History/README.md) and [Storage](Storage/README.md).
 
 #### Agent-owned tasks, delegated records and artifacts
 
-Storage separates foreground task records, executor-owned business tasks and individual UUID delegations. The stable public key is `agent_id + task_N`; completion ends one delegation, not the lifetime of a reusable workspace task. Request/event records retain runtime trace identities, while models receive readable task/window/editing handles with owner-projected metadata. WindowState owns window mapping independently of the creator. See [Task storage](Storage/Database/Tasks/README.md) and [artifact identities](Actions/Artifacts/README.md#workspace-and-editing-identities).
+Storage separates Assistant conversation themes and foreground tasks from Writer workspaces and delegation executions. Writer messages contain delegation entries and child messages whose optional workspace ownership is fixed at creation; selecting a workspace does not move earlier messages. AgentMessages retains original communication and delivery facts. The stable workspace key is `agent_id + task_N`; completion ends one delegation, not the lifetime of a reusable workspace. Request/event records retain runtime trace identities, while models receive readable task/window/editing handles with owner-projected metadata. WindowState owns window mapping independently of the creator. See [Task storage](Storage/Database/README.md) and [artifact identities](Actions/Artifacts/README.md#workspace-and-editing-identities).
 
-Writer uses the shared Chat/Task repositories under its own agent scope. Each stable task owns its history and `agent/task_N` workspace; continuation adds a new execution, preserving files and history. Deleting the requesting Assistant dialog clears provenance without deleting the Writer task. App composes Writer's records interface and Actions' preview/export interface for Settings. Model timing flows through ModelKit → role history → Storage evidence → UI detail; Writer derives cumulative execution duration and operation summaries, while UI renders neutral values. Full persisted request/tool evidence is distinct from the Agent's selected model context. See [Writer history](Agents/Writer/README.md#sqlite-历史与设置页).
+Writer uses its own WriterExecutionRepository and WriterMessageRepository, with WriterRecordStore/WriterHistoryStore owning its private history. Runtime history is scoped to the delegation; Settings queries delegation entries and workspace messages separately. Database message keys define ordering, while revision is a state version. A later delegation may reuse the same workspace while retaining separate execution history. Deleting the requesting Assistant dialog clears provenance without deleting the Writer workspace. App composes Writer's records interface and Actions' preview/export interface for Settings. Model timing flows through ModelKit → role history → Storage evidence → UI detail; Writer projects task start/update timestamps, request counts and operation summaries, while UI renders neutral values. Writer projects request overview, the current input, verified prior tool references, model output and host finalization through its Settings detail interface. The business sections survive request-log deletion, which clears prompt and generation diagnostics. Full persisted request/tool evidence is distinct from the Agent's selected model context. See [Writer history](Agents/Writer/README.md#sqlite-历史与设置页).
 
-Pending Writer terminal notices can survive restart without replaying creative work or reopening old execution permissions. The notification/outbox policy belongs to [Writer](Agents/Writer/README.md#委托与主动事件), not generic Gateway transport. Development storage uses the current schema and rebuilds a mismatched database; it does not migrate older schemas. See [SQLite lifecycle](Storage/Database/SQLite/README.md).
+Writer source lives in the current `writer/task_N` filesystem directory; SQLite indexes current files without retaining source bodies or workspace versions. StorageDatabase coordinates sandbox primitives and SQL leases, Actions owns validation/rendering/export, and Agents owns creative decisions. See [workspace storage](Storage/Database/WriterWorkspaces/README.md) and [Artifacts](Actions/Artifacts/README.md).
+
+Pending Writer terminal notices can survive restart without replaying creative work or reopening old execution permissions. The notification/outbox policy belongs to [Writer](Agents/Writer/README.md#委托与主动事件), not generic Gateway transport. Before publishing repositories, Storage initializes the current schema and resets older database formats together with Writer workspace/preview files under the approved replacement policy; settings, credentials and models remain outside that reset. Current-format data is preserved and future schema versions are rejected. Database root owns connection/lifecycle/schema assembly; Shared owns neutral encoding, identity and paging mechanisms, while table directories own SQL and recovery. Agent consumers use role-specific task and communication ports. See [SQLite lifecycle](Storage/Database/README.md).
 
 ### 19. Model lifecycle and inference boundaries
 
@@ -1605,6 +1605,8 @@ UI presentation admission differs from native completion. Finite expressions awa
 
 Each Agent owns its presentation intent and calls registered UI.Island internal tools through its own Gateway identity. Writer and Assistant own their task islands; Assistant separately owns inference waiting. SpeechPerception owns listening/recognition and captions. SpeechSynthesis owns synthesis and actual playback presentation; Actions' player returns joined start/end facts through an App-bound neutral callback, never through an Assistant delegation or UI-state observer. Photographer uses its existing camera fact input and ApplicationControl its connection input for their own presentation. Shared AgentIslandPublication owns only bounded delivery/retry and cleanup, not role policy. Actions executes validated calls, while UI owns arbitration, layout, animation and ActivityKit. Playback spectra use a dedicated data port without Action/ActivityKit updates per frame. System submission failure does not erase local content; iOS controls actual system display.
 
+The producer-bound internal-completion port accepts only the registered role’s declared internal native tools outside model rounds. Gateway validates permission, resources and execution, returning real outcomes directly to the presenting workflow without Signal/InputGateway ToolResult feedback. Model/native protocol calls retain their paired feedback. Internal presentation receipts can synchronize execution and playback without becoming cognitive input; ownership and session fences remain unchanged. See [Agents Support](Agents/Support/README.md).
+
 Only explicitly model-generated calls can contribute execution observations to ReACT. The shared Chat worker records origin per invocation: natural-text speech/caption expansion and code-owned lifecycle/waiting calls are runtime work even when a model can explicitly call the same function. Their successful values, failures and exceptions are handled internally; they may join completion barriers and retain diagnostic evidence but never become model observations or independently request another inference. Unmatched Tool feedback cannot become a fresh Chat input.
 
 Detail activity and live status are selected independently, preserving the user's detail expansion preference while the top indicators change. UI owns layout, animation, thumbnail resources and bounded display admission. Measured spectrum updates remain local presentation data rather than per-frame Actions or ActivityKit submissions. See [Island component](UI/Components/Island/README.md) for these contracts and [Actions Runtime](Actions/UI/Runtime/README.md) for validated execution and producer ownership.
@@ -1654,55 +1656,32 @@ Agents closes new cognitive work and explicitly cancels its scopes. Gateway join
 
 UI, PlatformKit and ModelKit runtime `stopped` flags describe their admission fences. `cleanupJoined` separately records successful joined shutdown; neither flag establishes physical-device completion or safety.
 
-| Boundary | Completion establishes | It does not establish |
-| --- | --- | --- |
-| Request/message admission | Acceptance or explicit rejection | Business completion or another inference round |
-| Path/UI update | Identity-matched state commit | Loaded data or displayed GPU frame |
-| Model operation | Adapter completion or joined cancellation | Device completion |
-| Action/Tool | Declared business completion and report | Successful delivery or cognitive consumption |
-| Playback | Actual native drain and handle release | Sound at synthesis admission |
-| File/database publication | Real commit or explicit partial outcome | Cross-backend atomicity or Photos synchronization |
-| Resource/session stop | Joined owned work and cleanup | Cooperative hardware stop or spatial safety |
+| Boundary                  | Completion establishes                    | It does not establish                             |
+| ------------------------- | ----------------------------------------- | ------------------------------------------------- |
+| Request/message admission | Acceptance or explicit rejection          | Business completion or another inference round    |
+| Path/UI update            | Identity-matched state commit             | Loaded data or displayed GPU frame                |
+| Model operation           | Adapter completion or joined cancellation | Device completion                                 |
+| Action/Tool               | Declared business completion and report   | Successful delivery or cognitive consumption      |
+| Playback                  | Actual native drain and handle release    | Sound at synthesis admission                      |
+| File/database publication | Real commit or explicit partial outcome   | Cross-backend atomicity or Photos synchronization |
+| Resource/session stop     | Joined owned work and cleanup             | Cooperative hardware stop or spatial safety       |
 
 Independent fences include UI generation, capture generation, endpoint incarnation/session, input/round, Agent Task grants, media ownership, resource lease/permit, settings revision and paging tickets. One fence cannot substitute for another; replacement owners cannot inherit stale writes. See [Input](Gateway/Input/README.md), [Scheduling](Gateway/Output/Scheduling/README.md), [Resources](Gateway/Output/Resources/README.md), [Results](Gateway/Output/Results/README.md) and [Context](Agents/Support/Context/README.md).
 
 #### Scene visibility versus execution lifetime
 
-Ordinary scene hiding stops/joins visible rendering and vision intake while preserving Assistant and Writer inference, files and messages. Actions retains bounded latest project snapshots; foreground restoration reads current state under the project lock, without reopening explicitly closed/minimized windows. Background full rendering returns deferred validation evidence, so saving and visual verification remain separate. Explicit root suspension, replacement and stop still cancel and join owned work. iOS process suspension does not imply application-requested cancellation and does not guarantee unlimited background CPU. See [App composition](App/Composition/README.md), [Agents lifecycle](Agents/README.md#lifetime-inputs-and-failures), [Artifacts snapshots](Actions/Artifacts/README.md#标题副标题与后台快照) and [Writer scene policy](Agents/Writer/README.md#窗口命名操作副标题与场景).
+Ordinary scene hiding stops/joins visible rendering and vision intake while preserving Assistant and Writer inference, files and messages. Actions retains bounded latest project snapshots; foreground restoration runs in one Actions-owned task and reads current state under the project lock. Explicitly closed or minimized windows retain their state. Preview restore failures are reported at the affected window, and scene admission continues. Background full rendering returns deferred validation evidence, so saving and visual verification remain separate. Explicit root suspension, replacement and stop still cancel and join owned work. iOS process suspension does not imply application-requested cancellation and does not guarantee unlimited background CPU. See [App composition](App/Composition/README.md), [Agents lifecycle](Agents/README.md#lifetime-inputs-and-failures), [Artifacts snapshots](Actions/Artifacts/README.md#标题副标题与后台快照) and [Writer scene policy](Agents/Writer/README.md#窗口命名操作副标题与场景).
 
 ### 22. End-to-end scenario map
 
-| Scenario | Entry and owners | Result boundary |
-| --- | --- | --- |
-| Album/settings click | Local navigation; business buttons submit typed requests to their role and registered domain functions. | Path commit and business reply remain separate. |
-| Voice conversation | Native PCM → SpeechPerception → Gateway final → Assistant → ModelKit → authorized calls. | Actual inference, execution and reply barriers. |
-| Known expression/speech sequence | One resolved sequence → Channel/wait → UI/Speech execution. | Actual group completion, not textual order alone. |
-| Vision without new user input | Native frame → VisionPerception → protected presentation / Photographer tracking. | Freshness, authority and feedback; no automatic ordinary chat. |
-| Module/device change | Native observation → responsible role → state/failure policy. | No automatic effect retry or inferred physical completion. |
-| Agent collaboration | Policy-authorized message → bound Gateway endpoint → target role. | Admission, progress, result and cancellation remain distinct. |
-| Navigation/inactivity | UI lifetime or App invalidation → owned cancellation/join. | Committed creations remain; root cleanup outlives pages. |
+| Scenario                         | Entry and owners                                                                                        | Result boundary                                                |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Album/settings click             | Local navigation; business buttons submit typed requests to their role and registered domain functions. | Path commit and business reply remain separate.                |
+| Voice conversation               | Native PCM → SpeechPerception → Gateway final → Assistant → ModelKit → authorized calls.                | Actual inference, execution and reply barriers.                |
+| Known expression/speech sequence | One resolved sequence → Channel/wait → UI/Speech execution.                                             | Actual group completion, not textual order alone.              |
+| Vision without new user input    | Native frame → VisionPerception → protected presentation / Photographer tracking.                       | Freshness, authority and feedback; no automatic ordinary chat. |
+| Module/device change             | Native observation → responsible role → state/failure policy.                                           | No automatic effect retry or inferred physical completion.     |
+| Agent collaboration              | Policy-authorized message → bound Gateway endpoint → target role.                                       | Admission, progress, result and cancellation remain distinct.  |
+| Navigation/inactivity            | UI lifetime or App invalidation → owned cancellation/join.                                              | Committed creations remain; root cleanup outlives pages.       |
 
 Automated checks, iOS builds, real-model samples, native UI and physical-device acceptance are separate evidence categories maintained in [validation](../docs/validation/README.md). Requirements and decisions live in [requirements](../docs/requirements/README.md) and [ADR](../docs/adr/README.md); historical design rationale lives in [documentation history](../docs/history/Documentation-History.md).
-
-### Shared round and request persistence
-
-Storage separates Assistant conversation themes, Assistant foreground tasks, Writer workspace tasks
-and individual delegations. Both cognitive Agents share messages (business rounds) and
-model_request_log (complete actual request evidence). Dynamic system/State stays in request logs.
-Assistant task summaries project over retained source rounds. Writer history belongs to its task and
-survives deletion of the originating Assistant conversation. Agent-delegation execution/report receipts
-share a row; failed reporting does not control Writer occupancy. See [Storage database design](Storage/Database/README.md).
-
-Writer code lives in the current writer/task_N filesystem directory; SQLite only indexes current files.
-StorageDatabase.Workspaces coordinates sandbox primitives and SQL leases, while Actions owns format
-validation/rendering/export and Agents own creation. There is no workspace version history. Agents records submitted ChatRequest and exposed ChatEvents without adding audit hooks or history
-interfaces to ModelKit. Raw provider HTTP/SSE is outside this history contract. No inference scheduling or Agent loop is moved into foundational storage.
-
-### Internal presentation completion
-
-Agent-owned island presentation remains Gateway-executed. The producer-bound internal-completion port
-accepts only declared internal native tools outside model rounds and returns real execution outcomes
-to the presenting workflow, without Signal/InputGateway ToolResult feedback. Model/native protocol
-calls retain their existing paired feedback. Internal presentation receipts may synchronize execution
-and playback but do not become cognitive input or ReACT observations; ownership and session fences
-remain unchanged. Details: [Agents Support](Agents/Support/README.md).

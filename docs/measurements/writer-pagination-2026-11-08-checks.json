@@ -1,0 +1,67 @@
+{
+  "date": "2026-11-08",
+  "scope": "Writer record end-of-pagination and loaded-page retention",
+  "runs": [
+    {
+      "command": "./scripts/check.sh",
+      "started": "2026-11-08T19:21:09.130130",
+      "finished": "2026-11-08T19:27:42.402613",
+      "exitCode": 0,
+      "log": "/tmp/writer-pagination-check.log",
+      "logSHA256": "39c518f9f90407cfae18565e47127dc1299978760239840973828b1e4042bfdc"
+    },
+    {
+      "command": "./scripts/build-ios.sh",
+      "started": "2026-11-08T19:27:42.403859",
+      "finished": "2026-11-08T19:31:43.933355",
+      "exitCode": 0,
+      "log": "/tmp/writer-pagination-build-ios.log",
+      "logSHA256": "a948b4ab8bd120b79280ab14fc56317f54572572e1b0024e707b3c3bf1f4663f"
+    }
+  ],
+  "focused": {
+    "log": "/tmp/writer-pagination-focused.log",
+    "logSHA256": "e4d44c7c7c0077477c3c2bf2f503c1b6d51f60c478dc84df37708ea78b6e1ce5",
+    "passed": 4,
+    "note": "Empty task-page assertion added afterwards and verified by full check."
+  },
+  "testSummaries": [
+    "Test run with 10 tests in 0 suites passed after 0.058 seconds.",
+    "Test run with 205 tests in 0 suites passed after 0.658 seconds.",
+    "Test run with 10 tests in 0 suites passed after 0.204 seconds.",
+    "Test run with 54 tests in 0 suites passed after 1.659 seconds.",
+    "Test run with 4 tests in 0 suites passed after 0.001 seconds.",
+    "Test run with 5 tests in 0 suites passed after 0.491 seconds.",
+    "Test run with 28 tests in 0 suites passed after 0.019 seconds.",
+    "Test run with 47 tests in 0 suites passed after 0.007 seconds.",
+    "Test run with 5 tests in 0 suites passed after 0.004 seconds.",
+    "Test run with 10 tests in 0 suites passed after 0.031 seconds.",
+    "Test run with 11 tests in 0 suites passed after 0.001 seconds.",
+    "Test run with 5 tests in 0 suites passed after 0.001 seconds.",
+    "Test run with 1096 tests in 3 suites passed after 67.384 seconds.",
+    "Test run with 20 tests in 1 suite passed after 0.001 seconds.",
+    "Test run with 2 tests in 0 suites passed after 0.001 seconds.",
+    "Test run with 2 tests in 0 suites passed after 0.003 seconds.",
+    "Test run with 175 tests in 0 suites passed after 1.528 seconds.",
+    "Test run with 1 test in 1 suite passed after 0.001 seconds.",
+    "Test run with 227 tests in 1 suite passed after 208.062 seconds."
+  ],
+  "testedSourceSHA256": {
+    "MobileHarness/UI/Settings/WriterRecordsView.swift": "eb4b513dd702b3e287d2318fef01b768dff0a4dc558035c57957295d2e0826fd",
+    "MobileHarness/Agents/Writer/WriterContainer.swift": "91f876e6ea77002e52fad3e79695762c9376be04e0e5092232180f5d9efeb49c",
+    "MobileHarness/Storage/Database/WriterMessages/WriterHistoryStore.swift": "b6ea32e4eac1517cc348c435bd0a1729941fdd8cd249a17f464ab8a95bb03d0c",
+    "Tests/UITests/ConversationHistoryPresentationTests.swift": "7f29db5213df8e70b5f6922c14847c756f519c19a477f8ddb104ec57c08d58e4",
+    "Tests/IntegrationTests/WriterAgentTests.swift": "16d0eac1b5f9689353a98f686d6b2b636c187874d09433e85537a28237ca2a13"
+  },
+  "iOSBuildSchemes": [
+    "MobileHarnessSimulator",
+    "ModelKitRuntime",
+    "ModelKitNemotron",
+    "ModelKitSilero"
+  ],
+  "nativePaginationAcceptance": {
+    "performed": false,
+    "deviceInstall": false,
+    "note": "State and real SQLite tests; physical List navigation and scroll position not verified."
+  }
+}

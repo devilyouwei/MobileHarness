@@ -23,7 +23,7 @@ flowchart LR
 | PoseOverlay.swift | 骨架与推理统计 UI 值 |
 | CameraFrameView.swift | 原生视图和 Metal 显示所有者 |
 | CameraConversationSurface.swift | Face 入口与窗口内预览/镜头/快门/错误/照片内容 |
-| CapturedPhotoView.swift / PhotoDeparture.swift | 照片查看、缩略图和真实离场回执 |
+| CapturedPhotoView.swift | 入栈回执、叠图入口、分页浏览和原生缩放 |
 
 姿态屏幕坐标由 CameraSkeletonMesh 与视频共享变换；测试直接验证生产网格、方向、独立媒体及真实 GPU 完成。运行路径不含额外的比较性投影或临时时序程序。
 
@@ -51,7 +51,11 @@ Face 背景视觉使用0.30不透明度叠在黑色底板上，使面部主体�
 
 Face 右上角保留胶囊式视觉／跟随开关（eye 图标）和设置入口；仅视觉开启时显示背景翻转，翻转可用性仍服从最上层镜头权限。Face 不额外提供拍摄窗口快捷按钮，拍摄由 Photography Action 打开窗口。视觉开启时在 Face 后方挂载含姿态的 CameraFrameView；拍摄不启用背景。相机入口受应用会话建立、根启动失败及相机控制忙碌状态约束，不依赖对话模型准备成功；请求仍经过类型化端口与 Action 的实际准入。CameraWindowContent 在独立窗口内显示原生预览、照片／视频模式、镜头切换和快门，权限失败可进入系统设置，普通错误可重新开启。完全被上层窗口覆盖时卸载预览渲染器，采集仍由领域拥有。
 
-照片按身份出现、保持并缩成96×128缩略图；真实动画完成后才开放后续交互。检查器是同一窗口内容内的覆盖，不再弹出全屏图片页面。窗口最小化不渲染内容，恢复已确认缩略图不重放首次照片动画。保存先放大再右移离场，忽略向右下缩小离场；替换、后台或离窗明确撤销旧等待，Reduce Motion 使用简化过渡。实际保存、声音、相册事务和移除策略留在上游。
+照片按身份执行一次入栈动画并返回真实完成回执，随后释放该临时全图呈现。CameraGalleryView 独立显示最新三层小缩略图及全部缓存数量；点击在窗口内展开，默认最新照片。顶部上／下一张和保存／忽略按钮与索引／状态常驻；保存／忽略保持当前页。被FIFO淘汰的当前图切换至最早剩余图，关闭会话退出浏览器。UI不选择模型图片。
+
+原生 UIScrollView 提供1...4倍缩放、双击适应／2倍和放大平移；仅适应大小时允许左右滑动翻页，箭头始终可用并重置缩放。首尾不循环。缩略图最多三张256px，浏览图仅当前与邻页且最大2048px；异步读取受会话、取消和当前目录检查约束。UI通过注入的CameraControlling.previewImage读取，不能访问Storage。
+
+CameraWindowContent 将实时预览铺满内容区，底部140pt控制带覆盖半透明黑色渐变，不再占用独立的不透明画面区域。已有缓存不锁定新拍摄／镜头／模式；实际设备、录像和当前操作准入保持独立。
 
 ## 失败与验证边界
 
@@ -103,7 +107,7 @@ CameraFrameSurface reads UIWindowScene.effectiveGeometry.interfaceOrientation du
 
 Both renderers retain the same immutable CameraVideoFrame; only the background passes skeleton data. Each renderer owns its native completion and its own failure surface; a failed photo renderer cannot clear shared frames or disable background rendering. Background renderer unmounts when Face is hidden or completely covered; photo renderer unmounts while minimized or fully covered. Neither unmount changes device demand.
 
-Photo rendering uses aspect-fit and explicit black letterboxing, with a separate interface-orientation report. photoAspect derives from native frame dimensions and the sensor-to-interface transform. CameraWindowContent reserves 140pt for controls, overlays errors without changing framing, and sizes its image region independently of window chrome. The root updates the typed image sizing policy as the actual aspect changes. Background keeps aspect-fill and common video/pose/gaze geometry.
+Photo rendering uses aspect-fill across the full content surface, with a separate interface-orientation report. photoAspect derives from native frame dimensions and the sensor-to-interface transform; it drives window sizing with zero reserved controls height. The140pt translucent control band overlays live pixels. Preview crop does not change original capture dimensions. Background keeps its common video/pose/gaze geometry.
 
 Background vision presents status, system-permission settings and explicit retry controls inside Face. These use the typed request chain without opening a photo window.
 
@@ -113,7 +117,7 @@ Face 左上角在背景视觉启用且存在新鲜姿态统计时显示 YOLO FPS
 
 ## Capture settings and movie presentation
 
-CameraSettings carries full mode/countdown/flash/zoom/duration selections plus actual capability bounds. The140pt control region offers photo/video selection, a settings menu, bounded zoom choices and one shutter/stop location. Configuration, cancel, start/stop and video disposition go through typed CameraInput; no view invokes native capture. countdown presents the domain's remaining seconds and cancel control. Recording uses startedAt for SwiftUI's timer display, a red indicator, listening-paused text and explicit stop.
+CameraSettings carries full mode/countdown/flash/zoom/duration selections plus actual capability bounds. The140pt translucent overlay offers photo/video selection, a settings menu, bounded zoom choices and one shutter/stop location. Configuration, cancel, start/stop and video disposition go through typed CameraInput; no view invokes native capture. countdown presents the domain's remaining seconds and cancel control. Recording uses startedAt for SwiftUI's timer display, a red indicator, listening-paused text and explicit stop.
 
 CameraRecordingPresentation separates idle/starting/recording/finishing/ready/failed. Ready clips use a local URL and LocalVideoPlayer; save/ignore remains available on a retained failed clip. Busy states disable incompatible controls. Both visual surfaces disable lens switching throughout recording startup/active/finalization, including minimized recording. Window aspect follows real preview dimensions plus140pt controls and52pt chrome. Hidden content does not retain preview/player rendering; business recording continues under its domain owner.
 
@@ -122,3 +126,7 @@ CameraState.photoCaptureRotation and CameraPresentationSnapshot expose the curre
 CameraInput与UICameraContainer同文件，描述拍照/录像/背景视觉的UI输入；Shared只传递泛型请求，不解释这些操作。
 
 背景视觉容器透明，由Root提供首页底色。视频内部叠加暗色对比渐变后，以30%透明度合成到首页；该对比层只随背景视频显示，不再覆盖无视频首页。窗口内拍摄预览保持原黑色底。
+
+CameraInput uses previewID for temporary photo disposition. savedPreviewID and savedMediaID separately identify the committed preview operation and persistent album image, including later request-completion failure. Model image loading does not switch UI. CameraInput captures previewSession before queuing; gallery metadata and scoped byte reads stay separate from model selection.
+
+The recording timer and pending-video save/ignore overlay sit above the140-point shutter region, preserving their visibility over the full-height live preview.

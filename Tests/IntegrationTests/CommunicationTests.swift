@@ -40,9 +40,9 @@ actor ObservationRecorder: Agent {
     var lifecycle: AgentLifecycle = .registered
     let reject: Bool
     let blockText: String?
-    let ownedTasks: (any TaskRepository)?
+    let ownedTasks: (any WriterExecutionRepository)?
     nonisolated let admissions = AsyncStream<String>.makeStream(bufferingPolicy: .bufferingOldest(16))
-    init(id: String, reject: Bool = false, blockText: String? = nil, tasks: (any TaskRepository)? = nil) {
+    init(id: String, reject: Bool = false, blockText: String? = nil, tasks: (any WriterExecutionRepository)? = nil) {
         self.ownedTasks = tasks
         self.blockText = blockText
         self.reject = reject
@@ -67,7 +67,7 @@ actor ObservationRecorder: Agent {
             signal.scope.execution == .background
         {
             let payload = try JSONDecoder().decode([String: String].self, from: signal.data)
-            _ = try await ownedTasks.beginDelegation(
+            _ = try await ownedTasks.beginRequest(
                 delegateID: signal.scope.id, taskID: payload["taskID"],
                 goal: payload["goal"] ?? signal.goal ?? payload["request"] ?? "",
                 input: signal.scope.executor == .writer

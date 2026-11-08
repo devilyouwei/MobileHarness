@@ -18,7 +18,7 @@ private actor CameraProbe {
     var facings: [String] = []
     var failFlip = true
     var held = false
-    let mediaID = "media_1"
+    let previewID = "preview_1"
     var photoVisible = true
     var exports = 0
     var failSave = false
@@ -26,12 +26,12 @@ private actor CameraProbe {
     func photo(_ operation: PhotographerCameraIntent.Operation, id: String?, source: String) throws
         -> CameraPhotoCommandReceipt
     {
-        guard photoVisible, id == nil || id == mediaID else { throw CameraControlError.photoUnavailable }
+        guard photoVisible, id == nil || id == previewID else { throw CameraControlError.photoUnavailable }
         operations.append(operation)
         sources.append(source)
         if operation == .ignorePhoto {
             photoVisible = false
-            return .init(mediaID: mediaID, state: .ignored)
+            return .init(previewID: previewID, state: .ignored)
         }
         if failSave {
             failSave = false
@@ -39,7 +39,7 @@ private actor CameraProbe {
         }
         let already = exports > 0
         if !already { exports += 1 }
-        return .init(mediaID: mediaID, state: .saved, alreadySaved: already)
+        return .init(previewID: previewID, state: .saved, alreadySaved: already)
     }
     private var release: CheckedContinuation<Void, Never>?
     nonisolated let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
@@ -355,22 +355,22 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
 
 @Test(.actionCatalog) func photoButtonsRouteExactIdentityAndRetainFailureBeforeRetry() async throws {
     let fixture = try await CameraFixture()
-    let id = await fixture.probe.mediaID
+    let id = await fixture.probe.previewID
     await fixture.probe.denyNextSave()
     await #expect(throws: PhotographerIntentFailure.self) {
-        try await fixture.runtime.perform(.savePhoto, mediaID: id)
+        try await fixture.runtime.perform(.savePhoto, previewID: id)
     }
-    let raw = try #require(try await fixture.runtime.perform(.savePhoto, mediaID: id))
+    let raw = try #require(try await fixture.runtime.perform(.savePhoto, previewID: id))
     let saved = try JSONDecoder().decode(CameraPhotoCommandReceipt.self, from: Data(raw.utf8))
-    #expect(saved == .init(mediaID: id, state: .saved))
-    let repeated = try #require(try await fixture.runtime.perform(.savePhoto, mediaID: id))
+    #expect(saved == .init(previewID: id, state: .saved))
+    let repeated = try #require(try await fixture.runtime.perform(.savePhoto, previewID: id))
     #expect(try JSONDecoder().decode(CameraPhotoCommandReceipt.self, from: Data(repeated.utf8)).alreadySaved)
     #expect(await fixture.probe.exports == 1)
     await #expect(throws: PhotographerIntentFailure.self) {
-        try await fixture.runtime.perform(.ignorePhoto, mediaID: UUID().uuidString)
+        try await fixture.runtime.perform(.ignorePhoto, previewID: UUID().uuidString)
     }
     #expect(await fixture.probe.photoVisible)
-    let ignored = try #require(try await fixture.runtime.perform(.ignorePhoto, mediaID: id))
+    let ignored = try #require(try await fixture.runtime.perform(.ignorePhoto, previewID: id))
     #expect(try JSONDecoder().decode(CameraPhotoCommandReceipt.self, from: Data(ignored.utf8)).state == .ignored)
     #expect(await fixture.probe.photoVisible == false)
     await #expect(throws: PhotographerIntentFailure.self) { try await fixture.runtime.perform(.savePhoto) }
@@ -388,7 +388,7 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
         let input = AgentInput(
             id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text(alias))
         let call = try capabilities.resolveAction(
-            alias, parameters: ["mediaID": await fixture.probe.mediaID])
+            alias, parameters: ["previewID": await fixture.probe.previewID])
         let result = try await fixture.gateway.execute(
             OutputEnvelope(
                 source: .photographer, context: input.context, output: .actionCall(call), sequence: 1,
@@ -419,7 +419,7 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
     let caller = fixture.runtime.agent
     let input = AgentInput(
         id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("invalid photo"))
-    let call = try caller.descriptor.capabilities.resolveAction("savePhoto", parameters: ["mediaID": "invalid"])
+    let call = try caller.descriptor.capabilities.resolveAction("savePhoto", parameters: ["previewID": "invalid"])
     let result = try await fixture.gateway.execute(
         OutputEnvelope(
             source: .photographer, context: input.context, output: .actionCall(call), sequence: 1,
@@ -435,7 +435,7 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
     #expect(await fixture.probe.operations.isEmpty)
     #expect(throws: CommunicationError.self) {
         try PhotographerCameraIntent(
-            .open, mediaID: UUID().uuidString, requestID: UUID().uuidString
+            .open, previewID: UUID().uuidString, requestID: UUID().uuidString
         ).message.validatedSize()
     }
     await fixture.runtime.shutdown()

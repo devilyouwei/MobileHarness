@@ -24,14 +24,20 @@ public enum AgentChatDriver {
             self.evidence = evidence
         }
     }
-    public static func collect(_ request: ChatRequest, using capability: any ChatCapability, consumers: Consumers)
+    public static func collect(
+        _ request: ChatRequest, using capability: any ChatCapability,
+        consumers: Consumers
+    )
         async throws -> String
     {
         var measured = request
         let timing = ChatTiming()
         measured.timing = timing
-        let audit = try AgentModelRequestRecording(measured)
+        let audit = try AgentModelRequestRecording(
+            measured)
+        measured.transportCapture = audit.transportRecorder(consumers.recording)
         do {
+            try await consumers.recording(try audit.snapshot(initial: true))
             let session = try await capability.chat(measured)
             defer { session.cancel() }
             let text = AsyncThrowingStream<String, any Error>.makeStream(bufferingPolicy: .bufferingOldest(8192))

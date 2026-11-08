@@ -94,9 +94,9 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     let endpoint = BehaviorEndpoint()
     let assembly = try BehaviorAssembly(
         presentation: endpoint, playback: endpoint, pose: endpoint, historyPresentation: endpoint, camera: endpoint,
-        history: HistoryQueryService(store: ConversationHistoryStore()),
+        history: HistoryQueryService(store: AssistantHistoryStore()),
         historyMutations: HistoryMutationService(
-            store: ConversationHistoryStore(), summarizeTitle: { _ in "Unused fixture title" }),
+            store: AssistantHistoryStore(), summarizeTitle: { _ in "Unused fixture title" }),
         windows: endpoint, web: endpoint, artifacts: endpoint, island: endpoint,
         modelResources: UnusedModelResourceCapability(),
         resourcePreferences: UnusedModelResourcePreferencesCapability(), resourceInventory: UnusedResourceInventory(),
@@ -330,7 +330,7 @@ struct UnusedDeviceControl: DeviceControlCapability {
 @MainActor private final class EndpointCameraFixture: CameraControlCapability {
     private(set) var calls = 0
     let receipt = CameraPhotoCommandReceipt(
-        mediaID: "captured-photo", state: .saved, alreadySaved: true, feedbackIssues: ["first", "第二个反馈"])
+        previewID: "captured-photo", state: .saved, alreadySaved: true, feedbackIssues: ["first", "第二个反馈"])
     var failure: (any Error)?
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws { calls += 1 }
     func flip(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws { calls += 1 }
@@ -382,7 +382,7 @@ private func endpointInvocation(source: String, session: String, decision: Strin
     let endpoint = TaskControlEndpoint(rootSessionID: "root")
     await #expect(throws: ActionHostError.scopeClosed) {
         try await endpoint.controlTask(
-            "startTask", arguments: [:], invocation: endpointInvocation(source: "assistant", session: "root"))
+            "task.start", arguments: [:], invocation: endpointInvocation(source: "assistant", session: "root"))
     }
     let accepted = LockedTaskRequests()
     endpoint.handler = { operation, _, source, session, _, _ in
@@ -391,18 +391,18 @@ private func endpointInvocation(source: String, session: String, decision: Strin
     }
     await #expect(throws: ActionHostError.scopeClosed) {
         try await endpoint.controlTask(
-            "startTask", arguments: [:], invocation: endpointInvocation(source: "assistant", session: "retired"))
+            "task.start", arguments: [:], invocation: endpointInvocation(source: "assistant", session: "retired"))
     }
     await #expect(throws: CancellationError.self) {
         try await endpoint.controlTask(
-            "startTask", arguments: [:], invocation: endpointInvocation(source: "memory", session: "root"))
+            "task.start", arguments: [:], invocation: endpointInvocation(source: "memory", session: "root"))
     }
-    #expect(await accepted.values == ["startTask:memory:root"])
+    #expect(await accepted.values == ["task.start:memory:root"])
     await #expect(throws: CancellationError.self) {
         try await endpoint.controlTask(
-            "startTask", arguments: [:], invocation: endpointInvocation(source: "assistant", session: "root"))
+            "task.start", arguments: [:], invocation: endpointInvocation(source: "assistant", session: "root"))
     }
-    #expect(await accepted.values == ["startTask:memory:root", "startTask:assistant:root"])
+    #expect(await accepted.values == ["task.start:memory:root", "task.start:assistant:root"])
 }
 
 private actor LockedTaskRequests {
@@ -415,9 +415,9 @@ private actor LockedTaskRequests {
     func assemble(task: (any TaskControlCapability)?) throws -> BehaviorAssembly {
         try BehaviorAssembly(
             presentation: endpoint, playback: endpoint, pose: endpoint, historyPresentation: endpoint, camera: endpoint,
-            history: HistoryQueryService(store: ConversationHistoryStore()),
+            history: HistoryQueryService(store: AssistantHistoryStore()),
             historyMutations: HistoryMutationService(
-                store: ConversationHistoryStore(), summarizeTitle: { _ in "fixture" }),
+                store: AssistantHistoryStore(), summarizeTitle: { _ in "fixture" }),
             modelResources: UnusedModelResourceCapability(),
             resourcePreferences: UnusedModelResourcePreferencesCapability(),
             resourceInventory: UnusedResourceInventory(),

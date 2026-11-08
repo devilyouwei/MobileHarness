@@ -1,5 +1,16 @@
 import Foundation
 
+public struct PreviewImageID: RawRepresentable, Hashable, Sendable {
+    public let rawValue: String
+    public init?(rawValue: String) {
+        guard rawValue.hasPrefix("preview_") else { return nil }
+        let suffix = String(rawValue.dropFirst(8))
+        guard let number = Int64(suffix), number > 0, String(number) == suffix else { return nil }
+        self.rawValue = rawValue
+    }
+
+}
+
 /// Host owns permission, capture leases and foreground lifecycle.
 extension CameraActions {
     public enum Facing: String, Codable, Sendable { case front, back }
@@ -20,28 +31,32 @@ public struct CameraCommandReceipt: Codable, Sendable, Equatable {
 }
 
 public struct CameraPhotoReceipt: Codable, Sendable, Equatable {
-    public let mediaID: String
+    public let previewID: String
     public let width: Int
     public let height: Int
     public let mimeType: String
-    public init(mediaID: String, width: Int, height: Int, mimeType: String = "image/jpeg") throws {
+    public init(previewID: String, width: Int, height: Int, mimeType: String = "image/jpeg") throws {
         guard width > 0, height > 0, width <= 4096, height <= 4096, mimeType == "image/jpeg" else {
             throw CameraControlError.unavailable
         }
-        self.mediaID = mediaID
+        self.previewID = previewID
         self.width = width
         self.height = height
         self.mimeType = mimeType
     }
 }
-
 public struct CameraPhotoCommandReceipt: Codable, Sendable, Equatable {
     public enum State: String, Codable, Sendable { case saved, ignored }
-    public let mediaID: String
+    public let previewID: String
+    public let mediaID: String?
     public let state: State
     public let alreadySaved: Bool
     public let feedbackIssues: [String]?
-    public init(mediaID: String, state: State, alreadySaved: Bool = false, feedbackIssues: [String]? = nil) {
+    public init(
+        previewID: String, mediaID: String? = nil, state: State, alreadySaved: Bool = false,
+        feedbackIssues: [String]? = nil
+    ) {
+        self.previewID = previewID
         self.mediaID = mediaID
         self.state = state
         self.alreadySaved = alreadySaved
@@ -76,6 +91,8 @@ public struct CameraCaptureSettings: Codable, Sendable, Equatable {
 }
 
 public protocol CameraControlCapability: Sendable {
+    func loadPreviewImage(_ id: String, invocation: any FunctionInput) async throws -> String
+    func unloadPreviewImage(_ id: String, invocation: any FunctionInput) async throws -> String
     func startRecording(durationSeconds: Int?, invocation: any FunctionInput) async throws -> CameraVideoReceipt
     func waitForRecording(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt
     func stopRecording(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt
@@ -189,5 +206,14 @@ public struct CameraVideoReceipt: Codable, Sendable, Equatable {
         self.durationSeconds = durationSeconds
         self.stopReason = stopReason
         self.fileName = fileName
+    }
+}
+
+extension CameraControlCapability {
+    public func loadPreviewImage(_ id: String, invocation: any FunctionInput) async throws -> String {
+        throw CameraControlError.unavailable
+    }
+    public func unloadPreviewImage(_ id: String, invocation: any FunctionInput) async throws -> String {
+        throw CameraControlError.unavailable
     }
 }

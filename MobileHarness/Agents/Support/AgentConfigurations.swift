@@ -94,6 +94,94 @@ public enum AgentConfigurations {
             else { throw AgentConfigurationError.invalidFormat }
         }
     }
+    /// Bundled role metadata is separate from the compiled v7 function/communication contract.
+    struct Resource: Decodable {
+        struct BackgroundTask: Decodable {
+            let contract: String
+            let skills: [String]
+        }
+        let version: Int
+        let id: String
+        let description: String
+        let communication: CommunicationDeclaration
+        let baseSkills: [String]
+        let backgroundTasks: [BackgroundTask]
+        private struct Key: CodingKey {
+            let stringValue: String
+            var intValue: Int? { nil }
+            init?(stringValue: String) { self.stringValue = stringValue }
+            init?(intValue: Int) { return nil }
+        }
+        private enum CodingKeys: String, CodingKey {
+            case version, id, description, communication, baseSkills, backgroundTasks
+        }
+        init(from decoder: any Decoder) throws {
+            let all = try decoder.container(keyedBy: Key.self)
+            guard
+                Set(all.allKeys.map(\.stringValue)) == [
+                    "version", "id", "description", "communication", "baseSkills", "backgroundTasks",
+                ]
+            else { throw AgentConfigurationError.invalidFormat }
+            let fields = try decoder.container(keyedBy: CodingKeys.self)
+            version = try fields.decode(Int.self, forKey: .version)
+            guard version == 8 else { throw AgentConfigurationError.unsupportedVersion(version) }
+            id = try fields.decode(String.self, forKey: .id)
+            description = try fields.decode(String.self, forKey: .description)
+            communication = try fields.decode(CommunicationDeclaration.self, forKey: .communication)
+            baseSkills = try fields.decode([String].self, forKey: .baseSkills)
+            backgroundTasks = try fields.decode([BackgroundTask].self, forKey: .backgroundTasks)
+            guard ActionIdentifier.validName(id),
+                !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                description.utf8.count <= 2048,
+                baseSkills.count <= 16, Set(baseSkills).count == baseSkills.count,
+                baseSkills.allSatisfy({ ActionIdentifier.validName($0) }),
+                backgroundTasks.count <= 32,
+                Set(backgroundTasks.map(\.contract)).count == backgroundTasks.count,
+                backgroundTasks.allSatisfy({
+                    ActionIdentifier.validName($0.contract) && $0.skills.count <= 16
+                        && Set($0.skills).count == $0.skills.count
+                        && $0.skills.allSatisfy({ ActionIdentifier.validName($0) })
+                })
+            else { throw AgentConfigurationError.invalidFormat }
+            try communication.validate(contracts: AgentContracts.communication)
+        }
+    }
+    static func decodeResource(_ data: Data, expectedID: AgentID) throws -> Resource {
+        guard !data.isEmpty, data.count <= 65_536 else { throw AgentConfigurationError.invalidFormat }
+        let value = try JSONDecoder().decode(Resource.self, from: data)
+        guard value.id == expectedID.rawValue else { throw AgentConfigurationError.identityMismatch }
+        return value
+    }
+    private static func resource(named name: String) throws -> Resource {
+        guard let path = try catalog().agents[name] else { throw AgentConfigurationError.resourceMissing(name) }
+        return try decodeResource(
+            data(path), expectedID: AgentID(rawValue: name.prefix(1).lowercased() + name.dropFirst()))
+    }
+    public static func publicDescription(named name: String) throws -> String {
+        try resource(named: name).description
+    }
+    /// Descriptions never add a task adapter or grant. Live availability remains State data.
+    public static func delegationOverview(
+        requester: AgentID, communication: CommunicationDeclaration
+    ) throws -> String {
+        var entries: [String] = []
+        for name in try catalog().agents.keys.sorted() {
+            let value = try resource(named: name)
+            guard
+                let adapter = AgentTaskDelegation.resolve(
+                    target: AgentID(rawValue: value.id), requester: requester, communication: communication)
+            else { continue }
+            let target = try load(named: name)
+            guard target.communication.inputs.contains(where: { $0.contract == "task.request" }) else {
+                throw CommunicationError.unsupportedContract
+            }
+            try backgroundSupport(target: adapter.target, contract: adapter.businessContract, skills: [])
+            entries.append("Agent ID=\(value.id); description=\(value.description)")
+        }
+        let result = entries.joined(separator: "\n")
+        guard result.utf8.count <= 8192 else { throw AgentConfigurationError.invalidField("Agent discovery capacity") }
+        return result
+    }
     private struct Catalog: Decodable {
         let version: Int
         let agents: [String: String]
@@ -146,37 +234,22 @@ public enum AgentConfigurations {
         try catalog().skills.keys.sorted().map { try registry(skill($0).useActions) }
     }
     public static func baseSkills(named name: String) throws -> [String] {
-        guard let path = try catalog().agents[name],
-            let root = try JSONSerialization.jsonObject(with: data(path)) as? [String: Any],
-            let ids = root["baseSkills"] as? [String], ids.count <= 16, Set(ids).count == ids.count
-        else { throw AgentConfigurationError.invalidFormat }
-        return ids
+        try resource(named: name).baseSkills
     }
     public static func backgroundSupport(target: AgentID, contract: String, skills: [String]) throws {
-        struct Declaration: Decodable {
-            let contract: String
-            let skills: [String]
+        for name in try catalog().agents.keys.sorted() {
+            let value = try resource(named: name)
+            guard value.id == target.rawValue else { continue }
+            guard
+                value.backgroundTasks.contains(where: {
+                    $0.contract == contract && Set(skills).isSubset(of: Set($0.skills))
+                })
+            else { throw CommunicationError.unsupportedContract }
+            let expanded = try AgentSkillLoader.expand(skills)
+            _ = try AgentSkillLoader.registry(expanded, fixed: load(named: name).capabilities)
+            return
         }
-        struct Resource: Decodable { let backgroundTasks: [Declaration] }
-        guard
-            let path = try catalog().agents.values.first(where: { path in
-                guard let root = try? JSONSerialization.jsonObject(with: data(path)) as? [String: Any] else {
-                    return false
-                }
-                return root["id"] as? String == target.rawValue
-            })
-        else { throw CommunicationError.unavailableTarget }
-        let resource = try JSONDecoder().decode(Resource.self, from: data(path))
-        guard resource.backgroundTasks.count <= 32,
-            resource.backgroundTasks.contains(where: {
-                $0.contract == contract && Set(skills).isSubset(of: Set($0.skills))
-            })
-        else { throw CommunicationError.unsupportedContract }
-        guard let name = try catalog().agents.keys.first(where: { try load(named: $0).agentID == target }) else {
-            throw CommunicationError.unavailableTarget
-        }
-        let expanded = try AgentSkillLoader.expand(skills)
-        _ = try AgentSkillLoader.registry(expanded, fixed: load(named: name).capabilities)
+        throw CommunicationError.unavailableTarget
     }
     public static func skillInstructions(_ id: String) throws -> String {
         guard let path = try catalog().skills[id] else { throw AgentConfigurationError.resourceMissing(id) }
@@ -213,20 +286,22 @@ public enum AgentConfigurations {
     public static func titlePromptData() throws -> Data { try data("Agents/Memory/TitlePrompts.json") }
     public static func promptData(named name: String) throws -> Data {
         guard let path = try catalog().agents[name] else { throw AgentConfigurationError.resourceMissing(name) }
-        // Shared Chat templates are used only by Assistant; old histories are never reinterpreted.
+        // Each role owns its template keys; callers validate the keys they consume.
         return try data(String(path.dropLast("Agent.json".count)) + "Prompts.json")
     }
     public static func load(named name: String) throws -> AgentConfiguration {
         if let cached = cache.lock.withLock({ cache.agents[name] }) { return cached }
         guard let path = try catalog().agents[name] else { throw AgentConfigurationError.resourceMissing(name) }
-        guard var root = try JSONSerialization.jsonObject(with: data(path)) as? [String: Any],
-            root["version"] as? Int == 7, root["permissions"] == nil,
-            root["functions"] == nil, root["actions"] == nil, root["tools"] == nil
-        else { throw AgentConfigurationError.invalidFormat }
-        let expanded = try AgentSkillLoader.expand(baseSkills(named: name))
+        let metadata = try resource(named: name)
+        guard var root = try JSONSerialization.jsonObject(with: data(path)) as? [String: Any] else {
+            throw AgentConfigurationError.invalidFormat
+        }
+        let expanded = try AgentSkillLoader.expand(metadata.baseSkills)
         let generated = try declaration(AgentSkillLoader.bindings(expanded))
         root.removeValue(forKey: "baseSkills")
         root.removeValue(forKey: "backgroundTasks")
+        root.removeValue(forKey: "description")
+        root["version"] = 7
         root["actions"] = generated.actions
         root["tools"] = generated.tools
         let configuration = try AgentConfiguration(

@@ -58,9 +58,8 @@ public actor ArtifactEditing {
     public func snapshot() -> ArtifactDraft { draft }
     public func read(path: String, offset: Int = 0, limit: Int = 2500) throws -> Read {
         guard !closed else { throw ArtifactWorkspaceError.conflict }
-        guard references.count < 128 else { throw ArtifactWorkspaceError.readReferenceLimit }
+        guard nextReference < UInt64.max else { throw ArtifactWorkspaceError.conflict }
         let text = try draft.read(path, offset: offset, limit: limit)
-        guard nextReference < UInt64.max else { throw ArtifactWorkspaceError.readReferenceLimit }
         nextReference += 1
         let id = "read_\(nextReference)"
         references[id] = Selection(
@@ -75,15 +74,14 @@ public actor ArtifactEditing {
     public func readLines(path: String, line: Int, count: Int) throws -> Read {
         guard let text = draft.files[path] else { throw ArtifactWorkspaceError.missingFile }
         let lines = text.components(separatedBy: "\n")
-        guard line > 0, line <= lines.count, (1...100).contains(count) else {
+        guard line > 0, line <= lines.count, count > 0 else {
             throw ArtifactWorkspaceError.invalidReadRange
         }
         let offset = lines.prefix(line - 1).reduce(0) { $0 + $1.count + 1 }
         let length = lines.dropFirst(line - 1).prefix(count).reduce(0) { $0 + $1.count + 1 }
-        return try read(path: path, offset: offset, limit: min(2500, max(1, length)))
+        return try read(path: path, offset: offset, limit: length)
     }
     public func relatedContext(_ ids: [String]) throws -> String {
-        guard ids.count <= 8 else { throw ArtifactWorkspaceError.relatedContextLimit }
         var result = ""
         for id in ids {
             guard let ref = references[id], ref.generation == versions[ref.path, default: 0],
@@ -92,7 +90,6 @@ public actor ArtifactEditing {
             result += "\nRelated file \(ref.path), version \(ref.generation), range \(ref.start)..<\(ref.end) (data):\n"
             result += String(text.dropFirst(ref.start).prefix(ref.end - ref.start))
         }
-        guard result.utf8.count <= 24_000 else { throw ArtifactWorkspaceError.relatedContextLimit }
         return result
     }
     private func invalidate(_ path: String) {

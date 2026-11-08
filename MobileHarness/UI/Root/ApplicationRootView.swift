@@ -11,6 +11,10 @@
         @Environment(\.scenePhase) private var scenePhase
         @State private var startupError: String?
         @State private var startupStatus = "正在准备…"
+        @State private var showsWelcome = false
+        @State private var opensModelsAfterWelcome = false
+        @State private var welcomeRestoreError: String?
+        @State private var restoringWelcome = false
         public var body: some View {
             Group {
                 PersistentHomeNavigation(
@@ -66,7 +70,7 @@
                 .onChange(of: assembly.cameraState.photoAspect) { _, aspect in
                     if let item = assembly.windows.windows.first(where: { $0.content == WindowContent.camera.rawValue })
                     {
-                        assembly.windows.resizeContent(item.id, sizing: .image(aspect: aspect, controlsHeight: 140))
+                        assembly.windows.resizeContent(item.id, sizing: .image(aspect: aspect, controlsHeight: 0))
                     }
                 }
                 .onChange(of: assembly.cameraState.perceptionEnabled) { _, _ in
@@ -74,6 +78,38 @@
                 }
                 .onChange(of: keepsHomeScreenAwake, initial: true) { _, keepsAwake in
                     UIApplication.shared.isIdleTimerDisabled = keepsAwake
+                }
+                .sheet(
+                    isPresented: $showsWelcome,
+                    onDismiss: {
+                        if opensModelsAfterWelcome {
+                            opensModelsAfterWelcome = false
+                            assembly.navigate(.language)
+                        }
+                    }
+                ) {
+                    WelcomeProviderView(
+                        settings: assembly.settings,
+                        save: { url, key in
+                            let saved = await assembly.settingsControls.saveWelcomeProvider(url: url, key: key)
+                            if saved {
+                                opensModelsAfterWelcome = true
+                                showsWelcome = false
+                            }
+                            return saved
+                        }, skip: { showsWelcome = false })
+                }
+                .alert(
+                    "无法读取模型配置",
+                    isPresented: Binding(
+                        get: { welcomeRestoreError != nil },
+                        set: { if !$0 { welcomeRestoreError = nil } }
+                    )
+                ) {
+                    Button("重试") { Task { await prepareWelcome() } }
+                    Button("稍后", role: .cancel) {}
+                } message: {
+                    Text(welcomeRestoreError ?? "请稍后重试")
                 }
                 .task {
                     await prepare()
@@ -172,12 +208,25 @@
         }
 
         private func prepare() async {
-            guard container == nil, startupError == nil else { return }
+            guard startupError == nil else { return }
             do {
-                try await assembly.prepare { startupStatus = $0 }
+                if container == nil { try await assembly.prepare { startupStatus = $0 } }
+                await prepareWelcome()
             } catch is CancellationError {
                 // A disappearing scene must not publish a partially prepared container.
             } catch { startupError = String(describing: error) }
+        }
+        private func prepareWelcome() async {
+            guard !isDiagnostic, !restoringWelcome, assembly.startupIssue == nil else { return }
+            restoringWelcome = true
+            defer { restoringWelcome = false }
+            do {
+                try await assembly.settingsControls.restore()
+                try Task.checkCancellation()
+                welcomeRestoreError = nil
+                showsWelcome = assembly.settingsControls.needsWelcome
+            } catch is CancellationError {
+            } catch { welcomeRestoreError = error.localizedDescription }
         }
         @ViewBuilder
         private func content(_ container: any ApplicationSessionProviding) -> some View {

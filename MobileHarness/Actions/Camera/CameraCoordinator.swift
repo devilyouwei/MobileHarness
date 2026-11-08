@@ -7,6 +7,7 @@
     import Foundation
     import OSLog
     import PlatformKit
+    import StorageCache
     import StorageCore
     import StorageMedia
     import UI
@@ -55,6 +56,18 @@
         private var revision = 0
         private var worker: Task<Void, Never>?
         private let photos: MediaStore
+        private let cache: CacheContainer
+        public let previews: CameraPreviewStore
+        public func loadPreviewImage(_ id: String, invocation: any FunctionInput) async throws -> String {
+            try validatePreview(invocation)
+            try await previews.load(id, scope: invocation.context.sessionID)
+            return String(decoding: try previews.snapshot(scope: invocation.context.sessionID).facts, as: UTF8.self)
+        }
+        public func unloadPreviewImage(_ id: String, invocation: any FunctionInput) async throws -> String {
+            try validatePreview(invocation)
+            try previews.unload(id, scope: invocation.context.sessionID)
+            return String(decoding: try previews.snapshot(scope: invocation.context.sessionID).facts, as: UTF8.self)
+        }
         private let windows: WindowState?
         public func windowID() async -> String? {
             windows?.windows.first(where: { $0.content == WindowContent.camera.rawValue }).flatMap {
@@ -91,7 +104,7 @@
                 throw CameraControlError.disabled
             }
             guard state.lensOwner == .capture else { throw CameraControlError.lensNotOwned }
-            guard !photoSession.isBusy, state.capturedPhoto == nil, worker == nil, !changingDemand, !windowTransition
+            guard !photoSession.isBusy, worker == nil, !changingDemand, !windowTransition
             else { throw CameraControlError.busy }
             changingDemand = true
             defer { changingDemand = false }
@@ -114,7 +127,7 @@
         }
         private let photoCues: any CuePlaying
         private lazy var photoSession = CameraPhotoSession(
-            camera: camera, presentation: presentation, photos: photos, photoCues: photoCues,
+            camera: camera, presentation: presentation, previews: previews, photoCues: photoCues,
             isForeground: { [weak self] in self?.foreground ?? false },
             captureRevision: { [weak self] in self?.revision ?? -1 },
             ensureCaptureAvailable: { [weak self] in
@@ -126,6 +139,7 @@
 
         public init(
             camera: any CameraCapturing, presentation: any CameraPresenting, photos: MediaStore,
+            cache: CacheContainer = CacheContainer(),
             photoCues: any CuePlaying, windows: WindowState? = nil,
 
             makeRuntime: @escaping () throws -> CameraRuntimeDependencies,
@@ -144,6 +158,42 @@
             self.connectPerception = connectPerception
             self.camera = camera
             self.photos = photos
+            self.cache = cache
+            self.previews = CameraPreviewStore(
+                cache: cache.cameraImages,
+                prepare: { data in
+                    let jpeg = try await NativeImageCompression.jpeg(
+                        from: data,
+                        limits: .init(
+                            maximumDimension: 1568, maximumPixels: 1_048_576, maximumBytes: 1024 * 1024, quality: 0.82))
+                    let info = try await NativeAlbumImage.inspect(jpeg)
+                    return .init(data: jpeg, width: info.width, height: info.height)
+                },
+                persist: { [photos] data in
+                    let info = try await NativeAlbumImage.inspect(data)
+                    return try await photos.importPhoto(
+                        data, owner: .init(namespace: "photos", source: "album", session: "", input: ""),
+                        metadata: .init(
+                            mime: info.mime, width: info.width, height: info.height, capturedAt: info.capturedAt,
+                            origin: "camera"))
+                })
+            previews.onChange = { [weak self] in self?.publishGallery() }
+        }
+        private func publishGallery() {
+            presentation.present(
+                .gallery(
+                    previews.sessionID,
+                    previews.catalog.map {
+                        CameraPreviewItem(id: $0.previewID, status: $0.status, mediaID: $0.mediaID)
+                    }))
+        }
+        public func previewSnapshot(scope: String) throws -> MultimodalContextSnapshot {
+            previews.modelVisible = foreground && state.lensOwner == .capture
+            return try previews.snapshot(scope: scope)
+        }
+        private func validatePreview(_ invocation: any FunctionInput) throws {
+            guard !windowTransition else { throw CameraControlError.busy }
+            try previews.validateSession(invocation.context.resourceBindings["actions.camera.preview"])
         }
 
         public func stateSnapshot() async throws -> ActionsStateSnapshot {
@@ -162,8 +212,7 @@
                     "enabled": .flag(state.isEnabled), "perceptionEnabled": .flag(state.perceptionEnabled),
                     "lensOwner": state.lensOwner.map { .text($0.rawValue) } ?? .unknown,
                     "busy": .flag(state.isBusy || state.photoBusy), "needsSettings": .flag(state.needsSettings),
-                    "displayedMediaID": state.capturedPhoto?.didReachThumbnail == true
-                        ? state.capturedPhoto.map { .text($0.id) } ?? .unknown : .unknown,
+                    "displayedPreviewID": state.previews.last.map { .text($0.id) } ?? .unknown,
                     "savedMediaID": state.savedMediaID.map { .text($0) } ?? .unknown,
                     "problem": failed
                         ? .text("cameraUnavailable")
@@ -177,14 +226,17 @@
                 issues: failed ? [.init(code: "cameraFailed", impact: "cameraExecutionUnavailable")] : [])
         }
         public func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data {
-            try await photoSession.readPhoto(id, source: source, sessionID: sessionID, inputID: inputID)
+            try await photos.read(
+                id, owner: .init(namespace: "photos", source: source, session: sessionID, input: inputID))
         }
         public func ignorePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt
         {
-            try await photoSession.ignorePhoto(id, invocation: invocation)
+            try validatePreview(invocation)
+            return try await photoSession.ignorePhoto(id, invocation: invocation)
         }
         public func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
-            try await photoSession.savePhoto(id, invocation: invocation)
+            try validatePreview(invocation)
+            return try await photoSession.savePhoto(id, invocation: invocation)
         }
         public func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt {
             guard !changingDemand, !windowTransition, worker == nil else { throw CameraControlError.busy }
@@ -192,7 +244,6 @@
             changingDemand = true
             defer { changingDemand = false }
             if state.settings.mode != "photo" {
-                guard state.capturedPhoto == nil else { throw CameraControlError.busy }
                 guard foreground, state.isEnabled, state.isVisible else { throw CameraControlError.disabled }
                 guard state.lensOwner == .capture else { throw CameraControlError.lensNotOwned }
                 try await CameraCaptureConfiguration.preparePhoto(camera: camera, presentation: presentation)
@@ -210,9 +261,6 @@
             guard state.lensOwner == .capture else { throw CameraControlError.lensNotOwned }
             changingDemand = true
             defer { changingDemand = false }
-            guard state.capturedPhoto == nil || settings.mode == state.settings.mode else {
-                throw CameraControlError.busy
-            }
             try await CameraCaptureConfiguration.apply(settings, camera: camera, presentation: presentation)
         }
         public func cancelCapture(invocation: any FunctionInput) async throws {
@@ -237,11 +285,12 @@
                     do {
                         _ = try await windows.present(
                             content: .camera, title: "相机", icon: .emoji("📷"),
-                            sizing: .image(aspect: 3.0 / 4.0, controlsHeight: 140))
+                            sizing: .image(aspect: 3.0 / 4.0, controlsHeight: 0))
                     } catch let error as WindowError {
                         throw WindowExecutionFailure(error: error)
                     }
                 }
+                try previews.openSession()
                 try await setCaptureEnabled(true, invocation: invocation)
                 _ = try await presentation.waitForPhotoCaptureRotation()
                 try Task.checkCancellation()
@@ -259,7 +308,7 @@
             windowTransition = true
             presentation.present(.lensHandoff(true))
             await worker?.value
-            if photoSession.isBusy || recordingSession.changing {
+            if recordingSession.changing {
                 endWindowTransition()
                 throw CameraControlError.busy
             }
@@ -277,7 +326,7 @@
         }
         public func closeWindow(invocation: any FunctionInput) async throws {
             guard foreground else { throw CameraControlError.notForeground }
-            guard !photoSession.isBusy else { throw CameraControlError.busy }
+            await photoSession.stopAndWait()
             await worker?.value
             try Task.checkCancellation()
             if let id = recordingSession.id {
@@ -302,28 +351,24 @@
                     }
                 }
             }
-            if let photo = state.capturedPhoto, let windows,
+            let pending = previews.pendingCount
+            if pending > 0, let windows,
                 let item = windows.windows.first(where: { $0.content == WindowContent.camera.rawValue })
             {
                 if item.mode == .minimized { try await windows.change(item.id, command: .restore) }
-                if state.savedMediaID == photo.id {
-                    _ = try await ignorePhoto(photo.id, invocation: invocation)
-                } else {
-                    let choice = try await windows.ask(
-                        item.id,
-                        prompt: .init(
-                            title: "关闭前如何处理这张照片？",
-                            choices: [
-                                .init(id: "save", title: "保存"), .init(id: "discard", title: "忽略"),
-                                .init(id: "cancel", title: "取消"),
-                            ]))
-                    switch choice {
-                    case "save": _ = try await savePhoto(photo.id, invocation: invocation)
-                    case "discard": _ = try await ignorePhoto(photo.id, invocation: invocation)
-                    default: throw CancellationError()
-                    }
-                }
+                let choice = try await windows.ask(
+                    item.id,
+                    prompt: .init(
+                        title: "还有 \(pending) 张照片未保存或忽略，关闭后将清空预览。",
+                        choices: [.init(id: "return", title: "返回查看"), .init(id: "clear", title: "关闭并清空")]))
+                guard choice == "clear" else { throw CancellationError() }
             }
+            await photoSession.stopAndWait()
+            await previews.endSession()
+            presentation.present(.capturedPhoto(nil))
+            presentation.present(.savedPreviewID(nil))
+            presentation.present(.savedMediaID(nil))
+            presentation.present(.photoMessage(nil))
             try await setCaptureEnabled(false, invocation: invocation)
         }
         private func setCaptureEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {

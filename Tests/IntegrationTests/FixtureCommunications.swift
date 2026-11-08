@@ -126,7 +126,7 @@ struct FixtureNativeChatState: AgentChatContextState {
     static func systemPrompt(_ capabilities: CapabilityRegistry) throws -> String {
         try AssistantAgent.systemPrompt(capabilities: capabilities)
     }
-    var history = ConversationArchive()
+    var history = AssistantArchive()
     var admissionSequence: UInt64 = 0
     var taskViews: [String: AgentTaskView]?
     init() {}

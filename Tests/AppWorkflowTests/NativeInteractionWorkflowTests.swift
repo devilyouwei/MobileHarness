@@ -107,7 +107,7 @@ import Testing
     let controls = CameraInteractionWorkflow(
         presentation: ui.camera,
         perform: { input in
-            let (operation, facing, mediaID) = (input.operation, input.facing, input.mediaID)
+            let (operation, facing, mediaID) = (input.operation, input.facing, input.previewID)
             try await host.performCamera(operation, facing: facing, mediaID: mediaID)
         })
     var started = host.started.stream.makeAsyncIterator()
@@ -141,10 +141,11 @@ import Testing
     let state = ui.camera.state
     let controls = CameraInteractionWorkflow(
         presentation: ui.camera,
-        perform: { input in try await host.performCamera(input.operation, facing: input.facing, mediaID: input.mediaID)
+        perform: { input in
+            try await host.performCamera(input.operation, facing: input.facing, mediaID: input.previewID)
         })
-    let original = "media_1"
-    let replacement = "media_2"
+    let original = "preview_1"
+    let replacement = "preview_2"
     var started = host.started.stream.makeAsyncIterator()
     controls.savePhoto(original)
     await started.next()
@@ -165,14 +166,15 @@ import Testing
     let ui = UIContainer()
     try ui.start()
     let state = ui.camera.state
-    let id = "media_1"
+    let id = "preview_1"
     var calls = 0
     let controls = CameraInteractionWorkflow(
         presentation: ui.camera,
         perform: { input in
-            let selected = input.mediaID
+            let selected = input.previewID
             calls += 1
             state.savedMediaID = selected
+            state.savedPreviewID = selected
             throw CancellationError()
         })
     controls.savePhoto(id)
@@ -213,7 +215,8 @@ import Testing
     let host = HeldInteraction()
     let controls = CameraInteractionWorkflow(
         presentation: ui.camera,
-        perform: { input in try await host.performCamera(input.operation, facing: input.facing, mediaID: input.mediaID)
+        perform: { input in
+            try await host.performCamera(input.operation, facing: input.facing, mediaID: input.previewID)
         })
     var started = host.started.stream.makeAsyncIterator()
     controls.toggle()

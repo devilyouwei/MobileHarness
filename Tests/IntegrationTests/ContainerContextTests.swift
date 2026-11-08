@@ -353,7 +353,8 @@ private actor ContextReadBarrier {
     #expect(
         names
             == (FixedPlatformState.sourceNames + [
-                "actions.camera", "agents.applicationcontrol", "agents.writer", "platform.vision.camera", "ui.album",
+                "actions.camera", "actions.camera.preview", "agents.applicationcontrol", "agents.writer",
+                "platform.vision.camera", "ui.album",
                 "ui.camera",
                 "ui.navigation", "ui.windows", "ui.island",
             ]).sorted())
@@ -372,7 +373,7 @@ private actor ContextReadBarrier {
     let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
     try skills.initialize(fixed: fixed, baseSkills: ["basic-skill"])
     _ = try skills.control(
-        "startTask", arguments: ["goal": "拍照"], inputID: "input", fixed: fixed,
+        "task.start", arguments: ["description": "拍照"], inputID: "input", fixed: fixed,
         sessionID: "one", taskID: try fixtureTaskID())
     let snapshot = skills.contextSnapshot(session: "one")
     #expect(snapshot.task?.goal == "拍照" && snapshot.task?.status == "running")
@@ -653,6 +654,7 @@ private func bundledStateSkillIDs() throws -> [String] {
             [
                 "actions": { @Sendable in ActionsStateSnapshot(path: "actions") },
                 "actions.camera": { @Sendable in ActionsStateSnapshot(path: "actions.camera") },
+                "actions.camera.preview": { @Sendable in ActionsStateSnapshot(path: "actions.camera.preview") },
                 "actions.robot": { @Sendable in ActionsStateSnapshot(path: "actions.robot") },
                 "actions.robot.motion": { @Sendable in ActionsStateSnapshot(path: "actions.robot.motion") },
             ]

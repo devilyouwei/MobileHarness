@@ -63,3 +63,5 @@ ProviderSettingsClient is an Actions-owned facade with coalesced restoration (at
 模型发现按稳定 Provider ID 缓存，页面进入刷新两个已选 Provider，切换 Provider 和编辑凭据自动查询；同 Provider 可共享列表而不共享 Agent 的模型选择。返回值经 ApplicationControl/Gateway 后由表单控制器呈现，凭据快照/请求 ID 阻止迟到覆盖。最多 32 个查询（包括尚未退出的取消任务），溢出明确显示错误；离页取消，根关闭加入。刷新不清空已保存模型，失败提供重试。保存仍走既有业务事务，密钥留钥匙串。
 
 Writer配置的writerThinking是独立选择，默认false；可选持久覆盖缺省表示当前角色默认低思考。恢复/保存/回滚通过原有事务传递，不改Provider/模型选择。新委托/续作模型选择按布尔值选择minimum/enabled，Assistant保持minimum；当前执行及其恢复时的模型选择持有原配置。
+
+首次 Welcome 使用同一 SettingsOperating 保存完整 Provider 配置，沿 ApplicationControl/Gateway 请求与现有 ProviderSettingsService/ProviderSettingsStore 事务写入。仅新增 Provider 且尚未选择角色模型时保持既有本地配置；密钥仍经 credentialID 引用保存到钥匙串。Welcome 不引入新的凭据仓库、发现端点或模型默认策略。

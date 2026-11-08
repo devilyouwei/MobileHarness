@@ -19,6 +19,7 @@ public protocol HistoryQueryCapability: Sendable {
 }
 
 public protocol HistoryMutationCapability: Sendable {
+    func clearRequestLogs(requestID: String?) async throws
     func deleteArchived(_ id: String) async throws
     func startNew() async throws -> String?
     func summarizeArchived(_ id: String) async throws
@@ -26,4 +27,8 @@ public protocol HistoryMutationCapability: Sendable {
 
 public protocol HistoryPresentationCapability: Sendable {
     func showHistory(invocation: any FunctionInput) async throws
+}
+
+extension HistoryMutationCapability {
+    public func clearRequestLogs(requestID: String?) async throws { throw HistoryQueryError.unavailable }
 }

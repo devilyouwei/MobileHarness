@@ -9,12 +9,13 @@ import PlatformKit
 import StorageCache
 import StorageChat
 import StorageCore
-import StorageMedia
 import UI
 
 /// App binds native services to these narrow role-facing ports. No business implementation is imported.
 @MainActor public protocol AgentCameraAccess: AnyObject, Sendable {
     func pauseVisionForModelMaintenance() async
+    func previewSnapshot(scope: String) async throws -> MultimodalContextSnapshot
+    func resetPreviewSelection(scope: String) async
     func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data
 }
 @MainActor public protocol AgentDeviceAccess: AnyObject, Sendable {
@@ -72,13 +73,12 @@ import UI
 }
 public typealias AgentMaintenancePorts = ActionMaintenancePorts<any ModelArtifactsManaging>
 public typealias AgentBusinessRequest = ActionAssemblyRequest<
-    ConversationHistoryStore, any ActivityPresenting,
-    any ExecutionFailureReporting, any ModelArtifactsManaging, StoredConversation
+    AssistantHistoryStore, any ActivityPresenting,
+    any ExecutionFailureReporting, any ModelArtifactsManaging, AssistantConversation
 >
 @MainActor public struct AgentBusinessBindings {
     public let artifactStreaming: (any ArtifactStreaming)?
     public let writerArtifacts: (any WriterArtifactsControlling)?
-    public let writerPhotos: MediaStore?
     public let writerModel: (@Sendable () async throws -> ChatModel)?
     public let executor: ActionsExecutionPort
     public let catalog: ActionCatalogSnapshot
@@ -101,7 +101,6 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
         executor: ActionsExecutionPort, catalog: ActionCatalogSnapshot,
         artifactStreaming: (any ArtifactStreaming)? = nil,
         writerArtifacts: (any WriterArtifactsControlling)? = nil,
-        writerPhotos: MediaStore? = nil,
         writerModel: (@Sendable () async throws -> ChatModel)? = nil,
         settings: any ProviderSettingsStaging, discovery: any ProviderDiscoveryStaging,
         providerPresentation: any ProviderPresentationRegistering, tasks: any TaskControlBinding,
@@ -120,7 +119,6 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
     ) {
         self.artifactStreaming = artifactStreaming
         self.writerArtifacts = writerArtifacts
-        self.writerPhotos = writerPhotos
         self.writerModel = writerModel
         self.executor = executor
         self.catalog = catalog

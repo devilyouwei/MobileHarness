@@ -2,6 +2,7 @@ import Foundation
 
 /// Opaque correlation supplied by the host; no Agent, permissions or scheduling state.
 public struct ActionExecutionContext: Equatable, Sendable {
+    public let resourceBindings: [String: String]
     public let source: String
     public let sessionID: String
     public let inputID: String
@@ -13,8 +14,10 @@ public struct ActionExecutionContext: Equatable, Sendable {
     public let taskExecutor: String?
     public init(
         source: String, sessionID: String, inputID: String, sequence: UInt64 = 0, correlationID: String? = nil,
-        ordinal: UInt64? = nil, decisionID: String? = nil, taskID: String? = nil, taskExecutor: String? = nil
+        ordinal: UInt64? = nil, decisionID: String? = nil, taskID: String? = nil, taskExecutor: String? = nil,
+        resourceBindings: [String: String] = [:]
     ) {
+        self.resourceBindings = resourceBindings
         self.source = source
         self.sessionID = sessionID
         self.inputID = inputID

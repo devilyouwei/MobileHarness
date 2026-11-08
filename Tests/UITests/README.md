@@ -12,6 +12,8 @@ WindowStateTests 验证窗口在向左右拖动、Action位置更新及安全区
 
 ✅ PersistentHomeNavigationTests 在 macOS 原生 SwiftUI/AppKit 窗口中挂载与生产相同的常驻导航容器，验证多层 push/pop、覆盖时首页原生视图身份/窗口挂载、持续状态更新与 page task 不取消，以及根销毁时清理。该回归不替代 iPhone 的 Core Animation、语音和物理动作验收。
 
+Writer 记录呈现回归覆盖任务日期/轮数且无任务状态字段、三种请求协议中的工具配对及当前输入选择、清日志后业务输入/文本/工具结果保留。WriterRecordsNativeAcceptance 使用更新时间、文件名标题与文本默认收起/点击展开的页面断言；该 iOS 验收需独立启用，不以 Swift 值测试替代。
+
 ## 当前用例
 
 | 文件 | 契约 |
@@ -23,7 +25,7 @@ WindowStateTests 验证窗口在向左右拖动、Action位置更新及安全区
 | ConversationHistoryPresentationTests | 请求行/任务索引、分页游标与重试、原始 JSON/图像引用、时间/缺失值、初次加载 gate 和返回详情保留页状态；native-only/mixed Tool Call 展示、实际结果/失败保留与未测计时不补造 |
 | ExecutionLogTests | 完整子错误、Channel/task 分组、终态/取消与展示值 |
 | EyeGeometryTests / ListeningMotionTests | 几何、眼睛/聆听运动、epoch 和有限状态 |
-| PhotoDepartureTests | 照片退出状态、身份 fence 与完成条件 |
+| CameraGalleryTests | 稳定ID分页、首尾边界、FIFO当前页回退、目录状态与会话清屏 |
 
 测试操作使用注入结果及明确完成信号；执行结果到 UI 值的映射属于 AppWorkflowTests。历史页的返回保留检查验证 gate/缓存状态，不声称已验证 native List 的真实滚动位置。
 
@@ -210,7 +212,7 @@ Caption lifecycle coverage retains user/reply text across listening off/on and v
 
 WebPageTests 的真实 macOS WebKit 回归覆盖同文档/节点/原生表面身份、相对 CSS 更新、脚本禁用、插入内容的阅读锚点、缩放、样式失败保留旧画面、取消更新不改变画面及交互期不主动滚动；完整脚本导航验证视口恢复。WebSimulatorAcceptance 在实际 iOS WebView 中验证多次增量更新、原生缩放/滚动继续和完整运行恢复；它使用程序化滚动，不替代真机手势验收。scripts/test-webkit-simulator.sh 可通过 WEBKIT_SIMULATOR_ID 指定设备。
 
-ConversationHistoryPresentationTests 验证Writer累计终止执行时长不随查看时间增长、仅当前执行递增，以及缺失首token/结束证据显示未知。Writer原生页面验收另核对耗时字段和折叠交互。
+ConversationHistoryPresentationTests 验证 Writer 任务仅投影日期和轮数、不携带执行状态，并验证请求缺失首 token/结束证据时显示未知。Writer 原生页面验收核对更新时间、默认收起、点击展开的文本回复及 Generation Meta；工具参数和结果仍可折叠。
 
 WindowStateTests覆盖元信息更新不聚焦/恢复/移动正常frame，并允许后台缓存；Web工具栏副标题通过通用参数注入。角色生成标题/操作语义由集成测试验证。
 
@@ -219,3 +221,9 @@ WindowStateTests覆盖元信息更新不聚焦/恢复/移动正常frame，并允
 WriterRecordsNativeAcceptance同时核对Settings首页英文标题、User四项命名及纵向顺序，使用稳定导航标识继续原有任务记录流程。
 
 记录列表日期测试覆盖时区跨年边界和同年短格式；原生验收保留现有数据，打开My Assistant核对分区并截图，再继续My Writer任务/文件流程，不点击新建或删除会话。
+
+Assistant 详情回归验证日志清空后的内存副本和导出移除请求/生成 meta，同时保留 Task/Skill/State/Catalog 业务证据；State 选择区分未记录与空列表。页面颜色、图标和原生列表布局需独立视觉验收。
+
+WriterRecordPages 值测试覆盖已加载两页后的首次成功标志、末页反复刷新不恢复虚假游标、去重和新增记录、显式刷新及取消提交保留列表。它验证页面持有的分页状态，不等同于 SwiftUI 导航点击/滚动的真机验收。
+
+`testDelegationWorkspaceSeparation` opens the delegation list/detail, enters the workspace flow, exhausts its pages, traces a message back to its delegation, and verifies loaded rows remain after returning. Run it with `WRITER_UI_ONLY_TEST=testDelegationWorkspaceSeparation` and the synthetic fixture exported by `writerDelegationAndWorkspaceMessagesHaveImmutableScopes`.

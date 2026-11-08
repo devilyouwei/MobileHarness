@@ -1,10 +1,16 @@
 # IntegrationTests
 
+WriterHistory 集成回归覆盖本轮 user/tool 输入快照和工具目录的 SQLite 重开、输入独立 checkpoint、日志清除后保留与 UI DTO 投影；任务摘要检查开始时间、更新时间及轮数，内部执行状态仍独立验证。
+
 ## 职责与构造边界
 
 通过真实 Agent/Gateway/Action/Tool/Storage 接口和注入模型、设备及呈现端点验证跨模块契约。ActionCatalogFixture 在每个作用域安装相同不可变生产声明；并发、失败与完成使用显式 gate/反馈同步。常规用例不推理真实模型、不控制硬件；真实 provider 和串口验收必须单独启用。
 
 ## 当前覆盖
+
+BasicSkill 控制教学回归检查九个已注册别名均有独立效果说明，打包指令包含 Skill/Task/State 的区分与跨请求生效规则。已有 AgentTaskSkillTests 验证 Task 持有项的显式释放仍保留活动目标、非法释放原子拒绝、初始 Skill 接管及终态清理；资源教学不引入具体业务例子或业务 Skill ID。
+
+PromptTemplateTests 动态枚举 Catalog 中所有非基础 Skill，验证默认请求可发现它们，但其私有指令/函数未加载；解析测试侧 loadSkills 调用、提交真实 Skill 状态后，下一请求获得对应教学/函数，旧目录仍拒绝新增函数。BasicSkill 的通用教学不包含这些业务 Skill ID。QwenWorkflowEvaluationTests 为 browse 返回明确标注的合成文本或失败；不打开网站、不生成截图，模型决策结果不能当作真实网页访问验收。
 
 PromptTemplateTests 验证摄影完成示例先单独解析为 Camera.Capture.close，下一示例才允许 Agent.Task.finishTask；装配提示保留关闭失败、独立视觉及重拍分支。此处验证资源和解析契约，不代表真实模型会遵循收尾流程。
 
@@ -232,7 +238,7 @@ Web Skill教学回归逐字符解析实际Instructions.md中的XML示例，使�
 Skill状态回归覆盖任意新路径无需Assistant登记、生产者完整Business嵌套、未知来源与有效来源混合采集、诊断固定原因码及关闭/取消/容量边界。旧字段白名单断言改为公开Business与内部Runtime的分类边界。
 
 
-Writing 替代旧绘图 Skill，原生工具覆盖纳入统一能力测试；agents.writer 被纳入全部 Skill 状态读取测试的显式 Agent fixture。
+作品库仅由 Writer 原生工具拥有；回归覆盖 writing 加载失败、Assistant 不暴露作品库入口、仅查询时不创建工作区，以及打开/删除和错误目标；agents.writer 被纳入全部 Skill 状态读取测试的显式 Agent fixture。
 
 WriterAgentTests 通过真实 AgentManager/通信与 Gateway DirectExecutionDispatcher 连接脚本模型和实际作品存储，验证后台接纳、流式编辑、发布与终态回报；呈现是明确 fixture。
 
@@ -304,3 +310,33 @@ Large-source persistence verifies responses above256KiB and tool results above64
 WorkspaceRepositoryTests owns relational catalog integration: over-8MiB independent projects, draft/version reopen, concurrent CAS, stale writes and deletion cleanup retry. AppWorkflowTests does not import the SQLite backend.
 
 Agent展示所有权回归在IslandIntegrationTests、VoiceTests和AssistantChatTests：验证各角色通过自身Gateway身份独立发布/结束，展示不可用重试，合成完成与播放完成区分，迟到结束与停机隔离，以及同一路径按LLM/内部来源决定ReACT。模型文本测试和历史预览同时接受显式action与代码展开runtimeAction；诊断装配包含实际Island执行工具。所有语音/模型结果使用测试替身，不代表原生音频或真实模型验收。
+
+Preview regressions cover session-local IDs, FIFO20, failed reservation retention, save/ignore flags and reload, session close/reopen and late-load fencing, scoped history expiry with independent album persistence, visibility suspension, private execution/audit bindings and original-user image merging.
+
+StorageSchemaTests exercises persisted request details referencing one preview across user turns, live-cache history reads without State mutation, new scoped references expiring after close/reopen while album bytes remain independently readable, unscoped/old-session expiry even when album records exist, no persisted preview identity, and independent album reads after database reopening.
+
+DatabaseTableRecordTests round-trips all eleven table models against real SQLite (optional fields, BLOBs, identity and composite keys), checks FK integrity, status updates preserving summary fields, and rollback of device selection/file-index replacement. HistoryIntentTests sends single/global clear requests through UIHistoryContainer → Memory → Gateway → History Action → SQLite and reloads the cleared Prompts projection.
+
+DatabaseTableRecordTests also verifies that unknown schema versions and populated unversioned databases are rejected without deleting records, initializing domain tables or advancing user_version. These are temporary SQLite fixtures, not device migration acceptance.
+
+Native State notification tests wait for observable snapshot changes with a bounded 15-second host-scheduling budget. Exact sample counts, failure recovery and post-stop assertions remain required; this test-only budget does not change production debounce or clock behavior.
+
+Assistant State 选择回归验证每轮快照跟随实际 Skill 选择变化，SQLite decision_json 往返以及删除请求日志后仍保留已记录路径。测试不读取当前 State 重建历史。
+
+## Prompt ownership coverage
+
+AgentConfigurationTests cover v8 public role metadata projected to the v7 compiled contract, missing/invalid/oversized descriptions, unknown fields and identity mismatch. PromptTemplateTests cover instance-permission filtering, exclusion of unsupported peers and private instructions, generic peer Task teaching, and Writer format/retry templates. Existing task, cancellation, library and Writer workflow tests exercise the execution boundary independently of public descriptions.
+
+## Writer JSON prompt evaluation
+
+WriterModelEvaluationTests loads writer-workflows.json when MH_WRITER_EVAL_SCENARIOS is supplied. Each case has isolated SQLite/files and actual Writer/Gateway/ArtifactService. WriterPromptHost uses production ArtifactPresentation, WebPageContainer and WindowState with a mobile viewport; the desktop host acknowledges animation transitions. It records presentation/DOM/window facts and available screenshots; this is not physical iOS acceptance. Provider requests use the same Writer resource assembly and native tool schemas as production. Incoming requests carry goals and optional real work references, never caller-assigned task/workspace IDs. Scenario scoring and synthetic seeds remain evaluation data. Legacy six-case selection remains for historical workflow comparison using the current admission contract.
+
+矩阵宿主通过 bindCommunications 接入实际通信存储，追问回答与取消使用同一持久化通道。无预设回答的等待状态直接记录，不把等待当完成。工具统计来自完整请求轨迹，避免有界历史截断漏算；金额包含断言接受千位逗号，局部替换仍验证完整字节等价。文件、窗口和语义人工复核独立报告。
+
+Writer cohesion regressions use scripted models with real Gateway, Artifacts, SQLite and history: goal-only lookup/edit, clarification then selection, read-before-select recovery without an empty workspace, explicit no-file explanation, premature finish followed by render and identical finish, explanation rejection after editing, and cross-target selection rejection after editing. Admission rejects caller-supplied taskID/workspaceID. Reopen checks preserve provider call IDs, paired outcomes, prior request history and current request/task association. Repository tests verify invalid targets, held leases and cancellation reject atomically. These are deterministic business tests, separate from real-model and native-window acceptance.
+
+Test-owned single- and multi-Skill task.start calls are validated against the default canonical catalog and committed to task/Skill state. These fixtures expose their functions and instructions on the next request without a separate loadSkills; unknown initial Skills leave both task and catalog unchanged. Existing Assistant/Gateway photography tests cover the full request boundary with scripted models.
+
+WriterContainer 分页回归使用真实 SQLite 和 WriterHistory，通过 0/19/20/21/40 条请求及任务列表验证准确末页、最多 20 条输出、前瞻不遗漏/重复和稳定重复查询；不调用真实模型。
+
+Writer separation regression uses real temporary SQLite: immutable preflight/workspace scope, two delegations sharing one workspace, exact 20/40 pagination, unique entries and supplemental input, terminal results without a workspace, restart interruption, high message keys independent of revision, tombstones, and fail-closed format reset preserving service configuration. `WRITER_SEPARATION_UI_SEED` optionally exports the synthetic two-delegation/40-message fixture for the native simulator runner; it does not call a model or read device data.

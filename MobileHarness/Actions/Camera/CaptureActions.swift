@@ -2,21 +2,21 @@ import Foundation
 import FunctionContracts
 import StorageCore
 
-/// Camera.Capture function ownership; current invocation paths remain compatible.
+/// Camera.Capture owns capture, preview selection and disposition.
 extension CameraActions {
     @Action(
         domain: "Camera", module: "Capture", title: "savePhoto",
         doc:
-            "Collect the preview into the App album, then join departure/cue. Failure retains preview. Receipt reports committed save and feedbackIssues; repeated exact saved ID is idempotent. Phone Photos export is only in the album page.",
+            "Save the exact current-session preview original to the App album, mark it saved and unload it from model State. Keep the cached original available to browse or load again until eviction/Camera close. Failure preserves the prior status. Repeated save is idempotent; feedbackIssues do not undo a committed save.",
         parameters: [
             .init(
-                "mediaID", type: .string, required: true, description: "Exact captured photo String.",
-                constraints: "A mediaID from actual capture feedback.")
+                "previewID", type: .string, required: true, description: "Exact cached preview identity.",
+                constraints: "A previewID from capture feedback or actions.camera.preview State.")
         ], timeout: .seconds(60))
     public static func savePhoto(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws
         -> String
     {
-        let id = try selectedMediaID(invocation)
+        let id = try selectedPreviewID(invocation)
         try Task.checkCancellation()
         return String(
             decoding: try JSONEncoder().encode(await camera.savePhoto(id, invocation: invocation)), as: UTF8.self)
@@ -25,29 +25,29 @@ extension CameraActions {
     @Action(
         domain: "Camera", module: "Capture", title: "ignorePhoto",
         doc:
-            "Join the displayed preview's discard animation/cue and remove it. Does not delete album photos or private image evidence. Receipt includes optional feedbackIssues; camera remains open.",
+            "Mark the exact current-session preview ignored and unload its State selections, retaining the original for browsing or loading again. Does not delete album photos; already saved photos cannot be ignored. Receipt includes optional feedbackIssues.",
         parameters: [
             .init(
-                "mediaID", type: .string, required: true, description: "Exact captured photo String.",
-                constraints: "A mediaID from actual capture feedback.")
+                "previewID", type: .string, required: true, description: "Exact cached preview identity.",
+                constraints: "A previewID from capture feedback or actions.camera.preview State.")
         ])
     public static func ignorePhoto(invocation: any FunctionInput, using camera: any CameraControlCapability)
         async throws
         -> String
     {
-        let id = try selectedMediaID(invocation)
+        let id = try selectedPreviewID(invocation)
         try Task.checkCancellation()
         return String(
             decoding: try JSONEncoder().encode(await camera.ignorePhoto(id, invocation: invocation)), as: UTF8.self)
     }
 
-    private static func selectedMediaID(_ invocation: any FunctionInput) throws -> String? {
+    private static func selectedPreviewID(_ invocation: any FunctionInput) throws -> String? {
         let arguments = ActionArguments(invocation.call.parameters)
-        try arguments.validateAllowedKeys(["mediaID"])
-        guard invocation.call.parameters["mediaID"] != nil else { return nil }
-        let raw = try arguments.requiredString("mediaID", maximumUTF8Bytes: 36)
-        guard let id = BusinessRecordID(rawValue: raw), id.kind == .media else {
-            throw ActionArguments.ValidationError.invalidValue("mediaID")
+        try arguments.validateAllowedKeys(["previewID"])
+        guard invocation.call.parameters["previewID"] != nil else { return nil }
+        let raw = try arguments.requiredString("previewID", maximumUTF8Bytes: 64)
+        guard let id = PreviewImageID(rawValue: raw) else {
+            throw ActionArguments.ValidationError.invalidValue("previewID")
         }
         return id.rawValue
     }
@@ -55,7 +55,7 @@ extension CameraActions {
     @Action(
         domain: "Camera", module: "Capture", title: "takePhoto",
         doc:
-            "Open or restore the Camera window, prepare photo mode and capture once; return mediaID/image evidence. No separate openCamera needed. Does not save to Photos.",
+            "Open or restore the Camera window, prepare photo mode and capture once; return previewID/image evidence. No separate openCamera needed. Keeps the original in temporary memory; does not save to an album.",
         parameters: [], timeout: .seconds(110))
     public static func takePhoto(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws
         -> String
@@ -182,5 +182,30 @@ extension CameraActions {
         try ActionArguments(invocation.call.parameters).validateAllowedKeys([])
         try await camera.cancelCapture(invocation: invocation)
         return "{\"countdown\":null}"
+    }
+}
+
+extension CameraActions {
+    @Action(
+        domain: "Camera", module: "Capture", title: "加载预览图片",
+        doc:
+            "Load a cached preview into multimodal State across turns. Selects at most three explicit images plus the latest; FIFO eviction can expire selections. Saved or ignored images still in the session cache can be loaded. Does not change the UI or read the album.",
+        parameters: [.init("previewID", required: true, description: "Exact previewID from actions.camera.preview.")])
+    public static func loadPreviewImage(invocation: any FunctionInput, using camera: any CameraControlCapability)
+        async throws -> String
+    {
+        guard let id = try selectedPreviewID(invocation) else { throw CameraControlError.photoUnavailable }
+        return try await camera.loadPreviewImage(id, invocation: invocation)
+    }
+    @Action(
+        domain: "Camera", module: "Capture", title: "卸载预览图片",
+        doc:
+            "Remove an explicit image selection without deleting cached bytes. The latest photo remains loaded automatically.",
+        parameters: [.init("previewID", required: true, description: "Exact previewID from actions.camera.preview.")])
+    public static func unloadPreviewImage(invocation: any FunctionInput, using camera: any CameraControlCapability)
+        async throws -> String
+    {
+        guard let id = try selectedPreviewID(invocation) else { throw CameraControlError.photoUnavailable }
+        return try await camera.unloadPreviewImage(id, invocation: invocation)
     }
 }

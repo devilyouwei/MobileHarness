@@ -1,41 +1,40 @@
 import Foundation
+import FunctionContracts
 import PlatformKit
 import StorageChat
 import StorageCore
 import UI
 
-public enum HistoryImageLoadingError: Error { case invalidReference, busy, oversizedImage, missingImage }
+public enum HistoryImageLoadingError: Error { case invalidReference, busy }
 
 /// One root-owned history operation slot. Cancel keeps admission closed until cleanup finishes.
 @MainActor
 public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
     public let state: any HistoryPresenting
+    private let clearLogs: @MainActor (String?) async throws -> Void
     private let deleteArchive: @MainActor (String) async throws -> Void
     private let refresh: @MainActor () async throws -> Void
     private let prepare: @MainActor () async throws -> Void
     private let startNewArchive: @MainActor () async throws -> Void
     private let summarizeArchive: @MainActor (String) async throws -> Void
-    private let previewOutput: @MainActor (HistoryTurn) -> String
     private let readConversation: @MainActor (String) async throws -> HistoryConversation
     private let readMessage: @MainActor (String) async throws -> HistoryConversation
     private let readPage: @MainActor (String, UInt64, String?) async throws -> HistoryConversation
     private let readArchives: @MainActor (Int64) async throws -> [HistoryConversation]
-    private let readPhoto: @MainActor (String, String) async throws -> Data?
-    private var photoReads: Set<UUID> = []
     private var detailTurns: [String: HistoryTurn] = [:]
     private var loaded = false
     private var stopped = false
     private var task: Task<Void, Never>?
     private var archivePageTask: Task<Void, Never>?
     public init(
-        state: any HistoryPresenting, prepare: @escaping @MainActor () async throws -> Void,
+        state: any HistoryPresenting,
+        clearLogs: @escaping @MainActor (String?) async throws -> Void = { _ in throw HistoryDetailError.unavailable },
+        prepare: @escaping @MainActor () async throws -> Void,
         refresh: @escaping @MainActor () async throws -> Void,
         deleteArchive: @escaping @MainActor (String) async throws -> Void,
         startNew: @escaping @MainActor () async throws -> Void,
         summarize: @escaping @MainActor (String) async throws -> Void,
-        previewOutput: @escaping @MainActor (HistoryTurn) -> String,
         readConversation: @escaping @MainActor (String) async throws -> HistoryConversation,
-        readPhoto: @escaping @MainActor (String, String) async throws -> Data?,
         readMessage: @escaping @MainActor (String) async throws -> HistoryConversation = { _ in
             throw HistoryDetailError.unavailable
         },
@@ -46,14 +45,13 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
             throw HistoryDetailError.unavailable
         }
     ) {
+        self.clearLogs = clearLogs
         self.deleteArchive = deleteArchive
         self.refresh = refresh
         self.state = state
         self.prepare = prepare
         self.startNewArchive = startNew
         self.summarizeArchive = summarize
-        self.previewOutput = previewOutput
-        self.readPhoto = readPhoto
         self.readConversation = readConversation
         self.readMessage = readMessage
         self.readPage = readPage
@@ -180,7 +178,7 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
                 state.present(.isBusy(false))
                 task = nil
             }
-            do { try await operation() } catch ConversationHistoryError.busy {
+            do { try await operation() } catch AssistantHistoryError.busy {
                 state.present(.status("正在回复或处理输入，请结束后再开始新对话。"))
             } catch { state.present(.status("历史操作失败：\(error)")) }
         }
@@ -194,6 +192,12 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
     }
     public func cancel() { task?.cancel() }
     public func waitUntilIdle() async { await task?.value }
+    public func clearRequestLogs(requestID: String?) async throws {
+        guard !stopped, !state.isBusy else { throw HistoryImageLoadingError.busy }
+        try await clearLogs(requestID)
+        detailTurns.removeAll()
+        try await refresh()
+    }
     public func imageData(_ id: String, for turnID: String) async throws -> Data? {
         try Task.checkCancellation()
         guard let archive = state.archive else { throw HistoryImageLoadingError.invalidReference }
@@ -207,30 +211,16 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
         guard let turn, turn.attachedImages.contains(where: { $0.id == id }) else {
             throw HistoryImageLoadingError.invalidReference
         }
-        guard photoReads.count < 4 else { throw HistoryImageLoadingError.busy }
-        let token = UUID()
-        photoReads.insert(token)
-        defer { photoReads.remove(token) }
-        guard let mediaID = BusinessRecordID(rawValue: id), mediaID.kind == .media,
-            let inputID = UUID(uuidString: turn.ownerInputID ?? turn.id)
-        else { throw HistoryImageLoadingError.invalidReference }
-        let data = try await readPhoto(mediaID.rawValue, inputID.uuidString)
-        try Task.checkCancellation()
-        guard let data else { throw HistoryImageLoadingError.missingImage }
-        guard !data.isEmpty && data.count <= 4 * 1024 * 1024 else {
-            throw HistoryImageLoadingError.oversizedImage
-        }
-        return data
+        if let data = HistoryRecordedImages.data(id, json: turn.requestParametersJSON) { return data }
+        throw HistoryImageAvailabilityError.expired
     }
-    public func preview(_ turn: HistoryTurn) -> String { previewOutput(turn) }
 }
 
 extension ConversationHistoryWorkflow {
     /// Reuses the same paged history presentation for a separately scoped Agent repository.
     @MainActor public static func records(
-        store: ConversationHistoryStore, state: ConversationHistoryState,
-        mutate: @escaping @MainActor (String, String?) async throws -> Void,
-        readPhoto: @escaping @MainActor (String, String) async throws -> Data? = { _, _ in nil }
+        store: AssistantHistoryStore, state: ConversationHistoryState,
+        mutate: @escaping @MainActor (String, String?) async throws -> Void
     )
         -> ConversationHistoryWorkflow
     {
@@ -240,7 +230,7 @@ extension ConversationHistoryWorkflow {
             state.present(snapshot, status: nil)
         }
         return ConversationHistoryWorkflow(
-            state: state, prepare: {}, refresh: refresh,
+            state: state, clearLogs: { try await mutate("clearLogs", $0) }, prepare: {}, refresh: refresh,
             deleteArchive: { id in
                 try await mutate("delete", id)
                 try await refresh()
@@ -252,9 +242,8 @@ extension ConversationHistoryWorkflow {
             summarize: { id in
                 try await mutate("title", id)
                 try await refresh()
-            }, previewOutput: { $0.response },
+            },
             readConversation: { try await HistoryPresentationAdapter.conversation(store.page($0)) },
-            readPhoto: readPhoto,
             readMessage: { try await HistoryPresentationAdapter.conversation(store.message($0)) },
             readPage: { try await HistoryPresentationAdapter.conversation(store.page($0, after: $1, taskID: $2)) },
             readArchives: { cursor in

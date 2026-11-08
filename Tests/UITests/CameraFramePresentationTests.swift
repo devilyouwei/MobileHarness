@@ -786,3 +786,20 @@ extension NativePresentationTests {
     }
     await root.stop()
 }
+
+@Test @MainActor func fullCameraSurfaceFillsTheControlOverlayAreaWithoutLetterboxing() throws {
+    for orientation in CameraInterfaceOrientation.allCases {
+        let size = CGSize(width: 400, height: 700)
+        let geometry = CameraPreviewGeometry(
+            frame: try orientedFrame(rotation: 0), size: size, orientation: orientation, fitsImage: false)
+        let topLeft = geometry.project(.zero, mirrored: false)
+        let bottomRight = geometry.project(CGPoint(x: 1, y: 1), mirrored: false)
+        // Rotation may swap corners; full image coverage must extend to every surface edge.
+        let corners = [CGPoint.zero, CGPoint(x: 1, y: 0), CGPoint(x: 0, y: 1), CGPoint(x: 1, y: 1)].map {
+            geometry.project($0, mirrored: false)
+        }
+        #expect(corners.map(\.x).min()! <= 0.001 && corners.map(\.x).max()! >= size.width - 0.001)
+        #expect(corners.map(\.y).min()! <= 0.001 && corners.map(\.y).max()! >= size.height - 0.001)
+        #expect(topLeft != bottomRight)
+    }
+}

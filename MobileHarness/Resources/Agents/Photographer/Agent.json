@@ -1,6 +1,7 @@
 {
-  "version": 7,
+  "version": 8,
   "id": "photographer",
+  "description": "I own camera and album intent, capture/tracking workflows, preview disposition and photo/video lifecycle. I consume supported camera, album and tracking inputs; my registration does not expose a general public delegation entry.",
   "communication": {
     "inputs": [
       {

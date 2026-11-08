@@ -35,7 +35,7 @@ struct FixtureCameraFact: Codable, Sendable {
             "enabled": .flag(enabled), "perceptionEnabled": .flag(false),
             "lensOwner": enabled ? .text("capture") : .unknown,
             "busy": .flag(busy), "needsSettings": .flag(needsSettings),
-            "displayedMediaID": displayedMediaID.map { .text($0) } ?? .unknown,
+            "displayedPreviewID": displayedMediaID.map { .text($0) } ?? .unknown,
             "savedMediaID": savedMediaID.map { .text($0) } ?? .unknown,
         ]
     }
@@ -84,6 +84,14 @@ struct FixedPlatformState: PlatformStateReading {
     nonisolated static func register(
         in context: AgentStateContext, camera: @escaping @Sendable () -> FixtureCameraFact = { FixtureCameraFact() }
     ) throws {
+        try context.registerMedia(
+            "actions.camera.preview",
+            read: { _ in
+                let id = camera().displayedMediaID
+                return .init(
+                    facts: try JSONEncoder().encode(["latestPreviewID": id]),
+                    images: id.map { [.init(id: $0, width: 1, height: 1, data: Data([1]))] } ?? [])
+            }, reset: { _ in })
         try AssistantStateBindings.register(in: context, names: ["platform.vision.camera"]) { _ in
             let value = camera()
             return PlatformStateSnapshot(

@@ -68,3 +68,9 @@ VoicePresentationHandling的clearReply是独立回复槽操作，由可信调用
 ToolResponse preserves complete value results without a generic payload-length rejection. Source/round identity, return policy and completion/report validity remain independent checks.
 
 WindowControlCapability takes a readable window_N string. The owning UI WindowState maps it to native identity inside the Window execution service; generic contracts do not allocate or interpret UI identities.
+
+MultimodalContextSnapshot carries facts, revision and immutable ContextImage attachments separately from ordinary Codable inspection. Images carry identity/source/MIME/dimensions/bytes. PreviewImageID is temporary; photo receipts use previewID, with a distinct mediaID only after persistent save. CameraControlCapability exposes preview load/unload.
+
+PreviewImageID validates canonical positive numeric preview_N values for live calls and State. History decodes images exclusively from model request logs and does not resolve preview identifiers through live caches.
+
+MultimodalContextSnapshot.resourceBindings and ContextImage.resourceScope are private ownership metadata, distinct from model-facing facts/IDs. ActionExecutionContext carries resource bindings unchanged for domain validation. Camera live photo calls require a matching window-session scope; short preview labels alone are not authorization.

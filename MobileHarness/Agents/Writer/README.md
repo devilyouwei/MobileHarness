@@ -2,15 +2,15 @@
 
 WriterWorkflow 消费独立注入的 ModelKit.ChatCapability，要求原生工具支持。控制请求选择工具、短编辑意图或经过读取校验的短literal补丁；edit返回运行时流身份后，单独无工具请求输出原始文件内容，逐个增量等待宿主追加，避免源码 JSON/XML 转义和丢失。WriterTools 由宿主绑定身份和范围，模型不能创建授权。
 
-控制历史按完整调用/结果组裁剪，保留本次目标及最新配对；不设置固定创作轮数或整任务期限；显式finish及正常无工具终止共用Gateway发布校验，成功后直接结束，不额外要求一轮模型调用。控制响应文本与源码流均不设额外字节截断，模型采用 Provider 默认输出预算；原生参数与完整观察不设置单项字节拒绝，源码响应不受历史层256KiB累积上限限制。取消会取消模型会话并中止写入；中止失败与原始错误同时保留。未正常结束的流不得完成事务。每个检查点读取追加要求，文件流期间不切换目标。
+控制历史按完整调用/结果组裁剪，保留本次目标及最新配对；不设置固定创作轮数或整任务期限；显式finish及正常无工具终止共用收尾入口：编辑任务通过Gateway发布校验，纯作品库任务核对实际成功库操作，显式 outcome=explanation 在尚无文件操作时完成无产物说明，成功后直接结束，不额外要求一轮模型调用。控制响应文本与源码流均不设额外字节截断，模型采用 Provider 默认输出预算；原生参数与完整观察不设置单项字节拒绝，源码响应不受历史层256KiB累积上限限制。取消会取消模型会话并中止写入；中止失败与原始错误同时保留。未正常结束的流不得完成事务。每个检查点读取追加要求，文件流期间不切换目标。
 
 WriterAgent 是独立 AgentCore 角色，WriterContainer 随 Agents 根注册、暂停、恢复和关闭。来自 Assistant 的后台 writer.author 请求通过真实 Input/OutputGateway 认证；工作区工具直接返回，不进入 ChannelScheduler。单任务准入（等待补充、暂停和取消清理也占用），每任务通过 ModelKit ChatModel 获取固定模型配置的能力句柄，暂停/补充期间保留；SDK 统一管理并发/本地排队和资源回收，Writer 不关闭或重开模型租约。Writer 不复用 Assistant 的 ChatWorker、XML、提示词或对话历史。
 
 工作区工具与内容续写共享同一个委托所有者，但完成边界不同：Gateway 的 edit 结果仅创建编辑流；append/complete/abort 经宿主 ArtifactStreaming 直接进入已接纳会话，单次 complete 只完成文件写入。取消、根暂停和停止先取消已捕获的生成 worker 并 revoke 续写准入，再加入这些 worker；worker 负责加入模型、预览和 release 后才提交终态或允许恢复。revoke 不取消已开始的 abort；release 等待全部在途效果，不因取消者自身退出而提前释放。恢复经 Gateway start/resume 重新接纳，旧 streamID 无效。Actions 根另有 shutdown 兜底。普通 Scene 隐藏不撤销创作会话。服务的互斥、容量与失败契约见 [Artifacts 生命周期](../../Actions/Artifacts/README.md#执行与续写生命周期)。
 
-Assistant 不参与创作循环或通过聆听/对话关闭终止 Writer；应用根拥有角色暂停/关闭，显式cancel在清理完成后确认。任务输入队列上限八项，满时拒绝；追加要求在文件检查点取出，写入恢复上下文。ask 工具发送带 interactionID 的 waitingUser 进度，结束当前推理并释放编辑租约；匹配输入后重新读取草稿继续。显式取消加入执行清理；根的显式暂停保存未完成内容并中止请求，恢复重建工作区和私有上下文；普通Scene隐藏不触发该暂停链路。窗口生命周期不决定任务生命周期。终态发送简短文本和artifactID，不携带源文件。模型与文件清理完成即释放创作占用，SQLite 原子保存执行终态和通知；通知接纳、回复或播报不影响下一次委托。
+Assistant 不参与创作循环或通过聆听/对话关闭终止 Writer；应用根拥有角色暂停/关闭，显式cancel在清理完成后确认。任务输入队列上限八项，满时拒绝；追加要求在文件检查点取出，写入恢复上下文。ask 工具发送带 interactionID 的 waitingUser 进度，结束当前推理并释放编辑租约；匹配输入后重新读取草稿继续。显式取消加入执行清理；根的显式暂停保存未完成内容并中止请求，恢复重建工作区和私有上下文；普通Scene隐藏不触发该暂停链路。窗口生命周期不决定任务生命周期。终态发送简短文本；有实际作品发布时附artifactID，纯库查询不伪造作品身份，不携带源文件。模型与文件清理完成即释放创作占用，SQLite 原子保存执行终态和通知；通知接纳、回复或播报不影响下一次委托。
 
-控制工具失败以有界观察反馈供下一轮修正；同一规范化参数的失败调用在草稿未改变时只执行一次，再次生成只返回原错误及修复建议，不重复执行效果。未推进草稿的恢复阶段最多接纳三次失败修正，耗尽才结束。成功编辑/移动/删除/恢复草稿后清除失败屏障，读取/查询不清除。可恢复请求进入 Writer 自有有限恢复；取消、提交不确定或清理失败立即终止。无效结束批次整体不执行并反馈修正；批次异常保留当前调用原始错误并为未执行兄弟调用补齐结果。完整配对后才添加截图或重复调用提醒。截图最多保留当前一张，不支持视觉的模型继续使用渲染文本和诊断。
+控制工具失败以有界观察反馈供下一轮修正；同一规范化参数的失败调用在草稿未改变时只执行一次，再次生成只返回原错误及修复建议，不重复执行效果。未推进草稿的恢复阶段最多接纳三次失败修正，耗尽才结束。成功编辑/移动/删除/恢复草稿后清除失败屏障，读取/查询不清除。成功的作品查询清除依赖搜索结果的失败缓存；成功 render 只清除因 renderRequired 拒绝的 finish 缓存，重试仍经过发布校验，不重置恢复次数。可恢复请求进入 Writer 自有有限恢复；取消、提交不确定或清理失败立即终止。无效结束批次整体不执行并反馈修正；批次异常保留当前调用原始错误并为未执行兄弟调用补齐结果。完整配对后才添加截图或重复调用提醒。截图最多保留当前一张，不支持视觉的模型继续使用渲染文本和诊断。
 
 ## 创作执行流程
 
@@ -18,11 +18,13 @@ Assistant 不参与创作循环或通过聆听/对话关闭终止 Writer；应�
 
 ```mermaid
 flowchart TD
-    Request["认证 writer.author 委托"] --> Admission["WriterAgent：单任务准入<br/>绑定长期 task_N 与本次 delegateID"]
-    Admission --> Prepare["Gateway direct → Artifacts.start<br/>建立/恢复工作区并准备窗口"]
-    Prepare --> Model["取得固定配置 ChatModel"]
-    Model --> Control["WriterWorkflow：原生工具控制请求<br/>WriterHistory 记录真实请求与结果"]
-    Control --> Route{"控制响应"}
+    Request["认证 writer.author 委托"] --> Admission["WriterAgent：单任务准入<br/>建立委托入口消息"]
+    Admission --> Model["取得固定配置 ChatModel"]
+    Model --> Library["作品库控制域 · 关键词搜索与分页"]
+    Library -->|"enter / create"| Prepare["Artifacts.start → 恢复已有作品或创建空目录<br/>请求入口窗口呈现"]
+    Library -->|"open"| View["呈现已有作品 · 只读汇报域"]
+    Prepare --> Control["工作区控制域 · 目标与已绑定元数据<br/>新的 system 提示词和工具目录"]
+    Control --> Route{"工作区控制响应"}
     Route -->|"读取 / 查询 / 短 replace"| Tools["Gateway direct → Artifacts<br/>校验引用、执行确定性操作"]
     Route -->|"新文件 / 大段 edit"| Begin["建立编辑事务与内容上下文"]
     Begin --> Content["独立无工具内容请求<br/>原始源码背压追加并保存草稿"]
@@ -31,10 +33,14 @@ flowchart TD
     Commit --> Step["加入最新预览<br/>发送已完成步骤事实"]
     Tools --> Step
     Step --> Control
+    Library -->|"ask"| Wait
+    View -->|"ask"| Wait
     Route -->|"ask"| Wait["结束推理 / 释放编辑租约<br/>waitingUser 与匹配问题身份"]
-    Wait -->|"已接纳回答 / 重新读取草稿"| Control
+    Wait -->|"恢复当前控制域与已接纳补充"| Model
     Route -->|"显式 finish / 自然终止"| Publish["共享发布校验<br/>显式 render 证据 + 当前令牌校验"]
     Publish --> Cleanup["加入模型与文件清理"]
+    Library -->|"库操作完成 / 无文件 explanation"| Cleanup
+    View -->|"汇报实际呈现结果"| Cleanup
     Control -->|"请求失败"| Recovery["WriterRecovery：分类与有限恢复<br/>中止失败流后才能重试"]
     Content -->|"请求失败"| Recovery
     Recovery -->|"控制请求可恢复"| Control
@@ -52,61 +58,67 @@ flowchart TD
 
 Writer 的 workspace 工具声明完整描述参数、失败修复和操作顺序。控制模型按需列出/查询文件、按行读取相关片段，用 contextReferences 将实际关联内容送入独立内容请求；新建/大段源码不进入工具参数，replace仅携带短精确旧/新文本。后续用户修订同时进入控制历史和内容请求目标。HTML/CSS/JS、Markdown、JSON、SVG 和纯文本的格式规则由 Writer 按目标扩展名选择，不加载动态 Skill。
 
-WriterPreview拥有默认安全预览：源码追加或确定性修改只唤醒一个latest-value worker，经Gateway direct内部preview读取最新词法检查点，约750ms合并，一个在途加一个最新待呈现状态。页面重载不阻塞源码接收。相同快照跳过；显式关闭/最小化使自动预览停止且不重开窗口；Scene隐藏只加入并取消当前预览worker、保留最新刷新意图，恢复后继续预览。render/finalize/abort先取消并加入预览，根生命周期加入worker；run独立实例和加入屏障防止迟到帧。完整render执行脚本并提供诊断，截图缺失不宣称视觉验证。
+工作区内的文件操作使用独立控制提示和工具目录。进入后只携带原始目标、已接受补充、绑定的工作区身份与入口呈现状态。已有文件先读再改。新目录先创建声明的入口文件。最后一次修改后使用 render 检查再 finish 发布。内容模板由 content.base 与对应格式的模板组合。
 
-工具支持目录前缀列举、按行/字符范围读取、带总数与继续位置的字面搜索、读取引用局部编辑、文件/目录移动与删除、savepoint/diff/restore。移动后模型负责修复链接/import。savepoint 是任务内有界多文件撤销点，保存使用当前令牌防止过期写入，不保留文件版本。相关业务和存储规则见 [Artifacts](../../Actions/Artifacts/README.md)。
+WriterPreview拥有默认安全预览：源码追加或确定性修改只唤醒一个latest-value worker，经Gateway direct内部preview读取最新词法检查点，约750ms合并，一个在途加一个最新待呈现状态。页面重载不阻塞源码接收。相同快照跳过。显式关闭结束该窗口的预览。最小化期间更新最新快照，用户恢复窗口后继续渲染。Scene 隐藏加入并取消当前预览 worker，保留最新刷新意图。render/finalize/abort先取消并加入预览，根生命周期加入worker；run独立实例和加入屏障防止迟到帧。完整render执行脚本并提供诊断，截图缺失不宣称视觉验证。
+
+工具支持目录前缀列举、按行/字符范围读取、带总数与继续位置的字面搜索、读取引用局部编辑、文件/目录移动与删除、savepoint/diff/restore。移动后模型负责修复链接/import。savepoint 是编辑会话内的多文件撤销点，随会话释放。保存使用当前令牌防止过期写入，不保留文件版本。相关业务和存储规则见 [Artifacts](../../Actions/Artifacts/README.md)。
 
 ## SQLite 历史与设置页
 
-WriterHistory 为每个真实控制/内容请求建立独立输入和模型请求记录，复用 StorageChat.ConversationHistoryStore 与 ConversationRecordStore(agent: writer)。生产装配使用与 Assistant 相同 SQLite Chat/Task repositories；无记录器仅用于显式测试实例，不是生产存储回退。完整文本/native pairs、工具定义、工具输出、用量、完成原因与失败/取消收尾保存到 SQLite。temperature 来自实际请求，控制与内容请求均不指定输出 token 上限，由 Provider 使用模型默认值；model 来自独立 ChatModel 的模型名称；不可用时明确标记名称未知。流增量先按既有 Chat 契约累积，结束边界提交；中断按现有 SQLite 恢复语义标记 interrupted，不重放操作。
+WriterHistory 为每个真实控制/内容请求建立独立输入和模型请求记录，由本侧 WriterHistoryStore 与 WriterRecordStore 保存。生产装配显式注入 WriterMessageRepository、WriterExecutionRepository、AgentMessageRepository 和 ModelRequestLogRepository；无记录器仅用于显式测试实例，不是生产存储回退。完整文本/native pairs、工具定义、工具输出、用量、完成原因与失败/取消收尾保存到 SQLite。temperature 来自实际请求，控制与内容请求均不指定输出 token 上限，由 Provider 使用模型默认值；model 来自独立 ChatModel 的模型名称；不可用时明确标记名称未知。流增量先按既有 Chat 契约累积，结束边界提交；中断按现有 SQLite 恢复语义标记 interrupted，不重放操作。
 
 委托 Task ID 与项目目标保留在 decisionMetadata/请求上下文，不加入 Assistant 的 Task message-source 集合。Writer 任务保持独立输入/请求身份，复用有界历史仓库写门。工具结果在独立内容请求结束后更新原控制记录，并显式 checkpoint。SQLite 保存失败会终止本次请求并保留原始/清理错误，不能报告虚构持久化成功。
 
-模型输入截图复用既有 MediaStore：SQLite 媒体记录和 StorageFiles 字节、请求中的 imageReferences、按 source=writer/input 校验的历史图片读取；沿用既有媒体容量与回收策略。规范化对话使用imageReferences；Agent记录送入ModelKit的实际请求和返回事件，不采集HTTP头或Provider内部报文。
+WriterHistory 将实际 ChatRequest.tools 的完整声明写入本轮 decisionMetadata.catalogJSON，数量和字节上限由 ChatRequest 校验；工具集合随 Writer 消息业务保存，不额外写入输入级定义数组。详情直接投影本轮目录，并独立呈现模型工具调用/结果。
 
-WriterContainer 通过 UI 自有 WriterRecordsControlling 提供分页任务、请求详情、图片及完整记录分享；App 只组合接口。没有手动新建会话、删除归档或标题生成的 Writer 管理通道。源文件预览和导出仍由 Actions.Artifacts 拥有。
+WriterHistory 在每次请求准入时截取最后一个 assistant 之后的 user/tool 输入，保存 WriterInputMessage 文本、工具名和关联 ID；完整历史和系统提示仍只属日志。WriterMessageRepository 将本轮输入存入 user_input_json.messages，清空日志后详情仍能展示，容量计入 Writer 历史窗口。
 
-WriterWorkflow 为控制/内容的每次实际请求创建独立 ChatTiming，并将同一请求及采样器交给模型；成功、失败和取消收尾均把已有Provider采样写入WriterHistory。未知Provider计时保持未知，不由文本消费时刻补造。请求完成时间由Storage记录，工具执行不改变模型完成边界。WriterContainer 读取各委托已有createdAt/finishedAt，累计终止委托时长并投影当前委托开始时间，续作间空档不计入执行时长；标题与累计轮数保持长期task身份。
+模型输入截图字节只在 model_request_log 保存，历史页读取 HTTP 或 local 请求中的实际图片，清日志后不回退相册。独立媒体库不参与聊天图片关联。
 
-时长缺失只使UI耗时投影为未知，不拒绝读取任务目标、状态或请求；运行时等待/暂停/取消清理包含在所属委托生命周期内，续作之间不计时。
+WriterContainer 通过 UI 自有 WriterRecordsControlling 提供分页任务、请求详情及完整记录分享。 任务页和请求页查询 21 条轻量记录、只返回前 20 条；只有存在第 21 条才附下一游标，游标对应第 20 条而非前瞻行。空页及恰好整页的末页均无下一游标，UI 不自行猜测。请求详情按稳定记录 ID 返回 WriterRequestDetails，聚合轮次标题、所选模型调用、已核实的工具来源及该轮宿主收尾。App 组合记录接口与 Actions.Artifacts 的文件预览和导出能力。
 
-WriterRequestNaming从当前原生工具名/参数派生请求行标题：读文件、编写文件、简短修改指令、渲染检查、保存等。文件内容阶段按目标路径命名，多工具按顺序去重合并，过长/含源码标记的instruction不作标题。没有操作事实时使用中性描述，不请求模型生成标题。请求失败/取消/中断优先保留，其后才判断工具失败、取消和在途状态；模型结束不等同工具操作成功。完整证据始终在请求详情。
+WriterWorkflow 为控制/内容的每次实际请求创建独立 ChatTiming，并将同一请求及采样器交给模型；成功、失败和取消收尾均把已有Provider采样写入WriterHistory。未知Provider计时保持未知，不由文本消费时刻补造。请求完成时间由Storage记录，工具执行不改变模型完成边界。WriterContainer 投影任务开始时间、更新时间和累计轮数，标题保持长期 task 身份；不再遍历委托累计时长或提供任务级最新状态。执行轮次仍保留自己的运行状态与失败证据。
+
+生成指标使用所选调用的日志证据，缺少参数或耗时可独立呈现。宿主收尾以模型调用 ID 持久化，保留实际状态及结果或错误；持久化失败与收尾失败分别传播。
+
+WriterRequestNaming 从工具与控制域派生请求行标题，包括作品查询、进入、创建、呈现、文件编辑与保存。文件内容阶段按目标路径命名，多工具按顺序去重合并，过长/含源码标记的instruction不作标题。没有操作事实时使用中性描述，不请求模型生成标题。请求失败/取消/中断优先保留，其后才判断工具失败、取消和在途状态；模型结束不等同工具操作成功。完整证据始终在请求详情。
 
 ## 委托与主动事件
 
-Assistant 的 BasicSkill 通过调度的 XML startTask(execution=background,executor=writer) 发送目标与实际用户输入，Writer 先经工作区 start 工具显示窗口，再获取模型。agents.writer 公开 idle/starting/running/waitingUser/cancelling/paused、agentID、taskID、goal、step、waitingForInput。已有窗口不等于运行任务；单任务忙碌明确拒绝。sendMessage 由运行时绑定待答 interactionID，Writer验证其匹配；cancelTask(executor,taskID,reason) 转换为可信 cancel 信号并立即接纳，由根拥有的 worker 加入清理并回报。
+Assistant 的 BasicSkill 通过调度的 XML task.delegate(agent_id=writer,description) 发送目标与实际用户输入，Writer 先获取模型判断操作；首次文件操作才通过工作区 start/resume 准备窗口和草稿，单纯作品库操作不创建文件。agents.writer 公开 idle/starting/running/waitingUser/cancelling/paused、agentID、taskID、goal、step、waitingForInput。已有窗口不等于运行任务；单任务忙碌明确拒绝。task.send 由运行时绑定待答 interactionID，Writer验证其匹配；task.cancel(agent_id,reason) 转换为可信 cancel 信号并立即接纳，由根拥有的 worker 加入清理并回报。
 
 AgentTaskContent.writerEvent 携带版本2、UUID eventID、递增 sequence、started/progress/userInput/completed/failed/cancelled 与可选项目/窗口身份。工作区就绪、文件提交和实际渲染/修改步骤回报事实，不生成虚假进度比例。运行阶段由内存 reportWorker 投递 task.progress，每种事件最多保留一项待送达事实及一个不可变在途事件；新的同类阶段替换未发送旧阶段，任务结束移除过期步骤。实际接纳由 CommunicationReceipt 决定，拒收每500ms重试，不终止创作。
 
-WriterNotifications 拥有独立于创作的持久终态投递。TaskRepository 将执行终态与不可变通知原子提交，通知保留原 eventID、taskID/delegateID 和认证 scope。两个 worker 分别投递 task.result 和 writer.completion：前者只退休 Gateway 执行权限，不进入 Assistant 回复队列；后者是普通认证角色消息，不使用已退休的 taskScope。每个 worker 分页读取最多32条通知并轮转重试，用户通知拒收不能阻塞退休或创作准入。失败证据与接纳/退休确认分别保存，通知积压不形成创作次数限制。
+Database 根目录拥有连接、schema 装配与生命周期；Shared 只保存编码、ID 与分页机制。Assistant 和 Writer 分别拥有消息/任务接口、历史 DTO、窗口及 SQL 实现。日志和 Agent 通信通过独立共享端口注入，不经统一 Chat/Task 门面。详见 [Database](../../Storage/Database/README.md)。
 
 暂停/关闭加入创作和投递 worker，未送达终态留在同一 SQLite；恢复或新进程只重投通知，不重跑创作，也不重建旧执行权限。跨进程退休遇到已关闭 scope 时保留证据并结束退休分支，用户通知继续独立递送。Assistant 使用可信 SQLite 执行状态对账 busy、替代和发送消息；对用户的通知不是任务释放条件。
 
-控制提示词明确 Assistant 是委托者和用户沟通者，ask/finish 由宿主发送回报；Writer 不生成 XML 调度或自行拼接跨 Agent 消息。独立内容请求只处理格式与文件编写，不承担角色协调。
+Writer 私有控制提示只教本角色的选择、文件操作、追问与完成；ask/finish 由宿主发送回报，Writer 不生成 XML 调度或自行拼接跨 Agent 消息。独立内容请求只处理格式与文件编写，不承担角色协调。
 
 ### Assistant 接收与用户汇报
 
-默认 BasicSkill 的后台入口无需已有前台 Task 或加载 Writing；运行时将单行 goal 与当前真实用户输入绑定到 writer.author。单任务忙碌时明确拒绝，Assistant 根据用户意图选择补充、取消或显式 replaceCurrent；替代必须等待旧执行清理，不能因为通知尚未到达而重复创作。busy、替代和定向消息在控制前与 SQLite 的可信执行状态对账。具体公开参数由 [Task Actions](../../Actions/System/Task/README.md) 拥有。
+默认 BasicSkill 的后台入口与 task.start 平级，同一目标不先建立前台 Task，也不加载 Skill；运行时将单行 goal 与当前真实用户输入绑定到 writer.author。单任务忙碌时明确拒绝，Assistant 根据用户意图选择补充或取消；再次委派必须等待旧执行清理，不能因为通知尚未到达而重复创作。忙碌由 WriterMessages 的单活跃委托入口约束；Assistant 通过可信通信结果更新委派视图。具体公开参数由 [Task Actions](../../Actions/System/Task/README.md) 拥有。
 
 Writer 的 started/progress 先持久化为控制事实，再合并为一个最新普通摘要。Assistant 等已有模型、输入 FIFO、播放和 peer 回复屏障排空后接纳摘要，普通回复开始间隔至少十秒；接纳后不再替换或重排。追问 userInput 与终态保持正式 FIFO，和最终语音/文本共用队列，并清除未接纳的普通摘要。原始源码、Writer 私有提示词和对话上下文不进入 Assistant 请求；回报只包含任务/窗口/步骤/失败事实，不授权模型重试创作或改变前台 Task。共享消费者的容量、去重、持久化和失败机制见 [Chat](../Support/Chat/README.md#writer普通进度合并)。
 
 执行退休 task.result 不进入用户回复队列；writer.completion 核对可信任务、委托及不可变通知后独立接纳。已存输入身份防止跨对话重复，旧委托终态不能覆盖新执行或触发迟到回复。成功汇报在真实播放屏障后经 ReplyActivity 发送完成事实，由 SpeechPerception 按较新的显式停止与生命周期意图围栏决定播毕启听；Assistant 模型不负责恢复麦克风。见 [SpeechPerception](../SpeechPerception/README.md)。
 
-## Agent-owned workspace tasks and delegations
+## Writer 自有任务与纯通信
 
-Writer allocates task_N through Storage only after accepting an authenticated UUID delegation. Assistant creates delegateID and the immutable request, not Writer tasks. The public task key is writer + taskID; it owns its history and Storage directory writer/task_N. New work allocates a new task; continuation preserves the original goal, history and workspace while adding a new delegation. Task status is the latest delegation projection, not permanent completion.
+Assistant 只发送 task.delegate(agent_id,description)，不分配 Writer workspace。Writer 接纳认证通信后创建委托入口消息，模型自主查询或选择。纯库操作可以完成而不创建 workspace；busy/waiting/paused/cleanup 不自动替换。
 
-Storage separates assistant_tasks from writer_tasks and agent_delegations. scope.id identifies the UUID delegation; WriterTaskEvent includes both the Agent-local taskID and internal delegateID. Request records retain UUID identities and metadata; visible ordinal numbers span delegations. The runtime resolves current delegation and pending interaction from executor + taskID for sendMessage/cancelTask. Models never provide delegate/event/interaction UUIDs. Writer public State exposes task/goal/phase/step/waitingForInput, not delegation or interaction identities.
+create、enter、open 的触发请求在前序域落库并保留原身份。Writer 在历史写门内 checkpoint 后绑定工作区。后续模型消息拥有 workspace_id。工作区内的读取、编辑与发布都使用已绑定目标，每次委托最多一个目标。
 
-Artifacts use WorkspaceID(agent,taskID), not an independently allocated project ID. Writer prepares the window before model acquisition and advances workspaceReady after preparation. Existing ready workspaces must exist; missing data fails explicitly. Files and read references remain task-isolated. read_N, savepoint_N and revision_N are model-facing handles; stream and immutable revision UUIDs remain private. WindowState maps internal native IDs to window_N for all Action results and State.
+writer_workspaces 保存 workspace 及文件 fence；writer_messages 保存委托入口、执行状态及完整消息。前序与 workspace 消息由字段区分，来源从持久化关联读取，不从当前请求兜底。Assistant 前台任务与 Writer 执行独立。
 
-WriterHistory restores bounded native call/result groups from the owned task history, preserving current goal and recent failures. Full SQLite history remains complete. Busy, replacement, cancellation joins, late-event fences and notification-independent completion retain the delegation boundary. The Assistant's scheduled XML actions remain distinct from Writer's direct Gateway tools.
+Artifacts 使用 WorkspaceID(writer,taskID)。显式 create 建立空目录并准备入口窗口，enter 复用已有目录并打开或聚焦窗口，open 只呈现已有作品。窗口隐藏时记录 deferred。会话内暂停或追问恢复使用 resume 并尊重关闭或最小化。旧回调仍校验委托范围。
 
 ## 失败诊断
 
 WriterDiagnostics.swift 分类模型网络、HTTP、响应协议、模型配置、工具、存储、工作流、取消和清理错误。每次控制/内容请求保留阶段、模型、输入ID、尝试次数和单调耗时；WriterDiagnosticCapture保存最新未恢复请求失败，成功请求清除过期原因，不拥有重试。工具失败附实际命令/路径并区分读取、编辑、渲染和发布。清理失败独立保留原始原因及清理原因，不覆盖主错误。
 
-通信使用 WriterFailureDiagnostic；Writer目录显式投影为 StorageChat.ConversationFailureDiagnostic，存入请求/工具 evidence，另将分类摘要保存到任务 failure。失败经 Gateway control 输出 AgentFailureDiagnostic，同时通过 WriterTaskEvent.failure 传给 Assistant。首页显示简短摘要，请求历史展示结构化分类/阶段/字段；无法从过去仅有 transport 字符串的记录反推已丢失的 URLError。
+通信使用 WriterFailureDiagnostic；Writer目录显式投影为 StorageChat.ModelFailureDiagnostic，存入请求/工具 evidence，另将分类摘要保存到任务 failure。失败经 Gateway control 输出 AgentFailureDiagnostic，同时通过 WriterTaskEvent.failure 传给 Assistant。首页显示简短摘要，请求历史展示结构化分类/阶段/字段；无法从过去仅有 transport 字符串的记录反推已丢失的 URLError。
 
 ## 自有任务岛
 
@@ -126,7 +138,7 @@ Control retries append a structured runtime failure observation with category/co
 
 ### 恢复上下文与完整证据
 
-Resume restores the latest control request’s selected task-local context, settled calls/results and failed-request diagnosis, rather than the entire database history. Old system instructions are rebuilt; old read/stream/savepoint identities require fresh reads. Selection retains complete native groups under existing message/text budgets; complete historical evidence remains in SQLite.
+Resume reconstructs delegation-local user/reply and settled native call/result groups from the bounded recent business request window, retaining the last failed-request diagnosis. It does not depend on deletable debug prompt snapshots. Old system instructions are rebuilt; old read/stream/savepoint identities require fresh reads. Selection retains complete native groups under existing message/text budgets; complete historical evidence remains in SQLite.
 
 Accepted user revisions also update the pinned current goal before context selection, so removing an older group cannot silently lose an accepted requirement.
 
@@ -136,7 +148,7 @@ Complete tool observations are checkpointed before model projection. Only model-
 
 Code-format content streams (HTML/CSS/JS/JSON/SVG) validate the initial prefix across deltas. An outer Markdown code fence fails with writer.content.markdownWrapper before commit; abort joins, a fresh stream is allocated, and the existing bounded retry includes explicit raw-source feedback. Markdown and text keep legitimate fences. This checks source packaging, not language validity; WebKit render remains the execution check.
 
-Workspace parameters carry local descriptions and command enums (internal preview is not model-exposed). Character ranges are decimal offsets inside a fresh read reference; omitting offsets replaces that read range. Pre-dispatch invalidParameters becomes a repairable WriterToolFailure with validationCode and executed=false; undeclared fields are rejected rather than ignored. The common capability registry and Gateway remain unchanged. Instructions require the smallest goal-complete artifact and finish after successful checks, without unsolicited cosmetic rewriting.
+Workspace parameters carry local descriptions and command enums (internal preview is not model-exposed). Character ranges are decimal offsets inside a fresh read reference. Omitting offsets replaces that read range. A positive read count selects the requested number of lines or characters. Edit instructions and related reads pass through to the content request without Writer-specific length or item quotas. Pre-dispatch invalidParameters becomes a repairable WriterToolFailure with validationCode and executed=false; undeclared fields are rejected rather than ignored. The common capability registry and Gateway remain unchanged. Instructions require the smallest goal-complete artifact and finish after successful checks, without unsolicited cosmetic rewriting.
 
 `replace(path,reference,oldText,newText)` 校验当前文件读取引用、版本与范围，并要求oldText在范围内唯一匹配；失败不改草稿，空newText删除匹配。所有范围外字节保持原样，文件修改使原引用失效。此短补丁直接经Gateway执行，不启动第二次内容请求；成功后需要重新render。新建和大段改写继续使用edit源码流，不扩展原生参数边界。
 
@@ -154,28 +166,40 @@ Workspace parameters carry local descriptions and command enums (internal previe
 
 ## 窗口命名、操作副标题与场景
 
-Writer新项目从显式title或goal派生初始短名，在首个edit中可携带更准确的简洁标题，不增加单独命名模型请求。指令要求使用“软件工程流程图”“星轨动画”“项目总结文档”等作品名；续作默认保留标题，rename(title)用于明确改名。标题由Artifacts随草稿/发布持久化，HTML document.title不覆盖业务窗口名。
+Writer 新项目使用 create 的显式简洁标题。指令要求使用“软件工程流程图”“星轨动画”“项目总结文档”等作品名；续作默认保留标题，rename(title)用于明确改名。标题由Artifacts随草稿/发布持久化，HTML document.title不覆盖业务窗口名。
 
 灰色栏先使用原始目标，随后更新实际控制/文件生成/工具操作、轮完成摘要、等待补充与保存/异常事实，不呈现源码或思维。Writer通过Gateway direct的内部workspace.describe更新，运行时subtitle不进入模型工具schema；展示失败单独记录，不改变创作结果。模型编辑和命名仍通过workspace工具执行。
 
 AgentContainer.setSceneActive只通知Writer预览可见性，不pause/resume创作；根的显式暂停/停止仍拥有取消/检查点/加入语义。模型、文件、报告和生命周期由Writer继续运行，UI隐藏仅影响渲染。后台render返回deferred，文件可以发布，但结果明确未进行视觉验证；指令禁止为此反复render或要求用户切回前台。系统是否继续分配CPU由iOS决定，本契约不保证无限后台运行。
 
-Writer history belongs directly to writer_tasks; each delegation groups its requests. Workspace files
-are current mutable files, indexed by workspace_files, with no persistent version control. Assistant
-source deletion does not cascade into Writer. History rendering continues through shared round/request
-projections; Writer does not acquire Assistant foreground tasks or Skill context.
+Writer history is request-scoped. Workspace selection changes only the target for newly admitted messages; the existing journal and invocation IDs remain unchanged. Workspace files remain owned by Storage Files and WorkspaceStore.
 
 ## Model request recording
 
-Agents owns AgentModelRequestRecording over existing ChatRequest/ChatEvent values. Complete submitted
-messages, tools, sampling parameters, context identity and all exposed response events are persisted in
-model_request_log alongside actual model identity, timing, errors and local tool outcomes. ModelKit has
-no history/audit interface or storage hooks. Raw HTTP/SSE and unexposed adapter options or reasoning
-are outside this record; normalized events are never presented as raw provider bodies.
+Agents 的 AgentModelRequestRecording 将 ModelKit 中立 HTTP 采集回调桥接到共享 model_request_log，记录实际请求、响应/SSE、图片和 generation meta。非 HTTP 调用标 local。业务输入、回复和工具结果分别在 assistant_messages / writer_messages；清日志不会删除业务消息，图片与生成信息随日志删除。后续采集仅 UPDATE，不重建已清除日志。
 
-Request admission checks the durable nullable delegation status before task binding. A requested
-assignment is eligible for acceptance without a full accepted-task fetch; terminal duplicates are
-ignored, while storage failures propagate instead of being treated as an absent assignment.
+Request admission checks durable requestStatus before creating an entry message. Requested communications are accepted without a preallocated workspace; terminal duplicates are ignored, while storage failures propagate instead of being treated as an absent request. beginRequest/task/requests/completeRequest describe Writer-owned state; the wire delegateID remains a communication correlation, not an externally assigned task.
 
 Writer灵动岛使用Gateway的内部完成模式执行：权限、资源、结果失败仍由原执行链校验，结果
 由呈现调用方直接消费，不向Writer或Assistant的输入通道发送ToolResult，也不触发创作续轮。
+
+Writer history uses the shared full recorder; screenshot files are not separately published merely for logs. Records detail reads Base64 from request logs. Its clear operation delegates to StorageChat: one request_N or the shared entire log library; task, workspace, replies and execution records remain. Late updates cannot recreate cleared logs.
+
+Writer续写从保留的业务请求input、response和已完成native call/result组重建上下文，最多24条／32000字节，按整组裁剪。它不读取可删除的完整请求日志，清空日志不改变续写或工作区。失败诊断独立保留；未完成工具组不会被恢复成孤立tool消息。
+
+通知投递使用共享通信 outbox 的 claim token 与有界退避；暂停释放当前 claim，恢复只重投消息，不重做创作。权限退休与面向用户的完成通知分开确认。
+
+历史 Prompts 图片由日志独占；本目录不提供相册或预览缓存的历史图片回退接口。实时相机和独立相册的读取不受日志清理影响。
+
+Database 根目录拥有连接、schema 装配与生命周期；Shared 只保存编码、ID 与分页机制。Assistant 和 Writer 分别拥有消息/任务接口、历史 DTO、窗口及 SQL 实现。日志和 Agent 通信通过独立共享端口注入，不经统一 Chat/Task 门面。详见 [Database](../../Storage/Database/README.md)。
+WriterContainer 和 WriterAgent 在接纳前核对消息、任务、通信和日志的 storageScope；不同数据库实例的端口不能混装。WriterHistoryStore 的 scope 与其消息仓库一致，显式无历史记录器只用于测试。
+
+## 作品库与工作区分域
+
+searchWorkspaces(query,before?) 在 SQLite 内匹配标题、描述或明确任务 ID。每页最多十二项，回传真实 title、taskID、entry、state 与可选 nextBefore。空查询用于用户明确要求浏览时的分页。同一搜索的返回 ID 才可用于 enter、open 和 delete，目标不清楚时使用 ask。
+
+create(title,entry) 显式创建目录与空草稿，临时占位由窗口呈现层拥有。enter 打开已有编辑目标。两个动作成功后切到工作区域，并在下一请求中才提供文件工具。open 绑定只读呈现域并返回实际窗口结果。搜索或删除完成可以在作品库域直接收尾。文件编辑使用 render 与 publish 校验。
+
+## 私有指令与公开介绍
+
+Resources/Agents/Writer/Agent.json.description 提供公开用途。Instructions.md 保存私有共用身份，Prompts.json 的 control.library、control.workspace、control.viewer 分别管理作品库、编辑、查看三个控制域。每个控制请求持久化域标识，恢复只加载当前域的调用/结果配对。无工具内容请求继续使用 content.base、格式模板和 content.retry。

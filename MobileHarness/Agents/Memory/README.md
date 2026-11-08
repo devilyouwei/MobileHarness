@@ -17,7 +17,6 @@ MemoryAgent 构造注入 `UIHistoryContainer`、会话身份、私有 `AgentCont
 | 文件 | 职责 |
 | --- | --- |
 | [ConversationTitleGenerator.swift](ConversationTitleGenerator.swift) | 有界标题采样与注入 Chat 的标题生成策略 |
-| [HistoryExecutionPreview.swift](HistoryExecutionPreview.swift) | 真实调用记录到历史预览的纯格式化 |
 | [MemoryAgent.swift](MemoryAgent.swift) | 历史请求与确定性固定 Task 的准入、调用及真实结果 |
 | [MemoryExecutionSession.swift](MemoryExecutionSession.swift) | Memory 注册、输出泵、失败与停止加入 |
 | [MemoryHistoryIntent.swift](MemoryHistoryIntent.swift) | 历史意图与本角色固定任务载荷解码，拒绝远程取消私有请求 |
@@ -120,4 +119,9 @@ Memory uses neutral ActionRequestSlot<HistoryInput, HistoryReply> for private fu
 
 stateSnapshot projects local installation/closure, Agent lifecycle/queue counters and initialized committed task/Skill fields without message content. residentContext() reads the repository’s last committed memory only; context fields are unknown before initialization. Agent start owns initialization/restoration and its failures. The root catalog binds independent readers without sampling roles or maintaining another mutable role-state registry.
 
-HistoryExecutionPreview同时解释显式action和自然文本展开的runtimeAction，预览不授予执行权或模型续轮权；调用来源与ReACT规则由[共享Chat](../Support/Chat/README.md)维护。
+
+Memory接受用户的HistoryInput.clearLogs并转成内部History.Conversation.clearLogs调用。request_N只清空一条完整请求日志，nil清空Assistant/Writer共享日志全库。结果由Memory内部处理并刷新历史，不触发ReACT；业务对话和请求详情其他区块保持。
+
+History clear registration and invocation share one InternalTool declaration with optional requestID. Single-row requests carry request_N; the global form omits the parameter. Parameter validation remains strict and the result is handled internally without model generation.
+
+历史详情仅呈现持久化输入、响应与业务快照；Memory 不提供重新解析旧回复的执行预览接口。真实 Action 调度及执行结果仍由其既有 owner 持有。

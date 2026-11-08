@@ -6,7 +6,9 @@ public actor CacheContainer {
     public nonisolated func beginClosing() {
         admission.close()
         buffers.close()
+        cameraImages.close()
     }
+    public nonisolated let cameraImages = PreviewImageCache()
     public nonisolated let buffers: BufferCache
     public nonisolated var images: CacheNamespace { namespace("images") }
     public nonisolated func namespace(_ name: String) -> CacheNamespace { CacheNamespace(buffers: buffers, name: name) }
@@ -26,6 +28,8 @@ public actor CacheContainer {
             runtime: [
                 "entries": .count(value.entries), "retainedBytes": .count(value.retainedBytes),
                 "maximumBytes": .count(value.maximumBytes), "audioScopes": .count(audio.count),
+                "cameraImages": .count(cameraImages.entries.count),
+                "cameraImageBytes": .count(cameraImages.retainedBytes),
                 "closingScopes": .count(closing.count), "closed": .flag(value.closed),
             ], units: ["runtime.retainedBytes": "bytes", "runtime.maximumBytes": "bytes"])
     }

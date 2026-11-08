@@ -18,10 +18,9 @@ final class ApplicationActionAssembly {
         ui: UIContainer
     ) -> ActionsDependencies {
         ActionsDependencies(
-            files: storage.files, model: model, platform: platform, ui: ui,
+            files: storage.files, cache: storage.cache, model: model, platform: platform, ui: ui,
             workspaces: { try storage.database.workspaces },
             media: { try storage.database.media }, devices: { try storage.database.devices },
-            previewHistory: MemoryContainer.previewHistory,
             makeCameraRuntime: { [weak self] in
                 guard let self else { throw ActionsContainerError.stopped }
                 let ports = try self.gateway.capabilities
@@ -39,7 +38,7 @@ final class ApplicationActionAssembly {
         let ports = try actions.configureBusiness(request: request)
         return AgentBusinessBindings(
             executor: ports.executor, catalog: ports.catalog, artifactStreaming: ports.artifactStreaming,
-            writerArtifacts: ports.writerArtifacts, writerPhotos: ports.writerPhotos,
+            writerArtifacts: ports.writerArtifacts,
             writerModel: ports.writerModel, settings: ports.settings,
             discovery: ports.discovery, providerPresentation: ports.providerPresentation, tasks: ports.tasks,
             resources: ports.resources, connectionFacts: ports.connectionFacts,

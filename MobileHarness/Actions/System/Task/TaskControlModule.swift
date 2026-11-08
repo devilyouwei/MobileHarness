@@ -16,6 +16,9 @@ public struct TaskControlModule: CapabilityModule {
             SystemActions.releaseSkillsDefinition(completing: {
                 try await SystemActions.releaseSkills($0, capability: capability)
             }),
+            SystemActions.delegateTaskDefinition(completing: {
+                try await SystemActions.delegateTask($0, capability: capability)
+            }),
             SystemActions.startTaskDefinition(completing: {
                 try await SystemActions.startTask($0, capability: capability)
             }

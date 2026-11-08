@@ -6,19 +6,23 @@ import UI
 @MainActor public final class CameraInteractionWorkflow: CameraControlling {
     private let presentation: any CameraPresenting
     private var state: CameraPresentationSnapshot { presentation.snapshot }
+    private let readPreview: (String, String) async throws -> Data
     private let perform: (CameraInput) async throws -> Void
     private var worker: Task<Void, Never>?
     private var stopped = false
     private var cancelledCountdown = false
     public init(
         presentation: any CameraPresenting,
+        readPreview: @escaping (String, String) async throws -> Data = { _, _ in throw UIRequestError.unavailable },
         perform:
             @escaping (CameraInput) async throws ->
             Void
     ) {
+        self.readPreview = readPreview
         self.presentation = presentation
         self.perform = perform
     }
+    public func previewImage(_ id: String, session: String) async throws -> Data { try await readPreview(id, session) }
     public func configure(_ settings: CameraSettings) { submit(.configure, settings: settings) }
     public func cancelCapture() {
         guard state.countdown != nil else { return }
@@ -47,11 +51,11 @@ import UI
     public func savePhoto(_ id: String) { submitPhoto(.savePhoto, id: id) }
     public func ignorePhoto(_ id: String) { submitPhoto(.ignorePhoto, id: id) }
     private func submitPhoto(_ operation: CameraInput.Operation, id: String) {
-        guard let mediaID = BusinessRecordID(rawValue: id), mediaID.kind == .media else {
+        guard let previewID = PreviewImageID(rawValue: id) else {
             presentation.present(.photoMessage("照片引用无效"))
             return
         }
-        submit(operation, mediaID: mediaID.rawValue)
+        submit(operation, previewID: previewID.rawValue)
     }
     public func shutdown() async {
         stopped = true
@@ -61,11 +65,11 @@ import UI
     public func waitUntilIdle() async { await worker?.value }
     private func submit(
         _ operation: CameraInput.Operation, facing: CameraDirection? = nil,
-        mediaID: String? = nil, settings: CameraSettings? = nil, recordingID: String? = nil
+        previewID: String? = nil, settings: CameraSettings? = nil, recordingID: String? = nil
     ) {
         guard !stopped else { return }
         guard worker == nil else {
-            if mediaID != nil {
+            if previewID != nil {
                 presentation.present(.photoMessage("照片操作正在执行，请稍后重试"))
             } else {
                 presentation.present(.controlMessage("相机操作正在执行，请稍后重试"))
@@ -74,6 +78,7 @@ import UI
         }
         presentation.present(.controlMessage(nil))
         presentation.present(.controlBusy(true))
+        let previewSession = state.gallerySession
         worker = Task {
             defer {
                 worker = nil
@@ -84,16 +89,17 @@ import UI
             do {
                 try await perform(
                     CameraInput(
-                        operation, facing: facing, mediaID: mediaID, settings: settings, recordingID: recordingID))
+                        operation, facing: facing, previewID: previewID, settings: settings, recordingID: recordingID,
+                        previewSession: previewSession))
             } catch {
                 if cancelledCountdown && error is CancellationError {
                     presentation.present(.photoMessage("已取消倒计时"))
                     return
                 }
                 let message = Self.message(for: error)
-                if operation == .savePhoto, let mediaID, state.savedMediaID == mediaID {
+                if operation == .savePhoto, let previewID, state.savedPreviewID == previewID {
                     presentation.present(.photoMessage("已保存到 App 相册，后续请求未完成：" + message))
-                } else if mediaID != nil {
+                } else if previewID != nil {
                     presentation.present(.photoMessage("照片操作失败：" + message))
                 } else {
                     presentation.present(.message("相机操作失败：" + message))

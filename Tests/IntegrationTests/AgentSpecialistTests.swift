@@ -456,7 +456,7 @@ private struct SpecialistTaskControls: TaskControlCapability {
 func memoryOwnsItsInjectedHistoryContainerWithoutAnInputHost() async throws {
     let ui = UIContainer()
     try ui.start()
-    let store = ConversationHistoryStore()
+    let store = AssistantHistoryStore()
     let runtime = try await intentRuntime(
         sessionID: "history-ui",
         presentation: HistoryPresentationAdapter(state: ui.history.presentation, store: store, sessionID: "history-ui"),

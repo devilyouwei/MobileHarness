@@ -7,12 +7,12 @@ import StorageCore
 public struct HistoryMutationService: HistoryMutationCapability {
     private let jobs = HistoryTitleJobs()
     private let archiveChanged: @Sendable (String?) async -> Void
-    private let store: ConversationHistoryStore
+    private let store: AssistantHistoryStore
     private let titlePositions: @Sendable (Int) -> [Int]
-    private let summarizeTitle: @Sendable (StoredConversation) async throws -> String
+    private let summarizeTitle: @Sendable (AssistantConversation) async throws -> String
     public init(
-        store: ConversationHistoryStore,
-        summarizeTitle: @escaping @Sendable (StoredConversation) async throws -> String,
+        store: AssistantHistoryStore,
+        summarizeTitle: @escaping @Sendable (AssistantConversation) async throws -> String,
         archiveChanged: @escaping @Sendable (String?) async -> Void = { _ in },
         titlePositions: @escaping @Sendable (Int) -> [Int] = { Array(0..<min(32, $0)) }
     ) {
@@ -20,6 +20,9 @@ public struct HistoryMutationService: HistoryMutationCapability {
         self.titlePositions = titlePositions
         self.store = store
         self.summarizeTitle = summarizeTitle
+    }
+    public func clearRequestLogs(requestID: String?) async throws {
+        try await store.clearRequestLogs(requestID: requestID)
     }
     public func startNew() async throws -> String? {
         try Task.checkCancellation()
@@ -38,7 +41,7 @@ public struct HistoryMutationService: HistoryMutationCapability {
     public func waitForTitles() async { await jobs.wait() }
     public func shutdown() async { await jobs.stop() }
     public func summarizeArchived(_ id: String) async throws {
-        guard await jobs.beginManual() else { throw ConversationHistoryError.busy }
+        guard await jobs.beginManual() else { throw AssistantHistoryError.busy }
         do {
             try await generateTitle(id)
             await jobs.endManual()
@@ -51,12 +54,12 @@ public struct HistoryMutationService: HistoryMutationCapability {
         try Task.checkCancellation()
         let snapshot = try await store.readCurrent()
         guard snapshot.current.id != id else { throw HistoryQueryError.currentConversation }
-        let conversation: StoredConversation
+        let conversation: AssistantConversation
         do {
             let metadata = try await store.dialogMetadata(id)
             conversation = try await store.titleExcerpt(
                 id, positions: titlePositions(metadata.turnCount ?? metadata.turns.count))
-        } catch ConversationHistoryError.missingTurn {
+        } catch AssistantHistoryError.missingTurn {
             throw HistoryQueryError.missingConversation
         }
         do {
@@ -90,7 +93,7 @@ public struct HistoryMutationService: HistoryMutationCapability {
         try Task.checkCancellation()
         let snapshot = try await store.readCurrent()
         guard snapshot.current.id != id else { throw HistoryQueryError.currentConversation }
-        do { _ = try await store.dialogMetadata(id) } catch ConversationHistoryError.missingTurn {
+        do { _ = try await store.dialogMetadata(id) } catch AssistantHistoryError.missingTurn {
             throw HistoryQueryError.missingConversation
         }
         try Task.checkCancellation()

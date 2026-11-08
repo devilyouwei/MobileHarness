@@ -1,0 +1,346 @@
+{
+  "date": "2026-11-08",
+  "scope": "Read-only physical-device task_7 diagnosis",
+  "taskID": "task_7",
+  "databaseSnapshot": "/tmp/task7-snapshot.sqlite",
+  "snapshotSHA256": "b8f54af6263aa6f715ff79e2657383649751677e6aba637088eab27b201060ef",
+  "integrityCheck": "ok",
+  "deviceMainDBSHA256": "e49b93c83ac7ee9d877a8994fe3e6c818f5890fdfb96bdb71e99259a165aab88",
+  "deviceWALSHA256": "8e1b349a1a7f090eadb227864ddb3620a8b0bf031ed42dcda1f75ee82b040e43",
+  "actualRequestCount": 2,
+  "requestRows": {
+    "A": 22,
+    "B": 8
+  },
+  "recordRows": 30,
+  "modelInvocations": 29,
+  "supplementalInputs": 1,
+  "renderedGroupCount": 10,
+  "orderedRows": [
+    {
+      "row": 1,
+      "messageID": 496,
+      "position": 2,
+      "time": "2026-11-08T18:44:02.784235",
+      "actualRequest": "A",
+      "displayRequest": "A",
+      "displayGroup": 1,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 2,
+      "messageID": 498,
+      "position": 13,
+      "time": "2026-11-08T18:44:07.404661",
+      "actualRequest": "A",
+      "displayRequest": "A",
+      "displayGroup": 1,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 3,
+      "messageID": 503,
+      "position": 14,
+      "time": "2026-11-08T18:45:00.378120",
+      "actualRequest": "A",
+      "displayRequest": "B",
+      "displayGroup": 2,
+      "hasProducerMetadata": false
+    },
+    {
+      "row": 4,
+      "messageID": 506,
+      "position": 24,
+      "time": "2026-11-08T18:45:42.421605",
+      "actualRequest": "A",
+      "displayRequest": "A",
+      "displayGroup": 3,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 5,
+      "messageID": 572,
+      "position": 25,
+      "time": "2026-11-08T19:15:25.439686",
+      "actualRequest": "B",
+      "displayRequest": "B",
+      "displayGroup": 4,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 6,
+      "messageID": 509,
+      "position": 35,
+      "time": "2026-11-08T18:45:59.874624",
+      "actualRequest": "A",
+      "displayRequest": "A",
+      "displayGroup": 5,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 7,
+      "messageID": 573,
+      "position": 35,
+      "time": "2026-11-08T19:15:28.314986",
+      "actualRequest": "B",
+      "displayRequest": "B",
+      "displayGroup": 6,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 8,
+      "messageID": 511,
+      "position": 45,
+      "time": "2026-11-08T18:46:10.315097",
+      "actualRequest": "A",
+      "displayRequest": "A",
+      "displayGroup": 7,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 9,
+      "messageID": 574,
+      "position": 45,
+      "time": "2026-11-08T19:15:30.938980",
+      "actualRequest": "B",
+      "displayRequest": "B",
+      "displayGroup": 8,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 10,
+      "messageID": 575,
+      "position": 55,
+      "time": "2026-11-08T19:15:33.633595",
+      "actualRequest": "B",
+      "displayRequest": "B",
+      "displayGroup": 8,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 11,
+      "messageID": 576,
+      "position": 65,
+      "time": "2026-11-08T19:15:38.443129",
+      "actualRequest": "B",
+      "displayRequest": "B",
+      "displayGroup": 8,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 12,
+      "messageID": 579,
+      "position": 93,
+      "time": "2026-11-08T19:19:08.370873",
+      "actualRequest": "B",
+      "displayRequest": "B",
+      "displayGroup": 8,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 13,
+      "messageID": 520,
+      "position": 530,
+      "time": "2026-11-08T18:48:22.686894",
+      "actualRequest": "A",
+      "displayRequest": "A",
+      "displayGroup": 9,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 14,
+      "messageID": 523,
+      "position": 541,
+      "time": "2026-11-08T18:48:26.064473",
+      "actualRequest": "A",
+      "displayRequest": "A",
+      "displayGroup": 9,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 15,
+      "messageID": 524,
+      "position": 552,
+      "time": "2026-11-08T18:48:30.684531",
+      "actualRequest": "A",
+      "displayRequest": "A",
+      "displayGroup": 9,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 16,
+      "messageID": 527,
+      "position": 562,
+      "time": "2026-11-08T18:51:06.338174",
+      "actualRequest": "A",
+      "displayRequest": "A",
+      "displayGroup": 9,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 17,
+      "messageID": 537,
+      "position": 840,
+      "time": "2026-11-08T18:53:56.947212",
+      "actualRequest": "A",
+      "displayRequest": "A",
+      "displayGroup": 9,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 18,
+      "messageID": 539,
+      "position": 851,
+      "time": "2026-11-08T18:54:02.891720",
+      "actualRequest": "A",
+      "displayRequest": "A",
+      "displayGroup": 9,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 19,
+      "messageID": 540,
+      "position": 862,
+      "time": "2026-11-08T18:54:06.543064",
+      "actualRequest": "A",
+      "displayRequest": "A",
+      "displayGroup": 9,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 20,
+      "messageID": 544,
+      "position": 872,
+      "time": "2026-11-08T18:55:59.512375",
+      "actualRequest": "A",
+      "displayRequest": "A",
+      "displayGroup": 9,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 21,
+      "messageID": 548,
+      "position": 1223,
+      "time": "2026-11-08T19:00:03.327329",
+      "actualRequest": "A",
+      "displayRequest": "A",
+      "displayGroup": 9,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 22,
+      "messageID": 550,
+      "position": 1234,
+      "time": "2026-11-08T19:00:08.731608",
+      "actualRequest": "A",
+      "displayRequest": "A",
+      "displayGroup": 9,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 23,
+      "messageID": 552,
+      "position": 1245,
+      "time": "2026-11-08T19:00:15.120910",
+      "actualRequest": "A",
+      "displayRequest": "A",
+      "displayGroup": 9,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 24,
+      "messageID": 554,
+      "position": 1256,
+      "time": "2026-11-08T19:00:22.692361",
+      "actualRequest": "A",
+      "displayRequest": "A",
+      "displayGroup": 9,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 25,
+      "messageID": 557,
+      "position": 1267,
+      "time": "2026-11-08T19:00:46.839649",
+      "actualRequest": "A",
+      "displayRequest": "A",
+      "displayGroup": 9,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 26,
+      "messageID": 558,
+      "position": 1278,
+      "time": "2026-11-08T19:00:52.008220",
+      "actualRequest": "A",
+      "displayRequest": "A",
+      "displayGroup": 9,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 27,
+      "messageID": 562,
+      "position": 1289,
+      "time": "2026-11-08T19:06:46.122271",
+      "actualRequest": "A",
+      "displayRequest": "A",
+      "displayGroup": 9,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 28,
+      "messageID": 564,
+      "position": 1299,
+      "time": "2026-11-08T19:07:21.809895",
+      "actualRequest": "A",
+      "displayRequest": "A",
+      "displayGroup": 9,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 29,
+      "messageID": 567,
+      "position": 1302,
+      "time": "2026-11-08T19:15:05.484964",
+      "actualRequest": "B",
+      "displayRequest": "B",
+      "displayGroup": 10,
+      "hasProducerMetadata": true
+    },
+    {
+      "row": 30,
+      "messageID": 569,
+      "position": 1313,
+      "time": "2026-11-08T19:15:08.422764",
+      "actualRequest": "B",
+      "displayRequest": "B",
+      "displayGroup": 10,
+      "hasProducerMetadata": true
+    }
+  ],
+  "sourceSHA256": {
+    "MobileHarness/Storage/Database/WriterMessages/WriterHistoryStore.swift": "b6ea32e4eac1517cc348c435bd0a1729941fdd8cd249a17f464ab8a95bb03d0c",
+    "MobileHarness/Storage/Database/WriterTasks/SQLiteWriterTasks.swift": "0b271573fd9af34781040edca31963361da3f0235896ff9d696c36ce6e5ea910",
+    "MobileHarness/Agents/Writer/WriterContainer.swift": "91f876e6ea77002e52fad3e79695762c9376be04e0e5092232180f5d9efeb49c",
+    "MobileHarness/UI/Settings/WriterRecordsView.swift": "eb4b513dd702b3e287d2318fef01b768dff0a4dc558035c57957295d2e0826fd"
+  },
+  "limitations": [
+    "Offline snapshot with copied WAL; no device database writes, app restart or installation.",
+    "Physical-device UI not driven; group labels reproduced from persisted rows and current presentation rules.",
+    "No production code or prompt edits in this diagnosis."
+  ],
+  "deviceFilesBeforeAndAfterUnchanged": {
+    "records.sqlite": {
+      "size": 66875392,
+      "lastModDate": "2026-11-08T11:19:26.000Z"
+    },
+    "records.sqlite-shm": {
+      "size": 32768,
+      "lastModDate": "2026-11-08T11:10:53.000Z"
+    },
+    "records.sqlite-wal": {
+      "size": 3320752,
+      "lastModDate": "2026-11-08T11:20:11.000Z"
+    }
+  }
+}

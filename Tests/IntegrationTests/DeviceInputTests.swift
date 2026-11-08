@@ -177,7 +177,8 @@ extension LiveRuntimeTests {
         try ProviderDiscoveryIntent(requestID: oversized).input(sessionID: "session"),
         try ProviderSettingsIntent(operation: .restore, requestID: oversized).input(sessionID: "session"),
         try MemoryHistoryIntent.delete(oversized).input(sessionID: "session"),
-        try PhotographerCameraIntent(.savePhoto, mediaID: oversized, requestID: "request").input(sessionID: "session"),
+        try PhotographerCameraIntent(.savePhoto, previewID: oversized, requestID: "request").input(
+            sessionID: "session"),
     ]
     for input in requests {
         guard case .observation(let message) = input.payload else {

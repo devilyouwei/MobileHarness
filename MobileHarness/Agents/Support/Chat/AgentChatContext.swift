@@ -18,23 +18,26 @@ public protocol AgentChatContextState: AgentTaskContextState {
     static var commitDependentTargets: Set<AgentID> { get }
     static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry
     static func preprocess(_ input: AgentInput, state: Self) throws -> SignalDisposition
-    static func buildChatMessages(system: String, user: String, conversation: StoredConversation) throws
+    static func buildChatMessages(system: String, user: String, conversation: AssistantConversation) throws
         -> [ChatMessage]
     static func isContextObservation(_ input: AgentInput) -> Bool
     mutating func applyContextObservation(_ input: AgentInput) throws
     static func systemPrompt(_ capabilities: CapabilityRegistry) throws -> String
     static func systemPrompt(_ capabilities: CapabilityRegistry, skills: AgentTaskSkillState?) throws -> String
+    static func systemPrompt(
+        _ capabilities: CapabilityRegistry, skills: AgentTaskSkillState?, communication: CommunicationDeclaration
+    ) throws -> String
     static func validateCommunication(_ signal: AgentTaskSignal, state: Self) throws
     init()
     var skillState: AgentTaskSkillState? { get set }
-    var history: ConversationArchive { get set }
+    var history: AssistantArchive { get set }
     var admissionSequence: UInt64 { get set }
 }
 
 /// Transactional projection of the Agent-owned authoritative history.
 public enum AgentChatHistoryContext {
     public static func attach<State: AgentChatContextState>(
-        repository: AgentContextRepository<State>, store: ConversationHistoryStore
+        repository: AgentContextRepository<State>, store: AssistantHistoryStore
     ) async throws {
         if await store.contextIdentity == repository.scopeID { return }
         try await store.attachContext(
@@ -44,7 +47,7 @@ public enum AgentChatHistoryContext {
     }
 
     public static func commit<State: AgentChatContextState>(
-        _ history: ConversationArchive, to repository: AgentContextRepository<State>
+        _ history: AssistantArchive, to repository: AgentContextRepository<State>
     ) async throws {
         try await repository.update {
             let oldIDs = Set(([$0.state.history.current] + $0.state.history.past).flatMap { $0.turns.map(\.id) })
@@ -59,7 +62,7 @@ public enum AgentChatHistoryContext {
             }
             try $0.eraseEvidence(for: oldIDs.subtracting(retained))
             guard history.revision > 0, $0.state.history.revision == history.revision - 1 else {
-                throw ConversationHistoryError.conflict
+                throw AssistantHistoryError.conflict
             }
             if $0.state.history.current.id != history.current.id, var skills = $0.state.skillState {
                 if $0.state.history.current.id != "draft" {
@@ -82,8 +85,8 @@ public enum AgentChatHistoryContext {
 
     public static func store<State: AgentChatContextState>(
         repository: AgentContextRepository<State>
-    ) -> ConversationHistoryStore {
-        ConversationHistoryStore(
+    ) -> AssistantHistoryStore {
+        AssistantHistoryStore(
             contextIdentity: repository.scopeID,
             contextLoad: { try await repository.snapshot().state.history },
             contextCommit: { history in try await commit(history, to: repository) })
@@ -95,6 +98,11 @@ extension AgentChatContextState {
     public static func systemPrompt(_ capabilities: CapabilityRegistry, skills: AgentTaskSkillState?) throws -> String {
         try systemPrompt(capabilities) + (try skills?.instructions() ?? "")
     }
+    public static func systemPrompt(
+        _ capabilities: CapabilityRegistry, skills: AgentTaskSkillState?, communication: CommunicationDeclaration
+    ) throws -> String {
+        try systemPrompt(capabilities, skills: skills)
+    }
     public static var supportsSkills: Bool { false }
     public var skillState: AgentTaskSkillState? {
         get { nil }
@@ -105,7 +113,7 @@ extension AgentChatContextState {
     public static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {
         capabilities
     }
-    public static func buildChatMessages(system: String, user: String, conversation: StoredConversation)
+    public static func buildChatMessages(system: String, user: String, conversation: AssistantConversation)
         throws -> [ChatMessage]
     {
         try AgentChatContextBuilder.request(
@@ -148,21 +156,21 @@ extension AgentChatContextState {
     /// Host terminal facts and model-reported summary are committed with their source index.
     public mutating func reconcileTaskCompressions() {
         guard let skills = skillState else { return }
-        func reconcile(_ conversation: inout StoredConversation) -> Bool {
+        func reconcile(_ conversation: inout AssistantConversation) -> Bool {
             var changed = false
             for task in skills.tasks {
-                guard let status = ConversationRecord.State(rawValue: task.status), status != .generating,
+                guard let status = AssistantRecord.State(rawValue: task.status), status != .generating,
                     !conversation.taskCompressions.contains(where: { $0.taskID == task.id })
                 else { continue }
                 let owned = conversation.turns.flatMap { turn in
                     (turn.modelRequests ?? []).filter { $0.historyTaskID == task.id }.map {
-                        (ConversationHistoryReference(inputID: turn.id, requestID: $0.id), $0.state, $0.historyOrder)
+                        (AssistantHistoryReference(inputID: turn.id, requestID: $0.id), $0.state, $0.historyOrder)
                     }
                 }
                 let ordered = owned.sorted { $0.2 < $1.2 }
                 guard !owned.isEmpty, owned.allSatisfy({ $0.1 != .generating }) else { continue }
                 conversation.taskCompressions.append(
-                    ConversationTaskCompression(
+                    AssistantTaskCompression(
                         taskID: task.id, goal: task.goal, status: status, reportedSummary: task.summary,
                         failure: task.failure, completedAt: task.updatedAt ?? task.date,
                         sources: ordered.map { $0.0 }))

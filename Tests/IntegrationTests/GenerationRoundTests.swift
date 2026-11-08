@@ -201,7 +201,7 @@ private actor RoundLog {
 private struct RoundHarness {
     let agent: any Agent
     let model: RoundModel
-    let store: ConversationHistoryStore
+    let store: AssistantHistoryStore
     let gateway: OutputGateway
     let scheduler: ChannelScheduler
     let manager: AgentManager
@@ -241,7 +241,7 @@ private func roundHarness(
         action: action, toolCount: toolCount, photo: photo, supportsImages: supportsImages,
         photoCommand: deviceStatus ? "Bluetooth.readStatus" : photoCommand, requestRounds: requestRounds,
         actionCount: actionCount)
-    let store = ConversationHistoryStore()
+    let store = AssistantHistoryStore()
     let agent: any Agent
     if photo || photoCommand != nil || deviceStatus {
         let declared = try AgentConfigurations.registry(
@@ -256,16 +256,26 @@ private func roundHarness(
                 {
                     throw CapabilityError.invalidRequest("Model lacks image support")
                 }
-                return try await AssistantContextBuilder.photoObservations(
-                    values, input: input, chat: chat,
-                    read: photoObservation,
-                    prepareJPEG: { data, policy in
-                        try await NativeImageCompression.jpeg(
-                            from: data,
-                            limits: .init(
-                                maximumDimension: policy.maximumDimension, maximumPixels: policy.maximumPixels,
-                                maximumBytes: policy.maximumBytes, quality: policy.quality))
-                    })
+                // This fixture exercises generic observation enrichment/barrier failure, not the production Camera State source.
+                var messages: [ChatMessage] = []
+                for item in values where item.path == "Camera.Capture.takePhoto" && !item.result.isError {
+                    let object = try JSONSerialization.jsonObject(with: Data(item.result.value.utf8)) as? [String: Any]
+                    guard let id = (object?["previewID"] ?? object?["mediaID"]) as? String else {
+                        throw CommunicationError.invalidPayload
+                    }
+                    let image = try await photoObservation(id, input)
+                    let policy = AssistantWebImagePolicy.analysis
+                    let prepared = try await NativeImageCompression.jpeg(
+                        from: image.data,
+                        limits: .init(
+                            maximumDimension: policy.maximumDimension, maximumPixels: policy.maximumPixels,
+                            maximumBytes: policy.maximumBytes, quality: policy.quality))
+                    messages.append(
+                        .init(
+                            role: .user, content: "Fixture image observation",
+                            images: [try ChatImage(id: id, data: prepared)]))
+                }
+                return messages
             },
             context: try AgentContextRepository(
                 agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState()),
@@ -698,6 +708,12 @@ func photographerPhotoFailuresDoNotFabricateVisionOrRepeatCapture(
     let id = try await store.save(bytes, owner: owner)
     let restarted = try fixtureMediaStore(root: root)
     #expect(try await restarted.read(id, owner: owner) == bytes)
+    await #expect(throws: FileStorageError.invalidFile) {
+        try await restarted.read(
+            id,
+            owner: .init(
+                namespace: owner.namespace, source: owner.source, session: UUID().uuidString, input: owner.input))
+    }
     await #expect(throws: FileStorageError.self) {
         try await restarted.read(
             id,
@@ -717,7 +733,7 @@ private actor PhotoFunctionEndpoint: CameraControlCapability {
     private(set) var captures = 0
     func takePhoto(invocation: any FunctionInput) throws -> CameraPhotoReceipt {
         captures += 1
-        return try CameraPhotoReceipt(mediaID: id, width: 640, height: 480)
+        return try CameraPhotoReceipt(previewID: id, width: 640, height: 480)
     }
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
         if enabled {
@@ -752,7 +768,7 @@ private actor PhotoFunctionEndpoint: CameraControlCapability {
         try await executor.execute(
             ToolCall(id: UUID().uuidString, toolPath: "Camera.Capture.takePhoto"), envelope: envelope))
     let receipt = try JSONDecoder().decode(CameraPhotoReceipt.self, from: Data(valid.value.utf8))
-    #expect(receipt.mediaID == endpoint.id)
+    #expect(receipt.previewID == endpoint.id)
     #expect(await endpoint.captures == 1)
 }
 
@@ -760,10 +776,10 @@ private actor PhotoFunctionEndpoint: CameraControlCapability {
 func photoDispositionObservationDrivesReplyWithoutAnotherImageOrCapture(_ command: String, _ denied: Bool) async throws
 {
     let id = UUID().uuidString
-    let receipt = CameraPhotoCommandReceipt(mediaID: id, state: command == "savePhoto" ? .saved : .ignored)
+    let receipt = CameraPhotoCommandReceipt(previewID: id, state: command == "savePhoto" ? .saved : .ignored)
     let value = String(decoding: try JSONEncoder().encode(receipt), as: UTF8.self)
     let harness = try await roundHarness(
-        action: false, toolCount: 0, photoCommand: command + " mediaID=\"" + id + "\"",
+        action: false, toolCount: 0, photoCommand: command + " previewID=\"" + id + "\"",
         handler: { _ in
             if denied { throw CameraControlError.permissionDenied }
             return .value(value)
@@ -904,7 +920,7 @@ func actionParserFailureCancelsOpenModelStreamWithoutWaitingForAnotherEvent()
     if case .cancelled = ended {} else { Issue.record("Failed protocol did not cancel the open model stream") }
 }
 
-@Test(.actionCatalog) func capturedPhotoHistoryReadsSurviveSessionsAndEnforceProducingInput() async throws {
+@Test(.actionCatalog) func persistedMediaReadsRequireTheCompleteProducingOwner() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let store = try fixtureMediaStore(root: root)
@@ -914,18 +930,21 @@ func actionParserFailureCancelsOpenModelStreamWithoutWaitingForAnotherEvent()
     let bytes = Data([1, 2, 3])
     let id = try await store.save(bytes, owner: owner)
     let restarted = try fixtureMediaStore(root: root)
-    #expect(try await restarted.readForInput(id, source: owner.source, input: owner.input) == bytes)
+    #expect(try await restarted.read(id, owner: owner) == bytes)
     await #expect(throws: FileStorageError.invalidFile) {
-        try await restarted.readForInput(id, source: "other", input: owner.input)
+        try await restarted.read(
+            id, owner: .init(namespace: owner.namespace, source: "other", session: owner.session, input: owner.input))
     }
     await #expect(throws: FileStorageError.invalidFile) {
-        try await restarted.readForInput(id, source: owner.source, input: UUID().uuidString)
+        try await restarted.read(
+            id,
+            owner: .init(
+                namespace: owner.namespace, source: owner.source, session: owner.session, input: UUID().uuidString))
     }
-    #expect(
-        try await restarted.readForInput("media_999999", source: owner.source, input: owner.input) == nil)
+    await #expect(throws: FileStorageError.invalidFile) { try await restarted.read("media_999999", owner: owner) }
     try FileManager.default.removeItem(
         at: root.appendingPathComponent(try #require(try testSQLiteRepositories(root).media.media(id)).path))
-    #expect(try await restarted.readForInput(id, source: owner.source, input: owner.input) == nil)
+    await #expect(throws: FileStorageError.invalidFile) { try await restarted.read(id, owner: owner) }
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func admittedUserRunsBeforeReadyContinuationAndPreservesNativePairs()
@@ -1044,7 +1063,7 @@ private struct UnfinishedGenerationModel: ChatCapability {
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
 func modelGenerationWaitsPastThirtySecondsUntilUserCancellation() async throws {
-    let store = ConversationHistoryStore()
+    let store = AssistantHistoryStore()
     let agent = try AssistantAgent(
         stateContext: try publicStateFixture(),
         chat: UnfinishedGenerationModel(), conversations: store,
@@ -1139,7 +1158,7 @@ private actor FailedAttemptModel: ChatCapability {
 private func agentRequestFailuresTerminateWithoutRetryOrEffectReplay(_ failure: FailedAttemptModel.Failure) async throws
 {
     let model = FailedAttemptModel(failure)
-    let store = ConversationHistoryStore()
+    let store = AssistantHistoryStore()
     let input = AgentInput(
         id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("继续完成原目标"))
     let context: AgentContextRepository<AssistantContextState>?
@@ -1149,7 +1168,8 @@ private func agentRequestFailuresTerminateWithoutRetryOrEffectReplay(_ failure: 
         var skills = AgentTaskSkillState()
         try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
         _ = try skills.control(
-            "startTask", arguments: ["goal": "保留跨轮目标"], inputID: input.id, fixed: fixed, taskID: try fixtureTaskID())
+            "task.start", arguments: ["description": "保留跨轮目标"], inputID: input.id, fixed: fixed,
+            taskID: try fixtureTaskID())
         initial.skillState = skills
         context = try AgentContextRepository(
             agent: .assistant, scope: UUID().uuidString, state: initial
@@ -1451,8 +1471,11 @@ func decisionContinuesThroughThirtySixRoundsAndOneHundredFortyFourNativeEffects(
     for index in 0..<8 { ids.append(try await store.save(Data(repeating: UInt8(index), count: 4), owner: owner)) }
     let restarted = try fixtureMediaStore(root: root, limits: limits)
     for (index, id) in ids.enumerated() {
-        let bytes = try await restarted.readForInput(id, source: owner.source, input: owner.input)
-        #expect(bytes == (index < 5 ? nil : Data(repeating: UInt8(index), count: 4)))
+        if index < 5 {
+            await #expect(throws: FileStorageError.invalidFile) { try await restarted.read(id, owner: owner) }
+        } else {
+            #expect(try await restarted.read(id, owner: owner) == Data(repeating: UInt8(index), count: 4))
+        }
         #expect(
             FileManager.default.fileExists(
                 atPath: root.appendingPathComponent(try #require(try testSQLiteRepositories(root).media.media(id)).path)
@@ -1462,7 +1485,8 @@ func decisionContinuesThroughThirtySixRoundsAndOneHundredFortyFourNativeEffects(
     #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).filter { $0.hasSuffix(".jpg") }.count == 3)
 }
 
-@Test func rollingModelContextKeepsIntentAndWholeLatestNativeResultBlock() throws {
+@Test(arguments: [false, true])
+func rollingModelContextKeepsIntentAndWholeLatestNativeResultBlock(stateImages: Bool) throws {
     var messages = [ChatMessage(role: .system, content: "fixture"), .init(role: .user, content: "original goal")]
     for index in 0..<80 {
         let id = "fixture-\(index)"
@@ -1470,11 +1494,20 @@ func decisionContinuesThroughThirtySixRoundsAndOneHundredFortyFourNativeEffects(
             .init(role: .assistant, content: "", toolCalls: [.init(id: id, name: "read", argumentsJSON: "{}")]))
         messages.append(.init(role: .tool, content: "actual result \(index)", toolCallID: id))
     }
+    if stateImages {
+        messages = try AgentChatContextBuilder.applyingStateImages(
+            [.init(id: "preview", width: 1, height: 1, data: Data([1]))],
+            to: messages, user: "original goal", supportsImages: true
+        ).messages
+        messages.append(.init(role: .system, content: "current state"))
+    }
     let retained = try AgentChatContextBuilder.retainingRecent(
-        messages, preservingUser: "original goal", protectedSuffixCount: 2)
+        messages, preservingUser: "original goal", protectedSuffixCount: stateImages ? 3 : 2,
+        protectedImageIDs: stateImages ? ["preview"] : [])
     #expect(retained.count <= 64 && retained.first?.role == .system)
     #expect(retained.contains { $0.content == "original goal" })
-    #expect(retained.last?.toolCallID == "fixture-79")
+    #expect(retained.last(where: { $0.role == .tool })?.toolCallID == "fixture-79")
+    #expect(retained.flatMap { $0.images ?? [] }.map(\.id) == (stateImages ? ["preview"] : []))
     #expect(!retained.flatMap(\.toolCalls).contains { $0.id == "fixture-0" })
     _ = try ChatRequest(messages: retained)
 }
@@ -1628,4 +1661,68 @@ func cameraFirstFramePendingDoesNotCaptureOrStartReact() async throws {
     #expect(await harness.model.requests.count == 2)
     await harness.close()
     await ui.stop()
+}
+
+@Test(arguments: ["input", "xml", "native"], [false, true])
+func stateImagesMergeIntoOriginalInputWithOrderedSystemMetadata(_ continuation: String, _ supported: Bool) throws {
+    let intent = "比较这两张照片"
+    var base = [
+        ChatMessage(role: .system, content: "instructions"), .init(role: .user, content: "earlier input"),
+        .init(role: .assistant, content: "earlier reply"), .init(role: .user, content: intent),
+    ]
+    if continuation == "xml" {
+        base.append(.init(role: .assistant, content: "<loadPreviewImage previewID=\"preview_1\"/>"))
+        base.append(.init(role: .user, content: "Action completed"))
+    } else if continuation == "native" {
+        base.append(
+            .init(role: .assistant, content: "", toolCalls: [.init(id: "call", name: "load", argumentsJSON: "{}")]))
+        base.append(.init(role: .tool, content: "Tool completed", toolCallID: "call"))
+    }
+    let images: [ContextImage] = [
+        .init(id: "preview_2", width: 32, height: 16, data: Data([4, 5]), source: "actions.camera.preview"),
+        .init(id: "preview_1", width: 16, height: 32, data: Data([6]), source: "actions.camera.preview"),
+    ]
+    let result = try AgentChatContextBuilder.applyingStateImages(
+        images, to: base, user: intent, supportsImages: supported)
+    #expect(result.messages.count == base.count)
+    #expect(result.messages.map(\.content) == base.map(\.content))
+    #expect(result.messages[3].images?.map(\.id) ?? [] == (supported ? ["preview_2", "preview_1"] : []))
+    #expect(result.messages.enumerated().allSatisfy { $0.offset == 3 || $0.element.images == nil })
+    #expect(base.allSatisfy { $0.images == nil })
+    let manifest = try #require(result.manifest)
+    let metadata = try #require(JSONSerialization.jsonObject(with: Data(manifest.utf8)) as? [String: Any])
+    #expect(metadata["message"] as? String == "current_user_input")
+    #expect(metadata["delivery"] as? String == (supported ? "attached" : "unsupported"))
+    let entries = try #require(metadata["images"] as? [[String: Any]])
+    #expect(entries.compactMap { $0["id"] as? String } == ["preview_2", "preview_1"])
+    #expect(entries.compactMap { $0["position"] as? Int } == (supported ? [1, 2] : []))
+    #expect(entries[0]["width"] as? Int == 32 && entries[0]["byteCount"] as? Int == 2)
+    #expect(!manifest.contains(Data([4, 5]).base64EncodedString()))
+    #expect(result.ephemeralIDs == (supported ? ["preview_2", "preview_1"] : []))
+    _ = try ChatRequest(messages: result.messages)
+    let refreshed = try AgentChatContextBuilder.applyingStateImages(
+        [images[1]], to: base, user: intent, supportsImages: supported)
+    #expect(refreshed.messages[3].images?.map(\.id) ?? [] == (supported ? ["preview_1"] : []))
+}
+
+@Test func stateImagePositionsIncludeExistingInputImagesAndRejectAmbiguousOrOversizedInput() throws {
+    let messages = [ChatMessage(role: .user, content: "input", images: [try ChatImage(id: "media_1", data: Data([1]))])]
+    let image = ContextImage(id: "preview_1", width: 1, height: 1, data: Data([2]))
+    let result = try AgentChatContextBuilder.applyingStateImages(
+        [image], to: messages, user: "input", supportsImages: true)
+    #expect(result.messages[0].images?.map(\.id) == ["media_1", "preview_1"])
+    #expect(result.manifest?.contains("\"position\":2") == true)
+    #expect(result.ephemeralIDs == ["preview_1"])
+    let tooMany = (1...4).map { ContextImage(id: "preview_\($0)", width: 1, height: 1, data: Data([2])) }
+    #expect(throws: CapabilityError.self) {
+        try AgentChatContextBuilder.applyingStateImages(tooMany, to: messages, user: "input", supportsImages: true)
+    }
+    #expect(throws: CapabilityError.self) {
+        try AgentChatContextBuilder.applyingStateImages(
+            [image, image], to: messages, user: "input", supportsImages: true)
+    }
+    #expect(throws: CapabilityError.self) {
+        try AgentChatContextBuilder.applyingStateImages(
+            [image], to: messages, user: "missing input", supportsImages: true)
+    }
 }

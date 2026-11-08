@@ -1,4 +1,3 @@
-import Actions
 import AgentCore
 import CallRuntime
 import Foundation
@@ -15,6 +14,7 @@ import Testing
 import UI
 import WebKit
 
+@testable import Actions
 @testable import Agents
 
 private enum WriterEvaluationError: Error { case requestBudget, renderTimeout, deadline, missingTask, invalidThinking }
@@ -23,12 +23,13 @@ private enum WriterEvaluationError: Error { case requestBudget, renderTimeout, d
 private actor WriterEvaluationChat: ChatCapability {
     nonisolated let availability: CapabilityAvailability = .available
     nonisolated let supportsToolCalls = true
-    nonisolated let supportsImages = false
+    nonisolated let supportsImages: Bool
     let provider: OpenAIChat
     let trace: URL
     var records: [[String: String]] = []
     var count = 0
-    init(provider: OpenAIChat, trace: URL) {
+    init(provider: OpenAIChat, trace: URL, supportsImages: Bool = false) {
+        self.supportsImages = supportsImages
         self.provider = provider
         self.trace = trace
     }
@@ -42,13 +43,19 @@ private actor WriterEvaluationChat: ChatCapability {
         try save()
     }
     func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
-        guard count < 36 else { throw WriterEvaluationError.requestBudget }
+        guard count < Int(ProcessInfo.processInfo.environment["MH_WRITER_EVAL_REQUEST_LIMIT"] ?? "36")! else {
+            throw WriterEvaluationError.requestBudget
+        }
         count += 1
         let index = records.count
         let started = Date()
         records.append([
             "phase": request.tools.isEmpty ? "content" : "control", "started": started.ISO8601Format(),
             "scope": request.context.scopeID, "state": "requesting",
+            "messagesJSON": String(
+                decoding: try JSONSerialization.data(
+                    withJSONObject: request.messages.map { ["role": $0.role.rawValue, "content": $0.content] }),
+                as: UTF8.self),
             "maximumOutputTokens": request.maximumOutputTokens.map(String.init) ?? "provider default",
         ])
         try save()
@@ -75,7 +82,9 @@ private actor WriterEvaluationChat: ChatCapability {
                         try self.update(index, ["firstEventSeconds": String(Date().timeIntervalSince(started))])
                     }
                     switch event {
-                    case .text(let value): bytes += value.utf8.count
+                    case .text(let value):
+                        bytes += value.utf8.count
+                        self.records[index]["response", default: ""] += value
                     case .toolCall(let call):
                         try self.update(index, ["tool.\(call.id)": call.argumentsJSON])
                         print("WRITER_TOOL \(index) \(call.argumentsJSON)")
@@ -256,6 +265,10 @@ private let writerEvaluationCases = [
 @Test(.actionCatalog, .enabled(if: ProcessInfo.processInfo.environment["MH_WRITER_EVAL"] == "1"))
 func writerRealModelWorkflowRegression() async throws {
     let env = ProcessInfo.processInfo.environment
+    if env["MH_WRITER_EVAL_SCENARIOS"] != nil {
+        try await writerPromptMatrixRun(env)
+        return
+    }
     let modelID = try #require(env["MH_WRITER_EVAL_MODEL"])
     let thinking = env["MH_WRITER_EVAL_THINKING"] ?? "enabled"
     guard ["enabled", "minimum"].contains(thinking) else { throw WriterEvaluationError.invalidThinking }
@@ -278,11 +291,11 @@ func writerRealModelWorkflowRegression() async throws {
         present: { id, _, entry, files, preview in
             try await renderer.show(id, entry: entry, files: files, preview: preview)
         })
-    let journal = ConversationHistoryStore(
-        records: try ConversationRecordStore(repository: records.chat, tasks: records.tasks, agent: "writer"))
+    let journal = WriterHistoryStore(
+        records: try WriterRecordStore(repository: records.writerMessages, logs: records.logs))
     let writer = try WriterAgent(
         model: { ChatModel(capability: model, modelName: modelID) }, streaming: artifacts, history: journal,
-        tasks: records.tasks)
+        tasks: records.writerExecutions, communications: records.agentMessages)
     let sink = WriterEvaluationSink()
     let island = await IslandState()
     await island.setAvailable(true)
@@ -299,11 +312,12 @@ func writerRealModelWorkflowRegression() async throws {
     ])
     let output = await OutputGateway(
         manager: manager, requests: input, tools: assembly.tools, policy: policy, sink: { _ in })
+    try await output.bindCommunications(records.agentMessages)
     await writer.bind(try await output.consumer(for: writer))
     try await manager.start(.writer)
     let messaging = try await output.messaging(for: .assistant)
     var results: [[String: Any]] = []
-    var tasks: [String: DelegatedTaskRecord] = [:]
+    var tasks: [String: WriterWorkspaceRecord] = [:]
     let selected = env["MH_WRITER_EVAL_CASES"].map { Set($0.split(separator: ",").map(String.init)) }
     let seconds = Double(env["MH_WRITER_EVAL_SECONDS"] ?? "600") ?? 600
     for scenario in writerEvaluationCases where selected == nil || selected!.contains(scenario.id) {
@@ -319,15 +333,15 @@ func writerRealModelWorkflowRegression() async throws {
             if let raw = previous?.workspaceID, let id = WorkspaceID(rawValue: raw) {
                 before = try await workspace.project(id)
             }
-            let task = try await records.tasks.seedDelegation(
-                taskID: previous?.id, goal: scenario.goal, input: scenario.goal, sourceDialog: nil, agent: "writer")
-            item["taskID"] = task.id
-            item["delegateID"] = task.delegateID
+            let delegateID = UUID().uuidString
+            let requestGoal = scenario.goal + (previous.map { " 已知作品引用：" + $0.workspaceID } ?? "")
+            try await records.agentMessages.seedAgentRequest(
+                id: delegateID, requester: "assistant", executor: "writer", goal: requestGoal, input: requestGoal,
+                sourceDialog: nil)
+            item["delegateID"] = delegateID
             let scope = AgentTaskScope(
-                id: task.delegateID, requester: .assistant, executor: .writer, sessionID: session,
-                execution: .background)
-            var data = ["request": scenario.goal, "goal": scenario.goal, "entry": scenario.entry, "taskID": task.id]
-            data["workspaceID"] = task.workspaceID
+                id: delegateID, requester: .assistant, executor: .writer, sessionID: session, execution: .background)
+            let data = ["request": requestGoal, "goal": requestGoal, "entry": scenario.entry]
             let signal = try AgentTaskSignal(
                 kind: .request, scope: scope, businessContract: "writer.author", data: JSONEncoder().encode(data))
             let receipt = try await messaging.send(
@@ -335,11 +349,15 @@ func writerRealModelWorkflowRegression() async throws {
                 parent: .init(id: UUID().uuidString, sessionID: session, payload: .text(scenario.goal)), to: .writer)
             guard receipt.rejected.isEmpty else { throw WriterFailure.unavailable }
             while true {
-                let current = try await records.tasks.delegatedTask(task.id, agent: "writer")
-                if !["running", "pending", "finishing"].contains(current.status) {
+                let current = try await records.writerExecutions.request(delegateID, agent: "writer")
+                item["taskID"] = current.taskID
+                if ["completed", "failed", "cancelled", "interrupted"].contains(current.status) {
                     item["status"] = current.status
                     item["failure"] = current.failure
-                    tasks[scenario.resumes ?? scenario.id] = current
+                    if !current.taskID.isEmpty {
+                        tasks[scenario.resumes ?? scenario.id] = try await records.writerExecutions.task(
+                            current.taskID, agent: "writer")
+                    }
                     if current.status != "completed" { issues.append("Writer terminal: \(current.status)") }
                     break
                 }
@@ -379,9 +397,7 @@ func writerRealModelWorkflowRegression() async throws {
                             issues.append("Unrelated file changed: \(path)")
                         }
                         if !html.contains("中文测试计数器") { issues.append("Title not modified") }
-                        if previous?.id != current.id || previous?.workspaceID != current.workspaceID
-                            || previous?.delegateID == current.delegateID
-                        {
+                        if previous?.id != current.id || previous?.workspaceID != current.workspaceID {
                             issues.append("Resume identity mismatch")
                         }
                     }
@@ -460,11 +476,11 @@ func writerRealModelWorkflowRegression() async throws {
     try await records.shutdown()
     try await context.unload()
     let reopened = try SQLiteRepositories(url: root.appendingPathComponent("records.sqlite"))
-    let restored = try ConversationRecordStore(repository: reopened.chat, tasks: reopened.tasks, agent: "writer")
+    let restored = try WriterRecordStore(repository: reopened.writerMessages, logs: reopened.logs)
     let projects = tasks.values.compactMap(\.workspaceID)
     #expect(Set(projects).count == projects.count)
     for task in tasks.values {
-        #expect(try await reopened.tasks.delegatedTask(task.id, agent: "writer").workspaceID == task.workspaceID)
+        #expect(try await reopened.writerExecutions.task(task.id, agent: "writer").workspaceID == task.workspaceID)
         let history = try await restored.read(task.dialogID)
         let calls = history.turns.flatMap { $0.modelRequests ?? [] }.flatMap(\.toolCalls)
         #expect(!history.turns.isEmpty)
@@ -503,4 +519,536 @@ func writerEvaluationWebKitReloadsLocalResourcesAndChecksClick() async throws {
     #expect(after["counterBefore"] as? String == "0")
     #expect(after["counterAfter"] as? String == "1")
     await renderer.stop()
+}
+
+// MARK: - JSON-owned prompt matrix (production code stays unchanged)
+
+private struct WriterPromptMatrix: Decodable {
+    let version: Int
+    let cases: [WriterPromptCase]
+}
+private struct WriterPromptSeed: Decodable {
+    let name: String
+    let title: String
+    let entry: String
+    let files: [String: String]
+}
+private struct WriterPromptCase: Decodable {
+    let id: String
+    let goal: String
+    let entry: String
+    var seeds: [WriterPromptSeed]? = nil
+    var resumeSeed: String? = nil
+    var targetSeed: String? = nil
+    var deleteSeed: String? = nil
+    var contains: [String: [String]]? = nil
+    var notContains: [String: [String]]? = nil
+    var requiredFiles: [String]? = nil
+    var forbiddenFiles: [String]? = nil
+    var unchangedFiles: [String]? = nil
+    var exactReplacement: [String: String]? = nil
+    var requiredCommands: [String]? = nil
+    var forbiddenCommands: [String]? = nil
+    var domContains: [String]? = nil
+    var library: Bool? = nil
+    var diagram: Bool? = nil
+    var counter: Bool? = nil
+    var noNewWorkspace: Bool? = nil
+    var windowRule: String? = nil
+    var hostEvent: String? = nil
+    var answer: String? = nil
+    var expectWaiting: Bool? = nil
+    var expectCancelled: Bool? = nil
+}
+
+/// Actual presentation/window owners; only animation completion is synthesized by this desktop host.
+@MainActor private final class WriterPromptHost {
+    let pages = WebPageContainer()
+    let windows = WindowState()
+    let presentation: ArtifactPresentation
+    let root: URL
+    var events: [[String: String]] = []
+    var renders: [[String: String]] = []
+    var animation: Task<Void, Never>?
+    var lastState = ""
+    var hostEvent: String?
+    var fired = false
+    init(root: URL, event: String?) throws {
+        self.root = root
+        hostEvent = event
+        pages.setAvailable(true)
+        windows.layout(width: 390, height: 844)
+        windows.setAvailable(true)
+        presentation = ArtifactPresentation(pages: pages, windows: windows, disk: try DiskFileStore(root: root))
+        animation = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                let state = self.windows.windows.map { "\($0.id):\($0.phase):\($0.mode)" }.joined(separator: ",")
+                if state != self.lastState {
+                    self.events.append(["kind": "windows", "value": state, "at": String(Date().timeIntervalSince1970)])
+                    self.lastState = state
+                }
+                for item in self.windows.windows where item.phase != .settled {
+                    self.windows.complete(
+                        item.id, revision: item.revision, generation: self.windows.generation, success: true)
+                }
+                try? await Task.sleep(for: .milliseconds(10))
+            }
+        }
+    }
+    func present(_ id: WorkspaceID, title: String, entry: String, files: [String: String], preview: Bool) async throws
+        -> String
+    {
+        events.append([
+            "kind": "present", "workspace": id.rawValue, "preview": String(preview),
+            "at": String(Date().timeIntervalSince1970),
+        ])
+        let raw = try await presentation.present(id: id, title: title, entry: entry, files: files, preview: preview)
+        var row = (try? JSONDecoder().decode([String: String].self, from: Data(raw.utf8))) ?? [:]
+        row["preview"] = String(preview)
+        row["workspace"] = id.rawValue
+        row["at"] = String(Date().timeIntervalSince1970)
+        if let ref = row["windowID"], let window = try? windows.resolve(reference: ref),
+            let page = pages.sessions[window]
+        {
+            page.webView.frame = .init(x: 0, y: 0, width: 390, height: 844)
+            if let dom = try? await page.webView.evaluateJavaScript(
+                "(()=>{let b=document.getElementById('increment'),c=document.getElementById('count');let before=c?.textContent;if(b&&c)b.click();return JSON.stringify({text:document.body?.innerText||'',svg:document.querySelectorAll('svg').length,counterBefore:before,counterAfter:c?.textContent,overflow:document.documentElement.scrollWidth>innerWidth+2})})()"
+            ) as? String {
+                row["dom"] = dom
+            }
+            if !preview, let png = try? await presentation.snapshot(id: id) {
+                let path = root.appendingPathComponent("render-\(renders.count).png")
+                try png.write(to: path)
+                row["screenshot"] = path.path
+            }
+        }
+        renders.append(row)
+        if preview, !fired, !(files[entry] ?? "").contains("正在准备创作"),
+            ["closeOnPreview", "minimizeOnPreview"].contains(hostEvent ?? ""), let window = windows.windows.first?.id
+        {
+            fired = true
+            if hostEvent == "closeOnPreview" {
+                try await close(window)
+            } else {
+                try await windows.change(window, command: .minimize)
+            }
+            events.append(["kind": hostEvent!, "at": String(Date().timeIntervalSince1970)])
+        }
+        return raw
+    }
+    func close(_ window: UUID) async throws {
+        let reference = try #require(windows.reference(for: window))
+        let invocation = FunctionInvocation(
+            call: .init(
+                actionPath: .init(domain: "UI", module: "Window", function: "close"),
+                parameters: ["windowID": reference]),
+            context: .init(source: "writer", sessionID: "evaluation", inputID: "close"),
+            executionID: UUID().uuidString, results: ActionReportStore())
+        try await presentation.closeWindow(invocation: invocation)
+        try await windows.change(window, command: .close)
+    }
+    func stop() async {
+        animation?.cancel()
+        await animation?.value
+        animation = nil
+        pages.closeSessions()
+        windows.setAvailable(false)
+    }
+}
+
+private func writerPromptMatrixRun(_ env: [String: String]) async throws {
+    let path = try #require(env["MH_WRITER_EVAL_SCENARIOS"])
+    let specification = try JSONDecoder().decode(
+        WriterPromptMatrix.self, from: Data(contentsOf: URL(fileURLWithPath: path)))
+    guard specification.version == 1, Set(specification.cases.map(\.id)).count == specification.cases.count else {
+        throw WriterFailure.invalidOutput
+    }
+    let root = URL(fileURLWithPath: try #require(env["MH_WRITER_EVAL_ROOT"]))
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let selected = env["MH_WRITER_EVAL_CASES"].map { Set($0.split(separator: ",").map(String.init)) }
+    var results: [[String: Any]] = []
+    for scenario in specification.cases where selected == nil || selected!.contains(scenario.id) {
+        print("WRITER_CASE \(env["MH_WRITER_EVAL_MODEL"] ?? "") \(scenario.id) START")
+        let result = try await writerPromptCase(scenario, env: env, root: root.appendingPathComponent(scenario.id))
+        results.append(result)
+        let report: [String: Any] = [
+            "version": 2, "model": env["MH_WRITER_EVAL_MODEL"] ?? "",
+            "thinking": env["MH_WRITER_EVAL_THINKING"] ?? "minimum",
+            "scope":
+                "Production Writer/Gateway/Artifacts/SQLite and macOS WebKit/window state; simulated animation acknowledgements, no iOS device acceptance",
+            "cases": results,
+        ]
+        try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]).write(
+            to: root.appendingPathComponent("report.json"), options: .atomic)
+        print(
+            "WRITER_CASE \(env["MH_WRITER_EVAL_MODEL"] ?? "") \(scenario.id) \(result["passed"] as? Bool == true ? "PASS" : "FAIL") \(result["issues"] ?? [])"
+        )
+        #expect(result["passed"] as? Bool == true, "\(scenario.id): \(result["issues"] ?? [])")
+    }
+}
+
+private func writerPromptCase(_ scenario: WriterPromptCase, env: [String: String], root: URL) async throws -> [String:
+    Any]
+{
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let started = Date()
+    let modelID = try #require(env["MH_WRITER_EVAL_MODEL"])
+    let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 1), maximumLoadWaiters: 4)
+    let provider = try OpenAIChat(
+        context: context,
+        configuration: OpenAIChatConfiguration(
+            baseURL: OpenAIChatConfiguration.endpoint(try #require(env["MH_WRITER_EVAL_API_URL"])),
+            apiKey: try #require(env["MH_WRITER_EVAL_API_KEY"]), model: modelID,
+            thinking: env["MH_WRITER_EVAL_THINKING"] == "enabled" ? .enabled : .minimum))
+    let model = WriterEvaluationChat(
+        provider: provider, trace: root.appendingPathComponent("requests.json"), supportsImages: true)
+    let records = try SQLiteRepositories(url: root.appendingPathComponent("records.sqlite"))
+    let workspace = ArtifactWorkspace(
+        disk: try DiskFileStore(root: root.appendingPathComponent("workspaces")), catalog: records.workspaces)
+    let host = try await WriterPromptHost(root: root.appendingPathComponent("presentation"), event: scenario.hostEvent)
+    let artifacts = ArtifactService(
+        workspace: workspace,
+        prepare: { id, deleting in try await host.presentation.prepare(id: id, deleting: deleting) },
+        capture: { id in try await host.presentation.snapshot(id: id) },
+        describe: { id, title, subtitle in await host.presentation.describe(id: id, title: title, subtitle: subtitle) },
+        present: { id, title, entry, files, preview in
+            try await host.present(id, title: title, entry: entry, files: files, preview: preview)
+        })
+    let journal = WriterHistoryStore(
+        records: try WriterRecordStore(repository: records.writerMessages, logs: records.logs))
+    let writer = try WriterAgent(
+        model: { ChatModel(capability: model, modelName: modelID) }, streaming: artifacts, history: journal,
+        tasks: records.writerExecutions, communications: records.agentMessages)
+    let sink = WriterEvaluationSink()
+    let island = await IslandState()
+    await island.setAvailable(true)
+    let islandService = await IslandPresentationService(state: island)
+    let session = UUID().uuidString
+    let manager = AgentManager()
+    try await manager.register(sink, sessionID: session)
+    try await manager.register(writer)
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication, configurations: AgentConfigurations.all())
+    let input = InputGateway(manager: manager, policy: policy)
+    let assembly = try BehaviorAssembly(capabilityModules: [
+        ArtifactsModule(artifacts: artifacts), IslandModule(island: islandService),
+    ])
+    let output = await OutputGateway(
+        manager: manager, requests: input, tools: assembly.tools, policy: policy, sink: { _ in })
+    try await output.bindCommunications(records.agentMessages)
+    await writer.bind(try await output.consumer(for: writer))
+    try await manager.start(.writer)
+    let messaging = try await output.messaging(for: .assistant)
+    var issues: [String] = []
+    var item: [String: Any] = ["id": scenario.id, "goal": scenario.goal]
+    var seeds: [String: WriterWorkspaceRecord] = [:]
+    var before: [String: ArtifactProject] = [:]
+    do {
+        for seed in scenario.seeds ?? [] {
+            let task = try await records.seedDelegation(
+                taskID: nil, goal: seed.title, input: "Synthetic fixture", sourceDialog: nil, agent: "writer")
+            let id = try #require(WorkspaceID(rawValue: task.workspaceID))
+            before[seed.name] = try await workspace.publish(
+                id: id, expecting: nil, title: seed.title, draft: ArtifactDraft(files: seed.files), entry: seed.entry)
+            try await records.writerExecutions.prepareWorkspace(
+                id.rawValue, taskID: task.id, delegateID: task.delegateID, agent: "writer")
+            try await records.endSeedDelegation(task.delegateID, status: "completed")
+            seeds[seed.name] = task.workspace
+        }
+        if scenario.hostEvent == "precloseSeed", let seed = before.values.first {
+            _ = try await host.present(seed.id, title: seed.title, entry: seed.entry, files: seed.files, preview: false)
+            if let window = await host.windows.windows.first?.id { try await host.close(window) }
+        }
+        if scenario.hostEvent == "hidden" {
+            await host.presentation.setSceneActive(false)
+            await writer.setSceneActive(false)
+        }
+        let eventStart = Date().timeIntervalSince1970
+        let previous = scenario.resumeSeed.flatMap { seeds[$0] }
+        let delegateID = UUID().uuidString
+        let requestGoal = scenario.goal + (previous.map { " 已知作品引用：" + $0.workspaceID } ?? "")
+        try await records.agentMessages.seedAgentRequest(
+            id: delegateID, requester: "assistant", executor: "writer", goal: requestGoal, input: requestGoal,
+            sourceDialog: nil)
+        let scope = AgentTaskScope(
+            id: delegateID, requester: .assistant, executor: .writer, sessionID: session, execution: .background)
+        item["delegateID"] = delegateID
+        let data = ["request": requestGoal, "goal": requestGoal, "entry": scenario.entry]
+        let signal = try AgentTaskSignal(
+            kind: .request, scope: scope, businessContract: "writer.author", data: JSONEncoder().encode(data))
+        let receipt = try await messaging.send(
+            signal.message(), parent: .init(id: UUID().uuidString, sessionID: session, payload: .text(scenario.goal)),
+            to: .writer)
+        guard receipt.rejected.isEmpty else {
+            item["admissionRejected"] = String(describing: receipt.rejected)
+            throw WriterFailure.unavailable
+        }
+        var terminal = ""
+        var answered = false
+        var cancelled = false
+        var waitingSeen = false
+        var busyChecked = false
+        while true {
+            let phase = await writer.observationSnapshot().business["phase"]
+            if !busyChecked, scenario.expectCancelled == true, phase == .text("running") {
+                let other = AgentTaskScope(
+                    id: UUID().uuidString, requester: .assistant, executor: .writer, sessionID: session,
+                    execution: .background)
+                let competing = try AgentTaskSignal(
+                    kind: .request, scope: other, businessContract: "writer.author",
+                    data: JSONEncoder().encode(["request": "another"]))
+                let rejection = try await messaging.send(
+                    competing.message(),
+                    parent: .init(id: UUID().uuidString, sessionID: session, payload: .text("another")), to: .writer)
+                item["busyRejected"] = !rejection.rejected.isEmpty
+                if rejection.rejected.isEmpty { issues.append("Busy assignment was accepted") }
+                busyChecked = true
+            }
+            if phase == .text("waitingUser") {
+                waitingSeen = true
+                if let answer = scenario.answer, !answered {
+                    let signals = await sink.signals
+                    let content = signals.reversed().compactMap { try? AgentTaskContent.decode($0) }.first {
+                        $0.interactionID != nil
+                    }
+                    if let content {
+                        let reply = try AgentTaskContent(text: answer, interactionID: content.interactionID).signal(
+                            .input, scope: scope)
+                        _ = try await messaging.send(
+                            reply.message(),
+                            parent: .init(id: UUID().uuidString, sessionID: session, payload: .text(answer)),
+                            to: .writer)
+                        answered = true
+                    }
+                } else if scenario.answer == nil {
+                    terminal = "waitingUser"
+                    break
+                }
+            }
+            if scenario.expectCancelled == true, !cancelled,
+                await model.records.contains(where: { $0["phase"] == "content" })
+            {
+                let cancel = try AgentTaskContent(text: "User cancellation in evaluation").signal(.cancel, scope: scope)
+                _ = try await messaging.send(
+                    cancel.message(),
+                    parent: .init(id: UUID().uuidString, sessionID: session, payload: .text("cancel")), to: .writer)
+                cancelled = true
+            }
+            let currentRequest = try await records.writerExecutions.request(delegateID, agent: "writer")
+            let current = currentRequest
+            item["taskID"] = current.taskID
+            if ["completed", "failed", "cancelled", "interrupted"].contains(current.status) {
+                terminal = current.status
+                item["failure"] = current.failure
+                break
+            }
+            if Date().timeIntervalSince(started) > Double(env["MH_WRITER_EVAL_SECONDS"] ?? "300")! {
+                terminal = "evaluationTimeout"
+                break
+            }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        item["status"] = terminal
+        item["waitingSeen"] = waitingSeen
+        if scenario.expectWaiting == true {
+            if terminal != "waitingUser" { issues.append("Expected clarification before effects") }
+        } else if scenario.expectCancelled == true {
+            if terminal != "cancelled" { issues.append("Expected cancelled, got \(terminal)") }
+        } else if terminal != "completed" {
+            issues.append("Writer terminal: \(terminal)")
+        }
+        if scenario.answer != nil && !answered { issues.append("Required question/follow-up did not occur") }
+        if terminal == "waitingUser" || terminal == "evaluationTimeout" {
+            let cancel = try AgentTaskContent(text: "Evaluation cleanup after recorded outcome").signal(
+                .cancel, scope: scope)
+            _ = try await messaging.send(
+                cancel.message(), parent: .init(id: UUID().uuidString, sessionID: session, payload: .text("cancel")),
+                to: .writer)
+        }
+        // Join all owned work before examining final files and late window effects.
+        await writer.stop()
+        let inventory = try await workspace.inventory()
+        item["inventory"] = inventory
+        let selectedRequest = try await records.writerExecutions.request(delegateID, agent: "writer")
+        let selectedTask =
+            selectedRequest.taskID.isEmpty
+            ? nil : try await records.writerExecutions.task(selectedRequest.taskID, agent: "writer")
+        let target = scenario.targetSeed.flatMap { seeds[$0] } ?? previous ?? selectedTask
+        var files: [String: String] = [:]
+        if let target, let id = WorkspaceID(rawValue: target.workspaceID),
+            let project = try? await workspace.project(id)
+        {
+            files = project.files
+        }
+        item["files"] = files
+        var seedAfter: [String: [String: String]] = [:]
+        for (name, original) in before {
+            let after = try? await workspace.project(original.id)
+            seedAfter[name] = after?.files
+            if name == scenario.deleteSeed {
+                if after != nil { issues.append("Requested deletion did not remove target") }
+            } else if scenario.library == true || (scenario.resumeSeed != name && scenario.targetSeed != name) {
+                if after?.files != original.files { issues.append("Unrelated saved work changed: \(name)") }
+            }
+        }
+        item["seedFilesAfter"] = seedAfter
+        if scenario.library == true, let selectedTask,
+            !before.values.contains(where: { $0.id.rawValue == selectedTask.workspaceID })
+        {
+            issues.append("Library-only operation created a workspace")
+        }
+        if scenario.noNewWorkspace == true, inventory.count != before.count {
+            issues.append("Lookup/edit created another workspace")
+        }
+        for (path, values) in scenario.contains ?? [:] {
+            for value in values where !writerPromptContains(files[path] ?? "", expected: value) {
+                issues.append("Missing content \(path): \(value)")
+            }
+        }
+        for (path, values) in scenario.notContains ?? [:] {
+            for value in values where (files[path] ?? "").contains(value) {
+                issues.append("Forbidden content \(path): \(value)")
+            }
+        }
+        for path in scenario.requiredFiles ?? [] where files[path] == nil { issues.append("Missing file: \(path)") }
+        for path in scenario.forbiddenFiles ?? [] where files[path] != nil {
+            issues.append("Unrequested file: \(path)")
+        }
+        let original = (scenario.resumeSeed ?? scenario.targetSeed).flatMap { before[$0] }
+        for path in scenario.unchangedFiles ?? [] where files[path] != original?.files[path] {
+            issues.append("Unrelated file changed: \(path)")
+        }
+        if let replacement = scenario.exactReplacement, let path = replacement["path"], let old = replacement["old"],
+            let new = replacement["new"],
+            files[path] != original?.files[path]?.replacingOccurrences(of: old, with: new)
+        {
+            issues.append("Local replacement changed unrelated bytes")
+        }
+        let archive = try await journal.readCurrent()
+        try JSONEncoder().encode(archive.current).write(
+            to: root.appendingPathComponent("history.json"), options: .atomic)
+        let trace = await model.records
+        let arguments = trace.flatMap { record in
+            record.filter { $0.key.hasPrefix("tool.") }.map(\.value)
+        }
+        let commands = arguments.compactMap {
+            try? JSONDecoder().decode([String: String].self, from: Data($0.utf8))["command"]
+        }
+        item["commands"] = commands
+        for command in scenario.requiredCommands ?? [] where !commands.contains(command) {
+            issues.append("Required operation missing: \(command)")
+        }
+        for command in scenario.forbiddenCommands ?? [] where commands.contains(command) {
+            issues.append("Forbidden operation: \(command)")
+        }
+        let renders = await host.renders.filter { Double($0["at"] ?? "0") ?? 0 >= eventStart }
+        let events = await host.events.filter { Double($0["at"] ?? "0") ?? 0 >= eventStart }
+        item["renders"] = renders
+        item["windowEvents"] = events
+        let windows = await host.windows.windows
+        item["finalWindowModes"] = windows.map { $0.mode.rawValue }
+        let windowIDs = Set(renders.compactMap { $0["windowID"] }.filter { !$0.isEmpty })
+        let hostEventFired = await host.fired
+        switch scenario.windowRule {
+        case "none": if !renders.isEmpty || !windows.isEmpty { issues.append("Unexpected window/presentation") }
+        case "one": if windowIDs.count != 1 || windows.count != 1 { issues.append("Expected one stable window") }
+        case "closed":
+            if !windows.isEmpty || !hostEventFired {
+                issues.append("Closed window resurrected or event not exercised")
+            }
+        case "minimized":
+            if windows.first?.mode != .minimized || !hostEventFired {
+                issues.append("Minimized preference lost or event not exercised")
+            }
+        case "deferred":
+            if !windows.isEmpty || !renders.contains(where: { $0["status"] == "deferred" }) {
+                issues.append("Hidden scene did not defer rendering")
+            }
+        default: break
+        }
+        if let raw = renders.last(where: { $0["preview"] == "false" })?["dom"],
+            let dom = try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any]
+        {
+            item["lastDOM"] = dom
+            for text in scenario.domContains ?? [] where !(dom["text"] as? String ?? "").contains(text) {
+                issues.append("Rendered text missing: \(text)")
+            }
+            if scenario.counter == true
+                && (dom["counterBefore"] as? String != "0" || dom["counterAfter"] as? String != "1")
+            {
+                issues.append("Counter interaction failed")
+            }
+            if scenario.diagram == true && (dom["svg"] as? Int ?? 0) == 0
+                && !files.values.contains(where: { $0.contains("<canvas") || $0.contains("border") })
+            {
+                issues.append("Diagram structure missing")
+            }
+            if dom["overflow"] as? Bool == true { issues.append("Horizontal overflow at mobile viewport") }
+        } else if scenario.counter == true || scenario.domContains != nil {
+            issues.append("No final rendered DOM evidence")
+        }
+        if scenario.hostEvent == "hidden" {
+            await host.presentation.setSceneActive(true)
+            await host.presentation.waitForSceneRestoration()
+            item["restoredWindowCount"] = await host.windows.windows.count
+            if await host.windows.windows.count != 1 { issues.append("Foreground restore did not show saved work") }
+        }
+    } catch { issues.append(String(describing: error)) }
+    await writer.stop()
+    try await artifacts.shutdown()
+    await host.stop()
+    try await records.shutdown()
+    item["requests"] = await model.records.count
+    item["contentRequests"] = await model.records.filter { $0["phase"] == "content" }.count
+    item["requestTrace"] = await model.records
+    item["seconds"] = Date().timeIntervalSince(started)
+    item["issues"] = issues
+    item["passed"] = issues.isEmpty
+    return item
+}
+
+@Test func writerPromptMatrixSchemaIsBoundedAndSeparatesAssertionsFromGoals() throws {
+    let repository = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let path = repository.appendingPathComponent("Tests/AgentModelEvaluationTests/Scenarios/writer-workflows.json")
+    let matrix = try JSONDecoder().decode(WriterPromptMatrix.self, from: Data(contentsOf: path))
+    #expect(matrix.version == 1 && matrix.cases.count == 30)
+    #expect(Set(matrix.cases.map(\.id)).count == matrix.cases.count)
+    for item in matrix.cases {
+        #expect(!item.goal.isEmpty && item.goal.utf8.count < 4096)
+        #expect(["html", "md", "txt"].contains((item.entry as NSString).pathExtension))
+        if let resume = item.resumeSeed { #expect(item.seeds?.contains { $0.name == resume } == true) }
+        if item.id == "P04-find-and-edit" { #expect(item.resumeSeed == nil && item.targetSeed != nil) }
+    }
+}
+
+@Test(.enabled(if: ProcessInfo.processInfo.environment["MH_WRITER_RENDER_EVAL"] == "1"))
+func writerPromptHostUsesProductionWindowAndRenderingOwners() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let host = try await WriterPromptHost(root: root, event: nil)
+    let id = try #require(WorkspaceID(agent: "writer", taskID: "task_1"))
+    _ = try await host.present(
+        id, title: "Synthetic preflight", entry: "index.html",
+        files: ["index.html": "<!doctype html><meta charset=utf-8><h1>Production renderer</h1>"], preview: false)
+    #expect(await host.windows.windows.count == 1)
+    let first = try await #require(host.windows.windows.first?.id)
+    try await host.close(first)
+    #expect(await host.windows.windows.isEmpty)
+    let blocked = try await host.present(
+        id, title: "closed", entry: "index.html", files: ["index.html": "<h1>Do not reopen</h1>"], preview: true)
+    #expect(blocked.contains("unavailable") && blocked.contains("closed"))
+    try await host.presentation.prepare(id: id, deleting: false)
+    _ = try await host.present(
+        id, title: "reopened", entry: "index.html", files: ["index.html": "<h1>Reopened</h1>"], preview: false)
+    #expect(await host.windows.windows.count == 1)
+    await host.stop()
+    try? FileManager.default.removeItem(at: root)
+}
+
+// Numeric content assertions accept standard thousands separators; exactReplacement remains byte-exact.
+private func writerPromptContains(_ text: String, expected: String) -> Bool {
+    if text.contains(expected) { return true }
+    guard !expected.isEmpty, expected.allSatisfy({ $0.isNumber }) else { return false }
+    return text.replacingOccurrences(of: ",", with: "").contains(expected)
 }

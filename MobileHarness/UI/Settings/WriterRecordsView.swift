@@ -41,41 +41,18 @@ public struct WriterTaskItem: Identifiable, Sendable, Codable {
     public let dialogID: String
     public let goal: String
     public let workspaceID: String?
-    public let delegateID: String
-    public let status: String
-    public let failure: String?
     public let updatedAt: Date
+    public var isDeleted = false
     public var startedAt: Date? = nil
     public var requestCount: Int = 0
-    public var completedDuration: TimeInterval? = 0
-    public var activeSince: Date? = nil
-    public var phase: String? = nil
     public init(
-        id: String, dialogID: String, goal: String, workspaceID: String?, delegateID: String, status: String,
-        failure: String?,
-        updatedAt: Date
+        id: String, dialogID: String, goal: String, workspaceID: String?, updatedAt: Date
     ) {
         self.id = id
         self.dialogID = dialogID
         self.goal = goal
         self.workspaceID = workspaceID
-        self.delegateID = delegateID
-        self.status = status
-        self.failure = failure
         self.updatedAt = updatedAt
-    }
-    public func elapsed(at date: Date) -> TimeInterval? {
-        completedDuration.map { $0 + (activeSince.map { max(0, date.timeIntervalSince($0)) } ?? 0) }
-    }
-    public var statusTitle: String {
-        switch status {
-        case "running", "finishing": phase == "waitingUser" ? "Waiting" : phase == "paused" ? "Paused" : "Running"
-        case "completed", "succeeded": "Completed"
-        case "cancelled": "Cancelled"
-        case "interrupted": "Interrupted"
-        case "failed": "Failed"
-        default: "Unknown"
-        }
     }
 }
 public struct WriterRequestItem: Identifiable, Sendable {
@@ -105,7 +82,8 @@ public struct WriterRequestItem: Identifiable, Sendable {
         self.title = title
     }
     public var displayTitle: String { title + (attempt > 1 ? "（重试）" : "") }
-    public var statusTitle: String {
+    public var statusTitle: String { Self.statusTitle(state) }
+    static func statusTitle(_ state: String) -> String {
         switch state {
         case "generating": "生成中"
         case "executing": "执行中"
@@ -125,13 +103,133 @@ public struct WriterRequestPage: Sendable {
         self.nextPosition = nextPosition
     }
 }
+public struct WriterTaskPage: Sendable {
+    public let items: [WriterTaskItem]
+    public let nextID: String?
+    public init(items: [WriterTaskItem], nextID: String?) {
+        self.items = items
+        self.nextID = nextID
+    }
+}
+
+/// Page-local snapshots survive child navigation; only a successful explicit refresh replaces them.
+struct WriterRecordPages<Item: Identifiable & Sendable, Cursor: Sendable>: Sendable {
+    private(set) var items: [Item] = []
+    private(set) var next: Cursor?
+    private(set) var hasLoaded = false
+    mutating func apply(_ incoming: [Item], next: Cursor?, reset: Bool) throws {
+        try Task.checkCancellation()
+        if reset {
+            items = incoming
+        } else {
+            for item in incoming {
+                if let index = items.firstIndex(where: { $0.id == item.id }) {
+                    items[index] = item
+                } else {
+                    items.append(item)
+                }
+            }
+        }
+        self.next = next
+        hasLoaded = true
+    }
+    mutating func update(_ item: Item) {
+        if let index = items.firstIndex(where: { $0.id == item.id }) { items[index] = item }
+    }
+}
+public struct WriterRequestFinalization: Sendable {
+    public enum State: String, Sendable { case completed, failed }
+    public let state: State
+    public let result: String?
+    public let error: String?
+    public init(state: State, result: String?, error: String?) {
+        self.state = state
+        self.result = result
+        self.error = error
+    }
+}
+public struct WriterRequestDetails: Sendable {
+    public let summary: WriterRequestItem
+    public private(set) var request: HistoryModelRequest?
+    public let fallbackInput: String
+    public private(set) var toolSources: [String: String]
+    public let finalization: WriterRequestFinalization?
+    public init(
+        summary: WriterRequestItem, request: HistoryModelRequest?, fallbackInput: String, toolSources: [String: String],
+        finalization: WriterRequestFinalization?
+    ) {
+        self.summary = summary
+        self.request = request
+        self.fallbackInput = fallbackInput
+        self.toolSources = toolSources
+        self.finalization = finalization
+    }
+    public mutating func clearLogs() {
+        if let request {
+            self.request = WriterRecordPresentation.clearingLogs(request)
+            if request.inputMessages == nil { toolSources = [:] }
+        }
+    }
+}
+public struct WriterDelegationItem: Identifiable, Sendable {
+    public let id: String
+    public let position: UInt64
+    public let goal: String
+    public let input: String
+    public let sourceAgent: String
+    public let sourceContext: String?
+    public var waiting: String? = nil
+    public let date: Date
+    public let state: String
+    public let result: String?
+    public let failure: String?
+    public let workspace: WriterTaskItem?
+    public var stateTitle: String {
+        switch state {
+        case "waiting_input": return "等待补充"
+        case "paused": return "已暂停"
+        case "closing": return "正在收尾"
+        case "cleanup_failed": return "清理失败"
+        default: return WriterRequestItem.statusTitle(state)
+        }
+    }
+    public init(
+        id: String, position: UInt64, goal: String, input: String, sourceAgent: String, sourceContext: String?,
+        date: Date, state: String, result: String?, failure: String?, workspace: WriterTaskItem?
+    ) {
+        self.id = id
+        self.position = position
+        self.goal = goal
+        self.input = input
+        self.sourceAgent = sourceAgent
+        self.sourceContext = sourceContext
+        self.date = date
+        self.state = state
+        self.result = result
+        self.failure = failure
+        self.workspace = workspace
+    }
+}
+public struct WriterDelegationPage: Sendable {
+    public let items: [WriterDelegationItem]
+    public let next: UInt64?
+    public let total: Int
+    public init(items: [WriterDelegationItem], next: UInt64?, total: Int) {
+        self.items = items
+        self.next = next
+        self.total = total
+    }
+}
 @MainActor public protocol WriterRecordsControlling: AnyObject {
-    func tasks(before: String?) async throws -> [WriterTaskItem]
+    func delegations(before: UInt64?) async throws -> WriterDelegationPage
+    func delegation(_ id: String) async throws -> WriterDelegationItem
+    func preflight(_ id: String, after: UInt64) async throws -> WriterRequestPage
+    func tasks(before: String?) async throws -> WriterTaskPage
     func task(_ id: String) async throws -> WriterTaskItem
     func requests(taskID: String, after: UInt64) async throws -> WriterRequestPage
-    func message(_ id: String) async throws -> HistoryConversation
+    func requestDetail(_ id: String) async throws -> WriterRequestDetails
     func shareTask(_ id: String) async throws -> String
-    func imageData(_ id: String, input: String) async throws -> Data?
+    func clearRequestLogs(requestID: String?) async throws
 }
 public struct WriterFilePreview: Sendable {
     public let url: URL
@@ -142,13 +240,76 @@ public struct WriterFilePreview: Sendable {
     }
 }
 public enum WriterRecordPresentation {
-    public static func duration(_ seconds: TimeInterval?) -> String {
-        guard let seconds, seconds.isFinite, seconds >= 0, seconds < Double(Int.max) else { return "未知" }
-        let value = Int(seconds)
-        return value >= 3600
-            ? "\(value / 3600) 小时 \(value / 60 % 60) 分 \(value % 60) 秒"
-            : value >= 60 ? "\(value / 60) 分 \(value % 60) 秒" : "\(value) 秒"
+    public static func contentPath(_ request: HistoryModelRequest) -> String? {
+        guard let path = request.producerMetadata?["path"],
+            !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else { return nil }
+        return path
     }
+    public static func tools(_ request: HistoryModelRequest) throws -> [HistoryFunctionRegistration]? {
+        guard let metadata = request.decisionMetadata else { return nil }
+        return try ConversationHistoryPresentation.functionCatalog(metadata.catalogJSON).tools
+    }
+    public static func promptMessages(_ request: HistoryModelRequest) -> [HistoryMessage] {
+        guard request.logsCleared != true else { return [] }
+        for source in [request.requestParametersJSON, request.requestJSON] {
+            if let json = HistoryRecordedImages.messagesJSON(source),
+                let messages = try? JSONDecoder().decode([HistoryMessage].self, from: Data(json.utf8))
+            {
+                return messages
+            }
+        }
+        return []
+    }
+    /// The current input is the user/tool suffix after the latest model response, not earlier history.
+    public static func inputMessages(_ messages: [HistoryMessage]) -> [HistoryMessage] {
+        let start = messages.lastIndex(where: { $0.role == .assistant }).map { $0 + 1 } ?? 0
+        return messages.dropFirst(start).filter { $0.role == .user || $0.role == .tool }
+    }
+    public static func requestInputs(_ request: HistoryModelRequest) -> [HistoryMessage] {
+        request.inputMessages ?? inputMessages(promptMessages(request))
+    }
+    private struct DraftChange: Decodable {
+        let path: String
+        let firstChangedLine: String
+        let beforeBytes: String
+        let afterBytes: String
+        let status: String
+    }
+    static func inputSummary(_ content: String, isTool: Bool) -> String {
+        if isTool, content.utf8.count <= 16_384,
+            let changes = try? JSONDecoder().decode([DraftChange].self, from: Data(content.utf8)),
+            !changes.isEmpty, changes.allSatisfy({ $0.status == "draft edited; render before finish" })
+        {
+            let summary = changes.prefix(2).map {
+                "\($0.path) · 草稿已修改，待渲染\n\($0.beforeBytes) → \($0.afterBytes) 字节 · 首个变化行 \($0.firstChangedLine)"
+            }.joined(separator: "\n")
+            return changes.count <= 2 ? summary : summary + "\n共 \(changes.count) 个文件"
+        }
+        let excerpt = content.prefix(240)
+        return String(excerpt) + (excerpt.endIndex == content.endIndex ? "" : "…")
+    }
+    static func toolState(_ calls: [HistoryToolCall]) -> HistoryToolCall.State? {
+        [.failed, .cancelled, .received, .completed].first { state in calls.contains { $0.state == state } }
+    }
+    static func toolStateTitle(_ state: HistoryToolCall.State) -> String {
+        switch state {
+        case .received: "待完成"
+        case .completed: "已完成"
+        case .failed: "失败"
+        case .cancelled: "已取消"
+        }
+    }
+    static func clearingLogs(_ request: HistoryModelRequest) -> HistoryModelRequest {
+        HistoryModelRequest(
+            producerMetadata: request.producerMetadata, inputMessages: request.inputMessages, logsCleared: true,
+            messageID: request.messageID, isObservation: request.isObservation,
+            historyOrder: request.historyOrder, id: request.id, date: request.date, input: request.input,
+            requestJSON: "[]", historyTaskID: request.historyTaskID, decisionMetadata: request.decisionMetadata,
+            modelRequestStartedAt: nil, firstTokenLatency: nil, firstTokenAt: nil, response: request.response,
+            toolCalls: request.toolCalls, tokenUsage: nil, state: request.state, finishReason: nil, error: nil)
+    }
+
     public static func firstToken(_ request: HistoryModelRequest) -> String {
         guard let latency = request.firstTokenLatency, latency.isFinite, latency >= 0 else {
             return "首 token 耗时：未知"
@@ -169,11 +330,13 @@ public enum WriterRecordPresentation {
     @MainActor public struct WriterRecordsView: View {
         private let controls: any WriterRecordsControlling
         private let artifacts: any WriterArtifactsControlling
-        @State private var items: [WriterTaskItem] = []
+        @State private var pages = WriterRecordPages<WriterTaskItem, String>()
+        private var items: [WriterTaskItem] { pages.items }
         @State private var failure: String?
-        @State private var more = true
         @State private var loading = false
         @State private var refreshOffset = 0
+        @State private var clearingLogs = false
+        @State private var delegationTotal = 0
         public init(controls: any WriterRecordsControlling, artifacts: any WriterArtifactsControlling) {
             self.controls = controls
             self.artifacts = artifacts
@@ -182,9 +345,16 @@ public enum WriterRecordPresentation {
             List {
                 if let failure { Text(failure).foregroundStyle(.red) }
                 Section {
+                    NavigationLink {
+                        WriterDelegationsView(controls: controls, artifacts: artifacts)
+                    } label: {
+                        LabeledContent("委托记录", value: String(delegationTotal))
+                    }.accessibilityIdentifier("writer.delegations")
+                }
+                Section("Workspace") {
                     ForEach(items) { item in
                         NavigationLink {
-                            WriterTaskDetail(seed: item, controls: controls, artifacts: artifacts)
+                            WriterTaskDetail(seed: item, controls: controls, artifacts: artifacts).id(item.id)
                         } label: {
                             HistoryRecordRow(
                                 title: item.goal, icon: "pencil.and.outline",
@@ -199,24 +369,40 @@ public enum WriterRecordPresentation {
                         .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
                         .accessibilityIdentifier("writer.task." + item.id)
                     }
-                    if items.isEmpty && !loading && failure == nil { Text("No writing tasks yet.") }
-                    if more {
+                    if items.isEmpty && !loading && failure == nil { Text("尚无 Workspace") }
+                    if !pages.hasLoaded || pages.next != nil {
                         Button(loading ? "Loading…" : "Load More") { Task { await load(reset: false) } }
                             .disabled(loading)
                     }
                 }
             }.navigationTitle("My Writer").navigationBarTitleDisplayMode(.inline).task {
-                await load(reset: true)
+                if !pages.hasLoaded { await load(reset: true) }
                 while !Task.isCancelled {
                     do {
                         try await Task.sleep(for: .seconds(2))
-                        try await refreshStates()
+                        try await refreshTasks()
                     } catch is CancellationError { return } catch {
-                        failure = "状态更新失败：\(error)"
+                        failure = "记录更新失败：\(error)"
                         return
                     }
                 }
             }.refreshable { await load(reset: true) }
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("清空请求日志", systemImage: "trash") { clearingLogs = true }
+                    }
+                }
+                .confirmationDialog("清空整个请求日志库？", isPresented: $clearingLogs, titleVisibility: .visible) {
+                    Button("清空全部日志", role: .destructive) {
+                        Task {
+                            do { try await controls.clearRequestLogs(requestID: nil) } catch {
+                                failure = "日志清空失败：\(error)"
+                            }
+                        }
+                    }
+                } message: {
+                    Text("删除 Assistant 和 Writer 的全部请求日志；保留任务、消息及其他详情。")
+                }
         }
         @ViewBuilder private func metadata(_ item: WriterTaskItem, stacked: Bool) -> some View {
             if stacked {
@@ -236,12 +422,8 @@ public enum WriterRecordPresentation {
             HStack(spacing: 5) {
                 Text(item.id)
                 Text("·")
-                Text("\(item.requestCount) turns")
-                Text(item.statusTitle)
-                    .font(.caption2)
-                    .padding(.horizontal, 5).padding(.vertical, 2)
-                    .foregroundStyle(statusColor(item.status))
-                    .background(statusColor(item.status).opacity(0.12), in: Capsule())
+                Text("\(item.requestCount) 条消息")
+
             }
         }
         private func taskDate(_ item: WriterTaskItem) -> some View {
@@ -249,21 +431,16 @@ public enum WriterRecordPresentation {
                 .fixedSize()
                 .accessibilityLabel("Last updated " + item.updatedAt.formatted(date: .complete, time: .shortened))
         }
-        private func statusColor(_ status: String) -> Color {
-            switch status {
-            case "running", "finishing": .blue
-            case "completed", "succeeded": .green
-            case "failed": .red
-            default: .secondary
-            }
-        }
-        private func refreshStates() async throws {
-            guard !loading, !items.isEmpty else { return }
+        private func refreshTasks() async throws {
+            guard !loading else { return }
+            delegationTotal = try await controls.delegations(before: nil).total
+            guard !items.isEmpty else { return }
             let targets = Array(items.dropFirst(refreshOffset).prefix(20))
             for item in targets {
                 try Task.checkCancellation()
                 let updated = try await controls.task(item.id)
-                if let index = items.firstIndex(where: { $0.id == updated.id }) { items[index] = updated }
+                try Task.checkCancellation()
+                pages.update(updated)
             }
             refreshOffset = items.isEmpty ? 0 : (refreshOffset + 20) % items.count
         }
@@ -272,12 +449,125 @@ public enum WriterRecordPresentation {
             loading = true
             defer { loading = false }
             do {
-                let page = try await controls.tasks(before: reset ? nil : items.last?.id)
+                delegationTotal = try await controls.delegations(before: nil).total
+                let page = try await controls.tasks(before: reset ? nil : pages.next)
                 try Task.checkCancellation()
-                items = reset ? page : items + page
-                more = page.count == 20
+                try pages.apply(page.items, next: page.nextID, reset: reset)
+                if reset { refreshOffset = 0 }
                 failure = nil
             } catch is CancellationError {} catch { failure = "读取失败：\(error)" }
+        }
+    }
+    @MainActor private struct WriterDelegationsView: View {
+        let controls: any WriterRecordsControlling
+        let artifacts: any WriterArtifactsControlling
+        @State private var pages = WriterRecordPages<WriterDelegationItem, UInt64>()
+        @State private var reading = false
+        @State private var failure: String?
+        var body: some View {
+            List {
+                if let failure { Text(failure).foregroundStyle(.red) }
+                ForEach(pages.items) { item in
+                    NavigationLink {
+                        WriterDelegationDetail(seed: item, controls: controls, artifacts: artifacts)
+                    } label: {
+                        VStack(alignment: .leading) {
+                            Text(item.goal).lineLimit(2)
+                            Text(item.sourceAgent + " · " + item.date.formatted() + " · " + item.state).font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }.accessibilityIdentifier("writer.delegation." + item.id)
+                }
+                if !pages.hasLoaded || pages.next != nil {
+                    Button("加载更多") { Task { await load(reset: false) } }.disabled(reading)
+                }
+            }.navigationTitle("委托记录").task { if !pages.hasLoaded { await load(reset: true) } }.refreshable {
+                await load(reset: true)
+            }
+        }
+        private func load(reset: Bool) async {
+            guard !reading else { return }
+            reading = true
+            defer { reading = false }
+            do {
+                let page = try await controls.delegations(before: reset ? nil : pages.next)
+                try pages.apply(page.items, next: page.next, reset: reset)
+                failure = nil
+            } catch is CancellationError {} catch { failure = String(describing: error) }
+        }
+    }
+    @MainActor private struct WriterDelegationDetail: View {
+        let seed: WriterDelegationItem
+        let controls: any WriterRecordsControlling
+        let artifacts: any WriterArtifactsControlling
+        @State private var current: WriterDelegationItem?
+        @State private var pages = WriterRecordPages<WriterRequestItem, UInt64>()
+        @State private var reading = false
+        @State private var failure: String?
+        private var item: WriterDelegationItem { current ?? seed }
+        var body: some View {
+            List {
+                Section("委托") {
+                    LabeledContent("来源 Agent", value: item.sourceAgent)
+                    if let source = item.sourceContext { LabeledContent("来源会话", value: source) }
+                    LabeledContent("接收时间", value: item.date.formatted())
+                    LabeledContent("状态", value: item.stateTitle)
+                    Text(item.goal)
+                }
+                if let waiting = item.waiting { Section("等待补充") { Text(verbatim: waiting) } }
+                Section("原始输入") { Text(verbatim: item.input).textSelection(.enabled) }
+                if let result = item.result { Section("结果") { Text(verbatim: result).textSelection(.enabled) } }
+                if let error = item.failure { Section("失败") { Text(verbatim: error).foregroundStyle(.red) } }
+                if let workspace = item.workspace {
+                    Section("Workspace") {
+                        NavigationLink {
+                            WriterTaskDetail(seed: workspace, controls: controls, artifacts: artifacts)
+                        } label: {
+                            Text(workspace.goal + (workspace.isDeleted ? "（已删除）" : ""))
+                        }
+                    }
+                }
+                if let failure { Text(failure).foregroundStyle(.red) }
+                Section("进入 Workspace 前的消息") {
+                    ForEach(pages.items) { row in
+                        NavigationLink {
+                            WriterRequestDetail(requestID: row.id, controls: controls)
+                        } label: {
+                            VStack(alignment: .leading) {
+                                Text(row.displayTitle)
+                                Text(row.date.formatted()).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }.accessibilityIdentifier("writer.preflight.request." + row.id)
+                    }
+                    if let next = pages.next {
+                        Button("加载更多") { Task { await load(after: next, reset: false) } }.disabled(reading)
+                    }
+                }
+            }.navigationTitle("委托详情").task {
+                if !pages.hasLoaded { await load(after: 0, reset: true) }
+                while !Task.isCancelled {
+                    do {
+                        try await Task.sleep(for: .seconds(2))
+                        current = try await controls.delegation(seed.id)
+                        if pages.next == nil {
+                            let rows = pages.items
+                            await load(after: rows.count > 20 ? rows[rows.count - 21].position : 0, reset: false)
+                        }
+                    } catch { return }
+                }
+            }.refreshable { await load(after: 0, reset: true) }
+        }
+        private func load(after: UInt64, reset: Bool) async {
+            guard !reading else { return }
+            reading = true
+            defer { reading = false }
+            do {
+                let updated = try await controls.delegation(seed.id)
+                let page = try await controls.preflight(seed.id, after: after)
+                try pages.apply(page.items, next: page.nextPosition, reset: reset)
+                current = updated
+                failure = nil
+            } catch is CancellationError {} catch { failure = String(describing: error) }
         }
     }
     @MainActor private struct WriterTaskDetail: View {
@@ -285,8 +575,8 @@ public enum WriterRecordPresentation {
         let controls: any WriterRecordsControlling
         let artifacts: any WriterArtifactsControlling
         @State private var current: WriterTaskItem?
-        @State private var items: [WriterRequestItem] = []
-        @State private var next: UInt64?
+        @State private var pages = WriterRecordPages<WriterRequestItem, UInt64>()
+        private var items: [WriterRequestItem] { pages.items }
         @State private var failure: String?
         @State private var sharing: String?
         @State private var showsShare = false
@@ -310,13 +600,12 @@ public enum WriterRecordPresentation {
                             .accessibilityIdentifier("writer.task.started")
                     }
                     LabeledContent(
-                        "持续时间", value: WriterRecordPresentation.duration((current ?? seed).elapsed(at: .now))
+                        "更新时间", value: (current ?? seed).updatedAt.formatted(date: .abbreviated, time: .standard)
                     )
-                    .accessibilityIdentifier("writer.task.duration")
-                    LabeledContent("执行轮次", value: String((current ?? seed).requestCount))
-                    LabeledContent("最新状态", value: (current ?? seed).statusTitle)
-                    if let error = (current ?? seed).failure { Text(error).foregroundStyle(.red) }
-                    if let project = (current ?? seed).workspaceID {
+                    .accessibilityIdentifier("writer.task.updated")
+                    LabeledContent("消息数量", value: String((current ?? seed).requestCount))
+                    if (current ?? seed).isDeleted { LabeledContent("状态", value: "Workspace 已删除") }
+                    if let project = (current ?? seed).workspaceID, !(current ?? seed).isDeleted {
                         NavigationLink {
                             WriterArtifactDetail(
                                 item: .init(id: project, title: seed.goal, state: "draft", entry: "index.html"),
@@ -327,26 +616,13 @@ public enum WriterRecordPresentation {
                     } else {
                         Label("尚未建立作品目录", systemImage: "folder").foregroundStyle(.secondary)
                     }
-                    Button {
-                        showsShare = true
-                    } label: {
-                        Label("导出任务对话记录", systemImage: "square.and.arrow.up")
-                    }.disabled(sharingBusy).accessibilityIdentifier("writer.task.export")
+
                 }
                 if let failure { Text(failure).foregroundStyle(.red) }
-                Section("执行轮次") {
+                Section("Workspace 消息") {
                     ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                        if index == 0 || items[index - 1].delegateID != item.delegateID {
-                            Text(
-                                "委托 "
-                                    + String(
-                                        items.prefix(index + 1).enumerated().filter {
-                                            $0.offset == 0 || items[$0.offset - 1].delegateID != $0.element.delegateID
-                                        }.count)
-                            ).font(.caption).foregroundStyle(.secondary)
-                        }
                         NavigationLink {
-                            WriterRequestDetail(messageID: item.id, controls: controls)
+                            WriterRequestDetail(requestID: item.id, controls: controls)
                         } label: {
                             HStack(alignment: .center, spacing: 12) {
                                 Text(String(item.number)).font(
@@ -371,21 +647,29 @@ public enum WriterRecordPresentation {
                             }.padding(.vertical, 3)
                         }.accessibilityIdentifier("writer.request." + item.id)
                     }
-                    if let next { Button("加载更多") { Task { await load(after: next, reset: false) } }.disabled(reading) }
+                    if let next = pages.next {
+                        Button("加载更多") { Task { await load(after: next, reset: false) } }
+                            .disabled(reading).accessibilityIdentifier("writer.requests.more")
+                    }
                 }
-            }.navigationTitle("任务记录")
+            }.navigationTitle("Workspace")
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("导出", systemImage: "square.and.arrow.up") { showsShare = true }
+                            .labelStyle(.iconOnly)
+                            .disabled(sharingBusy)
+                            .accessibilityLabel("导出任务对话记录")
+                            .accessibilityIdentifier("writer.task.export")
+                    }
+                }
                 .task {
-                    await load(after: 0, reset: true)
+                    if !pages.hasLoaded { await load(after: 0, reset: true) }
                     while !Task.isCancelled {
                         do {
                             try await Task.sleep(for: .seconds(2))
-                            current = try await controls.task(seed.id)
-                            if next == nil {
-                                let cursor = items.count > 20 ? items[items.count - 21].position : 0
-                                await load(after: cursor, reset: false)
-                            }
+                            await refreshVisible()
                         } catch is CancellationError { return } catch {
-                            failure = "状态更新失败：\(error)"
+                            failure = "记录更新失败：\(error)"
                             return
                         }
                     }
@@ -415,124 +699,325 @@ public enum WriterRecordPresentation {
         private func numberTint(_ item: WriterRequestItem) -> Color {
             item.state == "failed" ? .red : .gray
         }
+        private func refreshVisible() async {
+            guard !reading else { return }
+            if pages.next == nil {
+                let cursor = items.count > 20 ? items[items.count - 21].position : 0
+                await load(after: cursor, reset: !pages.hasLoaded)
+            } else {
+                reading = true
+                defer { reading = false }
+                do {
+                    let updated = try await controls.task(seed.id)
+                    try Task.checkCancellation()
+                    current = updated
+                } catch is CancellationError {} catch { failure = "记录更新失败：\(error)" }
+            }
+        }
         private func load(after: UInt64, reset: Bool) async {
             guard !reading else { return }
             reading = true
             defer { reading = false }
             do {
-                current = try await controls.task(seed.id)
+                let updated = try await controls.task(seed.id)
                 let page = try await controls.requests(taskID: seed.id, after: after)
                 try Task.checkCancellation()
-                if reset {
-                    items = page.items
-                } else {
-                    for item in page.items {
-                        if let index = items.firstIndex(where: { $0.id == item.id }) {
-                            items[index] = item
-                        } else {
-                            items.append(item)
-                        }
-                    }
-                }
-                next = page.nextPosition
+                try pages.apply(page.items, next: page.nextPosition, reset: reset)
+                current = updated
                 failure = nil
             } catch is CancellationError {} catch { failure = "读取失败：\(error)" }
         }
     }
     @MainActor private struct WriterRequestDetail: View {
-        let messageID: String
+        let requestID: String
         let controls: any WriterRecordsControlling
-        @State private var loaded: HistoryConversation?
+        @State private var detail: WriterRequestDetails?
         @State private var failure: String?
-        private func imageIDs(_ json: String) -> [String] {
-            guard let messages = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]] else {
-                return []
-            }
-            var seen = Set<String>()
-            return Array(
-                messages.flatMap { $0["imageReferences"] as? [[String: Any]] ?? [] }.compactMap { $0["id"] as? String }
-                    .filter { seen.insert($0).inserted }.prefix(4))
-        }
+        @State private var confirmsClearing = false
+        @State private var reading = false
+        @State private var clearing = false
+
         var body: some View {
             List {
                 if let failure { Text(failure).foregroundStyle(.red) }
-                ForEach(loaded?.turns ?? []) { input in
-                    Section("请求") {
-                        DisclosureGroup("请求输入") { Text(input.user).textSelection(.enabled) }
-                        Text("模型 · " + input.model)
-                        Text(input.date, style: .time)
-                        if let maximum = input.maximumOutputTokens { Text("最大输出 · \(maximum)") }
-                        Text("Temperature · \(input.temperature)")
-                        ForEach(input.toolDefinitions ?? [], id: \.self) { definition in
-                            DisclosureGroup("工具定义") {
-                                Text(definition).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
-                            }
-                        }
-                    }
-                    ForEach(input.generationRounds ?? []) { effect in
-                        Section("Writer 运行时收尾") {
-                            Text(effect.resultsJSON).font(.system(.caption, design: .monospaced)).textSelection(
-                                .enabled)
-                        }
-                    }
-                    ForEach(input.modelRequests ?? []) { request in
-                        Section(request.decisionMetadata?.mode ?? "模型请求") {
-                            Text(WriterRecordPresentation.firstToken(request))
-                                .accessibilityIdentifier("writer.request.ttft")
-                            Text(WriterRecordPresentation.requestDuration(request, at: .now))
-                                .accessibilityIdentifier("writer.request.duration")
-                            if !request.response.isEmpty {
-                                if request.decisionMetadata?.mode == "文件内容请求" {
-                                    DisclosureGroup("文件内容") {
-                                        Text(request.response).font(.system(.caption, design: .monospaced))
-                                            .textSelection(.enabled).accessibilityIdentifier("writer.request.source")
-                                    }.accessibilityIdentifier("writer.request.content")
-                                } else {
-                                    Text(request.response).textSelection(.enabled)
-                                }
-                            }
-                            Text(request.state.rawValue)
-                            if let reason = request.finishReason { Text("结束原因 · " + reason) }
-                            ForEach(imageIDs(request.requestJSON), id: \.self) { id in
-                                WriterRequestImage(id: id, input: input.id, controls: controls)
-                            }
-                            if let usage = request.tokenUsage {
-                                Text("Tokens · \(usage.input) 输入 / \(usage.generated) 输出")
-                            }
-                            if let diagnostic = request.failureDiagnostic {
-                                WriterFailureDetail(diagnostic: diagnostic)
-                            } else if let error = request.error {
-                                Text(error).foregroundStyle(.red)
-                            }
-                            DisclosureGroup("完整请求") {
-                                Text(request.requestJSON).font(.system(.caption, design: .monospaced)).textSelection(
-                                    .enabled)
-                            }
-                        }
-                        ForEach(request.toolCalls) { call in
-                            Section("Tool · " + call.name) {
-                                DisclosureGroup("调用参数") {
-                                    Text(call.argumentsJSON).font(.system(.caption, design: .monospaced)).textSelection(
-                                        .enabled)
-                                }
-                                Text(call.state.rawValue)
-                                if let output = call.output {
-                                    DisclosureGroup("调用结果") { Text(output).textSelection(.enabled) }
-                                }
-                                if let diagnostic = call.failureDiagnostic {
-                                    WriterFailureDetail(diagnostic: diagnostic)
-                                } else if let error = call.error {
-                                    Text(error).foregroundStyle(.red)
-                                }
-                            }
-                        }
-                    }
+                if let detail {
+                    WriterRequestSections(
+                        detail: detail, controls: controls, canClearLogs: !reading
+                    ) {
+                        confirmsClearing = true
+                    }.disabled(clearing)
+                } else if failure == nil {
+                    ProgressView()
                 }
-            }.navigationTitle("请求详情").task {
-                do { loaded = try await controls.message(messageID) } catch { failure = "读取失败：\(error)" }
+            }
+            .navigationTitle("请求详情")
+            .task { await load() }
+            .refreshable { await load() }
+            .confirmationDialog("清空此条请求日志？", isPresented: $confirmsClearing, titleVisibility: .visible) {
+                Button("清空日志", role: .destructive) { Task { await clearLogs() } }
+            }
+        }
+
+        private func load() async {
+            guard !reading, !clearing else { return }
+            reading = true
+            defer { reading = false }
+            do {
+                let result = try await controls.requestDetail(requestID)
+                try Task.checkCancellation()
+                detail = result
+                failure = nil
+            } catch is CancellationError {} catch {
+                failure = "读取失败：\(error)"
+            }
+        }
+
+        private func clearLogs() async {
+            guard !reading, !clearing, detail?.request?.logsCleared == false else { return }
+            clearing = true
+            defer { clearing = false }
+            do {
+                try await controls.clearRequestLogs(requestID: requestID)
+                detail?.clearLogs()
+                failure = nil
+            } catch {
+                failure = "日志清空失败：\(error)"
             }
         }
     }
+
+    @MainActor private struct WriterRequestSections: View {
+        let detail: WriterRequestDetails
+        let controls: any WriterRecordsControlling
+        let canClearLogs: Bool
+        let clearLogs: () -> Void
+
+        var body: some View {
+            overview
+            Section("本轮输入") {
+                let inputs = detail.request.map(WriterRecordPresentation.requestInputs) ?? []
+                if inputs.isEmpty {
+                    inputRow(detail.fallbackInput, title: "输入")
+                } else {
+                    ForEach(Array(inputs.enumerated()), id: \.offset) { _, message in
+                        inputRow(
+                            message.content,
+                            title: message.role == .tool ? "工具反馈" : "用户输入",
+                            message: message)
+                    }
+                }
+                if let request = detail.request { tools(request) }
+            }
+            if let request = detail.request, !request.toolCalls.isEmpty {
+                Section("本轮工具调用") {
+                    ForEach(request.toolCalls) { call in
+                        WriterRequestToolCard(call: call)
+                    }
+                }
+            }
+            output
+            if let request = detail.request { logs(request) }
+        }
+
+        private var overview: some View {
+            let summary = detail.summary
+            return Section("本轮概览") {
+                Text("第 \(summary.number) 轮 · \(summary.title)").font(.headline)
+                    .accessibilityIdentifier("writer.detail.overview")
+                LabeledContent("阶段", value: summary.phase)
+                if let path = summary.path { LabeledContent("目标文件", value: path) }
+                if summary.attempt > 1 { LabeledContent("尝试次数", value: String(summary.attempt)) }
+                if let request = detail.request {
+                    LabeledContent("模型", value: WriterRequestItem.statusTitle(request.state.rawValue))
+                        .accessibilityIdentifier("writer.detail.model-state")
+                    if let tool = WriterRecordPresentation.toolState(request.toolCalls) {
+                        LabeledContent("工具", value: WriterRecordPresentation.toolStateTitle(tool))
+                            .accessibilityIdentifier("writer.detail.tool-state")
+                    }
+                    LabeledContent("请求时间") {
+                        Text(summary.date, format: .dateTime.year().month().day().hour().minute().second())
+                    }
+                    WriterRecordIdentifier(label: "请求 ID", value: request.id)
+                } else {
+                    LabeledContent("记录时间") {
+                        Text(summary.date, format: .dateTime.year().month().day().hour().minute().second())
+                    }
+                }
+            }
+        }
+
+        @ViewBuilder private func inputRow(_ content: String, title: String, message: HistoryMessage? = nil)
+            -> some View
+        {
+            let isTool = message?.role == .tool
+            DisclosureGroup {
+                WriterRecordedText(content)
+                if let id = message?.toolCallID { WriterRecordIdentifier(label: "来源调用 ID", value: id) }
+            } label: {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(isTool && message?.toolName != nil ? "\(title) · \(message?.toolName ?? "")" : title)
+                    Text(verbatim: WriterRecordPresentation.inputSummary(content, isTool: isTool))
+                        .font(.subheadline).foregroundStyle(.secondary).lineLimit(isTool ? 5 : 3)
+                }
+            }
+            if let call = message?.toolCallID, let source = detail.toolSources[call] {
+                NavigationLink {
+                    WriterRequestDetail(requestID: source, controls: controls)
+                } label: {
+                    Text("查看来源调用")
+                }.accessibilityIdentifier("writer.detail.tool-source")
+            }
+        }
+
+        @ViewBuilder private func tools(_ request: HistoryModelRequest) -> some View {
+            switch Result(catching: { try WriterRecordPresentation.tools(request) }) {
+            case .success(let entries?):
+                DisclosureGroup("本轮可用工具（\(entries.count)）") {
+                    ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
+                        HistoryCatalogEntryRow(entry: entry)
+                    }
+                }.accessibilityIdentifier("writer.request.tools")
+                    .disabled(entries.isEmpty)
+            case .success(nil):
+                LabeledContent("本轮可用工具", value: "未记录")
+            case .failure:
+                LabeledContent("本轮可用工具", value: "读取失败")
+            }
+        }
+
+        @ViewBuilder private var output: some View {
+            let content = detail.request.flatMap { $0.response.isEmpty ? nil : $0 }
+            if content != nil || detail.finalization != nil {
+                Section("本轮产出") {
+                    if let content {
+                        let path = WriterRecordPresentation.contentPath(content)
+                        DisclosureGroup {
+                            WriterRecordedText(content.response).accessibilityIdentifier("writer.request.source")
+                        } label: {
+                            Label(path ?? "生成文本", systemImage: path == nil ? "text.alignleft" : "doc.text")
+                        }.accessibilityIdentifier("writer.request.content.toggle")
+                    }
+                    if let finalization = detail.finalization {
+                        let status = finalization.state == .completed ? "成功" : "失败"
+                        if let evidence = finalization.error ?? finalization.result, !evidence.isEmpty {
+                            DisclosureGroup("宿主收尾 · " + status) { WriterRecordedText(evidence) }
+                        } else {
+                            LabeledContent("宿主收尾", value: status)
+                        }
+                    }
+                }
+            }
+        }
+
+        private func logs(_ request: HistoryModelRequest) -> some View {
+            Section("调试日志") {
+                if request.logsCleared == true {
+                    Text("日志已清空").foregroundStyle(.secondary)
+                        .accessibilityIdentifier("writer.prompts.cleared")
+                } else {
+                    DisclosureGroup("完整 Prompts") {
+                        ForEach(HistoryRecordedImages.references(request.requestParametersJSON)) { reference in
+                            WriterRequestImage(
+                                recorded: HistoryRecordedImages.data(reference.id, json: request.requestParametersJSON))
+                        }
+                        let messages = WriterRecordPresentation.promptMessages(request)
+                        if messages.isEmpty { Text("未记录").foregroundStyle(.secondary) }
+                        HistoryPromptItems(messages: messages)
+                    }
+                    DisclosureGroup("生成指标") {
+                        LabeledContent("模型名称", value: request.model.flatMap { $0.isEmpty ? nil : $0 } ?? "未记录")
+                        LabeledContent("输出 Token 上限", value: request.maximumOutputTokens?.formatted() ?? "未记录")
+                        LabeledContent("Temperature", value: request.temperature?.formatted() ?? "未记录")
+                        Text(WriterRecordPresentation.firstToken(request)).accessibilityIdentifier(
+                            "writer.request.ttft")
+                        Text(WriterRecordPresentation.requestDuration(request, at: .now)).accessibilityIdentifier(
+                            "writer.request.duration")
+                        LabeledContent("结束原因", value: request.finishReason ?? "未记录")
+                        if let usage = request.tokenUsage {
+                            LabeledContent(
+                                "输入 / 输出 / 总 Token", value: "\(usage.input) / \(usage.generated) / \(usage.total)")
+                            if let cached = usage.cachedInput {
+                                LabeledContent("缓存读取 Token", value: cached.formatted())
+                            }
+                            if let written = usage.cacheWriteInput {
+                                LabeledContent("缓存写入 Token", value: written.formatted())
+                            }
+                        } else {
+                            LabeledContent("Token 用量", value: "未记录")
+                        }
+                        if let diagnostic = request.failureDiagnostic {
+                            WriterFailureDetail(diagnostic: diagnostic)
+                        } else if let error = request.error {
+                            Text(error).foregroundStyle(.red).textSelection(.enabled)
+                        }
+                    }.accessibilityIdentifier("writer.detail.generation")
+                    Button("清空此条请求日志", role: .destructive, action: clearLogs)
+                        .disabled(!canClearLogs)
+                        .accessibilityIdentifier("writer.detail.clear-logs")
+                }
+            }
+        }
+    }
+
+    @MainActor private struct WriterRequestToolCard: View {
+        let call: HistoryToolCall
+
+        var body: some View {
+            let arguments =
+                (try? JSONDecoder().decode([String: String].self, from: Data(call.argumentsJSON.utf8))) ?? [:]
+            VStack(alignment: .leading, spacing: 10) {
+                LabeledContent {
+                    Text(WriterRecordPresentation.toolStateTitle(call.state))
+                        .foregroundStyle(call.state == .failed ? Color.red : Color.secondary)
+                } label: {
+                    Text(verbatim: [call.name, arguments["command"]].compactMap { $0 }.joined(separator: " · "))
+                        .font(.headline)
+                }
+                if let path = arguments["path"] ?? arguments["entry"] ?? arguments["taskID"] {
+                    LabeledContent("目标", value: path)
+                }
+                if let destination = arguments["destination"] { LabeledContent("目的路径", value: destination) }
+                DisclosureGroup("参数") { WriterRecordedText(call.argumentsJSON) }
+                if let output = call.output {
+                    DisclosureGroup("结果") { WriterRecordedText(output) }
+                } else {
+                    LabeledContent("结果", value: call.state == .received ? "待完成" : "未记录")
+                }
+                WriterRecordIdentifier(label: "调用 ID", value: call.providerID)
+                if let diagnostic = call.failureDiagnostic {
+                    WriterFailureDetail(diagnostic: diagnostic)
+                } else if let error = call.error {
+                    Text(error).foregroundStyle(.red).textSelection(.enabled)
+                }
+            }
+        }
+    }
+
+    @MainActor private struct WriterRecordIdentifier: View {
+        let label: String
+        let value: String
+        var body: some View {
+            LabeledContent {
+                HStack {
+                    Text(verbatim: value).font(.system(.caption, design: .monospaced))
+                        .lineLimit(1).truncationMode(.middle)
+                    Button("复制" + label, systemImage: "document.on.document") { UIPasteboard.general.string = value }
+                        .labelStyle(.iconOnly).buttonStyle(.borderless)
+                }
+            } label: {
+                Text(label)
+            }
+        }
+    }
+
+    private struct WriterRecordedText: View {
+        let value: String
+        init(_ value: String) { self.value = value }
+        var body: some View {
+            Text(verbatim: value).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+        }
+    }
+
     @MainActor private struct WriterFailureDetail: View {
         let diagnostic: HistoryFailureDiagnostic
         var body: some View {
@@ -560,9 +1045,7 @@ public enum WriterRecordPresentation {
     }
 
     @MainActor private struct WriterRequestImage: View {
-        let id: String
-        let input: String
-        let controls: any WriterRecordsControlling
+        var recorded: Data? = nil
         @State private var data: Data?
         @State private var image: UIImage?
         @State private var failure: String?
@@ -581,11 +1064,9 @@ public enum WriterRecordPresentation {
                     ProgressView()
                 }
             }.task {
-                do {
-                    data = try await controls.imageData(id, input: input)
-                    if let data { image = await HistoryImageDecoder.decode(data, maximumPixelSize: 320) }
-                    if image == nil { failure = "截图不可用" }
-                } catch { failure = "截图读取失败：\(error)" }
+                data = recorded
+                if let data { image = await HistoryImageDecoder.decode(data, maximumPixelSize: 320) }
+                if image == nil { failure = "截图不可用" }
             }.sheet(isPresented: $expanded) { if let data { HistoryImagePreview(data: data).background(.black) } }
         }
     }
@@ -731,3 +1212,7 @@ public enum WriterRecordPresentation {
         func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
     }
 #endif
+
+extension WriterRecordsControlling {
+    public func clearRequestLogs(requestID: String?) async throws { throw HistoryDetailError.unavailable }
+}

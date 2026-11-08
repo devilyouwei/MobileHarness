@@ -15,7 +15,7 @@ import Testing
     let function = CameraActions.takePhotoDefinition(handler: { _ in })
     #expect(function.declaration == CameraActions.takePhotoDeclaration)
     try function.validate()
-    #expect(CameraActions.savePhotoDeclaration.parameters.map(\.name) == ["mediaID"])
+    #expect(CameraActions.savePhotoDeclaration.parameters.map(\.name) == ["previewID"])
     let object = try CameraActions.savePhotoDeclaration.actionObject(alias: "save")
     #expect(object["examples"] == nil)
     #expect(object["alias"] as? String == "save")
@@ -48,7 +48,7 @@ import Testing
 }
 
 @Test(.actionCatalog) func skillPromptHistoryAccepts64KiBAndRejectsLargerEvidence() async throws {
-    let store = ConversationHistoryStore()
+    let store = AssistantHistoryStore()
     let id = UUID().uuidString
     let prompt = String(repeating: "x", count: 65_536)
     let token = try await store.readCurrent().token
@@ -56,7 +56,7 @@ import Testing
         id: id, user: "task", request: [.init(role: .system, content: prompt)], expecting: token, model: "fixture")
     #expect(record.request.first?.content == prompt)
     try await store.finish(id, state: .completed, reason: "stop")
-    await #expect(throws: ConversationHistoryError.invalidRecord) {
+    await #expect(throws: AssistantHistoryError.invalidRecord) {
         let token = try await store.readCurrent().token
         _ = try await store.begin(
             id: UUID().uuidString, user: "task", request: [.init(role: .system, content: prompt + "x")],

@@ -6,7 +6,7 @@ import StorageCore
 import StorageTasks
 
 /// Assistant-owned scene-analysis policy; native implementations only consume these limits.
-public struct AssistantPhotoInputPolicy: Sendable {
+public struct AssistantWebImagePolicy: Sendable {
     public let maximumDimension: Int
     public let maximumPixels: Int
     public let maximumBytes: Int
@@ -26,7 +26,7 @@ public struct AssistantContextState: AgentChatContextState {
         return control == .cancelSession ? .close : .interrupt
     }
     public static let tracksDelegatedReplies = true
-    public static func buildChatMessages(system: String, user: String, conversation: StoredConversation)
+    public static func buildChatMessages(system: String, user: String, conversation: AssistantConversation)
         throws -> [ChatMessage]
     {
         try AgentChatContextBuilder.request(
@@ -50,19 +50,28 @@ public struct AssistantContextState: AgentChatContextState {
         try systemPrompt(capabilities, skills: nil)
     }
     public static func systemPrompt(_ capabilities: CapabilityRegistry, skills: AgentTaskSkillState?) throws -> String {
+        try systemPrompt(
+            capabilities, skills: skills,
+            communication: AgentConfigurations.load(named: configurationName).communication)
+    }
+    public static func systemPrompt(
+        _ capabilities: CapabilityRegistry, skills: AgentTaskSkillState?, communication: CommunicationDeclaration
+    ) throws -> String {
         guard capabilities.channels.contains("Speech") else { throw GenerationError.forbiddenChannel }
-        let templates = try AgentPrompts.load(named: configurationName)
         var base = AgentTaskSkillState()
         if skills == nil {
             try base.initialize(
                 fixed: capabilities, baseSkills: AgentConfigurations.baseSkills(named: configurationName))
         }
         let skillInstructions = try (skills ?? base).instructions(includeOverview: false)
+        let delegates =
+            capabilities.actions.contains { $0.path.description == "Agent.Task.delegateTask" }
+            ? try AgentConfigurations.delegationOverview(requester: agentID, communication: communication) : ""
         let sections = [
             try CapabilityContextBuilder.protocolRules(capabilities),
             "# ASSISTANT ROLE", try AgentConfigurations.identityInstructions(named: configurationName),
             "# AVAILABLE SKILLS", try AgentConfigurations.skillOverview(),
-            "# INDEPENDENT AGENT RESPONSIBILITIES", try templates.render("delegation"),
+            "# DELEGATABLE AGENTS", delegates,
             skillInstructions,
             "# EFFECTIVE ACTION CATALOG", try CapabilityContextBuilder.catalog(capabilities),
         ]
@@ -72,7 +81,7 @@ public struct AssistantContextState: AgentChatContextState {
     }
     public var skillState: AgentTaskSkillState?
     public var taskViews: [String: AgentTaskView]?
-    public var history = ConversationArchive()
+    public var history = AssistantArchive()
     public var admissionSequence: UInt64 = 0
     public init() {}
     public func validateContextState() throws {
@@ -120,27 +129,25 @@ public struct AssistantContextBuilder: ContextBuilder {
             try AssistantContextState.buildChatMessages(system: system, user: user, conversation: state.history.current)
         }
     }
-    public static func photoObservationHandler(
+    public static func webImageObservationHandler(
         read: @escaping @Sendable (String, AgentInput) async throws -> ChatImage,
-        prepareJPEG: @escaping @Sendable (Data, AssistantPhotoInputPolicy) async throws -> Data
+        prepareJPEG: @escaping @Sendable (Data, AssistantWebImagePolicy) async throws -> Data
     ) -> @Sendable ([AgentChatObservation], AgentInput, any ChatCapability) async throws -> [ChatMessage] {
         { observations, input, chat in
-            try await photoObservations(
+            try await webImageObservations(
                 observations, input: input, chat: chat, read: read, prepareJPEG: prepareJPEG)
         }
     }
 
-    public static func photoObservations(
+    public static func webImageObservations(
         _ observations: [AgentChatObservation], input: AgentInput,
         chat: any ChatCapability, read: @Sendable (String, AgentInput) async throws -> ChatImage,
-        prepareJPEG: @Sendable (Data, AssistantPhotoInputPolicy) async throws -> Data
+        prepareJPEG: @Sendable (Data, AssistantWebImagePolicy) async throws -> Data
     ) async throws -> [ChatMessage] {
         var messages: [ChatMessage] = []
         for observation in observations
         where
-            (observation.path == "Camera.Capture.takePhoto"
-            || ["Web.Page.browse", "Web.Page.snapshot", "Web.Page.navigate"]
-                .contains(observation.path))
+            ["Web.Page.browse", "Web.Page.snapshot", "Web.Page.navigate"].contains(observation.path)
             && !observation.result.isError
         {
             guard
@@ -155,7 +162,7 @@ public struct AssistantContextBuilder: ContextBuilder {
                 let original = try await read(id.rawValue, input)
                 guard original.id == id.rawValue else { throw CommunicationError.invalidPayload }
                 try Task.checkCancellation()
-                let policy = AssistantPhotoInputPolicy.analysis
+                let policy = AssistantWebImagePolicy.analysis
                 let prepared = try await prepareJPEG(original.data, policy)
                 try Task.checkCancellation()
                 guard !prepared.isEmpty, prepared.count <= policy.maximumBytes else {
@@ -187,12 +194,12 @@ public typealias AssistantHistoryContext = AgentChatHistoryContext
 
 /// Metadata-only UI projection. Exact capability requests and native pairs are retained in modelRequests.
 public enum ConversationContextBuilder {
-    public static func request(system: String, user: String, conversation: StoredConversation) throws
-        -> [ConversationMessage]
+    public static func request(system: String, user: String, conversation: AssistantConversation) throws
+        -> [ModelMessage]
     {
         try AssistantContextState.buildChatMessages(system: system, user: user, conversation: conversation).compactMap {
-            guard let role = ConversationMessage.Role(rawValue: $0.role.rawValue) else { return nil }
-            return ConversationMessage(role: role, content: $0.content)
+            guard let role = ModelMessage.Role(rawValue: $0.role.rawValue) else { return nil }
+            return ModelMessage(role: role, content: $0.content)
         }
     }
 }
@@ -200,19 +207,22 @@ public enum ConversationContextBuilder {
 /// Live Agent state stays in memory; normalized SQLite rows are the durable business facts.
 public enum AssistantConversationStorage {
     public static func store(
-        repository: AgentContextRepository<AssistantContextState>, chat: any ChatRepository, tasks: any TaskRepository
+        repository: AgentContextRepository<AssistantContextState>, messages: any AssistantMessageRepository,
+        tasks: any AssistantTaskRepository & AssistantTaskSummaryRepository,
+        conversations: any AssistantConversationRepository, logs: any ModelRequestLogRepository
     ) throws
-        -> ConversationHistoryStore
+        -> AssistantHistoryStore
     {
-        let records = try ConversationRecordStore(repository: chat, tasks: tasks)
-        return ConversationHistoryStore(
+        let records = try AssistantRecordStore(
+            repository: messages, tasks: tasks, conversations: conversations, logs: logs)
+        return AssistantHistoryStore(
             contextIdentity: repository.scopeID, records: records,
             canArchive: {
                 guard try await repository.snapshot().state.skillState?.activeTaskID == nil else {
                     throw CommunicationError.scopeClosed
                 }
             },
-            restore: { history, _ in
+            restore: { history in
                 try await repository.update { $0.state.history = history }
             },
             contextLoad: { try await repository.snapshot().state.history },

@@ -21,3 +21,5 @@ Chat output-token budgets are optional and default to nil. Assistant/cloud reque
 内置 Skill 的生产目录为 Action-only；共享云场景同时检查真实请求没有原生 Tool 声明。底层 Tool/混合协议测试在 IntegrationTests 独立保留，不以生产 Skill 注册作为 native fixture。
 
 Writer 的独立原生协议回归位于 `IntegrationTests/WriterModelEvaluationTests.swift`，不是 Assistant XML/Skill 场景。`scripts/evaluate-writer.py` 分别运行 Qwen 与 DeepSeek，使用实际 Writer/Gateway/Storage 和本机 WebKit。凭据隔离、复现和限制见 [scripts](../../scripts/README.md#writer-双模型回归)，结果见 [专项报告](../../docs/validation/Writer-Model-Regression.md)。
+
+Writer 的 JSON 提示词矩阵使用同目录 `Scenarios/writer-workflows.json` 和 `writer-evaluation.json`；`evaluate-writer.py --matrix` 默认只测 Qwen3.8 Max、GPT6.1 sol，旧六场景模式仍可显式选择其他已有模型。原生评估仍归 IntegrationTests；结果见 [Writer 提示词优化](../../docs/validation/Writer-Prompt-Optimization.md)。

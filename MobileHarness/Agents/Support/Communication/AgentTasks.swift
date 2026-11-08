@@ -141,7 +141,7 @@ public struct WriterTaskCompletion: Codable, Sendable, Equatable {
         let content = try AgentTaskContent.decode(signal)
         guard signal.kind == .result, signal.scope.requester == .assistant, signal.scope.executor == .writer,
             signal.scope.execution == .background, content.stage == .completed, let event = content.writerEvent,
-            event.delegateID == signal.scope.id, event.taskID != nil,
+            event.delegateID == signal.scope.id,
             (event.kind == .completed && signal.status == .succeeded)
                 || (event.kind == .failed && signal.status == .failed)
                 || (event.kind == .cancelled && signal.status == .cancelled)
@@ -281,6 +281,22 @@ enum AgentTaskSkillIDs {
             ids.count <= 16, ids.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 64 }), Set(ids).count == ids.count
         else { throw CommunicationError.invalidPayload }
         return ids
+    }
+}
+
+/// Implemented public task adapters, shared by discovery and execution admission.
+/// A resource description or a communication grant alone cannot create an adapter.
+enum AgentTaskDelegation {
+    case writer
+    var target: AgentID { .writer }
+    var businessContract: String { "writer.author" }
+    static func resolve(
+        target: AgentID, requester: AgentID, communication: CommunicationDeclaration
+    ) -> Self? {
+        guard requester == .assistant, target == .writer,
+            communication.sends.contains(where: { $0.contract == "task.request" && $0.target == target.rawValue })
+        else { return nil }
+        return .writer
     }
 }
 

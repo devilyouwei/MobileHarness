@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "check": {
+    "command": "./scripts/check.sh",
+    "exitCode": 0,
+    "rawLog": "/tmp/writer-prompt-check.log",
+    "sha256": "dbd7a2793b025a9c9752a2ba876357964c320907973694b0b780f4e31ef87a50",
+    "testSummaries": [
+      "✔ Test run with 10 tests in 0 suites passed after 0.058 seconds.",
+      "✔ Test run with 202 tests in 0 suites passed after 0.522 seconds.",
+      "✔ Test run with 10 tests in 0 suites passed after 0.125 seconds.",
+      "✔ Test run with 54 tests in 0 suites passed after 1.666 seconds.",
+      "✔ Test run with 4 tests in 0 suites passed after 0.002 seconds.",
+      "✔ Test run with 5 tests in 0 suites passed after 0.499 seconds.",
+      "✔ Test run with 28 tests in 0 suites passed after 0.020 seconds.",
+      "✔ Test run with 47 tests in 0 suites passed after 0.008 seconds.",
+      "✔ Test run with 5 tests in 0 suites passed after 0.006 seconds.",
+      "✔ Test run with 10 tests in 0 suites passed after 0.031 seconds.",
+      "✔ Test run with 11 tests in 0 suites passed after 0.001 seconds.",
+      "✔ Test run with 5 tests in 0 suites passed after 0.001 seconds.",
+      "✔ Test run with 1092 tests in 3 suites passed after 64.150 seconds.",
+      "✔ Test run with 20 tests in 1 suite passed after 0.002 seconds.",
+      "✔ Test run with 2 tests in 0 suites passed after 0.001 seconds.",
+      "✔ Test run with 2 tests in 0 suites passed after 0.003 seconds.",
+      "✔ Test run with 175 tests in 0 suites passed after 1.579 seconds.",
+      "✔ Test run with 1 test in 1 suite passed after 0.001 seconds.",
+      "✔ Test run with 227 tests in 1 suite passed after 206.120 seconds."
+    ]
+  },
+  "iosBuild": {
+    "command": "./scripts/build-ios.sh",
+    "exitCode": 0,
+    "scope": "Four iOS Simulator schemes, unsigned; not physical-device acceptance",
+    "rawLog": "/tmp/writer-prompt-ios-build.log",
+    "sha256": "7b5f28ccf1552571ec8b707ad6fbcf1b9a49a959003579acd907c6faa7384f9b",
+    "successfulTargets": 4,
+    "resourceChecks": [
+      "Final app Skill resources verified: 30 assets; Core protocol; function declarations compiled with Actions.",
+      "Native Live Activity verified: embedded WidgetKit executable, matching identity/version, support flag and return URL."
+    ]
+  },
+  "otherChecks": [
+    "JSON parsed",
+    "git diff --check",
+    "Report local links exist",
+    "Standalone review Swift formatting",
+    "evaluate-writer.py compiles"
+  ],
+  "productionSwiftEditedThisTask": false,
+  "closeoutScopeNote": "check.sh completed before three concurrent Writer production edits. iOS builds completed during those edits. Neither result is claimed as a complete acceptance of the concurrent changes."
+}

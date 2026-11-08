@@ -1,0 +1,136 @@
+{
+  "scope": "Writer-only runtime and private instruction changes; no new directory/table",
+  "models": [
+    "qwen3.8-max",
+    "gpt-6.1-sol"
+  ],
+  "focusedTests": {
+    "status": "passed",
+    "parameterizedModes": 7,
+    "existingModes": 14,
+    "atomicRepositoryTest": 1,
+    "logs": [
+      "/tmp/writer-cohesion-focused2.log",
+      "/tmp/writer-cohesion-focused3.log"
+    ]
+  },
+  "files": {
+    "MobileHarness/Agents/Writer/WriterWorkflow.swift": {
+      "before": "3780bac594dc9270cb08cb5a568704ccd2f777b0f37a05cb107a3b92a3e67134",
+      "after": "1856d87e5eaff822b44437947dca944051ea65087538f82a36fa7ba010d68229"
+    },
+    "Tests/IntegrationTests/DatabaseTableRecordTests.swift": {
+      "before": "0f8fa89b08508cf1f398737f8bfa1dd2c8a79049d0cc317de88a661bc8678b0d",
+      "after": "4cb913920f2ff36d4969b4d011da85f3ea3d7edb2d017f03a01c820d402089ac"
+    },
+    "MobileHarness/Agents/Writer/WriterHistory.swift": {
+      "before": "7bf23b9ca03f761a7989ed12d54901d69a985ef5777be3d661a8057939f87f86",
+      "after": "81c352c75ce817360d81f6d3733fd86a0dc07fcf39750a9a8f5ebeefe1759cfd"
+    },
+    "Tests/IntegrationTests/WriterAgentTests.swift": {
+      "before": "6cd325eac57f214625e174a20f09f4c72985d394011268fc6d6e64a5b60f16e8",
+      "after": "49684416b3246df63a1516241006ac7907939635c2d3e1bd97c4b5ecc8d219df"
+    },
+    "MobileHarness/Storage/Database/WriterMessages/WriterHistoryStore.swift": {
+      "before": "f92e9b075bba40c9dcdca0bae8d03441f66562fdf5f47e7e8457c79918ba7ef3",
+      "after": "7b736a9bf917e5ecb2187503da6579d35f5301fd46704eed3a7b3512cdcdb0b2"
+    },
+    "MobileHarness/Agents/Writer/WriterAgent.swift": {
+      "before": "b96f9893ae094e5a6cffcb7f8dfc52058797824f90d4fd7c4b105b36b67c8220",
+      "after": "6076fa40acec47ceee390808f3fac96014e8759ac2f35fbfd2a6d53ec0c7a57d"
+    },
+    "MobileHarness/Storage/Database/WriterTasks/SQLiteWriterTasks.swift": {
+      "before": "42dfa773bacb672835c024d2ada6899e43fcc840f4f3fe4c5fff22e92ff3339c",
+      "after": "0b271573fd9af34781040edca31963361da3f0235896ff9d696c36ce6e5ea910"
+    },
+    "MobileHarness/Storage/Database/WriterTasks/SQLiteWriterCompletion.swift": {
+      "before": "c343e521410b9647710fbaed490d18e60e759610a7413219f3f4985cdc07c51e",
+      "after": "690c70ccebe4d12eaef6d56e2ddd70f1c8916913563e3d7d6e85f12150aad5e8"
+    },
+    "MobileHarness/Storage/Database/WriterTasks/WriterTaskRepository.swift": {
+      "before": "5abcbe4532b3792765e6c32cecdd672362e157133d9a0de91d1402d59b6c675c",
+      "after": "8ca8f4f0fb0c4ef996dc511c781b1cd167e2eb705e1290565123adf9d7d34b40"
+    },
+    "Tests/IntegrationTests/WorkspaceRepositoryTests.swift": {
+      "before": "f8c3899ec603cb817cd79984b3cb6d0a21457c6ba74178cad165545c412bb322",
+      "after": "201394c4673bf97f0b76bcee42777f9691260f6686aa59f523f9c1d6328d6cf1"
+    },
+    "MobileHarness/Agents/Writer/WriterContainer.swift": {
+      "before": "8d195cb94f1c250a86163323d91c707ad5f4e5953e4d1ea09921eb9d753a8eee",
+      "after": "ce3ddcf55c4bdb252fa9d7e9e9cfdb30cabf4bca8cf58c81354972d968237c3e"
+    },
+    "Tests/IntegrationTests/CommunicationTests.swift": {
+      "before": "cfa3cea86e1e23f25afe7069d550176f1976d56a533787961fc5570fb0baf955",
+      "after": "705f8b2d0beb426768ce5bf31e40534c612e884e9e97783592dbf876c6b660f4"
+    },
+    "Tests/IntegrationTests/WriterModelEvaluationTests.swift": {
+      "before": "45ec7c4a24fc4418e5c5d854806f62a6e9842cb5371c732e5082d864ec00311b",
+      "after": "a45f4f58d05c054c43158053f6ce8934c53f5a7e8624d685f033dc3111a0deae"
+    },
+    "Tests/IntegrationTests/AgentTaskSkillTests.swift": {
+      "before": "b4b983a9365f64bae701d8581ec33bb8843a1631ea6d854ef3122dc5e1e9fa0b",
+      "after": "1b8235cf09e4b92a8f253641bce35f5abccb96be84ba3739621e34a623bd6f06"
+    },
+    "Tests/IntegrationTests/StorageSchemaTests.swift": {
+      "before": "e38d01101a65b555d83d0c966075dd4cd2eb55350f14bb5b5216ce7e93136725",
+      "after": "9434a27e19bfe9378a7962d9e3e5d86e5e3df5330323389e66887546a0821969"
+    },
+    "MobileHarness/Resources/Agents/Writer/Instructions.md": {
+      "before": "8ce35168981650067f6afc56a9017a773ac17d0de07d212b52a419b04e8029e4",
+      "after": "14efc46a491c70162380b4b278281edb99b6e59aca2768c3deba240a7347fd38"
+    }
+  },
+  "version": 1,
+  "createdAt": "2026-11-08T09:21:48.030636+00:00",
+  "checks": [
+    {
+      "command": "./scripts/check.sh",
+      "startUTC": "2026-11-08T09:11:06.602198+00:00",
+      "endUTC": "2026-11-08T09:17:08.346054+00:00",
+      "exitCode": 0,
+      "log": "/tmp/writer-cohesion-check.log",
+      "logSHA256": "419c60b7235ff00b1c4711639e8f7c3d15f858561403348331140289e97810f5",
+      "summary": [
+        "Module boundaries, directory documentation, Python download tests, Swift format, all Swift test phases, plist validation passed",
+        "1094 integration tests in 3 suites passed; 227 native runtime tests in 1 suite passed"
+      ]
+    },
+    {
+      "command": "./scripts/build-ios.sh",
+      "startUTC": "2026-11-08T09:17:42.444822+00:00",
+      "endUTC": "2026-11-08T09:20:39.622142+00:00",
+      "exitCode": 0,
+      "log": "/tmp/writer-cohesion-build-ios.log",
+      "logSHA256": "d573bb24fbbd19aeb65faa2bfe45dadb79eaef512fef7314c2e172fb02c468dd",
+      "summary": [
+        "MobileHarnessSimulator",
+        "ModelKitRuntime",
+        "ModelKitNemotron",
+        "ModelKitSilero",
+        "App Skill resources and native Live Activity packaging verified"
+      ]
+    }
+  ],
+  "sourcesStillMatchFullModelRun": true,
+  "changedSourcesAfterModelRun": [],
+  "manualReview": {
+    "P04ExactFullFiles": {
+      "qwen3.8-max": true,
+      "gpt-6.1-sol": true
+    },
+    "B02ZeroFilesAndWindowEvents": {
+      "qwen3.8-max": true,
+      "gpt-6.1-sol": true
+    },
+    "C02NoAddedDateOrYearInThisSample": true
+  },
+  "limits": [
+    "Desktop WebKit and production window state; animation acknowledgements synthesized",
+    "No physical iOS acceptance in this change",
+    "No exhaustive visual or semantic audit of all generated documents"
+  ],
+  "focusedLogSHA256": {
+    "/tmp/writer-cohesion-focused2.log": "6ee5d171912af530ef5f286c58413d498778fc025c12ea9c50283b59de60611c",
+    "/tmp/writer-cohesion-focused3.log": "9b5bf296e3b086943ca3b026b3c0e04ae39daa7f6cec086dd3e7f47643fc6cf7"
+  }
+}

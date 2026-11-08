@@ -2,7 +2,7 @@
 
 本目录拥有确定性文件编辑、格式验证、运行渲染和导出，不执行模型请求。ArtifactWorkspace使用StorageDatabase.WorkspaceStore协调当前目录与SQLite文件索引；StorageFiles拥有沙盒和原子文件操作。源码仅保存在agent/task_N/relative-path，不保存持久历史版本。支持HTML/CSS/JS/SVG/JSON/TXT/MD，不新增源码或任务累计配额。
 
-ArtifactsModule 暴露 Artifacts.Workspace.perform；Assistant 通过 Writing 的 XML Action 调度作品管理，Writer 通过 Gateway direct 原生 Tool 编辑作品。Assistant 仅能列出、打开、删除作品；Writer 的可信 delegateID 绑定编辑会话，agent/taskID 定位持久工作区，模型参数不能更改所有者。ArtifactService 拥有单项会话准入及项目单写锁；ArtifactEditing 拥有单流、128 个按文件版本失效的读取引用和范围修改。remove 要求有效读取引用且禁止入口删除。完整文件内容通过中立 ArtifactStreaming 端口背压追加，不通过 Tool 参数。发布要求最新草稿已进行显式渲染，存在已报告的运行错误时拒绝发布；窗口不可见时显式返回不能进行视觉验证，不能把保存等同视觉验收。
+ArtifactsModule 暴露 Artifacts.Workspace.perform；Writer 通过 Gateway direct 原生 Tool 管理作品库和编辑作品；Assistant 只能委派，不暴露作品库 Action，服务拒绝其直接调用。Writer 的可信 delegateID 绑定编辑会话，agent/taskID 定位持久工作区，模型参数不能更改所有者。ArtifactService 拥有单项会话准入及项目单写锁；ArtifactEditing 拥有单流、按文件版本失效的读取引用和范围修改。remove 要求有效读取引用且禁止入口删除。完整文件内容通过中立 ArtifactStreaming 端口背压追加，不通过 Tool 参数。发布要求最新草稿已进行显式渲染，存在已报告的运行错误时拒绝发布；窗口不可见时显式返回不能进行视觉验证，不能把保存等同视觉验收。
 
 ## 执行与续写生命周期
 
@@ -14,13 +14,13 @@ revoke 立即关闭该委托普通准入并取消在途普通操作，已开始�
 
 ArtifactPresentation 连接 UI 页面/窗口与 StorageFiles 临时预览；每作品双缓冲目录，最多四个页面。关闭清理预览和页面、不取消 Writer，流不会重开窗口；新委托 start 或显式 open 才解除关闭标记。删除清理窗口绑定及预览。TXT 转义显示；Markdown 支持标题、引用、列表、围栏代码、强调和 HTTP(S) 链接，其余语法保留可读文本。Writer内部preview命令按ArtifactContentParser安全检查点读取当前流或草稿，由Writer自有worker决定呈现；它不证明 HTML/JavaScript 语法有效。未完成草稿禁用脚本，完整渲染由 WebKit 执行并返回诊断/截图。项目索引可列出仅有草稿的中断作品，用户可显式委托恢复。
 
-同项目呈现通过独立串行门合并为安全磁盘/导航顺序，最多两个可取消等待者，超限显式 busy；不同项目仍可独立进行。关闭先标记页面退出，导航中断返回“草稿保留、视觉验证不可用”，再加入呈现并清理双缓冲目录；最小化期间保留最新快照供恢复时呈现。Assistant 打开/删除同样持有项目锁。
+同项目呈现通过独立串行门合并为安全磁盘/导航顺序，最多两个可取消等待者，超限显式 busy；不同项目仍可独立进行。关闭先标记页面退出，导航中断返回“草稿保留、视觉验证不可用”，再加入呈现并清理双缓冲目录；最小化期间保留最新快照供恢复时呈现。Writer 的 open/delete 同样持有项目锁，不能与正在编辑的项目并发。
 
 ## 文件工具与修改一致性
 
 所有操作限定在 StorageFiles.workspaces 内，不使用 Shell。目录由相对文件路径隐式形成，不保存空目录；list(path) 返回目录下文件和字节数。move/removeTree 在读取全部受影响文件后验证整个候选草稿再更新，拒绝穿越/覆盖/路径冲突；入口禁止删除，移动入口同步更新 entry，链接内容不自动改写。相对文件的新建和最后文件的删除分别形成/移除隐式目录。
 
-read 返回内容、起始行、字符范围、文件版本和宿主引用；line/limit 选择 1...100 行，返回内容最多 2500 字符，通过 nextOffset 继续。修改文件只失效该文件引用，其他引用继续有效。edit 的 contextReferences 最多八项、合计 24KB；宿主校验版本后装配关联片段，不接受模型伪造来源。字符 start/end 可进一步缩小已读取范围。参数数值解析失败明确拒绝。
+read 返回内容、起始行、字符范围、文件版本和宿主引用。limit 指定正数行数或字符数，省略时分别读取 60 行或 2500 字符，后续读取可使用 nextOffset。修改文件只失效该文件引用，其他引用继续有效。edit 的 contextReferences 使用同一会话的有效读取引用，宿主校验版本后装配关联片段。字符 start/end 可进一步缩小已读取范围。edit 指令、搜索词、作品标题和相对路径没有 Artifacts 自定长度门槛。相对路径仍校验文件类型、路径成分与沙盒，实际文件系统错误由存储层报告。
 
 
 ## 预览与诊断
@@ -37,17 +37,17 @@ HTML/MD/TXT 可导出 PDF；Markdown/TXT 复用 ArtifactTextRendering 转换，H
 
 ArtifactService 只拥有作品业务，不提供历史 startNew/delete/title 命令。Writer 长期任务与对话读取由 Agents/Writer 和 Storage 的委托记录接口管理。
 
-工作区 start 在模型获取前显示准备占位或已有内容，并返回窗口身份；占位不写入项目草稿、不视为完成渲染。展示失败撤销内存会话与写锁，保留已落盘草稿。
+Writer 显式 create 或 enter 时调用工作区 start，显示准备占位或已有内容，返回呈现状态与已确认的窗口身份；占位不写入项目草稿、不视为完成渲染。展示失败撤销内存会话与写锁，保留已落盘草稿。
 
 内部 start 为新委托恢复窗口，resume 为同任务续作保留关闭/最小化偏好；两者均非 Writer 模型可选择的编辑命令。Assistant 显式打开作品也恢复最小化窗口。
 
 任务文件预览使用独立暂存快照与 UI 受控 WebPageContainer，本地资源根、网络阻断和导航策略保持一致。预览和导出各仅一个 worker、零等待队列；根关闭取消并加入，预览离页请求取消并清理。首次临时目录清理由共用的准备任务合并，不能在首次导出时删除正在展示的预览。SVG 使用 HTML 宿主渲染；CSS/JS/JSON 转义显示并可作为文本 PDF 导出。分享关闭才清理对应导出文件。
 
-新项目的首次checkpoint在模型开始前建立agent/task_N目录；续作直接修改当前文件。SQL写租约排除并发写者，单文件原子替换后提交索引；失败保留真实文件和草稿状态，后续读取校验索引，不从模型日志恢复代码。
+新项目在显式 create 的首次 checkpoint 中建立 agent/task_N 目录；续作直接修改当前文件。SQL写租约排除并发写者，单文件原子替换后提交索引；失败保留真实文件和草稿状态，后续读取校验索引，不从模型日志恢复代码。
 
 start 的 createWorkspace 参数由受信 Writer 运行时为未完成初始化的预留项目传入，不暴露给模型工具 schema；模型循环不允许 start/resume。已有就绪项目缺失保持 missingProject。预览与 PDF 的临时 HTML 使用与发布一致的 UTF-8 BOM，源文件导出保持原始 UTF-8 文本。
 
-工具失败区分 invalidReadRange、readReferenceLimit、relatedContextLimit、savepointLimit、invalidTitle 与 invalidQuery，并附具体修正范围；不将参数错误或读取引用数量解释为作品磁盘不足。窗口并发不足仍明确 busy。
+工具失败区分 invalidReadRange、invalidInstruction、invalidTitle 与 invalidQuery，并报告对应参数要求。窗口并发不足明确返回 busy。
 
 ZIP 导出依据标准 ZIP 的字段宽度预检条目数、源码字节和偏移；需要 ZIP64 时明确 archiveFormatLimit，建议导出单文件，不产生整数转换崩溃或截断档案。此边界只约束该导出格式，不约束模型生成/文件编写。
 
@@ -61,9 +61,9 @@ replace使用fresh read引用约束字面旧文本，唯一匹配后原子替换
 
 会话标题在start接纳，首个edit的可选title随后续文件检查点保存；rename独立持久化标题，续作沿用。describe为Writer运行时更新操作subtitle，不改源码或模型上下文。ArtifactPresentation将这些通用显示值提交WindowState；重名仅在活动窗口显示层加稳定创建顺序后缀，业务标题不带序号。
 
-每项目最多一份latest快照，最多四项目；Scene隐藏不创建窗口/写预览资源/调用WebKit，返回deferred并保留最新文件。显式render可留下deferred验证证据供finish保存，不能宣称视觉检查通过。前台恢复经项目锁重新读取最新快照，避免排队旧副本覆盖新文件或名称；关闭/删除已退休的快照不复活，最小化不恢复。场景恢复及已接纳命令内的呈现更新属于 Actions 内部；Writer 发起的 preview/describe 命令仍经 Gateway direct。
+每项目最多一份latest快照，最多四项目；Scene隐藏不创建窗口/写预览资源/调用WebKit，返回deferred并保留最新文件。显式render可留下deferred验证证据供finish保存，不能宣称视觉检查通过。Actions 持有一个场景预览恢复任务。前台接纳后异步启动，按项目锁重新读取最新快照，避免排队旧副本覆盖新文件或名称；关闭/删除已退休的快照不复活，最小化不恢复。场景隐藏或 Actions 停止取消并加入恢复任务。恢复失败记入对应窗口与日志，保留快照并继续处理其他窗口。后续成功渲染清除本次窗口诊断。Writer 发起的 preview/describe 命令经 Gateway direct。
 
-窗口身份在等待首次呈现前预留并绑定，切后台导致回执中断时保留同一窗口，不按标题猜测归属。正在渲染时隐藏转换为deferred，截图不可见返回nil；其他渲染/磁盘错误仍明确传播。UI窗口生命周期与Writer执行独立。后台CPU/进程存活由系统控制，本能力不伪造后台运行权限。
+窗口身份在等待首次呈现前预留并绑定，切后台导致回执中断时保留同一窗口，不按标题猜测归属。正在渲染时隐藏转换为 deferred，截图不可见返回 nil。显式文件与渲染命令保留原始失败结果。UI窗口生命周期与Writer执行独立。后台CPU/进程存活由系统控制，本能力不伪造后台运行权限。
 
 ## Workspace and editing identities
 
@@ -81,3 +81,5 @@ current token fences stale publication; it is not a retained version. Temporary 
 in-memory undo state for one active session. Web/render/export snapshots remain separately owned,
 short-lived copies and never create workspace history. Missing files fail explicitly. Active task deletion
 requires Writer cancellation/join before directory cleanup and metadata deletion.
+
+searchWorkspaces、open 和 delete 只接受 Writer 委托调用。searchWorkspaces 通过 SQLite 返回当前页命中元数据。open 和 delete 校验 writer 所有者并取得单项目锁。open 呈现已有入口并返回窗口证据，保留文件与草稿状态。删除先清理展示，再删除存储。显式进入或打开聚焦已有窗口，最小化期间预览仅更新最新快照。窗口转换被打断时保留快照，明确关闭才退休。

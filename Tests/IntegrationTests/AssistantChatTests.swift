@@ -99,7 +99,7 @@ private func completedTurn(_ outputs: inout FixtureGenerationOutputs.Iterator) a
         let system = try #require(request.messages.first)
         #expect(system.role == .system)
         #expect(system.content.contains("You are the sole user-facing assistant on a phone."))
-        #expect(system.content.contains(try AgentPrompts.load(named: "Assistant").render("delegation")))
+        #expect(system.content.contains(try AgentConfigurations.publicDescription(named: "Writer")))
         #expect(!system.content.contains("Tool Call"))
         #expect(!system.content.contains("Action smile:"))
         #expect(system.content.contains("Action express:"))
@@ -652,7 +652,7 @@ func closingSessionCancelsRunningAndWaitingForegroundTasksAndAllowsFreshConversa
     var skills = AgentTaskSkillState()
     try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
     _ = try skills.control(
-        "startTask", arguments: ["goal": "拍照并等待选择", "skills": "[\"photography\"]"],
+        "task.start", arguments: ["description": "拍照并等待选择", "skills": "[\"photography\"]"],
         inputID: original.id, fixed: fixed, sessionID: session, taskID: try fixtureTaskID())
     if !running { try skills.decisionCompleted(failed: false, fixed: fixed, inputID: original.id) }
     initial.skillState = skills
@@ -702,7 +702,7 @@ func executionInterruptionPreservesConversationSkillsGoalAndPublicScope(control:
         try skills.decisionCompleted(failed: false, fixed: fixed, inputID: original.id)
     } else {
         _ = try skills.control(
-            "startTask", arguments: ["goal": "拍照并等待选择", "skills": "[\"photography\"]"],
+            "task.start", arguments: ["description": "拍照并等待选择", "skills": "[\"photography\"]"],
             inputID: original.id, fixed: fixed, sessionID: session, taskID: try fixtureTaskID())
         if mode == "waiting" { try skills.decisionCompleted(failed: false, fixed: fixed, inputID: original.id) }
     }
@@ -800,7 +800,7 @@ private actor DiagnosticFailureChat: ChatCapability {
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
 func modelProtocolFailureKeepsAgentClassificationHistoryAndGatewayCorrelation() async throws {
     let model = DiagnosticFailureChat()
-    let history = ConversationHistoryStore()
+    let history = AssistantHistoryStore()
     let agent = try AssistantAgent(
         stateContext: try publicStateFixture(), chat: model, conversations: history,
         context: try AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: AssistantContextState())
@@ -965,7 +965,7 @@ func assistantReplyWaitingEndsOnFirstOutputAndAllRequestTerminations(outcome: St
 @Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
 func internalCaptionAcknowledgmentAndFailureNeverTriggerModelReACT(_ failed: Bool) async throws {
     let model = ChatFixture()
-    let store = ConversationHistoryStore()
+    let store = AssistantHistoryStore()
     let agent = try AssistantAgent(
         stateContext: publicStateFixture(), chat: model, conversations: store,
         context: AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: AssistantContextState()))
@@ -1023,7 +1023,7 @@ private actor PresentationOriginChat: ChatCapability {
 @Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
 func sameActionPathUsesInvocationOriginForModelFeedback(failed: Bool) async throws {
     let model = PresentationOriginChat()
-    let history = ConversationHistoryStore()
+    let history = AssistantHistoryStore()
     let catalog = try CapabilityRegistry(
         actions: [
             .init(

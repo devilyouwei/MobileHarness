@@ -83,3 +83,5 @@ CommunicationReceipts 最多 16 个关联槽，证据提交后确认；提交失
 ## Execution ownership and lifecycle
 
 ExecutionOwner, resource lease/permit, ActionExecutionRecord and ActionExecutionSnapshot are neutral FunctionContracts values. AgentCore supplies cognitive identity adaptation only. ActionResult keeps Agent causality/Task semantics; Agents/Support projects neutral Gateway outcomes. Generic scheduling does not import these cognitive contracts.
+
+OutputEnvelope.resourceBindings carries private request-time resource scopes to execution; bindingResources returns a copy retaining provenance, attachments and round identity. Relaying roles preserve these bindings. They are not executable model arguments.

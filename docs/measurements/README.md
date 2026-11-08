@@ -4,6 +4,10 @@ Purpose: retain bounded raw model/device measurements independently of productio
 
 提示词回归的合成场景与真实云模型调用证据也保存在本目录，明确区分真实模型输出与设备执行替身。测试方法与结论由 validation 报告维护，原始结果不包含凭据或用户设备数据。
 
+- [BasicSkill 控制教学](basic-skill-control-2026-11-08.json)：revision 50 两轮 Qwen 回复、调用与失败；保留旧摄影夹具不适配及终轮两项模型失败，解释见[验证记录](../validation/BasicSkill-Control-Teaching.md)。
+
+- [通用 Skill 发现](skill-discovery-2026-11-08.json)：BasicSkill revision 48/49 的 Qwen 实际回复、调用、失败、请求 hash 与相关资源 hash 摘录；完整报告位置保留在数据中，解释见[验证记录](../validation/Skill-Discovery-Before-Denial.md)。
+
 - [Qwen 首轮](qwen-workflow-2026-10-17-run1.json) 与 [修订轮](qwen-workflow-2026-10-17-run2.json) 保留共用场景、各模型实际响应/调用/执行日志/State、请求 hash 和源输入 hash；重复 catalog 按 hash 引用，完整请求保留在报告标注的主机临时文件。首轮未覆盖修订轮新增的确认场景，不能直接把通过率差异视为模型或提示词改善。
 - [Native 名称诊断](qwen-native-names-2026-10-17.json) 区分完整提示词的单次额外 replay 与三个最小协议对照；不是原失败响应的完整 wire 捕获，也不解释全部 invalidResponse。结论及逐场景表见 [验证报告](../validation/Qwen-Workflow-Regression.md)。
 
@@ -29,3 +33,23 @@ Purpose: retain bounded raw model/device measurements independently of productio
 - [2026-10-25提示词复测](prompt-regression-2026-10-25.json)：Qwen三模型完整59场景及GPT-4.1的401诊断；消息语义、实际回复／调用／上下文及源hash持久化。字符串按textPool去重，解释见[验证报告](../validation/Qwen-Workflow-Regression.md#2026-10-25-container-上下文迁移后复测)。
 
 - [NexArm motor teaching experiments](nexarm-robot-teaching-2026-10-27.json): six prompt variants, three real models, synthetic device execution, actual calls/responses and normalized requests with deduplicated strings. See the [validation report](../validation/NexArm-Robot-Skill-Regression.md).
+
+Writer 的 2026-11-08 双模型实验保留 [原始基线](writer-prompt-2026-11-08-baseline.json)、[原提示词通信夹具复测](writer-prompt-2026-11-08-baseline-binding.json)和[原提示词及场景快照](writer-prompt-2026-11-08-inputs.json)。真实 Provider + 桌面 WebKit/窗口状态与动画回执替身的边界、结果解释见[Writer 优化报告](../validation/Writer-Prompt-Optimization.md)。PNG 是离线加载真实发布文件的视觉复核，不是模型输入截图。
+
+本轮追加保留 [校准](writer-prompt-2026-11-08-calibrations.json)、[定向一](writer-prompt-2026-11-08-pilot1.json)、[定向二](writer-prompt-2026-11-08-pilot2.json)、[最终完整矩阵](writer-prompt-2026-11-08-full1.json)与[人工复核](writer-prompt-2026-11-08-review.json)。原始自动判定、夹具修正复核与人工事实/视觉评审分开，不反写历史分数。
+
+[仓库验证](writer-prompt-2026-11-08-checks.json)保留 check.sh、四目标 iOS Simulator 构建的退出码、摘要和本机原始日志哈希；构建通过与真实模型断言、人工内容审阅分别计数。
+
+[Writer 执行内聚定向复测](writer-cohesion-2026-11-08-pilot1.json)保留两个模型的七例真实输出；运行时修复归属和平台边界见[验证报告](../validation/Writer-Execution-Cohesion.md)。
+
+[Writer 执行内聚完整矩阵](writer-cohesion-2026-11-08-full1.json)保留两个模型各 30 例的原始断言、工具轨迹、文件及窗口事实，source/binary 冻结校验为 true；结果不等于真机或完整语义验收。
+
+[Writer 执行内聚仓库验证](writer-cohesion-2026-11-08-checks.json)记录自动测试、四目标 iOS 构建、实际文件比对及源指纹；历史提示词实验结果保持不变。
+
+[task.start 初始 Skill 检查记录](task-start-skills-2026-11-08-checks.json)记录专项、全仓检查和四目标构建，以及 BasicSkill/test 指纹；[验证说明](../validation/Task-Start-Initial-Skills.md)区分提示词示例、脚本模型与真机验收。
+
+[task.start 修正版真机安装](task-start-skills-2026-11-08-device.json)记录 iPhone 17 Pro 的 2026110806 覆盖安装、独立版本核对及新包进程启动；不代替模型/交互验收。
+
+- [Writer 记录分页检查](writer-pagination-2026-11-08-checks.json)：分页边界、页面状态回归、完整检查与四目标 iOS 构建；非真机交互验收。
+
+- [task_7 脱敏诊断](writer-task7-2026-11-08-diagnosis.json)：真实两次请求、30 条记录与十段显示的逐行复现；原库留在本机。

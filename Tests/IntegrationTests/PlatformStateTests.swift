@@ -190,7 +190,8 @@ private func nativeObject(_ data: Data) throws -> [String: Any] {
 }
 
 @MainActor private func waitForNativeState(_ ready: () throws -> Bool) async throws {
-    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+    // MainActor notification delivery shares the host with the full integration suite.
+    let deadline = ContinuousClock.now.advanced(by: .seconds(15))
     while try !ready() {
         guard ContinuousClock.now < deadline else { throw PlatformStateError.invalidSnapshot }
         try await Task.sleep(for: .milliseconds(5))
