@@ -9,9 +9,12 @@ This directory contains the conceptual diagrams and feature examples used by the
 | [multi-agent-communication.svg](multi-agent-communication.svg) | Assistant and Writer delegation through Gateway. |
 | [everyday-voice-interaction.png](everyday-voice-interaction.png) | Voice interaction, captions, expressive eyes and pose overlays. |
 | [interactive-multiwindow.png](interactive-multiwindow.png) | Browser and Writer windows displayed together. |
+| [interactive-minimized-windows.png](interactive-minimized-windows.png) | Browser and Writer windows minimized through voice interaction. |
 | [nexarm-control-demo.gif](nexarm-control-demo.gif) | Animated NexArm demonstration. |
-| [photography-camera.png](photography-camera.png) | Camera controls and recent-photo thumbnails. |
+| [photography-camera.png](photography-camera.png) | An ongoing photography task with camera controls and recent-photo thumbnails. |
+| [photography-album.png](photography-album.png) | Saved photos displayed in the app album grid. |
 | [writer-illustrated-article.png](writer-illustrated-article.png) | An illustrated article created by Writer. |
+| [writer-visual-flowchart.png](writer-visual-flowchart.png) | A Writer-created visual processing flowchart reopened from saved work. |
 | [web-browsing.png](web-browsing.png) | Search results in the in-app browser. |
 
 PNG screenshots are resized proportionally to 480 pixels wide without cropping. The GIF retains its original animation at 480 pixels wide; SVG diagrams remain scalable. The feature table displays clickable 160-pixel-wide previews. Screenshots preserve their captured interface language and visible state; they are examples, not acceptance-test results.
