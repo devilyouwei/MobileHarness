@@ -1,6 +1,6 @@
-![MobileHarness concept banner: the app icon appears on an iPhone launch screen as the phone coordinates a robotic arm, rover, drone and a humanoid reaching for it in a futuristic laboratory.](output/mobileharness-lab-banner-v3.png)
+![MobileHarness concept banner: a blue winking eye logo appears on the central phone, connected by abstract bidirectional data flows to a robotic arm, rover, drone and friendly humanoid in a bright cartoon office.](output/mobileharness-office-banner-v1.png)
 
-<h1 align="center">MobileHarness</h1>
+<h1 align="center"><img src="docs/imgs/mobileharness-eyes.png" width="40" alt="" align="center"> MobileHarness</h1>
 
 <p align="center"><em>Your phone is the best robot brain!</em></p>
 
@@ -10,7 +10,7 @@ MobileHarness is an Apple-native, bio-inspired multimodal Agent app that turns y
   <img src="docs/imgs/perception-cognition-action.svg" alt="Perception, Cognition and Action form a counterclockwise loop connected by Internal Signals. A dashed External Signal arrow enters Perception from outside the loop.">
 </p>
 
-**Signals carry information through the Perception → Cognition → Action loop.** External Signals bring observations from the world and user interactions into perception; Internal Signals connect the three stages, carrying interpreted information, intent and feedback. Native inputs reach their responsible Agents through typed ports, while Gateway coordinates inter-Agent communication and Action execution. Agents interpret inputs, decide what to do and act through the phone's capabilities; actual outcomes feed back into the loop. See the [Signal flow design](MobileHarness/README.md#native-input-and-internal-signals) for delivery paths and execution feedback.
+**In MobileHarness, every input is a Signal; every output is an Action.** Signals carry information through the **Perception → Cognition → Action** loop. External Signals bring observations from the world and user interactions into perception; Internal Signals connect the three stages, carrying interpreted information, intent and feedback. Native inputs reach their responsible Agents through typed ports, while Gateway coordinates inter-Agent communication and Action execution. Agents interpret inputs, decide what to do and act through the phone's capabilities; actual outcomes feed back into the loop. See the [Signal flow design](MobileHarness/README.md#native-input-and-internal-signals) for delivery paths and execution feedback. The ultimate goal is human-like interaction with **simultaneous multi-channel input and output**.
 
 <p align="center">
   <img src="docs/imgs/task-skill-capabilities.svg" alt="An Agent manages a Task and loads Skills. Each Skill declares Actions, read-only States, Instructions and dependencies on other Skills.">

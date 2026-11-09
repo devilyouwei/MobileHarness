@@ -1,0 +1,8 @@
+Built-in ImageGen; transparent_background=true.
+Edit target: output/icon-concepts/mobile-eyes-wink-v4.png
+
+Use case: background-extraction.
+Edit target: the supplied minimal dark-background eye icon.
+Produce a transparent PNG containing ONLY the two existing bright blue eye silhouettes. Remove all navy background entirely, including the area between and around the eyes. Genuine transparent alpha, not white, not black, not a painted checkerboard.
+Preserve the exact bright blue color and smooth shapes: viewer-left large open plump eye with gently scooped lower edge; viewer-right thick rounded "<" shaped squeezed wink pointing LEFT. Keep the existing pair's relative sizes and spacing. No additional glow, shadows, outlines, pupils, marks or objects.
+This will be an inline icon before a README title: use a tightly framed landscape canvas around the entire pair with only a very small transparent safety margin, approximately 2.2:1 aspect ratio. Both eyes must remain complete. Do not include a square app-icon tile or any solid background.

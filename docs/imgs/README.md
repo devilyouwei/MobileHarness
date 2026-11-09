@@ -4,6 +4,7 @@ This directory contains the conceptual diagrams and feature examples used by the
 
 | File | Purpose |
 | --- | --- |
+| [mobileharness-eyes.png](mobileharness-eyes.png) | Transparent blue open-eye / chevron-wink emblem stored at 80 pixels wide and displayed at 40 pixels wide immediately before the README title. Generated with built-in ImageGen from the selected [eye concept](../../output/icon-concepts/mobile-eyes-wink-v4.png); [full prompt](../../output/icon-concepts/mobile-eyes-title-transparent-prompt.txt). |
 | [perception-cognition-action.svg](perception-cognition-action.svg) | Perception, Cognition and Action loop with external and internal Signals. |
 | [task-skill-capabilities.svg](task-skill-capabilities.svg) | Tasks and Skill declarations: Actions, States, Instructions and dependencies. |
 | [multi-agent-communication.svg](multi-agent-communication.svg) | Assistant and Writer delegation through Gateway. |
@@ -18,4 +19,4 @@ This directory contains the conceptual diagrams and feature examples used by the
 | [writer-visual-flowchart.png](writer-visual-flowchart.png) | A Writer-created visual processing flowchart reopened from saved work. |
 | [web-browsing.png](web-browsing.png) | Search results in the in-app browser. |
 
-PNG screenshots are resized proportionally to 480 pixels wide without cropping. GIFs retain their original animation at 480 pixels wide; SVG diagrams remain scalable. The project README separates its text-only feature table from a four-column example gallery. All ten screenshots and animations have their own cells, arranged in rows of four, four and two. Previews are 200 pixels high and clickable. Screenshots preserve their captured interface language and visible state; they are examples, not acceptance-test results.
+PNG screenshots are resized proportionally to 480 pixels wide without cropping. The title emblem is separate artwork, preserves its generated alpha channel and uses an empty alt attribute because the adjacent title supplies the name. GIFs retain their original animation at 480 pixels wide; SVG diagrams remain scalable. The project README separates its text-only feature table from a four-column example gallery. All ten screenshots and animations have their own cells, arranged in rows of four, four and two. Previews are 200 pixels high and clickable. Screenshots preserve their captured interface language and visible state; they are examples, not acceptance-test results.

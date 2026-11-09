@@ -19,7 +19,7 @@
 
 | 文件 | 接口与约束 |
 | --- | --- |
-| select-app-icon.sh | original / robot-camera / lamp-arm 显式选择并复制已保存的图标源，之后构建才能改变 App |
+| select-app-icon.sh | original / robot-camera / lamp-arm / eyes-wink 显式选择并复制已保存的图标源，之后构建才能改变 App |
 | clean-app-models.sh | Scheme 预构建清理生成的 Models/旧嵌入资源输出，不删除开发者源文件 |
 | stage-voice-models.sh | device/simulator 只打包 model-catalog.json 与许可文本，不打包权重、图或 tokenizer |
 | update-model-filelists.py | 生成 Xcode 资源 sandbox 输入/输出列表；修改制品元数据/许可后运行 |

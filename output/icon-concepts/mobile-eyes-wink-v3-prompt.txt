@@ -1,0 +1,7 @@
+Use case: precise-object-edit.
+Asset type: minimalist square app icon.
+Edit target: the supplied dark navy app icon with one open blue eye on the viewer's left and one curved closed blue eye on the viewer's right.
+Primary request: change ONLY the closed eye on the viewer's right into a cute squeezed wink shaped exactly like a less-than sign "<", adapted to the existing thick, soft, rounded blue eye style.
+Shape instructions: a SINGLE connected sideways chevron, with its point facing LEFT toward the open eye. Two thick gently curved arms meet at the leftmost center point and extend toward the upper-right and lower-right. The two free tips are on the RIGHT. The direction must be "<", never ">". Round the left joint and both free tips generously. Make the shape plump, compact, friendly and organic, like a tightly squeezed cartoon eye, not a thin typographic glyph and not a sharp angular arrow. Solid bright blue matching the other eye. About the existing closed eye's width, with a height about 55–65 percent of the open eye height. Position around the same horizontal center as the open eye.
+Invariants: preserve the open left eye exactly, the overall spacing and centered composition, original bright blue color, dark navy background, clean flat style and square full-bleed canvas.
+Avoid: extra marks, eyebrows, pupils, mouth, nose, text, literal printed character, shaft on the chevron, border, gradients, glow, texture or other objects. Exactly two blue eye silhouettes total.

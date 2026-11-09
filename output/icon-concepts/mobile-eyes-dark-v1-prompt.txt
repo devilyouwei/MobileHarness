@@ -1,0 +1,8 @@
+Use case: logo-brand
+Asset type: minimal iOS app icon, square 1024x1024 opaque artwork.
+Primary request: a dark background and exactly two cute blue eyes, nothing else.
+Scene/backdrop: uniform very dark navy near-black #080F1B, full bleed square.
+Subject: two friendly gently smiling eyes made of simple solid rounded shapes, using the app's actual eye fill color RGB(0.08,0.62,1.0), hex #149EFF. Each eye is a plump soft upright oval with a gently uplifted curved lower edge, giving a cute happy attentive expression. Both eyes open, matching size, balanced and horizontally aligned. No pupils or white highlights.
+Style/medium: exceptionally minimal clean flat graphic, smooth crisp antialiased silhouettes. Solid saturated blue interiors, at most a barely perceptible tight blue glow at edges.
+Composition/framing: eye pair centered as a single group on the square; each eye about 19% of canvas width and 24% of canvas height, with about 15% canvas width of empty gap between eyes. Ample negative space. Readable as an app icon at tiny sizes.
+Constraints: exactly two shapes on a dark background. No phone, robot, arm, mouth, nose, eyebrows, cheeks, face outline, stars, decorative marks, border, lettering, texture, 3D material or extra objects. No outer rounded-corner mask, no mockup, no watermark.

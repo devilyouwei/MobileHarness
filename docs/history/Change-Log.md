@@ -1,5 +1,12 @@
 # Documentation and architecture change history
 
+## 2026-11-09 — README 暖色办公室 banner
+
+- 标题前增加独立透明蓝色眼睛 PNG，使用内置 ImageGen 生成并保留提示词；Signal 段首先说明“every input is a Signal; every output is an Action”，段尾将拟人的多通道 Signal 输入／Action 输出明确为最终愿景。
+- 根 README 改用 `output/mobileharness-office-banner-v1.png`：手机显示蓝色睁眼／`<` 形眨眼，保留机械臂、小车、人形机器人和无人机及抽象双向数据流；整体改为自然光、木桌和柔和卡通材质。
+- 内置 ImageGen 以旧 banner 和放大的眼睛稿为参考生成；原图、历史版本及完整提示词分别保留。同步 output 和资源说明，区分 README 概念图与独立维护的生产 AppIcon。
+- 验证：图像为 2172×724、不透明、3:1；视觉检查四类设备、眼睛方向、文字及整体风格，检查引用路径和 diff 格式。本轮仅改图片和文档，不运行代码构建；画面不作为硬件集成或原生界面验收证据。
+
 ## 2026-10-15 — 总体第三部分与模块细节归位
 
 - 按用户要求收敛 MobileHarness/README.md 第三部分：保留跨模块链路、数据流、注入接口、权限/所有权和完成/失败语义；局部算法、状态机、完整函数清单及参数引用所属目录 README。第一、二部分和第三部分章节入口保持不变。

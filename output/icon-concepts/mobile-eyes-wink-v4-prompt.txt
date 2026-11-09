@@ -1,0 +1,5 @@
+Use case: precise-object-edit.
+Edit target: the provided minimalist app icon with two blue eyes on a dark navy square.
+Change ONLY the scale and placement of the existing eye pair. Enlarge BOTH eyes together uniformly by about 1.35x, including their spacing, so the whole eye pair now spans approximately 72–74% of the canvas width instead of about 52%. Center the combined pair precisely both horizontally and vertically, with balanced margins and enough room for the iOS corner crop.
+Preserve the exact shapes and proportions: left eye open, plump and rounded with a subtly scooped lower edge; right eye a thick rounded "<" shaped squeezed wink, pointing LEFT with two free tips to the RIGHT. Preserve the relative sizes of the two eyes and their relative spacing. The wink remains smaller in height than the open eye. Do not change the expression or redesign either eye.
+Preserve the same saturated bright blue fill and the same uniform near-black navy background. Clean crisp flat silhouettes. Opaque square full-bleed app-icon artwork. No extra elements, pupils, mouth, outlines, text, borders, outer rounded-corner mask, highlights, texture or glow. Deliver a single icon.

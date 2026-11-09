@@ -1,11 +1,28 @@
 # Icon concepts
 
+## Minimal dark eyes candidate
+
+The [enlarged chevron wink v4](mobile-eyes-wink-v4.png) follows the user's selected expression direction and enlarges the eye pair to approximately 72% of the icon width. Built-in ImageGen edited v3 with the [scale refinement prompt](mobile-eyes-wink-v4-prompt.txt). Visual review confirms increased coverage, centered composition and the rounded left-facing wink. The saved image is an opaque 1254×1254 concept; it is normalized to opaque 1024×1024 eyes-wink.png and selected into the production AppIcon asset.
+
+The [rounded chevron wink v3](mobile-eyes-wink-v3.png) refines option 1 with a viewer-right closed eye shaped like `<`: a left-facing rounded joint and two thick blue arms with soft tips. Built-in ImageGen edited v2 using the [preserved prompt](mobile-eyes-wink-v3-prompt.txt). Visual review confirms the requested direction, open left eye and minimal composition; the opaque square preview remains separate from production selection.
+
+Four expression candidates extend the dark-eyes concept using built-in ImageGen, with v1 as the shared visual reference. Each is an opaque 1254×1254 preview, visually checked for a two-eye composition; none is selected into the production asset. Exact generation prompts are preserved beside each image. The shared prompt requests the app's #149EFF eye color, with generated color remaining approximate.
+
+| Option | Candidate | Full prompt |
+| --- | --- | --- |
+| 1 — 俏皮眨眼 | [Wink](mobile-eyes-wink-v2.png) | [Prompt](mobile-eyes-wink-v2-prompt.txt) |
+| 2 — 弯弯笑眼 | [Happy](mobile-eyes-happy-v2.png) | [Prompt](mobile-eyes-happy-v2-prompt.txt) |
+| 3 — 好奇大小眼 | [Curious](mobile-eyes-curious-v2.png) | [Prompt](mobile-eyes-curious-v2-prompt.txt) |
+| 4 — 坏笑眯眼 | [Mischief](mobile-eyes-mischief-v2.png) | [Prompt](mobile-eyes-mischief-v2-prompt.txt) |
+
+[mobile-eyes-dark-v1.png](mobile-eyes-dark-v1.png) is a new opaque square candidate generated with built-in ImageGen: a near-black navy background and two rounded blue eyes, without a phone or robotic arm. The [complete prompt](mobile-eyes-dark-v1-prompt.txt) requests the native eye fill RGB(0.08, 0.62, 1.0), approximately #149EFF, from `MobileHarness/UI/Conversation/NativeCompanionSurface.swift`. Generated colors are a visual approximation, not a verified pixel-exact match. This is concept artwork; the selected production asset is unchanged. Visual review confirms the two-eye composition and absence of extra objects; native installed-icon acceptance is not part of this preview.
+
 Purpose: visual exploration of a phone controlling a robotic body.
 Design goals: landscape phone, friendly eyes and a compact robotic body; explore transparent foregrounds and complete opaque app-icon compositions while preserving the current icon's visual identity.
 
-## Selected production artwork
+## Historical lamp-arm production artwork
 
-✅ The user selected the **first** image from the v14 expression-refinement turn, preserved as [mobile-robot-lamp-arm-v14-first.png](mobile-robot-lamp-arm-v14-first.png). Its prompt is the initial edit in [v14 prompts](mobile-robot-lamp-arm-v14-prompt.txt), before the second refinement. The latest production composition is its [centered revision](mobile-robot-lamp-arm-centered.png), edited with built-in ImageGen using the preserved [centering prompt](mobile-robot-lamp-arm-centered-prompt.txt). It is resized to opaque 1024×1024 [lamp-arm.png](../../MobileHarness/Resources/AppIconVariants/lamp-arm.png), selected into the AppIcon asset, and incorporated into the central phone's launch screen in the [README banner](../README.md). Earlier designs, original production artwork and generation prompts remain preserved. Candidate status statements below describe their historical stage; the separately refined mobile-robot-lamp-arm-v14.png is not the selected design.
+✅ The user selected the **first** image from the v14 expression-refinement turn, preserved as [mobile-robot-lamp-arm-v14-first.png](mobile-robot-lamp-arm-v14-first.png). This historical selection was superseded by eyes-wink v4. Its prompt is the initial edit in [v14 prompts](mobile-robot-lamp-arm-v14-prompt.txt), before the second refinement. The lamp-arm production composition is its [centered revision](mobile-robot-lamp-arm-centered.png), edited with built-in ImageGen using the preserved [centering prompt](mobile-robot-lamp-arm-centered-prompt.txt). It is resized to opaque 1024×1024 [lamp-arm.png](../../MobileHarness/Resources/AppIconVariants/lamp-arm.png), selected into the AppIcon asset, and incorporated into the central phone's launch screen in the historical [laboratory banner v3](../mobileharness-lab-banner-v3.png). The current [README banner](../README.md) independently uses the enlarged blue-eye concept. Earlier designs, original production artwork and generation prompts remain preserved. Candidate status statements below describe their historical stage; the separately refined mobile-robot-lamp-arm-v14.png is not the selected design.
 
 ❌ Native icon appearance after app rebuild/installation remains separate from source-asset selection.
 
