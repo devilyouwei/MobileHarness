@@ -435,10 +435,12 @@ sequenceDiagram
     participant H as Agents · Task controller
     participant S as Storage · Task repository
     participant E as Agents · Executor
+    participant R as Agents · Execution authorization
+    participant I as UI · Writer Island
     A->>G: task.delegate(agent_id, description)
     G->>X: Scheduled Task Action
     X->>H: Validated request through injected port
-    H->>H: Check target, contract and permission
+    H->>H: Validate delegation parameters and permission
     H->>S: Persist agent_messages request
     H->>G: Bound task.request
     G->>E: Authenticated delivery
@@ -451,16 +453,17 @@ sequenceDiagram
     end
     G-->>H: Admission receipt
     H-->>X: Admission receipt or failure
-    X-->>G: Action result
-    G-->>A: Delegation admission outcome
+    X-->>G: Structured completion or failure
+    G-->>A: Failure is observable
     opt Accepted delegation
         E->>E: Resolve goal and select own work target
         opt Existing work selected by Writer
             E->>S: Bind selected workspace without moving earlier messages
         end
-        E->>G: Progress / request for input
+        E->>G: Started / request for input
         G->>H: Correlated task facts
-        H-->>A: Control state / receiver-defined reply
+        H->>H: Update correlated task view
+        E->>I: Show progress or question
         opt User supplement or cancellation
             A->>G: Scheduled supplement or cancellation
             G->>X: Task control Action
@@ -470,19 +473,23 @@ sequenceDiagram
         end
         E->>E: Join execution and cleanup
         E->>S: Persist terminal evidence
-        E->>G: task.result
-        G->>H: Retire scope / update terminal control state
-        opt Executor-defined independent user notification
+        par Runtime retirement
+            E->>R: Bound runtime retirement call
+            R->>G: Join existing executions
+            R-->>E: Cleanup joined and scope retired
+        and Durable completion delivery
             E->>G: Authenticated role notification
-            G->>H: Verify task binding and terminal evidence
-            H-->>A: Admit user report
+            G->>H: Verify terminal evidence and reconcile task view
+            H->>H: Mark notification consumed
+        and User presentation
+            E->>I: Display terminal text
         end
     end
 ```
 
-Task Actions validate and forward control through injected Agents ports. Independent communication consumers deliver messages while the scheduled Action waits for admission. Public controls use `agent_id`; runtime resolves the current communication and captured question identity. The caller does not allocate the target role’s local task/workspace. Late events remain fenced to their original execution. Admission, execution cleanup, scope retirement and user reporting have separate completion boundaries.
+Task Actions validate and forward control through injected Agents ports. Independent communication consumers deliver messages while the scheduled Action waits for admission. Public controls use `agent_id`; runtime resolves the current communication and captured question identity. The caller does not allocate the target role’s local task/workspace. Late events remain fenced to their original execution. Successful Writer transport completes without a model continuation. Writer presents user-facing facts on its Island and Assistant reconciles task state. Admission, execution cleanup, scope retirement and presentation have separate completion boundaries.
 
-Background targets require a registered business contract and communication permission. Writer is the current public creative executor, and `sendMessage` currently adapts Writer input. There is no Writing Skill or Assistant artifact-library Action. Writer calls Actions' native workspace tools through Gateway: search reads library metadata, open presents saved work, and explicit create initializes an empty directory before subsequent scoped file operations. Its library/workspace domains belong to [Writer](Agents/Writer/README.md#作品库与工作区分域), deterministic file validation/rendering/export to [Artifacts](Actions/Artifacts/README.md), and progress coalescing and durable terminal notifications to the [Writer communication contract](Agents/Writer/README.md#委托与主动事件).
+Background delegation requires an implemented route and communication permission. The receiver admits the assignment and its model can execute, ask for clarification or decline with a reason. Writer is the current public creative executor, and `sendMessage` currently adapts Writer input. Writer's artifact-library and file-editing Skills are private to Writer. The role calls Actions' native workspace tool through Gateway: search reads library metadata, open presents saved work, and explicit create initializes an empty directory before subsequent scoped file operations. Its library/workspace domains belong to [Writer](Agents/Writer/README.md#作品库与工作区分域), deterministic file validation/rendering/export to [Artifacts](Actions/Artifacts/README.md), and Island feedback and durable terminal notifications to the [Writer communication contract](Agents/Writer/README.md#委托与主动事件).
 
 [Assistant delegation](Agents/Assistant/README.md#对其他-agent-的委托) · [Task Actions](Actions/System/Task/README.md) · [Task message values](Agents/Support/Communication/README.md) · [Independent output consumers](Agents/Support/README.md#lifetime-bounds-and-failures)
 
@@ -581,19 +588,19 @@ Execution and completion contracts follow the shared workflow above; local prese
 
 #### Window presentation and domain lifecycle
 
-UIContainer owns WindowState and the `ui.windows` reader. ApplicationControl consumes typed window requests and invokes registered UI.Window functions through Gateway. Actions delegates domain lifecycle to WindowContentLifecycle; CameraCoordinator retains media ownership independently of view mounting. `Camera.Capture.open` combines photo-window presentation with capture readiness and returns windowID; `Camera.Perception.openVision` enables vision independently of that window.
+UIContainer owns WindowState and the `ui.windows` reader. ApplicationControl consumes typed window requests and invokes registered UI.Window functions through Gateway. Actions delegates domain lifecycle to WindowContentLifecycle; CameraCoordinator retains media ownership independently of view mounting. `Camera.Capture.open` combines photo-window presentation with capture readiness and completes without a business value; `Camera.Perception.openVision` enables vision independently of that window.
 
-UI owns geometry, focus, stacking and presentation completion. Camera owns device leases and media disposition: cancel retains the window, while save/discard must finish before cleanup and dismissal. Photography Skill awaits the close receipt after the matching Task's successful final disposition before Task termination. Completion, cancellation and replacement join that cleanup; failure retains the Task and pending media requires user disposition. Closing photography leaves independently enabled vision running. See [window execution](Actions/UI/Navigation/README.md), [Camera](Actions/Camera/README.md) and [Skill lifecycle](Agents/Support/README.md).
+UI owns geometry, focus, stacking and presentation completion. Camera owns device leases and media disposition. Closing clears temporary photo previews directly. Pending videos require explicit disposition. Photography Skill awaits the close receipt after the matching Task's successful final disposition before Task termination. Completion, cancellation and replacement join that cleanup; failure retains the Task and pending media requires user disposition. Closing photography leaves independently enabled vision running. Photography can select five cached images for model review and save all pending photos in the current window session. See [window execution](Actions/UI/Navigation/README.md), [Camera](Actions/Camera/README.md) and [Skill lifecycle](Agents/Support/README.md).
 
 #### Web browsing and artifact presentation
 
-Remote browsing follows Assistant → Gateway → Actions.Web → UI WebKit. Browse, navigation and snapshot receipts retain source-scoped Storage media references for Assistant image analysis; page text and screenshots are untrusted observations. UIContainer keeps the remote browser separate from per-window artifact pages. WindowState owns the cross-creator `window_N` index, and WebPageContainer owns page summaries by window identity. BasicSkill selects `ui.windows`; WebBrowsing selects `ui.web` and exposes scheduled page queries. Observing another Agent's page does not expose its source files or private context.
+Remote browsing follows Assistant → Gateway → Actions.Web → UI WebKit. Browse, navigation and snapshot receipts retain source-scoped Storage media references for Assistant image analysis; page text and screenshots are untrusted observations. UIContainer keeps each remote Web and artifact page in its own window session. Browsing a URL creates a window unless an existing Web window is targeted. WindowState owns the cross-creator `window_N` index and twelve-window limit. WebPageContainer owns page summaries by window identity. BasicSkill selects `ui.windows`; WebBrowsing selects `ui.web` and exposes scheduled page queries. Observing another Agent's page does not expose its source files or private context.
 
-Local creation follows [Agent delegation](#assistant-agent-delegation) into the creative owner, whose authorized direct tools invoke Actions.Artifacts. Artifacts owns deterministic edits, drafts, immutable publication, preview/export business operations and file/SQL compensation; Storage owns confined files, the shared SQLite workspace catalog and version CAS. App injects these ports without owning the workspace index. Raw source flows through a backpressured content port rather than Assistant's XML protocol or history. The role-specific control/content loop belongs to [Writer](Agents/Writer/README.md). Writer accepts a goal without caller-assigned task/workspace identity, then searches the SQLite catalog by keyword and explicitly enters, opens or creates a workspace. Entry requests a preview window and switches Writer to a separate system prompt and tool catalog. The control request that entered the workspace retains its original history identity; communication authentication and Assistant foreground tasks do not choose the file target.
+Local creation follows [Agent delegation](#assistant-agent-delegation) into the creative owner, whose authorized direct tools invoke Actions.Artifacts. Artifacts owns deterministic edits, drafts, immutable publication, preview/export business operations and file/SQL compensation; Storage owns confined files, the shared SQLite workspace catalog and version CAS. App injects these ports without owning the workspace index. Raw source flows through a backpressured content port rather than Assistant's XML protocol or history. The role-specific control/content loop belongs to [Writer](Agents/Writer/README.md). Writer accepts a goal without caller-assigned task/workspace identity, then searches the SQLite catalog by keyword and explicitly enters, opens or creates a workspace. Entry requests a preview window and activates the file-editing Skill and its workspace command schema. Opening works stays in the library. Writer selects matching identities and can issue multiple open calls in order, each with its own window result. In both the library and editing workspace, the model calls finish explicitly to submit the final result. The control request that entered the workspace retains its original history identity; communication authentication and Assistant foreground tasks do not choose the file target.
 
 Writer and Assistant share Gateway coordination without sharing a role workflow. Writer start/edit/preview/render/finish commands use Gateway direct execution; edit completion creates a stream, while host-bound append/complete/abort continue that admitted edit under its delegate/stream identity. File completion is distinct from task completion. Writer cancellation or root suspension revokes ordinary continuation admission and joins model/preview work plus Actions release before terminal reporting or resumption. Actions independently joins its tracked effects and editors on root shutdown. Per-chunk data does not create synthetic Gateway calls; details and capacity belong to [Artifacts](Actions/Artifacts/README.md#执行与续写生命周期).
 
-Artifacts maps project snapshots into a stable project-scoped WebKit read root. Safe incremental preview disables scripts and uses UI's same-document update; explicit rendering executes the assembled files with viewport restoration. Text/Markdown use escaped document presentation. The creative role decides when to preview or inspect; UI owns DOM, gestures, zoom and transitions, while Actions/Storage own file rotation and cleanup. A rendering failure does not erase a persisted draft, and a saved file does not establish visual acceptance. Export reads an immutable snapshot and uses a separate UI rendering page for PDF. See [Artifacts](Actions/Artifacts/README.md) and [Web component](UI/Components/Web/README.md).
+Artifacts maps project snapshots into a stable project-scoped WebKit read root. Safe incremental preview disables scripts and uses UI's same-document update; explicit rendering executes the assembled files with viewport restoration. Text uses escaped presentation. Markdown preview, saved-work display and PDF share UI’s offline conversion to static HTML and Mermaid SVG images. Actions carries diagram diagnostics in the workspace observation. The creative role decides when to preview or inspect; UI owns DOM, gestures, zoom and transitions, while Actions/Storage own file rotation and cleanup. A rendering failure does not erase a persisted draft, and a saved file does not establish visual acceptance. Export reads an immutable snapshot and uses a separate UI rendering page for PDF. See [Artifacts](Actions/Artifacts/README.md) and [Web component](UI/Components/Web/README.md).
 
 Content owners submit titles, operation subtitles and optional icons through Actions' existing UI presentation interface. UI validates display values and owns window layout without looking up business resources or interpreting Agent commands. HTML document titles do not rename the business window. Closing/minimizing a window does not terminate its creative task; explicit reopening and task control remain distinct operations. See [Window](UI/Components/Window/README.md) and [Writer window policy](Agents/Writer/README.md#窗口命名操作副标题与场景).
 
@@ -990,7 +997,7 @@ Agents submits a frozen request to ModelKit, resolves streamed output against it
 
 Call completion, delivery, round closure and the next inference are separate boundaries. Results retain endpoint/incarnation/session/input/round/execution identity and opaque cognitive correlation; Agents interprets turn/Task semantics. Late results cannot target the latest chat or awaken a replacement owner. Reply barriers also join synthesis and playback before continuation.
 
-Business values and real failures may become execution observations. Ordinary acknowledgments do not automatically create new rounds. Transport, parsing, lifecycle and cancellation failures do not automatically retry device effects. Partial and unknown effects and cleanup failures retain their evidence. Action deadlines belong to execution; conversation has no hidden universal TTL. See [Chat](Agents/Support/Chat/README.md), [Results](Gateway/Output/Results/README.md) and [ExecutionRuntime](Actions/Support/README.md).
+Business values and real failures may become execution observations. Effect-only Action handlers return Void, which the execution layer records as a typed completion without starting another inference. Transport, parsing, lifecycle and cancellation failures do not automatically retry device effects. Partial and unknown effects and cleanup failures retain their evidence. Action deadlines belong to execution; conversation has no hidden universal TTL. See [Chat](Agents/Support/Chat/README.md), [Results](Gateway/Output/Results/README.md) and [ExecutionRuntime](Actions/Support/README.md).
 
 ### 11. Listening, ASR and sound-source observations
 
@@ -1085,7 +1092,7 @@ sequenceDiagram
 
 Assistant maps natural text into an authorized directed synthesis request and a playback call. SpeechSynthesis owns the ModelKit TTS producer and reserves an owner-bound AudioCache ID; it does not issue playback itself. Actions checks out the matching single-use stream and waits for native output drain. Synthesis admission, producer completion, playback drain and listening restoration are joined separately.
 
-Explicit role messages coordinate half-duplex reply occupancy. Cancellation requests native stop, joins model production, cached streaming, scheduled playback and cleanup, then restores listening according to consent/session policy. Reply occupancy snapshots remain deliverable while execution cancellation joins playback, including already admitted publications; they retain role/session authorization and receiver revision fencing. A terminal fact releases only its source occupancy and cannot renew explicitly revoked listening consent. Successful Writer reports additionally carry a one-time completed-report fact after the real reply barrier; SpeechPerception evaluates that policy against newer explicit-stop and lifecycle intent, rather than relying on a model command to restart the microphone. Emitted audio cannot be undone; restored listening cannot turn failed playback into success. Model-load waiting and ordinary reply waiting use separate identity and completion conditions. See [SpeechSynthesis](Agents/SpeechSynthesis/README.md), [Speech](Actions/Speech/README.md) and [AudioCache](Storage/Cache/Audio/README.md).
+Explicit role messages coordinate half-duplex reply occupancy. Cancellation requests native stop, joins model production, cached streaming, scheduled playback and cleanup, then restores listening according to consent/session policy. Reply occupancy snapshots remain deliverable while execution cancellation joins playback, including already admitted publications; they retain role/session authorization and receiver revision fencing. A terminal fact releases only its source occupancy and cannot renew explicitly revoked listening consent. Writer feedback uses its own Island presentation and does not enter reply occupancy. Emitted audio cannot be undone; restored listening cannot turn failed playback into success. Model-load waiting and ordinary reply waiting use separate identity and completion conditions. See [SpeechSynthesis](Agents/SpeechSynthesis/README.md), [Speech](Actions/Speech/README.md) and [AudioCache](Storage/Cache/Audio/README.md).
 
 ### 13. Camera preview, vision and tracking
 
@@ -1669,6 +1676,8 @@ Independent fences include UI generation, capture generation, endpoint incarnati
 #### Scene visibility versus execution lifetime
 
 Ordinary scene hiding stops/joins visible rendering and vision intake while preserving Assistant and Writer inference, files and messages. Actions retains bounded latest project snapshots; foreground restoration runs in one Actions-owned task and reads current state under the project lock. Explicitly closed or minimized windows retain their state. Preview restore failures are reported at the affected window, and scene admission continues. Background full rendering returns deferred validation evidence, so saving and visual verification remain separate. Explicit root suspension, replacement and stop still cancel and join owned work. iOS process suspension does not imply application-requested cancellation and does not guarantee unlimited background CPU. See [App composition](App/Composition/README.md), [Agents lifecycle](Agents/README.md#lifetime-inputs-and-failures), [Artifacts snapshots](Actions/Artifacts/README.md#标题副标题与后台快照) and [Writer scene policy](Agents/Writer/README.md#窗口命名操作副标题与场景).
+
+App requests iOS continued processing for each foreground user-initiated Writer segment. When iOS grants time, Writer continues its existing model and file loop across scene loss. A native expiration is scoped to that segment and joins Writer cleanup before retiring the run. Terminal work and waiting for user input release the native task. See [Writer scene policy](Agents/Writer/README.md#窗口命名操作副标题与场景).
 
 ### 22. End-to-end scenario map
 

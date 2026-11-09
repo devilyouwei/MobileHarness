@@ -4,7 +4,7 @@
 
 UIContainer持有唯一WindowState；上游提交WindowContent/WindowPresentation和类型化控制请求，宿主注入内容插槽。组件拥有窗口身份、尺寸、层级、聚焦、最小化、呈现过渡和回执，不解释照片、录像、设备租约或Task。依赖Shared请求/状态快照能力；业务清理由请求消费者加入后再更新窗口状态。
 
-WindowState.swift定义模型、边界约束、状态和有界请求；WindowAppearance.swift拥有WindowIcon、图标校验／缩图和原生字体测量；WindowHost.swift定义UIKit宿主、SwiftUI窗口壳及动画。最多4窗口（含最小化），容量不足明确拒绝；revision/generation拒绝迟到回执，关闭和根失活释放动画等待。UI呈现成功不代表领域操作成功。
+WindowState.swift定义模型、边界约束、状态和有界请求；WindowAppearance.swift拥有WindowIcon、图标校验／缩图和原生字体测量；WindowHost.swift定义UIKit宿主、SwiftUI窗口壳及动画。全局最多十二个窗口（含最小化），容量不足明确拒绝；revision/generation拒绝迟到回执，关闭和根失活释放动画等待。UI呈现成功不代表领域操作成功。
 
 ## WindowHost 与 WindowChrome
 
@@ -31,7 +31,7 @@ Windows retain their last successfully presented revision. Failed receipts and r
 
 最大化外壳无圆角和边线，黑色背景填满至屏幕底边；标题/内容横向与底部控件保留必要安全内边距。UIHostingController不再次自动施加safeArea，避免重复缩进。顶部占用变化重新计算最大化frame，并从当前视觉frame接续既有动画；normal/card/restoreMode保持独立，最小化后恢复使用最新最大化布局。普通拖动仍直接跟手，不逐帧调用Action。
 
-WindowContent.web is a single-instance generic content slot. Its render surface comes from UI.WebPageView; injected Actions lifecycle joins outstanding page/editor operations on minimize or close. WindowState does not inspect URLs, workspace revisions or model requests.
+WindowContent.web allows multiple independent windows. The shared limit across Web, artifacts and Camera is twelve windows. Each Web window renders its own UI.WebPageView; injected Actions lifecycle joins outstanding page/editor operations on minimize or close. WindowState does not inspect URLs, workspace revisions or model requests.
 
 ## 最小化宽度与图标
 

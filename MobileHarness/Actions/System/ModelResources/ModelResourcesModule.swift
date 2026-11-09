@@ -31,17 +31,17 @@ public struct ModelResourcesModule: CapabilityModule {
             SystemActions.saveSourceDefinition(completing: { [preferences] in
                 .value(try await SystemActions.saveSource(invocation: $0, using: preferences))
             }),
-            SystemActions.configureSpeechDefinition(completing: { [resources] in
-                .value(try await SystemActions.configureSpeech(invocation: $0, using: resources))
+            SystemActions.configureSpeechDefinition(handler: { [resources] in
+                try await SystemActions.configureSpeech(invocation: $0, using: resources)
             }),
-            SystemActions.downloadDefinition(completing: { [resources] in
-                .value(try await SystemActions.download(invocation: $0, using: resources))
+            SystemActions.downloadDefinition(handler: { [resources] in
+                try await SystemActions.download(invocation: $0, using: resources)
             }),
-            SystemActions.cancelDefinition(completing: { [resources] in
-                .value(try await SystemActions.cancel(invocation: $0, using: resources))
+            SystemActions.cancelDefinition(handler: { [resources] in
+                try await SystemActions.cancel(invocation: $0, using: resources)
             }),
-            SystemActions.removeDefinition(completing: { [resources] in
-                .value(try await SystemActions.remove(invocation: $0, using: resources))
+            SystemActions.removeDefinition(handler: { [resources] in
+                try await SystemActions.remove(invocation: $0, using: resources)
             }),
         ]
     }

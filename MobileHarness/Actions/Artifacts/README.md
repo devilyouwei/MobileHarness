@@ -12,7 +12,7 @@ ArtifactService 跟踪全部工具、追加、完成、中止和截图操作：�
 
 revoke 立即关闭该委托普通准入并取消在途普通操作，已开始的 abort 只等待、不再次取消。release 合并并发调用，先围栏并加入在途工作，再保存中断草稿、关闭 editor 和释放项目锁。abort 的检查点失败仍尝试关闭流，原始错误和清理错误保留。release 清理失败后服务关闭准入，后续 release/shutdown 继续返回失败。Actions 根调用 shutdown 关闭全部准入、取消/加入普通工作并清理剩余会话，先于依赖的窗口服务关闭。已发生的文件效果不回滚；被取消的工具不得把已落盘内容描述为从未发生。
 
-ArtifactPresentation 连接 UI 页面/窗口与 StorageFiles 临时预览；每作品双缓冲目录，最多四个页面。关闭清理预览和页面、不取消 Writer，流不会重开窗口；新委托 start 或显式 open 才解除关闭标记。删除清理窗口绑定及预览。TXT 转义显示；Markdown 支持标题、引用、列表、围栏代码、强调和 HTTP(S) 链接，其余语法保留可读文本。Writer内部preview命令按ArtifactContentParser安全检查点读取当前流或草稿，由Writer自有worker决定呈现；它不证明 HTML/JavaScript 语法有效。未完成草稿禁用脚本，完整渲染由 WebKit 执行并返回诊断/截图。项目索引可列出仅有草稿的中断作品，用户可显式委托恢复。
+ArtifactPresentation 连接 UI 页面/窗口与 StorageFiles 临时预览；每作品双缓冲目录，与网页共用最多十二个窗口。关闭清理预览和页面、不取消 Writer，流不会重开窗口；新委托 start 或显式 open 才解除关闭标记。删除清理窗口绑定及预览。TXT 转义显示。Markdown 由 UI 的离线转换器解析，Mermaid 围栏转换成静态 SVG 图像。无效图保留围栏源码，转换诊断并入显式 render 的回执。Writer内部preview命令按ArtifactContentParser安全检查点读取当前流或草稿，由Writer自有worker决定呈现；它不证明 HTML/JavaScript 语法有效。未完成草稿禁用脚本，完整渲染由 WebKit 执行并返回诊断/截图。项目索引可列出仅有草稿的中断作品，用户可显式委托恢复。
 
 同项目呈现通过独立串行门合并为安全磁盘/导航顺序，最多两个可取消等待者，超限显式 busy；不同项目仍可独立进行。关闭先标记页面退出，导航中断返回“草稿保留、视觉验证不可用”，再加入呈现并清理双缓冲目录；最小化期间保留最新快照供恢复时呈现。Writer 的 open/delete 同样持有项目锁，不能与正在编辑的项目并发。
 
@@ -33,7 +33,7 @@ read 返回内容、起始行、字符范围、文件版本和宿主引用。lim
 
 ArtifactExportService 是根拥有的作品读取/导出业务，UI 通过 WriterArtifactsControlling 接口访问。读取一次完整、带草稿/已发布标识的快照，导出期间不追随 Writer 的后续修改。源文件保持 UTF-8，预览/历史读取/导出不另设更小的源码大小门槛；全部文件通过 ArtifactArchive 生成标准无压缩 UTF-8 ZIP，保留相对目录、CRC32 和中央目录，无 Shell/第三方压缩依赖。
 
-HTML/MD/TXT 可导出 PDF；Markdown/TXT 复用 ArtifactTextRendering 转换，HTML 保持关联资源。源文件在 workspaces/exports 的唯一暂存目录中生成，独立 WebPageContainer 通过受控根渲染，导出不占用/重载作品窗口。单次导出 worker、零等待队列；分享完成清理，取消加入 worker 并清理，根关闭取消/加入，首次导出回收上次进程残留。分享文件保留到系统分享关闭；容量、渲染和清理错误显式反馈。PDF 静态导出，不承诺保存动画状态。
+HTML/MD/TXT 可导出 PDF；作品窗口、历史文件预览和 PDF 复用 ArtifactTextRendering 的 Markdown/TXT 文档输出，HTML 保持关联资源。Markdown 转换不修改现有工作区源码。源文件在 workspaces/exports 的唯一暂存目录中生成，独立 WebPageContainer 通过受控根渲染，导出不占用/重载作品窗口。单次导出 worker、零等待队列；分享完成清理，取消加入 worker 并清理，根关闭取消/加入，首次导出回收上次进程残留。分享文件保留到系统分享关闭；容量、渲染和清理错误显式反馈。PDF 静态导出，不承诺保存动画状态。
 
 ArtifactService 只拥有作品业务，不提供历史 startNew/delete/title 命令。Writer 长期任务与对话读取由 Agents/Writer 和 Storage 的委托记录接口管理。
 
@@ -47,7 +47,7 @@ Writer 显式 create 或 enter 时调用工作区 start，显示准备占位或�
 
 start 的 createWorkspace 参数由受信 Writer 运行时为未完成初始化的预留项目传入，不暴露给模型工具 schema；模型循环不允许 start/resume。已有就绪项目缺失保持 missingProject。预览与 PDF 的临时 HTML 使用与发布一致的 UTF-8 BOM，源文件导出保持原始 UTF-8 文本。
 
-工具失败区分 invalidReadRange、invalidInstruction、invalidTitle 与 invalidQuery，并报告对应参数要求。窗口并发不足明确返回 busy。
+工具失败区分 invalidReadRange、invalidInstruction、invalidTitle 与 invalidQuery，并报告对应参数要求。达到共享窗口上限时明确报告容量不足。
 
 ZIP 导出依据标准 ZIP 的字段宽度预检条目数、源码字节和偏移；需要 ZIP64 时明确 archiveFormatLimit，建议导出单文件，不产生整数转换崩溃或截断档案。此边界只约束该导出格式，不约束模型生成/文件编写。
 
@@ -61,7 +61,7 @@ replace使用fresh read引用约束字面旧文本，唯一匹配后原子替换
 
 会话标题在start接纳，首个edit的可选title随后续文件检查点保存；rename独立持久化标题，续作沿用。describe为Writer运行时更新操作subtitle，不改源码或模型上下文。ArtifactPresentation将这些通用显示值提交WindowState；重名仅在活动窗口显示层加稳定创建顺序后缀，业务标题不带序号。
 
-每项目最多一份latest快照，最多四项目；Scene隐藏不创建窗口/写预览资源/调用WebKit，返回deferred并保留最新文件。显式render可留下deferred验证证据供finish保存，不能宣称视觉检查通过。Actions 持有一个场景预览恢复任务。前台接纳后异步启动，按项目锁重新读取最新快照，避免排队旧副本覆盖新文件或名称；关闭/删除已退休的快照不复活，最小化不恢复。场景隐藏或 Actions 停止取消并加入恢复任务。恢复失败记入对应窗口与日志，保留快照并继续处理其他窗口。后续成功渲染清除本次窗口诊断。Writer 发起的 preview/describe 命令经 Gateway direct。
+每项目最多一份latest快照，最多十二项目；Scene隐藏不创建窗口/写预览资源/调用WebKit，返回deferred并保留最新文件。显式render可留下deferred验证证据供finish保存，不能宣称视觉检查通过。Actions 持有一个场景预览恢复任务。前台接纳后异步启动，按项目锁重新读取最新快照，避免排队旧副本覆盖新文件或名称；关闭/删除已退休的快照不复活，最小化不恢复。场景隐藏或 Actions 停止取消并加入恢复任务。恢复失败记入对应窗口与日志，保留快照并继续处理其他窗口。后续成功渲染清除本次窗口诊断。Writer 发起的 preview/describe 命令经 Gateway direct。
 
 窗口身份在等待首次呈现前预留并绑定，切后台导致回执中断时保留同一窗口，不按标题猜测归属。正在渲染时隐藏转换为 deferred，截图不可见返回 nil。显式文件与渲染命令保留原始失败结果。UI窗口生命周期与Writer执行独立。后台CPU/进程存活由系统控制，本能力不伪造后台运行权限。
 
@@ -69,7 +69,7 @@ replace使用fresh read引用约束字面旧文本，唯一匹配后原子替换
 
 
 
-Assistant library open/delete accepts executor + taskID and derives WorkspaceID; inventory includes owner/task/title/entry/state. Runtime-only workspaceID remains a deterministic compound value for Writer setup and UI file previews, not another allocated identity.
+Writer library open/delete derives WorkspaceID from taskID. Each open uses the selected project gate and reports its own window result. Writer may call it for multiple catalog matches. Library inventory includes owner/task/title/entry/state. Runtime-only workspaceID remains a deterministic compound value for Writer setup and UI file previews, not another allocated identity.
 
 ## Current workspace persistence
 

@@ -10,11 +10,9 @@ public enum WriterFailure: String, Error, Sendable {
 public struct WriterTools: Sendable {
     public let definitions: [ChatToolDefinition]
     let library: ChatToolDefinition?
-    let viewer: ChatToolDefinition?
     public let execute: @Sendable (ChatToolCall) async throws -> WriterToolOutcome
     public let append: @Sendable (String, String) async throws -> Void
     public let complete: @Sendable (String) async throws -> String
-    public let finalize: @Sendable (String) async throws -> String
     public let refresh: @Sendable () async -> Void
     public let abort: @Sendable (String) async throws -> Void
     public init(
@@ -23,19 +21,16 @@ public struct WriterTools: Sendable {
         append: @escaping @Sendable (String, String) async throws -> Void,
         complete: @escaping @Sendable (String) async throws -> String,
         abort: @escaping @Sendable (String) async throws -> Void,
-        finalize: @escaping @Sendable (String) async throws -> String = { _ in throw WriterFailure.incomplete },
         refresh: @escaping @Sendable () async -> Void = {},
-        library: ChatToolDefinition? = nil, viewer: ChatToolDefinition? = nil
+        library: ChatToolDefinition? = nil
     ) {
         self.definitions = definitions
         self.execute = execute
         self.append = append
         self.complete = complete
         self.abort = abort
-        self.finalize = finalize
         self.refresh = refresh
         self.library = library
-        self.viewer = viewer
     }
 }
 public struct WriterWorkspaceContext: Sendable, Encodable {
@@ -43,9 +38,29 @@ public struct WriterWorkspaceContext: Sendable, Encodable {
     let title: String
     let entry: String
     let presentationStatus: String
-    let editing: Bool
 
-    var domain: String { (editing ? "workspace:" : "view:") + workspaceID }
+    var domain: String { "workspace:" + workspaceID }
+}
+
+enum WriterControlDomain: String {
+    case library
+    case editing = "workspace"
+
+    func skillIDs() throws -> [String] {
+        let roots: [String]
+        switch self {
+        case .library: roots = try AgentConfigurations.baseSkills(named: "Writer")
+        case .editing: roots = ["writer-file-editing"]
+        }
+        return try AgentSkillLoader.expand(roots, owner: .writer)
+    }
+
+    func toolDefinitions(_ tools: WriterTools) -> [ChatToolDefinition] {
+        switch self {
+        case .library: tools.library.map { [$0] } ?? []
+        case .editing: tools.definitions
+        }
+    }
 }
 public struct WriterNeedsInput: Error, Sendable { public let question: String }
 public enum WriterToolOutcome: Sendable {
@@ -55,6 +70,22 @@ public enum WriterToolOutcome: Sendable {
     case visual(String, ChatImage)
     case write(streamID: String, instruction: String, context: String)
     case finished(String)
+}
+
+/// Identity and phase of an actual model request, used by Writer presentation.
+public struct WriterRequestProgress: Codable, Sendable, Equatable {
+    public let inputID: String
+    public let number: Int
+    public let phase: String
+    public let attempt: Int
+    public let path: String?
+    public init(inputID: String, number: Int, phase: String, attempt: Int, path: String? = nil) {
+        self.inputID = inputID
+        self.number = number
+        self.phase = phase
+        self.attempt = attempt
+        self.path = path
+    }
 }
 
 /// A private native-tool loop. Source generation has no tools and bypasses every XML parser.
@@ -97,8 +128,9 @@ public struct WriterWorkflow: Sendable {
         guard !goal.isEmpty, goal.utf8.count <= 13_000 else { throw WriterFailure.capacity }
         var workspace = initialWorkspace
         var domain = workspace?.domain ?? (tools.library == nil ? nil : "library")
+        var controlDomain: WriterControlDomain = workspace == nil && tools.library != nil ? .library : .editing
         let restored = try await history?.restoredContext(domain: domain) ?? []
-        var messages = try Self.controlMessages(goal: goal, workspace: workspace, library: domain == "library")
+        var messages = try Self.controlMessages(goal: goal, workspace: workspace, domain: controlDomain)
         messages += restored
         if !restored.isEmpty { messages.append(messages[1]) }
         var currentGoal = goal
@@ -123,10 +155,9 @@ public struct WriterWorkflow: Sendable {
                 guard end < messages.count else { throw WriterFailure.capacity }
                 messages.removeSubrange(2..<end)
             }
-            let definition = workspace?.editing == false ? tools.viewer : domain == "library" ? tools.library : nil
             let request = try ChatRequest(
                 messages: messages, context: .init(scopeID: scope), temperature: 0.2,
-                tools: definition.map { [$0] } ?? tools.definitions)
+                tools: controlDomain.toolDefinitions(tools))
             let response = try await control(request, domain: domain, progress: progress)
             messages += response.recovery
             messages.append(.init(role: .assistant, content: response.text, toolCalls: response.calls))
@@ -134,7 +165,7 @@ public struct WriterWorkflow: Sendable {
                 response.calls.isEmpty
                 || response.calls.contains {
                     let args = try? JSONDecoder().decode([String: String].self, from: Data($0.argumentsJSON.utf8))
-                    return ["finish", "enter", "create", "open"].contains(args?["command"] ?? "")
+                    return ["finish", "enter", "create"].contains(args?["command"] ?? "")
                 }
             let late = terminalCandidate ? try await revisions() : []
             if !late.isEmpty {
@@ -154,36 +185,20 @@ public struct WriterWorkflow: Sendable {
                 continue
             }
             guard !response.calls.isEmpty else {
-                let value: String
-                do {
-                    guard !response.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                        throw WriterFailure.incomplete
-                    }
-                    value = try await tools.finalize(response.text)
-                } catch {
-                    if let id = response.inputID {
-                        do { try await history?.hostFinalization(id, result: nil, error: error) } catch let recording {
-                            throw WriterCleanupFailure(primary: error, cleanup: recording)
-                        }
-                    }
-                    guard !(error is WriterCleanupFailure),
-                        WriterRecovery.repairableTool(error) || error as? WriterFailure == .incomplete
-                    else { throw error }
-                    recoveryFailures += 1
-                    if recoveryFailures >= WriterRecovery.attempts {
-                        throw WriterRecoveryFailure(phase: "收尾修正", attempts: recoveryFailures, underlying: error)
-                    }
-                    messages.append(
-                        .init(
-                            role: .user,
-                            content:
-                                "Runtime finalization is not ready. Complete the actual goal, render the latest draft and resolve errors; then finish. "
-                                + String(describing: error)))
-                    await completeRound("本轮收尾检查未通过，准备修正。", tools: tools)
-                    continue
+                recoveryFailures += 1
+                if recoveryFailures >= WriterRecovery.attempts {
+                    throw WriterRecoveryFailure(
+                        phase: "委托结束", attempts: recoveryFailures, underlying: WriterFailure.incomplete)
                 }
-                if let id = response.inputID { try await history?.hostFinalization(id, result: value, error: nil) }
-                return value
+                messages.append(
+                    .init(
+                        role: .user,
+                        content: """
+                            Runtime observation: the delegation is still active. Continue any outstanding work, then call
+                            workspace with command=finish in a separate round and include a brief summary of the actual result.
+                            """))
+                await completeRound("等待模型提交结束委托的工具调用。", tools: tools)
+                continue
             }
             var pending = Set(response.calls.map(\.id))
             var latestImage: ChatImage?
@@ -194,7 +209,7 @@ public struct WriterWorkflow: Sendable {
                 if response.calls.count > 1,
                     response.calls.contains(where: {
                         let args = try? JSONDecoder().decode([String: String].self, from: Data($0.argumentsJSON.utf8))
-                        return ["finish", "ask", "enter", "create", "open"].contains(args?["command"] ?? "")
+                        return ["finish", "ask", "enter", "create"].contains(args?["command"] ?? "")
                     })
                 {
                     recoveryFailures += 1
@@ -205,7 +220,7 @@ public struct WriterWorkflow: Sendable {
                             .init(
                                 role: .tool,
                                 content:
-                                    "Not executed: finish, ask, enter, create and open require a separate tool round.",
+                                    "Not executed: finish, ask, enter and create require a separate tool round.",
                                 toolCallID: call.id))
                     }
                     if recoveryFailures >= WriterRecovery.attempts {
@@ -227,7 +242,9 @@ public struct WriterWorkflow: Sendable {
                         guard WriterRecovery.repairableTool(error) else { throw error }
                         let repeated = failedCalls[signature] != nil
                         failedCalls[signature] = error
-                        recoveryFailures += 1
+                        let reportedOpenFailure =
+                            !repeated && (error as? WriterToolFailure)?.context["command"] == "open"
+                        if !reportedOpenFailure { recoveryFailures += 1 }
                         try await history?.toolOutcome(call.id, output: nil, error: error)
                         pending.remove(call.id)
                         messages.append(
@@ -254,7 +271,9 @@ public struct WriterWorkflow: Sendable {
                         pending.remove(call.id)
                         workspace = selected
                         domain = selected.domain
-                        messages = try Self.controlMessages(goal: currentGoal, workspace: selected, library: false)
+                        controlDomain = .editing
+                        messages = try Self.controlMessages(
+                            goal: currentGoal, workspace: selected, domain: controlDomain)
                         failedCalls.removeAll()
                         recoveryFailures = 0
                         previousSignature = nil
@@ -429,7 +448,6 @@ public struct WriterWorkflow: Sendable {
         throw WriterFailure.incomplete
     }
     private struct Response {
-        var inputID: String?
         var text = ""
         var calls: [ChatToolCall] = []
         var recovery: [ChatMessage] = []
@@ -468,7 +486,7 @@ public struct WriterWorkflow: Sendable {
             return try await session.withCleanup {
                 return try await withTaskCancellationHandler {
                     defer { session.cancel() }
-                    var response = Response(inputID: record)
+                    var response = Response()
                     var finished = false
                     for try await event in session.events {
                         evidence.record(event)
@@ -649,16 +667,18 @@ public struct WriterWorkflow: Sendable {
         return valid(bytes.prefix(available * 3 / 4), prefix: true) + marker
             + valid(bytes.suffix(available / 4), prefix: false)
     }
-    private static func controlMessages(goal: String, workspace: WriterWorkspaceContext?, library: Bool) throws
+    private static func controlMessages(goal: String, workspace: WriterWorkspaceContext?, domain: WriterControlDomain)
+        throws
         -> [ChatMessage]
     {
         let templates = try PromptTemplates(data: AgentConfigurations.promptData(named: "Writer"))
         let identity = try AgentConfigurations.identityInstructions(named: "Writer")
-        let template =
-            library ? "control.library" : workspace?.editing == false ? "control.viewer" : "control.workspace"
+        let template = try templates.render("control." + domain.rawValue)
+        let instructions = try AgentSkillLoader.instructions(domain.skillIDs(), owner: .writer)
+        let teaching = instructions.isEmpty ? "" : "\n\n# LOADED SKILL INSTRUCTIONS\n" + instructions
         let context = workspace.map { "\nActive workspace: " + $0.workspaceID } ?? ""
         return [
-            .init(role: .system, content: identity + "\n\n" + (try templates.render(template)) + context),
+            .init(role: .system, content: identity + "\n\n" + template + teaching + context),
             try controlInput(goal, workspace: workspace),
         ]
     }

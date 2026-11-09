@@ -47,7 +47,7 @@ import FunctionContracts
         private var revision: Int { captureRevision() }
         private let log = Logger(subsystem: "dev.mobileharness", category: "CameraPhotos")
         private var photoTask: Task<CameraPhotoReceipt, Error>?
-        private var photoCommand: Task<CameraPhotoCommandReceipt, Error>?
+        private var photoCommand: Task<CameraPhotoBatchReceipt, Error>?
         private var presentationFinished: (id: String, success: Bool)?
         private var photoFeedbackContext: ActionExecutionContext?
         var isBusy: Bool { photoTask != nil || photoCommand != nil }
@@ -75,23 +75,41 @@ import FunctionContracts
             _ = await photoCommand?.result
         }
         public func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
+            guard let id else { throw CameraControlError.photoUnavailable }
+            let result = try await savePhotos(id, invocation: invocation)
+            guard let receipt = result.saved.first else { throw CameraControlError.photoUnavailable }
+            return .init(
+                previewID: receipt.previewID, mediaID: receipt.mediaID, state: receipt.state,
+                alreadySaved: receipt.alreadySaved, feedbackIssues: result.feedbackIssues)
+        }
+
+        public func saveAllPhotos(invocation: any FunctionInput) async throws -> CameraPhotoBatchReceipt {
+            try await savePhotos(nil, invocation: invocation)
+        }
+
+        private func savePhotos(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoBatchReceipt {
             try Task.checkCancellation()
             guard foreground else { throw CameraControlError.notForeground }
             guard photoTask == nil, photoCommand == nil else { throw CameraControlError.busy }
-            guard let id else { throw CameraControlError.photoUnavailable }
-            let task = Task<CameraPhotoCommandReceipt, Error> {
-                let receipt = try await previews.save(id)
-                presentation.present(.savedPreviewID(id))
-                presentation.present(.savedMediaID(receipt.mediaID))
+            let task = Task<CameraPhotoBatchReceipt, Error> {
+                let result: CameraPhotoBatchReceipt
+                if let id {
+                    result = .init(saved: [try await previews.save(id)])
+                } else {
+                    result = try await previews.saveAll()
+                }
+                if let receipt = result.saved.last {
+                    presentation.present(.savedPreviewID(receipt.previewID))
+                    presentation.present(.savedMediaID(receipt.mediaID))
+                }
                 var issues: [String] = []
-                if !receipt.alreadySaved {
+                if result.saved.contains(where: { !$0.alreadySaved }) {
                     issues = await PhotoDispositionWorkflow.feedback {
                         try await saveFeedback(invocation: invocation)
                     }
                 }
                 return .init(
-                    previewID: id, mediaID: receipt.mediaID, state: receipt.state,
-                    alreadySaved: receipt.alreadySaved, feedbackIssues: issues.isEmpty ? nil : issues)
+                    saved: result.saved, failures: result.failures, feedbackIssues: issues.isEmpty ? nil : issues)
             }
             photoCommand = task
             presentation.present(.photoBusy(true))

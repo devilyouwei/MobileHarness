@@ -32,23 +32,23 @@ public struct UIModule: CapabilityModule {
     }
     public var definitions: [ActionFunction] {
         expressionFunctions + presentationFunctions + feedbackFunctions + effectFunctions + [
-            UIActions.recordFailureDefinition(completing: { [runtimeFailures] invocation in
+            UIActions.recordFailureDefinition(handler: { [runtimeFailures] invocation in
                 guard let presentation = runtimeFailures else {
                     throw UIActions.PresentationError.invalidCall
                 }
-                return .value(try await UIActions.recordFailure(invocation: invocation, using: presentation))
+                try await UIActions.recordFailure(invocation: invocation, using: presentation)
             }),
-            UIActions.showBluetoothHomeDefinition(completing: { [bluetoothStatus] invocation in
+            UIActions.showBluetoothHomeDefinition(handler: { [bluetoothStatus] invocation in
                 guard let presentation = bluetoothStatus else {
                     throw UIActions.PresentationError.invalidCall
                 }
-                return .value(try await UIActions.showBluetoothHome(invocation: invocation, using: presentation))
+                try await UIActions.showBluetoothHome(invocation: invocation, using: presentation)
             }),
-            UIActions.showBluetoothSettingsDefinition(completing: { [bluetoothStatus] invocation in
+            UIActions.showBluetoothSettingsDefinition(handler: { [bluetoothStatus] invocation in
                 guard let presentation = bluetoothStatus else {
                     throw UIActions.PresentationError.invalidCall
                 }
-                return .value(try await UIActions.showBluetoothSettings(invocation: invocation, using: presentation))
+                try await UIActions.showBluetoothSettings(invocation: invocation, using: presentation)
             }),
         ]
     }

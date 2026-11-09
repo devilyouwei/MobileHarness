@@ -24,33 +24,24 @@ public struct SpeechSynthesisInput: Codable, Sendable, Equatable {
     }
 }
 
-/// Complete reply occupancy and authenticated Assistant report completion facts.
-/// SpeechPerception alone decides whether a completed report should enable listening.
+/// Complete reply occupancy and the most recent final-speech acknowledgement.
 public struct ReplyActivity: Codable, Sendable {
     public static let contract = "interaction.replyActivity"
     public let revision: UInt64
     public let inputs: [String]
     public let tasks: [String]
     public let acknowledgedRoot: String
-    public let completedReportID: String?
-    public let reportStartedAt: TimeInterval?
     public init(
-        revision: UInt64, inputs: [String], tasks: [String], acknowledgedRoot: String,
-        completedReportID: String? = nil, reportStartedAt: TimeInterval? = nil
+        revision: UInt64, inputs: [String], tasks: [String], acknowledgedRoot: String
     ) {
         self.revision = revision
         self.inputs = inputs
         self.tasks = tasks
         self.acknowledgedRoot = acknowledgedRoot
-        self.completedReportID = completedReportID
-        self.reportStartedAt = reportStartedAt
     }
     public func validate() throws {
         guard revision > 0, inputs.count <= 128, tasks.count <= 128,
-            Set(inputs).count == inputs.count, Set(tasks).count == tasks.count,
-            (completedReportID == nil && reportStartedAt == nil)
-                || (completedReportID != nil && reportStartedAt.map({ $0.isFinite && $0 > 0 }) == true),
-            completedReportID.map({ !$0.isEmpty && $0.utf8.count <= 128 && !inputs.contains($0) }) ?? true
+            Set(inputs).count == inputs.count, Set(tasks).count == tasks.count
         else { throw CommunicationError.invalidPayload }
     }
     public var message: AgentMessage {

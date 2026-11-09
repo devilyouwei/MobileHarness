@@ -38,8 +38,8 @@ Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注�
 | Feedback | playCue：cue/volume；vibrate：style/intensity/count/intervalMS | 提示音实际排空；触觉为有界脉冲请求发出 |
 | Notice | showNotice：text/tone/durationMS；dismissNotice 无参数 | 瞬时提示状态提交或自身提示清除 |
 | Light | updateLight：enabled 及位置/透明度/强度/期限 | 装饰光状态提交，不等待渲染期限结束 |
-| ResourcePresentation | showResources、showResourceFailure、showResourceOperationFailure、showResourcePreferenceFailure、showProviderResult | 端点呈现接纳，保留实际资源结果或 presented |
-| Navigation | open：destination | 导航端点完成后返回 presented |
+| ResourcePresentation | showResources、showResourceFailure、showResourceOperationFailure、showResourcePreferenceFailure、showProviderResult | showResources 返回实际资源结果；结果与错误展示返回结构化完成回执 |
+| Navigation | open：destination | 导航端点完成后返回结构化完成回执 |
 
 普通呈现函数静态预算为 5 秒，showResources 为 60 秒。setExpression 是 state kind，其余入口是 finite；finite 不表示所有视觉插值都要结束，应按各函数的 completion 理解。
 

@@ -130,3 +130,5 @@ CameraInput与UICameraContainer同文件，描述拍照/录像/背景视觉的UI
 CameraInput uses previewID for temporary photo disposition. savedPreviewID and savedMediaID separately identify the committed preview operation and persistent album image, including later request-completion failure. Model image loading does not switch UI. CameraInput captures previewSession before queuing; gallery metadata and scoped byte reads stay separate from model selection.
 
 The recording timer and pending-video save/ignore overlay sit above the140-point shutter region, preserving their visibility over the full-height live preview.
+
+照片窗口关闭直接清理会话预览。录像窗口按钮的待处置视频选择由 CameraCoordinator 提供。

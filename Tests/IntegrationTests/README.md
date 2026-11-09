@@ -200,7 +200,7 @@ Camera preparation also uses a padded synthetic mirrored JPEG to verify that nor
 
 ## Capture enhancements
 
-CameraEnhancementTests checks pure settings rejection, monotonic countdown deadlines/cancellation, domain recording stop/join/audio-release/background behavior, idempotent collection and file-backed video ownership/retention/image isolation. Native recording callbacks and metadata in domain tests are explicit fixtures, not camera/microphone acceptance. PhotographerCameraTests routes all added UI operations through the actual role/Gateway/declared-Action chain. PromptTemplateTests covers loaded aliases, task cleanup ordering and the enlarged Photography catalog budget.
+CameraEnhancementTests checks pure settings rejection, completion and error handling for configuration and preview unloading, monotonic countdown deadlines/cancellation, domain recording stop/join/audio-release/background behavior, idempotent collection and file-backed video ownership/retention/image isolation. Native recording callbacks and metadata in domain tests are explicit fixtures, not camera/microphone acceptance. PhotographerCameraTests routes all added UI operations through the actual role/Gateway/declared-Action chain. PromptTemplateTests covers loaded aliases, task cleanup ordering and the enlarged Photography catalog budget.
 
 Recording handoff tests exercise the production VoiceRecordingAudioHandoff with an explicit suspended native-stop receipt: microphone sample stop retains ownership, recording admission waits for release, cancellation still joins, and cleanup failure rejects admission. Recording tests assert the actual window-derived angle reaches the native port. Native audio ownership and encoded file orientation still require device acceptance.
 
@@ -241,6 +241,8 @@ Skill状态回归覆盖任意新路径无需Assistant登记、生产者完整Bus
 作品库仅由 Writer 原生工具拥有；回归覆盖 writing 加载失败、Assistant 不暴露作品库入口、仅查询时不创建工作区，以及打开/删除和错误目标；agents.writer 被纳入全部 Skill 状态读取测试的显式 Agent fixture。
 
 WriterAgentTests 通过真实 AgentManager/通信与 Gateway DirectExecutionDispatcher 连接脚本模型和实际作品存储，验证后台接纳、流式编辑、发布与终态回报；呈现是明确 fixture。
+
+Writer 分域回归检查作品库、编辑、只读呈现的 Skill 教学与 native 工具 schema，以及追问后编辑域恢复和无工具内容请求。配置回归检查 Writer 专属 Skill 的原生绑定与共享目录隔离。
 
 Writer 续写生命周期回归使用真实 ArtifactService/SQLite、可控非协作呈现与检查点阻塞：跨 session、撤销后及恢复后的旧流被拒绝；取消的 complete 不接纳；变更竞争显式 busy，预览不阻塞追加；release/Actions 根关闭等待在途效果并拒绝迟到操作；已开始的 abort 不被撤销再次取消。文件系统失败夹具检查清理失败持续可见及关闭准入。测试区分工具接纳、文件写入和委托终态，不证明真实模型或原生 WebKit 行为。
 
@@ -287,7 +289,7 @@ Writer思考选择回归验证默认minimum、显式开启的凭据/配置往返
 
 Robot Skill exposure is explicit. Assistant starts with BasicSkill and expression only; AgentTaskSkillTests covers discovery, load/release, State selection and frozen earlier catalogs. AgentSpecialistTests exercises scheduled XML loadSkills followed by the Robot Action without a foreground Task or delegation. Deterministic NexArm/Bluetooth/recovery/serial fixtures use loadedRobotAssistantContext to seed a recently loaded robot-interaction Skill through the production state transition before supplying fixed motion text. This fixture setup neither adds robot-interaction to production baseSkills nor changes fixed-host Task policy. Real-provider discovery scenarios start with the unmodified default catalog.
 
-Island lifecycle regressions cover role-owned task publication, all Writer terminal states ending their own activity, late-progress/run fencing, retained voice activity, latest-state retry and joined shutdown, plus Assistant foreground Skill projection. Writer Gateway/SQLite lifecycle fixtures assert terminal Island removal independently of notification delivery.
+Island lifecycle regressions cover role-owned task publication, all Writer terminal states showing text then ending their own activity, late-progress/run fencing, retained voice activity, latest-state retry and joined shutdown, plus Assistant foreground Skill projection. Writer Gateway/SQLite lifecycle fixtures assert terminal Island text independently of notification delivery.
 
 Island Action integration also covers registered/raw and container-local typed execution equivalence, producer ownership and shared presentation scope, stale generation/stopped endpoint rejection, same-version retry/new-fact replacement, no repeated presentation for frequency-only updates, root rebind, and domain cleanup preserving peer Agent activities. Domain probes implement typed Action calls without a Gateway or UI renderer.
 
@@ -325,7 +327,7 @@ Assistant State 选择回归验证每轮快照跟随实际 Skill 选择变化，
 
 ## Prompt ownership coverage
 
-AgentConfigurationTests cover v8 public role metadata projected to the v7 compiled contract, missing/invalid/oversized descriptions, unknown fields and identity mismatch. PromptTemplateTests cover instance-permission filtering, exclusion of unsupported peers and private instructions, generic peer Task teaching, and Writer format/retry templates. Existing task, cancellation, library and Writer workflow tests exercise the execution boundary independently of public descriptions.
+AgentConfigurationTests cover v9 public role metadata projected to the v7 compiled contract, missing/invalid/oversized descriptions, unknown fields and identity mismatch. PromptTemplateTests cover instance-permission filtering, exclusion of unsupported peers and private instructions, generic peer Task teaching, and Writer format/retry templates. Existing task, cancellation, library and Writer workflow tests exercise the execution boundary independently of public descriptions.
 
 ## Writer JSON prompt evaluation
 

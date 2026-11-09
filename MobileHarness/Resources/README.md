@@ -52,7 +52,7 @@ Agents packages Agents/, Skills/ and Catalog.json from this shared source root; 
 
 ## 职责与组织
 
-纯随 App 打包的配置与文本，由 Catalog.json 显式索引。Agents 保存 v8 身份、角色自有公开 description、私有角色指令、通信契约、baseSkills、backgroundTasks 支持声明；Skills 保存 v3 配置、revision、流程说明和函数引用。Task 目标仅作为运行时数据。
+纯随 App 打包的配置与文本，由 Catalog.json 显式索引。Agents 保存 v9 身份、角色自有公开 description、私有角色指令、通信契约和 baseSkills；Skills 保存 v3 配置、revision、可选的角色归属、流程说明和函数引用。Task 目标仅作为运行时数据。
 
 这里不包含 Swift、脚本、函数实现、凭据或用户媒体。Actions 独立提供实现，FunctionContracts 提供中立元数据。Catalog 是唯一资源索引。
 
@@ -62,17 +62,17 @@ AgentConfigurations 限定相对路径、单资源 64 KiB、catalog 32 Agents/64
 
 ## 生命周期
 
-Agent 配置声明基础交互与机械臂 Skill，任务和交互链按需要加载辅助 Skill；只有一个前台任务，不支持挂起恢复。等待用户保留任务；结束经过执行屏障后回默认。重启中断，不重放。
+Assistant 配置声明基础交互 Skill，前台任务和交互链按需要加载共享 Skill。等待用户保留任务，任务结束后经过执行屏障回收其持有的 Skill。Writer 从作品库基础 Skill 起步，按已绑定的编辑域激活文件编辑 Skill。两种工作流的生命周期分别由所属 Agent 管理。
 
 ## 泛化 Task 与独立 Skill
 
-Agent resources declare baseSkills and backgroundTasks; production backgroundTasks are empty until an executor implements and declares a business contract. Skill assets retain reusable instruction/function bindings. Task goals are runtime data, never bundled mode definitions.
+Agent resources declare baseSkills and communication permissions. Skill assets retain reusable instruction/function bindings. Delegation sends the runtime goal and original input to the receiving role.
 
 资源叶目录说明收拢到 [Agents](Agents/README.md) 与 [Skills](Skills/README.md)，不再为每个 Agent/Skill 放置开发 README；Skill 注册与运行时教学保留在各自目录。
 
 ## Skill 函数目录
 
-Agent.json 声明基础 Skill，不直接声明函数或函数权限上限。模型函数由已加载 Skill 组合，校验 canonical 元数据、重复/冲突、容量、通信授权、真实执行身份和 Task 范围。Gateway 使用调用所属轮次快照；固定调用使用 Agent 固定目录。Agents 检查所有 Skill 目录的真实实现覆盖；后台 Skill 还须匹配目标支持的业务契约。历史目录快照不可变。
+Agent.json 声明基础 Skill。模型函数由已加载 Skill 组合，校验 canonical 元数据、重复/冲突、容量、通信授权、真实执行身份和 Task 范围。Gateway 使用调用所属轮次快照；固定调用使用 Agent 固定目录。Agents 检查所有 Skill 目录的真实实现覆盖。后台委派由接收角色使用自己的工具和上下文处理。历史目录快照不可变。
 
 RobotInteraction instructions teach Channel/wait ordering and explicit resource conflicts; the arm writer group remains authoritative.
 

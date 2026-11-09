@@ -164,19 +164,33 @@ private actor PreviewPersistenceProbe {
         persist: { _ in "media_1" })
     try store.openSession()
     var ids: [String] = []
-    for value in 1...5 {
+    for value in 1...6 {
         let id = try await store.reserve()
         try await store.publish(Data([UInt8(value)]), id: id, width: 1, height: 1)
         ids.append(id)
-        if value <= 3 { try await store.load(id, scope: "s") }
     }
-    #expect(try store.snapshot(scope: "s").images.map(\.id) == [ids[4], ids[0], ids[1], ids[2]])
-    await #expect(throws: CameraPreviewStore.SelectionError.self) { try await store.load(ids[3], scope: "s") }
+    for id in ids.prefix(4) { try await store.load(id, scope: "s") }
+    #expect(try store.snapshot(scope: "s").images.map(\.id) == [ids[5], ids[0], ids[1], ids[2], ids[3]])
+    let selected = Array(ids.prefix(5))
+    try await store.load(selected, scope: "s")
+    #expect(try store.snapshot(scope: "s").images.map(\.id) == selected)
+    let state = AgentStateContext()
+    try state.open(session: "s")
+    try state.registerMedia("actions.camera.preview", read: { try await store.snapshot(scope: $0) }, reset: { _ in })
+    #expect(
+        try await state.multimodalSnapshot(session: "s", names: ["actions.camera.preview"]).images.map(\.id) == selected
+    )
+    await #expect(throws: CameraPreviewStore.SelectionError.self) { try await store.load(ids[5], scope: "s") }
+    await #expect(throws: CameraControlError.photoUnavailable) {
+        try await store.load([ids[5], "preview_99"], scope: "s")
+    }
+    #expect(try store.snapshot(scope: "s").images.map(\.id) == selected)
     try store.unload(ids[0], scope: "s")
-    try await store.load(ids[3], scope: "s")
-    #expect(try store.snapshot(scope: "s").images.count == 4)
-    try store.unload(ids[4], scope: "s")
-    #expect(try store.snapshot(scope: "s").images.first?.id == ids[4])
+    #expect(try store.snapshot(scope: "s").images.map(\.id) == [ids[5], ids[1], ids[2], ids[3], ids[4]])
+    try await store.load(selected, scope: "s")
+    let new = try await store.reserve()
+    try await store.publish(Data([7]), id: new, width: 1, height: 1)
+    #expect(try store.snapshot(scope: "s").images.map(\.id) == [new] + selected.dropFirst())
     try await store.close()
 }
 
@@ -361,19 +375,42 @@ func invalidAndLegacyPreviewIDsCannotBecomeLiveActions(_ value: String) {
     try await store.close()
 }
 
-@Test @MainActor func closeConfirmationCountsOnlyUnreviewedPhotos() async throws {
+private actor BatchPhotoAlbum {
+    private var rejected = true
+    private(set) var writes: [UInt8] = []
+
+    func save(_ data: Data) throws -> String {
+        let value = try #require(data.first)
+        if value == 2, rejected { throw CameraControlError.unavailable }
+        writes.append(value)
+        return "media_\(value)"
+    }
+
+    func allowRemainingPhoto() { rejected = false }
+}
+
+@Test @MainActor func saveAllPhotosPreservesPartialSuccessAndOnlyRetriesPendingPhotos() async throws {
+    let album = BatchPhotoAlbum()
     let root = CacheContainer()
     let store = CameraPreviewStore(
-        cache: root.cameraImages, prepare: { .init(data: $0, width: 1, height: 1) }, persist: { _ in "media_1" })
+        cache: root.cameraImages, prepare: { .init(data: $0, width: 1, height: 1) },
+        persist: { try await album.save($0) })
     try store.openSession()
     for n in 1...3 {
         let id = try await store.reserve()
         try await store.publish(Data([UInt8(n)]), id: id, width: 1, height: 1)
     }
-    #expect(store.pendingCount == 3)
-    _ = try await store.save("preview_1")
-    #expect(store.pendingCount == 2 && store.catalog.count == 3)
+    let first = try await store.saveAll()
+    #expect(first.saved.map(\.mediaID) == ["media_1", "media_3"])
+    #expect(first.failures.map(\.previewID) == ["preview_2"])
+    #expect(store.catalog.map(\.status) == ["saved", "pending", "saved"])
+    await album.allowRemainingPhoto()
+    let second = try await store.saveAll()
+    #expect(second.saved.map(\.previewID) == ["preview_2"] && second.failures.isEmpty)
+    #expect(try await store.saveAll().saved.isEmpty)
+    #expect(await album.writes == [1, 3, 2])
     await store.endSession()
-    #expect(store.pendingCount == 0 && store.catalog.isEmpty)
+    #expect(store.catalog.isEmpty && root.cameraImages.retainedBytes == 0)
+    #expect(await album.writes == [1, 3, 2])
     try await store.close()
 }

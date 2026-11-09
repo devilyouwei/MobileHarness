@@ -56,7 +56,7 @@ CameraControlCapability distinguishes photo setEnabled/flip from setPerceptionEn
 
 ## Capture configuration and movie receipts
 
-CameraCaptureSettings is a complete validated settings value (photo/video mode, countdown, flash, zoom, duration). CameraControlCapability includes configure/cancel and typed recording start/wait/stop/save/ignore. Start accepts an optional validated duration override; its domain owner prepares video mode and otherwise preserves current capture preferences. CameraVideoReceipt separates recording, ready, saved and ignored, carrying recordingID, optional mediaID/duration/stopReason/fileName (a display basename, never a file URL). These values contain no native device or UI implementation. Defaults on capability test adapters reject unavailable operations rather than fabricating a recording.
+CameraCaptureSettings is a complete validated settings value (photo/video mode, countdown, flash, zoom, duration). CameraCaptureSettings.Update carries only provided fields. CameraControlCapability includes partial configure/cancel and typed recording start/wait/stop/save/ignore. Start accepts an optional validated duration override; its domain owner prepares video mode and otherwise preserves current capture preferences. CameraVideoReceipt separates recording, ready, saved and ignored, carrying recordingID, optional mediaID/duration/stopReason/fileName (a display basename, never a file URL). These values contain no native device or UI implementation. Defaults on capability test adapters reject unavailable operations rather than fabricating a recording.
 
 
 ArtifactStreaming 是已接纳编辑的宿主续写端口，streamID 与 delegateID 必须匹配；追加施加背压，complete 结束单次写入，snapshot 返回实际渲染图片。revoke 关闭普通准入并请求取消，不等待清理；已开始的 abort 不被它再次取消。abort 保存中断草稿并关闭流，release 是合并并发调用的会话清理屏障：加入在途操作后释放编辑资源，失败保留。恢复必须经工具重新接纳，旧流身份无效。它不包含模型或角色实现；服务容量和根关闭契约见 [Artifacts](../../Artifacts/README.md#执行与续写生命周期)。
@@ -69,7 +69,7 @@ ToolResponse preserves complete value results without a generic payload-length r
 
 WindowControlCapability takes a readable window_N string. The owning UI WindowState maps it to native identity inside the Window execution service; generic contracts do not allocate or interpret UI identities.
 
-MultimodalContextSnapshot carries facts, revision and immutable ContextImage attachments separately from ordinary Codable inspection. Images carry identity/source/MIME/dimensions/bytes. PreviewImageID is temporary; photo receipts use previewID, with a distinct mediaID only after persistent save. CameraControlCapability exposes preview load/unload.
+MultimodalContextSnapshot carries facts, revision and immutable ContextImage attachments separately from ordinary Codable inspection. Images carry identity/source/MIME/dimensions/bytes. PreviewImageID is temporary; photo receipts use previewID, with a distinct mediaID only after persistent save. CameraControlCapability returns preview metadata on single or batch load and completes unload with Void. Batch save reports committed photos and per-photo failures. The current selection is available in State.
 
 PreviewImageID validates canonical positive numeric preview_N values for live calls and State. History decodes images exclusively from model request logs and does not resolve preview identifiers through live caches.
 

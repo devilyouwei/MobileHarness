@@ -60,24 +60,25 @@ extension AgentMessage { public var appInteraction: AppInteractionIntent? { cont
 /// Only this role interprets its own fixed-task payloads; shared admission never switches role types.
 enum ApplicationControlTaskInput {
     static func message(_ signal: AgentTaskSignal) throws -> AgentMessage {
-        switch signal.businessContract {
+        guard let contract = signal.businessContract else { throw CommunicationError.unsupportedContract }
+        switch contract {
         case AppInteractionIntent.contract:
             let value = try JSONDecoder().decode(AppInteractionIntent.self, from: signal.data)
             return AgentMessage(
-                contract: signal.businessContract, content: value, maximumBytes: 2048, validate: { try $0.validate() })
+                contract: contract, content: value, maximumBytes: 2048, validate: { try $0.validate() })
         case ModelResourceIntent.contract:
             let value = try JSONDecoder().decode(ModelResourceIntent.self, from: signal.data)
             if case .retire = value { throw CommunicationError.unauthorized }
             return AgentMessage(
-                contract: signal.businessContract, content: value, maximumBytes: 2048, validate: { try $0.validate() })
+                contract: contract, content: value, maximumBytes: 2048, validate: { try $0.validate() })
         case ProviderSettingsIntent.contract:
             return AgentMessage(
-                contract: signal.businessContract,
+                contract: contract,
                 content: try JSONDecoder().decode(ProviderSettingsIntent.self, from: signal.data), maximumBytes: 512,
                 validate: { try $0.validate() })
         case ProviderDiscoveryIntent.contract:
             return AgentMessage(
-                contract: signal.businessContract,
+                contract: contract,
                 content: try JSONDecoder().decode(ProviderDiscoveryIntent.self, from: signal.data), maximumBytes: 512,
                 validate: { try $0.validate() })
         default: throw CommunicationError.unsupportedContract

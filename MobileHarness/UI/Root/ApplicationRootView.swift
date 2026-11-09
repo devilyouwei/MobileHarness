@@ -127,7 +127,8 @@
                             camera: assembly.cameraState, controls: assembly.cameraControls,
                             rendersPreview: !assembly.windows.isCovered(item.id)
                         ) { assembly.cameraPreview() })
-                } else if item.content == WindowContent.artifact.rawValue {
+                } else if item.content == WindowContent.artifact.rawValue || item.content == WindowContent.web.rawValue
+                {
                     AnyView(
                         Group {
                             if let page = assembly.web.sessions[item.id] {
@@ -136,8 +137,6 @@
                                 ProgressView()
                             }
                         })
-                } else if item.content == WindowContent.web.rawValue {
-                    AnyView(WebPageView(page: assembly.web))
                 } else {
                     AnyView(Text("窗口内容不可用").foregroundStyle(.white))
                 }

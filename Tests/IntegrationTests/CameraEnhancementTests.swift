@@ -12,11 +12,13 @@ import UI
 
 @testable import Actions
 
-private func captureInput(_ function: String = "startRecording", parameters: [String: String] = [:])
+private func captureInput(
+    _ function: String = "startRecording", parameters: [String: String] = [:], module: String = "Video"
+)
     -> FunctionInvocation
 {
     FunctionInvocation(
-        call: .init(actionPath: .init(domain: "Camera", module: "Video", function: function), parameters: parameters),
+        call: .init(actionPath: .init(domain: "Camera", module: module, function: function), parameters: parameters),
         context: .init(source: "assistant", sessionID: "recording-session", inputID: "recording-input"),
         executionID: UUID().uuidString, results: ActionReportStore())
 }
@@ -40,34 +42,96 @@ private func captureInput(_ function: String = "startRecording", parameters: [St
     #expect(shown == [nil])
 }
 
-private actor CaptureConfigurationProbe: CameraControlCapability {
-    var settings: [CameraCaptureSettings] = []
-    func configureCapture(_ settings: CameraCaptureSettings, invocation: any FunctionInput) {
+private actor CameraCommandProbe: CameraControlCapability {
+    var settings: [CameraCaptureSettings.Update] = []
+    var unloaded: [String] = []
+    var selections: [[String]] = []
+    func loadPreviewImages(_ ids: [String], invocation: any FunctionInput) -> String {
+        selections.append(ids)
+        return "selected"
+    }
+    func saveAllPhotos(invocation: any FunctionInput) -> CameraPhotoBatchReceipt {
+        .init(saved: [.init(previewID: "preview_1", mediaID: "media_1", state: .saved)])
+    }
+    func configureCapture(_ settings: CameraCaptureSettings.Update, invocation: any FunctionInput) {
         self.settings.append(settings)
+    }
+    func unloadPreviewImage(_ id: String, invocation: any FunctionInput) throws {
+        guard id == "preview_1" else { throw CameraControlError.photoUnavailable }
+        unloaded.append(id)
     }
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) {}
     func flip(_ facing: CameraActions.Facing, invocation: any FunctionInput) {}
 }
+@Test func cameraPhotoBatchActionsValidateParametersAndReturnResults() async throws {
+    let probe = CameraCommandProbe()
+    let definitions = CameraModule(camera: probe).definitions
+    let load = try #require(definitions.first { $0.path.function == "loadPreviewImage" })
+    let save = try #require(definitions.first { $0.path.function == "saveAllPhotos" })
+    let ids = (1...5).map { "preview_\($0)" }
+    let array = String(decoding: try JSONEncoder().encode(ids), as: UTF8.self)
+    let loaded = try await FunctionExecutor.perform(
+        captureInput("loadPreviewImage", parameters: ["previewIDs": array], module: "Capture"), definition: load)
+    #expect(loaded == .value("selected"))
+    for parameters in [
+        ["previewIDs": array, "previewID": "preview_1"],
+        ["previewIDs": #"["preview_1","preview_1"]"#],
+        ["previewIDs": #"["media_1"]"#],
+    ] {
+        await #expect(throws: ActionArguments.ValidationError.self) {
+            _ = try await FunctionExecutor.perform(
+                captureInput("loadPreviewImage", parameters: parameters, module: "Capture"), definition: load)
+        }
+    }
+    #expect(await probe.selections == [ids])
+    let completion = try await FunctionExecutor.perform(
+        captureInput("saveAllPhotos", module: "Capture"), definition: save)
+    guard case .value(let json) = completion else {
+        Issue.record("Missing batch receipt")
+        return
+    }
+    let receipt = try JSONDecoder().decode(CameraPhotoBatchReceipt.self, from: Data(json.utf8))
+    #expect(receipt.saved.first?.mediaID == "media_1")
+}
+
 @Test func cameraSettingsValidateBeforeCallingHardware() async throws {
-    let probe = CaptureConfigurationProbe()
+    let probe = CameraCommandProbe()
+    let configure = try #require(CameraModule(camera: probe).definitions.first { $0.path.function == "configure" })
     for parameters in [
         ["delaySeconds": "31"], ["zoom": "nan"], ["zoom": "0"], ["flash": "torch"], ["mode": "portrait"],
         ["durationSeconds": "0"], ["extra": "true"],
     ] {
         await #expect(throws: (any Error).self) {
-            _ = try await CameraActions.configure(
-                invocation: captureInput("configure", parameters: parameters), using: probe)
+            _ = try await FunctionExecutor.perform(
+                captureInput("configure", parameters: parameters, module: "Capture"), definition: configure)
         }
     }
     #expect(await probe.settings.isEmpty)
-    let value = try await CameraActions.configure(
-        invocation: captureInput("configure", parameters: ["mode": "video", "durationSeconds": "10", "zoom": "2"]),
-        using: probe)
-    let receipt = try JSONDecoder().decode(CameraCaptureSettings.self, from: Data(value.utf8))
-    #expect(receipt.mode == "video" && receipt.durationSeconds == 10 && receipt.zoom == 2)
-    #expect(await probe.settings == [receipt])
-    let message = PhotographerCameraIntent(.configure, settings: receipt, requestID: UUID().uuidString).message
-    #expect(message.photographerCamera?.settings == receipt)
+    let completion = try await FunctionExecutor.perform(
+        captureInput(
+            "configure", parameters: ["mode": "video", "durationSeconds": "10", "zoom": "2"], module: "Capture"),
+        definition: configure)
+    #expect(completion == .completed)
+    #expect(await probe.settings == [.init(mode: "video", zoom: 2, durationSeconds: 10)])
+    let settings = CameraCaptureSettings(mode: "video", zoom: 2, durationSeconds: 10)
+    let message = PhotographerCameraIntent(.configure, settings: settings, requestID: UUID().uuidString).message
+    #expect(message.photographerCamera?.settings == settings)
+}
+
+@Test func unloadingCameraPreviewReturnsOnlyCompletionAndPreservesErrors() async throws {
+    let probe = CameraCommandProbe()
+    let unload = try #require(
+        CameraModule(camera: probe).definitions.first { $0.path.function == "unloadPreviewImage" })
+    let completion = try await FunctionExecutor.perform(
+        captureInput("unloadPreviewImage", parameters: ["previewID": "preview_1"], module: "Capture"),
+        definition: unload)
+    #expect(completion == .completed)
+    await #expect(throws: CameraControlError.self) {
+        _ = try await FunctionExecutor.perform(
+            captureInput("unloadPreviewImage", parameters: ["previewID": "preview_2"], module: "Capture"),
+            definition: unload)
+    }
+    #expect(await probe.unloaded == ["preview_1"])
 }
 
 /// Synthetic native callbacks exercise domain ownership, not AVFoundation encoding or microphone acceptance.
@@ -429,7 +493,7 @@ func recordingTerminalWaitJoinsSingleFileAndPublishesBeforeAudioResume(_ ending:
 }
 
 @Test func recordingCompletionModeValidatesBeforeEffectsAndHasBoundedBudgets() async throws {
-    let camera = CaptureConfigurationProbe()
+    let camera = CameraCommandProbe()
     for parameters in [
         ["waitForCompletion": "yes"], ["unexpected": "true"], ["durationSeconds": "0"],
         ["durationSeconds": "601"], ["durationSeconds": "nan"], ["durationSeconds": "1.5"],
@@ -516,6 +580,40 @@ private actor AutomaticCaptureProbe: CameraControlCapability {
             recordingID: id, state: "ready", mediaID: "media_152", durationSeconds: 10,
             stopReason: "durationLimit", fileName: "video.mov")
     }
+}
+
+@Test(.actionCatalog, arguments: [false, true])
+func openingCameraReturnsOnlyCompletionAndPreservesPermissionFailure(_ deny: Bool) async throws {
+    let camera = AutomaticCaptureProbe(denyOpen: deny)
+    let definition = try #require(CameraModule(camera: camera).definitions.first { $0.path.function == "open" })
+    let input = captureInput("open", module: "Capture")
+    if deny {
+        await #expect(throws: CameraControlError.permissionDenied) {
+            _ = try await FunctionExecutor.perform(input, definition: definition)
+        }
+    } else {
+        #expect(try await FunctionExecutor.perform(input, definition: definition) == .completed)
+    }
+    #expect(await camera.trace == ["open"])
+}
+
+@Test(.actionCatalog) @MainActor func cameraSettingUpdatesPreserveLatestOmittedFields() async throws {
+    let ui = UIContainer()
+    try ui.start()
+    var settings = CameraSettings()
+    settings.mode = "video"
+    settings.delaySeconds = 5
+    settings.zoom = 2
+    settings.durationSeconds = 30
+    ui.camera.present(.settings(settings))
+    let camera = RecordingCameraFixture(file: URL.temporaryDirectory.appendingPathComponent("unused.mov"))
+    try await CameraCaptureConfiguration.applyUpdate(.init(delaySeconds: 0), camera: camera, presentation: ui.camera)
+    try await CameraCaptureConfiguration.applyUpdate(.init(zoom: 3), camera: camera, presentation: ui.camera)
+    let after = ui.camera.snapshot.settings
+    #expect(after.mode == "video" && after.flash == "off")
+    #expect(after.delaySeconds == 0 && after.zoom == 3 && after.durationSeconds == 30)
+    #expect(await camera.trace == ["video:true", "settings:off:2.0", "video:true", "settings:off:3.0"])
+    await ui.stop()
 }
 
 @Test(.actionCatalog, arguments: ["photo", "video", "interactiveVideo"], ["success", "openFailure", "captureFailure"])

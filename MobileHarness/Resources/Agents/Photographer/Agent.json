@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 9,
   "id": "photographer",
   "description": "I own camera and album intent, capture/tracking workflows, preview disposition and photo/video lifecycle. I consume supported camera, album and tracking inputs; my registration does not expose a general public delegation entry.",
   "communication": {
@@ -66,6 +66,5 @@
   },
   "baseSkills": [
     "photography"
-  ],
-  "backgroundTasks": []
+  ]
 }

@@ -51,20 +51,20 @@ struct HistoryReadFixture: HistoryFullReadCapability {
             try await UIActions.showHistory(invocation: invocation, using: presentation)
         }), protocols: [.tool], executionPolicy: .direct)
     let deletion = ActionBinding(
-        function: HistoryActions.deleteDefinition(completing: { invocation in
-            .value(try await HistoryActions.delete(invocation: invocation, using: mutations))
+        function: HistoryActions.deleteDefinition(handler: { invocation in
+            try await HistoryActions.delete(invocation: invocation, using: mutations)
         }), protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
     let archive = ActionBinding(
         function: HistoryActions.startNewDefinition(completing: { invocation in
             .value(try await HistoryActions.startNew(invocation: invocation, using: mutations))
         }), protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
     let title = ActionBinding(
-        function: HistoryActions.summarizeDefinition(completing: { invocation in
-            .value(try await HistoryActions.summarize(invocation: invocation, using: mutations))
+        function: HistoryActions.summarizeDefinition(handler: { invocation in
+            try await HistoryActions.summarize(invocation: invocation, using: mutations)
         }), protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
     let clearLogs = ActionBinding(
-        function: HistoryActions.clearLogsDefinition(completing: { invocation in
-            .value(try await HistoryActions.clearLogs(invocation: invocation, using: mutations))
+        function: HistoryActions.clearLogsDefinition(handler: { invocation in
+            try await HistoryActions.clearLogs(invocation: invocation, using: mutations)
         }), protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
     let gateway = await OutputGateway(
         manager: manager, requests: input,

@@ -16,11 +16,11 @@ public struct ProviderModule: CapabilityModule {
             SystemActions.readSettingsDefinition(completing: { [settings] in
                 .value(try await SystemActions.readSettings(invocation: $0, using: settings))
             }),
-            SystemActions.restoreSettingsDefinition(completing: { [settings] in
-                .value(try await SystemActions.restoreSettings(invocation: $0, using: settings))
+            SystemActions.restoreSettingsDefinition(handler: { [settings] in
+                try await SystemActions.restoreSettings(invocation: $0, using: settings)
             }),
-            SystemActions.saveSettingsDefinition(completing: { [settings] in
-                .value(try await SystemActions.saveSettings(invocation: $0, using: settings))
+            SystemActions.saveSettingsDefinition(handler: { [settings] in
+                try await SystemActions.saveSettings(invocation: $0, using: settings)
             }),
         ]
     }

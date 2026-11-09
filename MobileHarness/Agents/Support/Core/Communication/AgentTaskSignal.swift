@@ -40,14 +40,14 @@ public struct AgentTaskSignal: Codable, Sendable, Equatable {
     public enum Status: String, Codable, Sendable { case succeeded, failed, cancelled }
     public let kind: Kind
     public let scope: AgentTaskScope
-    public let businessContract: String
+    public let businessContract: String?
     public let data: Data
     public let status: Status?
     public let goal: String?
     public let requestedSkills: [String]?
     public var contract: String { "task." + kind.rawValue }
     public init(
-        kind: Kind, scope: AgentTaskScope, businessContract: String, data: Data, status: Status? = nil,
+        kind: Kind, scope: AgentTaskScope, businessContract: String? = nil, data: Data, status: Status? = nil,
         goal: String? = nil, requestedSkills: [String]? = nil
     ) throws {
         self.goal = goal
@@ -64,7 +64,8 @@ public struct AgentTaskSignal: Codable, Sendable, Equatable {
             (requestedSkills?.count ?? 0) <= 16,
             Set(requestedSkills ?? []).count == (requestedSkills?.count ?? 0),
             (requestedSkills ?? []).allSatisfy({ CapabilityRegistry.validName($0) }),
-            !businessContract.isEmpty, businessContract.utf8.count <= 64, data.count <= 65_536,
+            businessContract.map({ !$0.isEmpty && $0.utf8.count <= 64 })
+                ?? (kind == .request && scope.execution == .background), data.count <= 65_536,
             (kind == .result) == (status != nil), scope.id != scope.parentID,
             CapabilityRegistry.validName(scope.requester.rawValue),
             CapabilityRegistry.validName(scope.executor.rawValue)

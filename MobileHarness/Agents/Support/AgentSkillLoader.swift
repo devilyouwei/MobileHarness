@@ -3,14 +3,21 @@ import Foundation
 
 /// Stateless atomic composition of immutable Skill resources and canonical function grants.
 public enum AgentSkillLoader {
-    public static func expand(_ ids: [String]) throws -> [String] {
+    private static func skill(_ id: String, owner: AgentID?) throws -> AgentConfigurations.Skill {
+        let skill = try AgentConfigurations.skill(id)
+        guard skill.owner == nil || skill.owner == owner?.rawValue else {
+            throw AgentConfigurationError.resourceMissing(id)
+        }
+        return skill
+    }
+    public static func expand(_ ids: [String], owner: AgentID? = nil) throws -> [String] {
         var result: [String] = []
         func visit(_ id: String, path: [String]) throws {
             guard path.count < 8, !path.contains(id) else {
                 throw AgentConfigurationError.invalidField("Skill dependency cycle/depth")
             }
             if result.contains(id) { return }
-            let skill = try AgentConfigurations.skill(id)
+            let skill = try skill(id, owner: owner)
             for dependency in skill.dependencies { try visit(dependency, path: path + [id]) }
             guard result.count < 16 else { throw CommunicationError.capacityExceeded }
             result.append(id)
@@ -18,13 +25,19 @@ public enum AgentSkillLoader {
         for id in ids { try visit(id, path: []) }
         return result
     }
+    public static func instructions(_ loaded: [String], owner: AgentID? = nil) throws -> String {
+        try loaded.map { id in
+            _ = try skill(id, owner: owner)
+            return try AgentConfigurations.skillInstructions(id)
+        }.joined(separator: "\n")
+    }
     public static func useStates(_ loaded: [String]) throws -> [String] {
         try Set(loaded.flatMap { try AgentConfigurations.skill($0).useStates }).sorted()
     }
-    static func bindings(_ loaded: [String]) throws -> [AgentConfigurations.Binding] {
+    static func bindings(_ loaded: [String], owner: AgentID? = nil) throws -> [AgentConfigurations.Binding] {
         var bindings: [AgentConfigurations.Binding] = []
         for id in loaded {
-            for b in try AgentConfigurations.skill(id).useActions {
+            for b in try skill(id, owner: owner).useActions {
                 if let existing = bindings.first(where: { $0.path == b.path }) {
                     guard existing == b else { throw GenerationError.duplicateAlias }
                 } else {

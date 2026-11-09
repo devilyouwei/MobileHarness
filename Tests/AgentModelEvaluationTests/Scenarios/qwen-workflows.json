@@ -120,7 +120,6 @@
           "user": "帮我拍一张照片，不需要后续操作，不用保存也不用问我。",
           "required": [
             "loadSkills",
-            "openCamera",
             "takePhoto"
           ],
           "forbidden": [
@@ -131,13 +130,7 @@
           "task": false,
           "counts": {
             "takePhoto": 1
-          },
-          "separateRounds": [
-            [
-              "openCamera",
-              "takePhoto"
-            ]
-          ]
+          }
         }
       ]
     },
@@ -174,7 +167,6 @@
           "user": "帮我拍张照片，拍好后让我选择保存还是关闭。",
           "required": [
             "task.start",
-            "openCamera",
             "takePhoto"
           ],
           "task": true,
@@ -182,13 +174,7 @@
           "first": "task.start",
           "counts": {
             "takePhoto": 1
-          },
-          "separateRounds": [
-            [
-              "openCamera",
-              "takePhoto"
-            ]
-          ]
+          }
         },
         {
           "user": "保存这张。",
@@ -1122,18 +1108,7 @@
         {
           "user": "只拍一张，不做后续操作。",
           "required": [
-            "openCamera",
             "takePhoto"
-          ],
-          "ordered": [
-            "openCamera",
-            "takePhoto"
-          ],
-          "separateRounds": [
-            [
-              "openCamera",
-              "takePhoto"
-            ]
           ],
           "forbidden": [
             "task.start"

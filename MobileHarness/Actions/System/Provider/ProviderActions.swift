@@ -23,21 +23,19 @@ extension SystemActions {
 extension SystemActions {
     @Action(domain: "System", module: "Provider", title: "restoreSettings", timeout: .seconds(60))
     public static func restoreSettings(invocation: any FunctionInput, using settings: any ProviderSettingsCapability)
-        async throws -> String
+        async throws
     {
         let id = try providerSettingsRequest(invocation)
         try Task.checkCancellation()
         try await settings.restoreSettings(requestID: id, sessionID: invocation.context.sessionID)
-        return id
     }
     @Action(domain: "System", module: "Provider", title: "saveSettings", timeout: .seconds(60))
     public static func saveSettings(invocation: any FunctionInput, using settings: any ProviderSettingsCapability)
-        async throws -> String
+        async throws
     {
         let id = try providerSettingsRequest(invocation)
         try Task.checkCancellation()
         try await settings.saveSettings(requestID: id, sessionID: invocation.context.sessionID)
-        return id
     }
     @Action(
         domain: "System", module: "Provider", title: "readSettings",

@@ -11,7 +11,7 @@ extension SystemActions {
     public static func sendMessage(_ input: any FunctionInput, capability: any TaskControlCapability) async throws
         -> ActionCompletion
     {
-        .value(try await capability.controlTask("task.send", arguments: input.call.parameters, invocation: input))
+        try await capability.controlTask("task.send", arguments: input.call.parameters, invocation: input)
     }
     @Action(
         domain: "Agent", module: "Task", title: "loadSkills",
@@ -24,7 +24,7 @@ extension SystemActions {
     public static func loadSkills(_ input: any FunctionInput, capability: any TaskControlCapability) async throws
         -> ActionCompletion
     {
-        .value(try await capability.controlTask("loadSkills", arguments: input.call.parameters, invocation: input))
+        try await capability.controlTask("loadSkills", arguments: input.call.parameters, invocation: input)
     }
     @Action(
         domain: "Agent", module: "Task", title: "releaseSkills",
@@ -37,7 +37,7 @@ extension SystemActions {
     public static func releaseSkills(_ input: any FunctionInput, capability: any TaskControlCapability) async throws
         -> ActionCompletion
     {
-        .value(try await capability.controlTask("releaseSkills", arguments: input.call.parameters, invocation: input))
+        try await capability.controlTask("releaseSkills", arguments: input.call.parameters, invocation: input)
     }
     @Action(
         domain: "Agent", module: "Task", title: "startTask",
@@ -51,7 +51,7 @@ extension SystemActions {
     public static func startTask(_ input: any FunctionInput, capability: any TaskControlCapability) async throws
         -> ActionCompletion
     {
-        .value(try await capability.controlTask("task.start", arguments: input.call.parameters, invocation: input))
+        try await capability.controlTask("task.start", arguments: input.call.parameters, invocation: input)
     }
     @Action(
         domain: "Agent", module: "Task", title: "finishTask",
@@ -69,7 +69,7 @@ extension SystemActions {
     public static func finishTask(_ input: any FunctionInput, capability: any TaskControlCapability) async throws
         -> ActionCompletion
     {
-        .value(try await capability.controlTask("task.end", arguments: input.call.parameters, invocation: input))
+        try await capability.controlTask("task.end", arguments: input.call.parameters, invocation: input)
     }
     @Action(
         domain: "Agent", module: "Task", title: "cancelTask",
@@ -81,7 +81,7 @@ extension SystemActions {
     public static func cancelTask(_ input: any FunctionInput, capability: any TaskControlCapability) async throws
         -> ActionCompletion
     {
-        .value(try await capability.controlTask("task.cancel", arguments: input.call.parameters, invocation: input))
+        try await capability.controlTask("task.cancel", arguments: input.call.parameters, invocation: input)
     }
     @Action(
         domain: "Agent", module: "Task", title: "delegateTask",
@@ -94,6 +94,6 @@ extension SystemActions {
     public static func delegateTask(_ input: any FunctionInput, capability: any TaskControlCapability) async throws
         -> ActionCompletion
     {
-        .value(try await capability.controlTask("task.delegate", arguments: input.call.parameters, invocation: input))
+        try await capability.controlTask("task.delegate", arguments: input.call.parameters, invocation: input)
     }
 }

@@ -6,23 +6,23 @@ public struct WindowModule: CapabilityModule {
     public init(windows: any WindowControlCapability) { self.windows = windows }
     public var definitions: [ActionFunction] {
         [
-            WindowActions.focusDefinition(completing: { [windows] in
-                .value(try await WindowActions.focus(invocation: $0, using: windows))
+            WindowActions.focusDefinition(handler: { [windows] in
+                try await WindowActions.focus(invocation: $0, using: windows)
             }),
-            WindowActions.minimizeDefinition(completing: { [windows] in
-                .value(try await WindowActions.minimize(invocation: $0, using: windows))
+            WindowActions.minimizeDefinition(handler: { [windows] in
+                try await WindowActions.minimize(invocation: $0, using: windows)
             }),
-            WindowActions.maximizeDefinition(completing: { [windows] in
-                .value(try await WindowActions.maximize(invocation: $0, using: windows))
+            WindowActions.maximizeDefinition(handler: { [windows] in
+                try await WindowActions.maximize(invocation: $0, using: windows)
             }),
-            WindowActions.restoreDefinition(completing: { [windows] in
-                .value(try await WindowActions.restore(invocation: $0, using: windows))
+            WindowActions.restoreDefinition(handler: { [windows] in
+                try await WindowActions.restore(invocation: $0, using: windows)
             }),
-            WindowActions.moveDefinition(completing: { [windows] in
-                .value(try await WindowActions.move(invocation: $0, using: windows))
+            WindowActions.moveDefinition(handler: { [windows] in
+                try await WindowActions.move(invocation: $0, using: windows)
             }),
-            WindowActions.closeDefinition(completing: { [windows] in
-                .value(try await WindowActions.close(invocation: $0, using: windows))
+            WindowActions.closeDefinition(handler: { [windows] in
+                try await WindowActions.close(invocation: $0, using: windows)
             }),
         ]
     }

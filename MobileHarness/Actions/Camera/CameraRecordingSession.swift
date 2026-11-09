@@ -276,6 +276,17 @@ private struct CameraRecordingCleanupFailure: Error, LocalizedError {
                 zoom: current.zoom, durationSeconds: current.durationSeconds),
             camera: camera, presentation: presentation)
     }
+    static func applyUpdate(
+        _ update: CameraCaptureSettings.Update, camera: any CameraCapturing, presentation: any CameraPresenting
+    ) async throws {
+        let current = presentation.snapshot.settings
+        try await apply(
+            .init(
+                mode: update.mode ?? current.mode, delaySeconds: update.delaySeconds ?? current.delaySeconds,
+                flash: update.flash ?? current.flash, zoom: update.zoom ?? current.zoom,
+                durationSeconds: update.durationSeconds ?? current.durationSeconds),
+            camera: camera, presentation: presentation)
+    }
     static func apply(
         _ settings: CameraCaptureSettings, camera: any CameraCapturing, presentation: any CameraPresenting
     ) async throws {

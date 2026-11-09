@@ -182,7 +182,6 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         guard lifecycle == .running else { throw HarnessError.invalidTransition }
         lifecycle = .paused
         await refreshIsland()
-        listeningPolicy.revokeReportListening()
         if microphoneInput != nil { await closeCapture() }
         pendingSound = nil
         soundPublisher?.cancel()
@@ -240,7 +239,6 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         listeningAdmissionEpoch = UUID()
         await stopUIInputs()
         lifecycle = .stopped
-        listeningPolicy.revokeReportListening()
         nativeInput?.cancel()
         await recognitionTurn?.cancel()
         await segmenter?.cancel()
@@ -307,7 +305,6 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             listeningPolicy.enabled = intent.enabled ?? !listeningPolicy.enabled
             if !listeningPolicy.enabled {
                 listeningPolicy.pendingFinal = nil
-                listeningPolicy.revokeReportListening()
             }
         } else if message.contract == SpeechCaptureEnded.contract {
             guard input.metadata.origin == .local, input.metadata.source == "phone.microphone",
@@ -317,7 +314,6 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             guard ended.revision == listeningPolicy.revision, listeningPolicy.enabled else { return }
             listeningPolicy.enabled = false
             listeningPolicy.pendingFinal = nil
-            listeningPolicy.revokeReportListening()
         } else {
             guard input.metadata.origin == .agent, let incarnation = input.metadata.incarnation,
                 let activity = message.content(as: ReplyActivity.self),
@@ -374,7 +370,6 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         listeningAdmissionEpoch = UUID()
         listeningPolicy.enabled = enabled
         if !enabled {
-            listeningPolicy.revokeReportListening()
             listeningPolicy.pendingFinal = nil
             awaitingReply = true
         }
@@ -394,7 +389,6 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         let wasEnabled = listeningPolicy.enabled
         listeningPolicy.enabled = false
         listeningPolicy.pendingFinal = nil
-        listeningPolicy.revokeReportListening()
         guard wasEnabled else { return }
         let context = ProcessingContext(sessionID: sessionID, source: "runtime")
         try await applyListeningPolicy(parent: context.input(.event("listening.revoked")))

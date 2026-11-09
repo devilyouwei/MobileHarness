@@ -437,7 +437,7 @@ public struct AgentTaskSkillState: Codable, Sendable {
         let overview = includeOverview ? "\n# AVAILABLE SKILLS\n" + (try AgentConfigurations.skillOverview()) : ""
         return overview
             + "\n# LOADED SKILL INSTRUCTIONS\n"
-            + (try loaded.map { try AgentConfigurations.skillInstructions($0) }.joined(separator: "\n"))
+            + (try AgentSkillLoader.instructions(loaded))
     }
 }
 

@@ -24,24 +24,10 @@ public struct WriterFailureDiagnostic: Codable, Sendable, Equatable {
     }
 }
 
-/// Writer business evidence carried by the existing authenticated task transport.
-public struct WriterRequestProgress: Codable, Sendable, Equatable {
-    public let inputID: String
-    public let number: Int
-    public let phase: String
-    public let attempt: Int
-    public let path: String?
-    public init(inputID: String, number: Int, phase: String, attempt: Int, path: String? = nil) {
-        self.inputID = inputID
-        self.number = number
-        self.phase = phase
-        self.attempt = attempt
-        self.path = path
-    }
-}
+/// Writer business evidence carried by the authenticated task transport.
 public struct WriterTaskEvent: Codable, Sendable, Equatable {
     public enum Kind: String, Codable, Sendable {
-        case started, progress, userInput, completed, failed, cancelled
+        case started, userInput, completed, declined, failed, cancelled
     }
     public let version: Int
     public let eventID: String
@@ -53,11 +39,10 @@ public struct WriterTaskEvent: Codable, Sendable, Equatable {
     public let taskID: String?
     public let delegateID: String?
     public let failure: WriterFailureDiagnostic?
-    public let request: WriterRequestProgress?
     public init(
         sequence: UInt64, kind: Kind, workspaceID: String? = nil, goal: String? = nil, windowID: String? = nil,
         taskID: String? = nil,
-        delegateID: String? = nil, failure: WriterFailureDiagnostic? = nil, request: WriterRequestProgress? = nil,
+        delegateID: String? = nil, failure: WriterFailureDiagnostic? = nil,
         eventID: String = UUID().uuidString
     ) {
         version = 2
@@ -70,14 +55,8 @@ public struct WriterTaskEvent: Codable, Sendable, Equatable {
         self.taskID = taskID
         self.delegateID = delegateID
         self.failure = failure
-        self.request = request
     }
     public func validate() throws {
-        if let request {
-            guard request.number > 0, request.attempt > 0, !request.inputID.isEmpty, request.inputID.utf8.count <= 128,
-                !request.phase.isEmpty
-            else { throw CommunicationError.invalidPayload }
-        }
         guard version == 2, UUID(uuidString: eventID) != nil, sequence > 0,
             [taskID, delegateID].allSatisfy({ $0.map { !$0.isEmpty && $0.utf8.count <= 128 } ?? true })
         else {
@@ -128,7 +107,7 @@ public struct AgentTaskContent: Codable, Sendable, Equatable {
 }
 
 /// A completed Writer fact outlives the execution grant. Gateway authenticates the role;
-/// the Assistant validates its persisted task/run/event binding before admitting a reply.
+/// the Assistant validates its persisted task and event binding before settling its view.
 public struct WriterTaskCompletion: Codable, Sendable, Equatable {
     public static let contract = "writer.completion"
     public let signal: AgentTaskSignal
@@ -143,7 +122,7 @@ public struct WriterTaskCompletion: Codable, Sendable, Equatable {
             signal.scope.execution == .background, content.stage == .completed, let event = content.writerEvent,
             event.delegateID == signal.scope.id,
             (event.kind == .completed && signal.status == .succeeded)
-                || (event.kind == .failed && signal.status == .failed)
+                || ([.failed, .declined].contains(event.kind) && signal.status == .failed)
                 || (event.kind == .cancelled && signal.status == .cancelled)
         else {
             throw CommunicationError.invalidPayload
@@ -239,40 +218,6 @@ public struct AgentTaskInputIntent: Codable, Sendable, Equatable {
     }
 }
 
-/// Validated background request; target capability declarations are injected by the host.
-public struct AgentBackgroundTaskRequest: Sendable {
-    public let goal: String
-    public let skills: [String]
-    public let target: AgentID
-    public let businessContract: String
-    public let data: Data
-    public init(arguments: [String: String]) throws {
-        let required: Set<String> = ["goal", "execution", "target", "businessContract", "payload"]
-        guard required.isSubset(of: Set(arguments.keys)), Set(arguments.keys).isSubset(of: required.union(["skills"])),
-            arguments["execution"] == "background", let goal = arguments["goal"],
-            !goal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, goal.utf8.count <= 4096,
-            let target = arguments["target"], !target.isEmpty, target.utf8.count <= 64,
-            let contract = arguments["businessContract"], !contract.isEmpty, contract.utf8.count <= 64,
-            let payload = arguments["payload"], payload.utf8.count <= 65_536,
-            (try? JSONSerialization.jsonObject(with: Data(payload.utf8))) != nil
-        else { throw CommunicationError.invalidPayload }
-        self.goal = goal
-        self.skills = try AgentTaskSkillIDs.decode(arguments["skills"])
-        self.target = AgentID(rawValue: target)
-        self.businessContract = contract
-        self.data = Data(payload.utf8)
-    }
-    public func signal(id: String, requester: AgentID, parent: String?, session: String) throws -> AgentTaskSignal {
-        guard target != requester else { throw CommunicationError.unauthorized }
-        return try AgentTaskSignal(
-            kind: .request,
-            scope: AgentTaskScope(
-                id: id,
-                parentID: parent, requester: requester, executor: target, sessionID: session, execution: .background),
-            businessContract: businessContract, data: data, goal: goal, requestedSkills: skills)
-    }
-}
-
 /// Input-only validation shared by local and remote task requests.
 enum AgentTaskSkillIDs {
     static func decode(_ text: String?) throws -> [String] {
@@ -287,16 +232,11 @@ enum AgentTaskSkillIDs {
 /// Implemented public task adapters, shared by discovery and execution admission.
 /// A resource description or a communication grant alone cannot create an adapter.
 enum AgentTaskDelegation {
-    case writer
-    var target: AgentID { .writer }
-    var businessContract: String { "writer.author" }
-    static func resolve(
+    static func permits(
         target: AgentID, requester: AgentID, communication: CommunicationDeclaration
-    ) -> Self? {
-        guard requester == .assistant, target == .writer,
-            communication.sends.contains(where: { $0.contract == "task.request" && $0.target == target.rawValue })
-        else { return nil }
-        return .writer
+    ) -> Bool {
+        requester == .assistant && target == .writer
+            && communication.sends.contains { $0.contract == "task.request" && $0.target == target.rawValue }
     }
 }
 
@@ -312,8 +252,6 @@ enum AgentTaskCommunication {
             .init("content", description: "Public task content"),
             .init("taskID", required: false, description: "Existing task identity"),
             .init("artifactID", required: false, description: "Authorized artifact reference"),
-            .init("businessContract", required: false, description: "Declared background business contract"),
-            .init("payload", required: false, description: "Business input encoded as a JSON string"),
         ])
 
 }

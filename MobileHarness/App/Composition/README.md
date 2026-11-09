@@ -99,6 +99,8 @@ Settings uses independent assistantHistory/writerHistory routes to injected My A
 
 普通Scene转发保持Writer创作连续，仅通知其预览可见性；Actions在前台恢复Artifacts最新快照，UI继续独立管理原生表面可用性。显式根暂停/替换/关闭沿原清理图执行，不借用Scene事件暂停Writer模型循环。
 
+AppComposition 持有一个 WriterContinuedProcessing 适配器，向每个根的 WriterContainer 注入执行端口。根替换先加入旧 Writer 清理，再绑定新根。系统任务回调经执行段身份返回 Writer，系统适配器只管理 iOS 执行时间与进度。
+
 ActionsDependencies receives a lazy WorkspaceRepository getter from the existing Storage database, alongside media/device getters. It is resolved after foundation readiness and creates no parallel database or JSON catalog.
 
 ApplicationActionAssembly透传AgentVoiceHost.playbackChanged到ActionsVoiceHost。SpeechSynthesisContainer接收真实播放事实并在本角色内决定展示；App只连接接口，Actions不导入Agents，基础UI不接收业务接口。播放频谱仍直连UI的专用数据接口。

@@ -20,3 +20,5 @@ Purpose: preserve license notices for model artifacts and runtime dependencies. 
 ✅ GRDB.swift7.11.1 is the Storage-owned SQLite adapter. [GRDB-MIT.txt](GRDB-MIT.txt) preserves its original MIT notice. GRDB uses Apple’s system SQLite; no database engine or dependency is exposed to UI/ModelKit/PlatformKit.
 
 [Isle-MIT.txt](Isle-MIT.txt)仅保留121版使用提交a47b8cf62891c820729c9939660ac24094705202的历史许可证据。原生重构已移除SDK依赖、锁定记录与包内许可副本；当前实现不分发Isle代码。IslandActivityWidget分区按1998code/iOS16-Live-Activities的WidgetDemo.swift适配，源码保留来源注释；未复制送餐素材或保活代码，未添加第三方运行库。该仓库未提供已核实的许可证文件，不将其标为MIT。
+
+UI Web 的 Markdown 转换随 App 分发 [markdown-it 15.0.3](https://github.com/markdown-it/markdown-it) 和 [Mermaid 12.3.0](https://github.com/mermaid-js/mermaid) 官方 npm 浏览器构建。源码目录保留原始 [markdown-it MIT 许可](../../MobileHarness/UI/Components/Web/markdown-it-LICENSE.txt) 和 [Mermaid MIT 许可](../../MobileHarness/UI/Components/Web/mermaid-LICENSE.txt)，包内脚本保留上游附带的第三方版权声明。

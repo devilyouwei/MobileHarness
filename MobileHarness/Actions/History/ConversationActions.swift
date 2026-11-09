@@ -7,7 +7,7 @@ import UI
 extension HistoryActions {
     @Action(domain: "History", module: "Conversation", title: "clearLogs")
     public static func clearLogs(invocation: any FunctionInput, using history: any HistoryMutationCapability)
-        async throws -> String
+        async throws
     {
         try ActionArguments(invocation.call.parameters).validateAllowedKeys(["requestID"])
         let input = invocation.call.parameters["requestID"]
@@ -15,7 +15,6 @@ extension HistoryActions {
             throw ActionArguments.ValidationError.invalidValue("requestID")
         }
         try await history.clearRequestLogs(requestID: input)
-        return "{\"cleared\":true}"
     }
 
     @Action(domain: "History", module: "Conversation", title: "startNew")
@@ -33,7 +32,7 @@ extension HistoryActions {
         domain: "History", module: "Conversation", title: "summarize",
         timeout: .seconds(60))
     public static func summarize(invocation: any FunctionInput, using history: any HistoryMutationCapability)
-        async throws -> String
+        async throws
     {
         try Task.checkCancellation()
         let arguments = ActionArguments(invocation.call.parameters)
@@ -44,13 +43,11 @@ extension HistoryActions {
         }
         try await history.summarizeArchived(id.rawValue)
         try Task.checkCancellation()
-        return "{\"summarized\":\"" + id.rawValue + "\"}"
     }
 
     @Action(
         domain: "History", module: "Conversation", title: "delete")
     public static func delete(invocation: any FunctionInput, using history: any HistoryMutationCapability) async throws
-        -> String
     {
         try Task.checkCancellation()
         let arguments = ActionArguments(invocation.call.parameters)
@@ -61,7 +58,6 @@ extension HistoryActions {
         }
         try await history.deleteArchived(id.rawValue)
         try Task.checkCancellation()
-        return "{\"deleted\":\"" + id.rawValue + "\"}"
     }
 
     @Action(

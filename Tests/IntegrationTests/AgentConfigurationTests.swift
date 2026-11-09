@@ -5,6 +5,22 @@ import Testing
 
 @testable import Agents
 
+@Test(.actionCatalog, arguments: ["writer-workspace", "writer-file-editing"])
+func writerSkillsAreScopedToTheirOwner(id: String) throws {
+    #expect(try AgentConfigurations.baseSkills(named: "Writer") == ["writer-workspace"])
+    #expect(try AgentSkillLoader.expand([id], owner: .writer) == [id])
+    #expect(throws: AgentConfigurationError.self) { try AgentSkillLoader.expand([id], owner: .assistant) }
+    #expect(throws: AgentConfigurationError.self) {
+        try AgentSkillLoader.registry([id], fixed: CapabilityRegistry())
+    }
+    let overview = try AgentConfigurations.skillOverview()
+    #expect(overview.contains("photography"))
+    #expect(!overview.contains(id))
+    let capabilities = try AgentConfigurations.load(named: "Writer").capabilities
+    #expect(capabilities.tools.map(\.alias) == ["workspace"])
+    #expect(capabilities.tools.map(\.path) == ["Artifacts.Workspace.perform"])
+}
+
 private func document() -> [String: Any] {
     [
         "version": 7,
@@ -575,10 +591,20 @@ func skillUseStateRejectsInvalidDeclarations(_ mutation: String) throws {
         let configuration = try AgentConfigurations.load(named: name)
         let data = try AgentConfigurations.data("Agents/" + name + "/Agent.json")
         let resource = try AgentConfigurations.decodeResource(data, expectedID: configuration.agentID)
-        #expect(resource.version == 8 && configuration.version == 7)
+        #expect(resource.version == 9 && configuration.version == 7)
         #expect(!resource.description.isEmpty && resource.description.utf8.count <= 2048)
         #expect(try AgentConfigurations.publicDescription(named: name) == resource.description)
     }
+}
+
+@Test(.actionCatalog) func writerDeclaresOnlyConsumedInputsAndPeerReports() throws {
+    let communication = try AgentConfigurations.load(named: "Writer").communication
+    #expect(
+        Set(communication.inputs.map(\.contract)) == [
+            "task.request", "task.input", "task.cancel",
+        ])
+    #expect(Set(communication.sends.map(\.contract)) == ["task.progress", "writer.completion"])
+    #expect(communication.sends.allSatisfy { $0.target == "assistant" })
 }
 
 @Test(
@@ -597,7 +623,7 @@ func invalidPublicAgentDescriptionsFailExplicitly(failure: String) throws {
     case "wrongType": resource["description"] = ["text": "writer"]
     case "oversize": resource["description"] = String(repeating: "a", count: 2049)
     case "multibyteOversize": resource["description"] = String(repeating: "写", count: 683)
-    case "oldVersion": resource["version"] = 7
+    case "oldVersion": resource["version"] = 8
     case "unknownField": resource["privateInstructions"] = "must not be public"
     case "wrongID": resource["id"] = "assistant"
     default: Issue.record("Unknown fixture")

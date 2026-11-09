@@ -6,6 +6,7 @@ import Observation
 
 @MainActor @Observable final class AppComposition {
     private var services: ServiceFactories.Services
+    private let writerBackground = WriterContinuedProcessing()
     private var owner: Result<ApplicationLifecycle, any Error>
     private var foreground = false
     private var replacement: Task<Void, Never>?
@@ -24,6 +25,7 @@ import Observation
         connect()
     }
     private func connect() {
+        services.agents.writer.bindBackgroundExecution(writerBackground.start)
         let selected = scopeID
         features.bootstrap = { [weak self] in
             guard let self, selected == self.scopeID else { throw CancellationError() }

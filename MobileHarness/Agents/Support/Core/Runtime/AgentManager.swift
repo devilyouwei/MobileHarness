@@ -53,13 +53,26 @@ public actor AgentManager {
             throw CommunicationError.scopeClosed
         }
     }
-    public func beginTaskCompletion(_ scope: AgentTaskScope, executor: AgentID) throws {
+    public func beginTaskCompletion(_ scope: AgentTaskScope, executor: AgentID) throws
+        -> (admissionID: String, executionIDs: Set<String>)
+    {
         try validateTask(scope, agent: executor, sessionID: scope.sessionID)
-        guard scope.executor == executor else { throw CommunicationError.unauthorized }
+        guard scope.executor == executor, let grant = taskGrants[scope.id] else {
+            throw CommunicationError.unauthorized
+        }
         guard !taskGrants.values.contains(where: { $0.scope.parentID == scope.id }) else {
             throw CommunicationError.scopeClosed
         }
         taskGrants[scope.id]?.finishing = true
+        return (grant.admissionID, grant.executionIDs)
+    }
+    public func beginTaskCompletionIfPresent(_ scope: AgentTaskScope, executor: AgentID, incarnation: String) throws
+        -> (admissionID: String, executionIDs: Set<String>)?
+    {
+        guard scope.executor == executor else { throw CommunicationError.unauthorized }
+        try validate(executor, incarnation: incarnation, sessionID: scope.sessionID)
+        guard taskGrants[scope.id] != nil else { return nil }
+        return try beginTaskCompletion(scope, executor: executor)
     }
     public func validateTask(_ scope: AgentTaskScope, agent: AgentID, sessionID: String) throws {
         guard let grant = taskGrants[scope.id] else { throw CommunicationError.scopeClosed }
@@ -89,10 +102,13 @@ public actor AgentManager {
         grant.executionIDs.insert(id)
         taskGrants[scope.id] = grant
     }
-    public func failTask(_ scope: AgentTaskScope, executor: AgentID, incarnation: String, reason: String) throws
+    public func failTask(
+        _ scope: AgentTaskScope, executor: AgentID, incarnation: String, reason: String, admissionID: String? = nil
+    ) throws
         -> [AgentTaskTermination]
     {
         let root = try validatedGrant(scope.id, agent: executor, sessionID: scope.sessionID)
+        guard admissionID == nil || root.admissionID == admissionID else { throw CommunicationError.scopeClosed }
         guard root.scope == scope, scope.executor == executor, root.executor == incarnation else {
             throw CommunicationError.unauthorized
         }
@@ -116,9 +132,9 @@ public actor AgentManager {
         for id in ids { taskGrants[id] = nil }
         return events
     }
-    public func retireTask(_ id: String, admissionID: String? = nil) {
-        if let admissionID, taskGrants[id]?.admissionID != admissionID { return }
-        taskGrants[id] = nil
+    @discardableResult public func retireTask(_ id: String, admissionID: String? = nil) -> Bool {
+        if let admissionID, taskGrants[id]?.admissionID != admissionID { return false }
+        return taskGrants.removeValue(forKey: id) != nil
     }
     private var identities: [AgentID: String] = [:]
     private var sessions: [AgentID: String] = [:]

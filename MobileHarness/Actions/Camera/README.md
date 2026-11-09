@@ -2,7 +2,7 @@
 
 ## 职责与模块关系
 
-Camera owns capture, cached previews and disposition. CameraModule binds eleven Capture functions, four Video functions, four Perception functions and private Album.perform. CameraExecutionEndpoint validates invocation scope; CameraCoordinator owns native capture and CameraPreviewStore owns temporary image state.
+Camera owns capture, cached previews and disposition. CameraModule binds twelve Capture functions, four Video functions, four Perception functions and private Album.perform. CameraExecutionEndpoint validates invocation scope; CameraCoordinator owns native capture and CameraPreviewStore owns temporary image state.
 
 Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注入唯一基础能力和根生命周期。本域消费 FunctionContracts 及需要的基础能力，不导入 Agents、Gateway 实现或 App。全部域内源码由 Actions 单一目标编译。
 
@@ -19,7 +19,7 @@ Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注�
 | [CameraModule.swift](CameraModule.swift) | 绑定相机与相册函数，不定义业务参数或调用协议 |
 | [CameraRecordingSession.swift](CameraRecordingSession.swift) | 录像启动/终态/素材处置；与显式设置共享原生配置及回滚事务 |
 | [CameraPhotoSession.swift](CameraPhotoSession.swift) | 拍照／处置任务、预览身份、呈现确认和反馈作用域 |
-| [CameraPreviewStore.swift](CameraPreviewStore.swift) | 原图缓存目录、最新图与显式选择、分析图准备和保存／忽略 |
+| [CameraPreviewStore.swift](CameraPreviewStore.swift) | 原图缓存目录、最新图与显式选择、分析图准备和批量保存 |
 | [CameraRuntimePorts.swift](CameraRuntimePorts.swift) | Injected resource arbitration interface and runtime dependencies; perception connections are supplied by App composition |
 | [CameraStorageFactory.swift](CameraStorageFactory.swift) | 注入仓库并选择照片保留策略 |
 | [CameraCaptureWorkflow.swift](CameraCaptureWorkflow.swift) | Canonical open 子Action与最终拍摄的失败即停组合；只返回最终媒体回执 |
@@ -31,27 +31,33 @@ Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注�
 CameraCoordinator owns native demand/leases; CameraPhotoSession joins capture and display feedback. CameraPreviewStore owns temporary bytes/selections/disposition. Persistent album storage remains1024 files/2GiB and cannot evict collected media. Background joins native work without deleting cached previews.
 
 ## 接口与完成语义
-拍摄地址位于 `Camera.Capture`，包含十一个函数。相册内部入口另见下节。
+拍摄地址位于 `Camera.Capture`，包含十二个函数。相册内部入口另见下节。
 
 | 函数 | 实际入口参数 | 返回与预算 |
 | --- | --- | --- |
-| open / close | 无 | 组合窗口/设备启闭完成后返回 operation/enabled；open 增加 windowID；60 秒 |
+| open | 无 | 窗口与首帧就绪后 Void/completed；60 秒 |
+| close | 无 | 直接清理临时照片并关闭窗口后返回 operation/enabled；60 秒 |
 | flip | facing=front/back | 注入镜头切换完成后返回 operation/facing；默认 30 秒 |
 | retry | 无 | 等待端点重试完成，Void/completed；默认 30 秒 |
 | takePhoto | none | JSON: previewID, width, height, mimeType; 110 seconds including open/countdown/capture |
 | savePhoto | previewID | JSON: saved, previewID, mediaID, alreadySaved, optional feedbackIssues; 60 seconds |
-| loadPreviewImage / unloadPreviewImage | previewID | 更新调用方的显式图片选择并返回最新 metadata；30 秒 |
+| saveAllPhotos | 无 | JSON: saved, failures, optional feedbackIssues；120 秒 |
+| configure | mode、delaySeconds、flash、zoom、durationSeconds | 仅应用传入字段，保留其余当前设置；成功为 Void/completed；默认 30 秒 |
+| loadPreviewImage | previewID 或 previewIDs JSON 数组 | 追加单张或原子替换 1–5 张选区，返回最新 metadata；30 秒 |
+| unloadPreviewImage | previewID | 移除调用方的显式图片选择，Void/completed；30 秒 |
 
-All entries reject unknown parameters. Photo disposition requires an exact previewID, at most64 bytes. Native work owns cancellation/cleanup; committed saves are not undone by presentation failure.
+All entries reject unknown parameters. Single-photo disposition requires an exact previewID, at most 64 bytes. Native work owns cancellation/cleanup; committed saves are not undone by presentation failure.
 
 ## 数据流与失败边界
-函数等待真实端点结果后编码回执，不推断模型就绪或物理效果。open/close 的 enabled 来自已完成的目标操作，flip 的 facing 来自已完成的目标选择；这些不是额外原生状态查询。预览像素通过类型化 State 附件传输；选择绑定可信调用 session，不接受模型提供 scope。Web 截图的持久媒体读取仍验证 source/session/input，不作为普通字符串参数传输。
+函数等待真实端点结果后编码回执，不推断模型就绪或物理效果。close 的 enabled 来自已完成的目标操作，flip 的 facing 来自已完成的目标选择；这些不是额外原生状态查询。预览像素通过类型化 State 附件传输；选择绑定可信调用 session，不接受模型提供 scope。Web 截图的持久媒体读取仍验证 source/session/input，不作为普通字符串参数传输。
 
-Disposition works by cached preview identity, including non-displayed images. Save returns a durable mediaID and optional feedback issues; repeated committed saves return alreadySaved. Ignore cannot delete persistent album media.
+cancelCapture 加入倒计时取消后返回 Void。倒计时状态由相机状态提供，异常走原执行结果链。
+
+Disposition works by cached preview identity, including non-displayed images. Save returns a durable mediaID and optional feedback issues; repeated committed saves return alreadySaved. Batch save snapshots all pending entries in the current session and holds the same single disposition slot across the operation. Per-photo errors leave pending originals and return alongside successful media IDs. Retrying the batch writes only remaining pending photos. One feedback cue follows a batch that committed at least one photo.
 
 takePhoto/startRecording 在同一父调用内复用 canonical open 子Action：窗口关闭时打开、最小化时恢复、已打开时聚焦并复用原生采集；确认后才进入拍摄。前置失败后将拍摄标记notStarted，不自动重试或丢弃媒体；成功子报告不能覆盖最终照片／录像JSON。open仍可单独使用以只预览。子步骤不重新进入Gateway，不产生中间ReAct。takePhoto在需要时切photo并保留已有zoom/flash/delay/duration，配置失败加入回滚。
 
-Action 函数本身没有请求队列或缓存；CameraCoordinator 拥有唯一采集/租约工作者。权限拒绝、忙、未启用、后台或照片不可用通过类型化错误传播；是否已经发生部分效果以端点的实际状态和回执为准。
+Action 函数本身没有请求队列或缓存；CameraCoordinator 拥有唯一采集/租约工作者。配置更新在 CameraCoordinator 独占段内读取并补齐当前设置，再进入原生配置及失败回滚事务。空更新不写入硬件。权限拒绝、忙、未启用、后台或照片不可用通过类型化错误传播；是否已经发生部分效果以端点的实际状态和回执为准。
 
 [Actions 设计](../README.md) · [公共函数契约](../Support/Contracts/README.md)
 
@@ -88,9 +94,9 @@ CameraResourceAccess.isSettled asks whether resource handoff has reached a stabl
 
 ## Camera window lifecycle
 
-CameraCoordinator implements WindowContentLifecycle using the root WindowState injected by ActionsBusinessAssembly. Camera.Capture.open presents/restores the unique Camera window then awaits native capture and an admitted fresh preview frame through CameraPresenting.waitForPhotoCaptureRotation; the receipt adds optional windowID. Failure keeps the window and existing camera failure/retry interface. Photo opening never enables the independent Face visual/following branch. Camera.Perception.openVision enables only that branch.
+CameraCoordinator implements WindowContentLifecycle using the root WindowState injected by ActionsBusinessAssembly. Camera.Capture.open presents/restores the unique Camera window then awaits native capture and an admitted fresh preview frame through CameraPresenting.waitForPhotoCaptureRotation; it completes without a business value. Window commands obtain the camera window identity from ui.windows. Failure keeps the window and existing camera failure/retry interface. Photo opening never enables the independent Face visual/following branch. Camera.Perception.openVision enables only that branch.
 
-Minimize rejects conflicting photo work and hides rendering, retaining the photo branch and its capture demand. Restore mounts before confirming readiness. The shared capture composition restores a minimized window and awaits native readiness before photo/video work. Closing asks return/clear for unsaved photos and save/discard/cancel for pending video; cancellation retains the session. Photo and visual demand are independent: a healthy existing capture/lease is reused when adding or removing either branch. Only zero demand releases the lease and joins native stop. Background clears both demands and joins pose/preview/photo cleanup; foreground does not restart solely because a window exists.
+Minimize rejects conflicting photo work and hides rendering, retaining the photo branch and its capture demand. Restore mounts before confirming readiness. The shared capture composition restores a minimized window and awaits native readiness before photo/video work. Closing directly clears temporary photo previews. closeCamera returns pendingVideo without presenting a dialog when a clip needs explicit saveVideo or ignoreVideo. The window button offers save/discard/cancel for pending video. Photo and visual demand are independent: a healthy existing capture/lease is reused when adding or removing either branch. Only zero demand releases the lease and joins native stop. Background clears both demands and joins pose/preview/photo cleanup; foreground does not restart solely because a window exists.
 
 The preview worker feeds one immutable display frame shared by both surfaces. A separate pose task exists only for visual demand. Enabling/disabling pose joins only that task, without cancelling preview or restarting hardware. Native lens changes invalidate old pose/gaze and join the perception/tracking scope before renewing frames; old mechanical targets cannot survive that scope. Model failure preserves preview. Photo and video modes share this graph; video installs a movie output without removing the preview source.
 
@@ -104,7 +110,7 @@ System permission prompts can invalidate the active scene's request generation. 
 
 ## Capture settings and recording
 
-Capture.configure replaces mode/photo-video, delaySeconds0…30, flash/off-on-auto, zoom1…6 (further bounded by hardware), durationSeconds1…600. Validation is pure; native capability checks remain in CameraCapturing. Failed mode/settings changes join rollback before reporting failure. Settings and supportedFlash/maximumZoom are exposed by actions.camera. Capture.cancelCapture cancels and joins only the owned countdown. CameraCountdown uses monotonic absolute deadlines inside photoTask; cancellation/background prevents the subsequent shutter and clears the display.
+Capture.configure updates supplied fields for mode/photo-video, delaySeconds0…30, flash/off-on-auto, zoom1…6 (further bounded by hardware), durationSeconds1…600. Validation is pure; native capability checks remain in CameraCapturing. Failed mode/settings changes join rollback before reporting failure. Settings and supportedFlash/maximumZoom are exposed by actions.camera. Capture.cancelCapture cancels and joins only the owned countdown. CameraCountdown uses monotonic absolute deadlines inside photoTask; cancellation/background prevents the subsequent shutter and clears the display.
 
 VideoActions.swift owns Camera.Video.startRecording/stopRecording/saveVideo/ignoreVideo; CameraModule binds all explicitly. startRecording defaults waitForCompletion=true: it waits for native didStart and the recording's single joined completion, returning state=ready/mediaID/fileName/actual duration/stopReason only after file preparation and audio handback. Its budget is780 seconds (60 for opening plus720 for at most600 seconds recording and startup/finalization). Explicit false has a120-second budget (60 for opening plus60 for startup) and returns only recordingID/state=recording at didStart, with no later result from that invocation. Photographer's fixed interactive Tool supplies false so the UI/role request slot remains available for stop. Business code does not branch on call protocol. A model's scheduled start remains pending while the UI stop Tool executes independently of ChannelScheduler. Cancellation of the terminal waiter stops only the matching recording, joins its completion and cancellation worker, then propagates cancellation; actual finalization failure is preserved. Stop joins didFinish, validates the file and publishes an uncollected video before state=ready; neither receipt means album collection. Native duration/size completion follows the same path. Stop/save/ignore use a real UUID recordingID. Invalid identity, permission, busy, file validation and cleanup failures propagate.
 
@@ -128,7 +134,7 @@ CameraCoordinator创建相机Window时提供UI.WindowIcon.emoji("📷")；图标
 
 CameraPreviewStore owns the open-window image session and model selections over StorageCache.cameraImages. Local preview_N IDs start at1 in each session and stay unchanged when the oldest of20 images is evicted. Storage owns original/analysis bytes and Camera-written disposition facts; Camera owns prepare/load/unload/save policy. One preparation/disposition is admitted; endSession invalidates pending work, joins it, then clears memory. PhotoSession separately cancels/joins capture and presentation. Root close seals the business owner; a new camera window opens a fresh scope.
 
-New captures automatically load the latest image. Each context can additionally select three cached images, including saved images. Model-image preparation is bounded to1568px/1MP/1MiB; failure retains the original and explicit analysisFailure. New capture replaces the default slot; explicit selections survive until unload, save, FIFO expiry or session close. Dialog reset drops explicit selections only. Minimized, occluded and background windows retain memory but withhold model facts/images; restoring visible Camera restores selected images. Background Vision does not own or extend this image session.
+New captures automatically load the latest image. Each context can explicitly select up to five cached images, including saved images. The latest image fills a free slot and is included at most once. A new capture displaces the first explicit selection when all five slots are occupied. Model-image preparation is bounded to1568px/1MP/1MiB; failure retains the original and explicit analysisFailure. New capture replaces the default slot; explicit selections survive until unload, save, FIFO expiry or session close. Dialog reset drops explicit selections only. Minimized, occluded and background windows retain memory but withhold model facts/images; restoring visible Camera restores selected images. Background Vision does not own or extend this image session.
 
 Save passes bytes without preview/session identity to MediaStore under generic album ownership (source=album, empty session/input), publishes an independent media_N, marks saved and unloads all matching State selections without deleting the cached original. Repeat save returns the same media_N. New captures retain earlier originals for later loading until FIFO eviction or session close. Feedback failures preserve committed results. Gallery browsing changes no model State and starts no inference.
 
@@ -136,6 +142,6 @@ Model snapshots carry private resource bindings outside facts/manifest. Camera o
 
 The gallery receives typed metadata and scoped read access through CameraInteractionWorkflow. Its stack counts all cached images irrespective of status. Capture presentation is one acknowledged arrival transaction; saves update catalog flags and cue feedback without removing gallery entries. Closing prompts once if unreviewed images remain, then clears the session after joined work. Video disposition remains independent.
 
-CameraPreviewStore owns a cancellable image-preparation task. Closing cancels it and joins completion before clearing bytes; non-cooperative callbacks remain generation-fenced. Window transitions reject new preview operations. pendingCount includes only unsaved entries for the single close confirmation.
+CameraPreviewStore owns a cancellable image-preparation task. Closing cancels it and joins completion before clearing bytes; non-cooperative callbacks remain generation-fenced. Window transitions reject new preview operations. Batch disposition and analysis preparation share the same single operation slot.
 
 历史 Prompts 图片由日志独占；本目录不提供相册或预览缓存的历史图片回退接口。实时相机和独立相册的读取不受日志清理影响。

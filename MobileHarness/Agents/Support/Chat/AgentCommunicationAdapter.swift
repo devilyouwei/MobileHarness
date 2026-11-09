@@ -19,7 +19,7 @@ public enum AgentCommunicationAdapter {
         let taskSends = policy.sends.filter { $0.contract.hasPrefix("task.") }
         if !taskSends.isEmpty {
             let required: Set<String> = ["target", "kind", "content"]
-            let optional: Set<String> = ["taskID", "artifactID", "businessContract", "payload"]
+            let optional: Set<String> = ["taskID", "artifactID"]
             let kinds = Set(taskSends.map { $0.contract.replacingOccurrences(of: "task.", with: "") }).sorted()
             let targets = Set(taskSends.map(\.target)).sorted()
             let templates = try FunctionTokenPrompts.load()
@@ -61,7 +61,9 @@ public enum AgentCommunicationAdapter {
         path: String, arguments: [String: String], sender: AgentID, input: AgentInput,
         policy: CommunicationDeclaration, existing: AgentTaskScope? = nil
     ) throws -> (CommunicationAction, AgentTaskSignal) {
-        guard isCommunication(path), let kindText = arguments["kind"],
+        guard isCommunication(path),
+            Set(arguments.keys).isSubset(of: ["target", "kind", "content", "taskID", "artifactID"]),
+            let kindText = arguments["kind"],
             let kind = AgentTaskSignal.Kind(rawValue: kindText), let text = arguments["content"]
         else { throw CommunicationError.invalidPayload }
         let target = arguments["target"].map { AgentID(rawValue: $0) }
@@ -87,16 +89,6 @@ public enum AgentCommunicationAdapter {
                 target == (kind == .input || kind == .cancel ? existing.executor : existing.requester)
             else { throw CommunicationError.scopeClosed }
             scope = existing
-        }
-        if arguments["businessContract"] != nil || arguments["payload"] != nil {
-            guard kind == .input, scope.execution == .background,
-                let contract = arguments["businessContract"], let payload = arguments["payload"],
-                payload.utf8.count <= 65_536,
-                (try? JSONSerialization.jsonObject(with: Data(payload.utf8))) != nil
-            else { throw CommunicationError.invalidPayload }
-            let signal = try AgentTaskSignal(
-                kind: kind, scope: scope, businessContract: contract, data: Data(payload.utf8))
-            return (try CommunicationAction(message: signal.message(), target: target), signal)
         }
         if kind == .input, scope.execution == .background { throw CommunicationError.invalidPayload }
         let content = try AgentTaskContent(

@@ -26,6 +26,8 @@ Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注�
 
 预览按分页投影并限制 JSON 大小；完整读取经 HistoryReadInvocation 保存一个请求私有结果，验证来源、会话、输入身份与取消后完成，不创建全局请求表。HistoryMutationService 共享一个标题准入槽，自动标题和显式重试不并行创建第二套 worker；关闭加入标题工作，取消不能撤销已提交持久化。HistoryPresentationAdapter 通过 UI 公开端口提交真实仓库事实。
 
+删除、清理日志和标题摘要成功只产生结构化完成回执。新建对话返回本次实际归档的对话 ID 或空归档结果，Memory 校验该结果后刷新历史。
+
 ## 查询算法与数据约束
 
 list 使用 store.listConversations 的当前会话与归档元数据，顺序沿用按 archivedAt 排序的索引，不加载归档正文。标题和 latestUser 预览各最多 40 UTF-8 字节，turnCount 取输入块数。

@@ -157,7 +157,7 @@ Writer UI acceptance seeds the shared SQLite catalog and copies agent/task_N wor
 
 ## Agent public resource validation
 
-check-modelkit-boundaries.py validates bundled Agent resource schema v8 and required nonblank descriptions up to 2048 UTF-8 bytes. Runtime/tests additionally validate identities, full schema, peer discovery permissions and compiled v7 projection. Resource packaging includes each role's private instruction/template assets through the existing Resources bundle.
+check-modelkit-boundaries.py validates bundled Agent resource schema v9 and required nonblank descriptions up to 2048 UTF-8 bytes. Runtime/tests additionally validate identities, full schema, peer discovery permissions and compiled v7 projection. Resource packaging includes each role's private instruction/template assets through the existing Resources bundle.
 
 ## Writer prompt matrix runner
 

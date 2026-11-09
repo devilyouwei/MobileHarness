@@ -237,7 +237,7 @@ private actor SpecialistRobotModel: ChatCapability {
 private struct SpecialistTaskControls: TaskControlCapability {
     let agent: AssistantAgent
     func controlTask(_ operation: String, arguments: [String: String], invocation: any FunctionInput) async throws
-        -> String
+        -> ActionCompletion
     {
         try await agent.controlTask(
             operation, arguments: arguments, source: invocation.context.source,

@@ -23,3 +23,5 @@
 AppInfo.plist声明NSSupportsLiveActivities及固定mobileharness URL scheme。IslandInfo.plist声明com.apple.widgetkit-extension；MobileHarnessLiveActivity扩展被两个App目标显式依赖并嵌入PlugIns，bundle ID为宿主ID加.island，版本与宿主一致。扩展使用同一共享构建设置但不继承App内存entitlement，不声明相机/麦克风、App Groups、推送或后台保活能力。
 
 AppInfo.plist的UIBackgroundModes声明audio，用于用户已开启会话的后台录音和语音播放；扩展不声明该模式。系统中断和终止仍影响运行，Live Activity不提供后台执行时间。
+
+AppInfo.plist 的 BGTaskSchedulerPermittedIdentifiers 声明宿主 bundle ID 下的 `.writer.*` 标识。Writer 的持续后台任务使用系统默认 CPU/网络资源，系统进度界面由 BackgroundTasks 提供。

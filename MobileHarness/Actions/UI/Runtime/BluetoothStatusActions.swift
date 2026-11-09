@@ -12,19 +12,17 @@ extension UIActions {
     @Action(domain: "UI", module: "BluetoothStatus", title: "showHome", timeout: .seconds(5))
     public static func showBluetoothHome(
         invocation: any FunctionInput, using presentation: any BluetoothStatusPresentationCapability
-    ) async throws -> String {
+    ) async throws {
         try Task.checkCancellation()
         let (phase, revision) = try bluetoothStatus(invocation)
         try await presentation.presentBluetoothHome(phase, revision: revision, invocation: invocation)
-        return "presented"
     }
     @Action(domain: "UI", module: "BluetoothStatus", title: "showSettings", timeout: .seconds(5))
     public static func showBluetoothSettings(
         invocation: any FunctionInput, using presentation: any BluetoothStatusPresentationCapability
-    ) async throws -> String {
+    ) async throws {
         try Task.checkCancellation()
         let (phase, revision) = try bluetoothStatus(invocation)
         try await presentation.presentBluetoothSettings(phase, revision: revision, invocation: invocation)
-        return "presented"
     }
 }

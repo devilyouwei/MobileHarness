@@ -1026,7 +1026,8 @@ extension LiveRuntimeTests {
     var decoded = 0
     func decode(_ signal: AgentTaskSignal) throws -> AgentMessage {
         decoded += 1
-        return AgentMessage(contract: signal.businessContract, content: "payload", maximumBytes: 64, validate: { _ in })
+        return AgentMessage(
+            contract: try #require(signal.businessContract), content: "payload", maximumBytes: 64, validate: { _ in })
     }
     for untrusted in [
         input(origin: .local, incarnation: nil), input(origin: .runtime, incarnation: "runtime"),

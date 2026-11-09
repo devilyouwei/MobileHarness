@@ -15,17 +15,17 @@ public struct HistoryModule: CapabilityModule {
     }
     public var definitions: [ActionFunction] {
         var values = [
-            HistoryActions.clearLogsDefinition(completing: { [mutations] invocation in
-                .value(try await HistoryActions.clearLogs(invocation: invocation, using: mutations))
+            HistoryActions.clearLogsDefinition(handler: { [mutations] invocation in
+                try await HistoryActions.clearLogs(invocation: invocation, using: mutations)
             }),
             HistoryActions.startNewDefinition(completing: { [mutations] invocation in
                 .value(try await HistoryActions.startNew(invocation: invocation, using: mutations))
             }),
-            HistoryActions.summarizeDefinition(completing: { [mutations] invocation in
-                .value(try await HistoryActions.summarize(invocation: invocation, using: mutations))
+            HistoryActions.summarizeDefinition(handler: { [mutations] invocation in
+                try await HistoryActions.summarize(invocation: invocation, using: mutations)
             }),
-            HistoryActions.deleteDefinition(completing: { [mutations] invocation in
-                .value(try await HistoryActions.delete(invocation: invocation, using: mutations))
+            HistoryActions.deleteDefinition(handler: { [mutations] invocation in
+                try await HistoryActions.delete(invocation: invocation, using: mutations)
             }),
             HistoryActions.listDefinition(completing: { [history] invocation in
                 .value(try await HistoryActions.list(invocation: invocation, using: history))

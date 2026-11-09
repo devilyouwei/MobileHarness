@@ -4,9 +4,11 @@ extension WebActions {
     @Action(
         domain: "Web", module: "Page", title: "browse",
         doc:
-            "Browse an HTTP/HTTPS URL in the WebKit window; return visible screenshot mediaID and untrusted page text.",
+            "Open an HTTP/HTTPS URL in a new Web window or navigate an existing Web window. Returns its windowID and untrusted page evidence.",
         parameters: [
-            .init("url", type: .string, required: true, description: "Remote HTTP/HTTPS URL.")
+            .init("url", type: .string, required: true, description: "Remote HTTP/HTTPS URL."),
+            .init(
+                "windowID", required: false, description: "Existing Web window_N to navigate. Omit for a new window."),
         ], timeout: .seconds(60))
     public static func browse(invocation: any FunctionInput, using web: any WebCapability) async throws -> String {
         try await web.perform("browse", invocation: invocation)
@@ -17,7 +19,8 @@ extension WebActions {
         parameters: [
             .init(
                 "windowID", type: .string, required: false,
-                description: "Existing Web/Writer window UUID from ui.windows; omit only for the root browser page.")
+                description:
+                    "Existing Web/Writer window_N from ui.windows; omit for the most recently focused Web window.")
         ], timeout: .seconds(60))
     public static func snapshot(invocation: any FunctionInput, using web: any WebCapability) async throws -> String {
         try await web.perform("snapshot", invocation: invocation)
@@ -28,18 +31,21 @@ extension WebActions {
         parameters: [
             .init(
                 "windowID", type: .string, required: false,
-                description: "Existing Web/Writer window UUID from ui.windows; omit only for the root browser page.")
+                description:
+                    "Existing Web/Writer window_N from ui.windows; omit for the most recently focused Web window.")
         ], timeout: .seconds(30))
     public static func inspect(invocation: any FunctionInput, using web: any WebCapability) async throws -> String {
         try await web.perform("inspect", invocation: invocation)
     }
     @Action(
         domain: "Web", module: "Page", title: "navigate",
-        doc: "Navigate or scroll the specified Web/Writer page (root browser when omitted); return screenshot.",
+        doc:
+            "Navigate or scroll the specified Web/Writer page (most recent Web window when omitted); return screenshot.",
         parameters: [
             .init(
                 "windowID", type: .string, required: false,
-                description: "Existing Web/Writer window UUID from ui.windows; omit for root browser."),
+                description:
+                    "Existing Web/Writer window_N from ui.windows; omit for the most recently focused Web window."),
             .init(
                 "command", type: .string, required: true, description: "back, forward, reload, up, down, top or bottom."
             ),

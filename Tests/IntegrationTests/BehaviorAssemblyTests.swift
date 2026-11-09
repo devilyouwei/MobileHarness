@@ -28,7 +28,7 @@ private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, Sp
         async throws
     { throw CancellationError() }
     func controlTask(_ operation: String, arguments: [String: String], invocation: any FunctionInput) async throws
-        -> String
+        -> ActionCompletion
     {
         throw CancellationError()
     }

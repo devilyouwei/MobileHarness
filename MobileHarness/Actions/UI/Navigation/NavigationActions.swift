@@ -13,7 +13,7 @@ extension UIActions {
             )
         ], timeout: .seconds(5))
     public static func open(invocation: any FunctionInput, using presentation: any ResourcePresentationCapability)
-        async throws -> String
+        async throws
     {
         let args = ActionArguments(invocation.call.parameters)
         try args.validateAllowedKeys(["destination"])
@@ -27,6 +27,5 @@ extension UIActions {
         else { throw ResourcePresentationError.invalidGeneration }
         try Task.checkCancellation()
         try await presentation.navigate(destination, invocation: invocation)
-        return "presented"
     }
 }

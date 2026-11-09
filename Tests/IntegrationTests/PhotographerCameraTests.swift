@@ -76,8 +76,7 @@ private actor CameraProbe {
 private actor CameraBridge: CameraControlCapability {
     let probe: CameraProbe
     init(probe: CameraProbe) { self.probe = probe }
-    func configureCapture(_ settings: CameraCaptureSettings, invocation: any FunctionInput) async throws {
-        try settings.validate()
+    func configureCapture(_ settings: CameraCaptureSettings.Update, invocation: any FunctionInput) async throws {
         try await perform(.configure, invocation: invocation)
     }
     func cancelCapture(invocation: any FunctionInput) async throws {
@@ -193,9 +192,7 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
     let f = try await CameraFixture()
     try await f.runtime.perform(.open)
     let opened = try #require(await f.runtime.agent.cameraResult())
-    #expect(
-        try JSONDecoder().decode(CameraCommandReceipt.self, from: Data(opened.value.utf8))
-            == CameraCommandReceipt(operation: "open", enabled: true))
+    #expect(opened.completion == .completed && !opened.isError)
     await #expect(throws: PhotographerIntentFailure.self) { try await f.runtime.perform(.flip, facing: .back) }
     let feedback = try #require(await f.runtime.agent.cameraResult())
     #expect(feedback.isError)

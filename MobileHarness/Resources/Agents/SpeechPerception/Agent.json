@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 9,
   "id": "speechPerception",
   "description": "I own listening consent, microphone intake, voice detection, speech recognition and sound-source observations. I publish recognized speech and enforce listening/playback lifecycle policy.",
   "communication": {
@@ -30,6 +30,5 @@
     ],
     "sends": []
   },
-  "baseSkills": [],
-  "backgroundTasks": []
+  "baseSkills": []
 }

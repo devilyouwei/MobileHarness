@@ -1,5 +1,21 @@
 # 已完成需求归档
 
+- [相机照片查看、批量保存和直接关闭](Camera-Photo-Review-Actions.md)（2026-11-09）。五张缓存照片可供同轮查看，支持批量保存和无照片确认框的关闭。
+
+- [Writer Markdown 与 Mermaid 渲染](Writer-Markdown-Mermaid.md)（2026-11-09）。离线文档解析、Mermaid 图表和窗口预览验证。
+
+- [相机设置、预览及 Writer 回馈](Camera-and-Writer-Feedback.md)（2026-11-09）。相机局部设置和预览完成语义，Writer 灵动岛回馈及普通进度收敛。
+
+- [Writer 持续后台执行](Writer-Continued-Background-Execution.md)（2026-11-09）。接入 iOS 持续后台任务，验证工作流继续、过期清理和 App 配置。
+
+- [相机设置与卸载预览的成功回执](Camera-Success-Observations.md)（2026-11-09）。两项相机 Action 改为 Void，验证结构化完成与异常传播。
+
+- [Action 成功回执与业务观察](Action-Success-Observations.md)（2026-11-09）。24 个纯操作 Action 改为 Void，验证成功不续轮和异常反馈。
+
+- [Writer 委派接纳与业务拒绝](Writer-Delegation-Admission.md)（2026-11-09）。移除后台契约白名单，增加模型拒绝终态及验证。
+
+- [精简 Writer 通信](Writer-Communication-Reduction.md)（2026-11-09）。四项入站和两项出站，运行时收尾独立于持久业务通知。
+
 - [独立 Agent 业务、纯通信与 HTTP 日志](Message-Agent-Business-Separation.md)（2026-11-07）：Assistant/Writer 独立十表、按表目录、业务与历史 UI 改造、旧代码清理和真机清洁安装。
 - [Database 表归属与日志清空](Database-Table-Ownership.md)（2026-11-07）：表目录与仓库归属、清空日志入口及后续独立表结构。
 - [完整请求日志与独立清空](Complete-Request-Logs.md)（2026-11-07）：原始 HTTP/图片/generation meta 可删除日志，业务记录独立保留；以独立 Agent 后续设计为当前边界。
@@ -116,3 +132,7 @@
 - [Writer 记录分页](Writer-Record-Pagination.md)：准确末页与导航返回保留；完整自动检查和 iOS 构建通过，原生交互另行复验。
 
 - [删除 Channel 覆盖与照片忽略](Remove-Channel-Override-And-Photo-Ignore.md)（2026-11-09）：固定注册 Channel，删除照片忽略 Action/UI/缓存状态/音效/教学；完整检查和四项 iOS 构建通过。
+
+- [Writer 批量打开作品与网页多窗口](Writer-and-Web-Multiwindow.md)（2026-11-09）。批量打开、多窗口及定向换站的调查和检查见[验证记录](../validation/Writer-and-Web-Multiwindow.md)。
+
+- [Writer 显式结束委托与通用作品打开](Writer-Explicit-Finish-and-Open.md)（2026-11-09）。统一 finish，按模型选定的作品逐件打开。

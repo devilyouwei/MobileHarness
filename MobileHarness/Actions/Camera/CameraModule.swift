@@ -14,8 +14,8 @@ public struct CameraModule: CapabilityModule {
             CameraActions.loadPreviewImageDefinition(completing: { [camera] in
                 .value(try await CameraActions.loadPreviewImage(invocation: $0, using: camera))
             }),
-            CameraActions.unloadPreviewImageDefinition(completing: { [camera] in
-                .value(try await CameraActions.unloadPreviewImage(invocation: $0, using: camera))
+            CameraActions.unloadPreviewImageDefinition(handler: { [camera] in
+                try await CameraActions.unloadPreviewImage(invocation: $0, using: camera)
             }),
             CameraActions.startRecordingDefinition(completing: { [camera] in
                 .value(try await CameraActions.startRecording(invocation: $0, using: camera))
@@ -29,11 +29,11 @@ public struct CameraModule: CapabilityModule {
             CameraActions.ignoreVideoDefinition(completing: { [camera] in
                 .value(try await CameraActions.ignoreVideo(invocation: $0, using: camera))
             }),
-            CameraActions.configureDefinition(completing: { [camera] in
-                .value(try await CameraActions.configure(invocation: $0, using: camera))
+            CameraActions.configureDefinition(handler: { [camera] in
+                try await CameraActions.configure(invocation: $0, using: camera)
             }),
-            CameraActions.cancelCaptureDefinition(completing: { [camera] in
-                .value(try await CameraActions.cancelCapture(invocation: $0, using: camera))
+            CameraActions.cancelCaptureDefinition(handler: { [camera] in
+                try await CameraActions.cancelCapture(invocation: $0, using: camera)
             }),
             CameraActions.openVisionDefinition(handler: { [camera] in
                 try await CameraActions.openVision(invocation: $0, using: camera)
@@ -50,14 +50,17 @@ public struct CameraModule: CapabilityModule {
             CameraActions.savePhotoDefinition(completing: { [camera] invocation in
                 .value(try await CameraActions.savePhoto(invocation: invocation, using: camera))
             }),
+            CameraActions.saveAllPhotosDefinition(completing: { [camera] invocation in
+                .value(try await CameraActions.saveAllPhotos(invocation: invocation, using: camera))
+            }),
             CameraActions.takePhotoDefinition(completing: { [camera] invocation in
                 .value(try await CameraActions.takePhoto(invocation: invocation, using: camera))
             }),
             CameraActions.retryDefinition(handler: { [camera] invocation in
                 try await CameraActions.retry(invocation: invocation, using: camera)
             }),
-            CameraActions.openDefinition(completing: { [camera] invocation in
-                .value(try await CameraActions.open(invocation: invocation, using: camera))
+            CameraActions.openDefinition(handler: { [camera] invocation in
+                try await CameraActions.open(invocation: invocation, using: camera)
             }),
             CameraActions.closeDefinition(completing: { [camera] invocation in
                 .value(try await CameraActions.close(invocation: invocation, using: camera))

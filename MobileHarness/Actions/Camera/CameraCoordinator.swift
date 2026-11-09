@@ -63,18 +63,16 @@
             try await previews.load(id, scope: invocation.context.sessionID)
             return String(decoding: try previews.snapshot(scope: invocation.context.sessionID).facts, as: UTF8.self)
         }
-        public func unloadPreviewImage(_ id: String, invocation: any FunctionInput) async throws -> String {
+        public func loadPreviewImages(_ ids: [String], invocation: any FunctionInput) async throws -> String {
             try validatePreview(invocation)
-            try previews.unload(id, scope: invocation.context.sessionID)
+            try await previews.load(ids, scope: invocation.context.sessionID)
             return String(decoding: try previews.snapshot(scope: invocation.context.sessionID).facts, as: UTF8.self)
         }
-        private let windows: WindowState?
-        public func windowID() async -> String? {
-            windows?.windows.first(where: { $0.content == WindowContent.camera.rawValue }).flatMap {
-                windows?.reference(for: $0.id)
-            }
+        public func unloadPreviewImage(_ id: String, invocation: any FunctionInput) async throws {
+            try validatePreview(invocation)
+            try previews.unload(id, scope: invocation.context.sessionID)
         }
-
+        private let windows: WindowState?
         var acquireRecordingAudio: @MainActor () async throws -> Void = {}
         var releaseRecordingAudio: @MainActor (Bool) async throws -> Void = { _ in }
         private(set) var recordingAudioHeld = false
@@ -233,6 +231,10 @@
             try validatePreview(invocation)
             return try await photoSession.savePhoto(id, invocation: invocation)
         }
+        public func saveAllPhotos(invocation: any FunctionInput) async throws -> CameraPhotoBatchReceipt {
+            try validatePreview(invocation)
+            return try await photoSession.saveAllPhotos(invocation: invocation)
+        }
         public func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt {
             guard !changingDemand, !windowTransition, worker == nil else { throw CameraControlError.busy }
             guard !recordingSession.busy, !recordingSession.hasClip else { throw CameraControlError.busy }
@@ -247,8 +249,10 @@
             return try await photoSession.takePhoto(delaySeconds: state.settings.delaySeconds, invocation: invocation)
         }
 
-        public func configureCapture(_ settings: CameraCaptureSettings, invocation: any FunctionInput) async throws {
-            try settings.validate()
+        public func configureCapture(_ update: CameraCaptureSettings.Update, invocation: any FunctionInput) async throws
+        {
+            try Task.checkCancellation()
+            guard update != .init() else { return }
             guard foreground, state.isEnabled, state.isVisible else { throw CameraControlError.disabled }
             guard !photoSession.isBusy, !recordingSession.busy, !recordingSession.hasClip, worker == nil,
                 !changingDemand, !windowTransition
@@ -256,7 +260,7 @@
             guard state.lensOwner == .capture else { throw CameraControlError.lensNotOwned }
             changingDemand = true
             defer { changingDemand = false }
-            try await CameraCaptureConfiguration.apply(settings, camera: camera, presentation: presentation)
+            try await CameraCaptureConfiguration.applyUpdate(update, camera: camera, presentation: presentation)
         }
         public func cancelCapture(invocation: any FunctionInput) async throws {
             try Task.checkCancellation()
@@ -291,7 +295,7 @@
                 try Task.checkCancellation()
                 guard foreground, state.isVisible else { throw CameraControlError.notForeground }
             } else {
-                try await closeWindow(invocation: invocation)
+                try await closeCapture(invocation: invocation, allowsVideoPrompt: false)
                 if let windows, let item = windows.windows.first(where: { $0.content == WindowContent.camera.rawValue })
                 {
                     try await windows.change(item.id, command: .close)
@@ -320,6 +324,9 @@
             try await setCaptureEnabled(true, invocation: invocation)
         }
         public func closeWindow(invocation: any FunctionInput) async throws {
+            try await closeCapture(invocation: invocation, allowsVideoPrompt: true)
+        }
+        private func closeCapture(invocation: any FunctionInput, allowsVideoPrompt: Bool) async throws {
             guard foreground else { throw CameraControlError.notForeground }
             await photoSession.stopAndWait()
             await worker?.value
@@ -327,6 +334,7 @@
             if let id = recordingSession.id {
                 if state.recording.active { _ = try await recordingSession.stop(id) }
                 if recordingSession.hasClip {
+                    guard allowsVideoPrompt else { throw CameraControlError.pendingVideo }
                     guard let windows,
                         let item = windows.windows.first(where: { $0.content == WindowContent.camera.rawValue })
                     else { throw CameraControlError.unavailable }
@@ -346,19 +354,6 @@
                     }
                 }
             }
-            let pending = previews.pendingCount
-            if pending > 0, let windows,
-                let item = windows.windows.first(where: { $0.content == WindowContent.camera.rawValue })
-            {
-                if item.mode == .minimized { try await windows.change(item.id, command: .restore) }
-                let choice = try await windows.ask(
-                    item.id,
-                    prompt: .init(
-                        title: "还有 \(pending) 张照片未保存，关闭后将清空预览。",
-                        choices: [.init(id: "return", title: "返回查看"), .init(id: "clear", title: "关闭并清空")]))
-                guard choice == "clear" else { throw CancellationError() }
-            }
-            await photoSession.stopAndWait()
             await previews.endSession()
             presentation.present(.capturedPhoto(nil))
             presentation.present(.savedPreviewID(nil))

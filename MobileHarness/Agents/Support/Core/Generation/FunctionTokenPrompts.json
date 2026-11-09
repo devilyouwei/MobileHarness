@@ -8,7 +8,7 @@
     "communicationDescription": "Targets: {{targets}}. Kinds: {{kinds}}. {{usage}}",
     "catalogBoundary": "# RESPONSE CHECK\nChoose a declared XML Action, an exact API-native Tool, or useful text; never mix their calling syntax. Check current blocking facts and parameters before effects. A request or generated tag is not success: perform a still-needed operation and await its actual result before confirming it. Dependent decisions require confirmed prerequisite feedback, not just output order. Do not replay an effect to obtain another round. If a step requires a sole call, the ENTIRE response is that call: no narration, acknowledgment or second call.",
     "communication.request": "request is only for a supported independent task, not a foreground operation handled by local Skills; omit taskID.",
-    "communication.input": "input requires taskID; background input also requires declared businessContract and payload JSON.",
+    "communication.input": "input requires taskID. Use task.send for a background delegation.",
     "communication.cancel": "cancel requires taskID; admission does not confirm device cleanup.",
     "communication.progress": "progress requires taskID; report progress or request user input without ending the task.",
     "communication.result": "result requires taskID and completes the task; report its actual outcome.",

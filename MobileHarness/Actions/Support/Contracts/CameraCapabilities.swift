@@ -21,12 +21,10 @@ public struct CameraCommandReceipt: Codable, Sendable, Equatable {
     public let operation: String
     public let enabled: Bool?
     public let facing: CameraActions.Facing?
-    public let windowID: String?
-    public init(operation: String, enabled: Bool? = nil, facing: CameraActions.Facing? = nil, windowID: String? = nil) {
+    public init(operation: String, enabled: Bool? = nil, facing: CameraActions.Facing? = nil) {
         self.operation = operation
         self.enabled = enabled
         self.facing = facing
-        self.windowID = windowID
     }
 }
 
@@ -64,7 +62,45 @@ public struct CameraPhotoCommandReceipt: Codable, Sendable, Equatable {
     }
 }
 
+public struct CameraPhotoBatchReceipt: Codable, Sendable, Equatable {
+    public struct Failure: Codable, Sendable, Equatable {
+        public let previewID: String
+        public let reason: String
+        public init(previewID: String, reason: String) {
+            self.previewID = previewID
+            self.reason = reason
+        }
+    }
+    public let saved: [CameraPhotoCommandReceipt]
+    public let failures: [Failure]
+    public let feedbackIssues: [String]?
+    public init(saved: [CameraPhotoCommandReceipt], failures: [Failure] = [], feedbackIssues: [String]? = nil) {
+        self.saved = saved
+        self.failures = failures
+        self.feedbackIssues = feedbackIssues
+    }
+}
+
 public struct CameraCaptureSettings: Codable, Sendable, Equatable {
+    public struct Update: Sendable, Equatable {
+        public let mode: String?
+        public let delaySeconds: Int?
+        public let flash: String?
+        public let zoom: Double?
+        public let durationSeconds: Int?
+
+        public init(
+            mode: String? = nil, delaySeconds: Int? = nil, flash: String? = nil, zoom: Double? = nil,
+            durationSeconds: Int? = nil
+        ) {
+            self.mode = mode
+            self.delaySeconds = delaySeconds
+            self.flash = flash
+            self.zoom = zoom
+            self.durationSeconds = durationSeconds
+        }
+    }
+
     public let mode: String
     public let delaySeconds: Int
     public let flash: String
@@ -92,19 +128,20 @@ public struct CameraCaptureSettings: Codable, Sendable, Equatable {
 
 public protocol CameraControlCapability: Sendable {
     func loadPreviewImage(_ id: String, invocation: any FunctionInput) async throws -> String
-    func unloadPreviewImage(_ id: String, invocation: any FunctionInput) async throws -> String
+    func loadPreviewImages(_ ids: [String], invocation: any FunctionInput) async throws -> String
+    func unloadPreviewImage(_ id: String, invocation: any FunctionInput) async throws
     func startRecording(durationSeconds: Int?, invocation: any FunctionInput) async throws -> CameraVideoReceipt
     func waitForRecording(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt
     func stopRecording(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt
     func saveVideo(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt
     func ignoreVideo(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt
-    func configureCapture(_ settings: CameraCaptureSettings, invocation: any FunctionInput) async throws
+    func configureCapture(_ settings: CameraCaptureSettings.Update, invocation: any FunctionInput) async throws
     func cancelCapture(invocation: any FunctionInput) async throws
 
-    func windowID() async -> String?
     func setPerceptionEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws
     func flipPerception(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws
     func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt
+    func saveAllPhotos(invocation: any FunctionInput) async throws -> CameraPhotoBatchReceipt
     func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt
     func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws
@@ -119,9 +156,11 @@ public enum CameraControlError: Error, Equatable, Sendable, ActionExecutionFailu
     case permissionDenied
     case unavailable
     case photoUnavailable
+    case pendingVideo
     case lensNotOwned
     public var errorDescription: String? {
         switch self {
+        case .pendingVideo: "请先保存或忽略待处理的视频，再关闭相机。"
         case .notForeground: "请回到应用前台再操作"
         case .busy: "照片或相机操作正在执行，请稍后重试"
         case .disabled: "相机尚未开启"
@@ -133,6 +172,7 @@ public enum CameraControlError: Error, Equatable, Sendable, ActionExecutionFailu
     }
     public var executionFailureCode: ActionExecutionFailureCode {
         switch self {
+        case .pendingVideo: .init(rawValue: "pendingVideo")
         case .permissionDenied: .permissionDenied
         case .notForeground: .init(rawValue: "background")
         case .busy: .init(rawValue: "busy")
@@ -161,12 +201,11 @@ extension CameraControlCapability {
     public func ignoreVideo(_ id: String, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
         throw CameraControlError.unavailable
     }
-    public func configureCapture(_ settings: CameraCaptureSettings, invocation: any FunctionInput) async throws {
+    public func configureCapture(_ settings: CameraCaptureSettings.Update, invocation: any FunctionInput) async throws {
         throw CameraControlError.unavailable
     }
     public func cancelCapture(invocation: any FunctionInput) async throws { throw CameraControlError.unavailable }
 
-    public func windowID() async -> String? { nil }
     public func setPerceptionEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
         throw CameraControlError.unavailable
     }
@@ -209,7 +248,13 @@ extension CameraControlCapability {
     public func loadPreviewImage(_ id: String, invocation: any FunctionInput) async throws -> String {
         throw CameraControlError.unavailable
     }
-    public func unloadPreviewImage(_ id: String, invocation: any FunctionInput) async throws -> String {
+    public func loadPreviewImages(_ ids: [String], invocation: any FunctionInput) async throws -> String {
+        throw CameraControlError.unavailable
+    }
+    public func saveAllPhotos(invocation: any FunctionInput) async throws -> CameraPhotoBatchReceipt {
+        throw CameraControlError.unavailable
+    }
+    public func unloadPreviewImage(_ id: String, invocation: any FunctionInput) async throws {
         throw CameraControlError.unavailable
     }
 }

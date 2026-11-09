@@ -100,7 +100,7 @@ AgentChatWorker.executeRound is the final assembly boundary for skills-enabled r
 2. Resolve the loaded Skills' useStates union and call the injected AgentStateContext for the current session. Its callbacks read actual owners; failures stop request construction. Business collection is separate from the private actor snapshot and is not a global atomic observation.
 3. Encode the same private snapshot's minimal Task/Skill projection. Construct one system data message containing AGENT CONTEXT, then CURRENT STATE with the explicit facts-only boundary. Limit this combined block to 16 KiB.
 4. Rebuild State.systemPrompt from the same catalog and Skill snapshot. Remove old system messages and insert the instruction/catalog prefix at index zero. Insert the fresh data message immediately before a trailing latest user message; otherwise append it after the complete native call/result group. Never split native result pairing.
-5. Apply retainingRecent to complete message groups, preserving system messages, current intent and the required continuation suffix. The final request is bounded to 64 messages, 64 KiB of counted text/call fields and four images; inability to fit protected content is an error. Native definitions are supplied separately in ChatRequest.tools when supported.
+5. Apply retainingRecent to complete message groups, preserving system messages, current intent and the required continuation suffix. The final request is bounded to 64 messages, 64 KiB of counted text/call fields and five images; inability to fit protected content is an error. Native definitions are supplied separately in ChatRequest.tools when supported.
 6. Persist the actual request messages and decision metadata before collecting provider output. A continuation repeats this assembly, refreshing facts and the effective catalog rather than accumulating old State messages.
 
 The prefix contains role/protocol instructions, Skill overview, current loaded teaching and the effective catalog. It remains stable while those inputs remain unchanged; load/release changes the next request's prefix. CURRENT STATE is owner-sampled business/presentation data. AGENT CONTEXT contains only the matching active Task goal/status and effective loaded Skill IDs. The entire private task registry, delegated views, authorization records and idle counters stay out of that projection. Owner/source mappings belong in [Context](../Context/README.md#container-context-read-path).
@@ -163,7 +163,7 @@ ChatTiming 由支持的 provider 在请求发出及首个非空文本或已校�
 | Tool `isError`, nonnil non-cancellation `failureCode`, failed report | Real failure takes precedence over absence of business output; continue. |
 | Unknown Action/Tool alias or invalid parameters | Parser-local rejection becomes a correlated error result (`invalidInvocation` or `communicationRejected`), without executing the call. Malformed markup ends the generation as a real Agent failure. |
 | Handler exception, Action timeout, resource/permission/admission rejection with reliable terminal feedback | Continue from the real failure. A closed scheduling tree alone does not authorize continuation: call results and the round receipt must remain reliable. |
-| Failed model communication | Continue from the error. Successful send/publish admission is a `.completed` acknowledgment. Other background progress/results update control state; Writer business facts follow the domain FIFO contract below. |
+| Failed model communication | Continue from the error. Successful send/publish admission is a `.completed` acknowledgment. Other background progress/results update control state; Writer facts update the task view without a decision. |
 | Chat request/stream/consumer failure within `collect` | Record the failed attempt, join admitted effects and terminate the decision. Includes HTTP/network/provider errors, output parsing, unsupported output and per-request limits. No automatic Agent retry. |
 | Observation/image enrichment construction failure | Terminate the decision with the real error and retained execution evidence; never fabricate an image or repeat capture. |
 | Round closure failure with a prior generation error and every call result already present | Retain both causes and terminate the input; round closure/delivery uncertainty never authorizes a retry. |
@@ -199,36 +199,15 @@ residentContext() exposes only the repository’s initialized committed in-memor
 
 Task 控制通过 task.start/end 管理 Assistant 前台 scope，task.delegate(agent_id,description) 发送独立请求；task.send/cancel 带 agent_id 时发送消息，不带时作用于前台。目标自主选择 task/workspace，外部不提供 taskID。连续 start 排空旧 scope 副作用并取消旧任务后建立新任务；等待用户仍保留活跃 scope。
 
-Writer started/progress events update durable control facts and one latest pending summary. Only admitted summaries, userInput and terminal reports enter the common 32-item FIFO with final speech/text. Duplicate sequences do not trigger another reply. Summary admission waits for current playback and peer replies; terminal reports keep their independent persistent delivery. Reports never import private source-dialog context or restart Writer.
+Writer 的 started 和 userInput 作为认证控制事实更新任务视图。按委派和事件序号去重。终态由 writer.completion 提供，核对 SQLite 不可变通知并标记消费。运行时独立清理并退休执行授权。旧委派的终态只结算原视图，创作不因投递重试而重放。
 
-Writer 的 task.result 仅关闭控制身份，不进入回复队列，也不作为通知开始模型处理的屏障。writer.completion 独立经过认证角色通信，核对 SQLite 的任务、执行、终态和不可变通知；通知确认或跨对话的已存输入身份防止重复回复。续作后旧 run 的终态仅确认接收，不改变新执行或触发模型。新根中的回复使用当前交互身份。委托、取消替代和消息发送前读取可信执行状态关闭过期私有 Task/view，不等待通知。进程重启只恢复待送达通知；已接纳输入仍遵循 Chat interrupted 恢复，不自动重放语音或创作。
+Writer 回馈由其灵动岛呈现。Assistant 接收回馈时不占用 32 项正式输入 FIFO，不建立模型或语音回合。真实文本接纳或语音开始时捕获当前追问身份。相应问题在该用户请求中作为带引号的数据提供。补充使用 task.send 时核对该输入捕获的追问与当前委派，只有匹配时才转发。面向 Writer 的委派、补充、取消送达成功产生 completed。参数、准入和传输失败保留观察。
 
-模型历史 read-token/begin 短事务与 Assistant 输入接纳共用 admission gate，避免并发接纳使请求历史令牌失效；模型生成和工具执行不占此锁。
-
-后台委托注册失败和递送失败均进入清理；内存任务失败/终态与 SQLite 任务关闭分别执行，任一步失败仍尝试另一项并汇总清理错误。通信通过独立于轮次屏障的输出消费链路递送，模型仍使用 XML Action 调度。
-
-Writer 事件输入只授权向用户汇报或提问，不授权 startTask/finishTask/cancelTask 生命周期操作。委托只从当前真实文本/最终语音输入获取原文；每项输入只可尝试一次实际委托，拒绝后须新的用户输入才能重试。busy/参数校验拒绝未尝试实际委托，可在同项输入内按用户已确认的替代意图修正。Writer 通知不伪装用户输入，也不能退化为 goal 作为原文。
-
-Writer 失败输入包含生产者提供的分类、阶段、网络/HTTP原因、模型及耗时事实；Assistant向用户汇报这些事实，不把 transport/http阶段推测成某个HTTP状态或服务端报错，不自动重试。
-
-详细Writer失败投影沿用4KiB观察输入边界，优先保留身份和分类/关键网络事实；过长文本按UTF-8有效边界投影并明确标记截断，原始事件及Writer请求诊断不受投影删减。
-
-
-Writer事实仅在当前Decision、真实round/playback屏障及前台委托回复占用清空后开始；foreground结果/等待用户播放收尾解除占用时立即drain，仍遵守已接纳输入FIFO。Writer回复的处理起点使用单调时间，只有成功Decision在真实屏障后发布completedReportID/reportStartedAt；保留最近一次成功事实随完整ReplyActivity快照重复携带，避免并发通信消费者先递送新版快照而漏掉完成。取消/失败不发布新的成功事实。SpeechPerception据用户停止/生命周期围栏决定播毕启听，模型不调用startListening完成该衔接。
-
-ReplyActivity发布端只在占用进入/退出、会话变化、新的最终语音root确认或新的成功Writer汇报时发送完整快照。同态排队文本/Writer输入仅更新本地集合，不逐项发布，避免32项接纳突发挤满16项通信消费队列；最终语音确认不能被合并。模型输入、SQLite证据和FIFO仍逐项保留，通信队列容量不变。
-
-## Writer普通进度合并
-
-认证started/progress先作为control事实持久更新任务视图，最新普通摘要仅一项，不占32项正式输入容量。独立摘要worker等待当前模型/播放/peer屏障和既有FIFO排空，普通回复开始间隔至少10秒；接纳时使用独立输入身份，预留容量、持久化work后进入共用队列，一旦接纳不替换或重排。userInput及终态保持原FIFO/持久重投并清除未接纳普通摘要；暂停/停止加入worker。摘要失败保留最新待处理事实并显式记录，不能重跑Writer创作。
-
-The ordinary-progress worker rechecks the pending event identity after asynchronous state reads, so a replaced or terminal-cleared summary is never consumed as the latest one. Formal FIFO admission and playback completion remain the gates for beginning an ordinary reply.
-
-Writer普通进度是完成步骤的事实；请求开始不会进入Assistant摘要队列。全局窗口摘要由BasicSkill选择ui.windows，其他页面能力按Skill目录渐进加载；公共容器State与创建窗口的Agent身份无关。
+模型历史 read-token/begin 短事务与 Assistant 输入接纳共用 admission gate，避免并发接纳使请求历史令牌失效。模型生成和工具执行不占此锁。ReplyActivity 发送占用变化、会话变化和最新语音 root 确认。Writer 回馈不改变语音占用或许可。
 
 ChatDriver scopes request consumption with InferenceSession.withCleanup, joining the SDK request worker on normal/error/cancellation exits. It owns no model-instance lease and does not unload shared clients.
 
-Assistant在receive控制路径接纳新的speech.phase(speaking)时发布独立的clearReply内部Action，不经模型生成、正式输入FIFO或当前round调用登记。会话／source incarnation／turn去重有32会话上限，关闭会话删除标记。begunInputID绑定当前回复请求并作为清理目标传出，避免迟到clear删除新请求或旧请求继续打开已退休字幕。正式ASR final、用户文本及Writer消息的FIFO不变。
+Assistant在receive控制路径接纳新的speech.phase(speaking)时发布独立的clearReply内部Action，不经模型生成、正式输入FIFO或当前round调用登记。会话／source incarnation／turn去重有32会话上限，关闭会话删除标记。begunInputID绑定当前回复请求并作为清理目标传出，避免迟到clear删除新请求或旧请求继续打开已退休字幕。正式 ASR final 与用户文本维持 FIFO。
 
 Background task.delegate persists a request in agent_messages without creating a target task. Assistant reconciles authenticated communication facts; Writer owns its private task and workspace. Task send/cancel resolve agent_id to the active communication, with pending-question matching for answers. No caller-supplied task/workspace selection is accepted.
 
@@ -237,7 +216,7 @@ Background task.delegate persists a request in agent_messages without creating a
 Agents 的 AgentModelRequestRecording 将 ModelKit 中立 HTTP 采集回调桥接到共享 model_request_log，记录实际请求、响应/SSE、图片和 generation meta。非 HTTP 调用标 local。业务输入、回复和工具结果分别在 assistant_messages / writer_messages；清日志不会删除业务消息，图片与生成信息随日志删除。后续采集仅 UPDATE，不重建已清除日志。
 
 Assistant reply-activity snapshots retain the latest admitted final-speech acknowledgment for the
-interaction session. Later text, Writer, task-feedback and terminal publications carry that same root;
+interaction session. Later text, task-feedback and terminal publications carry that same root;
 finishing an older input cannot replace it. SpeechPerception can therefore release its pending-final
 gate from the newest complete snapshot even when transport overtakes the original acknowledgment.
 Occupancy and explicit listening consent remain independent; no task waiting state forces a microphone

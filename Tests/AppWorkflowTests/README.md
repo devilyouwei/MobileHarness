@@ -145,7 +145,7 @@ Writer raw-code regressions cover split outer fences, normal JS template literal
 
 Exact replace regressions assert unchanged surrounding UTF-8/newlines/related files, fresh read ownership, unique matches within a narrowed range, empty replacement deletion, stale/cross-file reference rejection, and failure atomicity. This is a deterministic patch operation, separate from model-generated fragment streaming.
 
-WriterWorkflow tests cover natural no-tool termination through the shared finalizer, one progress event per actual request, late accepted revisions and paired native-call results. Fixture revisions are consumed once, matching the production port. No loop-count or output-token budget is added to production behavior.
+WriterWorkflow tests cover bounded recovery from tool-free responses before explicit finish, one progress event per actual request, late accepted revisions and paired native-call results. Fixture revisions are consumed once, matching the production port. No loop-count or output-token budget is added to production behavior.
 
 Writer回合边界回归验证控制/内容请求、文件提交、预览加入、完成汇报、下一请求的顺序；Web定向回归验证Writer窗口读取/截图隔离、无根页面创建、真实目标回执及错误ID拒绝。
 

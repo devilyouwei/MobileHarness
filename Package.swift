@@ -184,7 +184,16 @@ let package = Package(
                 "Conversation/README.md",
                 "Components/Island/README.md", "Components/Window/README.md", "Components/Web/README.md",
                 "Settings/README.md", "Diagnostics/README.md", "Components/Island/IslandActivityWidget.swift",
-            ], resources: [.process("Conversation/ListeningHalo.metal")]),
+            ],
+            resources: [
+                .process("Conversation/ListeningHalo.metal"),
+                .copy("Components/Web/MarkdownRenderHost.html"),
+                .copy("Components/Web/MarkdownRenderer.js"),
+                .copy("Components/Web/markdown-it-15.0.3.min.js"),
+                .copy("Components/Web/mermaid-12.3.0.min.js"),
+                .copy("Components/Web/markdown-it-LICENSE.txt"),
+                .copy("Components/Web/mermaid-LICENSE.txt"),
+            ]),
 
         .target(
             name: "AppLifecycle", dependencies: [], path: "MobileHarness/App/Lifecycle",

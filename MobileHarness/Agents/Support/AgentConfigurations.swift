@@ -43,6 +43,7 @@ public enum AgentConfigurations {
         public let id: String
         public let revision: Int
         public let description: String
+        public let owner: String?
         public let dependencies: [String]
         public let useActions: [Binding]
         public let useStates: [String]
@@ -60,7 +61,8 @@ public enum AgentConfigurations {
                 Set(all.allKeys.map(\.stringValue))
                     .isSubset(
                         of: Set([
-                            "version", "id", "revision", "description", "dependencies", "useActions", "useStates",
+                            "version", "id", "revision", "description", "owner", "dependencies", "useActions",
+                            "useStates",
                             "useInstructions",
                         ]))
             else {
@@ -70,11 +72,13 @@ public enum AgentConfigurations {
             id = try fields.decode(String.self, forKey: .id)
             revision = try fields.decode(Int.self, forKey: .revision)
             description = try fields.decode(String.self, forKey: .description)
+            owner = try fields.contains(.owner) ? fields.decode(String.self, forKey: .owner) : nil
             dependencies = try fields.decode([String].self, forKey: .dependencies)
             useActions = try fields.decode([Binding].self, forKey: .useActions)
             useStates = try fields.decode([String].self, forKey: .useStates)
             useInstructions = try fields.decode([String].self, forKey: .useInstructions)
-            guard version == 3, revision > 0, dependencies.count <= 16,
+            guard version == 3, revision > 0, owner.map({ ActionIdentifier.validName($0) }) ?? true,
+                dependencies.count <= 16,
                 useActions.count <= 128, Set(useActions.map(\.path)).count == useActions.count,
                 useStates.count <= 16, Set(useStates).count == useStates.count,
                 useStates.allSatisfy({
@@ -96,16 +100,11 @@ public enum AgentConfigurations {
     }
     /// Bundled role metadata is separate from the compiled v7 function/communication contract.
     struct Resource: Decodable {
-        struct BackgroundTask: Decodable {
-            let contract: String
-            let skills: [String]
-        }
         let version: Int
         let id: String
         let description: String
         let communication: CommunicationDeclaration
         let baseSkills: [String]
-        let backgroundTasks: [BackgroundTask]
         private struct Key: CodingKey {
             let stringValue: String
             var intValue: Int? { nil }
@@ -113,35 +112,27 @@ public enum AgentConfigurations {
             init?(intValue: Int) { return nil }
         }
         private enum CodingKeys: String, CodingKey {
-            case version, id, description, communication, baseSkills, backgroundTasks
+            case version, id, description, communication, baseSkills
         }
         init(from decoder: any Decoder) throws {
             let all = try decoder.container(keyedBy: Key.self)
             guard
                 Set(all.allKeys.map(\.stringValue)) == [
-                    "version", "id", "description", "communication", "baseSkills", "backgroundTasks",
+                    "version", "id", "description", "communication", "baseSkills",
                 ]
             else { throw AgentConfigurationError.invalidFormat }
             let fields = try decoder.container(keyedBy: CodingKeys.self)
             version = try fields.decode(Int.self, forKey: .version)
-            guard version == 8 else { throw AgentConfigurationError.unsupportedVersion(version) }
+            guard version == 9 else { throw AgentConfigurationError.unsupportedVersion(version) }
             id = try fields.decode(String.self, forKey: .id)
             description = try fields.decode(String.self, forKey: .description)
             communication = try fields.decode(CommunicationDeclaration.self, forKey: .communication)
             baseSkills = try fields.decode([String].self, forKey: .baseSkills)
-            backgroundTasks = try fields.decode([BackgroundTask].self, forKey: .backgroundTasks)
             guard ActionIdentifier.validName(id),
                 !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                 description.utf8.count <= 2048,
                 baseSkills.count <= 16, Set(baseSkills).count == baseSkills.count,
-                baseSkills.allSatisfy({ ActionIdentifier.validName($0) }),
-                backgroundTasks.count <= 32,
-                Set(backgroundTasks.map(\.contract)).count == backgroundTasks.count,
-                backgroundTasks.allSatisfy({
-                    ActionIdentifier.validName($0.contract) && $0.skills.count <= 16
-                        && Set($0.skills).count == $0.skills.count
-                        && $0.skills.allSatisfy({ ActionIdentifier.validName($0) })
-                })
+                baseSkills.allSatisfy({ ActionIdentifier.validName($0) })
             else { throw AgentConfigurationError.invalidFormat }
             try communication.validate(contracts: AgentContracts.communication)
         }
@@ -168,14 +159,13 @@ public enum AgentConfigurations {
         for name in try catalog().agents.keys.sorted() {
             let value = try resource(named: name)
             guard
-                let adapter = AgentTaskDelegation.resolve(
+                AgentTaskDelegation.permits(
                     target: AgentID(rawValue: value.id), requester: requester, communication: communication)
             else { continue }
             let target = try load(named: name)
             guard target.communication.inputs.contains(where: { $0.contract == "task.request" }) else {
                 throw CommunicationError.unsupportedContract
             }
-            try backgroundSupport(target: adapter.target, contract: adapter.businessContract, skills: [])
             entries.append("Agent ID=\(value.id); description=\(value.description)")
         }
         let result = entries.joined(separator: "\n")
@@ -236,21 +226,6 @@ public enum AgentConfigurations {
     public static func baseSkills(named name: String) throws -> [String] {
         try resource(named: name).baseSkills
     }
-    public static func backgroundSupport(target: AgentID, contract: String, skills: [String]) throws {
-        for name in try catalog().agents.keys.sorted() {
-            let value = try resource(named: name)
-            guard value.id == target.rawValue else { continue }
-            guard
-                value.backgroundTasks.contains(where: {
-                    $0.contract == contract && Set(skills).isSubset(of: Set($0.skills))
-                })
-            else { throw CommunicationError.unsupportedContract }
-            let expanded = try AgentSkillLoader.expand(skills)
-            _ = try AgentSkillLoader.registry(expanded, fixed: load(named: name).capabilities)
-            return
-        }
-        throw CommunicationError.unavailableTarget
-    }
     public static func skillInstructions(_ id: String) throws -> String {
         guard let path = try catalog().skills[id] else { throw AgentConfigurationError.resourceMissing(id) }
         let root = String(path.dropLast("Skill.json".count))
@@ -262,7 +237,7 @@ public enum AgentConfigurations {
         }.joined(separator: "\n\n")
     }
     public static func skillOverview() throws -> String {
-        let skills = try catalog().skills.keys.sorted().map { try skill($0) }
+        let skills = try catalog().skills.keys.sorted().map { try skill($0) }.filter { $0.owner == nil }
         let prefixes = skills.map { "Skill ID=\($0.id); description=" }
         let overhead = prefixes.reduce(0) { $0 + $1.utf8.count } + max(0, skills.count - 1)
         guard overhead <= 4096 else { throw AgentConfigurationError.invalidField("Skill discovery capacity") }
@@ -296,10 +271,10 @@ public enum AgentConfigurations {
         guard var root = try JSONSerialization.jsonObject(with: data(path)) as? [String: Any] else {
             throw AgentConfigurationError.invalidFormat
         }
-        let expanded = try AgentSkillLoader.expand(metadata.baseSkills)
-        let generated = try declaration(AgentSkillLoader.bindings(expanded))
+        let owner = AgentID(rawValue: metadata.id)
+        let expanded = try AgentSkillLoader.expand(metadata.baseSkills, owner: owner)
+        let generated = try declaration(AgentSkillLoader.bindings(expanded, owner: owner))
         root.removeValue(forKey: "baseSkills")
-        root.removeValue(forKey: "backgroundTasks")
         root.removeValue(forKey: "description")
         root["version"] = 7
         root["actions"] = generated.actions

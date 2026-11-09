@@ -364,8 +364,7 @@ extension ApplicationControlAgent {
                             if [
                                 "System.ModelResources.restoreSource", "System.ModelResources.saveSource",
                                 "System.ModelResources.snapshotResources", "UI.ResourcePresentation.showResources",
-                                "System.Provider.discoverModels", "System.Provider.restoreSettings",
-                                "System.Provider.saveSettings",
+                                "System.Provider.discoverModels",
                             ].contains(call.toolPath) {
                                 value = tool.value
                             }

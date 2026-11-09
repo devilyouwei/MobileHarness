@@ -1,14 +1,9 @@
 {
-  "version": 8,
+  "version": 9,
   "id": "writer",
-  "description": "I create and revise drawings, diagrams, HTML/CSS/JS pages, Markdown documents and text files, and find, open or delete saved works. Delegate these goals directly to me. Supply a short goal and any known real work title or returned writer/task_N reference; I verify the target, and ask when ambiguous. Do not send source code or assign my task/workspace identity. Request deletion only when the user explicitly asks. I accept one assignment at a time, including waiting, paused and cleanup states; relevant follow-up input supplements that assignment, and cancellation must finish cleanup before a new one. Accepted work survives the requesting conversation or listening session ending. I report progress, questions, results and failures; acceptance is not completion, and completion ends the assignment rather than the saved work. My private tools and execution instructions remain private.",
+  "description": "I create and revise drawings, diagrams, HTML/CSS/JS pages, Markdown documents and text files, and find, open or delete saved works. Delegate these goals directly to me. Supply a short goal and any known real work title or returned writer/task_N reference; I verify the target, and ask when ambiguous. Do not send source code or assign my task/workspace identity. Request deletion only when the user explicitly asks. I accept one assignment at a time, including waiting, paused and cleanup states; relevant follow-up input supplements that assignment, and cancellation must finish cleanup before a new one. Accepted work survives the requesting conversation or listening session ending. I show acceptance, progress, questions, results, refusals and failures directly as text on my Island. Forward relevant user answers or corrections to me. Successful delivery needs no extra reply. Completion ends the assignment rather than the saved work. My private tools and execution instructions remain private.",
   "communication": {
     "inputs": [
-      {
-        "contract": "tool.result",
-        "version": 1,
-        "kind": "toolResult"
-      },
       {
         "contract": "task.request",
         "version": 1,
@@ -20,24 +15,9 @@
         "kind": "observation"
       },
       {
-        "contract": "task.progress",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
-        "contract": "task.result",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
         "contract": "task.cancel",
         "version": 1,
         "kind": "observation"
-      },
-      {
-        "contract": "communication.receipt",
-        "version": 1,
-        "kind": "communicationReceipt"
       }
     ],
     "subscriptions": [],
@@ -48,20 +28,12 @@
         "target": "assistant"
       },
       {
-        "contract": "task.result",
-        "target": "assistant"
-      },
-      {
         "contract": "writer.completion",
         "target": "assistant"
       }
     ]
   },
-  "baseSkills": [],
-  "backgroundTasks": [
-    {
-      "contract": "writer.author",
-      "skills": []
-    }
+  "baseSkills": [
+    "writer-workspace"
   ]
 }

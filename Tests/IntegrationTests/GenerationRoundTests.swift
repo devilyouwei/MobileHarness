@@ -1253,16 +1253,19 @@ private func agentRequestFailuresTerminateWithoutRetryOrEffectReplay(_ failure: 
 @Test(
     .actionCatalog, arguments: ["action", "tool", "mixed"],
     [
-        "emptyValue", "emptyReport", "report", "failedReport", "partialReport", "cancelledReport", "cancelledThrow",
+        "completed", "emptyValue", "emptyReport", "report", "failedReport", "handlerThrow", "partialReport",
+        "cancelledReport", "cancelledThrow",
         "typedCancelledThrow", "mixedCancellationReport", "executionFailure",
     ])
 func generationRoundUsesBusinessOutputRatherThanAcknowledgment(_ route: String, _ shape: String) async throws {
     let harness = try await roundHarness(
         action: route != "tool", toolCount: route == "action" ? 0 : 1,
         handler: { _ in
+            if shape == "completed" { return .completed }
             if shape == "emptyValue" { return .value("") }
             if shape == "emptyReport" { return .report(.empty) }
             if shape == "failedReport" { return .report(.failure(.handlerFailed)) }
+            if shape == "handlerThrow" { throw ActionReportedError(.failure(.handlerFailed)) }
             if shape == "cancelledReport" { return .report(.failure(.cancelled)) }
             if shape == "cancelledThrow" { throw CancellationError() }
             if shape == "typedCancelledThrow" {
@@ -1292,7 +1295,7 @@ func generationRoundUsesBusinessOutputRatherThanAcknowledgment(_ route: String, 
     try await pump.value
     let requests = await harness.model.requests
     let cancellation = ["cancelledReport", "cancelledThrow", "typedCancelledThrow"].contains(shape)
-    let continues = shape != "emptyReport" && shape != "report" && !cancellation
+    let continues = !["completed", "emptyReport", "report"].contains(shape) && !cancellation
     try #require(requests.count == (continues ? 2 : 1))
     let record = try #require(try await harness.store.snapshot().current.turns.first)
     if shape == "report" {
@@ -1302,8 +1305,8 @@ func generationRoundUsesBusinessOutputRatherThanAcknowledgment(_ route: String, 
         }
     } else if shape == "partialReport" {
         #expect(requests[1].messages.contains { $0.content.contains("first") && $0.content.contains("second") })
-    } else if shape == "failedReport" || shape == "executionFailure" {
-        let code = shape == "failedReport" ? "handlerFailed" : (shape == "executionFailure" ? "timedOut" : "cancelled")
+    } else if ["failedReport", "handlerThrow", "executionFailure"].contains(shape) {
+        let code = shape == "executionFailure" ? "timedOut" : "handlerFailed"
         #expect(requests[1].messages.contains { $0.content.contains(code) })
     }
     #expect(record.state == .completed)
@@ -1665,7 +1668,7 @@ func cameraFirstFramePendingDoesNotCaptureOrStartReact() async throws {
 
 @Test(arguments: ["input", "xml", "native"], [false, true])
 func stateImagesMergeIntoOriginalInputWithOrderedSystemMetadata(_ continuation: String, _ supported: Bool) throws {
-    let intent = "比较这两张照片"
+    let intent = "比较这五张照片"
     var base = [
         ChatMessage(role: .system, content: "instructions"), .init(role: .user, content: "earlier input"),
         .init(role: .assistant, content: "earlier reply"), .init(role: .user, content: intent),
@@ -1678,15 +1681,20 @@ func stateImagesMergeIntoOriginalInputWithOrderedSystemMetadata(_ continuation: 
             .init(role: .assistant, content: "", toolCalls: [.init(id: "call", name: "load", argumentsJSON: "{}")]))
         base.append(.init(role: .tool, content: "Tool completed", toolCallID: "call"))
     }
-    let images: [ContextImage] = [
-        .init(id: "preview_2", width: 32, height: 16, data: Data([4, 5]), source: "actions.camera.preview"),
-        .init(id: "preview_1", width: 16, height: 32, data: Data([6]), source: "actions.camera.preview"),
-    ]
+    let images: [ContextImage] =
+        [
+            .init(id: "preview_2", width: 32, height: 16, data: Data([4, 5]), source: "actions.camera.preview"),
+            .init(id: "preview_1", width: 16, height: 32, data: Data([6]), source: "actions.camera.preview"),
+        ]
+        + (3...5).map {
+            .init(id: "preview_\($0)", width: 16, height: 32, data: Data([6]), source: "actions.camera.preview")
+        }
+    let ids = images.map(\.id)
     let result = try AgentChatContextBuilder.applyingStateImages(
         images, to: base, user: intent, supportsImages: supported)
     #expect(result.messages.count == base.count)
     #expect(result.messages.map(\.content) == base.map(\.content))
-    #expect(result.messages[3].images?.map(\.id) ?? [] == (supported ? ["preview_2", "preview_1"] : []))
+    #expect(result.messages[3].images?.map(\.id) ?? [] == (supported ? ids : []))
     #expect(result.messages.enumerated().allSatisfy { $0.offset == 3 || $0.element.images == nil })
     #expect(base.allSatisfy { $0.images == nil })
     let manifest = try #require(result.manifest)
@@ -1694,11 +1702,11 @@ func stateImagesMergeIntoOriginalInputWithOrderedSystemMetadata(_ continuation: 
     #expect(metadata["message"] as? String == "current_user_input")
     #expect(metadata["delivery"] as? String == (supported ? "attached" : "unsupported"))
     let entries = try #require(metadata["images"] as? [[String: Any]])
-    #expect(entries.compactMap { $0["id"] as? String } == ["preview_2", "preview_1"])
-    #expect(entries.compactMap { $0["position"] as? Int } == (supported ? [1, 2] : []))
+    #expect(entries.compactMap { $0["id"] as? String } == ids)
+    #expect(entries.compactMap { $0["position"] as? Int } == (supported ? [1, 2, 3, 4, 5] : []))
     #expect(entries[0]["width"] as? Int == 32 && entries[0]["byteCount"] as? Int == 2)
     #expect(!manifest.contains(Data([4, 5]).base64EncodedString()))
-    #expect(result.ephemeralIDs == (supported ? ["preview_2", "preview_1"] : []))
+    #expect(result.ephemeralIDs == (supported ? Set(ids) : []))
     _ = try ChatRequest(messages: result.messages)
     let refreshed = try AgentChatContextBuilder.applyingStateImages(
         [images[1]], to: base, user: intent, supportsImages: supported)
@@ -1713,7 +1721,7 @@ func stateImagesMergeIntoOriginalInputWithOrderedSystemMetadata(_ continuation: 
     #expect(result.messages[0].images?.map(\.id) == ["media_1", "preview_1"])
     #expect(result.manifest?.contains("\"position\":2") == true)
     #expect(result.ephemeralIDs == ["preview_1"])
-    let tooMany = (1...4).map { ContextImage(id: "preview_\($0)", width: 1, height: 1, data: Data([2])) }
+    let tooMany = (1...5).map { ContextImage(id: "preview_\($0)", width: 1, height: 1, data: Data([2])) }
     #expect(throws: CapabilityError.self) {
         try AgentChatContextBuilder.applyingStateImages(tooMany, to: messages, user: "input", supportsImages: true)
     }

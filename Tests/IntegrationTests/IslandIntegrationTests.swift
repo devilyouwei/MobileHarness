@@ -155,7 +155,7 @@ private func islandInput(_ function: String, parameters: [String: String], sourc
     }
 }
 
-@Test @MainActor func writerIslandEndsTerminalWithoutRemovingVoice() async throws {
+@Test @MainActor func writerIslandDisplaysTerminalThenEndsWithoutRemovingVoice() async throws {
     let ui = UIContainer()
     try ui.start()
     let service = IslandPresentationService(state: ui.island)
@@ -164,7 +164,7 @@ private func islandInput(_ function: String, parameters: [String: String], sourc
         while !condition(), ContinuousClock.now < deadline { await Task.yield() }
         try #require(condition())
     }
-    let writer = WriterIslandPresentation()
+    let writer = WriterIslandPresentation(terminalDuration: .seconds(1))
     await writer.bind { operation, parameters, session in
         let input = FunctionInvocation(
             call: .init(actionPath: .init(domain: "UI", module: "Island", function: operation), parameters: parameters),
@@ -193,9 +193,11 @@ private func islandInput(_ function: String, parameters: [String: String], sourc
     #expect(ui.island.detailActivity?.id == id)
     #expect(!ui.island.expanded)
     await writer.update(delegateID: "writer-run", phase: .completed, step: "作品已保存")
-    try await wait { ui.island.detailActivity == nil }
+    try await wait { ui.island.detailActivity?.content.subtitle == "作品已保存" }
+    #expect(ui.island.expanded)
     #expect(ui.island.headerActivity?.owner == "test.voice")
     await writer.update(delegateID: "writer-run", phase: .running, step: "迟到进度")
+    try await wait { ui.island.detailActivity == nil }
     // Assistant Task logs are no longer a producer of Writer Island content.
     ui.home.activity.updateTask(
         .init(id: "stale", parentID: nil, requester: "assistant", executor: "writer", title: "旧日志", phase: .running),
@@ -306,7 +308,7 @@ private actor WriterIslandPublicationProbe {
     let state = IslandState()
     state.setAvailable(true)
     let service = IslandPresentationService(state: state)
-    let writer = WriterIslandPresentation()
+    let writer = WriterIslandPresentation(terminalDuration: .milliseconds(250))
     await writer.bind { operation, parameters, session in
         let input = FunctionInvocation(
             call: .init(actionPath: .init(domain: "UI", module: "Island", function: operation), parameters: parameters),
@@ -319,7 +321,7 @@ private actor WriterIslandPublicationProbe {
         }
     }
     await writer.start()
-    for phase in [WriterIslandPresentation.Phase.completed, .failed, .cancelled, .interrupted] {
+    for phase in [WriterIslandPresentation.Phase.completed, .declined, .failed, .cancelled, .interrupted] {
         let run = UUID().uuidString
         await writer.begin(delegateID: run, goal: "测试终态")
         let start = ContinuousClock.now + .seconds(3)
@@ -327,7 +329,13 @@ private actor WriterIslandPublicationProbe {
         try #require(state.detailActivity != nil)
         await writer.update(delegateID: run, phase: .waitingUser)
         await writer.update(delegateID: run, phase: .cancelling)
-        await writer.update(delegateID: run, phase: phase)
+        await writer.update(delegateID: run, phase: phase, step: phase.title)
+        let expansionID = run + ":" + phase.rawValue
+        let terminal = ContinuousClock.now + .seconds(2)
+        while state.detailActivity?.content.expansionID != expansionID, ContinuousClock.now < terminal {
+            await Task.yield()
+        }
+        #expect(state.detailActivity?.content.subtitle == phase.title)
         let end = ContinuousClock.now + .seconds(3)
         while state.detailActivity != nil, ContinuousClock.now < end { await Task.yield() }
         #expect(state.activities.isEmpty)

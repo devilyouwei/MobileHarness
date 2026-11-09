@@ -188,7 +188,7 @@ private final class QwenFacts: Sendable {
 private struct QwenControls: TaskControlCapability {
     let agent: AssistantAgent
     func controlTask(_ operation: String, arguments: [String: String], invocation: any FunctionInput) async throws
-        -> String
+        -> ActionCompletion
     {
         try await agent.controlTask(
             operation, arguments: arguments, source: invocation.context.source,
@@ -269,7 +269,7 @@ private actor QwenEffects {
                     $0.enabled = true
                     $0.running = true
                 }
-                return .value(#"{"operation":"open","enabled":true,"running":true}"#)
+                return .completed
             case "close":
                 try facts.change {
                     $0.enabled = false
@@ -282,7 +282,11 @@ private actor QwenEffects {
             case "takePhoto":
                 let current = try facts.camera.read()
                 guard current.busy != true else { throw CameraControlError.busy }
-                guard current.running == true else { throw CameraControlError.disabled }
+                guard scenario.failure != "cameraPermission" else { throw CameraControlError.permissionDenied }
+                try facts.change {
+                    $0.enabled = true
+                    $0.running = true
+                }
                 photoCount += 1
                 let id = "media_\(photoCount)"
                 try facts.change { $0.displayedMediaID = id }
@@ -327,7 +331,7 @@ private actor QwenEffects {
                 #"{"groups":[{"id":"model_17","name":"Synthetic Model","installed":true,"download":{"state":"downloading","id":"model_17","progress":0.4}}]}"#
             )
         case "System.ModelResources.download", "System.ModelResources.cancel":
-            return .value(try Self.json(["status": "accepted", "id": args["id"] ?? ""]))
+            return .completed
         case "History.Conversation.list":
             var value: [String: Any] = [
                 "items": [["id": "dialog_17", "title": "昨天的拍照讨论", "preview": "我们讨论了拍照构图。"]],
@@ -360,7 +364,9 @@ private actor QwenEffects {
                     "windowID": QwenWindowFacts.id, "title": "Writer 流程图",
                     "text": "开始 → 执行测试 → 结束", "diagnostics": "",
                 ]))
-        case "UI.Navigation.open": return .value("presented")
+        case "UI.Navigation.open", "UI.Window.focus", "UI.Window.minimize", "UI.Window.maximize",
+            "UI.Window.restore", "UI.Window.move", "UI.Window.close", "Camera.Capture.cancelCapture":
+            return .completed
         default:
             if path.hasPrefix("NexArm.") && scenario.failure == "robotPartial" {
                 throw QwenEvalError.syntheticFailure

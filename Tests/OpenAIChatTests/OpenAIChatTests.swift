@@ -779,7 +779,7 @@ private final class UsageProtocol: URLProtocol, @unchecked Sendable {
         try ChatRequest(messages: [.init(role: .assistant, content: "bad", images: [image])])
     }
     #expect(throws: (any Error).self) {
-        try ChatRequest(messages: [.init(role: .user, content: "bad", images: Array(repeating: image, count: 5))])
+        try ChatRequest(messages: [.init(role: .user, content: "bad", images: Array(repeating: image, count: 6))])
     }
     #expect(throws: (any Error).self) {
         try ChatImage(id: UUID().uuidString, data: Data(count: 4 * 1024 * 1024 + 1))

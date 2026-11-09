@@ -196,7 +196,7 @@ extension HistoryTurn {
 extension HistoryMessage {
     public var attachedImages: [HistoryImageReference] {
         guard role == .user else { return [] }
-        return Array((imageReferences ?? []).filter(\.isValid).prefix(4))
+        return Array((imageReferences ?? []).filter(\.isValid).prefix(5))
     }
     public var displayContent: String { content }
 

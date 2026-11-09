@@ -1,0 +1,19 @@
+{
+  "version": 3,
+  "id": "writer-workspace",
+  "revision": 3,
+  "description": "Find saved works and select, show, create or delete a workspace.",
+  "owner": "writer",
+  "dependencies": [],
+  "useActions": [
+    {
+      "path": "Artifacts.Workspace.perform",
+      "callType": "tool",
+      "alias": "workspace"
+    }
+  ],
+  "useStates": [],
+  "useInstructions": [
+    "Instructions.md"
+  ]
+}

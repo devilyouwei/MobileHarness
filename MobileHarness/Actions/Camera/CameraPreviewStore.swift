@@ -46,7 +46,7 @@ import StorageCore
     public var onChange: (@MainActor () -> Void)?
     public var modelVisible = true
     public var sessionID: String? { cache.scope }
-    public var pendingCount: Int { cache.entries.filter { $0.disposition == .pending }.count }
+    public nonisolated static let maximumLoadedPhotos = 5
     public var catalog: [Metadata] {
         cache.entries.map {
             .init(
@@ -143,6 +143,9 @@ import StorageCore
             for scope in selections.keys { selections[scope]?.removeAll { $0 == removed } }
         }
         latest = id
+        for scope in selections.keys where selections[scope]?.count == Self.maximumLoadedPhotos {
+            selections[scope]?.removeFirst()
+        }
         releaseUnused()
         changed()
         do { try await load(id, scope: nil) } catch {
@@ -155,23 +158,42 @@ import StorageCore
     }
     public func original(_ id: String) throws -> Data { try cache.read(id) }
     public func load(_ id: String, scope: String?) async throws {
+        try await load([id], scope: scope, replacing: false)
+    }
+    public func load(_ ids: [String], scope: String) async throws {
+        try await load(ids, scope: scope, replacing: true)
+    }
+    private func load(_ ids: [String], scope: String?, replacing: Bool) async throws {
         try Task.checkCancellation()
         try validateSession(sessionID)
-        guard cache.entries.contains(where: { $0.id == id }) else { throw CameraControlError.photoUnavailable }
+        guard !ids.isEmpty, Set(ids).count == ids.count else {
+            throw ActionArguments.ValidationError.invalidValue("previewIDs")
+        }
+        let available = Set(cache.entries.map(\.id))
+        guard ids.allSatisfy(available.contains) else { throw CameraControlError.photoUnavailable }
         guard !busy else { throw CameraControlError.busy }
+        var selected = [String]()
         if let scope {
             guard selections[scope] != nil || selections.count < 64 else { throw CameraControlError.busy }
-            guard selections[scope, default: []].contains(id) || selections[scope, default: []].count < 3 else {
-                throw SelectionError.full(loaded(scope))
-            }
+            selected = replacing ? [] : selections[scope, default: []]
+            selected += ids.filter { !selected.contains($0) }
+            guard selected.count <= Self.maximumLoadedPhotos else { throw SelectionError.full(loaded(scope)) }
+            if selected == selections[scope], ids.allSatisfy({ images[$0] != nil }) { return }
         }
-        if images[id] != nil, scope.map({ selections[$0, default: []].contains(id) }) ?? true { return }
         busy = true
         let expected = generation
         defer {
             finishBusy()
             releaseUnused()
         }
+        for id in ids { try await prepareImage(id, generation: expected) }
+        try Task.checkCancellation()
+        guard !closed, ending == nil, expected == generation else { throw CameraControlError.photoUnavailable }
+        if let scope { selections[scope] = selected }
+        for id in ids { failures[id] = nil }
+        changed()
+    }
+    private func prepareImage(_ id: String, generation expected: UInt64) async throws {
         if images[id] == nil {
             let data = try cache.read(id)
             let task = Task { [prepare] in try await prepare(data) }
@@ -193,9 +215,6 @@ import StorageCore
             images[id] = .init(
                 id: id, width: prepared.width, height: prepared.height, data: prepared.data, resourceScope: sessionID)
         }
-        if let scope, !selections[scope, default: []].contains(id) { selections[scope, default: []].append(id) }
-        failures[id] = nil
-        changed()
     }
     public func unload(_ id: String, scope: String) throws {
         try validateSession(sessionID)
@@ -212,9 +231,11 @@ import StorageCore
         changed()
     }
     private func loaded(_ scope: String) -> [String] {
-        var ids = latest.map { [$0] } ?? []
-        for id in selections[scope, default: []] where !ids.contains(id) { ids.append(id) }
-        return ids
+        let explicit = selections[scope, default: []]
+        guard let latest, !explicit.contains(latest), explicit.count < Self.maximumLoadedPhotos else {
+            return explicit
+        }
+        return [latest] + explicit
     }
     public func snapshot(scope: String) throws -> MultimodalContextSnapshot {
         let active = !closed && ending == nil && sessionID != nil && modelVisible
@@ -230,13 +251,40 @@ import StorageCore
     }
     public func save(_ id: String) async throws -> CameraPhotoCommandReceipt {
         try validateSession(sessionID)
-        guard let entry = cache.entries.first(where: { $0.id == id }) else { throw CameraControlError.photoUnavailable }
         guard !busy else { throw CameraControlError.busy }
         busy = true
         defer {
             finishBusy()
             releaseUnused()
         }
+        return try await saveEntry(id)
+    }
+    public func saveAll() async throws -> CameraPhotoBatchReceipt {
+        try validateSession(sessionID)
+        guard !busy else { throw CameraControlError.busy }
+        busy = true
+        defer {
+            finishBusy()
+            releaseUnused()
+        }
+        let ids = cache.entries.filter { $0.disposition == .pending }.map(\.id)
+        var saved: [CameraPhotoCommandReceipt] = []
+        var failures: [CameraPhotoBatchReceipt.Failure] = []
+        for id in ids {
+            try Task.checkCancellation()
+            try validateSession(sessionID)
+            do {
+                saved.append(try await saveEntry(id))
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                failures.append(.init(previewID: id, reason: String(error.localizedDescription.prefix(256))))
+            }
+        }
+        return .init(saved: saved, failures: failures)
+    }
+    private func saveEntry(_ id: String) async throws -> CameraPhotoCommandReceipt {
+        guard let entry = cache.entries.first(where: { $0.id == id }) else { throw CameraControlError.photoUnavailable }
         try Task.checkCancellation()
         var mediaID = entry.mediaID
         if mediaID == nil { mediaID = try await persist(cache.read(id)) }

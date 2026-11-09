@@ -85,12 +85,19 @@ import UI
     var snapshots = 0
     var reads = 0
     var navigation: [String] = []
+    var remote: URL?
+    var closed = false
     init(_ text: String) { self.text = text }
-    func loadRemote(_ url: URL) async throws -> WebPageObservation { try await observe() }
+    func loadRemote(_ url: URL) async throws -> WebPageObservation {
+        remote = url
+        return try await observe()
+    }
     func loadLocal(_ entry: URL) async throws -> WebPageObservation { try await observe() }
     func observe() async throws -> WebPageObservation {
         reads += 1
-        return .init(url: "file:///private/project/index.html", title: text, text: text, diagnostics: "")
+        return .init(
+            url: remote?.absoluteString ?? "file:///private/project/index.html", title: text, text: text,
+            diagnostics: "")
     }
     func snapshot() async throws -> Data {
         snapshots += 1
@@ -100,13 +107,15 @@ import UI
         navigation.append(command)
         return try await observe()
     }
-    func close() {}
+    func close() { closed = true }
 }
-private func webWindowInput(_ command: String, windowID: String, extra: [String: String] = [:]) -> FunctionInvocation {
+private func webWindowInput(_ command: String, windowID: String? = nil, extra: [String: String] = [:])
+    -> FunctionInvocation
+{
     .init(
         call: .init(
             actionPath: .init(domain: "Web", module: "Page", function: command),
-            parameters: extra.merging(["windowID": windowID]) { _, value in value }),
+            parameters: windowID.map { extra.merging(["windowID": $0]) { _, value in value } } ?? extra),
         context: .init(source: "assistant", sessionID: "fixture", inputID: UUID().uuidString),
         executionID: UUID().uuidString, results: ActionReportStore())
 }
@@ -127,12 +136,12 @@ private func webWindowInput(_ command: String, windowID: String, extra: [String:
     }
     let first = try await create("Writer A")
     let second = try await create("Writer B")
-    let root = WebWindowPageProbe("Root")
     let a = WebWindowPageProbe("Diagram A")
     let b = WebWindowPageProbe("Diagram B")
     let pages = [first: a, second: b]
     let service = WebExecutionService(
-        page: root, windows: windows, pageForWindow: { pages[$0] },
+        windows: windows, pageForWindow: { pages[$0] },
+        createPage: { _, _ in throw WebPageError.unavailable }, removePage: { _ in },
         saveImage: { _, _ in "media_1" })
     let result = try await service.perform(
         "inspect", invocation: webWindowInput("inspect", windowID: try #require(windows.reference(for: first))))
@@ -143,7 +152,7 @@ private func webWindowInput(_ command: String, windowID: String, extra: [String:
     let screenshot = try await service.perform(
         "snapshot", invocation: webWindowInput("snapshot", windowID: try #require(windows.reference(for: second))))
     #expect(screenshot.contains("media_1"))
-    #expect(a.reads == 1 && a.snapshots == 0 && b.snapshots == 1 && root.reads == 0)
+    #expect(a.reads == 1 && a.snapshots == 0 && b.snapshots == 1)
     #expect(windows.windows.count == 2)
     await #expect(throws: WindowError.self) {
         try await service.perform("inspect", invocation: webWindowInput("inspect", windowID: "not-a-uuid"))
@@ -153,5 +162,64 @@ private func webWindowInput(_ command: String, windowID: String, extra: [String:
     }
     #expect(windows.windows.count == 2)
     await service.stop()
+    await windows.stop()
+}
+
+@MainActor private final class BrowserPages {
+    var pages: [UUID: WebWindowPageProbe] = [:]
+    func page(_ id: UUID) -> WebWindowPageProbe {
+        if let existing = pages[id] { return existing }
+        let page = WebWindowPageProbe("Web")
+        pages[id] = page
+        return page
+    }
+}
+
+@Test @MainActor func webBrowseOpensDistinctWindowsAndRetargetsOnlySpecifiedPage() async throws {
+    let windows = WindowState()
+    windows.layout(width: 390, height: 750)
+    windows.setAvailable(true)
+    let pages = BrowserPages()
+    let service = WebExecutionService(
+        windows: windows, pageForWindow: { pages.pages[$0] },
+        createPage: { id, _ in pages.page(id) },
+        removePage: { pages.pages.removeValue(forKey: $0)?.close() },
+        saveImage: { _, _ in "media_1" })
+    func browse(_ url: String) async throws -> (id: UUID, reference: String) {
+        let previous = Set(windows.windows.map(\.id))
+        let task = Task {
+            try await service.perform("browse", invocation: webWindowInput("browse", extra: ["url": url]))
+        }
+        let deadline = ContinuousClock.now + .seconds(5)
+        while !windows.windows.contains(where: { !previous.contains($0.id) }) {
+            guard ContinuousClock.now < deadline else {
+                task.cancel()
+                throw WindowError.unavailable
+            }
+            await Task.yield()
+        }
+        let item = try #require(windows.windows.first { !previous.contains($0.id) })
+        windows.complete(item.id, revision: item.revision, generation: windows.generation, success: true)
+        let reference = try #require(windows.reference(for: item.id))
+        #expect(try await task.value.contains(reference))
+        return (item.id, reference)
+    }
+    let first = try await browse("https://example.com")
+    let second = try await browse("https://example.org")
+    let firstPage = try #require(pages.pages[first.id])
+    let secondPage = try #require(pages.pages[second.id])
+    #expect(firstPage !== secondPage)
+    _ = try await service.perform(
+        "browse", invocation: webWindowInput("browse", windowID: first.reference, extra: ["url": "https://example.net"])
+    )
+    #expect(windows.windows.count == 2 && windows.focusedID == first.id)
+    #expect(firstPage.remote?.host == "example.net")
+    #expect(secondPage.remote?.host == "example.org")
+    let recent = try await service.perform("inspect", invocation: webWindowInput("inspect"))
+    #expect(recent.contains(first.reference))
+    try await service.closeWindow(invocation: webWindowInput("close", windowID: first.reference))
+    #expect(firstPage.closed && !secondPage.closed)
+    await service.stop()
+    #expect(secondPage.closed)
     await windows.stop()
 }

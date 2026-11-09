@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 9,
   "id": "speechSynthesis",
   "description": "I synthesize requested speech and own synthesis cancellation and audio production. I do not own user goals or independently start conversation.",
   "communication": {
@@ -19,6 +19,5 @@
     "publications": [],
     "sends": []
   },
-  "baseSkills": [],
-  "backgroundTasks": []
+  "baseSkills": []
 }

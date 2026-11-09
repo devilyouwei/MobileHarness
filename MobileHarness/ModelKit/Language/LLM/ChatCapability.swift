@@ -216,6 +216,7 @@ public enum ChatTransportEvent: Sendable {
 }
 
 public struct ChatRequest: Sendable {
+    public static let maximumImageCount = 5
     public var transportCapture: (@Sendable (ChatTransportEvent) async -> Void)?
     public var timing: ChatTiming?
     public let context: InferenceContext
@@ -271,7 +272,8 @@ public struct ChatRequest: Sendable {
                 }
             }
         }
-        guard pending.isEmpty, bytes <= 65_536, imageCount <= 4, imageBytes <= 16 * 1024 * 1024 else {
+        guard pending.isEmpty, bytes <= 65_536, imageCount <= Self.maximumImageCount, imageBytes <= 16 * 1024 * 1024
+        else {
             throw CapabilityError.invalidRequest("Incomplete or oversized tool transcript")
         }
         guard tools.count <= 128, Set(tools.map(\.name)).count == tools.count,

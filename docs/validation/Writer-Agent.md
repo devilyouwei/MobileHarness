@@ -463,3 +463,10 @@ scripts/build-ios.sh退出0，四个scheme均BUILD SUCCEEDED，Skill与Live Acti
 `scripts/check.sh` 退出 0。主集成 1103 项和独立 LiveRuntimeTests 227 项通过，边界、格式、Python 和 plist 检查通过。NativePresentationTests 在 cameraNativeMetalDrawStopAndLayerHandoff 开始后没有套件完成记录。
 
 `scripts/build-ios.sh` 退出 0。四个模拟器 scheme 均构建成功，App Agent/Skill 和 Live Activity 资源校验通过。最终生产源码再次构建 MobileHarnessSimulator 成功。本轮修复的验证使用本机测试及模拟器编译。
+
+## 2026-11-09 Writer Skill 分域
+
+- 定向回归通过。脚本模型经 Writer、Gateway 和作品仓库覆盖 10 个控制场景，检查作品库、编辑、只读呈现和追问恢复的教学及命令 schema，并检查原始文件请求的无工具边界。配置回归覆盖两个专属 Skill 的归属、Assistant 的共享发现及显式加载拒绝。测试使用替身模型与呈现。
+- 首轮完整检查发现两项旧测试把 Catalog 全部条目当作 Assistant 可加载项，已修正测试口径并验证拒绝路径。首轮并发运行还出现一项 NexArm 跟踪时序断言失败，同项定向复测通过。
+- 最终 `scripts/check.sh` 退出 0，主集成 1106 项和 LiveRuntimeTests 228 项通过，NexArm 时序用例也通过。脚本日志中的 NativePresentationTests 在 WebKit 像素用例开始后缺套件完成记录，该用例单独复测通过。
+- `scripts/build-ios.sh` 退出 0，四个模拟器方案均构建成功。App Bundle 校验通过，包括两个新 Skill 的配置与教学资源在内共 34 项。真机与真实模型属于独立验收范围。

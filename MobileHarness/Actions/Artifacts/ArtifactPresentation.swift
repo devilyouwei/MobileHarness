@@ -142,7 +142,9 @@ import UI
                 return try report(
                     status: "unavailable", detail: "Window closed; draft retained. Visual verification unavailable.")
             }
-            guard latest[id] != nil || latest.count < 4 else { throw WebPageError.busy }
+            guard latest[id] != nil || latest.count < WindowState.maximumWindows else { throw WindowError.capacity }
+            let hasWindow = bindings[id].map { bound in windows.windows.contains { $0.id == bound } } ?? false
+            if canRender, !hasWindow, windows.windows.count >= WindowState.maximumWindows { throw WindowError.capacity }
             let subtitle = latest[id]?.subtitle
             latest[id] = Latest(title: title, subtitle: subtitle, entry: entry, files: files, preview: preview)
             guard canRender else {
@@ -154,7 +156,6 @@ import UI
             if let existing = bindings[id], windows.windows.contains(where: { $0.id == existing }) {
                 window = existing
             } else {
-                guard bindings.count < 4 else { throw WebPageError.busy }
                 let reserved = UUID()
                 bindings[id] = reserved
                 serial += 1
@@ -196,24 +197,28 @@ import UI
                     reason: "minimized")
             }
             let slot = ((slots[id] ?? 0) + 1) % 2
-            let slotRoot = "previews/" + id.rawValue + "/" + String(slot)
-            try await disk.remove(slotRoot)
-            let prefix = slotRoot + "/" + UUID().uuidString
-            var rendered = files
-            if !entry.hasSuffix(".html") {
-                rendered["index.html"] = ArtifactTextRendering.html(
-                    files[entry] ?? "", markdown: entry.hasSuffix(".md"))
-            } else if rendered[entry] == nil {
-                rendered[entry] = "<!doctype html><meta charset=utf-8>"
-            }
-            for (path, content) in rendered {
-                try ArtifactDraft.validatePath(path)
-                try await disk.putIfAbsent(Data(("\u{feff}" + content).utf8), key: prefix + "/" + path)
-            }
-            let target = entry.hasSuffix(".html") ? entry : "index.html"
-            let url = try await disk.fileURL(prefix + "/" + target, maximumBytes: Int.max)
+            let ext = (entry as NSString).pathExtension.lowercased()
+            let target = ext == "html" ? entry : "index.html"
+            var markupDiagnostics = ""
             let observation: WebPageObservation
             do {
+                var rendered = files
+                if ext != "html" {
+                    let document = try await ArtifactTextRendering.document(files[entry] ?? "", markdown: ext == "md")
+                    rendered[target] = document.html
+                    markupDiagnostics = document.diagnostics
+                } else if rendered[entry] == nil {
+                    rendered[entry] = "<!doctype html><meta charset=utf-8>"
+                }
+                guard canRender, !dismissed.contains(id) else { throw WebPageError.unavailable }
+                let slotRoot = "previews/" + id.rawValue + "/" + String(slot)
+                try await disk.remove(slotRoot)
+                let prefix = slotRoot + "/" + UUID().uuidString
+                for (path, content) in rendered {
+                    try ArtifactDraft.validatePath(path)
+                    try await disk.putIfAbsent(Data(("\u{feff}" + content).utf8), key: prefix + "/" + path)
+                }
+                let url = try await disk.fileURL(prefix + "/" + target, maximumBytes: Int.max)
                 var readRoot = url
                 for _ in target.split(separator: "/") { readRoot.deleteLastPathComponent() }
                 // Stable project confinement, fresh resource URLs, and a retained native surface.
@@ -234,7 +239,7 @@ import UI
                         rendered[target] ?? "", entry: url, readAccessRoot: readRoot, documentEntry: host)
                 } else {
                     observation = try await page.loadLocal(
-                        url, executesScripts: entry.hasSuffix(".html"), readAccessRoot: readRoot,
+                        url, executesScripts: ext == "html", readAccessRoot: readRoot,
                         preservingViewport: true)
                 }
             } catch {
@@ -259,10 +264,12 @@ import UI
                     status: "deferred", detail: "Window transition interrupted; entry content retained.",
                     window: windows.reference(for: window) ?? "")
             }
+            let diagnostics = [markupDiagnostics, observation.diagnostics].filter { !$0.isEmpty }.joined(
+                separator: "\n")
             return try report(
-                status: preview ? "preview" : (observation.diagnostics.isEmpty ? "observed" : "errors"),
+                status: preview ? "preview" : (diagnostics.isEmpty ? "observed" : "errors"),
                 detail: "", window: windows.reference(for: window) ?? "", text: observation.text,
-                diagnostics: observation.diagnostics)
+                diagnostics: diagnostics)
         }
         private func report(
             status: String, detail: String, window: String = "", text: String = "", diagnostics: String = "",
@@ -351,81 +358,35 @@ import UI
     }
 #endif
 
-/// Deterministic escaped rendering. Unsupported Markdown syntax remains readable source.
+/// Shared document output for a work window, history preview and PDF export.
 public enum ArtifactTextRendering {
-    public static func html(_ text: String, markdown: Bool) -> String {
-        func escape(_ value: String) -> String {
-            value.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
-                .replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;")
-        }
-        func inline(_ value: String) -> String {
-            // Match source tokens once, escaping every literal and link destination independently.
-            let pattern = #"`([^`]+)`|\*\*([^*]+)\*\*|\*([^*]+)\*|\[([^\]]+)\]\(([^ )]+)\)"#
-            guard let expression = try? NSRegularExpression(pattern: pattern) else { return escape(value) }
-            let source = value as NSString
-            var result = ""
-            var offset = 0
-            for match in expression.matches(in: value, range: NSRange(location: 0, length: source.length)) {
-                result += escape(
-                    source.substring(with: NSRange(location: offset, length: match.range.location - offset)))
-                if match.range(at: 1).location != NSNotFound {
-                    result += "<code>" + escape(source.substring(with: match.range(at: 1))) + "</code>"
-                } else if match.range(at: 2).location != NSNotFound {
-                    result += "<strong>" + escape(source.substring(with: match.range(at: 2))) + "</strong>"
-                } else if match.range(at: 3).location != NSNotFound {
-                    result += "<em>" + escape(source.substring(with: match.range(at: 3))) + "</em>"
-                } else {
-                    let label = escape(source.substring(with: match.range(at: 4)))
-                    let target = source.substring(with: match.range(at: 5))
-                    if let url = URL(string: target), ["https", "http"].contains(url.scheme?.lowercased() ?? ""),
-                        url.host != nil
-                    {
-                        result += "<a href=\"" + escape(target) + "\" rel=\"noreferrer\">" + label + "</a>"
-                    } else {
-                        result += escape(source.substring(with: match.range))
-                    }
-                }
-                offset = NSMaxRange(match.range)
-            }
-            result += escape(source.substring(from: offset))
-            return result
-        }
-        var body = ""
-        if !markdown {
-            body = "<pre>" + escape(text) + "</pre>"
+    @MainActor public static func document(_ text: String, markdown: Bool) async throws
+        -> (html: String, diagnostics: String)
+    {
+        let fragment: (html: String, diagnostics: String)
+        if markdown {
+            fragment = try await WebPageContainer.renderMarkdown(text)
         } else {
-            var fenced = false
-            for line in text.components(separatedBy: "\n") {
-                if line.hasPrefix("```") {
-                    body += fenced ? "</code></pre>" : "<pre><code>"
-                    fenced.toggle()
-                } else if fenced {
-                    body += escape(line) + "\n"
-                } else if line.hasPrefix("#") {
-                    let depth = min(6, line.prefix(while: { $0 == "#" }).count)
-                    body +=
-                        "<h\(depth)>" + inline(String(line.dropFirst(depth)).trimmingCharacters(in: .whitespaces))
-                        + "</h\(depth)>"
-                } else if line.hasPrefix("> ") {
-                    body += "<blockquote>" + inline(String(line.dropFirst(2))) + "</blockquote>"
-                } else if line.hasPrefix("- ") || line.hasPrefix("* ") {
-                    body += "<p>• " + inline(String(line.dropFirst(2))) + "</p>"
-                } else {
-                    if let dot = line.firstIndex(of: "."), !line[..<dot].isEmpty,
-                        line[..<dot].allSatisfy(\.isNumber), line[line.index(after: dot)...].hasPrefix(" ")
-                    {
-                        body +=
-                            "<p>" + escape(String(line[...dot])) + " " + inline(String(line[line.index(after: dot)...]))
-                            + "</p>"
-                    } else {
-                        body += "<p>" + inline(line) + "</p>"
-                    }
-                }
-            }
-            if fenced { body += "</code></pre>" }
+            let escaped = text.replacingOccurrences(of: "&", with: "&amp;")
+                .replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")
+            fragment = ("<pre>" + escaped + "</pre>", "")
         }
-        return
-            "<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><style>body{font:17px system-ui;padding:20px;color:#182034;background:#fff;line-height:1.6}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f3f4f7;padding:12px;border-radius:10px}blockquote{border-left:3px solid #6878ac;padding-left:12px;margin-left:0}</style>"
-            + body
+        let document = """
+            <!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">
+            <style>
+              body { font: 17px system-ui; padding: 20px; color: #182034; background: #fff; line-height: 1.6;
+                overflow-wrap: anywhere; }
+              pre { white-space: pre-wrap; background: #f3f4f7; padding: 12px; border-radius: 10px; }
+              blockquote { border-left: 3px solid #6878ac; padding-left: 12px; margin-left: 0; }
+              table { border-collapse: collapse; }
+              th, td { border: 1px solid #c4c9d4; padding: 4px 8px; }
+              .mermaid-diagram { margin: 1em 0; break-inside: avoid; }
+              .mermaid-diagram img { display: block; max-width: 100%; height: auto; }
+              .mermaid-failure > p { color: #9a342e; }
+              @media print { .mermaid-diagram img { max-height: 700px; object-fit: contain; } }
+            </style>
+            """
+        return (document + fragment.html, fragment.diagnostics)
     }
 }

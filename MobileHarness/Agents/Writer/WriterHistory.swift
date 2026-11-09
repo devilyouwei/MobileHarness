@@ -169,16 +169,6 @@ public actor WriterHistory {
         }
     }
     public func progress(_ id: String) -> WriterRequestProgress? { progressValues.removeValue(forKey: id) }
-    public func hostFinalization(_ id: String, result: String?, error: (any Error)?) async throws {
-        var fields = [
-            "origin": "writer.runtime", "operation": "finalize", "status": error == nil ? "completed" : "failed",
-        ]
-        fields["result"] = result
-        fields["error"] = error.map(String.init(describing:))
-        let json = String(decoding: try JSONEncoder().encode(fields), as: UTF8.self)
-        try await store.recordHostFinalization(json, for: id)
-        try await store.checkpoint(inputID: id)
-    }
     public func event(_ event: ChatEvent, id: String) async throws {
         switch event {
         case .text(let text): try await store.append(text, to: id)

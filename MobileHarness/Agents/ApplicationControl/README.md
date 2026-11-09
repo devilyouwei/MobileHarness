@@ -158,6 +158,8 @@ Provider restore/save/discover 与资源偏好事务由 Actions 执行；偏好�
 
 ApplicationControlFunctions 只声明代码拥有的内部调用权限；ApplicationControlPolicy 只分类事实与结果，不持有 UI、设备或模型。ProviderSettingsClient 和 ModelResourcesClient 是 Actions 拥有的 UI 请求客户端；实际配置事务、模型绑定和下载由 Actions 执行，纯表单草稿由基础 UI 拥有。
 
+Provider 保存和恢复通过结构化完成推进请求，表单值由已登记的请求端口领取。模型发现和资源清单仍使用调用返回的业务值。
+
 ## 多 Provider 管理
 
 沿用私有设置事务传递至多 32 个 URL 唯一的 provider；当前配置与其余配置一起保存。UI 在加载模型上方提供单选、编辑、删除和末行添加，删除当前项关闭云端并要求重新选择。保存提交后生效，Key 保持钥匙串存储，旧单配置恢复为首项。

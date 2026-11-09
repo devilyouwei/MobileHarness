@@ -63,9 +63,12 @@ public enum WebPagePolicy {
         public var isAvailable: Bool { available }
         private var sessionReferences: [UUID: String] = [:]
         public func createSession(windowID: UUID, reference: String? = nil) throws -> WebPageContainer {
+            if let page = sessions[windowID] {
+                if let reference { sessionReferences[windowID] = reference }
+                return page
+            }
+            guard sessions.count < WindowState.maximumWindows else { throw WindowError.capacity }
             sessionReferences[windowID] = reference
-            if let page = sessions[windowID] { return page }
-            guard sessions.count < 4 else { throw WebPageError.busy }
             let page = WebPageContainer()
             page.setAvailable(available)
             sessions[windowID] = page
@@ -183,12 +186,14 @@ public enum WebPagePolicy {
                 throw error
             }
         }
-        private func clientScript(_ script: String, arguments: [String: Any] = [:]) async throws -> String {
+        private func clientScript(
+            _ script: String, arguments: [String: Any] = [:], world: WKContentWorld = .defaultClient
+        ) async throws -> String {
             let view = webView
             let token = generation
             if documentUpdating { nativeCancel?() }
             let result: String = try await native { finish in
-                view.callAsyncJavaScript(script, arguments: arguments, in: nil, in: .defaultClient) {
+                view.callAsyncJavaScript(script, arguments: arguments, in: nil, in: world) {
                     result in
                     switch result {
                     case .success(let value):
@@ -395,6 +400,30 @@ public enum WebPagePolicy {
             try await waitForNavigation { webView.load(URLRequest(url: url)) }
             return try await observe()
         }
+        /// Renders untrusted Markdown in a temporary, package-only document.
+        /// The returned fragment contains static HTML and diagram images.
+        public static func renderMarkdown(_ source: String) async throws -> (html: String, diagnostics: String) {
+            struct Document: Decodable {
+                let html: String
+                let diagnostics: String
+            }
+            guard let asset = Bundle.module.url(forResource: "MarkdownRenderHost", withExtension: "html") else {
+                throw WebPageError.unavailable
+            }
+            let entry = asset.resolvingSymlinksInPath()
+            let page = WebPageContainer()
+            page.setAvailable(true)
+            defer { page.close() }
+            _ = try await page.loadLocal(entry, executesScripts: true)
+            page.webView.frame = CGRect(x: 0, y: 0, width: 768, height: 1024)
+            let result = try await page.clientScript(
+                "return await globalThis.renderMobileHarnessMarkdown(source)",
+                arguments: ["source": source], world: .page)
+            try Task.checkCancellation()
+            let document = try JSONDecoder().decode(Document.self, from: Data(result.utf8))
+            return (document.html, document.diagnostics)
+        }
+
         public func loadLocal(_ entry: URL) async throws -> WebPageObservation {
             try await loadLocal(entry, executesScripts: true)
         }

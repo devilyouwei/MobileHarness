@@ -351,9 +351,8 @@ private actor OperationFailurePresentation: ResourcePresentationCapability {
         }
     }
     #expect(await presentation.errors.isEmpty)
-    let acknowledgment = try await UIActions.showResourceOperationFailure(
+    try await UIActions.showResourceOperationFailure(
         invocation: invocation(["message": "native failure"]), using: presentation)
-    #expect(acknowledgment == "presented")
     #expect(await presentation.errors == ["native failure"])
     #expect(
         ApplicationControlIntentFailure.execution("primary; presentation: secondary").localizedDescription

@@ -371,7 +371,7 @@ private func historyFixture(extra: [String: Any]) throws -> HistoryConversation 
     let valid = (0..<6).map { _ in
         HistoryImageReference(id: UUID().uuidString, mimeType: "image/png", byteCount: 1)
     }
-    #expect(HistoryMessage(role: .user, content: "", imageReferences: valid).attachedImages.count == 4)
+    #expect(HistoryMessage(role: .user, content: "", imageReferences: valid).attachedImages.count == 5)
     let invalid = [
         HistoryImageReference(id: UUID().uuidString, mimeType: "text/plain", byteCount: 1),
         HistoryImageReference(id: UUID().uuidString, mimeType: "image/jpeg", byteCount: 0),

@@ -1040,12 +1040,10 @@ private actor PerceptionListeningProbe {
 
 private func replyActivityInput(
     session: String, source: String = "assistant", incarnation: String, revision: UInt64,
-    inputs: [String] = [], tasks: [String] = [], root: String = UUID().uuidString,
-    completedReportID: String? = nil, reportStartedAt: TimeInterval? = nil
+    inputs: [String] = [], tasks: [String] = [], root: String = UUID().uuidString
 ) -> AgentInput {
     let activity = ReplyActivity(
-        revision: revision, inputs: inputs, tasks: tasks, acknowledgedRoot: root,
-        completedReportID: completedReportID, reportStartedAt: reportStartedAt)
+        revision: revision, inputs: inputs, tasks: tasks, acknowledgedRoot: root)
     let payload = InputPayload.observation(activity.message)
     return AgentInput(
         id: UUID().uuidString,
@@ -1747,8 +1745,8 @@ func listeningOffCancellationFeedbackDoesNotScheduleAnotherOff() async throws {
     await agent.stop()
 }
 
-@Test(.actionCatalog, arguments: ["off", "on", "stop", "failed", "paused", "reordered"])
-func writerReportCompletionOwnsOneShotListeningWithoutCancellingOffPlayback(mode: String) async throws {
+@Test(.actionCatalog, arguments: ["off", "on", "stop", "paused", "reordered"])
+func replyOccupancyCannotEnableListeningWithoutConsent(mode: String) async throws {
     let session = UUID().uuidString
     let incarnation = UUID().uuidString
     let agent = try SpeechPerceptionAgent(
@@ -1761,7 +1759,6 @@ func writerReportCompletionOwnsOneShotListeningWithoutCancellingOffPlayback(mode
     let pump = Task { for await output in agent.outputs { await probe.record(output) } }
     if mode == "on" { try await agent.receive(ListeningIntent(enabled: true).input(sessionID: session)) }
     let id = UUID().uuidString
-    let startedAt = ProcessInfo.processInfo.systemUptime
     let occupied = replyActivityInput(
         session: session, incarnation: incarnation, revision: 1, inputs: [id])
     if mode != "reordered" { try await agent.receive(occupied) }
@@ -1770,9 +1767,7 @@ func writerReportCompletionOwnsOneShotListeningWithoutCancellingOffPlayback(mode
         try await agent.pause()
         try await agent.resume()
     }
-    let completed = replyActivityInput(
-        session: session, incarnation: incarnation, revision: 2,
-        completedReportID: mode == "failed" ? nil : id, reportStartedAt: mode == "failed" ? nil : startedAt)
+    let completed = replyActivityInput(session: session, incarnation: incarnation, revision: 2)
     try await agent.receive(completed)
     try await agent.receive(completed)  // Duplicate revision never applies twice.
     if mode == "reordered" { try await agent.receive(occupied) }
@@ -1780,37 +1775,11 @@ func writerReportCompletionOwnsOneShotListeningWithoutCancellingOffPlayback(mode
     await pump.value
     let values = await probe.values
     switch mode {
-    case "failed", "paused": #expect(values.isEmpty)
+    case "off", "paused", "reordered": #expect(values.isEmpty)
     case "stop": #expect(values.map(\.enabled) == [false])
     case "on": #expect(values.map(\.paused) == [false, true, false])
-    default: #expect(values.count == 1 && values.first?.enabled == true && values.first?.paused == false)
+    default: Issue.record("Unexpected listening test mode")
     }
-}
-
-@Test func onlyAssistantMayReportWriterReplyCompletionAndNewStopFencesDuplicates() throws {
-    var policy = SpeechListeningPolicy()
-    let incarnation = UUID().uuidString
-    let startedAt = ProcessInfo.processInfo.systemUptime
-    let fact = ReplyActivity(
-        revision: 1, inputs: [], tasks: [], acknowledgedRoot: "root",
-        completedReportID: "report", reportStartedAt: startedAt)
-    #expect(throws: CommunicationError.unauthorized) {
-        try policy.accept(fact, source: "memory", incarnation: incarnation)
-    }
-    #expect(try policy.accept(fact, source: "assistant", incarnation: incarnation))
-    #expect(policy.enabled)
-    policy.enabled = false
-    policy.revokeReportListening()
-    let repeated = ReplyActivity(
-        revision: 2, inputs: [], tasks: [], acknowledgedRoot: "root",
-        completedReportID: "report", reportStartedAt: startedAt)
-    #expect(try policy.accept(repeated, source: "assistant", incarnation: incarnation))
-    #expect(!policy.enabled)
-    let next = ReplyActivity(
-        revision: 3, inputs: [], tasks: [], acknowledgedRoot: "root",
-        completedReportID: "new-report", reportStartedAt: ProcessInfo.processInfo.systemUptime)
-    #expect(try policy.accept(next, source: "assistant", incarnation: incarnation))
-    #expect(policy.enabled)
 }
 
 /// Holds actual scheduled cleanup so lifecycle publication deterministically overlaps cancellation.

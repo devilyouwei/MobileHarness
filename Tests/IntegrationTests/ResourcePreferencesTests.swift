@@ -407,9 +407,8 @@ private struct SpoofedPreferenceFailure: ModelResourcePreferencesCapability {
     #expect(await presentation.reasons.isEmpty)
     for reason in [ResourcePreferenceFailureReason.recognitionRequired, .synthesisRequired, .invalidSource, .execution]
     {
-        let result = try await UIActions.showResourcePreferenceFailure(
+        try await UIActions.showResourcePreferenceFailure(
             invocation: invocation(reason.rawValue), using: presentation)
-        #expect(result == "presented")
     }
     #expect(await presentation.reasons == [.recognitionRequired, .synthesisRequired, .invalidSource, .execution])
 }

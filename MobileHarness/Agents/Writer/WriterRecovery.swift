@@ -72,7 +72,7 @@ enum WriterRecovery {
             "recoveryAttempt": String(attempt), "maximumAttempts": String(attempts),
             "effect": repeated ? "notExecuted; unchanged failed call" : "see original tool failure",
             "recovery":
-                "Inspect the error and current files. Reread stale references, correct arguments, or change approach. An unchanged failed effect is not re-executed. Finish only after successful render; ask only for genuinely missing user information.",
+                "Inspect the error and current files. Reread stale references, correct arguments, or change approach. An unchanged failed effect is not re-executed. For edits, render successfully before calling finish; ask only for genuinely missing user information.",
         ]
         return String(decoding: (try? JSONEncoder().encode(value)) ?? Data("Tool recovery failed".utf8), as: UTF8.self)
     }

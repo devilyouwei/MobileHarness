@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 9,
   "id": "visionPerception",
   "description": "I interpret authorized camera frames, produce pose observations and maintain visual inference state. Observing a frame does not grant device-control authority.",
   "communication": {
@@ -16,6 +16,5 @@
     ],
     "sends": []
   },
-  "baseSkills": [],
-  "backgroundTasks": []
+  "baseSkills": []
 }

@@ -4,6 +4,8 @@
 
 AgentContextRepository actor 唯一持有 AgentCore.AgentContext 值，角色决定 schema、校验、保留窗口与业务语义。AgentTaskSkillState 管根 Skill 与任务状态；AgentFixedTaskCoordinator 管确定性 Task 调用及真实结果加入。生产私有 Context 在内存，不编码整份快照或隐式刷盘。
 
+固定任务协调器接纳确定性角色的前台请求及已授权的后续消息。独立后台委派由接收角色的执行入口接纳。
+
 ## 文件与职责
 
 | 文件 | 职责 |
@@ -73,6 +75,8 @@ recordSignal 只保存有界中立 Data 证据到内存，非 Signal 传输或�
 ## Task and Skill lifecycle
 
 下图描述单前台 Task 与非基础根 Skill 的当前生命周期。实际控制函数别名为 loadSkills / releaseSkills；基础 Skill 常驻，不参与图中的计数与回收。
+
+此生命周期处理共享 Skill。依赖展开、函数绑定和教学由 AgentSkillLoader 解析；带 owner 的 Skill 由所属 Agent 的工作流加载，Writer 以工作区域管理其私有 Skill。
 
 ```mermaid
 flowchart TB
@@ -158,9 +162,9 @@ residentSnapshot() returns the last initialized committed Context without acquir
 
 ui.windows reports windowID/title/content/mode/phase and focusedID from the UI owner. Photography and ApplicationControl select it explicitly; BasicSkill remains unchanged. It contains no capture, media or Task authority.
 
-WebBrowsing/WebDrawing选择ui.web与ui.windows；ui.web由生产者提供content/url业务字段，本地路径保持unknown。Skill加载改变下一轮读取集合，新增来源无需修改角色路径清单。
+WebBrowsing/WebDrawing选择ui.web与ui.windows；ui.web 由生产者提供按窗口组织的页面类型与 URL，本地路径保持 unknown。Skill加载改变下一轮读取集合，新增来源无需修改角色路径清单。
 
-AgentStateContext registers scope-aware multimodal readers/reset callbacks alongside ordinary facts. multimodalSnapshot reads only selected sources, checks session generation and enforces 8 KiB/source, 16 KiB facts and four images. snapshot remains a text-only facade. synchronize resets explicit selections when the committed dialog identity changes; Skill visibility does not reset media. Sources own bytes and lifecycle.
+AgentStateContext registers scope-aware multimodal readers/reset callbacks alongside ordinary facts. multimodalSnapshot reads only selected sources, checks session generation and enforces 8 KiB/source, 16 KiB facts and five images. snapshot remains a text-only facade. synchronize resets explicit selections when the committed dialog identity changes; Skill visibility does not reset media. Sources own bytes and lifecycle.
 
 The shared Chat projection combines snapshot images with the current input's user message. Source/image metadata and the one-based attachment mapping live in system State; the source snapshot still owns selection and bytes, with no role-specific image-message generation.
 

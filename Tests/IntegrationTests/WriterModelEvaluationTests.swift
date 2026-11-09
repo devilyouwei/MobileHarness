@@ -313,7 +313,7 @@ func writerRealModelWorkflowRegression() async throws {
     let output = await OutputGateway(
         manager: manager, requests: input, tools: assembly.tools, policy: policy, sink: { _ in })
     try await output.bindCommunications(records.agentMessages)
-    await writer.bind(try await output.consumer(for: writer))
+    await writer.bind(try await output.consumer(for: writer), messaging: try await output.messaging(for: .writer))
     try await manager.start(.writer)
     let messaging = try await output.messaging(for: .assistant)
     var results: [[String: Any]] = []
@@ -343,7 +343,7 @@ func writerRealModelWorkflowRegression() async throws {
                 id: delegateID, requester: .assistant, executor: .writer, sessionID: session, execution: .background)
             let data = ["request": requestGoal, "goal": requestGoal, "entry": scenario.entry]
             let signal = try AgentTaskSignal(
-                kind: .request, scope: scope, businessContract: "writer.author", data: JSONEncoder().encode(data))
+                kind: .request, scope: scope, data: JSONEncoder().encode(data))
             let receipt = try await messaging.send(
                 signal.message(),
                 parent: .init(id: UUID().uuidString, sessionID: session, payload: .text(scenario.goal)), to: .writer)
@@ -737,7 +737,7 @@ private func writerPromptCase(_ scenario: WriterPromptCase, env: [String: String
     let output = await OutputGateway(
         manager: manager, requests: input, tools: assembly.tools, policy: policy, sink: { _ in })
     try await output.bindCommunications(records.agentMessages)
-    await writer.bind(try await output.consumer(for: writer))
+    await writer.bind(try await output.consumer(for: writer), messaging: try await output.messaging(for: .writer))
     try await manager.start(.writer)
     let messaging = try await output.messaging(for: .assistant)
     var issues: [String] = []
@@ -776,7 +776,7 @@ private func writerPromptCase(_ scenario: WriterPromptCase, env: [String: String
         item["delegateID"] = delegateID
         let data = ["request": requestGoal, "goal": requestGoal, "entry": scenario.entry]
         let signal = try AgentTaskSignal(
-            kind: .request, scope: scope, businessContract: "writer.author", data: JSONEncoder().encode(data))
+            kind: .request, scope: scope, data: JSONEncoder().encode(data))
         let receipt = try await messaging.send(
             signal.message(), parent: .init(id: UUID().uuidString, sessionID: session, payload: .text(scenario.goal)),
             to: .writer)
@@ -796,7 +796,7 @@ private func writerPromptCase(_ scenario: WriterPromptCase, env: [String: String
                     id: UUID().uuidString, requester: .assistant, executor: .writer, sessionID: session,
                     execution: .background)
                 let competing = try AgentTaskSignal(
-                    kind: .request, scope: other, businessContract: "writer.author",
+                    kind: .request, scope: other,
                     data: JSONEncoder().encode(["request": "another"]))
                 let rejection = try await messaging.send(
                     competing.message(),

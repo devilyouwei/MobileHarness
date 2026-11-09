@@ -71,6 +71,8 @@ GatewayOutputConsumer区分模型/Agent协议反馈与内部完成结果。execu
 失败仅返回内部调用方，不向InputGateway递送ToolResult。execute与executeReturning保持原有
 协议反馈，配对的模型工具结果仍按调用身份回到Agent。内部灵动岛呈现使用executeInternal。
 
+GatewayOutputConsumer 的退休端口绑定注册执行者的身份。OutputGateway 先封住任务授权的新执行，按终态加入或取消现有调用，再按接纳代际撤销授权。成功撤权后，InputGateway 写入本地任务诊断记录供状态观察。已有生命周期清理或进程重启留下的缺失授权可以收敛。Writer 的持久收尾 worker 持有调用并负责暂停和停止时加入，用户通知由另一个 worker 独立投递。
+
 默认内部动作过滤同时覆盖识别字幕/封口、回复字幕、等待态、语音状态和灵动岛呈现，不把这些
 成功的运行时维护调用混入业务记录；用户打开内部动作后可查看。失败仍沿现有诊断策略可见。
 
@@ -80,4 +82,6 @@ OutputGateway binds only AgentMessageRepository for durable Agent communication.
 
 ## Agent 公开元数据
 
-AgentConfigurations 校验 Catalog 索引的 v8 Agent 资源（description、身份、通信、baseSkills 和后台契约），再投影为 AgentCore v7 的函数/通信配置。公开 description 由各角色维护，单条最多 2048 UTF-8 字节。delegationOverview 与任务执行共用 Communication/AgentTaskDelegation 的真实适配和调用者权限；总目录最多 8192 字节，超限或无效配置明确失败。它只组装公开介绍，不加载同伴私有指令；模型上下文采用当前实例的通信策略，实时可用性由 State 提供。
+AgentConfigurations 校验 Catalog 索引的 v9 Agent 资源（description、身份、通信和 baseSkills），再投影为 AgentCore v7 的函数/通信配置。公开 description 由各角色维护，单条最多 2048 UTF-8 字节。delegationOverview 与任务执行共用 Communication/AgentTaskDelegation 的真实适配和调用者权限；总目录最多 8192 字节，超限或无效配置明确失败。它只组装公开介绍，不加载同伴私有指令；模型上下文采用当前实例的通信策略，实时可用性由 State 提供。
+
+AgentSkillLoader 共享依赖展开、函数绑定和教学读取。Skill 可声明 owner 限定运行时 Agent ID。共享发现仅列出无 owner 的 Skill，共享 Task/Skill 加载按同一规则校验根 Skill 和依赖。Agent 基础目录按可信配置身份解析；Writer 以自己的身份组合各控制域的 Skill。

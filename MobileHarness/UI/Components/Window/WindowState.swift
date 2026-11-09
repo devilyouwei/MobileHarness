@@ -20,6 +20,11 @@ public enum WindowMode: String, Sendable { case normal, minimized, maximized }
 public enum WindowPhase: String, Sendable { case opening, settled, changing, closing }
 public enum WindowError: String, Error, Sendable, LocalizedError {
     case unavailable, capacity, missing, invalidPosition, invalidIcon, interrupted, busy
+
+    public var errorDescription: String? {
+        guard self == .capacity else { return nil }
+        return "The window limit of \(WindowState.maximumWindows) has been reached."
+    }
 }
 
 public struct WindowGeometry: Equatable, Sendable {
@@ -91,6 +96,7 @@ public struct WindowPresentation: Identifiable, Sendable {
     @ObservationIgnored private var prompts:
         [UUID: (token: UUID, continuation: CheckedContinuation<String, any Error>)] = [:]
     @ObservationIgnored private var stopped = false
+    public nonisolated static let maximumWindows = 12
     public init() {}
     public func setAvailable(_ value: Bool) {
         guard !stopped else { return }
@@ -221,7 +227,7 @@ public struct WindowPresentation: Identifiable, Sendable {
             try focus(item.id)
             return item.id
         }
-        guard windows.count < 4 else { throw WindowError.capacity }
+        guard windows.count < Self.maximumWindows else { throw WindowError.capacity }
         let icon = try icon?.prepared()
         let cardWidth = WindowCardLayout.width(title: title, viewport: width, fontSize: cardTitleSize)
         let id = windowID ?? UUID()
@@ -404,7 +410,8 @@ public struct WindowPresentation: Identifiable, Sendable {
                 "windows": .array(
                     windows.map {
                         .object([
-                            "windowID": .text(reference(for: $0.id) ?? "unknown"), "title": .text($0.title),
+                            "windowID": .text(reference(for: $0.id) ?? "unknown"),
+                            "title": .text(String($0.title.prefix(80))),
                             "content": .text($0.content),
                             "mode": .text($0.mode.rawValue), "phase": .text($0.phase.rawValue),
                             "subtitle": $0.subtitle.map { .text(String($0.prefix(64))) } ?? .unknown,
@@ -442,7 +449,7 @@ public struct WindowContent: RawRepresentable, Sendable, Equatable {
         self.singleInstance = singleInstance
     }
     public static let artifact = Self(rawValue: "artifact", singleInstance: false)
-    public static let web = Self(rawValue: "web", singleInstance: true)
+    public static let web = Self(rawValue: "web")
     public static let camera = Self(rawValue: "camera", singleInstance: true)
 }
 public struct WindowInput: Sendable {

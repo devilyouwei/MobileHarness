@@ -33,11 +33,7 @@ func conversationalAlbumNavigationUsesRegisteredAliasAndRealPresentation() async
     #expect(call.actionPath.description == "UI.Navigation.open")
     let input = AgentInput(id: UUID().uuidString, sessionID: sessionID, payload: .text("打开相册"))
     let result = try await executor.execute(ActionInvocation(source: .assistant, input: input, call: call))
-    guard case .value(let value) = result else {
-        Issue.record("Expected real navigation receipt")
-        return
-    }
-    #expect(value == "presented")
+    #expect(result == .completed)
     #expect(ui.navigation.state.path == [.settings, .album])
     #expect(ui.album.items.isEmpty)
     let declaration = try #require(NavigationModule.declarations.first { $0.path.description == "UI.Navigation.open" })

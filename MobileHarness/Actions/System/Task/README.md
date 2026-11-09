@@ -30,7 +30,7 @@ BasicSkill 的公开别名为 task.start、task.end、task.delegate、task.cance
 | task.cancel | reason、可选 agent_id；省略目标取消前台，带目标发送当前通信链的取消 |
 | task.send | text、可选 agent_id；省略目标补充前台，带目标发送补充/待答输入 |
 
-不接受公开 taskID、workspaceID、replaceCurrent、业务协议或内部通信 ID。后台委派只等待接纳，目标忙碌明确拒绝，不自动替换。Writer 自行保存本地运行和工作区状态，Assistant 不读取 Writer 私有表。通信送达与业务完成分别处理。前台切换清理失败时保留旧 scope，并拒绝新任务。
+不接受公开 taskID、workspaceID、replaceCurrent、业务协议或内部通信 ID。后台委派只等待接纳，目标忙碌明确拒绝，不自动替换。Writer 自行保存本地运行和工作区状态，Assistant 不读取 Writer 私有表。通信送达与业务完成分别处理。任务端口返回结构化 ActionCompletion；委派及发往 Writer 的补充与取消成功时使用 completed，异常仍走失败观察。前台控制由执行者返回所需业务值。前台切换清理失败时保留旧 scope，并拒绝新任务。
 
 跨模块认证、接纳与完成时序见[总体委托流程](../../../README.md#assistant-agent-delegation)，调用方政策见 [Assistant](../../../Agents/Assistant/README.md#对其他-agent-的委托)，创作、通知和长期作品任务见 [Writer](../../../Agents/Writer/README.md)。
 

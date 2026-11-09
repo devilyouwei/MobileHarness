@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "photography",
-  "revision": 41,
+  "revision": 44,
   "description": "Photo/video capture, camera controls, photo saving and video save/ignore. Tracking: application-control.",
   "dependencies": [],
   "useActions": [
@@ -33,6 +33,12 @@
       "path": "Camera.Capture.savePhoto",
       "callType": "action",
       "alias": "savePhoto",
+      "channel": "Camera"
+    },
+    {
+      "path": "Camera.Capture.saveAllPhotos",
+      "callType": "action",
+      "alias": "saveAllPhotos",
       "channel": "Camera"
     },
     {

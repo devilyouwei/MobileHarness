@@ -9,11 +9,9 @@ public enum WindowActions {
         parameters: [
             .init(
                 "windowID", type: .string, required: true,
-                description: "Actual ID from ui.windows/openCamera.")
+                description: "Actual ID from ui.windows.")
         ], timeout: .seconds(60))
-    public static func focus(invocation: any FunctionInput, using windows: any WindowControlCapability) async throws
-        -> String
-    {
+    public static func focus(invocation: any FunctionInput, using windows: any WindowControlCapability) async throws {
         let args = ActionArguments(invocation.call.parameters)
         try args.validateAllowedKeys(["windowID"])
         let raw = try args.requiredString("windowID", maximumUTF8Bytes: 36)
@@ -22,7 +20,6 @@ public enum WindowActions {
         else { throw ActionArguments.ValidationError.invalidValue("windowID") }
         try Task.checkCancellation()
         try await windows.performWindow(.focus, id: id, x: nil, y: nil, invocation: invocation)
-        return "presented"
     }
     @Action(
         domain: "UI", module: "Window", title: "minimize",
@@ -31,10 +28,9 @@ public enum WindowActions {
         parameters: [
             .init(
                 "windowID", type: .string, required: true,
-                description: "Actual ID from ui.windows/openCamera.")
+                description: "Actual ID from ui.windows.")
         ], timeout: .seconds(60))
     public static func minimize(invocation: any FunctionInput, using windows: any WindowControlCapability) async throws
-        -> String
     {
         let args = ActionArguments(invocation.call.parameters)
         try args.validateAllowedKeys(["windowID"])
@@ -44,7 +40,6 @@ public enum WindowActions {
         else { throw ActionArguments.ValidationError.invalidValue("windowID") }
         try Task.checkCancellation()
         try await windows.performWindow(.minimize, id: id, x: nil, y: nil, invocation: invocation)
-        return "presented"
     }
     @Action(
         domain: "UI", module: "Window", title: "maximize",
@@ -53,10 +48,9 @@ public enum WindowActions {
         parameters: [
             .init(
                 "windowID", type: .string, required: true,
-                description: "Actual ID from ui.windows/openCamera.")
+                description: "Actual ID from ui.windows.")
         ], timeout: .seconds(60))
     public static func maximize(invocation: any FunctionInput, using windows: any WindowControlCapability) async throws
-        -> String
     {
         let args = ActionArguments(invocation.call.parameters)
         try args.validateAllowedKeys(["windowID"])
@@ -66,7 +60,6 @@ public enum WindowActions {
         else { throw ActionArguments.ValidationError.invalidValue("windowID") }
         try Task.checkCancellation()
         try await windows.performWindow(.maximize, id: id, x: nil, y: nil, invocation: invocation)
-        return "presented"
     }
     @Action(
         domain: "UI", module: "Window", title: "restore",
@@ -75,11 +68,9 @@ public enum WindowActions {
         parameters: [
             .init(
                 "windowID", type: .string, required: true,
-                description: "Actual ID from ui.windows/openCamera.")
+                description: "Actual ID from ui.windows.")
         ], timeout: .seconds(60))
-    public static func restore(invocation: any FunctionInput, using windows: any WindowControlCapability) async throws
-        -> String
-    {
+    public static func restore(invocation: any FunctionInput, using windows: any WindowControlCapability) async throws {
         let args = ActionArguments(invocation.call.parameters)
         try args.validateAllowedKeys(["windowID"])
         let raw = try args.requiredString("windowID", maximumUTF8Bytes: 36)
@@ -88,7 +79,6 @@ public enum WindowActions {
         else { throw ActionArguments.ValidationError.invalidValue("windowID") }
         try Task.checkCancellation()
         try await windows.performWindow(.restore, id: id, x: nil, y: nil, invocation: invocation)
-        return "presented"
     }
     @Action(
         domain: "UI", module: "Window", title: "move",
@@ -97,13 +87,11 @@ public enum WindowActions {
         parameters: [
             .init(
                 "windowID", type: .string, required: true,
-                description: "Actual ID from ui.windows/openCamera."),
+                description: "Actual ID from ui.windows."),
             .init("x", type: .number, required: true, description: "Horizontal safe-area position, 0...1."),
             .init("y", type: .number, required: true, description: "Vertical safe-area position, 0...1."),
         ], timeout: .seconds(60))
-    public static func move(invocation: any FunctionInput, using windows: any WindowControlCapability) async throws
-        -> String
-    {
+    public static func move(invocation: any FunctionInput, using windows: any WindowControlCapability) async throws {
         let args = ActionArguments(invocation.call.parameters)
         try args.validateAllowedKeys(["windowID", "x", "y"])
         let raw = try args.requiredString("windowID", maximumUTF8Bytes: 36)
@@ -117,7 +105,6 @@ public enum WindowActions {
         }
         try Task.checkCancellation()
         try await windows.performWindow(.move, id: id, x: x, y: y, invocation: invocation)
-        return "presented"
     }
     @Action(
         domain: "UI", module: "Window", title: "close",
@@ -126,11 +113,9 @@ public enum WindowActions {
         parameters: [
             .init(
                 "windowID", type: .string, required: true,
-                description: "Actual ID from ui.windows/openCamera.")
+                description: "Actual ID from ui.windows.")
         ], timeout: .seconds(60))
-    public static func close(invocation: any FunctionInput, using windows: any WindowControlCapability) async throws
-        -> String
-    {
+    public static func close(invocation: any FunctionInput, using windows: any WindowControlCapability) async throws {
         let args = ActionArguments(invocation.call.parameters)
         try args.validateAllowedKeys(["windowID"])
         let raw = try args.requiredString("windowID", maximumUTF8Bytes: 36)
@@ -139,6 +124,5 @@ public enum WindowActions {
         else { throw ActionArguments.ValidationError.invalidValue("windowID") }
         try Task.checkCancellation()
         try await windows.performWindow(.close, id: id, x: nil, y: nil, invocation: invocation)
-        return "presented"
     }
 }

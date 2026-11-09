@@ -169,8 +169,12 @@
                         id: id, title: title, entry: entry, files: files, preview: preview)
                 })
             let web = WebExecutionService(
-                page: ui.web, windows: ui.windows,
+                windows: ui.windows,
                 pageForWindow: { [pages = ui.web] id in pages.sessions[id] },
+                createPage: { [pages = ui.web] id, reference in
+                    try pages.createSession(windowID: id, reference: reference)
+                },
+                removePage: { [pages = ui.web] id in pages.removeSession(windowID: id) },
                 saveImage: { [photos] data, input in
                     try await photos.save(
                         data,

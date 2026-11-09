@@ -4,6 +4,8 @@
 
 本目录校验、执行已经由调用方决定的展示请求；运行异常分类属于 ApplicationControl，蓝牙显示函数只更新展示事实。Agent 使用自身绑定的 Gateway consumer 调用注册函数；Actions 不观察 UI 状态推断角色阶段，也不替角色调用灵动岛。
 
+recordFailure、showHome 和 showSettings 以 Void 完成，调用方仍可收到结构化回执或实际失败。
+
 | 文件 | 当前职责 |
 | --- | --- |
 | [BluetoothStatusActions.swift](BluetoothStatusActions.swift) | 已分类连接状态的参数校验和呈现 |

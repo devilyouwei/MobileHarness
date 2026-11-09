@@ -50,6 +50,6 @@ extension MemoryHistoryIntent {
         let value = try JSONDecoder().decode(Self.self, from: signal.data)
         if case .cancel = value { throw CommunicationError.unauthorized }
         return AgentMessage(
-            contract: signal.businessContract, content: value, maximumBytes: 512, validate: { try $0.validate() })
+            contract: Self.contract, content: value, maximumBytes: 512, validate: { try $0.validate() })
     }
 }

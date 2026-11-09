@@ -640,7 +640,7 @@ private func bundledStateSkillIDs() throws -> [String] {
     return try JSONDecoder().decode(Catalog.self, from: AgentConfigurations.data("Catalog.json")).skills.keys.sorted()
 }
 
-@Test(.actionCatalog) @MainActor func everyBundledSkillCanCollectContextAfterLoadingAndRelease() async throws {
+@Test(.actionCatalog) @MainActor func everySharedSkillCanCollectContextAfterLoadingAndRelease() async throws {
     let registry = ApplicationContainer(root: .temporaryDirectory.appendingPathComponent(UUID().uuidString))
     let ui = registry.ui()
     let platform = registry.platform()
@@ -673,7 +673,8 @@ private func bundledStateSkillIDs() throws -> [String] {
     try context.open(session: "web-regression")
     let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
     let base = try AgentConfigurations.baseSkills(named: "Assistant")
-    for id in try bundledStateSkillIDs() where !base.contains(id) {
+    let shared = try bundledStateSkillIDs().filter { try AgentConfigurations.skill($0).owner == nil }
+    for id in shared where !base.contains(id) {
         var skills = AgentTaskSkillState()
         try skills.initialize(fixed: fixed, baseSkills: base)
         _ = try skills.control("loadSkills", arguments: ["skills": "[\"\(id)\"]"], inputID: "input", fixed: fixed)

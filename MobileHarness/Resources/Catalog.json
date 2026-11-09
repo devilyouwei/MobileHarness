@@ -17,6 +17,8 @@
     "photography": "Skills/Photography/Skill.json",
     "history-query": "Skills/HistoryQuery/Skill.json",
     "application-control": "Skills/ApplicationControl/Skill.json",
-    "web-browsing": "Skills/WebBrowsing/Skill.json"
+    "web-browsing": "Skills/WebBrowsing/Skill.json",
+    "writer-workspace": "Skills/WriterWorkspace/Skill.json",
+    "writer-file-editing": "Skills/WriterFileEditing/Skill.json"
   }
 }

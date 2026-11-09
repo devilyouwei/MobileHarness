@@ -140,10 +140,7 @@ public enum ArtifactArchive {
                     entry = path
                 } else {
                     entry = "preview-" + UUID().uuidString + ".html"
-                    let html =
-                        ext == "svg"
-                        ? "<!doctype html><meta charset=utf-8>" + selected.content
-                        : ArtifactTextRendering.html(selected.content, markdown: ext == "md")
+                    let html = try await previewHTML(selected.content, ext: ext)
                     try await disk.putIfAbsent(Data(html.utf8), key: prefix + "/" + entry)
                 }
                 let url = try await disk.fileURL(prefix + "/" + entry, maximumBytes: Int.max)
@@ -159,6 +156,10 @@ public enum ArtifactArchive {
                 } catch { throw BinaryPublicationError(publication: primary, cleanup: error) }
                 throw primary
             }
+        }
+        private func previewHTML(_ source: String, ext: String) async throws -> String {
+            if ext == "svg" { return "<!doctype html><meta charset=utf-8>" + source }
+            return try await ArtifactTextRendering.document(source, markdown: ext == "md").html
         }
         public func closePreview() async throws {
             if let previewWorker {
@@ -226,12 +227,8 @@ public enum ArtifactArchive {
                         entry = path
                     } else {
                         entry = "export-" + UUID().uuidString + ".html"
-                        try await disk.putIfAbsent(
-                            Data(
-                                (ext == "svg"
-                                    ? "<!doctype html><meta charset=utf-8>" + source
-                                    : ArtifactTextRendering.html(source, markdown: ext == "md")).utf8),
-                            key: prefix + "/source/" + entry)
+                        let html = try await previewHTML(source, ext: ext)
+                        try await disk.putIfAbsent(Data(html.utf8), key: prefix + "/source/" + entry)
                     }
                     let url = try await disk.fileURL(prefix + "/source/" + entry, maximumBytes: Int.max)
                     var root = url

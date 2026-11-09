@@ -30,15 +30,17 @@ import Testing
     let state = WindowState()
     state.layout(width: 390, height: 750)
     state.setAvailable(true)
-    let ids = try await [
-        presentFixture(state, "one"), presentFixture(state, "two"), presentFixture(state, "three"),
-        presentFixture(state, "four"),
-    ]
-    #expect(state.windows.count == 4)
-    await #expect(throws: WindowError.self) { try await state.present(content: .init(rawValue: "five"), title: "five") }
+    let first = try await presentFixture(state, "one")
+    for index in 1..<WindowState.maximumWindows {
+        _ = try await presentFixture(state, "window-\(index)")
+    }
+    #expect(state.windows.count == WindowState.maximumWindows)
+    await #expect(throws: WindowError.capacity) {
+        try await state.present(content: .init(rawValue: "overflow"), title: "overflow")
+    }
     #expect(
-        try await state.present(content: .init(rawValue: "one", singleInstance: true), title: "unchanged") == ids[0])
-    #expect(state.focusedID == ids[0] && state.windows.last?.id == ids[0])
+        try await state.present(content: .init(rawValue: "one", singleInstance: true), title: "unchanged") == first)
+    #expect(state.focusedID == first && state.windows.last?.id == first)
     await state.stop()
 }
 @Test @MainActor func windowNormalMaximizedAndCardPositionsStayIndependent() async throws {

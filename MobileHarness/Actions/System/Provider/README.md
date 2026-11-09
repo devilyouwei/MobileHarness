@@ -36,6 +36,8 @@ ProviderSettingsService 在 MainActor 上拥有 saved/restored/changing、一个
 
 save 排斥其它更改和在途恢复：校验选项，prepare 获得 apply，加入 beginChange 屏障，持久化后应用，最终 endChange。应用失败时用独立 Task 加入持久化旧值回滚；回滚失败同时保留两个安全原因。此回滚是文档回滚，不保证原生状态能撤销。summary 仅在 restored 后返回 cloudEnabled/selectedCloudModel。
 
+保存与恢复 Action 成功只产生结构化完成回执。已保存的表单由同一个请求端口领取，公开摘要与模型发现仍返回查询数据。
+
 ProviderSettingsStore 是 actor，以 busy 排斥重叠读写，保存 version=1 的配置文档和 credentialID 引用。ProviderCredentialStorage 注入原生凭据读写；原文 key 不存入配置文档。只读取当前文档与 credentialID 引用；不读取旧 Keychain 配置，不将单 Provider 文档转换成列表。
 
 替换时先写新凭据，再按 revision 保存文档；文档失败时尽力删除新凭据，提交成功后尽力删除旧凭据。凭据清理是 best effort，可能留下无引用记录，不将已提交配置改判为未提交。原生凭据策略及原始网络错误不进入协议结果；安全失败码与有界摘要由 ProviderSettingsError 提供。

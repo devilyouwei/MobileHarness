@@ -1,0 +1,19 @@
+{
+  "version": 3,
+  "id": "writer-file-editing",
+  "revision": 2,
+  "description": "Inspect and edit files in the active Writer workspace.",
+  "owner": "writer",
+  "dependencies": [],
+  "useActions": [
+    {
+      "path": "Artifacts.Workspace.perform",
+      "callType": "tool",
+      "alias": "workspace"
+    }
+  ],
+  "useStates": [],
+  "useInstructions": [
+    "Instructions.md"
+  ]
+}

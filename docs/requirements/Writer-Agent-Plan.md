@@ -1,5 +1,17 @@
 # WriterAgent 流式创作计划
 
+当前委派接纳及模型拒绝由 [Writer 委派接纳与业务拒绝](../completed/Writer-Delegation-Admission.md) 维护。下文记录原计划和各次实施时的接口。
+
+## Writer Skill 与工作区域
+
+用户批准沿用 Assistant 的资源和命名约定。使用 Catalog 索引的 `Resources/Skills/WriterWorkspace/` 与 `Resources/Skills/WriterFileEditing/`，分别提供 `writer-workspace`、`writer-file-editing` 的 Skill.json 和 Instructions.md。两者是纯资源目录，沿用 Skills 根 README 集中维护的目录规则。Writer/Agent.json 将作品库 Skill 配为 baseSkills。两个 Skill 通过同一个 canonical native Tool 绑定声明 workspace；既有 Actions、Gateway 和文件流接口继续执行实际工作。
+
+- Agents/Support 的资源加载器识别可选的 Skill owner。未指定的 Skill 继续共享；Writer 专属 Skill 从通用发现目录排除，并且通用加载链不能直接或通过依赖激活它。Writer 使用相同的元数据、依赖展开和教学读取机制。
+- Agents/Writer 以可信绑定状态选择本次控制请求的有效教学和原生工具 schema。作品库呈现搜索、选择、打开、新建和删除；enter/create 成功后的编辑域自动激活文件编辑教学与命令；open 只进入结果汇报域。已有编辑域等待补充或暂停恢复时重建相同能力。保留工具执行前的实时域校验、只读边界、原始内容无工具请求和渲染发布门槛。
+- 从 Writer/Prompts.json 迁出两个 Skill 的业务教学，保留角色和控制域专属约束、只读呈现及内容生成模板。同步 Writer、Assistant、Agents Support、Resources 与总体技术 README；用脚本模型覆盖教学与 schema 的切换、只读和恢复，用配置回归覆盖共享发现与跨角色加载。运行 check.sh 和 build-ios.sh，分别记录自动化与设备验收。
+
+实现与验证见 [Writer Skill 分域验证](../validation/Writer-Agent.md#2026-11-09-writer-skill-分域)。
+
 2026-11-03。用户已批准本计划实施及新增 Agents/Writer、Actions/Artifacts、Resources/Agents/Writer、Resources/Skills/Writing 目录。基线 ada643ae，分支 codex/writer-agent。
 
 ## 目标与责任

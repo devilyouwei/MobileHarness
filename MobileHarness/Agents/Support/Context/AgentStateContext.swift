@@ -114,7 +114,7 @@ public final class AgentStateContext: Sendable {
             guard !value.closed, value.sessions[session] == generation else { throw ContainerContextError.closed }
         }
         let data = try JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys])
-        guard data.count <= 16384, images.count <= 4 else { throw ContainerContextError.capacityExceeded }
+        guard data.count <= 16384, images.count <= 5 else { throw ContainerContextError.capacityExceeded }
         return .init(facts: data, images: images, resourceBindings: bindings)
     }
     public func close(session: String) {

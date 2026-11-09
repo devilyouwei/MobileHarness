@@ -52,7 +52,7 @@ extension SystemActions {
         domain: "System", module: "ModelResources", title: "configureSpeech",
         timeout: .seconds(60))
     public static func configureSpeech(invocation: any FunctionInput, using resources: any ModelResourceCapability)
-        async throws -> String
+        async throws
     {
         try Task.checkCancellation()
         let arguments = ActionArguments(invocation.call.parameters)
@@ -64,7 +64,6 @@ extension SystemActions {
         }
         try await resources.configureSpeech(recognition: recognition == "true", synthesis: synthesis == "true")
         try Task.checkCancellation()
-        return "configured"
     }
 
     @Action(
@@ -80,7 +79,7 @@ extension SystemActions {
         ],
         timeout: .seconds(60))
     public static func download(invocation: any FunctionInput, using resources: any ModelResourceCapability)
-        async throws -> String
+        async throws
     {
         try Task.checkCancellation()
         let arguments = ActionArguments(invocation.call.parameters)
@@ -93,7 +92,6 @@ extension SystemActions {
         }
         try await resources.download(id, endpoint: endpoint, allowsCellular: cellular == "true")
         try Task.checkCancellation()
-        return "accepted"
     }
 
     @Action(
@@ -102,7 +100,6 @@ extension SystemActions {
         parameters: [.init("id", type: .string, required: true, description: "id", constraints: "")],
         timeout: .seconds(60))
     public static func cancel(invocation: any FunctionInput, using resources: any ModelResourceCapability) async throws
-        -> String
     {
         try Task.checkCancellation()
         let arguments = ActionArguments(invocation.call.parameters)
@@ -110,14 +107,12 @@ extension SystemActions {
         let id = try arguments.requiredString("id", maximumUTF8Bytes: 64)
         try await resources.cancel(id)
         try Task.checkCancellation()
-        return "cancelled"
     }
 
     @Action(
         domain: "System", module: "ModelResources", title: "remove",
         timeout: .seconds(60))
     public static func remove(invocation: any FunctionInput, using resources: any ModelResourceCapability) async throws
-        -> String
     {
         try Task.checkCancellation()
         let arguments = ActionArguments(invocation.call.parameters)
@@ -125,6 +120,5 @@ extension SystemActions {
         let id = try arguments.requiredString("id", maximumUTF8Bytes: 64)
         try await resources.remove(id)
         try Task.checkCancellation()
-        return "removed"
     }
 }

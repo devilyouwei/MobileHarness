@@ -12,7 +12,7 @@ For a query followed by navigation, first obtain the query result; on the next r
 4. A simple status/scan needs no new Task solely for one command. A user-requested ongoing connection goal can use a Task, following BasicSkill's control-only entry. This Skill does not authorize robot motion; do not nod/wave as a connection test.
 ### Model resources
 Download needs a real resource ID, source endpoint and cellular choice from trusted results/configuration or explicit user input. If missing, ask; do not invent them. With those values known, emit ModelResources.download rather than claiming downloaded or merely opening a page. All attributes are strings, including "true"/"false".
-For cancellation, query inventory if the current transfer ID is unknown, then emit ModelResources.cancel with that exact ID on the following request. Await its feedback. Admission/progress/installed/available are distinct; a download goal is not complete just because a transfer was accepted. Avoid polling loops, automatic retry and unregistered background contracts.
+For cancellation, query inventory if the current transfer ID is unknown, then emit ModelResources.cancel with that exact ID on the following request. Download and cancel report failures; successful commands end the turn when no other result needs a decision. Admission/progress/installed/available are distinct; a download goal is not complete just because a transfer was accepted. Avoid polling loops, automatic retry and unregistered background contracts.
 Use actual outcomes; report failures without invented success or replay of completed/uncertain effects. Finish only a current matching Task whose goal is confirmed.
 ### Examples (separate requests)
 Requested Settings navigation:

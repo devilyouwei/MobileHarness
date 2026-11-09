@@ -146,19 +146,77 @@ private func writerDefinition() throws -> ChatToolDefinition {
     #expect(await model.requests.allSatisfy { $0.messages[1].content == "检查多文件后完成" })
 }
 
-@Test func artifactMarkdownEscapesMarkupAndUnsafeLinks() {
-    let rendered = ArtifactTextRendering.html(
-        "# Title\n**bold** *italic* `code`\n[safe](https://example.com) [bad](javascript:alert)\n<script>bad</script>\n1. first",
+@Test @MainActor func artifactMarkdownRendersStructuredContentAndEscapesMarkup() async throws {
+    let rendered = try await ArtifactTextRendering.document(
+        """
+        # Title
+
+        **bold** *italic* `code`
+        [safe](https://example.com) [bad](javascript:alert)
+
+        <script>bad</script>
+
+        1. first
+           - nested
+
+        | 名称 | 状态 |
+        | --- | --- |
+        | 测试 | 完成 |
+        """,
         markdown: true)
-    #expect(rendered.contains("<strong>bold</strong>"))
-    #expect(rendered.contains("<em>italic</em>"))
-    #expect(rendered.contains("<code>code</code>"))
-    #expect(rendered.contains("href=\"https://example.com\""))
-    #expect(!rendered.contains("href=\"javascript:"))
-    #expect(!rendered.contains("<script>"))
-    #expect(rendered.contains("1.  first"))
+    #expect(rendered.html.contains("<strong>bold</strong>"))
+    #expect(rendered.html.contains("<em>italic</em>"))
+    #expect(rendered.html.contains("<code>code</code>"))
+    #expect(rendered.html.contains("href=\"https://example.com\""))
+    #expect(!rendered.html.contains("href=\"javascript:"))
+    #expect(!rendered.html.contains("<script>"))
+    #expect(rendered.html.contains("&lt;script&gt;"))
+    #expect(rendered.html.contains("<ol>") && rendered.html.contains("<ul>"))
+    #expect(rendered.html.contains("<table>") && rendered.html.contains("<td>完成</td>"))
+    #expect(rendered.diagnostics.isEmpty)
 }
 
+@Test @MainActor func artifactMarkdownRendersMultipleMermaidImagesAndKeepsInvalidSource() async throws {
+    let rendered = try await ArtifactTextRendering.document(
+        """
+        # 软件工程流程图
+
+        ```mermaid
+        flowchart TD
+          A[开始] --> B{可行}
+          B -->|是| C[需求分析]
+          B -->|否| D[结束]
+        ```
+
+        ```mermaid
+        flowchart TD
+          A[broken
+        ```
+
+        ~~~MERMAID
+        sequenceDiagram
+          开发者->>系统: 提交
+        ~~~
+
+        ```text
+        flowchart TD
+        ```
+        """,
+        markdown: true)
+    let pattern = try NSRegularExpression(pattern: #"data:image/svg\+xml;base64,([A-Za-z0-9+/=]+)"#)
+    let html = rendered.html as NSString
+    let images = pattern.matches(in: rendered.html, range: NSRange(location: 0, length: html.length))
+    try #require(images.count == 2, "Diagnostics: \(rendered.diagnostics)")
+    let charts = try images.map { match in
+        String(decoding: try #require(Data(base64Encoded: html.substring(with: match.range(at: 1)))), as: UTF8.self)
+    }
+    #expect(charts[0].contains("<svg") && charts[0].contains("需求分析"))
+    #expect(charts[1].contains("<svg") && charts[1].contains("提交"))
+    #expect(rendered.diagnostics.contains("Mermaid 图表 2 无法渲染"))
+    #expect(rendered.html.contains("A[broken"))
+    #expect(rendered.html.contains("<code class=\"language-text\">flowchart TD"))
+    #expect(!rendered.html.contains("<script"))
+}
 @Test func artifactRemovalPreservesUnrelatedReadReferences() async throws {
     let editor = ArtifactEditing(draft: try .init(files: ["index.html": "home", "old.css": "red"]))
     let reference = try await editor.read(path: "old.css")
@@ -409,7 +467,7 @@ private func writerFinishTools() throws -> WriterTools {
         try await WriterWorkflow(model: model).run(goal: "Demo", scope: "run", tools: writerFinishTools()) == "Done")
     let requests = await model.requests
     #expect(requests.count == 3)
-    #expect(requests[1].messages.contains { $0.content.contains("Runtime finalization is not ready") })
+    #expect(requests[1].messages.contains { $0.content.contains("the delegation is still active") })
     for id in ["finish-early", "edit-early"] {
         #expect(
             requests[2].messages.contains {
@@ -630,18 +688,21 @@ private actor WriterNaturalFinishProbe {
     }
     func report(_ fact: WriterRequestProgress) { progress.append(fact) }
 }
-@Test func writerNaturalTerminationPublishesWithoutAnotherModelRequest() async throws {
-    let model = WriterScriptModel([[.text("Ready"), .finished(.stop)]])
+@Test func writerRequiresAnExplicitFinishAfterPlainText() async throws {
+    let model = WriterScriptModel([[.text("Ready"), .finished(.stop)], writerControl("finish", "finish")])
     let probe = WriterNaturalFinishProbe()
     let tools = WriterTools(
-        definitions: [try writerDefinition()], execute: { _ in throw WriterFailure.invalidOutput }, append: { _, _ in },
-        complete: { _ in "unused" }, abort: { _ in }, finalize: { _ in await probe.commit() })
+        definitions: [try writerDefinition()],
+        execute: { call in
+            #expect(call.id == "finish")
+            return .finished(await probe.commit())
+        }, append: { _, _ in }, complete: { _ in "unused" }, abort: { _ in })
     #expect(
         try await WriterWorkflow(model: model, requestProgress: { await probe.report($0) }).run(
             goal: "Done", scope: "run", tools: tools) == "Published")
-    #expect(await model.requests.count == 1)
+    #expect(await model.requests.count == 2)
     #expect(await probe.commits == 1)
-    #expect(await probe.progress.map(\.number) == [1])
+    #expect(await probe.progress.map(\.number) == [1, 2])
 }
 
 private actor WriterRoundBoundaryProbe {

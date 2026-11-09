@@ -144,7 +144,7 @@ Publication is one-way. A subscriber rejection cannot stop inference; output pro
 
 ## 聆听、取消与完成
 
-同意只在本会话有效；撤销／暂停推进接纳 epoch，并在异步提交后重验 UI 代际，拒绝迟到启用。原生 owner 的 `stopListening(sessionID:)` 只撤销并发布内部策略，不能重新同意。公开启停 Action 通过 `setListening(enabled:sessionID:)` 更新同一许可：校验 resident/root 会话与运行态（paused 时仅允许关闭），推进 admission epoch 并返回单调 revision 的中立 ListeningPolicy；关闭同时清空 pendingFinal 并关闭新句接纳。此调用不发布第二个 Action，由原执行方直接应用返回策略并确认原生完成。普通回复活动只改变paused。认证Assistant的成功Writer汇报完成事实可使enabled变为true，经现有Speech.Listening.update执行启听；物理停止不依赖UI队列可用。
+同意只在本会话有效；撤销／暂停推进接纳 epoch，并在异步提交后重验 UI 代际，拒绝迟到启用。原生 owner 的 `stopListening(sessionID:)` 只撤销并发布内部策略，不能重新同意。公开启停 Action 通过 `setListening(enabled:sessionID:)` 更新同一许可：校验 resident/root 会话与运行态（paused 时仅允许关闭），推进 admission epoch 并返回单调 revision 的中立 ListeningPolicy；关闭同时清空 pendingFinal 并关闭新句接纳。此调用不发布第二个 Action，由原执行方直接应用返回策略并确认原生完成。回复占用只改变 paused；物理停止不依赖 UI 队列可用。
 
 最多四个 source/incarnation/revision 围栏的 replyActivity 快照及一个 pending final root 抑制新句接纳。最终识别先关接纳再发布，Assistant 匹配回复事实接管 occupancy；释放依赖真实终态／生命周期，没有占用定时器。半双工暂停保留逻辑同意，Actions 加入已确认语句、播放 drain 和音频清理后才恢复；用户撤销推进单调时间围栏，早于撤销开始的汇报不能重新启听。新的汇报在撤销后实际开始并成功播毕时可按汇报政策启听。
 

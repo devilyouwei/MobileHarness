@@ -8,6 +8,25 @@ import StorageCore
 import StorageTasks
 import UI
 
+/// Optional execution time granted by the host for one active Writer segment.
+public struct WriterBackgroundExecution: Sendable {
+    public typealias Start =
+        @MainActor @Sendable (
+            _ expire: @escaping @Sendable () async -> Void,
+            _ failed: @escaping @Sendable (String) async -> Void
+        ) -> WriterBackgroundExecution?
+
+    public let advance: @MainActor @Sendable () -> Void
+    public let finish: @MainActor @Sendable (Bool) -> Void
+
+    public init(
+        advance: @escaping @MainActor @Sendable () -> Void, finish: @escaping @MainActor @Sendable (Bool) -> Void
+    ) {
+        self.advance = advance
+        self.finish = finish
+    }
+}
+
 /// Root-owned role lifecycle. It never shuts down the borrowed Gateway roots.
 @MainActor public final class WriterContainer {
     private var agent: WriterAgent?
@@ -17,10 +36,14 @@ import UI
     private var output: OutputGateway?
     private var registered = false
     private var closed = false
+    private var startBackground: WriterBackgroundExecution.Start?
     public private(set) var artifacts: (any WriterArtifactsControlling)?
     public func bindArtifacts(_ artifacts: (any WriterArtifactsControlling)?) { self.artifacts = artifacts }
     public private(set) var historyStore: WriterHistoryStore?
     public init() {}
+    public func bindBackgroundExecution(_ start: @escaping WriterBackgroundExecution.Start) {
+        startBackground = start
+    }
     func configureHistory(
         messages: any WriterMessageRepository, tasks: any WriterExecutionRepository,
         communications: any AgentMessageRepository, logs: any ModelRequestLogRepository
@@ -42,7 +65,8 @@ import UI
             throw WriterFailure.unavailable
         }
         agent = try WriterAgent(
-            model: model, streaming: streaming, history: historyStore, tasks: tasks, communications: communications)
+            model: model, streaming: streaming, history: historyStore, tasks: tasks, communications: communications,
+            startBackground: startBackground)
         self.manager = manager
         self.output = output
     }
@@ -52,7 +76,7 @@ import UI
         try await manager.register(agent)
         registered = true
         do {
-            await agent.bind(try await output.consumer(for: agent))
+            await agent.bind(try await output.consumer(for: agent), messaging: try await output.messaging(for: .writer))
             try await manager.start(.writer)
         } catch {
             let primary = error

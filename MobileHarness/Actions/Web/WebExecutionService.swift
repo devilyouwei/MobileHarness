@@ -6,22 +6,25 @@ import UI
 
 /// Actions owns work independently of the window. One operation, zero queued operations.
 @MainActor public final class WebExecutionService: WebCapability, WindowContentLifecycle {
-    private let page: any WebPagePresenting
     private let windows: WindowState
+    private let createPage: @MainActor @Sendable (UUID, String?) throws -> any WebPagePresenting
+    private let removePage: @MainActor @Sendable (UUID) -> Void
     private let pageForWindow: @MainActor @Sendable (UUID) -> (any WebPagePresenting)?
     private var operationWindowID: UUID?
     private let saveImage: @Sendable (Data, any FunctionInput) async throws -> String
     private var operation: Task<String, any Error>?
     private var stopped = false
-    private var windowID: UUID?
     public init(
-        page: any WebPagePresenting, windows: WindowState,
-        pageForWindow: @escaping @MainActor @Sendable (UUID) -> (any WebPagePresenting)? = { _ in nil },
+        windows: WindowState,
+        pageForWindow: @escaping @MainActor @Sendable (UUID) -> (any WebPagePresenting)?,
+        createPage: @escaping @MainActor @Sendable (UUID, String?) throws -> any WebPagePresenting,
+        removePage: @escaping @MainActor @Sendable (UUID) -> Void,
         saveImage: @escaping @Sendable (Data, any FunctionInput) async throws -> String
     ) {
-        self.page = page
-        self.pageForWindow = pageForWindow
         self.windows = windows
+        self.pageForWindow = pageForWindow
+        self.createPage = createPage
+        self.removePage = removePage
         self.saveImage = saveImage
     }
     public func perform(_ operation: String, invocation: any FunctionInput) async throws -> String {
@@ -44,15 +47,19 @@ import UI
         let args = ActionArguments(invocation.call.parameters)
         switch operation {
         case "browse":
-            try args.validateAllowedKeys(["url"])
+            try args.validateAllowedKeys(["url", "windowID"])
             guard let url = URL(string: try args.requiredString("url", maximumUTF8Bytes: 4096)) else {
                 throw WebPageError.invalidURL
             }
             try WebPagePolicy.remote(url)
-            try await show()
-            operationWindowID = windowID
+            let id = try await browseWindow(invocation.call.parameters["windowID"])
+            let page = try createPage(id, windows.reference(for: id))
             let result = try await page.loadRemote(url)
-            return try await receipt(result, page: page, window: windowID, invocation: invocation, image: true)
+            let title = result.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            windows.setPresentation(id, title: title.isEmpty ? (url.host ?? "网页") : String(title.prefix(80)))
+            return try await receipt(
+                result, page: page, window: id, invocation: invocation, image: true, allowsHiddenImage: true)
+
         case "snapshot", "inspect":
             try args.validateAllowedKeys(["windowID"])
             let (selected, id) = try await target(invocation.call.parameters["windowID"])
@@ -73,44 +80,59 @@ import UI
         default: throw ActionExecutionError.invalidInvocation
         }
     }
-    private func target(_ raw: String?) async throws -> (any WebPagePresenting, UUID) {
-        if let raw {
-            let id = try windows.resolve(reference: raw)
-            let window = try windows.find(id)
-            guard window.phase != .closing else { throw WebPageError.unavailable }
-            let selected: any WebPagePresenting
-            if window.content == WindowContent.web.rawValue {
-                selected = page
-            } else {
-                guard let existing = pageForWindow(id) else { throw WebPageError.unavailable }
-                selected = existing
-            }
+    private func target(_ reference: String?) async throws -> (any WebPagePresenting, UUID) {
+        let id: UUID
+        if let reference {
+            id = try windows.resolve(reference: reference)
+        } else {
+            guard
+                let recent = windows.windows.last(where: {
+                    $0.content == WindowContent.web.rawValue && $0.phase == .settled
+                })
+            else { throw WebPageError.unavailable }
+            id = recent.id
             operationWindowID = id
-            return (selected, id)
+            if recent.mode == .minimized { try await windows.change(id, command: .restore) }
+            try windows.focus(id)
         }
-        try await showExisting()
-        guard let id = windowID else { throw WebPageError.unavailable }
+        let item = try windows.find(id)
+        guard item.phase == .settled,
+            [WindowContent.web.rawValue, WindowContent.artifact.rawValue].contains(item.content),
+            let page = pageForWindow(id)
+        else { throw WebPageError.unavailable }
         operationWindowID = id
         return (page, id)
     }
-    private func show() async throws {
-        windowID = try await windows.present(content: .web, title: "网页", icon: .emoji("🌐"))
-        try Task.checkCancellation()
-    }
-    private func showExisting() async throws {
-        guard let windowID, windows.windows.contains(where: { $0.id == windowID }) else {
-            throw WebPageError.unavailable
+    private func browseWindow(_ reference: String?) async throws -> UUID {
+        if let reference {
+            let id = try windows.resolve(reference: reference)
+            let item = try windows.find(id)
+            guard item.content == WindowContent.web.rawValue, item.phase == .settled else {
+                throw WebPageError.unavailable
+            }
+            operationWindowID = id
+            if item.mode == .minimized { try await windows.change(id, command: .restore) }
+            try windows.focus(id)
+            return id
         }
-        try await show()
+        let id = UUID()
+        operationWindowID = id
+        _ = try await windows.present(content: .web, title: "网页", icon: .emoji("🌐"), windowID: id)
+        try Task.checkCancellation()
+        return id
     }
     private func receipt(
         _ observation: WebPageObservation, page: any WebPagePresenting, window: UUID?,
-        invocation: any FunctionInput, image: Bool
+        invocation: any FunctionInput, image: Bool, allowsHiddenImage: Bool = false
     ) async throws -> String {
         let mediaID: String?
         if image {
-            let bytes = try await page.snapshot()
-            mediaID = try await saveImage(bytes, invocation)
+            do {
+                let bytes = try await page.snapshot()
+                mediaID = try await saveImage(bytes, invocation)
+            } catch WebPageError.notVisible where allowsHiddenImage {
+                mediaID = nil
+            }
         } else {
             mediaID = nil
         }
@@ -130,24 +152,31 @@ import UI
         let mediaID: String?
     }
     public func pauseWindow(invocation: any FunctionInput) async throws {
-        if operationWindowID == windowID {
-            operation?.cancel()
-            _ = await operation?.result
-        }
+        let id = try lifecycleWindow(invocation)
+        await cancelOperation(in: id)
     }
     public func resumeWindow(invocation: any FunctionInput) async throws {}
     public func closeWindow(invocation: any FunctionInput) async throws {
-        if operationWindowID == windowID {
-            operation?.cancel()
-            _ = await operation?.result
-        }
-        page.close()
-        windowID = nil
+        let id = try lifecycleWindow(invocation)
+        await cancelOperation(in: id)
+        try Task.checkCancellation()
+        removePage(id)
+    }
+    private func lifecycleWindow(_ invocation: any FunctionInput) throws -> UUID {
+        guard let reference = invocation.call.parameters["windowID"] else { throw WindowError.missing }
+        return try windows.resolve(reference: reference)
+    }
+    private func cancelOperation(in id: UUID) async {
+        guard operationWindowID == id else { return }
+        operation?.cancel()
+        _ = await operation?.result
     }
     public func stop() async {
         stopped = true
         operation?.cancel()
         _ = await operation?.result
-        page.close()
+        for window in windows.windows where window.content == WindowContent.web.rawValue {
+            removePage(window.id)
+        }
     }
 }

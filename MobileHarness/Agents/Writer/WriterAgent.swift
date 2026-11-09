@@ -15,12 +15,16 @@ public actor WriterAgent: Agent {
     private let history: WriterHistoryStore?
     private let communications: any AgentMessageRepository
     private let tasks: any WriterExecutionRepository
+    private let startBackground: WriterBackgroundExecution.Start?
     private let island = WriterIslandPresentation()
     private let notifications: WriterNotifications
-    private let receipts = CommunicationReceipts()
+    private var messaging: AgentMessaging?
     private var consumer: GatewayOutputConsumer?
     private var lifecycle = AgentLifecycle.registered
     private var workers: [String: Task<Void, Never>] = [:]
+    private var backgroundRuns: [String: UUID] = [:]
+    private var expiredBackgroundRuns: Set<String> = []
+    private var backgroundFailure: String?
     private var previews: [String: WriterPreview] = [:]
     private var sceneActive = true
     private var updates: [String: [String]] = [:]
@@ -60,13 +64,19 @@ public actor WriterAgent: Agent {
         "instruction", "summary", "outcome",
         "line", "limit", "contextReferences", "destination", "savepoint", "oldText", "newText", "taskID",
     ]
+    private static let workspaceAlias = "workspace"
+
     public static func capabilities() throws -> CapabilityRegistry {
-        try CapabilityRegistry(
-            tools: [
-                .init(
-                    alias: "workspace", path: "Artifacts.Workspace.perform",
-                    requiredParameters: ["command"], optionalParameters: parameters)
-            ],
+        let library = try AgentSkillLoader.bindings(WriterControlDomain.library.skillIDs(), owner: .writer)
+        let editing = try AgentSkillLoader.bindings(WriterControlDomain.editing.skillIDs(), owner: .writer)
+        let configured = try AgentConfigurations.load(named: "Writer").capabilities
+        guard library == editing, configured.actions.isEmpty, configured.tools.map(\.alias) == [workspaceAlias],
+            configured.tools.first?.path == "Artifacts.Workspace.perform"
+        else {
+            throw AgentConfigurationError.invalidField("Writer workspace Skill binding")
+        }
+        return try CapabilityRegistry(
+            tools: configured.tools,
             internalTools: [
                 .init(path: "UI.Island.present", required: ["activityID", "revision", "content"]),
                 .init(path: "UI.Island.end", required: ["activityID", "revision"]),
@@ -75,13 +85,14 @@ public actor WriterAgent: Agent {
     public init(
         model: @escaping @Sendable () async throws -> ChatModel, streaming: any ArtifactStreaming,
         history: WriterHistoryStore? = nil, tasks: any WriterExecutionRepository,
-        communications: any AgentMessageRepository
+        communications: any AgentMessageRepository, startBackground: WriterBackgroundExecution.Start? = nil
     ) throws {
         guard tasks.storageScope == communications.storageScope,
             history.map({ $0.storageScope == tasks.storageScope }) ?? true
         else { throw RecordStorageError.invalidRecord }
         self.tasks = tasks
         self.communications = communications
+        self.startBackground = startBackground
         notifications = WriterNotifications(tasks: tasks, communications: communications)
         self.history = history
         self.model = model
@@ -94,16 +105,18 @@ public actor WriterAgent: Agent {
         outputs = pair.stream
         continuation = pair.continuation
     }
-    public func bind(_ consumer: GatewayOutputConsumer) async {
+    public func bind(_ consumer: GatewayOutputConsumer, messaging: AgentMessaging) async {
         self.consumer = consumer
+        self.messaging = messaging
         await island.bind { [weak self] operation, parameters, session in
             guard let self else { throw WriterFailure.unavailable }
             try await self.presentIsland(operation, parameters: parameters, sessionID: session)
         }
-        await notifications.bind { [weak self] message, scope, retirement in
-            guard let self else { throw WriterFailure.unavailable }
-            return try await self.sendCompletion(message, scope: scope, retirement: retirement)
-        }
+        await notifications.bind(
+            sender: { [weak self] completion in
+                guard let self else { throw WriterFailure.unavailable }
+                return try await self.sendCompletion(completion)
+            }, retire: consumer.retireTask)
     }
     public func start() async throws {
         guard lifecycle == .registered, consumer != nil else { throw WriterFailure.unavailable }
@@ -176,7 +189,7 @@ public actor WriterAgent: Agent {
         pendingReports.removeAll()
         await island.stop()
         await notifications.stop()
-        await receipts.close()
+        messaging = nil
         continuation.finish()
         consumer = nil
     }
@@ -206,19 +219,12 @@ public actor WriterAgent: Agent {
                 "rolePhase": .text(lifecycle.rawValue), "failures": .count(failures.count),
                 "lastFailure": failures.values.sorted().last.map { .text($0) } ?? .unknown,
                 "pendingReports": .count(pendingReports.values.reduce(0) { $0 + $1.count }),
+                "backgroundFailure": backgroundFailure.map { .text($0) } ?? .unknown,
                 "deliveryFailure": (notificationFailure ?? deliveryFailures.values.sorted().last).map { .text($0) }
                     ?? .unknown,
             ])
     }
     public func receive(_ input: AgentInput) async throws {
-        if case .toolResult = input.payload { return }
-        if case .communicationReceipt(let receipt) = input.payload {
-            guard input.metadata.origin == .runtime, receipt.owner.agent == .writer,
-                receipt.owner.sessionID == input.sessionID
-            else { throw CommunicationError.unauthorized }
-            try await receipts.accept(receipt)
-            return
-        }
         guard case .observation(let message) = input.payload, let signal = message.content(as: AgentTaskSignal.self),
             input.metadata.origin == .agent, input.metadata.source == "assistant", input.metadata.incarnation != nil,
             signal.scope.requester == .assistant, signal.scope.executor == .writer,
@@ -284,7 +290,7 @@ public actor WriterAgent: Agent {
                 waiting.removeValue(forKey: id)
                 await island.update(delegateID: id, phase: .running, step: "已收到补充，继续创作。")
                 if lifecycle == .running, workers[id] == nil {
-                    workers[id] = Task { await run(request, input: original, scope: signal.scope) }
+                    workers[id] = Task { await run(request, input: original, scope: signal.scope, userInitiated: true) }
                 }
             } else {
                 guard content.interactionID == nil else { throw CommunicationError.invalidPayload }
@@ -296,6 +302,7 @@ public actor WriterAgent: Agent {
                 guard try await tasks.acceptWriterInput(input.id, requestID: id, text: content.text, questionID: nil)
                 else { return }
                 updates[id, default: []].append(content.text)
+                await island.update(delegateID: id, phase: .running, step: "已收到补充，将在下一个编辑步骤处理。")
             }
         case .request:
             if let original = inputs[id], requests[id] != nil {
@@ -310,8 +317,7 @@ public actor WriterAgent: Agent {
             {
                 return
             }
-            guard lifecycle == .running, !acceptingRequest, requests[id] == nil,
-                signal.businessContract == "writer.author"
+            guard lifecycle == .running, !acceptingRequest, requests[id] == nil
             else {
                 try await communications.rejectDelegation(id, failure: "Writer unavailable or busy")
                 throw WriterFailure.unavailable
@@ -319,7 +325,9 @@ public actor WriterAgent: Agent {
             acceptingRequest = true
             defer { acceptingRequest = false }
             var request = try JSONDecoder().decode(Request.self, from: signal.data)
-            guard request.taskID == nil, request.workspaceID == nil, request.request.utf8.count <= 12_000 else {
+            guard request.taskID == nil, request.workspaceID == nil, request.request.utf8.count <= 12_000,
+                !request.request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            else {
                 throw WriterFailure.capacity
             }
             let task = try await tasks.beginRequest(
@@ -330,8 +338,7 @@ public actor WriterAgent: Agent {
                 try await communications.rejectDelegation(id, failure: "Writer unavailable or busy")
                 throw WriterFailure.unavailable
             }
-            request.taskID = nil
-            request.workspaceID = nil
+            request.goal = request.goal ?? signal.goal
             requests[id] = request
             inputs[id] = input
             updates[id] = []
@@ -349,38 +356,59 @@ public actor WriterAgent: Agent {
                     status: .failed, persistedStatus: "interrupted")
                 return
             }
-            workers[id] = Task { await run(request, input: input, scope: signal.scope) }
+            workers[id] = Task { await run(request, input: input, scope: signal.scope, userInitiated: true) }
             processed += 1
         default: throw CommunicationError.unsupportedContract
         }
     }
     private struct Request: Decodable {
         var request: String
-        let goal: String?
+        var goal: String?
         var taskID: String?
         var workspaceID: String? = nil
         private enum CodingKeys: String, CodingKey { case request, goal, taskID, workspaceID }
     }
-    private func run(_ request: Request, input: AgentInput, scope: AgentTaskScope) async {
+    private func beginBackground(for id: String) async -> WriterBackgroundExecution? {
+        guard lifecycle == .running, sceneActive, !Task.isCancelled, let startBackground else { return nil }
+        let token = UUID()
+        backgroundRuns[id] = token
+        backgroundFailure = nil
+        return await startBackground(
+            { [weak self] in await self?.expireBackground(id, token: token) },
+            { [weak self] failure in await self?.recordBackgroundFailure(failure, id: id, token: token) })
+    }
+    private func recordBackgroundFailure(_ failure: String, id: String, token: UUID) {
+        guard backgroundRuns[id] == token else { return }
+        backgroundFailure = String(failure.prefix(256))
+    }
+    private func expireBackground(_ id: String, token: UUID) async {
+        guard lifecycle == .running, backgroundRuns[id] == token, let worker = workers[id],
+            !finalizing.contains(id), !cancelling.contains(id), !suspending.contains(id),
+            expiredBackgroundRuns.insert(id).inserted
+        else { return }
+        worker.cancel()
+        await streaming.revoke(delegateID: id)
+    }
+    private func run(_ request: Request, input: AgentInput, scope: AgentTaskScope, userInitiated: Bool = false) async {
+        let background = userInitiated ? await beginBackground(for: scope.id) : nil
         var request = request
         var failure: (any Error)?
         var result = ""
         let preview = WriterPreview(
             present: { try await self.execute(["command": "preview"], input: input) },
-            observed: { text in
-                do { try await self.report(text, scope: scope, input: input) } catch {
-                    await self.recoveryReportFailed(error, delegateID: scope.id)
-                }
-            })
+            observed: { text in await self.updateProgress(text, input: input) })
         previews[scope.id] = preview
         await preview.setSceneActive(sceneActive)
         let diagnosticCapture = WriterDiagnosticCapture()
         var failureStage = "工作区准备"
         var selectedModel: String?
         do {
+            try Task.checkCancellation()
             let stableTaskID = request.taskID ?? ""
             let goal = (request.goal.map { "Goal: " + $0 + "\nUser input: " } ?? "") + request.request
-            try await report("已接收任务，正在处理。", scope: scope, input: input, kind: .started)
+            if eventSequences[scope.id] == nil {
+                try await report("已接收任务，正在处理。", scope: scope, input: input, kind: .started)
+            }
             failureStage = "模型配置"
             await island.update(delegateID: scope.id, phase: .running, step: "正在准备创作模型。")
             let acquired: ChatModel
@@ -393,7 +421,7 @@ public actor WriterAgent: Agent {
             selectedModel = acquired.modelName
             let selected = acquired.capability
             guard await selected.supportsToolCalls else { throw WriterFailure.unsupportedModel }
-            if let workspace = workspaceContexts[scope.id], workspace.editing, let taskID = request.taskID {
+            if workspaceContexts[scope.id] != nil, let taskID = request.taskID {
                 let allocation = try await tasks.task(taskID, agent: "writer")
                 _ = try await enterEditing(allocation, input: input, resuming: true)
             }
@@ -414,28 +442,26 @@ public actor WriterAgent: Agent {
                     await self.island.update(delegateID: scope.id, phase: .running, step: text + " · 正在处理")
                 },
                 roundCompleted: { fact, summary in
+                    await background?.advance()
                     await self.updateSubtitle(summary, input: input)
                     let prefix = fact.map { "截至第\($0.number)次请求 · " } ?? ""
-                    do {
-                        try await self.report(prefix + summary, scope: scope, input: input, requestProgress: fact)
-                    } catch {
-                        await self.recoveryReportFailed(error, delegateID: scope.id)
-                    }
+                    await self.updateProgress(prefix + summary, input: input, updateWindow: false)
                 }
             ).run(
                 goal: goal,
                 scope: scope.id, tools: tools,
-                progress: { text in
-                    do { try await self.report(text, scope: scope, input: input) } catch {
-                        await self.recoveryReportFailed(error, delegateID: scope.id)
-                    }
-                }, revisions: { await self.takeUpdates(scope.id) }, workspace: workspaceContexts[scope.id])
+                progress: { text in await self.updateProgress(text, input: input) },
+                revisions: { await self.takeUpdates(scope.id) }, workspace: workspaceContexts[scope.id])
         } catch { failure = error }
+        backgroundRuns.removeValue(forKey: scope.id)
+        let backgroundExpired = expiredBackgroundRuns.remove(scope.id) != nil
+        let outcome = try? JSONDecoder().decode([String: String].self, from: Data(result.utf8))
+        let refusal = outcome?["completionKind"] == "declined" ? outcome?["summary"] : nil
         let subtitle: String
-        if let question = failure as? WriterNeedsInput {
+        if let refusal {
+            subtitle = refusal
+        } else if let question = failure as? WriterNeedsInput {
             subtitle = "等待补充 · " + question.question
-        } else if failure == nil, let view = workspaceContexts[scope.id], !view.editing {
-            subtitle = view.presentationStatus == "deferred" ? "作品呈现已延后" : "已处理作品查看请求"
         } else if failure == nil, !preparedWorkspaces.contains(scope.id) {
             subtitle = "请求已处理，未创建作品"
         } else if failure == nil {
@@ -444,6 +470,8 @@ public actor WriterAgent: Agent {
             subtitle =
                 ["deferred", "unavailable", "unverified"].contains(verification ?? "unverified")
                 ? "作品已保存，未进行视觉验证" : "作品已保存"
+        } else if backgroundExpired {
+            subtitle = "后台执行已中断，草稿保留"
         } else if suspending.contains(scope.id) {
             subtitle = "创作已暂停，草稿保留"
         } else if cancelling.contains(scope.id) {
@@ -462,6 +490,7 @@ public actor WriterAgent: Agent {
         if suspending.remove(scope.id) != nil, !cancelling.contains(scope.id), Task.isCancelled,
             !(failure is WriterCleanupFailure)
         {
+            await background?.finish(false)
             workers.removeValue(forKey: scope.id)
             return
         }
@@ -470,21 +499,26 @@ public actor WriterAgent: Agent {
             waiting[scope.id] = interaction
             do {
                 try await report(question.question, scope: scope, input: input, interactionID: interaction)
+                await background?.finish(true)
                 workers.removeValue(forKey: scope.id)
                 if waiting[scope.id] == nil, lifecycle == .running, let next = requests[scope.id] {
-                    workers[scope.id] = Task { await run(next, input: input, scope: scope) }
+                    workers[scope.id] = Task { await run(next, input: input, scope: scope, userInitiated: true) }
                 }
                 return
             } catch { failure = error }
             if lifecycle == .paused, !cancelling.contains(scope.id) {
+                await background?.finish(false)
                 workers.removeValue(forKey: scope.id)
                 return
             }
         }
+        var backgroundSucceeded = false
         do {
-            let interrupted = lifecycle == .stopped && !cancelling.contains(scope.id)
+            let expired = backgroundExpired && Task.isCancelled && failure is CancellationError
+            let interrupted = (lifecycle == .stopped || expired) && !cancelling.contains(scope.id)
+            let declined = refusal != nil && failure == nil && !interrupted && !cancelling.contains(scope.id)
             let status: AgentTaskSignal.Status =
-                failure == nil && !interrupted
+                failure == nil && !interrupted && refusal == nil
                 ? .succeeded
                 : (cancelling.contains(scope.id) && !(failure is WriterCleanupFailure)) ? .cancelled : .failed
             var details = ["delegateID": scope.id]
@@ -508,14 +542,18 @@ public actor WriterAgent: Agent {
             let finalText =
                 status == .cancelled
                 ? "创作已取消，草稿已保留。"
-                : interrupted
-                    ? "创作已中断，草稿已保留。"
-                    : diagnostic.map { "创作未完成：" + $0.message } ?? result
+                : interrupted && expired
+                    ? "系统已结束 Writer 的后台执行，已有草稿保留。"
+                    : interrupted
+                        ? "创作已中断，草稿已保留。"
+                        : diagnostic.map { "创作未完成：" + $0.message } ?? refusal ?? result
             try await Task {
                 try await self.report(
-                    finalText, scope: scope, input: input, status: status, failure: diagnostic,
+                    finalText, scope: scope, input: input, status: status, kind: declined ? .declined : nil,
+                    failure: diagnostic,
                     persistedStatus: interrupted ? "interrupted" : nil)
             }.value
+            backgroundSucceeded = status == .succeeded
         } catch {
             let description = String(String(describing: error).prefix(256))
             failures[scope.id] = "任务收尾失败：" + description
@@ -529,13 +567,11 @@ public actor WriterAgent: Agent {
                 forget(scope.id)
             }
         }
+        await background?.finish(backgroundSucceeded)
         workers.removeValue(forKey: scope.id)
         if failures.count > 16, let key = failures.keys.sorted().first { failures.removeValue(forKey: key) }
         // Completion persistence and delivery never own the creative slot.
         startReports()
-    }
-    private func recoveryReportFailed(_ error: any Error, delegateID: String) {
-        deliveryFailures[delegateID] = "恢复进度尚未送达：" + String(String(describing: error).prefix(256))
     }
     private func forget(_ id: String) {
         preparedWorkspaces.remove(id)
@@ -570,7 +606,7 @@ public actor WriterAgent: Agent {
         case "before": return "Workspace search cursor returned as nextBefore. Omit for the first page."
         case "outcome":
             return
-                "finish only: artifact (default) publishes edited files; explanation explicitly ends without an artifact, only before file operations."
+                "finish only: artifact (default) publishes edited files; explanation explicitly ends without an artifact, only before file operations; declined declines an infeasible assignment with a reason before entering a workspace."
         case "path":
             return
                 "Project-relative path or directory prefix. Use ASCII letters, digits, dots, underscores and hyphens, e.g. assets/index.html."
@@ -605,15 +641,15 @@ public actor WriterAgent: Agent {
         default: return "Workspace operation parameter."
         }
     }
-    private static let libraryCommands = ["searchWorkspaces", "enter", "create", "open", "delete", "ask", "finish"]
-    private static let viewCommands = ["ask", "finish"]
+    private static let libraryCommands = [
+        "searchWorkspaces", "enter", "create", "open", "delete", "ask", "finish",
+    ]
     private static let editingCommands = [
         "list", "read", "search", "edit", "replace", "remove", "move", "removeTree", "diff", "savepoint", "restore",
         "rename", "render", "finish", "ask",
     ]
-    private static func toolDefinition(
-        commands: [String], keys: Set<String>, description: String
-    ) throws -> ChatToolDefinition {
+    private static func toolDefinition(domain: WriterControlDomain, description: String) throws -> ChatToolDefinition {
+        let (commands, keys) = commandProfile(domain)
         var properties: [String: Any] = [:]
         for key in keys {
             properties[key] = ["type": "string", "description": parameterDescription(key)]
@@ -625,7 +661,7 @@ public actor WriterAgent: Agent {
             declaration: JSONSerialization.data(withJSONObject: [
                 "type": "function",
                 "function": [
-                    "name": "workspace", "description": description,
+                    "name": workspaceAlias, "description": description,
                     "parameters": [
                         "type": "object", "properties": properties, "required": ["command"],
                         "additionalProperties": false,
@@ -634,21 +670,23 @@ public actor WriterAgent: Agent {
             ]))
     }
     private static let libraryKeys: Set<String> = ["query", "before", "taskID", "title", "entry", "summary", "outcome"]
-    private static let viewKeys: Set<String> = ["summary"]
     private static let editingKeys = parameters.subtracting(
         ["createWorkspace", "subtitle", "workspaceID", "taskID", "before", "entry", "outcome"])
+    private static func commandProfile(_ domain: WriterControlDomain) -> ([String], Set<String>) {
+        switch domain {
+        case .library: (libraryCommands, libraryKeys)
+        case .editing: (editingCommands, editingKeys)
+        }
+    }
     private func toolPorts(input: AgentInput, preview: WriterPreview) throws -> WriterTools {
         let library = try Self.toolDefinition(
-            commands: Self.libraryCommands, keys: Self.libraryKeys,
+            domain: .library,
             description: """
-                Search workspaces by keyword, then enter an existing workspace to edit or open it to show. Create an empty
-                workspace with a title and entry only when the goal permits new work. Enter, create and open run alone.
+                Search the catalog, open selected works without entering them, or enter one to edit. Call open for each selected
+                taskID. Multiple open calls can run in one round. Enter, create and finish run alone.
                 """)
-        let viewer = try Self.toolDefinition(
-            commands: Self.viewCommands, keys: Self.viewKeys,
-            description: "Report the result of opening this workspace or request essential clarification.")
         let editing = try Self.toolDefinition(
-            commands: Self.editingCommands, keys: Self.editingKeys,
+            domain: .editing,
             description: """
                 Edit the active workspace. Read returns a versioned range and reference. Use contextReferences for related
                 ranges. Edit streams source in a separate request. Replace requires one exact match in the selected range.
@@ -685,7 +723,8 @@ public actor WriterAgent: Agent {
                 let response =
                     args["command"] == "finish"
                     ? try await self.finalize(
-                        args["summary"] ?? "作品已完成", input: input, outcome: args["outcome"] ?? "artifact")
+                        args["summary"] ?? (args["outcome"] == "declined" ? "" : "作品已完成"),
+                        input: input, outcome: args["outcome"] ?? "artifact")
                     : try await self.execute(args, input: input)
                 if ["replace", "move", "remove", "removeTree", "restore"].contains(
                     args["command"] ?? "")
@@ -721,16 +760,10 @@ public actor WriterAgent: Agent {
                 await preview.settle()
                 try await streaming.abort(streamID: id, delegateID: delegateID)
             },
-            finalize: { summary in
-                await preview.settle()
-                return try await self.finalize(summary, input: input)
-            },
-            refresh: { await preview.flush() }, library: library, viewer: viewer)
+            refresh: { await preview.flush() }, library: library)
     }
     private func validateCommand(_ args: [String: String], delegateID: String) throws -> String {
-        let context = workspaceContexts[delegateID]
-        let commands = context.map { $0.editing ? Self.editingCommands : Self.viewCommands } ?? Self.libraryCommands
-        let keys = context.map { $0.editing ? Self.editingKeys : Self.viewKeys } ?? Self.libraryKeys
+        let (commands, keys) = Self.commandProfile(workspaceContexts[delegateID] == nil ? .library : .editing)
         guard let command = args["command"], commands.contains(command),
             Set(args.keys).subtracting(["command"]).isSubset(of: keys)
         else {
@@ -779,18 +812,14 @@ public actor WriterAgent: Agent {
                 "Use an actual taskID returned by workspace search.",
                 context: ["condition": "workspaceSearchRequired"])
         }
-        if command == "delete" {
+        if command == "open" || command == "delete" {
             let result = try await execute(args, input: input)
             completedLibraryOperations.insert(id)
-            searchMatches[id]?.remove(taskID)
+            if command == "delete" { searchMatches[id]?.remove(taskID) }
             return .observation(result)
         }
         completedLibraryOperations.remove(id)
         let allocation = try await tasks.task(taskID, agent: "writer")
-        if command == "open" {
-            let result = try await execute(args, input: input)
-            return try await bindWorkspace(allocation, evidence: result, input: input, editing: false)
-        }
         return try await enterEditing(allocation, input: input, resuming: false)
     }
 
@@ -799,10 +828,16 @@ public actor WriterAgent: Agent {
         guard (updates[id] ?? []).isEmpty else {
             throw WriterToolFailure("Newly accepted requirements must be processed before publication.")
         }
-        guard ["artifact", "explanation"].contains(outcome),
+        guard ["artifact", "explanation", "declined"].contains(outcome),
             !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         else {
             throw WriterFailure.invalidOutput
+        }
+        if outcome == "declined" {
+            guard workspaceContexts[id] == nil, summary.utf8.count <= 2048 else { throw WriterFailure.invalidOutput }
+            return String(
+                decoding: try JSONEncoder().encode(["summary": summary, "completionKind": "declined"]),
+                as: UTF8.self)
         }
         if outcome == "explanation" {
             guard !preparedWorkspaces.contains(id) else {
@@ -811,20 +846,6 @@ public actor WriterAgent: Agent {
             return String(
                 decoding: try JSONEncoder().encode([
                     "summary": summary, "completionKind": "explanation", "status": "completed",
-                ]), as: UTF8.self)
-        }
-        if let view = workspaceContexts[id], !view.editing {
-            let presentation: String
-            switch view.presentationStatus {
-            case "preview", "observed", "errors": presentation = "已打开《\(view.title)》。"
-            case "deferred": presentation = "《\(view.title)》的窗口呈现已延后。"
-            default: presentation = "已找到《\(view.title)》，窗口呈现状态：\(view.presentationStatus)。"
-            }
-            return String(
-                decoding: try JSONEncoder().encode([
-                    "summary": presentation, "workspaceID": view.workspaceID,
-                    "presentationStatus": view.presentationStatus,
-                    "completionKind": "view", "status": "completed",
                 ]), as: UTF8.self)
         }
         if !preparedWorkspaces.contains(id) {
@@ -859,11 +880,11 @@ public actor WriterAgent: Agent {
         start["subtitle"] = request.goal ?? request.request
         let response = try await execute(start, input: input)
         preparedWorkspaces.insert(id)
-        let outcome = try await bindWorkspace(allocation, evidence: response, input: input, editing: true)
+        let outcome = try await bindWorkspace(allocation, evidence: response, input: input)
         return outcome
     }
     private func bindWorkspace(
-        _ allocation: WriterWorkspaceRecord, evidence: String, input: AgentInput, editing: Bool
+        _ allocation: WriterWorkspaceRecord, evidence: String, input: AgentInput
     ) async throws -> WriterToolOutcome {
         guard let scope = input.taskScope else { throw CommunicationError.unauthorized }
         let data = try JSONDecoder().decode([String: String].self, from: Data(evidence.utf8))
@@ -871,15 +892,10 @@ public actor WriterAgent: Agent {
             let status = data["presentationStatus"]
         else { throw WriterFailure.invalidOutput }
         let context = WriterWorkspaceContext(
-            workspaceID: allocation.workspaceID, title: title, entry: entry, presentationStatus: status,
-            editing: editing)
+            workspaceID: allocation.workspaceID, title: title, entry: entry, presentationStatus: status)
         let bind: @Sendable () async throws -> Void = { [tasks] in
-            if editing {
-                try await tasks.prepareWorkspace(
-                    allocation.workspaceID, taskID: allocation.id, delegateID: scope.id, agent: "writer")
-            } else {
-                _ = try await tasks.selectWorkspace(requestID: scope.id, taskID: allocation.id)
-            }
+            try await tasks.prepareWorkspace(
+                allocation.workspaceID, taskID: allocation.id, delegateID: scope.id, agent: "writer")
         }
         if workspaceContexts[scope.id] == nil {
             if let history { try await history.bindingWorkspace(bind) } else { try await bind() }
@@ -893,14 +909,14 @@ public actor WriterAgent: Agent {
         let summary =
             windowIDs[scope.id] != nil && ["preview", "observed", "errors"].contains(status)
             ? "已打开作品窗口。" : "已进入工作区。窗口呈现状态：\(status)。"
-        do { try await report(summary, scope: scope, input: input) } catch {
-            recoveryReportFailed(error, delegateID: scope.id)
-        }
+        await updateProgress(summary, input: input)
         return .entered(context, evidence: evidence)
     }
     private func workspaceCall(_ arguments: [String: String]) throws -> ToolCall {
         let call: ToolCall
-        do { call = try descriptor.capabilities.resolveTool("workspace", arguments: arguments) } catch GenerationError
+        do {
+            call = try descriptor.capabilities.resolveTool(Self.workspaceAlias, arguments: arguments)
+        } catch GenerationError
             .invalidParameters
         {
             let unknown = Set(arguments.keys).subtracting(Self.parameters.union(["command"]))
@@ -939,11 +955,18 @@ public actor WriterAgent: Agent {
         do { _ = try await execute(["command": "describe", "subtitle": String(text.prefix(160))], input: input) } catch
         { deliveryFailures[run] = "窗口状态尚未更新：" + String(String(describing: error).prefix(256)) }
     }
+    private func updateProgress(_ text: String, input: AgentInput, updateWindow: Bool = true) async {
+        guard let id = input.taskScope?.id, requests[id] != nil, waiting[id] == nil, !cancelling.contains(id)
+        else { return }
+        lastSteps[id] = String(text.prefix(1000))
+        if updateWindow, previews[id] != nil { await updateSubtitle(text, input: input) }
+        await island.update(delegateID: id, phase: .running, step: text)
+    }
+
     private func report(
         _ text: String, scope: AgentTaskScope, input: AgentInput, status: AgentTaskSignal.Status? = nil,
         interactionID: String? = nil, kind: WriterTaskEvent.Kind? = nil,
-        failure: WriterFailureDiagnostic? = nil, persistedStatus: String? = nil,
-        requestProgress: WriterRequestProgress? = nil
+        failure: WriterFailureDiagnostic? = nil, persistedStatus: String? = nil
     )
         async throws
     {
@@ -953,27 +976,25 @@ public actor WriterAgent: Agent {
             status == .succeeded ? try? JSONDecoder().decode([String: String].self, from: Data(text.utf8)) : nil
         let savedSummary = artifact?["summary"] ?? text
         let unverified =
-            artifact?["workspaceID"] != nil && artifact?["completionKind"] != "view"
+            artifact?["workspaceID"] != nil
             && ["deferred", "unavailable", "unverified"].contains(artifact?["verification"] ?? "unverified")
         let summary = unverified ? savedSummary + "\n作品已保存，但未进行页面视觉验证。" : savedSummary
         let display = (taskID.map { "taskID=" + $0 + "\n" } ?? "") + summary
         let eventKind =
             kind
             ?? (status == nil
-                ? (interactionID == nil ? .progress : .userInput)
+                ? .userInput
                 : status == .succeeded ? .completed : status == .cancelled ? .cancelled : .failed)
         let displayPhase: WriterIslandPresentation.Phase =
-            persistedStatus == "interrupted"
-            ? .interrupted
-            : status == .succeeded
-                ? .completed
-                : status == .failed
-                    ? .failed
-                    : status == .cancelled ? .cancelled : interactionID == nil ? .running : .waitingUser
-        if status == nil, requestProgress == nil, previews[scope.id] != nil {
-            await updateSubtitle(summary, input: input)
-        }
-        if status == nil { await island.update(delegateID: scope.id, phase: displayPhase, step: summary) }
+            eventKind == .declined
+            ? .declined
+            : persistedStatus == "interrupted"
+                ? .interrupted
+                : status == .succeeded
+                    ? .completed
+                    : status == .failed
+                        ? .failed
+                        : status == .cancelled ? .cancelled : interactionID == nil ? .running : .waitingUser
         let eventSequence = (eventSequences[scope.id] ?? 0) + 1
         eventSequences[scope.id] = eventSequence
         phases[scope.id] = status == .cancelled ? "cancelling" : interactionID == nil ? "running" : "waitingUser"
@@ -987,7 +1008,7 @@ public actor WriterAgent: Agent {
             workspaceID: artifact?["libraryResult"] != nil || artifact?["completionKind"] == "explanation"
                 ? nil : artifact?["workspaceID"] ?? requests[scope.id]?.workspaceID, goal: requests[scope.id]?.goal,
             windowID: windowIDs[scope.id],
-            taskID: taskID, delegateID: scope.id, failure: failure, request: requestProgress)
+            taskID: taskID, delegateID: scope.id, failure: failure)
         let content = try AgentTaskContent(
             text: String(display.prefix(1000)),
             stage: status == nil ? (interactionID == nil ? .running : .waitingUser) : .completed,
@@ -1017,15 +1038,15 @@ public actor WriterAgent: Agent {
             try await tasks.saveInteraction(
                 delegateID: scope.id, interactionID: interactionID, data: JSONEncoder().encode(content))
         }
+        if previews[scope.id] != nil { await updateSubtitle(summary, input: input) }
+        await island.update(delegateID: scope.id, phase: displayPhase, step: summary)
         let pending = PendingReport(content: content, scope: scope, input: input)
         var queue = pendingReports[scope.id] ?? []
         // Preserve the in-flight identity; replace only unsent facts of the same kind.
         // A waiting question can only be superseded after its matching input resumes Writer.
         queue.removeAll {
             let kind = $0.content.writerEvent?.kind
-            let ordinary = [.started, .progress].contains(eventKind)
-            return (ordinary ? kind == .started || kind == .progress : kind == eventKind)
-                && $0.content.writerEvent?.eventID != deliveringEvent
+            return kind == eventKind && $0.content.writerEvent?.eventID != deliveringEvent
         }
         queue.append(pending)
         pendingReports[scope.id] = queue
@@ -1046,8 +1067,7 @@ public actor WriterAgent: Agent {
         {
             deliveringEvent = pending.content.writerEvent?.eventID
             do {
-                guard let consumer else { throw WriterFailure.unavailable }
-                try await deliver(pending, consumer: consumer)
+                try await deliver(pending)
                 pendingReports[id]?.removeAll { $0.content.writerEvent?.eventID == deliveringEvent }
                 if pendingReports[id]?.isEmpty == true { pendingReports.removeValue(forKey: id) }
                 deliveryFailures.removeValue(forKey: id)
@@ -1063,11 +1083,12 @@ public actor WriterAgent: Agent {
             }
         }
     }
-    private func deliver(_ pending: PendingReport, consumer: GatewayOutputConsumer) async throws {
+    private func deliver(_ pending: PendingReport) async throws {
+        guard let messaging else { throw WriterFailure.unavailable }
         let content = pending.content
         let scope = pending.scope
         let evidence = try content.signal(.progress, scope: scope)
-        let delivered = try await send(evidence, input: pending.input, consumer: consumer)
+        let delivered = try await messaging.sendResult(evidence.message(), parent: pending.input, to: .assistant)
         guard delivered.failure == nil, delivered.rejected.isEmpty, delivered.delivered.contains(.assistant) else {
             throw WriterToolFailure(delivered.rejected[.assistant] ?? delivered.failure ?? "Assistant unavailable")
         }
@@ -1085,44 +1106,11 @@ public actor WriterAgent: Agent {
             throw WriterToolFailure(result.failure ?? "Island presentation rejected", context: ["tool": call.toolPath])
         }
     }
-    private func sendCompletion(_ message: AgentMessage, scope: AgentTaskScope, retirement: Bool) async throws
-        -> DeliveryReport
-    {
-        guard let consumer else { throw WriterFailure.unavailable }
-        let call = try CommunicationAction(message: message, target: .assistant)
-        try await receipts.register(call.id)
-        do {
-            sequence += 1
-            let context = ProcessingContext(sessionID: scope.sessionID, source: "writer")
-            let result = try await consumer.execute(
-                .init(
-                    source: .writer, context: context,
-                    output: .communication(call), sequence: sequence, taskScope: retirement ? scope : nil))
-            guard !result.isError else { throw WriterToolFailure(result.failure ?? "Completion transport failed") }
-            return try await receipts.wait(call.id)
-        } catch {
-            await receipts.cancel(call.id)
-            throw error
-        }
+    private func sendCompletion(_ completion: WriterTaskCompletion) async throws -> DeliveryReport {
+        guard let messaging else { throw WriterFailure.unavailable }
+        let message = completion.message
+        let parent = AgentInput(
+            id: UUID().uuidString, sessionID: completion.signal.scope.sessionID, payload: .observation(message))
+        return try await messaging.sendResult(message, parent: parent, to: .assistant)
     }
-    private func send(_ signal: AgentTaskSignal, input: AgentInput, consumer: GatewayOutputConsumer) async throws
-        -> DeliveryReport
-    {
-        let call = try CommunicationAction(message: signal.message(), target: .assistant)
-        try await receipts.register(call.id)
-        do {
-            sequence += 1
-            let result = try await consumer.execute(
-                .init(
-                    source: .writer, context: input.context,
-                    output: .communication(call), sequence: sequence, taskScope: signal.scope))
-            guard !result.isCancellationOnly else { throw CancellationError() }
-            guard !result.isError else { throw WriterFailure.unavailable }
-            return try await receipts.wait(call.id)
-        } catch {
-            await receipts.cancel(call.id)
-            throw error
-        }
-    }
-
 }

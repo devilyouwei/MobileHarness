@@ -59,10 +59,6 @@ struct SpeechListeningPolicy {
         var incarnation: String
         var occupied: Bool
     }
-    private var reportListeningRevokedAt: TimeInterval = 0
-    mutating func revokeReportListening() {
-        reportListeningRevokedAt = ProcessInfo.processInfo.systemUptime
-    }
     var enabled = false
     var revision: UInt64 = 0
     var activities: [String: Activity] = [:]
@@ -73,26 +69,11 @@ struct SpeechListeningPolicy {
         guard ["assistant", "photographer", "memory", "applicationControl"].contains(source) else {
             throw CommunicationError.unauthorized
         }
-        guard
-            source == "assistant"
-                || (value.completedReportID == nil && value.reportStartedAt == nil)
-        else {
-            throw CommunicationError.unauthorized
-        }
         guard activities[source]?.incarnation != incarnation || value.revision > (activities[source]?.revision ?? 0)
         else { return false }
         activities[source] = Activity(
             revision: value.revision, incarnation: incarnation, occupied: !value.inputs.isEmpty || !value.tasks.isEmpty)
-        if source == "assistant" {
-            if pendingFinal == value.acknowledgedRoot { pendingFinal = nil }
-            // Completion is self-contained: the independent communication reader may deliver
-            // a newer complete snapshot before its earlier occupied snapshot.
-            if value.completedReportID != nil, let startedAt = value.reportStartedAt,
-                startedAt > reportListeningRevokedAt
-            {
-                enabled = true
-            }
-        }
+        if source == "assistant", pendingFinal == value.acknowledgedRoot { pendingFinal = nil }
         return true
     }
 }

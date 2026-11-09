@@ -24,7 +24,7 @@ extension UIActions {
     @Action(domain: "UI", module: "ResourcePresentation", title: "showResourceFailure", timeout: .seconds(5))
     public static func showResourceFailure(
         invocation: any FunctionInput, using presentation: any ResourcePresentationCapability
-    ) async throws -> String {
+    ) async throws {
         let arguments = ActionArguments(invocation.call.parameters)
         try arguments.validateAllowedKeys(["generation", "message"])
         let generation = try resourceGeneration(arguments)
@@ -32,27 +32,25 @@ extension UIActions {
         try Task.checkCancellation()
         try await presentation.presentResourceFailure(message, generation: generation, invocation: invocation)
         try Task.checkCancellation()
-        return "presented"
     }
 
     @Action(domain: "UI", module: "ResourcePresentation", title: "showResourceOperationFailure", timeout: .seconds(5))
     public static func showResourceOperationFailure(
         invocation: any FunctionInput, using presentation: any ResourcePresentationCapability
-    ) async throws -> String {
+    ) async throws {
         let arguments = ActionArguments(invocation.call.parameters)
         try arguments.validateAllowedKeys(["message"])
         let message = try arguments.requiredString("message", maximumUTF8Bytes: 2048)
         try Task.checkCancellation()
         try await presentation.presentResourceOperationFailure(message, invocation: invocation)
         try Task.checkCancellation()
-        return "presented"
     }
 
     @Action(
         domain: "UI", module: "ResourcePresentation", title: "showResourcePreferenceFailure", timeout: .seconds(5))
     public static func showResourcePreferenceFailure(
         invocation: any FunctionInput, using presentation: any ResourcePresentationCapability
-    ) async throws -> String {
+    ) async throws {
         let arguments = ActionArguments(invocation.call.parameters)
         try arguments.validateAllowedKeys(["reason", "message"])
         guard
@@ -65,13 +63,12 @@ extension UIActions {
         try Task.checkCancellation()
         try await presentation.presentResourcePreferenceFailure(reason, message: message, invocation: invocation)
         try Task.checkCancellation()
-        return "presented"
     }
 
     @Action(domain: "UI", module: "ResourcePresentation", title: "showProviderResult", timeout: .seconds(5))
     public static func showProviderResult(
         invocation: any FunctionInput, using presentation: any ResourcePresentationCapability
-    ) async throws -> String {
+    ) async throws {
         let arguments = ActionArguments(invocation.call.parameters)
         try arguments.validateAllowedKeys(["requestID", "failureCode"])
         guard let id = UUID(uuidString: try arguments.requiredString("requestID", maximumUTF8Bytes: 36)) else {
@@ -84,7 +81,6 @@ extension UIActions {
         try Task.checkCancellation()
         try await presentation.presentProviderResult(
             requestID: id.uuidString, failureCode: code, invocation: invocation)
-        return "presented"
     }
 
     private static func resourceGeneration(_ arguments: ActionArguments) throws -> UInt64 {

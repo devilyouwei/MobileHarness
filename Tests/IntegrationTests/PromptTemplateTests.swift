@@ -258,7 +258,8 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
                 #expect(trace.calls.first?.channel == "Control")
                 #expect(trace.events.count == 1)  // No speech, caption, wait or extra Action.
             }
-            #expect(trace.calls.filter { $0.channel == "Camera" }.count <= 1)
+            let camera = trace.calls.filter { $0.channel == "Camera" }.map { $0.actionPath.function }
+            #expect(camera.count <= 1 || camera == ["open", "flip"])
             let speech = trace.calls.filter { $0.channel == "Speech" }.compactMap { $0.parameters["text"] }
             #expect(Set(speech).count == speech.count)
             if example.contains("<wait>") {
@@ -296,7 +297,7 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
     #expect(!instructions.contains("Never invent IDs or release Task-owned Skills this way"))
 }
 
-@Test(.actionCatalog) func defaultPromptDiscoversEveryNonBaseSkillBeforeItsFunctionsAreLoaded() throws {
+@Test(.actionCatalog) func defaultPromptDiscoversSharedNonBaseSkillsBeforeTheirFunctionsAreLoaded() throws {
     struct Catalog: Decodable { let skills: [String: String] }
     let ids = try JSONDecoder().decode(Catalog.self, from: AgentConfigurations.data("Catalog.json")).skills.keys
         .sorted()
@@ -323,6 +324,14 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
         #expect(trace.parserError == nil && trace.events.count == 1 && trace.calls.count == 1)
         let call = try #require(trace.calls.first)
         #expect(call.actionPath.description == "Agent.Task.loadSkills" && call.channel == "Control")
+        if try AgentConfigurations.skill(id).owner != nil {
+            #expect(!prompt.contains(id))
+            #expect(throws: AgentConfigurationError.self) {
+                try state.control("loadSkills", arguments: call.parameters, inputID: "discovery", fixed: fixed)
+            }
+            #expect(state.loaded == base)
+            continue
+        }
         _ = try state.control("loadSkills", arguments: call.parameters, inputID: "discovery", fixed: fixed)
         let next = try state.registry(fixed: fixed)
         #expect(state.activeTaskID == nil && state.loaded.contains(id))

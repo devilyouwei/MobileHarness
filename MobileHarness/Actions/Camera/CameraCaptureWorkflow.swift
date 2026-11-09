@@ -9,8 +9,8 @@ enum CameraCaptureWorkflow {
         capture: String, timeout: Duration,
         operation: @escaping @Sendable () async throws -> Value
     ) async throws -> Value {
-        let open = CameraActions.openDefinition(completing: {
-            .value(try await CameraActions.open(invocation: $0, using: camera))
+        let open = CameraActions.openDefinition(handler: {
+            try await CameraActions.open(invocation: $0, using: camera)
         })
         let child = FunctionInvocation(
             call: .init(actionPath: open.path, parameters: [:]), context: invocation.context,

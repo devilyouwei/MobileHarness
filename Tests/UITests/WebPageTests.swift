@@ -75,10 +75,11 @@ import UI
                 pages.close()
             }
             var ids: [UUID] = []
-            for title in ["Writer A", "Writer B"] {
+            let references = ["window_1", "window_2"]
+            for (title, reference) in zip(["Writer A", "Writer B"], references) {
                 let id = UUID()
                 ids.append(id)
-                let page = try pages.createSession(windowID: id)
+                let page = try pages.createSession(windowID: id, reference: reference)
                 let entry = root.appendingPathComponent(id.uuidString + ".html")
                 try "<title>\(title)</title><h1>\(title)</h1>".write(to: entry, atomically: true, encoding: .utf8)
                 _ = try await page.loadLocal(entry)
@@ -91,7 +92,8 @@ import UI
             }
             #expect(sessions.count == 2)
             let json = String(decoding: try JSONEncoder().encode(state), as: UTF8.self)
-            for id in ids { #expect(json.contains(id.uuidString)) }
+            for reference in references { #expect(json.contains(reference)) }
+            for id in ids { #expect(!json.contains(id.uuidString)) }
             #expect(json.contains("Writer A") && json.contains("Writer B"))
             #expect(!json.contains(root.path) && !json.contains("file:"))
             pages.removeSession(windowID: ids[0])

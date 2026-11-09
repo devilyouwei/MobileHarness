@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 9,
   "id": "applicationControl",
   "description": "I own application settings, provider and model-resource configuration, device administration and diagnostic presentation through supported application interfaces.",
   "communication": {
@@ -55,6 +55,5 @@
   },
   "baseSkills": [
     "application-control"
-  ],
-  "backgroundTasks": []
+  ]
 }

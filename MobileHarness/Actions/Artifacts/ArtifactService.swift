@@ -85,22 +85,12 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
             guard let task = args["taskID"], let id = WorkspaceID(agent: "writer", taskID: task) else {
                 throw ArtifactWorkspaceError.invalidPath
             }
-            guard !lockedProjects.contains(id) else { throw ArtifactWorkspaceError.busy }
-            lockedProjects.insert(id)
+            if command == "open" { return try await openWorkspace(id) }
+            guard lockedProjects.insert(id).inserted else { throw ArtifactWorkspaceError.busy }
             defer { lockedProjects.remove(id) }
-            if command == "delete" {
-                try await prepare(id, true)
-                try await workspace.delete(id)
-                return try encode(["workspaceID": id.rawValue, "status": "deleted"])
-            }
-            try await prepare(id, false)
-            if let draft = try await workspace.checkpoint(for: id) {
-                let presentation = try await present(id, draft.title, draft.entry, draft.draft.files, true)
-                return try workspaceEvidence(id, title: draft.title, entry: draft.entry, presentation: presentation)
-            }
-            let project = try await workspace.project(id)
-            let presentation = try await present(id, project.title, project.entry, project.files, false)
-            return try workspaceEvidence(id, title: project.title, entry: project.entry, presentation: presentation)
+            try await prepare(id, true)
+            try await workspace.delete(id)
+            return try encode(["workspaceID": id.rawValue, "status": "deleted"])
         }
         switch command {
         case "start", "resume":
@@ -597,6 +587,19 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
             ]
         }
     }
+    private func openWorkspace(_ id: WorkspaceID) async throws -> String {
+        guard lockedProjects.insert(id).inserted else { throw ArtifactWorkspaceError.busy }
+        defer { lockedProjects.remove(id) }
+        try await prepare(id, false)
+        if let draft = try await workspace.checkpoint(for: id) {
+            let presentation = try await present(id, draft.title, draft.entry, draft.draft.files, true)
+            return try workspaceEvidence(id, title: draft.title, entry: draft.entry, presentation: presentation)
+        }
+        let project = try await workspace.project(id)
+        let presentation = try await present(id, project.title, project.entry, project.files, false)
+        return try workspaceEvidence(id, title: project.title, entry: project.entry, presentation: presentation)
+    }
+
     private func workspaceEvidence(_ id: WorkspaceID, title: String, entry: String, presentation: String) throws
         -> String
     {

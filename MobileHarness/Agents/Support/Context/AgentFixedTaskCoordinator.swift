@@ -44,8 +44,7 @@ public actor AgentFixedTaskCoordinator<State: AgentContextState> {
         let id = agent
         guard signal.scope.executor == id else { throw CommunicationError.unauthorized }
         if signal.kind == .request, signal.scope.execution == .background {
-            try AgentConfigurations.backgroundSupport(
-                target: id, contract: signal.businessContract, skills: signal.requestedSkills ?? [])
+            throw CommunicationError.unsupportedContract
         }
         try await repository.update { try $0.tasks.accept(signal, input: input, agent: id) }
     }

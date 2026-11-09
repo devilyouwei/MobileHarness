@@ -35,7 +35,7 @@ import FunctionContracts
         try validate(invocation)
         return try await camera.ignoreVideo(id, invocation: invocation)
     }
-    public func configureCapture(_ settings: CameraCaptureSettings, invocation: any FunctionInput) async throws {
+    public func configureCapture(_ settings: CameraCaptureSettings.Update, invocation: any FunctionInput) async throws {
         try validate(invocation)
         try await camera.configureCapture(settings, invocation: invocation)
     }
@@ -43,7 +43,6 @@ import FunctionContracts
         try validate(invocation)
         try await camera.cancelCapture(invocation: invocation)
     }
-    public func windowID() async -> String? { await camera.windowID() }
     public func setPerceptionEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
         try validate(invocation)
         try await camera.setPerceptionEnabled(enabled, invocation: invocation)
@@ -63,9 +62,17 @@ import FunctionContracts
         try validate(invocation)
         return try await camera.loadPreviewImage(id, invocation: invocation)
     }
-    public func unloadPreviewImage(_ id: String, invocation: any FunctionInput) async throws -> String {
+    public func loadPreviewImages(_ ids: [String], invocation: any FunctionInput) async throws -> String {
         try validate(invocation)
-        return try await camera.unloadPreviewImage(id, invocation: invocation)
+        return try await camera.loadPreviewImages(ids, invocation: invocation)
+    }
+    public func saveAllPhotos(invocation: any FunctionInput) async throws -> CameraPhotoBatchReceipt {
+        try validate(invocation)
+        return try await camera.saveAllPhotos(invocation: invocation)
+    }
+    public func unloadPreviewImage(_ id: String, invocation: any FunctionInput) async throws {
+        try validate(invocation)
+        try await camera.unloadPreviewImage(id, invocation: invocation)
     }
     public func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt {
         try validate(invocation)

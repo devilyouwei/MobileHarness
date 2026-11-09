@@ -18,6 +18,8 @@
 | [全局灵动岛](Global-In-App-Island.md) | 设置/记录/相册中的全局状态与展开偏好、导航及生命周期回归、原生界面验收限制。 |
 | [原生音视频故障诊断](Native-Media-Failure-Diagnosis.md) | 保存照片后媒体服务重置的现场证据、错误保真回归及真机调查限制。 |
 | [Writer 执行与续写生命周期](Writer-Execution-Lifetime.md) | 工具接纳后的续写权限、取消/清理并发回归、Simulator 构建与历史失败记录。 |
+| [Writer 显式结束委托与通用作品打开](Writer-Explicit-Finish-and-Open.md) | 控制轮补交 finish、按选中 ID 单开和多开、独立失败以及构建证据。 |
+| [Writer 与网页多窗口](Writer-and-Web-Multiwindow.md) | 真机 SQLite 只读调查、批量打开和定向换站回归、构建与验收范围。 |
 | [WriterAgent](Writer-Agent.md) | 流式创作、后台任务、工作区回归及原生 WebKit 验证，区分真实模型和真机验收。 |
 | [UI interaction paths audit](UI-Interaction-Paths-Audit.md) | Static routing and consistency audit of presentation-only, touch-business and voice-business interactions; deviations and validation limits. |
 | [Container 状态与模型上下文](Container-State-Context.md) | 容器快照、Skill v3、StorageState移除、自动化证据及独立原生验收。 |
@@ -154,3 +156,7 @@ refactor, Agent-only model recording, current-file recovery and automated/build/
 - [Writer 委托与 Workspace 解耦验证](Writer-Workspace-Separation.md)：真实 SQLite 回归、构建及独立原生页面验收。
 
 - [Channel override and photo-ignore removal](Remove-Channel-Override-And-Photo-Ignore.md): routing, retained reshoot previews, removed declarations/UI/cues and automated/build evidence.
+
+- [Writer 通信精简](Writer-Communication-Reduction.md) 记录授权关闭、通知拒收与恢复、任务诊断及构建验证。
+
+- [Writer 委派接纳与业务拒绝](Writer-Delegation-Admission.md) 记录正常接纳、模型拒绝、持久理由、授权释放及构建证据。

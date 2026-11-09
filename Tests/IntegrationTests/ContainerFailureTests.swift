@@ -108,9 +108,9 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
             rootSessionID: sessionID, activity: activity.state,
             effects: ui.home.effects, expressions: ui.home.expressions,
             homeBluetooth: ui.home.conversation, deviceBluetooth: ui.devices.state)
-        let function = UIActions.recordFailureDefinition(completing: { invocation in
+        let function = UIActions.recordFailureDefinition(handler: { invocation in
             if rejectPresentation { throw InjectedContainerFailure.operation(99) }
-            return .value(try await UIActions.recordFailure(invocation: invocation, using: presentation))
+            try await UIActions.recordFailure(invocation: invocation, using: presentation)
         })
         output = await OutputGateway(
             manager: manager, requests: input,
@@ -121,12 +121,11 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
                         UIActions.setLoadingDefinition(handler: { invocation in
                             try await UIActions.setLoading(invocation: invocation, using: presentation)
                         }),
-                        UIActions.showBluetoothHomeDefinition(completing: { invocation in
-                            .value(try await UIActions.showBluetoothHome(invocation: invocation, using: presentation))
+                        UIActions.showBluetoothHomeDefinition(handler: { invocation in
+                            try await UIActions.showBluetoothHome(invocation: invocation, using: presentation)
                         }),
-                        UIActions.showBluetoothSettingsDefinition(completing: { invocation in
-                            .value(
-                                try await UIActions.showBluetoothSettings(invocation: invocation, using: presentation))
+                        UIActions.showBluetoothSettingsDefinition(handler: { invocation in
+                            try await UIActions.showBluetoothSettings(invocation: invocation, using: presentation)
                         }),
                     ].map(BehaviorProtocolBindings.bind)),
                 DiagnosticTools(
@@ -241,8 +240,8 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
         rootSessionID: "diagnostic-session", activity: activity.state,
         effects: display.home.effects, expressions: display.home.expressions,
         homeBluetooth: display.home.conversation, deviceBluetooth: display.devices.state)
-    let function = UIActions.recordFailureDefinition(completing: { invocation in
-        .value(try await UIActions.recordFailure(invocation: invocation, using: presentation))
+    let function = UIActions.recordFailureDefinition(handler: { invocation in
+        try await UIActions.recordFailure(invocation: invocation, using: presentation)
     })
     let output = await OutputGateway(
         manager: manager, requests: input,

@@ -11,24 +11,25 @@ Skill 是可复用的流程与能力集合，Task 是运行时目标、状态和
 | 文件 | 作用与要求 |
 | --- | --- |
 | `../Catalog.json` | `version: 1`，`skills` 显式映射 Skill ID 到 `Skills/<SkillName>/Skill.json`。运行时按 ID 加载，不扫描文件夹。 |
-| `<SkillName>/Skill.json` | 必需。v2 资源配置，引用 canonical 函数绑定，不复制参数或文档。 |
+| `<SkillName>/Skill.json` | 必需。v3 资源配置，引用 canonical 函数绑定。 |
 | `<SkillName>/Instructions.md` | 必需。UTF-8 静态运行时指令，与 Skill.json 同目录；加载后进入模型上下文。开发 README 不能替代它。 |
 
 目录用 UpperCamelCase，如 `Photography`；ID 用稳定的 kebab-case，如 `photography`、`history-query`。ID 必须与 Catalog 键完全一致。文件名固定为 Skill.json 和 Instructions.md；路径相对 Resources，不允许绝对路径、反斜杠和 `.` / `..` 段。Skill 引用其他 Skill 使用 ID，不使用文件路径。
 
 ## Skill.json 字段
 
-所有下列字段必须填写，空列表写 `[]`；不得额外放任务实例、模型配置、函数实现或未实现选项。
+除标明可选的字段外，所有下列字段必须填写，空列表写 `[]`。资源只保存静态 Skill 声明。
 
 | 字段 | 类型 | 作用与校验 |
 | --- | --- | --- |
 | `version` | integer | Schema 版本，当前固定为 3。 |
 | `id` | string | 稳定 Skill 身份，必须等于 Catalog 中的键。 |
 | `revision` | integer | Skill 内容修订号，必须大于 0；流程、绑定、依赖等语义变更应递增，以便历史快照区分。不是 Schema version。 |
-| `description` | string | 可用 Skill 概述，尚未加载时也会提供给 Assistant，用来判断何时加载。简洁写明用途、适用范围，不在此放完整流程。 |
+| `description` | string | Skill 概述。共享 Skill 的摘要供 Assistant 在加载前选择。简洁写明用途和适用范围。 |
+| `owner` | string | 可选。填写运行时 Agent ID 时，该 Skill 仅由对应角色加载，通用发现和加载只使用省略此字段的共享 Skill。 |
 | `dependencies` | string array | 前置 Skill ID，最多 16 个；应唯一、必要且可加载。禁止自依赖和环，加载器先展开依赖再加入当前 Skill。 |
 | `useActions` | object array | 本 Skill 所需函数绑定，最多 128 项，canonical path 不重复。组合后的总目录还受容量与函数合法性限制。 |
-| `useInstructions` | string array | 可省略，默认 Instructions.md；显式数组按顺序加载，空数组不加载。 |
+| `useInstructions` | string array | 显式数组按顺序加载，空数组不加载。 |
 | `useStates` | string array | 必填；最多 16 个公开名称，拒绝重复和非法命名空间；未知来源按项观察为unknown并附诊断。 |
 
 ### useActions 绑定
@@ -36,13 +37,15 @@ Skill 是可复用的流程与能力集合，Task 是运行时目标、状态和
 | 字段 | 作用与规范 |
 | --- | --- |
 | `path` | `Domain.Module.function` 三段 canonical 路径，必须有所属实现维护的中立声明和真实执行路由；通信函数声明由 Agents/Support/Communication 维护。 |
-| `callType` | 所有内置 Skill 固定为 `action`，包括查询、设备操作、展示和 Task/Skill 控制。通用配置库保留 `tool` 支持，不作为生产 Skill 的第二入口。 |
-| `alias` | 项目内可读调用标识，组合目录内唯一；内置 Skill 使用该 XML 别名。底层 Tool 兼容接口的传输 name 仍由适配器负责。不使用保留名 wait。 |
-| `channel` | 每个内置函数必需，声明调度 Channel；五个历史/资源/Provider/蓝牙查询使用独立 `Query` Channel。底层 Tool 配置仍不填写。 |
+| `callType` | 共享 Skill 使用 `action`，包括查询、设备操作、展示和 Task/Skill 控制。Writer 专属 Skill 使用原生 `tool`。 |
+| `alias` | 组合目录内唯一的模型调用标识，作为 Action 的 XML 别名或原生 Tool 名称。保留名为 `wait`。 |
+| `channel` | Action 必填，用于调度。原生 Tool 省略此字段。 |
 
 加载了 Skill 即可使用其全部合法 Action，不再维护 Agent 权限上限或重复登记函数。不同 Skill 引用同一 path 时，绑定完全相同才合并；类型、别名或 Channel 冲突时整个加载失败。不同 path 也不能共享 alias；同一函数不能同时作为 Action 和 Tool。send 只能是 Action，不能作为原生 Tool。Task 控制 Actions 由 BasicSkill 注册，通过 baseSkills 常驻；组合器没有固定 Task 函数注入特例。
 
 `doc`、参数 Schema、必填项、约束和完成语义来自函数自己的 `@Action`，不放在 Skill.json。函数不注册 examples；全部业务示例放在 Instructions.md，并遵循真实函数参数与当前 Skill 别名。
+
+[WriterWorkspace](WriterWorkspace/Skill.json) 是 Writer 的基础作品库 Skill，[WriterFileEditing](WriterFileEditing/Skill.json) 随编辑域自动激活。两者引用同一个原生 workspace 绑定；Writer 按可信工作区域收窄工具的命令和参数。只读呈现只开放结果汇报命令。详见 [Writer 工作区分域](../../Agents/Writer/README.md#作品库与工作区分域)。
 
 ✅ ExpressionInteraction 教学连续表情演出，提供指定子集的纯串行及“每项语音与表情并行、各项串行”的全量 XML 示例；“所有表情”按当前 express 参数枚举逐项展开，不包括仅用于清除状态的 clear。演出使用完成时等待过渡与恢复的 express，保持默认 Speech/Display Channel；不为有限演出创建需后续用户决策的 Task。资源 revision 随教学递增，通用编排规则由 Core scheduling 模板拥有。
 
@@ -112,7 +115,7 @@ BasicSkill Instructions.md先检查CURRENT STATE：已有足够事实直接回�
 
 每次模型请求持有不可变的 Skill / 函数快照。切换只影响后续请求，本轮不能立即调用刚加载的函数；成功结果通过现有屏障进入 ReACT。无 Task 的近期 Skill 在五次闲置用户决策后回收，内部 ReACT 不扣次数；任务所属 Skill 在 waitingUser 保留，任务终态清理后释放，基础 Skill 继续有效。Skill 不保存运行时业务状态，不能通过修改文件恢复旧任务或重放动作。
 
-后台任务可携带 Skill 组，但必须由目标 Agent 实现并声明对应 backgroundTasks 契约、拥有通信授权及独立 Context；不能用 Skill 配置制造后台执行能力，也不能抢占前台。当前生产后台契约未开放。
+后台委派使用 task.delegate 发送目标和用户输入。接收角色拥有自己的能力与 Context，并由内部工作流判断执行、追问或拒绝。
 
 ## 开发与 Review 标准
 
@@ -133,7 +136,7 @@ BasicSkill Instructions.md先检查CURRENT STATE：已有足够事实直接回�
 | photography / Photography | Assistant 内的摄影任务流程和相机 Actions。 |
 | history-query / HistoryQuery | 历史只读查询 Actions。 |
 | application-control / ApplicationControl | 应用配置、资源、设备及 UI 能力。 |
-| web-browsing / WebBrowsing | 远程网页访问、正文与截图观察、逐屏导航及网页窗口控制。 |
+| web-browsing / WebBrowsing | 远程网页多窗口访问、原窗口跨站跳转、正文与截图观察及逐屏导航。 |
 
 资源仅随 App 打包，无远程下载或热更新。
 
@@ -141,7 +144,7 @@ BasicSkill Instructions.md先检查CURRENT STATE：已有足够事实直接回�
 
 ## 当前流程规则
 
-Photography 的匹配摄影 Task 在照片保存成功且不重拍后，单独执行 closeCamera，收到 operation=close、enabled=false 后才 task.end；不保留照片时直接关闭窗口并确认清空。取消和替换同样先完成窗口收尾。未保存照片在关闭时确认返回或清空；关闭失败或取消不结束 Task、不重放已成功的保存。Capture 关闭不关闭背景视觉。独立拍照／保存操作不创建 Task，也不自动关窗；重拍保留原 Task、窗口及先前缓存照片。视频仍使用独立保存／忽略决策。
+Photography 的匹配摄影 Task 在照片保存成功且不重拍后，单独执行 closeCamera，收到 operation=close、enabled=false 后才 task.end；不保留照片时直接关闭窗口并确认清空。取消和替换同样先完成窗口收尾。关闭直接清空未保存照片。待处置视频需先保存或忽略。关闭失败或取消时保留 Task 和已提交的保存结果。Capture 关闭不关闭背景视觉。独立拍照／保存操作不创建 Task，也不自动关窗；重拍保留原 Task、窗口及先前缓存照片。视频仍使用独立保存／忽略决策。
 
 BasicSkill 要求以 AGENT CONTEXT task 和匹配目标判断关闭：无 Task 单步完成只回复，不生成 task.end/task.cancel。明确目标切换可释放无关非基础近期 Skill；不确定是否放弃旧目标时先问是否继续实际 Task，保持等待状态。明确替换或正常目标完成不重复询问。continueDecision 只继续同一输入剩余新目标；释放 Skill 不代表相机/照片清理。Photography 与 HistoryQuery 的完成示例遵循同一规则。
 
@@ -209,7 +212,7 @@ BasicSkill routes 打开视觉／跟踪／人物或姿态跟随 to application-c
 
 ## Photo/video workflow
 
-Photography exposes Capture.configure/cancelCapture plus Video.startRecording/stopRecording/saveVideo/ignoreVideo using the existing Camera channel and stable aliases. configureCamera replaces the full settings; unrelated values are preserved from facts. A native countdown belongs to takePhoto; video startup, file completion and App album inclusion remain distinct. takePhoto/startRecording internally open or restore the Camera window and select their mode; ordinary capture needs no separate openCamera/configureCamera. openCamera remains for preview-only or explicitly requested lens/settings preparation. startRecording accepts optional durationSeconds for timed recording. Photo and video have parallel start/disposition/Task-cleanup examples. startRecording defaults to awaiting the ready file before model feedback; Photographer's fixed interactive Tool requests startup-only acknowledgement. Ready feedback supplies actual media identity, fileName and duration, and requires an authorized save/ignore decision rather than reporting recording in progress. The Skill gives spoken preparation before recording, then relies on the stop button or configured duration while listening is paused. Failed/uncertain work is not automatically replayed. Confirmed photo save or video save/ignore closes the matching photography window before Task completion; background Vision is independent.
+Photography exposes Capture.configure/cancelCapture plus Video.startRecording/stopRecording/saveVideo/ignoreVideo using the existing Camera channel and stable aliases. configureCamera updates supplied settings and preserves omitted fields. A native countdown belongs to takePhoto; video startup, file completion and App album inclusion remain distinct. takePhoto/startRecording internally open or restore the Camera window and select their mode; ordinary capture needs no separate openCamera/configureCamera. openCamera waits for a ready preview and completes without a business value. Same-channel lens or settings preparation can follow it in one response; window commands use ui.windows. startRecording accepts optional durationSeconds for timed recording. Photo and video have parallel start/disposition/Task-cleanup examples. startRecording defaults to awaiting the ready file before model feedback; Photographer's fixed interactive Tool requests startup-only acknowledgement. Ready feedback supplies actual media identity, fileName and duration, and requires an authorized save/ignore decision rather than reporting recording in progress. The Skill gives spoken preparation before recording, then relies on the stop button or configured duration while listening is paused. Failed/uncertain work is not automatically replayed. Confirmed photo save or video save/ignore closes the matching photography window before Task completion; background Vision is independent.
 
 BasicSkill revision37 routes 拍照/录像 to Photography without adding permanent camera Actions. Prompt regression budgets are26,000 UTF-8 bytes for the base catalog and38,000 with Photography, which includes six additional Action declarations and recording lifecycle instructions. These are context-size checks, not model or device acceptance.
 
@@ -228,4 +231,4 @@ Photography selects actions.camera.preview and exposes loadPreviewImage/unloadPr
 
 Photography teaches actual numeric preview_N references and system-State attachment-order mapping for images merged into the current user input.
 
-Photography describes the20-image FIFO window session, stable local preview_N labels, retained pending/saved entries, reload and close expiry. Model-visible selection remains latest plus three explicit images; UI paging does not select model evidence.
+Photography describes the20-image FIFO window session, stable local preview_N labels, retained pending/saved entries, reload and close expiry. A single load appends a selection. A batch load sets up to five explicit photos, with the latest photo filling a free slot. saveAllPhotos saves all pending photos, and closing clears temporary previews without a photo prompt.

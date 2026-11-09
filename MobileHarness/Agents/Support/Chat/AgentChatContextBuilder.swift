@@ -45,7 +45,9 @@ public enum AgentChatContextBuilder {
             "images": entries,
         ]
         if supportsImages {
-            guard attachments.count <= 4 else { throw CapabilityError.invalidRequest("Too many current input images") }
+            guard attachments.count <= ChatRequest.maximumImageCount else {
+                throw CapabilityError.invalidRequest("Too many current input images")
+            }
             result[index] = .init(
                 role: input.role, content: input.content, toolCalls: input.toolCalls,
                 toolCallID: input.toolCallID, images: attachments)
@@ -170,7 +172,9 @@ public enum AgentChatContextBuilder {
             let selected = groups.flatMap { $0.map { messages[$0] } }
             let bytes = selected.reduce(0) { $0 + textBytes($1) }
             let images = selected.reduce(0) { $0 + ($1.images?.count ?? 0) }
-            if selected.count + reservingMessages <= 64 && bytes + reservingBytes <= 65_536 && images <= 4 {
+            if selected.count + reservingMessages <= 64 && bytes + reservingBytes <= 65_536
+                && images <= ChatRequest.maximumImageCount
+            {
                 return selected
             }
             guard let oldest = groups.firstIndex(where: { !protected($0) }) else {

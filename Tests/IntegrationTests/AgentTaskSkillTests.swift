@@ -157,28 +157,27 @@ private actor SkillModel: ChatCapability {
         requests.append(request)
         let output: String
         if captureOnly {
-            if let followUpAlias, requests.count > 4 {
+            if let followUpAlias, requests.count > 3 {
                 let round = requests.count - (expireBeforeFollowUp ? 5 : 0)
-                if expireBeforeFollowUp && requests.count <= 9 {
+                if expireBeforeFollowUp && requests.count <= 8 {
                     output = "无关话题已回复。"
                 } else if !expireBeforeFollowUp {
                     let parameters = followUpAlias == "closeCamera" ? "" : " previewID=\"\(mediaID)\""
-                    output = requests.count == 5 ? "<\(followUpAlias)\(parameters)/>" : "处理完成。"
+                    output = requests.count == 4 ? "<\(followUpAlias)\(parameters)/>" : "处理完成。"
                 } else {
                     switch round {
-                    case 5, 7:
+                    case 4, 6:
                         let alias = followUpAlias
                         let parameters = alias == "closeCamera" ? "" : " previewID=\"\(mediaID)\""
                         output = "<\(alias)\(parameters)/>"
-                    case 6: output = "<loadSkills skills='[\"photography\"]'/>"
+                    case 5: output = "<loadSkills skills='[\"photography\"]'/>"
                     default: output = "处理完成。"
                     }
                 }
             } else {
                 switch requests.count {
                 case 1: output = "<loadSkills skills='[\"photography\"]'/>"
-                case 2: output = "<openCamera/>"
-                case 3: output = "<takePhoto/>"
+                case 2: output = "<takePhoto/>"
                 default: output = "拍好了。"
                 }
             }
@@ -213,7 +212,7 @@ private actor SkillModel: ChatCapability {
 private struct SkillControls: TaskControlCapability {
     let agent: AssistantAgent
     func controlTask(_ operation: String, arguments: [String: String], invocation: any FunctionInput) async throws
-        -> String
+        -> ActionCompletion
     {
         try await agent.controlTask(
             operation, arguments: arguments, source: invocation.context.source,
@@ -360,10 +359,11 @@ private func photographyAcceptance(
                         publicOwner.camera.update {
                             $0 = FixtureCameraFact(enabled: enabled, running: enabled)
                         }
+                        if enabled { return .completed }
                         return .value(
                             String(
                                 decoding: try JSONEncoder().encode(
-                                    CameraCommandReceipt(operation: enabled ? "open" : "close", enabled: enabled)),
+                                    CameraCommandReceipt(operation: "close", enabled: false)),
                                 as: UTF8.self))
                     }
                     let id: String
@@ -475,7 +475,7 @@ private func photographyAcceptance(
         let history = try #require(snapshot.state.history.current.turns.first)
         #expect(snapshot.state.skillState?.activeTaskID == nil && snapshot.state.skillState?.tasks.isEmpty == true)
         #expect(history.state == .completed && history.error == nil)
-        #expect(requests.count == 4)
+        #expect(requests.count == 3)
         #expect(requests.last?.messages.contains { $0.content.contains(photo) } == true)
         #expect(
             requests.last?.messages.contains { $0.images?.contains { $0.id == photo } == true }
@@ -483,7 +483,7 @@ private func photographyAcceptance(
         #expect(history.modelRequests?.allSatisfy { $0.decisionMetadata?.taskID == nil } == true)
         #expect(
             await effects.paths.filter { $0.hasPrefix("Camera.") } == [
-                "Camera.Capture.open", "Camera.Capture.takePhoto",
+                "Camera.Capture.takePhoto"
             ])
         #expect(
             !history.raw.contains("task.start") && !history.raw.contains("task.end") && !history.raw.contains("保存"))
@@ -516,26 +516,26 @@ private func photographyAcceptance(
             _ = try await manager.receiveLocally(followUp, to: .assistant)
             try await skillEventually { await effects.completed == (expireBeforeFollowUp ? 7 : 2) }
             let requests = await stub.requests
-            #expect(requests.count == (expireBeforeFollowUp ? 13 : 6))
+            try #require(requests.count == (expireBeforeFollowUp ? 12 : 5))
             if expireBeforeFollowUp {
-                let failure = try #require(requests[10].messages.last { $0.content.contains("unknownCapability") })
+                let failure = try #require(requests[9].messages.last { $0.content.contains("unknownCapability") })
                 #expect(failure.content.contains("No function was executed for this rejected call"))
-                #expect(!requests[9].messages[0].content.contains("Action savePhoto:"))
-                #expect(requests[11].messages[0].content.contains("Action savePhoto:"))
+                #expect(!requests[8].messages[0].content.contains("Action savePhoto:"))
+                #expect(requests[10].messages[0].content.contains("Action savePhoto:"))
                 let failures = await effects.failures
                 #expect(failures.count == 1 && failures[0].contains("unknownCapability"))
             } else {
-                #expect(requests[4].messages[0].content.contains("Action savePhoto:"))
+                #expect(requests[3].messages[0].content.contains("Action savePhoto:"))
                 #expect(await effects.failures.isEmpty)
                 #expect(
-                    requests.dropFirst(4).allSatisfy { request in
+                    requests.dropFirst(3).allSatisfy { request in
                         request.messages.last?.content.contains("\"action\":\"loadSkills\"") != true
                     })
             }
             let path = alias == "closeCamera" ? "Camera.Capture.close" : "Camera.Capture.savePhoto"
             #expect(
                 await effects.paths.filter { $0.hasPrefix("Camera.") } == [
-                    "Camera.Capture.open", "Camera.Capture.takePhoto", path,
+                    "Camera.Capture.takePhoto", path,
                 ])
             let state = try await context.snapshot().state
             #expect(state.skillState?.tasks.isEmpty == true)
@@ -958,9 +958,6 @@ private func photographyAcceptance(
         AgentTaskScope(
             id: UUID().uuidString, requester: .assistant, executor: .memory, sessionID: session,
             execution: .background))
-    #expect(throws: CommunicationError.unsupportedContract) {
-        try AgentConfigurations.backgroundSupport(target: .memory, contract: "demo.background", skills: [])
-    }
     var old = AgentTaskSkillState()
     old.version = 1
     let fixedCapabilities = try AssistantAgent.runtimeCapabilities(
@@ -975,9 +972,6 @@ private func photographyAcceptance(
     ]
     #expect(throws: DecodingError.self) {
         try JSONDecoder().decode(AgentTaskScope.self, from: JSONSerialization.data(withJSONObject: legacyScope))
-    }
-    #expect(throws: CommunicationError.invalidPayload) {
-        try AgentBackgroundTaskRequest(arguments: ["goal": "后台", "execution": "background"])
     }
 }
 
@@ -997,12 +991,7 @@ func legacyBackgroundStartIsRejectedWithoutChangingForegroundOrInvokingChat()
     let model = SkillModel(mediaID: "preview_1")
     let assistant = try AssistantAgent(
         stateContext: try publicStateFixture(),
-        chat: model, conversations: history, communications: database.agentMessages, context: context,
-        backgroundSupport: { target, contract, skills in
-            guard target == .memory, contract == "demo.background", skills.isEmpty else {
-                throw CommunicationError.unsupportedContract
-            }
-        })
+        chat: model, conversations: history, communications: database.agentMessages, context: context)
     let child = ObservationRecorder(id: "memory", tasks: database.writerExecutions)
     let configurations = try AgentConfigurations.all()
     let policy = try CommunicationPolicy(
@@ -1059,9 +1048,9 @@ func legacyBackgroundStartIsRejectedWithoutChangingForegroundOrInvokingChat()
 
 private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
     func controlTask(_ operation: String, arguments: [String: String], invocation: any FunctionInput) async throws
-        -> String
+        -> ActionCompletion
     {
-        "Committed \(operation)"
+        .value("Committed \(operation)")
     }
 }
 
@@ -2364,11 +2353,10 @@ func assistantIdleExpiryChangesNextRequestCatalogButKeepsEarlierConversationEvid
 @Test(
     .actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true],
     [
-        "completed", "failed", "failedRetry", "failedDiagnostic", "rejected", "rejectedRetry", "coalesced",
-        "liveProgress", "closed", "switched", "playback", "completionFacts",
-        "peerReply", "deferredNew", "task.cancel",
+        "completed", "failed", "declined", "rejected", "rejectedRetry", "duplicate",
+        "closed", "switched", "deferredNew", "task.cancel",
     ])
-func writerWaitingAndCompletionEnterAssistantModelFIFO(foreground: Bool, outcome: String)
+func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outcome: String)
     async throws
 {
     let databaseURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".sqlite")
@@ -2381,15 +2369,10 @@ func writerWaitingAndCompletionEnterAssistantModelFIFO(foreground: Bool, outcome
     let session = UUID().uuidString
     let context = try AgentContextRepository(
         agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState())
-    let model = WriterNoticeModel(
-        delegate: true, retryFailed: outcome == "failedRetry", retryRejected: outcome == "rejectedRetry")
+    let model = WriterNoticeModel(delegate: true, retryRejected: outcome == "rejectedRetry")
     let assistant = try AssistantAgent(
         stateContext: try publicStateFixture(),
-        reportsReplyActivity: ["completionFacts", "peerReply"].contains(outcome),
-        chat: model, conversations: history, communications: database.agentMessages, context: context,
-        backgroundSupport: { target, _, _ in
-            guard target == .writer else { throw CommunicationError.unsupportedContract }
-        })
+        chat: model, conversations: history, communications: database.agentMessages, context: context)
     let child = ObservationRecorder(
         id: "writer", reject: outcome.hasPrefix("rejected"), tasks: database.writerExecutions)
     let speech = ObservationRecorder(id: "speechSynthesis")
@@ -2401,16 +2384,12 @@ func writerWaitingAndCompletionEnterAssistantModelFIFO(foreground: Bool, outcome
         contracts: AgentContracts.communication, configurations: AgentConfigurations.all())
     let input = InputGateway(manager: manager, policy: policy)
     struct Module: ActionModule { let definitions: [ActionBinding] }
-    let playbackGate = WriterReplyPlaybackGate(blocked: outcome == "playback" && !foreground)
     let definitions = ["UI.Caption.print", "UI.Caption.beginReplyTurn", "Speech.Playback.speak"].map { path in
         let parts = path.split(separator: ".").map(String.init)
         return ActionBinding(
             path: .init(domain: parts[0], module: parts[1], function: parts[2]),
             displayName: path, kind: .finite, completion: "Fixture",
-            completing: { _ in
-                if path == "Speech.Playback.speak" { await playbackGate.wait() }
-                return .completed
-            })
+            completing: { _ in .completed })
     }
     let assembly = try BehaviorAssembly(capabilityModules: [
         TaskControlModule(capability: SkillControls(agent: assistant))
@@ -2447,11 +2426,7 @@ func writerWaitingAndCompletionEnterAssistantModelFIFO(foreground: Bool, outcome
     }
     let priorTask = try await context.snapshot().state.skillState?.activeTaskID
     try await assistant.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("帮我画一个蓝色的流程图")))
-    if outcome == "playback", !foreground {
-        try await skillEventually { await playbackGate.entered }
-    } else {
-        try await skillEventually { try await context.snapshot().work.values.contains { $0.state == .completed } }
-    }
+    try await skillEventually { await log.finishedDecisions.count == 1 }
     let taskStateAfterDelegation = try await context.snapshot().state
     #expect(
         taskStateAfterDelegation.skillState?.activeTaskID == priorTask,
@@ -2487,14 +2462,17 @@ func writerWaitingAndCompletionEnterAssistantModelFIFO(foreground: Bool, outcome
         try await database.shutdown()
         return
     }
+    #expect(await model.requests.count == 1)
     let received = try #require(await child.inputs.last)
     guard case .observation(let message) = received.payload else { throw CommunicationError.invalidPayload }
     let request = try #require(message.content(as: AgentTaskSignal.self))
     #expect(request.scope.parentID == nil)
     let payload = try #require(JSONSerialization.jsonObject(with: request.data) as? [String: String])
-    #expect(payload["goal"] == "绘制蓝色流程图")
+    #expect(request.goal == "绘制蓝色流程图")
+    #expect(request.businessContract == nil && request.requestedSkills == nil)
     #expect(payload["request"] == "帮我画一个蓝色的流程图")
     let port = try await output.messaging(for: .writer)
+    let writerRuntime = try await output.consumer(for: child)
     if outcome == "task.cancel" {
         let stable = try await database.writerExecutions.request(request.scope.id, agent: "writer").taskID
         try await skillEventually { await log.finishedDecisions.count == 1 }
@@ -2536,9 +2514,9 @@ func writerWaitingAndCompletionEnterAssistantModelFIFO(foreground: Bool, outcome
                 text: "Cleanup complete", stage: .completed,
                 writerEvent: .init(sequence: 1, kind: .cancelled)),
             scope: request.scope, status: .cancelled, tasks: database.writerExecutions)
-        _ = try await port.sendResult(ended.signal.message(), parent: received, to: .assistant)
+        try await writerRuntime.retireTask(ended.signal)
         _ = try await port.sendResult(ended.message, parent: received, to: .assistant)
-        try await skillEventually { await log.finishedDecisions.count == 3 }
+        #expect(await model.requests.count == 2)
         #expect(try await context.snapshot().state.taskViews?[request.scope.id]?.terminal == true)
         #expect(try await context.snapshot().state.skillState?.activeTaskID == priorTask)
         if foreground {
@@ -2561,7 +2539,7 @@ func writerWaitingAndCompletionEnterAssistantModelFIFO(foreground: Bool, outcome
         let old = try await fixtureWriterCompletion(
             content, scope: request.scope, status: .succeeded, tasks: database.writerExecutions)
         #expect(try await context.snapshot().state.taskViews?[request.scope.id]?.terminal == false)
-        _ = try await port.sendResult(old.signal.message(), parent: received, to: .assistant)
+        try await writerRuntime.retireTask(old.signal)
         try await database.writerExecutions.finishTaskNotification(
             request.scope.id, agent: "writer", retirement: true, completed: true, failure: nil)
         await model.delegateAgain()
@@ -2582,9 +2560,9 @@ func writerWaitingAndCompletionEnterAssistantModelFIFO(foreground: Bool, outcome
             AgentTaskContent(
                 text: "second complete", stage: .completed, writerEvent: .init(sequence: 1, kind: .completed)),
             scope: next.scope, status: .succeeded, tasks: database.writerExecutions)
-        _ = try await port.sendResult(final.signal.message(), parent: nextInput, to: .assistant)
+        try await writerRuntime.retireTask(final.signal)
         _ = try await port.sendResult(final.message, parent: nextInput, to: .assistant)
-        let expected = 4
+        let expected = 2
         let deadline = ContinuousClock.now + .seconds(10)
         while await log.finishedDecisions.count < expected && ContinuousClock.now < deadline {
             try await Task.sleep(for: .milliseconds(20))
@@ -2623,245 +2601,84 @@ func writerWaitingAndCompletionEnterAssistantModelFIFO(foreground: Bool, outcome
         #expect(await child.inputs.count == 1)
     }
     if outcome == "switched", !foreground { _ = try await history.startNew() }
-    let peerScope = AgentTaskScope(
-        id: UUID().uuidString, requester: .assistant, executor: .memory, sessionID: session)
-    if outcome == "peerReply", !foreground {
-        try await context.update { try $0.tasks.register(peerScope) }
-        let peerProgress = try AgentTaskContent(text: "Peer is still speaking").signal(.progress, scope: peerScope)
-        try await assistant.receive(writerFixturePeerInput(peerProgress))
-    }
     if foreground { try await assistant.pause() }
-    if outcome == "completionFacts", !foreground { await playbackGate.arm() }
-    if outcome == "coalesced" {
-        if !foreground { try await assistant.pause() }
-        for number in 1...100 {
-            let content = try AgentTaskContent(
-                text: "步骤\(number)", writerEvent: .init(sequence: UInt64(number), kind: .progress))
-            let receipt = try await port.sendResult(
-                content.signal(.progress, scope: request.scope).message(), parent: received, to: .assistant)
-            #expect(receipt.rejected.isEmpty)
-        }
-        #expect(try await context.snapshot().state.taskViews?[request.scope.id]?.writerEvent?.sequence == 100)
-        #expect(try await context.snapshot().work.values.filter { $0.state == .queued }.isEmpty)
-        try await assistant.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("先聊一下天气")))
-        let content = try AgentTaskContent(
-            text: "图已保存", stage: .completed, artifactID: "project", writerEvent: .init(sequence: 101, kind: .completed))
-        let done = try await fixtureWriterCompletion(
-            content, scope: request.scope, status: .succeeded, tasks: database.writerExecutions)
-        #expect(try await port.sendResult(done.message, parent: received, to: .assistant).rejected.isEmpty)
-        #expect(try await port.sendResult(done.signal.message(), parent: received, to: .assistant).rejected.isEmpty)
-        try await assistant.resume()
-        try await skillEventually { await log.finishedDecisions.count == 3 }
-        #expect(await model.requests.count == 4)
-        let prompts = await model.requests.map { $0.messages.last?.content ?? "" }
-        #expect(prompts[2].contains("先聊一下天气"))
-        #expect(prompts[3].contains("图已保存"))
-        #expect(!prompts.contains { $0.contains("步骤100") })
-        if foreground {
-            _ = try await assistant.controlTask(
-                "task.cancel", arguments: ["reason": "cleanup"], source: "assistant", sessionID: session,
-                inputID: UUID().uuidString, decisionID: nil)
-        }
-        await assistant.stop()
-        try await collection.value
-        await child.stop()
-        await speech.stop()
-        await output.shutdown()
-        try await database.shutdown()
-        return
+    let previousWork = try await context.snapshot().work.keys.sorted()
+    let started = try AgentTaskContent(
+        text: "已接纳", writerEvent: .init(sequence: 1, kind: .started))
+    for _ in 1...(outcome == "duplicate" ? 5 : 1) {
+        let receipt = try await port.sendResult(
+            started.signal(.progress, scope: request.scope).message(), parent: received, to: .assistant)
+        #expect(receipt.rejected.isEmpty)
     }
-    if outcome == "liveProgress" {
-        if foreground { try await assistant.resume() }
-        func sendStep(_ number: Int) async throws {
-            let content = try AgentTaskContent(
-                text: "实时步骤\(number)", writerEvent: .init(sequence: UInt64(number), kind: .progress))
-            let receipt = try await port.sendResult(
-                content.signal(.progress, scope: request.scope).message(), parent: received, to: .assistant)
-            #expect(receipt.rejected.isEmpty)
-        }
-        try await sendStep(1)
-        try await skillEventually { await log.finishedDecisions.count == 2 }
-        let first = ContinuousClock.now
-        for number in 2...20 { try await sendStep(number) }
-        try await assistant.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("插入用户问题")))
-        try await skillEventually { await log.finishedDecisions.count == 3 }
-        #expect(await model.requests.count == 4)
-        try await Task.sleep(for: .seconds(1))
-        #expect(await log.finishedDecisions.count == 3)
-        let deadline = first + .seconds(25)
-        while await log.finishedDecisions.count < 4 {
-            guard ContinuousClock.now < deadline else { throw CommunicationError.invalidPayload }
-            try await Task.sleep(for: .milliseconds(100))
-        }
-        #expect(first.duration(to: .now) >= .seconds(8))
-        let prompts = await model.requests.map { $0.messages.last?.content ?? "" }
-        #expect(prompts.count == 5)
-        #expect(prompts[2].contains("实时步骤1"))
-        #expect(prompts[3].contains("插入用户问题"))
-        #expect(prompts[4].contains("实时步骤20"))
-        if foreground {
-            _ = try await assistant.controlTask(
-                "task.cancel", arguments: ["reason": "cleanup"], source: "assistant", sessionID: session,
-                inputID: UUID().uuidString, decisionID: nil)
-        }
-        await assistant.stop()
-        try await collection.value
-        await child.stop()
-        await speech.stop()
-        await output.shutdown()
-        try await database.shutdown()
-        return
-    }
+    #expect(try await context.snapshot().state.taskViews?[request.scope.id]?.writerEvent?.sequence == 1)
+    let interactionID = UUID().uuidString
     let question = try AgentTaskContent(
-        text: "需要颜色", stage: ["started", "progress"].contains(outcome) ? .running : .waitingUser,
-        interactionID: ["started", "progress"].contains(outcome) ? nil : UUID().uuidString,
-        writerEvent: .init(
-            sequence: 1, kind: outcome == "started" ? .started : outcome == "progress" ? .progress : .userInput))
+        text: "需要颜色", stage: .waitingUser, interactionID: interactionID,
+        writerEvent: .init(sequence: 2, kind: .userInput))
     let progress = try question.signal(.progress, scope: request.scope)
-    let receipt = try await port.sendResult(progress.message(), parent: received, to: .assistant)
-    #expect(receipt.rejected.isEmpty)
-    let duplicate = try await port.sendResult(progress.message(), parent: received, to: .assistant)
-    #expect(duplicate.rejected.isEmpty)
-    if outcome == "peerReply", !foreground {
+    for _ in 1...2 {
+        #expect(try await port.sendResult(progress.message(), parent: received, to: .assistant).rejected.isEmpty)
+    }
+    let waiting = try await context.snapshot()
+    #expect(waiting.state.taskViews?[request.scope.id]?.interactionID == interactionID)
+    #expect(waiting.work.keys.sorted() == previousWork)
+    #expect(await model.requests.count == 1)
+
+    if foreground { try await assistant.resume() }
+    if outcome == "completed" {
+        try await assistant.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("用蓝色")))
+        try await skillEventually { await log.finishedDecisions.count == 2 }
+        let response = try #require(await child.inputs.last)
+        guard case .observation(let message) = response.payload,
+            let signal = message.content(as: AgentTaskSignal.self)
+        else { throw CommunicationError.invalidPayload }
+        #expect(signal.kind == .input && signal.scope == request.scope)
+        #expect(try AgentTaskContent.decode(signal).interactionID == interactionID)
         #expect(await model.requests.count == 2)
-        let peerDone = try AgentTaskContent(text: "Peer playback drained", stage: .completed).signal(
-            .result, scope: peerScope, status: .succeeded)
-        try await assistant.receive(writerFixturePeerInput(peerDone))
     }
-    if outcome == "completionFacts", !foreground {
-        try await skillEventually { await playbackGate.entered }
-        #expect(await log.reportCompletions.isEmpty)
-        await playbackGate.open()
-    }
-    if outcome == "playback", !foreground {
-        #expect(await model.requests.count == 2)
-        #expect(try await context.snapshot().work[try #require(question.writerEvent?.eventID)]?.state == .queued)
-        await playbackGate.open()
-    }
-    try await assistant.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("先聊一下天气")))
-    let fillers = foreground ? 30 : 0
-    for index in 0..<fillers {
-        try await assistant.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("排队消息 \(index)")))
-    }
+
+    let kind: WriterTaskEvent.Kind = outcome == "declined" ? .declined : outcome == "failed" ? .failed : .completed
     let completion = try AgentTaskContent(
-        text: outcome.hasPrefix("failed") ? "创作失败，草稿已保留" : "图已保存", stage: .completed, artifactID: "project",
-        writerEvent: .init(
-            sequence: 2, kind: outcome.hasPrefix("failed") ? .failed : .completed,
-            failure: outcome == "failedDiagnostic"
-                ? .init(
-                    category: "modelHTTP", code: "writer.http.400", stage: "控制请求",
-                    message: String(repeating: "参数错误🌍", count: 200),
-                    details: ["httpStatus": "400", "providerMessage": String(repeating: "参数错误🌍", count: 200)]) : nil))
-    let completed = try await fixtureWriterCompletion(
-        completion, scope: request.scope,
-        status: outcome.hasPrefix("failed") ? .failed : .succeeded, tasks: database.writerExecutions)
-    let evidence = completed.message
-    if foreground {
-        #expect(!(try await port.sendResult(evidence, parent: received, to: .assistant)).rejected.isEmpty)
-        #expect(
-            try await context.snapshot().state.taskViews?[request.scope.id]?.writerEvent?.kind
-                == question.writerEvent?.kind)
-        try await assistant.resume()
+        text: "Writer 终态", stage: .completed, artifactID: "project",
+        writerEvent: .init(sequence: 3, kind: kind))
+    let ended = try await fixtureWriterCompletion(
+        completion, scope: request.scope, status: kind == .completed ? .succeeded : .failed,
+        tasks: database.writerExecutions)
+    for _ in 1...2 {
+        #expect(try await port.sendResult(ended.message, parent: received, to: .assistant).rejected.isEmpty)
     }
-    #expect(try await port.sendResult(evidence, parent: received, to: .assistant).rejected.isEmpty)
-    let result = completed.signal
-    #expect(try await port.sendResult(result.message(), parent: received, to: .assistant).rejected.isEmpty)
-    let deadline = ContinuousClock.now.advanced(by: .seconds(15))
-    while await log.finishedDecisions.count < 4 + fillers,
-        ContinuousClock.now < deadline
-    {
-        try await Task.sleep(for: .milliseconds(10))
-    }
-    #expect(await log.failure == nil)
-    let workerState = try await context.snapshot().work.values.map { $0.state.rawValue }
-    let transportFailure = await log.failure ?? "none"
-    try #require(
-        await log.finishedDecisions.count == 4 + fillers,
-        "States: \(workerState); transport: \(transportFailure)")
-    #expect(try await context.snapshot().state.taskViews?[request.scope.id]?.terminal == true)
-    #expect(try await context.snapshot().state.skillState?.activeTaskID == priorTask)
+    try await writerRuntime.retireTask(ended.signal)
+    let settled = try await context.snapshot()
+    #expect(settled.state.taskViews?[request.scope.id]?.terminal == true)
+    #expect(settled.state.taskViews?[request.scope.id]?.writerEvent?.kind == kind)
+    #expect(settled.state.skillState?.activeTaskID == priorTask)
+    #expect(settled.work.count == previousWork.count + (outcome == "completed" ? 1 : 0))
+    let decisions = outcome == "completed" ? 2 : 1
+    #expect(await model.requests.count == decisions)
+    #expect(try await database.writerExecutions.taskNotification(request.scope.id, agent: "writer")?.delivered == true)
+
     if foreground {
         _ = try await assistant.controlTask(
             "task.cancel", arguments: ["reason": "test cleanup"], source: "assistant", sessionID: session,
             inputID: UUID().uuidString, decisionID: nil)
     }
-    let archivedDialog = try #require(try await history.startNew()).id
     await assistant.stop()
     try await collection.value
-    let outputs = await log.values
-    let observed = String(describing: outputs.map(\.output))
-    #expect(await log.finishedDecisions.count == 4 + fillers, "\(observed)")
-    if outcome == "completionFacts" {
-        let completed = await log.reportCompletions
-        #expect(completed.contains { $0.completedReportID == question.writerEvent?.eventID })
-        #expect(completed.contains { $0.completedReportID == completion.writerEvent?.eventID })
-        #expect(completed.allSatisfy { $0.reportStartedAt != nil })
-    }
-    try #require(await model.requests.count == 5 + fillers + (outcome == "failedRetry" ? 1 : 0))
-    let prompts = await model.requests.map { $0.messages.last?.content ?? "" }
-    #expect(prompts[2].contains("需要颜色"))
-    #expect(prompts[3].contains("先聊一下天气"))
-    #expect(prompts.contains { $0.contains(outcome.hasPrefix("failed") ? "创作失败" : "图已保存") })
-    if outcome == "failedRetry" {
-        #expect(try await database.writerExecutions.delegationCount() == 1)
-        #expect(try await database.writerExecutions.tasks(agent: "writer", before: nil, limit: 50).isEmpty)
-        #expect(prompts.last?.contains("Await new user input") == true)
-    }
-    if outcome == "failedDiagnostic" {
-        let projected = try #require(prompts.first { $0.contains("code=writer.http.400") })
-        #expect(projected.utf8.count <= 4096 && projected.contains("Observation truncated"))
-        #expect(projected.contains("httpStatus=400"))
-    }
-    #expect(try await context.snapshot().state.taskViews?[request.scope.id]?.artifactID == "project")
-    #expect(
-        !outputs.contains {
-            if case .actionCall(let call) = $0.output {
-                return call.actionPath.function == "startTask" && call.parameters["execution"] != "background"
-            }
-            return false
-        })
+    #expect(await log.failure == nil)
+    #expect(await log.finishedDecisions.count == decisions)
     await child.stop()
     await speech.stop()
     await output.shutdown()
     try await database.shutdown()
-    let reopened = try SQLiteRepositories(url: databaseURL)
-    let restored = AssistantHistoryStore(
-        records: try AssistantRecordStore(
-            repository: reopened.assistantMessages, tasks: reopened.assistantTasks,
-            conversations: reopened.assistantConversations, logs: reopened.logs))
-    let dialogID = archivedDialog
-    var position: UInt64 = 0
-    var eventTurns: [AssistantRecord] = []
-    repeat {
-        let page = try await restored.page(dialogID, after: position)
-        for turn in page.turns where turn.user.contains("Writer task facts") {
-            let messageID = try #require(turn.modelRequests?.first?.messageID)
-            eventTurns += try await restored.message(messageID).turns
-        }
-        guard let next = page.nextPosition else { break }
-        position = next
-    } while true
-    #expect(eventTurns.count == (outcome == "failedRetry" ? 3 : 2))
-    #expect(
-        eventTurns.allSatisfy {
-            $0.user.contains("agent=writer") && !$0.user.contains("eventID=") && !$0.user.contains("delegateID=")
-        })
-    #expect(
-        eventTurns.flatMap { $0.modelRequests ?? [] }.allSatisfy {
-            $0.historyTaskID == nil && $0.decisionMetadata?.mode == "writer.event"
-        })
-    try await reopened.shutdown()
 }
 
 private actor WriterNoticeModel: ChatCapability {
     var delegate: Bool
-    var retryFailed: Bool
     var retryRejected: Bool
     var cancellationTask: String?
     func cancel(_ taskID: String) { cancellationTask = taskID }
-    init(delegate: Bool = false, retryFailed: Bool = false, retryRejected: Bool = false) {
+    init(delegate: Bool = false, retryRejected: Bool = false) {
         self.delegate = delegate
-        self.retryFailed = retryFailed
         self.retryRejected = retryRejected
     }
     func delegateAgain() { delegate = true }
@@ -2875,14 +2692,14 @@ private actor WriterNoticeModel: ChatCapability {
             retryRejected = false
             delegate = true
         }
-        if retryFailed, request.messages.last?.content.contains("type=failed") == true {
-            retryFailed = false
-            delegate = true
-        }
         if cancellationTask != nil {
             cancellationTask = nil
             try pair.emitter.yield(
                 .text("<task.cancel agent_id=\"writer\" reason=\"User cancelled\"/>"))
+            try pair.emitter.yield(.finished(.stop))
+        } else if request.messages.last?.content == "用蓝色" {
+            #expect(request.messages.contains { $0.content.contains("需要颜色") })
+            try pair.emitter.yield(.text("<task.send agent_id=\"writer\" text=\"用蓝色\"/>"))
             try pair.emitter.yield(.finished(.stop))
         } else if delegate {
             delegate = false
@@ -2913,42 +2730,6 @@ private actor WriterOutputLog {
             })
         return values.filter { $0.output == .control("agent.finished") && decisionIDs.contains($0.inputID) }
     }
-    var reportCompletions: [ReplyActivity] {
-        values.compactMap {
-            guard case .communication(let call) = $0.output,
-                let fact = call.message.content(as: ReplyActivity.self), fact.completedReportID != nil
-            else { return nil }
-            return fact
-        }
-    }
-}
-
-/// The Action completes only when the fixture's physical-playback boundary opens.
-private actor WriterReplyPlaybackGate {
-    var blocked: Bool
-    var entered = false
-    private let release = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
-    init(blocked: Bool) { self.blocked = blocked }
-    func wait() async {
-        guard blocked else { return }
-        entered = true
-        for await _ in release.stream { break }
-    }
-    func arm() { blocked = true }
-    func open() {
-        blocked = false
-        release.continuation.yield(())
-        release.continuation.finish()
-    }
-}
-
-private func writerFixturePeerInput(_ signal: AgentTaskSignal) throws -> AgentInput {
-    let payload = InputPayload.observation(try signal.message())
-    return AgentInput(
-        id: UUID().uuidString, sessionID: signal.scope.sessionID, payload: payload,
-        metadata: InputMetadata(
-            payload: payload, source: "memory", incarnation: "fixture-memory", origin: .agent,
-            rootID: signal.scope.id))
 }
 
 @Test(.actionCatalog) func assistantPhotographyForegroundTasksPersistThroughSQLite() async throws {

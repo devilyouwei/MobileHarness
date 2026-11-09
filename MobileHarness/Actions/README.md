@@ -67,6 +67,8 @@ Synchronous invalidation closes execution and cancels active work; foreground tr
 
 State acceptance, animation restoration, audio drain, download admission and motor arrival have distinct completion contracts. Committed effects are not undone by later cancellation/delivery failure. See the owning domain READMEs for native bounds and [overall design](../README.md) for cross-module flows.
 
+Effect-only handlers return Void and the execution layer emits a typed `.completed` receipt. Handlers return values for observations consumed by the model or another workflow, such as captured media identity, confirmed settings and query data. A successful receipt still joins execution and delivery. Exceptions and failure reports retain their execution details.
+
 ## State summaries and detail queries
 
 Business snapshot readers and explicit detail queries share their owning services. Specific device/resource/provider/history queries retain declared parameters, bounds and real outcomes; no generic environment query or Agent-result lookup is bound into Actions. A query does not grant readiness or initiate an unspecified probe. Application summaries belong to Agents, native summaries to PlatformKit, presentation summaries to UI, and actual execution validation remains here.

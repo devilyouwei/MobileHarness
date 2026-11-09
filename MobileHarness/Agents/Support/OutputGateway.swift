@@ -19,10 +19,13 @@ public struct GatewayOutputConsumer: Sendable {
         public var errorDescription: String? { description }
     }
     private let consume: @Sendable (OutputEnvelope, GatewayOutputMode) async throws -> OutputExecutionResult
+    let retireTask: @Sendable (AgentTaskSignal) async throws -> Void
     fileprivate init(
-        _ consume: @escaping @Sendable (OutputEnvelope, GatewayOutputMode) async throws -> OutputExecutionResult
+        consume: @escaping @Sendable (OutputEnvelope, GatewayOutputMode) async throws -> OutputExecutionResult,
+        retireTask: @escaping @Sendable (AgentTaskSignal) async throws -> Void
     ) {
         self.consume = consume
+        self.retireTask = retireTask
     }
     @discardableResult public func execute(_ envelope: OutputEnvelope) async throws -> OutputExecutionResult {
         try await consume(envelope, .protocolFeedback)
@@ -250,6 +253,9 @@ public actor OutputGateway {
                     try await execute(envelope)
                 }
             }
+        } retireTask: { [self] terminal in
+            try await retireTask(
+                terminal, owner: .init(agent: id, incarnation: incarnation, sessionID: terminal.scope.sessionID))
         }
     }
     private func sourceIdentity(_ envelope: OutputEnvelope) async throws -> String {
@@ -336,26 +342,10 @@ public actor OutputGateway {
                     if task.kind == .input { try await manager.validateTaskInput(task.scope, agent: source) }
                     if task.kind == .cancel { try await manager.cancelTask(task.scope, requester: source) }
                     if task.kind == .result {
-                        try await manager.beginTaskCompletion(task.scope, executor: source)
-                        if task.status != .succeeded {
-                            for id in try await manager.taskExecutions(task.scope) {
-                                await actions.executor.cancel(inputID: id, source: source)
-                            }
-                            await cancelTaskCalls(task.scope.id)
-                        }
-                        for id in try await manager.taskExecutions(task.scope) {
-                            do { try await actions.executor.finish(inputID: id, source: source) } catch {
-                                if task.status == .succeeded { throw error }
-                                try Task.checkCancellation()
-                            }
-                        }
-                        let calls = taskCalls[task.scope.id] ?? [:]
-                        for call in calls.values {
-                            do { _ = try await call.value } catch {
-                                if task.status == .succeeded { throw error }
-                                try Task.checkCancellation()
-                            }
-                        }
+                        let completion = try await manager.beginTaskCompletion(task.scope, executor: source)
+                        try await joinTaskCompletion(
+                            task.scope, executionIDs: completion.executionIDs,
+                            succeeded: task.status == .succeeded)
                     }
                 }
             }
@@ -497,10 +487,52 @@ public actor OutputGateway {
         retainTaskFailure(event.scope.id, message: "Task terminal delivery rejected")
     }
 
-    private func failTaskCompletion(_ scope: AgentTaskScope, owner: ExecutionOwner, reason: String) async {
+    private func joinTaskCompletion(_ scope: AgentTaskScope, executionIDs: Set<String>, succeeded: Bool) async throws {
+        let calls = taskCalls[scope.id] ?? [:]
+        if !succeeded {
+            for id in executionIDs { await actions.executor.cancel(inputID: id, source: scope.executor) }
+            for call in calls.values { call.cancel() }
+            for call in calls.values { _ = await call.result }
+        }
+        for id in executionIDs {
+            do { try await actions.executor.finish(inputID: id, source: scope.executor) } catch {
+                if succeeded { throw error }
+                try Task.checkCancellation()
+            }
+        }
+        if succeeded { for call in calls.values { _ = try await call.value } }
+    }
+
+    private func retireTask(_ terminal: AgentTaskSignal, owner: ExecutionOwner) async throws {
+        guard terminal.kind == .result, let status = terminal.status else { throw CommunicationError.invalidPayload }
+        let scope = terminal.scope
+        let evidence = try terminal.message()
+        guard !closed else { throw CommunicationError.scopeClosed }
+        try Task.checkCancellation()
+        try await bindLifecycle()
+        guard !closed else { throw CommunicationError.scopeClosed }
+        guard
+            let completion = try await manager.beginTaskCompletionIfPresent(
+                scope, executor: owner.agent, incarnation: owner.incarnation)
+        else { return }
+        do {
+            try await joinTaskCompletion(scope, executionIDs: completion.executionIDs, succeeded: status == .succeeded)
+            if await manager.retireTask(scope.id, admissionID: completion.admissionID) {
+                await requests.recordTaskRetirement(evidence, owner: owner)
+            }
+        } catch {
+            await failTaskCompletion(
+                scope, owner: owner, reason: String(describing: error), admissionID: completion.admissionID)
+            throw error
+        }
+    }
+
+    private func failTaskCompletion(
+        _ scope: AgentTaskScope, owner: ExecutionOwner, reason: String, admissionID: String? = nil
+    ) async {
         do {
             let events = try await manager.failTask(
-                scope, executor: owner.agent, incarnation: owner.incarnation, reason: reason)
+                scope, executor: owner.agent, incarnation: owner.incarnation, reason: reason, admissionID: admissionID)
             for event in events {
                 for id in event.executionIDs {
                     await actions.executor.cancel(inputID: id, source: event.scope.executor)

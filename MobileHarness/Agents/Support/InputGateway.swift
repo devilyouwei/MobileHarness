@@ -127,6 +127,19 @@ public actor InputGateway {
         signalChanged()
         return input.id
     }
+
+    /// Records joined execution cleanup for observers without admitting another Agent input.
+    func recordTaskRetirement(_ evidence: AgentMessage, owner: ExecutionOwner) {
+        guard !closed else { return }
+        let payload = InputPayload.observation(evidence)
+        let id = UUID().uuidString
+        let input = AgentInput(
+            id: id, sessionID: owner.sessionID, payload: payload,
+            metadata: .init(
+                payload: payload, source: owner.agent.rawValue, incarnation: owner.incarnation, origin: .runtime,
+                rootID: id))
+        finishSignal(beginSignal(input, mode: .feedback, targets: []), phase: .accepted)
+    }
     private func finishSignal(
         _ id: String, phase: SignalTraceRecord.Phase? = nil, reason: String? = nil,
         report: DeliveryReport? = nil

@@ -15,7 +15,7 @@ extension WindowContentLifecycle {
     public func endWindowTransition() {}
 }
 
-/// Root-owned operations are bounded by the four admitted windows; replacement cancels and joins.
+/// Root-owned operations are bounded by admitted windows; replacement cancels and joins.
 @MainActor public final class WindowExecutionService: WindowControlCapability {
     private struct Operation {
         let token: UUID
