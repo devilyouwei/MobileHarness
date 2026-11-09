@@ -34,11 +34,16 @@ private actor WriterStreamProbe {
     }
     func abort() { aborted = true }
 }
-private func writerDefinition() throws -> ChatToolDefinition {
-    try .init(
-        declaration: Data(
-            #"{"type":"function","function":{"name":"workspace","parameters":{"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}}}"#
-                .utf8))
+private func writerDefinitions() throws -> [ChatToolDefinition] {
+    try ["edit", "finish", "list", "read", "render", "replace"].map { name in
+        try .init(
+            declaration: JSONSerialization.data(withJSONObject: [
+                "type": "function",
+                "function": [
+                    "name": name, "parameters": ["type": "object", "properties": [:]],
+                ],
+            ]))
+    }
 }
 @Test(arguments: [false, true]) func writerSeparatesNativeControlAndUnescapedContentStream(large: Bool) async throws {
     let fragment = "<h1>中文 & \"emoji 🌍\"</h1>"
@@ -48,18 +53,18 @@ private func writerDefinition() throws -> ChatToolDefinition {
     let model = WriterScriptModel([
         [
             .text(String(repeating: "Planning ", count: 1000)),
-            .toolCall(.init(id: "edit", name: "workspace", argumentsJSON: #"{"command":"edit"}"#)),
+            .toolCall(.init(id: "edit", name: "edit", argumentsJSON: "{}")),
             .finished(.toolCalls),
         ],
         chunks.map(ChatEvent.text) + [.finished(.stop)],
         [
-            .toolCall(.init(id: "finish", name: "workspace", argumentsJSON: #"{"command":"finish"}"#)),
+            .toolCall(.init(id: "finish", name: "finish", argumentsJSON: "{}")),
             .finished(.toolCalls),
         ],
     ])
     let probe = WriterStreamProbe()
     let tools = WriterTools(
-        definitions: [try writerDefinition()],
+        definitions: try writerDefinitions(),
         execute: { call in
             call.id == "edit"
                 ? .write(streamID: "runtime-owned", instruction: "Create HTML", context: "") : .finished("完成")
@@ -83,7 +88,7 @@ private func writerDefinition() throws -> ChatToolDefinition {
 @Test func writerTruncatedContentAbortsWithoutCommitting() async throws {
     let model = WriterScriptModel([
         [
-            .toolCall(.init(id: "edit", name: "workspace", argumentsJSON: #"{"command":"edit"}"#)),
+            .toolCall(.init(id: "edit", name: "edit", argumentsJSON: "{}")),
             .finished(.toolCalls),
         ],
         [.text("partial"), .finished(.lengthLimit)],
@@ -92,7 +97,7 @@ private func writerDefinition() throws -> ChatToolDefinition {
     ])
     let probe = WriterStreamProbe()
     let tools = WriterTools(
-        definitions: [try writerDefinition()],
+        definitions: try writerDefinitions(),
         execute: { _ in .write(streamID: "s", instruction: "Text", context: "") },
         append: { _, text in await probe.append(text) }, complete: { _ in await probe.complete() },
         abort: { _ in await probe.abort() })
@@ -126,19 +131,19 @@ private func writerDefinition() throws -> ChatToolDefinition {
 @Test func writerCompletesWhenModelFinishesBeyondFormerRoundBudget() async throws {
     let steps = (0..<30).map { index -> [ChatEvent] in
         [
-            .toolCall(.init(id: "read-\(index)", name: "workspace", argumentsJSON: #"{"command":"list"}"#)),
+            .toolCall(.init(id: "read-\(index)", name: "list", argumentsJSON: "{}")),
             .finished(.toolCalls),
         ]
     }
     let model = WriterScriptModel(
         steps + [
             [
-                .toolCall(.init(id: "finish", name: "workspace", argumentsJSON: #"{"command":"finish"}"#)),
+                .toolCall(.init(id: "finish", name: "finish", argumentsJSON: "{}")),
                 .finished(.toolCalls),
             ]
         ])
     let tools = WriterTools(
-        definitions: [try writerDefinition()],
+        definitions: try writerDefinitions(),
         execute: { $0.id == "finish" ? .finished("完成") : .observation("Files checked") },
         append: { _, _ in }, complete: { _ in "" }, abort: { _ in })
     #expect(try await WriterWorkflow(model: model).run(goal: "检查多文件后完成", scope: "task", tools: tools) == "完成")
@@ -234,14 +239,14 @@ private func writerDefinition() throws -> ChatToolDefinition {
 @Test func writerCancellationJoinsUncancelledDraftCleanup() async throws {
     let model = WriterScriptModel([
         [
-            .toolCall(.init(id: "edit", name: "workspace", argumentsJSON: #"{"command":"edit"}"#)),
+            .toolCall(.init(id: "edit", name: "edit", argumentsJSON: "{}")),
             .finished(.toolCalls),
         ],
         [.text("partial"), .finished(.stop)],
     ])
     let probe = WriterStreamProbe()
     let tools = WriterTools(
-        definitions: [try writerDefinition()],
+        definitions: try writerDefinitions(),
         execute: { _ in .write(streamID: "s", instruction: "Write", context: "") },
         append: { _, _ in
             withUnsafeCurrentTask { $0?.cancel() }
@@ -298,18 +303,18 @@ private func writerDefinition() throws -> ChatToolDefinition {
 @Test func writerContentReceivesUpdatedGoalRelatedSourceAndFormatPolicy() async throws {
     let model = WriterScriptModel([
         [
-            .toolCall(.init(id: "edit", name: "workspace", argumentsJSON: #"{"command":"edit"}"#)),
+            .toolCall(.init(id: "edit", name: "edit", argumentsJSON: "{}")),
             .finished(.toolCalls),
         ],
         [.text(".diagram {color:red}"), .finished(.stop)],
         [
-            .toolCall(.init(id: "finish", name: "workspace", argumentsJSON: #"{"command":"finish"}"#)),
+            .toolCall(.init(id: "finish", name: "finish", argumentsJSON: "{}")),
             .finished(.toolCalls),
         ],
     ])
     let probe = WriterStreamProbe()
     let tools = WriterTools(
-        definitions: [try writerDefinition()],
+        definitions: try writerDefinitions(),
         execute: { call in
             call.id == "edit"
                 ? .write(streamID: "s", instruction: "File: style.css\nUpdate style", context: "<div class=diagram>")
@@ -334,23 +339,23 @@ private actor WriterFailureProbe {
 }
 
 @Test(arguments: [false, true]) func writerDoesNotRepeatFailedEffectsUntilDraftChanges(repair: Bool) async throws {
-    func control(_ id: String, _ args: String) -> [ChatEvent] {
-        [.toolCall(.init(id: id, name: "workspace", argumentsJSON: args)), .finished(.toolCalls)]
+    func control(_ id: String, _ name: String) -> [ChatEvent] {
+        [.toolCall(.init(id: id, name: name, argumentsJSON: "{}")), .finished(.toolCalls)]
     }
-    var script = [control("first", #"{"command":"render"}"#)]
+    var script = [control("first", "render")]
     if repair {
-        script += [control("edit", #"{"command":"edit"}"#), [.text("Fixed"), .finished(.stop)]]
+        script += [control("edit", "edit"), [.text("Fixed"), .finished(.stop)]]
     }
-    script.append(control("second", #"{ "command" : "render" }"#))
+    script.append(control("second", "render"))
     if repair {
-        script.append(control("finish", #"{"command":"finish"}"#))
+        script.append(control("finish", "finish"))
     } else {
-        script.append(control("third", #"{"command":"render"}"#))
+        script.append(control("third", "render"))
     }
     let model = WriterScriptModel(script)
     let probe = WriterFailureProbe()
     let tools = WriterTools(
-        definitions: [try writerDefinition()],
+        definitions: try writerDefinitions(),
         execute: { call in
             if ["first", "second"].contains(call.id) { return try await probe.render() }
             if call.id == "edit" { return .write(streamID: "s", instruction: "Fix", context: "") }
@@ -408,13 +413,13 @@ private actor WriterRetryModel: ChatCapability {
 }
 private func writerControl(_ id: String, _ command: String) -> [ChatEvent] {
     [
-        .toolCall(.init(id: id, name: "workspace", argumentsJSON: "{\"command\":\"" + command + "\"}")),
+        .toolCall(.init(id: id, name: command, argumentsJSON: "{}")),
         .finished(.toolCalls),
     ]
 }
 private func writerFinishTools() throws -> WriterTools {
     WriterTools(
-        definitions: [try writerDefinition()], execute: { _ in .finished("Done") },
+        definitions: try writerDefinitions(), execute: { _ in .finished("Done") },
         append: { _, _ in }, complete: { _ in "" }, abort: { _ in })
 }
 
@@ -457,8 +462,8 @@ private func writerFinishTools() throws -> WriterTools {
     let model = WriterScriptModel([
         [.text("I will draw it"), .finished(.stop)],
         [
-            .toolCall(.init(id: "finish-early", name: "workspace", argumentsJSON: #"{"command":"finish"}"#)),
-            .toolCall(.init(id: "edit-early", name: "workspace", argumentsJSON: #"{"command":"edit"}"#)),
+            .toolCall(.init(id: "finish-early", name: "finish", argumentsJSON: "{}")),
+            .toolCall(.init(id: "edit-early", name: "edit", argumentsJSON: "{}")),
             .finished(.toolCalls),
         ],
         writerControl("finish", "finish"),
@@ -514,7 +519,7 @@ private actor WriterRetryEditor {
     ])
     let probe = try WriterRetryEditor()
     let tools = WriterTools(
-        definitions: [try writerDefinition()],
+        definitions: try writerDefinitions(),
         execute: { call in
             call.id == "edit" ? try await probe.begin() : .finished("Done")
         }, append: { try await probe.append($0, $1) }, complete: { try await probe.complete($0) },
@@ -537,7 +542,7 @@ private actor WriterRetryEditor {
     let model = WriterScriptModel([writerControl("edit", "edit"), [.text("complete"), .finished(.stop)]])
     let probe = try WriterRetryEditor(commitFails: true)
     let tools = WriterTools(
-        definitions: [try writerDefinition()], execute: { _ in try await probe.begin() },
+        definitions: try writerDefinitions(), execute: { _ in try await probe.begin() },
         append: { try await probe.append($0, $1) }, complete: { try await probe.complete($0) },
         abort: { try await probe.abort($0) })
     await #expect(throws: WriterToolFailure.self) {
@@ -563,7 +568,7 @@ private actor WriterRetryEditor {
 @Test func writerAbortFailurePreservesBothCausesAndStopsRecovery() async throws {
     let model = WriterScriptModel([writerControl("edit", "edit"), [.text("partial"), .finished(.lengthLimit)]])
     let tools = WriterTools(
-        definitions: [try writerDefinition()],
+        definitions: try writerDefinitions(),
         execute: { _ in .write(streamID: "s", instruction: "Create demo", context: "") },
         append: { _, _ in }, complete: { _ in "not committed" }, abort: { _ in throw WriterToolFailure("abort failed") }
     )
@@ -605,7 +610,7 @@ func writerRejectsSplitOuterCodeFencesBeforeCommit(format: String) throws {
     ])
     let probe = try WriterRetryEditor()
     let tools = WriterTools(
-        definitions: [try writerDefinition()],
+        definitions: try writerDefinitions(),
         execute: { call in
             call.id == "edit" ? try await probe.begin() : .finished("Done")
         }, append: { try await probe.append($0, $1) }, complete: { try await probe.complete($0) },
@@ -622,7 +627,7 @@ func writerRejectsSplitOuterCodeFencesBeforeCommit(format: String) throws {
     let model = WriterScriptModel([writerControl("edit", "edit"), wrapped, wrapped, wrapped])
     let probe = try WriterRetryEditor()
     let tools = WriterTools(
-        definitions: [try writerDefinition()], execute: { _ in try await probe.begin() },
+        definitions: try writerDefinitions(), execute: { _ in try await probe.begin() },
         append: { try await probe.append($0, $1) }, complete: { try await probe.complete($0) },
         abort: { try await probe.abort($0) })
     do {
@@ -692,7 +697,7 @@ private actor WriterNaturalFinishProbe {
     let model = WriterScriptModel([[.text("Ready"), .finished(.stop)], writerControl("finish", "finish")])
     let probe = WriterNaturalFinishProbe()
     let tools = WriterTools(
-        definitions: [try writerDefinition()],
+        definitions: try writerDefinitions(),
         execute: { call in
             #expect(call.id == "finish")
             return .finished(await probe.commit())
@@ -712,22 +717,22 @@ private actor WriterRoundBoundaryProbe {
 @Test func writerReportsCompletedStepsAfterCommitAndRefreshBeforeNextLoop() async throws {
     let model = WriterScriptModel([
         [
-            .toolCall(.init(id: "edit", name: "workspace", argumentsJSON: #"{"command":"edit","path":"index.html"}"#)),
+            .toolCall(.init(id: "edit", name: "edit", argumentsJSON: #"{"path":"index.html"}"#)),
             .finished(.toolCalls),
         ],
         [.text("<h1>Ready</h1>"), .finished(.stop)],
         [
-            .toolCall(.init(id: "render", name: "workspace", argumentsJSON: #"{"command":"render"}"#)),
+            .toolCall(.init(id: "render", name: "render", argumentsJSON: "{}")),
             .finished(.toolCalls),
         ],
         [
-            .toolCall(.init(id: "finish", name: "workspace", argumentsJSON: #"{"command":"finish"}"#)),
+            .toolCall(.init(id: "finish", name: "finish", argumentsJSON: "{}")),
             .finished(.toolCalls),
         ],
     ])
     let probe = WriterRoundBoundaryProbe()
     let tools = WriterTools(
-        definitions: [try writerDefinition()],
+        definitions: try writerDefinitions(),
         execute: { call in
             await probe.add(call.id)
             switch call.id {
@@ -764,7 +769,7 @@ private actor WriterRoundBoundaryProbe {
         .events(writerControl("read", "read")), .events(writerControl("finish", "finish")),
     ])
     let tools = WriterTools(
-        definitions: [try writerDefinition()],
+        definitions: try writerDefinitions(),
         execute: { $0.id == "finish" ? .finished("Done") : .observation("File is ready") },
         append: { _, _ in }, complete: { _ in "" }, abort: { _ in })
     #expect(try await WriterWorkflow(model: model).run(goal: "Demo", scope: "run", tools: tools) == "Done")
@@ -783,11 +788,11 @@ private actor WriterRoundBoundaryProbe {
 @Test func writerAcceptsLargeNativePatchAndCarriesItIntoNextRequest() async throws {
     let arguments = String(
         decoding: try JSONEncoder().encode(
-            ["command": "replace", "newText": String(repeating: "source", count: 20000)]), as: UTF8.self)
-    let call = ChatToolCall(id: "large", name: "workspace", argumentsJSON: arguments)
+            ["newText": String(repeating: "source", count: 20000)]), as: UTF8.self)
+    let call = ChatToolCall(id: "large", name: "replace", argumentsJSON: arguments)
     let model = WriterScriptModel([[.toolCall(call), .finished(.toolCalls)], writerControl("finish", "finish")])
     let tools = WriterTools(
-        definitions: [try writerDefinition()],
+        definitions: try writerDefinitions(),
         execute: { $0.id == "finish" ? .finished("Done") : .observation("Patch saved") },
         append: { _, _ in }, complete: { _ in "" }, abort: { _ in })
     #expect(try await WriterWorkflow(model: model).run(goal: "Patch", scope: "run", tools: tools) == "Done")
@@ -799,7 +804,7 @@ private actor WriterRoundBoundaryProbe {
     let result = String(repeating: "long file contents ", count: 10000)
     let model = WriterScriptModel([writerControl("read", "read"), writerControl("finish", "finish")])
     let tools = WriterTools(
-        definitions: [try writerDefinition()],
+        definitions: try writerDefinitions(),
         execute: { $0.id == "finish" ? .finished("Done") : .observation(result) },
         append: { _, _ in }, complete: { _ in "" }, abort: { _ in })
     #expect(try await WriterWorkflow(model: model).run(goal: "Inspect", scope: "run", tools: tools) == "Done")

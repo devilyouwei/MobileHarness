@@ -89,21 +89,18 @@ private actor WriterNativeFixture: ChatCapability {
             #expect(!policy.contains("Assistant delegates"))
             #expect(policy.contains("Your private workflow uses tools, never XML scheduling"))
             #expect(policy.contains("Do not invent extra features"))
-            let schema = try #require(
-                try JSONSerialization.jsonObject(with: request.tools[0].declaration) as? [String: Any])
-            let function = try #require(schema["function"] as? [String: Any])
-            let parameters = try #require(function["parameters"] as? [String: Any])
-            let properties = try #require(parameters["properties"] as? [String: [String: Any]])
-            let commands = try #require(properties["command"]?["enum"] as? [String])
-            let library = commands.contains("searchWorkspaces")
-            #expect(properties["workspaceID"] == nil)
+            let names = Set(request.tools.map(\.name))
+            let library = !names.contains("edit")
+            #expect(!names.contains("workspace") && !names.contains("publish") && names.contains("finish"))
             if library {
                 #expect(policy.contains("Workspace library domain"))
-                #expect(!commands.contains("edit") && properties["path"] == nil)
+                #expect(!names.contains("edit"))
             } else {
                 #expect(policy.contains("Workspace editing domain") && policy.contains("Active workspace: writer/"))
-                #expect((properties["start"]?["description"] as? String)?.contains("decimal") == true)
-                #expect(commands.contains("move") && !commands.contains("searchWorkspaces"))
+                #expect(names.contains("move") && names.contains("open") && names.contains("enter"))
+                let edit = try #require(request.tools.first { $0.name == "edit" })
+                let schema = String(decoding: edit.declaration, as: UTF8.self)
+                #expect(schema.contains("decimal") && !schema.contains("workspaceID"))
             }
             let step = requests - (asks || invalidArguments ? 1 : 0)
             let command: [String: String]
@@ -126,7 +123,8 @@ private actor WriterNativeFixture: ChatCapability {
                 case 0:
                     command =
                         invalidArguments
-                        ? ["command": "list", "verification": "ok"] : ["command": "ask", "summary": "希望用什么语言？"]
+                        ? ["command": "searchWorkspaces", "verification": "ok"]
+                        : ["command": "ask", "summary": "希望用什么语言？"]
                 case 1: command = ["command": "searchWorkspaces", "query": existing ? "task_1" : "测试问候"]
                 case 2:
                     command =
@@ -146,14 +144,28 @@ private actor WriterNativeFixture: ChatCapability {
             try pair.emitter.yield(
                 .toolCall(
                     .init(
-                        id: UUID().uuidString, name: "workspace",
-                        argumentsJSON: String(decoding: try JSONEncoder().encode(command), as: UTF8.self))))
+                        id: UUID().uuidString, name: try #require(command["command"]),
+                        argumentsJSON: String(
+                            decoding: try JSONEncoder().encode(
+                                writerFixtureToolArgs(command)), as: UTF8.self))))
             try pair.emitter.yield(.finished(.toolCalls))
         }
         pair.emitter.finish()
         return pair.session
     }
 }
+private func writerFixtureToolArgs(_ input: [String: String]) -> [String: String] {
+    var args = input
+    if args.removeValue(forKey: "command") == "ask" {
+        args["question"] = args.removeValue(forKey: "summary")
+    }
+    return args
+}
+
+private func artifactFixturePath(_ operation: String) -> ActionIdentifier {
+    .init(domain: "Artifacts", module: "Workspace", function: operation == "finish" ? "publish" : operation)
+}
+
 private struct WriterNetworkFixtureFailure: Error, ChatFailureProviding {
     var chatFailure: ChatFailureDiagnostic {
         .init(.transport, stage: .stream, networkReason: .timeout, networkCode: -1001)
@@ -550,7 +562,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     if mode == 11 {
         let last = try #require(current.turns.last?.modelRequests?.last)
         #expect(last.toolCalls.count == 1)
-        #expect(last.toolCalls.first?.argumentsJSON.contains("finish") == true)
+        #expect(last.toolCalls.first?.name == "finish")
         let textRound = try #require(current.turns.dropLast().last)
         #expect(textRound.modelRequests?.last?.toolCalls.isEmpty == true)
         #expect(textRound.generationRounds?.contains { $0.resultsJSON.contains("writer.runtime") } != true)
@@ -584,7 +596,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     func invocation(_ task: String, _ parameters: [String: String]) throws -> FunctionInvocation {
         .init(
             call: .init(
-                actionPath: ActionIdentifier(domain: "Artifacts", module: "Workspace", function: "perform"),
+                actionPath: artifactFixturePath(parameters["command"] ?? ""),
                 parameters: parameters.merging(["workspaceID": "writer/task_1", "createWorkspace": "true"]) {
                     existing, _ in existing
                 }),
@@ -643,7 +655,7 @@ private func writerLifetimeInvocation(_ parameters: [String: String], session: S
 {
     .init(
         call: .init(
-            actionPath: ActionIdentifier(domain: "Artifacts", module: "Workspace", function: "perform"),
+            actionPath: artifactFixturePath(parameters["command"] ?? ""),
             parameters: parameters.merging(["workspaceID": "writer/task_1", "createWorkspace": "true"]) {
                 existing, _ in existing
             }),
@@ -1029,7 +1041,7 @@ private actor WriterRenderProbe {
         try await service.perform(
             invocation: FunctionInvocation(
                 call: .init(
-                    actionPath: ActionIdentifier(domain: "Artifacts", module: "Workspace", function: "perform"),
+                    actionPath: artifactFixturePath(parameters["command"] ?? ""),
                     parameters: parameters.merging(["workspaceID": "writer/task_1", "createWorkspace": "true"]) {
                         existing, _ in existing
                     }),
@@ -1383,6 +1395,9 @@ private actor WriterStartupProbe {
         .toolCall(.init(id: "read-1", name: "workspace", argumentsJSON: "{\"command\":\"read\"}")), id: input)
     try await history.finish(input)
     try await history.toolOutcome("read-1", output: "node A")
+    let migrated = try await history.restoredContext(availableTools: ["read"])
+    #expect(migrated.allSatisfy { $0.role != .tool && $0.toolCalls.isEmpty })
+    #expect(migrated.contains { $0.content.contains("Earlier tool evidence") && $0.content.contains("node A") })
     try await database.endSeedDelegation(first.delegateID, status: "completed")
     let second = try await database.seedDelegation(
         taskID: first.id, goal: "改为蓝色", input: "继续改成蓝色", sourceDialog: source.id, agent: "writer")
@@ -1726,7 +1741,7 @@ private actor WriterBatchFailureModel: ChatCapability {
         let pair = InferenceSession<ChatEvent>.make(limits: try .init(), estimatedBytes: { $0.estimatedBytes })
         for (id, command) in [("edit", "edit"), ("later", "list")] {
             try pair.emitter.yield(
-                .toolCall(.init(id: id, name: "workspace", argumentsJSON: "{\"command\":\"" + command + "\"}")))
+                .toolCall(.init(id: id, name: command, argumentsJSON: "{}")))
         }
         try pair.emitter.yield(.finished(.toolCalls))
         pair.emitter.finish()
@@ -1753,12 +1768,14 @@ private actor WriterBatchEffectProbe {
         records: try WriterRecordStore(repository: database.writerMessages, logs: database.logs))
     let model = WriterBatchFailureModel()
     let probe = WriterBatchEffectProbe()
-    let definition = try ChatToolDefinition(
-        declaration: Data(
-            #"{"type":"function","function":{"name":"workspace","parameters":{"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}}}"#
-                .utf8))
+    let definitions = try ["edit", "list"].map { name in
+        try ChatToolDefinition(
+            declaration: JSONSerialization.data(withJSONObject: [
+                "type": "function", "function": ["name": name, "parameters": ["type": "object"]],
+            ]))
+    }
     let tools = WriterTools(
-        definitions: [definition], execute: { await probe.execute($0) }, append: { _, _ in },
+        definitions: definitions, execute: { await probe.execute($0) }, append: { _, _ in },
         complete: { _ in "not committed" }, abort: { _ in await probe.abort() })
     await #expect(throws: WriterPermanentFixtureFailure.self) {
         try await WriterWorkflow(
@@ -2276,7 +2293,7 @@ private actor WriterPreviewProbe {
     func call(_ command: String, source: String = "writer", task: String = "task_1") -> FunctionInvocation {
         .init(
             call: .init(
-                actionPath: .init(domain: "Artifacts", module: "Workspace", function: "perform"),
+                actionPath: artifactFixturePath(command),
                 parameters: ["command": command, "taskID": task, "query": "流程"]),
             context: .init(source: source, sessionID: "library", inputID: "lookup", taskID: "delegate"),
             executionID: UUID().uuidString, results: ActionReportStore())
@@ -2325,9 +2342,8 @@ private actor WriterCohesionModel: ChatCapability {
                 let prompt = try #require(request.messages.first?.content)
                 #expect(prompt.contains(try AgentConfigurations.skillInstructions("writer-workspace")))
                 #expect(!prompt.contains(try AgentConfigurations.skillInstructions("writer-file-editing")))
-                let schema = String(decoding: request.tools[0].declaration, as: UTF8.self)
-                #expect(schema.contains("\"searchWorkspaces\""))
-                #expect(!schema.contains("\"edit\""))
+                #expect(request.tools.contains { $0.name == "searchWorkspaces" })
+                #expect(!request.tools.contains { $0.name == "edit" })
                 #expect(
                     !request.messages.contains {
                         $0.role == .user && $0.content.contains("Workspace: writer/" + target + "\n")
@@ -2347,7 +2363,14 @@ private actor WriterCohesionModel: ChatCapability {
                 sequence = ["searchWorkspaces", "ask", "enter", "read", "replace", "render", "finish"]
             case "clarify-workspace":
                 sequence = ["searchWorkspaces", "enter", "ask", "read", "replace", "render", "finish"]
-            case "switch-after-edit": sequence = ["searchWorkspaces", "create", "edit", "enter", "render", "finish"]
+            case "switch-after-edit":
+                sequence = [
+                    "searchWorkspaces", "create", "edit", "searchWorkspaces", "open", "enter", "read", "replace",
+                    "render",
+                    "finish",
+                ]
+            case "switch-failure":
+                sequence = ["searchWorkspaces", "create", "edit", "searchWorkspaces", "enter", "render", "finish"]
             case "open": sequence = ["searchWorkspaces", "open", "finish"]
             case "open-multiple": sequence = ["searchWorkspaces", "openBatch", "finish"]
             case "open-multiple-partial": sequence = ["searchWorkspaces", "openBatch", "summaryOnly", "finish"]
@@ -2355,24 +2378,37 @@ private actor WriterCohesionModel: ChatCapability {
             }
             let command = sequence[min(round - 1, sequence.count - 1)]
             if round > 1, ["enter", "create"].contains(commands.last ?? ""),
-                mode != "switch-after-edit" || commands.last == "create"
+                !mode.hasPrefix("switch-") || commands.last == "create"
             {
                 let prompt = try #require(request.messages.first?.content)
                 #expect(prompt.contains("Workspace editing domain"))
                 #expect(request.messages.count == 2 && !prompt.contains("Workspace library domain"))
-                #expect(!prompt.contains(try AgentConfigurations.skillInstructions("writer-workspace")))
+                #expect(prompt.contains(try AgentConfigurations.skillInstructions("writer-workspace")))
                 #expect(prompt.contains(try AgentConfigurations.skillInstructions("writer-file-editing")))
-                let schema = String(decoding: request.tools[0].declaration, as: UTF8.self)
-                #expect(!schema.contains("\"searchWorkspaces\""))
-                #expect(schema.contains("\"edit\""))
+                #expect(request.tools.contains { $0.name == "searchWorkspaces" })
+                #expect(request.tools.contains { $0.name == "edit" })
             }
             if mode == "clarify-workspace", commands.last == "ask" {
                 let prompt = try #require(request.messages.first?.content)
                 #expect(prompt.contains("Workspace editing domain"))
                 #expect(prompt.contains(try AgentConfigurations.skillInstructions("writer-file-editing")))
                 let tools = request.messages.flatMap(\.toolCalls)
-                #expect(!tools.contains { $0.argumentsJSON.contains("searchWorkspaces") })
-                #expect(tools.contains { $0.argumentsJSON.contains("ask") })
+                #expect(!tools.contains { $0.name == "searchWorkspaces" })
+                #expect(tools.contains { $0.name == "ask" })
+            }
+            if mode == "switch-after-edit", commands.last == "open" {
+                #expect(request.messages.first?.content.contains("Active workspace: writer/task_2") == true)
+                #expect(request.messages.last(where: { $0.role == .tool })?.content.contains("window_1") == true)
+            }
+            if mode == "switch-after-edit", commands.last == "enter" {
+                #expect(request.messages.first?.content.contains("Active workspace: writer/" + target) == true)
+                #expect(request.messages.contains { $0.content.contains("Previous draft retained") })
+            }
+            if mode == "switch-failure", commands.last == "enter" {
+                #expect(request.messages.first?.content.contains("Active workspace: writer/task_2") == true)
+                #expect(
+                    request.messages.contains { $0.role == .tool && $0.content.contains("Previous workspace restored") }
+                )
             }
             commands.append(command)
             if command == "summaryOnly" {
@@ -2389,11 +2425,11 @@ private actor WriterCohesionModel: ChatCapability {
                 for item in matches {
                     let id = try #require(item["taskID"])
                     if mode == "open-multiple-partial", id == "task_5" { continue }
-                    let args = ["command": "open", "taskID": id]
+                    let args = ["taskID": id]
                     try pair.emitter.yield(
                         .toolCall(
                             .init(
-                                id: "open-" + id, name: "workspace",
+                                id: "open-" + id, name: "open",
                                 argumentsJSON: String(decoding: try JSONEncoder().encode(args), as: UTF8.self))))
                 }
                 try pair.emitter.yield(.finished(.toolCalls))
@@ -2405,7 +2441,8 @@ private actor WriterCohesionModel: ChatCapability {
             case "enter", "open": args["taskID"] = target
             case "searchWorkspaces":
                 args["query"] =
-                    ["render-retry", "explanation-after-edit", "switch-after-edit"].contains(mode)
+                    ["render-retry", "explanation-after-edit", "switch-after-edit", "switch-failure"].contains(mode)
+                        && round == 1
                     ? "distinct new fixture" : mode.hasPrefix("open-multiple") ? "" : target
             case "create":
                 args["title"] = "New work"
@@ -2448,11 +2485,15 @@ private actor WriterCohesionModel: ChatCapability {
             case "declined": args = ["command": "finish", "outcome": "declined", "summary": "我无法执行外部下载。"]
             default: break
             }
+            var name = try #require(args["command"])
+            if mode == "read-before-enter", round == 1 { name = "open" }
             try pair.emitter.yield(
                 .toolCall(
                     .init(
-                        id: UUID().uuidString, name: "workspace",
-                        argumentsJSON: String(decoding: try JSONEncoder().encode(args), as: UTF8.self))))
+                        id: UUID().uuidString, name: name,
+                        argumentsJSON: String(
+                            decoding: try JSONEncoder().encode(
+                                writerFixtureToolArgs(args)), as: UTF8.self))))
             try pair.emitter.yield(.finished(.toolCalls))
         }
         pair.emitter.finish()
@@ -2468,7 +2509,7 @@ private actor WriterCohesionModel: ChatCapability {
         "explanation", "declined",
         "render-retry",
         "explanation-after-edit",
-        "switch-after-edit",
+        "switch-after-edit", "switch-failure",
     ])
 func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -2505,6 +2546,7 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
         present: { id, _, _, _, _ in
             await startup.mark()
             if mode == "open-multiple-partial", id.taskID != "task_1" { throw WindowError.capacity }
+            if mode == "switch-failure", id == workspaceID { throw WindowError.capacity }
             return #"{"status":"observed","windowID":"window_\#(id.taskID.dropFirst(5))"}"#
         })
     let writer = try WriterAgent(
@@ -2597,6 +2639,11 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
         }
         #expect(try await records.writerExecutions.tasks(agent: "writer", before: nil, limit: 50).count == 1)
         #expect(try await records.writerExecutions.request(old.delegateID, agent: "writer").status == "completed")
+    } else if mode == "switch-after-edit" {
+        #expect(current.taskID == old.id && content.artifactID == workspaceID.rawValue)
+        #expect(try await workspace.project(workspaceID).files["document.md"] == "# Final\nKEEP")
+        let earlier = try #require(WorkspaceID(rawValue: "writer/task_2"))
+        #expect(try await workspace.checkpoint(for: earlier)?.draft.files["document.md"] == "# Draft\nKEEP")
     } else if mode == "open" {
         #expect(current.taskID.isEmpty && content.artifactID == nil)
         #expect(await startup.shown)
@@ -2647,7 +2694,11 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
         let scopedRequests = requests.filter { $0.producerMetadata?["controlDomain"] == expectedDomain }
         #expect(!scopedRequests.isEmpty && scopedRequests.allSatisfy { $0.decisionMetadata?.taskID == current.taskID })
     }
-    if ["render-retry", "explanation-after-edit", "read-before-enter", "switch-after-edit"].contains(mode) {
+    if mode == "switch-after-edit" {
+        let prior = requests.filter { $0.producerMetadata?["controlDomain"] == "workspace:writer/task_2" }
+        #expect(!prior.isEmpty && prior.allSatisfy { $0.decisionMetadata?.taskID == "task_2" })
+    }
+    if ["render-retry", "explanation-after-edit", "read-before-enter", "switch-failure"].contains(mode) {
         #expect(calls.contains { $0.state == .failed })
     }
     let identities = Set(calls.map(\.providerID))

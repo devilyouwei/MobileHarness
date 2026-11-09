@@ -86,8 +86,9 @@ private actor WriterEvaluationChat: ChatCapability {
                         bytes += value.utf8.count
                         self.records[index]["response", default: ""] += value
                     case .toolCall(let call):
-                        try self.update(index, ["tool.\(call.id)": call.argumentsJSON])
-                        print("WRITER_TOOL \(index) \(call.argumentsJSON)")
+                        try self.update(
+                            index, ["tool.\(call.id)": call.argumentsJSON, "toolName.\(call.id)": call.name])
+                        print("WRITER_TOOL \(index) \(call.name) \(call.argumentsJSON)")
                     case .finished(let reason): try self.update(index, ["finish": String(describing: reason)])
                     case .usage(let usage): try self.update(index, ["usage": String(describing: usage)])
                     }
@@ -929,11 +930,8 @@ private func writerPromptCase(_ scenario: WriterPromptCase, env: [String: String
         try JSONEncoder().encode(archive.current).write(
             to: root.appendingPathComponent("history.json"), options: .atomic)
         let trace = await model.records
-        let arguments = trace.flatMap { record in
-            record.filter { $0.key.hasPrefix("tool.") }.map(\.value)
-        }
-        let commands = arguments.compactMap {
-            try? JSONDecoder().decode([String: String].self, from: Data($0.utf8))["command"]
+        let commands = trace.flatMap { record in
+            record.filter { $0.key.hasPrefix("toolName.") }.map(\.value)
         }
         item["commands"] = commands
         for command in scenario.requiredCommands ?? [] where !commands.contains(command) {

@@ -20,9 +20,11 @@ import Testing
     #expect(object["examples"] == nil)
     #expect(object["alias"] as? String == "save")
     #expect((object["parameters"] as? [[String: Any]])?.first?["required"] as? Bool == true)
+    let toolDeclarations = declarations + WriterLocalTools.declarations
+    #expect(Set(toolDeclarations.map(\.path)).count == toolDeclarations.count)
     for registry in try AgentConfigurations.skillRegistries() {
         for tool in registry.tools {
-            let declaration = try #require(declarations.first { $0.path.description == tool.path })
+            let declaration = try #require(toolDeclarations.first { $0.path.description == tool.path })
             #expect(tool.requiredParameters == Set(declaration.parameters.filter(\.required).map(\.name)))
         }
     }

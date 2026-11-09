@@ -84,4 +84,4 @@ OutputGateway binds only AgentMessageRepository for durable Agent communication.
 
 AgentConfigurations 校验 Catalog 索引的 v9 Agent 资源（description、身份、通信和 baseSkills），再投影为 AgentCore v7 的函数/通信配置。公开 description 由各角色维护，单条最多 2048 UTF-8 字节。delegationOverview 与任务执行共用 Communication/AgentTaskDelegation 的真实适配和调用者权限；总目录最多 8192 字节，超限或无效配置明确失败。它只组装公开介绍，不加载同伴私有指令；模型上下文采用当前实例的通信策略，实时可用性由 State 提供。
 
-AgentSkillLoader 共享依赖展开、函数绑定和教学读取。Skill 可声明 owner 限定运行时 Agent ID。共享发现仅列出无 owner 的 Skill，共享 Task/Skill 加载按同一规则校验根 Skill 和依赖。Agent 基础目录按可信配置身份解析；Writer 以自己的身份组合各控制域的 Skill。
+AgentSkillLoader 共享依赖展开、函数绑定和教学读取。Skill 可声明 owner 限定运行时 Agent ID。共享发现仅列出无 owner 的 Skill，共享 Task/Skill 加载按同一规则校验根 Skill 和依赖。Agent 基础目录按可信配置身份解析；Writer 以自己的身份组合各控制域的 Skill。共享目录也解析 Writer 专属的 Agent.Writer 工具声明，校验 Skill 所有者并为其生成同样的模型参数。Gateway 覆盖检查只要求外部执行入口，本地工具由 Writer 消费。

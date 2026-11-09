@@ -80,6 +80,12 @@ actor WriterPreview {
         old?.cancel()
         await old?.value
     }
+    func resetForWorkspace() async {
+        await settle()
+        unavailable = false
+        reported = false
+        failure = nil
+    }
     func stop() async {
         stopped = true
         await settle()

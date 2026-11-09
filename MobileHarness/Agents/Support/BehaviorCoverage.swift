@@ -17,6 +17,7 @@ public enum BehaviorCoverage {
                 else { throw HarnessError.forbiddenFunction }
             }
             for path in capability.tools.map(\.path) + capability.internalTools.map(\.path) {
+                if WriterLocalTools.contains(path) { continue }
                 guard catalog.entries.contains(where: { $0.path.description == path && $0.protocols.contains(.tool) })
                 else { throw HarnessError.forbiddenTool }
             }

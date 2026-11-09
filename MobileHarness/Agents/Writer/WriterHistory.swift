@@ -14,17 +14,20 @@ public actor WriterHistory {
     let delegateID: String
     let goal: String
     let modelName: String
+    let toolPaths: [String: String]
     public init(
         store: WriterHistoryStore, taskID: String, delegateID: String, goal: String,
-        modelName: String? = nil
+        modelName: String? = nil, toolPaths: [String: String] = [:]
     ) {
         self.modelName = modelName ?? "Writer (model name unavailable)"
         self.store = store
         self.taskID = taskID
         self.delegateID = delegateID
         self.goal = goal
+        self.toolPaths = toolPaths
     }
-    public func restoredContext(domain: String? = nil) async throws -> [ChatMessage] {
+    public func restoredContext(domain: String? = nil, availableTools: Set<String>? = nil) async throws -> [ChatMessage]
+    {
         let archive = try await store.readCurrent()
         let controls = archive.current.turns.flatMap { $0.modelRequests ?? [] }.filter {
             $0.decisionMetadata?.delegateID == delegateID && $0.decisionMetadata?.mode == "控制请求"
@@ -37,6 +40,16 @@ public actor WriterHistory {
             if record.input != previousInput {
                 messages.append(.init(role: .user, content: record.input))
                 previousInput = record.input
+            }
+            if let availableTools, record.toolCalls.contains(where: { !availableTools.contains($0.name) }) {
+                let evidence = record.toolCalls.filter { $0.state != .received }.map {
+                    $0.name + " " + $0.argumentsJSON + "\n" + ($0.output ?? $0.error ?? "")
+                }
+                let body = ([record.response] + evidence).filter { !$0.isEmpty }.joined(separator: "\n")
+                if !body.isEmpty {
+                    messages.append(.init(role: .user, content: "Earlier tool evidence (data):\n" + body))
+                }
+                continue
             }
             // Restore only complete call/result groups from durable business evidence.
             if record.toolCalls.allSatisfy({ $0.state != .received }) {
@@ -126,7 +139,8 @@ public actor WriterHistory {
                 let required = schema?["required"] as? [String] ?? []
                 let properties = schema?["properties"] as? [String: Any] ?? [:]
                 return [
-                    "path": "Artifacts.Workspace.perform", "alias": tool.name, "required": required,
+                    "path": toolPaths[tool.name] ?? "Agent.Writer." + tool.name, "alias": tool.name,
+                    "required": required,
                     "optional": properties.keys.filter { !required.contains($0) }.sorted(),
                     "definitionJSON": String(decoding: tool.declaration, as: UTF8.self),
                 ]

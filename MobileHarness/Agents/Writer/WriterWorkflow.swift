@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import FunctionContracts
 import ModelKit
 
 public enum WriterFailure: String, Error, Sendable {
@@ -9,7 +10,7 @@ public enum WriterFailure: String, Error, Sendable {
 /// Host ports bind authenticated request identity. Writer may select its work, never its execution owner.
 public struct WriterTools: Sendable {
     public let definitions: [ChatToolDefinition]
-    let library: ChatToolDefinition?
+    let library: [ChatToolDefinition]?
     public let execute: @Sendable (ChatToolCall) async throws -> WriterToolOutcome
     public let append: @Sendable (String, String) async throws -> Void
     public let complete: @Sendable (String) async throws -> String
@@ -22,7 +23,7 @@ public struct WriterTools: Sendable {
         complete: @escaping @Sendable (String) async throws -> String,
         abort: @escaping @Sendable (String) async throws -> Void,
         refresh: @escaping @Sendable () async -> Void = {},
-        library: ChatToolDefinition? = nil
+        library: [ChatToolDefinition]? = nil
     ) {
         self.definitions = definitions
         self.execute = execute
@@ -55,13 +56,58 @@ enum WriterControlDomain: String {
         return try AgentSkillLoader.expand(roots, owner: .writer)
     }
 
+    func registry() throws -> CapabilityRegistry {
+        try AgentConfigurations.registry(AgentSkillLoader.bindings(skillIDs(), owner: .writer))
+    }
+
+    func definitions(_ registry: CapabilityRegistry) throws -> [ChatToolDefinition] {
+        try registry.tools.map { tool in
+            guard let definition = tool.definition else { throw WriterFailure.invalidOutput }
+            return try ChatToolDefinition(declaration: JSONEncoder().encode(definition))
+        }
+    }
+
     func toolDefinitions(_ tools: WriterTools) -> [ChatToolDefinition] {
         switch self {
-        case .library: tools.library.map { [$0] } ?? []
+        case .library: tools.library ?? []
         case .editing: tools.definitions
         }
     }
 }
+enum WriterLocalTools {
+    static let declarations: [ActionDeclaration] = [
+        tool("ask", "Pause for essential user information.", [.init("question", description: "Brief question.")]),
+        tool(
+            "finish", "End the delegation in a separate tool round. Report actual results.",
+            [
+                .init("summary", description: "Brief factual completion summary."),
+                .init(
+                    "outcome", required: false,
+                    description: "Use explanation or declined before editing when appropriate.",
+                    values: ["artifact", "explanation", "declined"]),
+            ]),
+        tool(
+            "enter", "Enter a saved workspace for editing or switch to another saved workspace. Call alone.",
+            [
+                .init("taskID", description: "Saved task_N returned by searchWorkspaces.")
+            ]),
+        tool(
+            "create", "Create and enter an authorized new workspace. Call alone.",
+            [
+                .init("title", description: "Brief work title."),
+                .init("entry", description: "Relative HTML, Markdown or plain-text entry file."),
+            ]),
+    ]
+
+    static func contains(_ path: String) -> Bool {
+        declarations.contains { $0.path.description == path }
+    }
+
+    private static func tool(_ name: String, _ doc: String, _ parameters: [ActionParameter]) -> ActionDeclaration {
+        .init(path: .init(domain: "Agent", module: "Writer", function: name), doc: doc, parameters: parameters)
+    }
+}
+
 public struct WriterNeedsInput: Error, Sendable { public let question: String }
 public enum WriterToolOutcome: Sendable {
     case waiting(String)
@@ -129,7 +175,9 @@ public struct WriterWorkflow: Sendable {
         var workspace = initialWorkspace
         var domain = workspace?.domain ?? (tools.library == nil ? nil : "library")
         var controlDomain: WriterControlDomain = workspace == nil && tools.library != nil ? .library : .editing
-        let restored = try await history?.restoredContext(domain: domain) ?? []
+        let restored =
+            try await history?.restoredContext(
+                domain: domain, availableTools: Set(controlDomain.toolDefinitions(tools).map(\.name))) ?? []
         var messages = try Self.controlMessages(goal: goal, workspace: workspace, domain: controlDomain)
         messages += restored
         if !restored.isEmpty { messages.append(messages[1]) }
@@ -163,10 +211,7 @@ public struct WriterWorkflow: Sendable {
             messages.append(.init(role: .assistant, content: response.text, toolCalls: response.calls))
             let terminalCandidate =
                 response.calls.isEmpty
-                || response.calls.contains {
-                    let args = try? JSONDecoder().decode([String: String].self, from: Data($0.argumentsJSON.utf8))
-                    return ["finish", "enter", "create"].contains(args?["command"] ?? "")
-                }
+                || response.calls.contains { ["finish", "enter", "create"].contains($0.name) }
             let late = terminalCandidate ? try await revisions() : []
             if !late.isEmpty {
                 for call in response.calls {
@@ -195,7 +240,7 @@ public struct WriterWorkflow: Sendable {
                         role: .user,
                         content: """
                             Runtime observation: the delegation is still active. Continue any outstanding work, then call
-                            workspace with command=finish in a separate round and include a brief summary of the actual result.
+                            the finish tool in a separate round and include a brief summary of the actual result.
                             """))
                 await completeRound("等待模型提交结束委托的工具调用。", tools: tools)
                 continue
@@ -207,10 +252,7 @@ public struct WriterWorkflow: Sendable {
             var steps: [String] = []
             do {
                 if response.calls.count > 1,
-                    response.calls.contains(where: {
-                        let args = try? JSONDecoder().decode([String: String].self, from: Data($0.argumentsJSON.utf8))
-                        return ["finish", "ask", "enter", "create"].contains(args?["command"] ?? "")
-                    })
+                    response.calls.contains(where: { ["finish", "ask", "enter", "create"].contains($0.name) })
                 {
                     recoveryFailures += 1
                     for call in response.calls {
@@ -269,11 +311,15 @@ public struct WriterWorkflow: Sendable {
                     case .entered(let selected, let evidence):
                         try await history?.toolOutcome(call.id, output: evidence)
                         pending.remove(call.id)
+                        let switching = workspace != nil
                         workspace = selected
                         domain = selected.domain
                         controlDomain = .editing
                         messages = try Self.controlMessages(
                             goal: currentGoal, workspace: selected, domain: controlDomain)
+                        if switching {
+                            messages.append(.init(role: .user, content: "Workspace switch result (data): " + evidence))
+                        }
                         failedCalls.removeAll()
                         recoveryFailures = 0
                         previousSignature = nil
@@ -282,11 +328,7 @@ public struct WriterWorkflow: Sendable {
                         continue controlLoop
                     case .observation(let value):
                         observation = value
-                        if let args = try? JSONDecoder().decode(
-                            [String: String].self, from: Data(call.argumentsJSON.utf8)),
-                            ["replace", "move", "removeTree", "remove", "restore"].contains(
-                                args["command"] ?? "")
-                        {
+                        if ["replace", "move", "removeTree", "remove", "restore"].contains(call.name) {
                             failedCalls.removeAll()
                             recoveryFailures = 0
                         }
@@ -307,14 +349,12 @@ public struct WriterWorkflow: Sendable {
                         failedCalls.removeAll()
                         recoveryFailures = 0
                     }
-                    if let args = try? JSONDecoder().decode([String: String].self, from: Data(call.argumentsJSON.utf8)),
-                        ["render", "searchWorkspaces"].contains(args["command"] ?? "")
-                    {
+                    if ["render", "searchWorkspaces"].contains(call.name) {
                         // Rendering changes publication preconditions, even without changing source bytes.
                         // Do not reset the recovery budget or unblock unrelated failed effects.
                         failedCalls = failedCalls.filter { _, error in
                             guard let failure = error as? WriterToolFailure else { return true }
-                            if args["command"] == "searchWorkspaces" {
+                            if call.name == "searchWorkspaces" {
                                 return failure.context["condition"] != "workspaceSearchRequired"
                             }
                             return failure.context["command"] != "finish"
@@ -379,7 +419,7 @@ public struct WriterWorkflow: Sendable {
     private static func step(_ call: ChatToolCall, observation: String) -> String {
         let args = (try? JSONDecoder().decode([String: String].self, from: Data(call.argumentsJSON.utf8))) ?? [:]
         let label: String
-        switch args["command"] {
+        switch call.name {
         case "edit", "replace": label = "已更新文件"
         case "read": label = "已读取文件"
         case "list": label = "已查看目录"

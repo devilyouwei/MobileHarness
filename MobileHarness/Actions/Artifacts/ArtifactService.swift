@@ -65,14 +65,14 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
         if let owner, let session = sessions[owner], session.sessionID != invocation.context.sessionID {
             throw ActionExecutionError.invalidInvocation
         }
-        let lane: Lane = invocation.call.parameters["command"] == "preview" ? .observation : .mutation
+        let lane: Lane = invocation.call.actionPath.function == "preview" ? .observation : .mutation
         return try await run(delegateID: owner, lane: lane) {
             try await self.performAdmitted(invocation: invocation)
         }
     }
     private func performAdmitted(invocation: any FunctionInput) async throws -> String {
         let args = invocation.call.parameters
-        guard let command = args["command"] else { throw ArtifactWorkspaceError.missingFile }
+        let command = invocation.call.actionPath.function
         guard let delegateID = invocation.context.taskID, invocation.context.source == "writer" else {
             throw ActionExecutionError.invalidInvocation
         }
@@ -361,7 +361,7 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
             sessions[delegateID] = session
             return "Draft revision: \(session.generation). Rendering is execution evidence, not semantic acceptance.\n"
                 + result
-        case "finish":
+        case "publish":
             guard session.rendered, session.stream == nil, session.verification != "errors" else {
                 throw ArtifactWorkspaceError.renderRequired
             }

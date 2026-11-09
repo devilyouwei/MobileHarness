@@ -108,7 +108,7 @@ Writer 接收 task.request、task.input 和 task.cancel。工作区工具结果�
 
 Assistant 只发送 task.delegate(agent_id,description)，不分配 Writer workspace。Writer 接纳认证通信后创建委托入口消息，模型自主查询或选择。模型可以在选择工作区前用 finish(outcome=declined,summary) 拒绝无法完成的目标。拒绝理由通过持久 writer.completion 回报，使用未成功的运行时终态收尾。纯库操作可以完成而不创建 workspace；busy/waiting/paused/cleanup 不自动替换。
 
-create 和 enter 的触发请求在作品库落库并保留原身份。Writer 在历史写门内 checkpoint 后绑定编辑工作区。后续读取、编辑与发布使用该目标，模型消息携带 workspace_id。open 在作品库展示指定作品并记录窗口结果，同一轮可顺序执行最多八个 open。
+create 和 enter 的触发请求保留发起时的历史归属。Writer 在历史写门内 checkpoint 后绑定编辑工作区。后续读取、编辑与发布使用该目标，模型消息携带 workspace_id。open 展示指定作品并保持当前阶段，同一轮可顺序执行最多八个 open。
 
 writer_workspaces 保存 workspace 及文件 fence；writer_messages 保存委托入口、执行状态及完整消息。前序与 workspace 消息由字段区分，来源从持久化关联读取，不从当前请求兜底。Assistant 前台任务与 Writer 执行独立。
 
@@ -148,13 +148,13 @@ Complete tool observations are checkpointed before model projection. Only model-
 
 Code-format content streams (HTML/CSS/JS/JSON/SVG) validate the initial prefix across deltas. An outer Markdown code fence fails with writer.content.markdownWrapper before commit; abort joins, a fresh stream is allocated, and the existing bounded retry includes explicit raw-source feedback. Markdown and text keep legitimate fences. This checks source packaging, not language validity; WebKit render remains the execution check.
 
-Workspace parameters carry local descriptions and command enums (internal preview is not model-exposed). Character ranges are decimal offsets inside a fresh read reference. Omitting offsets replaces that read range. A positive read count selects the requested number of lines or characters. Edit instructions and related reads pass through to the content request without Writer-specific length or item quotas. Pre-dispatch invalidParameters becomes a repairable WriterToolFailure with validationCode and executed=false; undeclared fields are rejected rather than ignored. The common capability registry and Gateway remain unchanged. Instructions require the smallest goal-complete artifact and finish after successful checks, without unsolicited cosmetic rewriting.
+Each workspace tool has its own parameter schema projected from the registered function. The Writer runtime exposes its own control tools and authorizes internal preview and publication separately. Character ranges are decimal offsets inside a fresh read reference. Omitting offsets replaces that read range. A positive read count selects the requested number of lines or characters. Edit instructions and related reads pass through to the content request without Writer-specific length or item quotas. Pre-dispatch invalidParameters becomes a repairable WriterToolFailure with validationCode and executed=false; undeclared fields are rejected rather than ignored. The common capability registry and Gateway remain unchanged. Instructions require the smallest goal-complete artifact and finish after successful checks, without unsolicited cosmetic rewriting.
 
 `replace(path,reference,oldText,newText)` 校验当前文件读取引用、版本与范围，并要求oldText在范围内唯一匹配；失败不改草稿，空newText删除匹配。所有范围外字节保持原样，文件修改使原引用失效。此短补丁直接经Gateway执行，不启动第二次内容请求；成功后需要重新render。新建和大段改写继续使用edit源码流，不扩展原生参数边界。
 
 ## 请求可见性与快速收尾
 
-每个实际模型attempt在SQLite建立身份和producerMetadata后，调用模型前只更新Writer自己的任务岛，包含inputID、跨run累计number、phase、attempt和path。本地进度对应已经结束的模型生成及其实际步骤：控制请求成功准备编辑后汇报准备结果，再进入独立内容模型；内容提交及父工具结果持久化后汇报文件修改；普通控制轮在工具结果后汇报。进入下一模型请求前先加入已安排的最新预览，未改源码不额外重载。请求ID去重，同一请求不会因多个工具重复汇报；最终请求用终态，取消后迟到步骤不会覆盖取消状态。首画面与失败恢复仍报告实际事实，追问独立投递。收尾前处理已接纳补充，finish 的结果保存在该轮的工具调用和结果中。
+每个实际模型attempt在SQLite建立身份和producerMetadata后，调用模型前只更新Writer自己的任务岛，包含inputID、跨run累计number、phase、attempt和path。本地进度对应已经结束的模型生成及其实际步骤：控制请求成功准备编辑后汇报准备结果，再进入独立内容模型；内容提交及父工具结果持久化后汇报文件修改；普通控制轮在工具结果后汇报。进入下一模型请求前先加入已安排的最新预览，未改源码不额外重载。请求ID去重，同一请求不会因多个工具重复汇报；最终请求用终态，取消后迟到步骤不会覆盖取消状态。首画面与失败恢复仍报告实际事实，追问独立投递。收尾前处理已接纳补充，finish 的结果保存在该轮的工具调用和结果中。历史目录保存每个工具的真实地址和参数。恢复只向模型提供当前工具集可识别的调用配对，旧工具调用以历史事实的形式提供。
 
 指令要求最小满足目标、尽早产生可见主体，不添加未请求动画/图纸信息，不反复读取刚生成文件；窗口不可见记录验证受限并收尾。Provider输出默认值及现有有限恢复不变。WriterContainer提供轻量WriterRequestItem分页，完整内容按消息ID按需读取；任务摘要以受控对话创建时间和中立timelineCount查询计算总轮次，不以已加载页数计数。
 
@@ -200,9 +200,9 @@ WriterContainer 和 WriterAgent 在接纳前核对消息、任务、通信和日
 
 searchWorkspaces(query,before?) 在 SQLite 内匹配标题、描述或明确任务 ID。每页最多十二项，回传真实 title、taskID、entry、state 与可选 nextBefore。空查询用于用户明确要求浏览时的分页。同一搜索的返回 ID 才可用于 enter、open 和 delete，目标不清楚时使用 ask。
 
-create(title,entry) 显式创建目录与空草稿，临时占位由窗口呈现层拥有。enter 打开已有编辑目标。两个动作成功后切到编辑域，下一请求自动使用文件编辑 Skill。open 返回实际窗口结果并留在作品库。模型根据检索结果选出每个目标，再调用 open。搜索、打开或删除后，模型以单独的 finish 工具调用结束委托。文件编辑使用 render 与 publish 校验。
+create(title,entry) 显式创建目录与空草稿，临时占位由窗口呈现层拥有。enter 打开已有编辑目标。两个动作成功后切到编辑域，下一请求自动使用文件编辑 Skill。open 返回实际窗口结果并保持当前阶段。模型根据检索结果选择 open 或 enter。编辑阶段可通过 enter 切换到另一件作品，也可按用户授权创建并切换。Writer 加入旧预览、释放会话、保留草稿，然后准备新目标并替换 SQLite 活动绑定。失败时恢复旧编辑会话并要求重新读取；取消或恢复失败进入委托清理。finish 以单独调用结束委托，发布当前作品。文件编辑使用 render 与 publish 校验。
 
-作品库域使用 baseSkills 中的 [writer-workspace](../../Resources/Skills/WriterWorkspace/Skill.json)，编辑域使用 [writer-file-editing](../../Resources/Skills/WriterFileEditing/Skill.json)。两者均为 Writer 专属，通过共享资源加载器读取教学和绑定，使用同一个 canonical workspace Tool。控制域同时选择本轮 Skill 教学与 native schema，执行前按当前可信绑定状态重新校验命令与参数。追问或暂停后按同一绑定重建编辑 Skill，结束后下个任务从作品库域开始。原始文件内容使用独立的无工具请求。
+作品库域加载 [writer-workspace](../../Resources/Skills/WriterWorkspace/Skill.json)。编辑域加载 [writer-file-editing](../../Resources/Skills/WriterFileEditing/Skill.json)，通过 Skill 依赖保留作品库教学和工具。两份 Skill 经同一加载器声明本轮工具与教学；共享注册表生成 native schema。enter、create、ask 和 finish 由 Writer 本地执行，其他工具经 Gateway；执行前按当前域校验已声明的工具与参数。ask 使用 question，finish 使用 summary。原始文件内容使用独立的无工具请求。
 
 ## 私有指令与公开介绍
 

@@ -291,7 +291,7 @@ enum WriterRequestNaming {
         for call in calls {
             let args = (try? JSONDecoder().decode([String: String].self, from: Data(call.argumentsJSON.utf8))) ?? [:]
             let title: String
-            switch args["command"] {
+            switch call.name == "workspace" ? args["command"] : call.name {
             case "searchWorkspaces": title = "搜索作品库"
             case "create": title = "创建并进入工作区"
             case "enter": title = "进入已有工作区"

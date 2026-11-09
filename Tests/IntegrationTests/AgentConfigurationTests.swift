@@ -8,7 +8,8 @@ import Testing
 @Test(.actionCatalog, arguments: ["writer-workspace", "writer-file-editing"])
 func writerSkillsAreScopedToTheirOwner(id: String) throws {
     #expect(try AgentConfigurations.baseSkills(named: "Writer") == ["writer-workspace"])
-    #expect(try AgentSkillLoader.expand([id], owner: .writer) == [id])
+    let expected = id == "writer-workspace" ? [id] : ["writer-workspace", id]
+    #expect(try AgentSkillLoader.expand([id], owner: .writer) == expected)
     #expect(throws: AgentConfigurationError.self) { try AgentSkillLoader.expand([id], owner: .assistant) }
     #expect(throws: AgentConfigurationError.self) {
         try AgentSkillLoader.registry([id], fixed: CapabilityRegistry())
@@ -17,8 +18,21 @@ func writerSkillsAreScopedToTheirOwner(id: String) throws {
     #expect(overview.contains("photography"))
     #expect(!overview.contains(id))
     let capabilities = try AgentConfigurations.load(named: "Writer").capabilities
-    #expect(capabilities.tools.map(\.alias) == ["workspace"])
-    #expect(capabilities.tools.map(\.path) == ["Artifacts.Workspace.perform"])
+    #expect(
+        Set(capabilities.tools.map(\.alias)) == [
+            "searchWorkspaces", "open", "delete", "enter", "create", "ask", "finish",
+        ])
+    #expect(try capabilities.resolveTool("enter", arguments: ["taskID": "task_1"]).toolPath == "Agent.Writer.enter")
+    let editing = try WriterControlDomain.editing.registry()
+    #expect(Set(capabilities.tools.map(\.alias)).isSubset(of: Set(editing.tools.map(\.alias))))
+    #expect(try editing.resolveTool("finish", arguments: ["summary": "done"]).toolPath == "Agent.Writer.finish")
+    let writer = try WriterAgent.capabilities()
+    #expect(try writer.resolveTool("open", arguments: ["taskID": "task_1"]).toolPath == "Artifacts.Workspace.open")
+    #expect(throws: GenerationError.self) { try writer.resolveTool("open", arguments: [:]) }
+    #expect(throws: GenerationError.self) {
+        try writer.resolveTool("read", arguments: ["path": "document.md", "taskID": "task_1"])
+    }
+    #expect(throws: GenerationError.self) { try writer.resolveTool("publish", arguments: ["summary": "done"]) }
 }
 
 private func document() -> [String: Any] {

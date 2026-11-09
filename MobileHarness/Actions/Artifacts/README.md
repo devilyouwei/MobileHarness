@@ -2,7 +2,7 @@
 
 本目录拥有确定性文件编辑、格式验证、运行渲染和导出，不执行模型请求。ArtifactWorkspace使用StorageDatabase.WorkspaceStore协调当前目录与SQLite文件索引；StorageFiles拥有沙盒和原子文件操作。源码仅保存在agent/task_N/relative-path，不保存持久历史版本。支持HTML/CSS/JS/SVG/JSON/TXT/MD，不新增源码或任务累计配额。
 
-ArtifactsModule 暴露 Artifacts.Workspace.perform；Writer 通过 Gateway direct 原生 Tool 管理作品库和编辑作品；Assistant 只能委派，不暴露作品库 Action，服务拒绝其直接调用。Writer 的可信 delegateID 绑定编辑会话，agent/taskID 定位持久工作区，模型参数不能更改所有者。ArtifactService 拥有单项会话准入及项目单写锁；ArtifactEditing 拥有单流、按文件版本失效的读取引用和范围修改。remove 要求有效读取引用且禁止入口删除。完整文件内容通过中立 ArtifactStreaming 端口背压追加，不通过 Tool 参数。发布要求最新草稿已进行显式渲染，存在已报告的运行错误时拒绝发布；窗口不可见时显式返回不能进行视觉验证，不能把保存等同视觉验收。
+ArtifactsModule 从 WorkspaceActions 的声明表注册独立的 Artifacts.Workspace 函数。Writer 通过 Gateway direct 调用作品库检索、打开、删除、文件读写和渲染。start/resume/describe/preview/publish 由 Writer 运行时授权并调用。函数地址选择实际操作，各操作有独立的参数声明。Assistant 只能委派，不暴露作品库 Action，服务拒绝其直接调用。Writer 的可信 delegateID 绑定编辑会话，agent/taskID 定位持久工作区，模型参数不能更改所有者。ArtifactService 拥有单项会话准入及项目单写锁；ArtifactEditing 拥有单流、按文件版本失效的读取引用和范围修改。remove 要求有效读取引用且禁止入口删除。完整文件内容通过中立 ArtifactStreaming 端口背压追加，不通过 Tool 参数。发布要求最新草稿已进行显式渲染，存在已报告的运行错误时拒绝发布；窗口不可见时显式返回不能进行视觉验证，不能把保存等同视觉验收。
 
 ## 执行与续写生命周期
 
@@ -69,7 +69,7 @@ replace使用fresh read引用约束字面旧文本，唯一匹配后原子替换
 
 
 
-Writer library open/delete derives WorkspaceID from taskID. Each open uses the selected project gate and reports its own window result. Writer may call it for multiple catalog matches. Library inventory includes owner/task/title/entry/state. Runtime-only workspaceID remains a deterministic compound value for Writer setup and UI file previews, not another allocated identity.
+Writer library open/delete derives WorkspaceID from taskID. ArtifactService uses the canonical function name to select the operation. Each open uses the selected project gate and reports its own window result. Writer may call it for multiple catalog matches. Library inventory includes owner/task/title/entry/state. Runtime-only workspaceID remains a deterministic compound value for Writer setup and UI file previews, not another allocated identity.
 
 ## Current workspace persistence
 

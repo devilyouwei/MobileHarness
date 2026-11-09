@@ -7,7 +7,7 @@ public struct BehaviorProtocolBindings {
     public static func bind(_ function: ActionFunction) throws -> ActionBinding {
         if function.path.domain == "Artifacts" {
             return ActionBinding(
-                function: function, protocols: [.action, .tool], executionPolicy: .direct,
+                function: function, protocols: [.tool], executionPolicy: .direct,
                 directResultPolicy: .returning)
         }
         if function.path.domain == "Web" {

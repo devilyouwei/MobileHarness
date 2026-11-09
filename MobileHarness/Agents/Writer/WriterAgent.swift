@@ -57,27 +57,20 @@ public actor WriterAgent: Agent {
     private var workspaceContexts: [String: WriterWorkspaceContext] = [:]
     private var processed = 0
     private var sequence: UInt64 = 0
-    public static let parameters: Set<String> = [
-        "workspaceID", "createWorkspace", "title", "subtitle", "entry", "path", "offset", "query", "before",
-        "reference", "start",
-        "end",
-        "instruction", "summary", "outcome",
-        "line", "limit", "contextReferences", "destination", "savepoint", "oldText", "newText", "taskID",
-    ]
-    private static let workspaceAlias = "workspace"
+    private static let workspacePath = "Artifacts.Workspace."
+    private static let internalWorkspaceTools = ["start", "resume", "describe", "preview", "publish"]
 
     public static func capabilities() throws -> CapabilityRegistry {
-        let library = try AgentSkillLoader.bindings(WriterControlDomain.library.skillIDs(), owner: .writer)
-        let editing = try AgentSkillLoader.bindings(WriterControlDomain.editing.skillIDs(), owner: .writer)
-        let configured = try AgentConfigurations.load(named: "Writer").capabilities
-        guard library == editing, configured.actions.isEmpty, configured.tools.map(\.alias) == [workspaceAlias],
-            configured.tools.first?.path == "Artifacts.Workspace.perform"
-        else {
-            throw AgentConfigurationError.invalidField("Writer workspace Skill binding")
-        }
+        let editing = try WriterControlDomain.editing.registry()
+        let lifecycle = try AgentConfigurations.registry(
+            internalWorkspaceTools.map {
+                .init(path: workspacePath + $0, callType: "tool", alias: $0, channel: nil)
+            })
         return try CapabilityRegistry(
-            tools: configured.tools,
-            internalTools: [
+            tools: editing.tools.filter { !WriterLocalTools.contains($0.path) },
+            internalTools: lifecycle.tools.map {
+                .init(path: $0.path, required: $0.requiredParameters, optional: $0.optionalParameters)
+            } + [
                 .init(path: "UI.Island.present", required: ["activityID", "revision", "content"]),
                 .init(path: "UI.Island.end", required: ["activityID", "revision"]),
             ])
@@ -395,7 +388,7 @@ public actor WriterAgent: Agent {
         var failure: (any Error)?
         var result = ""
         let preview = WriterPreview(
-            present: { try await self.execute(["command": "preview"], input: input) },
+            present: { try await self.execute("preview", input: input) },
             observed: { text in await self.updateProgress(text, input: input) })
         previews[scope.id] = preview
         await preview.setSceneActive(sceneActive)
@@ -432,7 +425,9 @@ public actor WriterAgent: Agent {
                 history: history.map {
                     WriterHistory(
                         store: $0, taskID: stableTaskID, delegateID: scope.id,
-                        goal: goal, modelName: acquired.modelName)
+                        goal: goal, modelName: acquired.modelName,
+                        toolPaths: Dictionary(
+                            uniqueKeysWithValues: descriptor.capabilities.tools.map { ($0.alias, $0.path) }))
                 }, diagnostics: diagnosticCapture,
                 requestProgress: { fact in
                     let text =
@@ -599,116 +594,36 @@ public actor WriterAgent: Agent {
         updates[id] = []
         return value
     }
-    private static func parameterDescription(_ key: String) -> String {
-        switch key {
-        case "command": return "Operation name; use only a declared command."
-        case "taskID": return "enter/open/delete: saved task_N returned by searchWorkspaces."
-        case "before": return "Workspace search cursor returned as nextBefore. Omit for the first page."
-        case "outcome":
-            return
-                "finish only: artifact (default) publishes edited files; explanation explicitly ends without an artifact, only before file operations; declined declines an infeasible assignment with a reason before entering a workspace."
-        case "path":
-            return
-                "Project-relative path or directory prefix. Use ASCII letters, digits, dots, underscores and hyphens, e.g. assets/index.html."
-        case "line": return "read only: 1-based decimal line number as a string, e.g. 1."
-        case "limit":
-            return
-                "Positive decimal read count: lines with line, characters with offset. Follow nextOffset for subsequent character reads."
-        case "query": return "Literal keyword for workspace search or literal text for source search."
-        case "offset": return "Nonnegative decimal string from nextOffset for pagination; never source text."
-        case "start", "end":
-            return
-                "Optional absolute Unicode character offset as a decimal string, within the referenced range. NEVER a selector, anchor, source string or line number. Prefer omitting both and replacing the exact read range."
-        case "reference":
-            return
-                "Fresh read_N reference returned by read for this file. edit replaces exactly that read range, not necessarily the whole file."
-        case "oldText": return "replace only: exact nonempty text copied from the fresh read range; must match once."
-        case "newText":
-            return
-                "replace only: exact replacement for oldText. Empty string deletes it. All surrounding bytes are preserved."
-        case "instruction":
-            return
-                "Change request for the separate content writer. Describe the edit and the selected range; the content writer generates the source."
-        case "contextReferences": return "Comma-separated fresh read_N references for related files."
-        case "destination": return "move only: new project-relative path; read every affected source file first."
-        case "savepoint": return "ID returned by savepoint, used by diff/restore."
-        case "summary": return "Brief user-language completion summary for finish, or essential question for ask."
-        case "entry": return "Project entry path. Usually omit to preserve the existing entry."
-        case "workspaceID": return "Host-bound project identity; omit, the runtime supplies it."
-        case "title":
-            return
-                "Concise user-language artifact name, e.g. 软件工程流程图. Supply on create or an explicit rename."
-        default: return "Workspace operation parameter."
-        }
-    }
-    private static let libraryCommands = [
-        "searchWorkspaces", "enter", "create", "open", "delete", "ask", "finish",
-    ]
-    private static let editingCommands = [
-        "list", "read", "search", "edit", "replace", "remove", "move", "removeTree", "diff", "savepoint", "restore",
-        "rename", "render", "finish", "ask",
-    ]
-    private static func toolDefinition(domain: WriterControlDomain, description: String) throws -> ChatToolDefinition {
-        let (commands, keys) = commandProfile(domain)
-        var properties: [String: Any] = [:]
-        for key in keys {
-            properties[key] = ["type": "string", "description": parameterDescription(key)]
-        }
-        properties["command"] = [
-            "type": "string", "description": parameterDescription("command"), "enum": commands,
-        ]
-        return try ChatToolDefinition(
-            declaration: JSONSerialization.data(withJSONObject: [
-                "type": "function",
-                "function": [
-                    "name": workspaceAlias, "description": description,
-                    "parameters": [
-                        "type": "object", "properties": properties, "required": ["command"],
-                        "additionalProperties": false,
-                    ],
-                ],
-            ]))
-    }
-    private static let libraryKeys: Set<String> = ["query", "before", "taskID", "title", "entry", "summary", "outcome"]
-    private static let editingKeys = parameters.subtracting(
-        ["createWorkspace", "subtitle", "workspaceID", "taskID", "before", "entry", "outcome"])
-    private static func commandProfile(_ domain: WriterControlDomain) -> ([String], Set<String>) {
-        switch domain {
-        case .library: (libraryCommands, libraryKeys)
-        case .editing: (editingCommands, editingKeys)
-        }
-    }
     private func toolPorts(input: AgentInput, preview: WriterPreview) throws -> WriterTools {
-        let library = try Self.toolDefinition(
-            domain: .library,
-            description: """
-                Search the catalog, open selected works without entering them, or enter one to edit. Call open for each selected
-                taskID. Multiple open calls can run in one round. Enter, create and finish run alone.
-                """)
-        let editing = try Self.toolDefinition(
-            domain: .editing,
-            description: """
-                Edit the active workspace. Read returns a versioned range and reference. Use contextReferences for related
-                ranges. Edit streams source in a separate request. Replace requires one exact match in the selected range.
-                Move and removeTree require reading the affected files. Savepoint, diff and restore operate on the current
-                draft. Render the latest draft before finish. The window follows the entry through automatic preview.
-                """)
+        let library = try WriterControlDomain.library.registry()
+        let editing = try WriterControlDomain.editing.registry()
+        let editingTools = try WriterControlDomain.editing.definitions(editing)
+        let libraryTools = try WriterControlDomain.library.definitions(library)
         guard let delegateID = input.taskScope?.id else { throw CommunicationError.unauthorized }
         return WriterTools(
-            definitions: [editing],
+            definitions: editingTools,
             execute: { call in
                 let args = try JSONDecoder().decode([String: String].self, from: Data(call.argumentsJSON.utf8))
-                let operation = try await self.validateCommand(args, delegateID: delegateID)
+                let inLibrary = await self.workspaceContexts[delegateID] == nil
+                let resolved: ToolCall
+                do {
+                    resolved = try (inLibrary ? library : editing).resolveTool(call.name, arguments: args)
+                } catch {
+                    throw WriterToolFailure(
+                        "Invalid tool or parameters for the current phase. Follow the active tool schema.",
+                        context: ["command": call.name, "validationCode": "invalidParameters", "executed": "false"])
+                }
+                let operation = String(resolved.toolPath.split(separator: ".").last ?? "")
                 if operation == "ask" {
-                    guard let question = args["summary"], !question.isEmpty, question.utf8.count <= 2048 else {
+                    guard let question = args["question"], !question.isEmpty, question.utf8.count <= 2048 else {
                         throw WriterFailure.invalidOutput
                     }
                     return .waiting(question)
                 }
                 if ["searchWorkspaces", "enter", "create", "open", "delete"].contains(operation) {
-                    return try await self.libraryCall(operation, args: args, input: input)
+                    return try await self.libraryCall(operation, args: args, input: input, preview: preview)
                 }
-                if ["render", "finish", "restore"].contains(args["command"] ?? "") {
+                if ["render", "finish", "restore"].contains(operation) {
                     await preview.settle()
                 }
                 let captions = [
@@ -721,30 +636,30 @@ public actor WriterAgent: Agent {
                     await self.updateSubtitle(caption + (args["path"].map { " · " + $0 } ?? ""), input: input)
                 }
                 let response =
-                    args["command"] == "finish"
+                    operation == "finish"
                     ? try await self.finalize(
-                        args["summary"] ?? (args["outcome"] == "declined" ? "" : "作品已完成"),
+                        args["summary"] ?? "",
                         input: input, outcome: args["outcome"] ?? "artifact")
-                    : try await self.execute(args, input: input)
+                    : try await self.execute(operation, args: args, input: input)
                 if ["replace", "move", "remove", "removeTree", "restore"].contains(
-                    args["command"] ?? "")
+                    operation)
                 {
                     await preview.changed()
                 }
-                if args["command"] == "edit" {
+                if operation == "edit" {
                     let value = try JSONDecoder().decode([String: String].self, from: Data(response.utf8))
                     guard let id = value["streamID"], let instruction = value["instruction"],
                         let context = value["context"]
                     else { throw WriterFailure.invalidOutput }
                     return .write(streamID: id, instruction: instruction, context: context)
                 }
-                if args["command"] == "render" {
+                if operation == "render" {
                     if let bytes = try await self.streaming.snapshot(delegateID: delegateID) {
                         return .visual(response, try ChatImage(id: UUID().uuidString, data: bytes))
                     }
                     return .observation(response + "\nScreenshot unavailable; do not claim visual verification.")
                 }
-                if args["command"] == "finish" { return .finished(response) }
+                if operation == "finish" { return .finished(response) }
                 return .observation(response)
             },
             append: { [streaming] id, text in
@@ -760,28 +675,18 @@ public actor WriterAgent: Agent {
                 await preview.settle()
                 try await streaming.abort(streamID: id, delegateID: delegateID)
             },
-            refresh: { await preview.flush() }, library: library)
-    }
-    private func validateCommand(_ args: [String: String], delegateID: String) throws -> String {
-        let (commands, keys) = Self.commandProfile(workspaceContexts[delegateID] == nil ? .library : .editing)
-        guard let command = args["command"], commands.contains(command),
-            Set(args.keys).subtracting(["command"]).isSubset(of: keys)
-        else {
-            throw WriterToolFailure(
-                "Command or parameters are unavailable in this domain. Use the active tool schema.",
-                context: ["validationCode": "invalidParameters", "executed": "false"])
-        }
-        return command
+            refresh: { await preview.flush() }, library: libraryTools)
     }
     private struct WorkspaceSearchResult: Decodable {
         let matches: [[String: String]]
     }
-    private func libraryCall(_ command: String, args: [String: String], input: AgentInput) async throws
+    private func libraryCall(_ command: String, args: [String: String], input: AgentInput, preview: WriterPreview)
+        async throws
         -> WriterToolOutcome
     {
         guard let id = input.taskScope?.id, let request = requests[id] else { throw CommunicationError.unauthorized }
         if command == "searchWorkspaces" {
-            let result = try await execute(args, input: input)
+            let result = try await execute(command, args: args, input: input)
             let page = try JSONDecoder().decode(WorkspaceSearchResult.self, from: Data(result.utf8))
             if args["before"] == nil { searchMatches[id] = [] }
             searchMatches[id, default: []].formUnion(page.matches.compactMap { $0["taskID"] })
@@ -799,13 +704,15 @@ public actor WriterAgent: Agent {
             else { throw WriterToolFailure("Supply a title and relative entry file path to create a workspace.") }
             completedLibraryOperations.remove(id)
             let allocation: WriterWorkspaceRecord
-            if let reserved = request.taskID {
+            if workspaceContexts[id] != nil, let current = request.taskID {
+                allocation = try await tasks.createWorkspace(requestID: id, title: title, replacing: current)
+            } else if let reserved = request.taskID {
                 allocation = try await tasks.task(reserved, agent: "writer")
             } else {
                 allocation = try await tasks.createWorkspace(requestID: id, title: title)
                 requests[id]?.taskID = allocation.id
             }
-            return try await enterEditing(allocation, input: input, resuming: false, title: title, entry: entry)
+            return try await selectEditing(allocation, input: input, preview: preview, title: title, entry: entry)
         }
         guard let taskID = args["taskID"], matches.contains(taskID) else {
             throw WriterToolFailure(
@@ -813,14 +720,17 @@ public actor WriterAgent: Agent {
                 context: ["condition": "workspaceSearchRequired"])
         }
         if command == "open" || command == "delete" {
-            let result = try await execute(args, input: input)
+            if command == "delete", workspaceContexts[id] != nil, request.taskID == taskID {
+                throw WriterToolFailure("Switch to a different workspace before deleting the active work.")
+            }
+            let result = try await execute(command, args: args, input: input)
             completedLibraryOperations.insert(id)
             if command == "delete" { searchMatches[id]?.remove(taskID) }
             return .observation(result)
         }
         completedLibraryOperations.remove(id)
         let allocation = try await tasks.task(taskID, agent: "writer")
-        return try await enterEditing(allocation, input: input, resuming: false)
+        return try await selectEditing(allocation, input: input, preview: preview)
     }
 
     private func finalize(_ summary: String, input: AgentInput, outcome: String = "artifact") async throws -> String {
@@ -857,12 +767,46 @@ public actor WriterAgent: Agent {
         }
         finalizing.insert(id)
         defer { finalizing.remove(id) }
-        do { return try await execute(["command": "finish", "summary": summary], input: input) } catch let error
+        do { return try await execute("publish", args: ["summary": summary], input: input) } catch let error
             as WriterToolFailure
         {
             if error.description.contains("renderRequired") { throw error }
             throw WriterCleanupFailure(
                 primary: error, cleanup: WriterToolFailure("Publication outcome uncertain; never replay."))
+        }
+    }
+
+    private func selectEditing(
+        _ target: WriterWorkspaceRecord, input: AgentInput, preview: WriterPreview,
+        title: String? = nil, entry: String? = nil
+    ) async throws -> WriterToolOutcome {
+        guard let id = input.taskScope?.id else { throw CommunicationError.unauthorized }
+        guard let previous = workspaceContexts[id], let previousTask = requests[id]?.taskID else {
+            return try await enterEditing(target, input: input, resuming: false, title: title, entry: entry)
+        }
+        if previous.workspaceID == target.workspaceID {
+            return .observation(
+                "This workspace is already active. Existing read references and savepoints still apply.")
+        }
+        let priorAllocation = try await tasks.task(previousTask, agent: "writer")
+        await preview.resetForWorkspace()
+        try await streaming.release(delegateID: id)
+        try Task.checkCancellation()
+        do {
+            return try await enterEditing(target, input: input, resuming: false, title: title, entry: entry)
+        } catch {
+            let primary = error
+            try Task.checkCancellation()
+            do {
+                try await streaming.release(delegateID: id)
+                _ = try await enterEditing(priorAllocation, input: input, resuming: true)
+            } catch {
+                throw WriterCleanupFailure(primary: primary, cleanup: error)
+            }
+            throw WriterToolFailure(
+                "Switch failed. Previous workspace restored; reread files for fresh references. "
+                    + String(describing: primary),
+                context: ["command": "enter"])
         }
     }
 
@@ -872,13 +816,13 @@ public actor WriterAgent: Agent {
     ) async throws -> WriterToolOutcome {
         guard let id = input.taskScope?.id, let request = requests[id] else { throw CommunicationError.unauthorized }
         var start = [
-            "command": resuming ? "resume" : "start", "workspaceID": allocation.workspaceID,
+            "workspaceID": allocation.workspaceID,
             "createWorkspace": allocation.workspaceReady ? "false" : "true",
         ]
         start["title"] = title
         start["entry"] = entry
         start["subtitle"] = request.goal ?? request.request
-        let response = try await execute(start, input: input)
+        let response = try await execute(resuming ? "resume" : "start", args: start, input: input)
         preparedWorkspaces.insert(id)
         let outcome = try await bindWorkspace(allocation, evidence: response, input: input)
         return outcome
@@ -893,11 +837,24 @@ public actor WriterAgent: Agent {
         else { throw WriterFailure.invalidOutput }
         let context = WriterWorkspaceContext(
             workspaceID: allocation.workspaceID, title: title, entry: entry, presentationStatus: status)
-        let bind: @Sendable () async throws -> Void = { [tasks] in
-            try await tasks.prepareWorkspace(
-                allocation.workspaceID, taskID: allocation.id, delegateID: scope.id, agent: "writer")
+        let previous = workspaceContexts[scope.id].flatMap { _ in requests[scope.id]?.taskID }
+        var result = evidence
+        if let previous, previous != allocation.id {
+            var details = data
+            details["previousTaskID"] = previous
+            details["previousWorkspace"] =
+                "Previous draft retained. Its read references and savepoints are no longer active."
+            result = String(decoding: try JSONEncoder().encode(details), as: UTF8.self)
         }
-        if workspaceContexts[scope.id] == nil {
+        let bind: @Sendable () async throws -> Void = { [tasks] in
+            if let previous {
+                try await tasks.switchWorkspace(requestID: scope.id, from: previous, to: allocation.id)
+            } else {
+                try await tasks.prepareWorkspace(
+                    allocation.workspaceID, taskID: allocation.id, delegateID: scope.id, agent: "writer")
+            }
+        }
+        if previous != allocation.id {
             if let history { try await history.bindingWorkspace(bind) } else { try await bind() }
         }
         requests[scope.id]?.taskID = allocation.id
@@ -905,34 +862,25 @@ public actor WriterAgent: Agent {
         workspaceContexts[scope.id] = context
         if let window = data["windowID"], !window.isEmpty {
             windowIDs[scope.id] = window
+        } else if previous != allocation.id {
+            windowIDs.removeValue(forKey: scope.id)
         }
         let summary =
             windowIDs[scope.id] != nil && ["preview", "observed", "errors"].contains(status)
             ? "已打开作品窗口。" : "已进入工作区。窗口呈现状态：\(status)。"
         await updateProgress(summary, input: input)
-        return .entered(context, evidence: evidence)
+        return .entered(context, evidence: result)
     }
-    private func workspaceCall(_ arguments: [String: String]) throws -> ToolCall {
-        let call: ToolCall
-        do {
-            call = try descriptor.capabilities.resolveTool(Self.workspaceAlias, arguments: arguments)
-        } catch GenerationError
-            .invalidParameters
-        {
-            let unknown = Set(arguments.keys).subtracting(Self.parameters.union(["command"]))
-            throw WriterToolFailure(
-                "Invalid workspace parameters. Remove undeclared fields: " + unknown.sorted().joined(separator: ", ")
-                    + ". Follow the declared schema.",
-                context: [
-                    "command": arguments["command"] ?? "", "path": arguments["path"] ?? "",
-                    "validationCode": "invalidParameters", "executed": "false",
-                ])
-        }
-        return call
-    }
-    private func execute(_ arguments: [String: String], input: AgentInput) async throws -> String {
+    private func execute(_ operation: String, args: [String: String] = [:], input: AgentInput) async throws -> String {
         guard let consumer else { throw WriterFailure.unavailable }
-        let call = try workspaceCall(arguments)
+        let path = Self.workspacePath + operation
+        let capabilities = descriptor.capabilities
+        let call: ToolCall
+        if let internalTool = capabilities.internalTools.first(where: { $0.path == path }) {
+            call = try internalTool.call(args)
+        } else {
+            call = try capabilities.resolveTool(operation, arguments: args)
+        }
         sequence += 1
         let output = OutputEnvelope(
             source: .writer, context: input.context, output: .toolCall(call), sequence: sequence,
@@ -940,9 +888,9 @@ public actor WriterAgent: Agent {
         let result = try await consumer.executeReturning(output)
         if result.isCancellationOnly { throw CancellationError() }
         guard !result.isError, let response = result.tool else {
-            var details = ["tool": "Artifacts.Workspace.perform"]
-            details["command"] = arguments["command"]
-            details["path"] = arguments["path"]
+            var details = ["tool": path]
+            details["command"] = operation == "publish" ? "finish" : operation
+            details["path"] = args["path"]
             details["dispatchFailure"] = result.failureCode?.rawValue
             details["toolFailureCode"] = result.tool?.failureCode?.rawValue
             if result.failureCode != nil { details["repairable"] = "false" }
@@ -952,8 +900,9 @@ public actor WriterAgent: Agent {
     }
     private func updateSubtitle(_ text: String, input: AgentInput) async {
         guard let run = input.taskScope?.id, preparedWorkspaces.contains(run) else { return }
-        do { _ = try await execute(["command": "describe", "subtitle": String(text.prefix(160))], input: input) } catch
-        { deliveryFailures[run] = "窗口状态尚未更新：" + String(String(describing: error).prefix(256)) }
+        do { _ = try await execute("describe", args: ["subtitle": String(text.prefix(160))], input: input) } catch {
+            deliveryFailures[run] = "窗口状态尚未更新：" + String(String(describing: error).prefix(256))
+        }
     }
     private func updateProgress(_ text: String, input: AgentInput, updateWindow: Bool = true) async {
         guard let id = input.taskScope?.id, requests[id] != nil, waiting[id] == nil, !cancelling.contains(id)

@@ -114,7 +114,9 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
         }
     }
     #expect(await assembly.tools.handler(for: "Agent.Task.startTask") == nil)
-    #expect(await assembly.tools.handler(for: "Artifacts.Workspace.perform") != nil)
+    #expect(await assembly.tools.handler(for: "Artifacts.Workspace.open") != nil)
+    #expect(await assembly.tools.handler(for: "Artifacts.Workspace.read") != nil)
+    #expect(await assembly.tools.handler(for: "Artifacts.Workspace.perform") == nil)
     try BehaviorCoverage.validate(
         actions: assembly.actions, toolPaths: assembly.toolPaths,
         capabilities: [

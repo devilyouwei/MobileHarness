@@ -4,6 +4,9 @@ import StorageCore
 public protocol WriterExecutionRepository: Sendable {
     var storageScope: UUID { get }
     func createWorkspace(requestID: String, title: String) async throws -> WriterWorkspaceRecord
+    func createWorkspace(requestID: String, title: String, replacing previousTaskID: String) async throws
+        -> WriterWorkspaceRecord
+    func switchWorkspace(requestID: String, from previousTaskID: String, to taskID: String) async throws
     func delegations(before: UInt64?, limit: Int) async throws -> [WriterRequestRecord]
     func delegationCount() async throws -> Int
     func selectWorkspace(requestID: String, taskID: String) async throws -> WriterWorkspaceRecord
@@ -36,6 +39,14 @@ extension WriterExecutionRepository {
     }
     public func delegationCount() async throws -> Int { throw RecordStorageError.invalidRecord }
     public func createWorkspace(requestID: String, title: String) async throws -> WriterWorkspaceRecord {
+        throw RecordStorageError.invalidRecord
+    }
+    public func createWorkspace(requestID: String, title: String, replacing previousTaskID: String) async throws
+        -> WriterWorkspaceRecord
+    {
+        throw RecordStorageError.invalidRecord
+    }
+    public func switchWorkspace(requestID: String, from previousTaskID: String, to taskID: String) async throws {
         throw RecordStorageError.invalidRecord
     }
     public func selectWorkspace(requestID: String, taskID: String) async throws -> WriterWorkspaceRecord {

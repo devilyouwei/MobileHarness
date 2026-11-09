@@ -80,6 +80,9 @@ public enum AgentConfigurations {
             guard version == 3, revision > 0, owner.map({ ActionIdentifier.validName($0) }) ?? true,
                 dependencies.count <= 16,
                 useActions.count <= 128, Set(useActions.map(\.path)).count == useActions.count,
+                useActions.allSatisfy({ binding in
+                    !WriterLocalTools.contains(binding.path) || (owner == "writer" && binding.callType == "tool")
+                }),
                 useStates.count <= 16, Set(useStates).count == useStates.count,
                 useStates.allSatisfy({
                     !$0.isEmpty && $0.utf8.count <= 256 && $0.split(separator: ".").count >= 2 && !$0.hasPrefix(".")
@@ -309,7 +312,8 @@ public enum AgentConfigurations {
             guard
                 let declaration = binding.path == "Agent.Communication.send"
                     ? AgentTaskCommunication.sendDeclaration
-                    : definitions.first(where: { $0.path.description == binding.path }),
+                    : definitions.first(where: { $0.path.description == binding.path })
+                        ?? WriterLocalTools.declarations.first(where: { $0.path.description == binding.path }),
                 ["action", "tool"].contains(binding.callType)
             else {
                 throw AgentConfigurationError.invalidField(binding.path)

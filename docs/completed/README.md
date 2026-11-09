@@ -136,3 +136,7 @@
 - [Writer 批量打开作品与网页多窗口](Writer-and-Web-Multiwindow.md)（2026-11-09）。批量打开、多窗口及定向换站的调查和检查见[验证记录](../validation/Writer-and-Web-Multiwindow.md)。
 
 - [Writer 显式结束委托与通用作品打开](Writer-Explicit-Finish-and-Open.md)（2026-11-09）。统一 finish，按模型选定的作品逐件打开。
+
+- [Writer 工具注册拆分](Writer-Tool-Separation.md)（2026-11-09）。各操作独立注册，Writer 保有委托与编辑会话编排。
+
+- [Writer Skill 统一注册与工作区切换](Writer-Skill-Registration-and-Switching.md)（2026-11-09）。两阶段由 Skill 声明工具与教学，支持保留旧草稿后切换。

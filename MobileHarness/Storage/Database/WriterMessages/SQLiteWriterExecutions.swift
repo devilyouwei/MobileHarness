@@ -112,16 +112,55 @@ extension SQLiteWriterExecutionRepository {
                 return try Self.bind(requestID, target: existing, db: db)
             }
             guard root["run_state"] as String == "running" else { throw RecordStorageError.conflict }
-            let now = Date().timeIntervalSince1970
-            let goal: String? = root["request_goal"]
-            var row = WriterWorkspaceRow(description: goal ?? title, title: title, createdAt: now, updatedAt: now)
-            try row.insert(db)
-            guard let key = row.id,
-                let stored = try Row.fetchOne(db, sql: "SELECT * FROM writer_workspaces WHERE id=?", arguments: [key])
-            else { throw RecordStorageError.missingRecord }
-            return try Self.task(stored)
+            return try Self.allocateWorkspace(title: title, root: root, db: db)
         }
     }
+
+    public func createWorkspace(requestID: String, title: String, replacing previousTaskID: String) async throws
+        -> WriterWorkspaceRecord
+    {
+        try database.write { db in
+            let root = try Self.entry(requestID, db: db)
+            let previous = try BusinessRecordID.number(previousTaskID, kind: .task)
+            guard root["run_state"] as String == "running", root["selected_workspace_id"] as Int64? == previous else {
+                throw RecordStorageError.conflict
+            }
+            return try Self.allocateWorkspace(title: title, root: root, db: db)
+        }
+    }
+
+    private static func allocateWorkspace(title: String, root: Row, db: Database) throws -> WriterWorkspaceRecord {
+        let now = Date().timeIntervalSince1970
+        let goal: String? = root["request_goal"]
+        var row = WriterWorkspaceRow(description: goal ?? title, title: title, createdAt: now, updatedAt: now)
+        try row.insert(db)
+        guard let key = row.id,
+            let stored = try Row.fetchOne(db, sql: "SELECT * FROM writer_workspaces WHERE id=?", arguments: [key])
+        else { throw RecordStorageError.missingRecord }
+        return try task(stored)
+    }
+
+    public func switchWorkspace(requestID: String, from previousTaskID: String, to taskID: String) async throws {
+        try database.write { db in
+            let root = try Self.entry(requestID, db: db)
+            let previous = try BusinessRecordID.number(previousTaskID, kind: .task)
+            let target = try BusinessRecordID.number(taskID, kind: .task)
+            guard previous != target, root["run_state"] as String == "running",
+                root["selected_workspace_id"] as Int64? == previous
+            else { throw RecordStorageError.conflict }
+            try db.execute(
+                sql: """
+                    UPDATE writer_workspaces SET workspace_state='ready',revision=revision+1
+                    WHERE id=? AND workspace_state NOT IN ('deleting','deleted') AND write_lease IS NULL
+                    """, arguments: [target])
+            guard db.changesCount == 1 else { throw RecordStorageError.conflict }
+            try db.execute(
+                sql:
+                    "UPDATE writer_messages SET selected_workspace_id=?,request_revision=request_revision+1 WHERE id=?",
+                arguments: [target, root["id"] as Int64])
+        }
+    }
+
     public func acceptWriterInput(_ id: String, requestID: String, text: String, questionID: String?) async throws
         -> Bool
     {

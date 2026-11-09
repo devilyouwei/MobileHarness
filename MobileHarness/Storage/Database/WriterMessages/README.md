@@ -23,3 +23,5 @@ WriterHistoryStore.requestPreviews 透传有界 limit（默认 20，仓库上限
 忙碌拒绝使用 rejected 入口并记录失败原因与完成时间，计入委托列表但不参与运行上下文选择。委托终态结果由入口 result_json 保存，通知删除或日志清理不改变业务结果。
 
 Writer 控制请求将作品库、编辑或查看域写入 producerMetadata.controlDomain。进入工具所在消息保留前序归属，进入后的请求携带 workspace_id。恢复按委托与控制域选择消息，查询结果和跨域操作仍可审计。
+
+运行中切换工作区要求委托当前绑定与预期旧目标一致。SQLite 在同一事务中确认新工作区可绑定并更新委托选择，已有消息的 workspace_id 和请求身份保留。新建后切换先分配目标，当前绑定在目标准备成功后更新。

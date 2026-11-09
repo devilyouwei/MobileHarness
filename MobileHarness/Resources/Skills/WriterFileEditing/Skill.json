@@ -1,15 +1,77 @@
 {
   "version": 3,
   "id": "writer-file-editing",
-  "revision": 2,
+  "revision": 4,
   "description": "Inspect and edit files in the active Writer workspace.",
   "owner": "writer",
-  "dependencies": [],
+  "dependencies": [
+    "writer-workspace"
+  ],
   "useActions": [
     {
-      "path": "Artifacts.Workspace.perform",
+      "path": "Artifacts.Workspace.list",
       "callType": "tool",
-      "alias": "workspace"
+      "alias": "list"
+    },
+    {
+      "path": "Artifacts.Workspace.read",
+      "callType": "tool",
+      "alias": "read"
+    },
+    {
+      "path": "Artifacts.Workspace.search",
+      "callType": "tool",
+      "alias": "search"
+    },
+    {
+      "path": "Artifacts.Workspace.edit",
+      "callType": "tool",
+      "alias": "edit"
+    },
+    {
+      "path": "Artifacts.Workspace.replace",
+      "callType": "tool",
+      "alias": "replace"
+    },
+    {
+      "path": "Artifacts.Workspace.remove",
+      "callType": "tool",
+      "alias": "remove"
+    },
+    {
+      "path": "Artifacts.Workspace.move",
+      "callType": "tool",
+      "alias": "move"
+    },
+    {
+      "path": "Artifacts.Workspace.removeTree",
+      "callType": "tool",
+      "alias": "removeTree"
+    },
+    {
+      "path": "Artifacts.Workspace.diff",
+      "callType": "tool",
+      "alias": "diff"
+    },
+    {
+      "path": "Artifacts.Workspace.savepoint",
+      "callType": "tool",
+      "alias": "savepoint"
+    },
+    {
+      "path": "Artifacts.Workspace.restore",
+      "callType": "tool",
+      "alias": "restore"
+    },
+    {
+      "path": "Artifacts.Workspace.rename",
+      "callType": "tool",
+      "alias": "rename"
+    },
+    {
+      "path": "Artifacts.Workspace.render",
+      "callType": "tool",
+      "alias": "render"
     }
   ],
   "useStates": [],
