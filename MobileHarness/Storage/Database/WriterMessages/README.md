@@ -2,7 +2,7 @@
 
 writer_messages 统一保存委托入口、模型请求与补充输入。input_kind=delegation 的入口保存原始输入、request_goal、run_state、terminal_state、request_revision、pending_question_id、pending_question_json、result_json 和 failure_json；user_input_json 同时保存原始输入、来源 Agent/会话及原始通信包；关联不可变 agent_messages 来源。每个通信请求只能有一个入口，单活跃索引覆盖运行、等待、暂停及清理。
 
-非入口消息用 delegation_id 指向入口，workspace_id 为创建当时的 workspace 或空值。入口的 selected_workspace_id 记录执行目标；选择不修改旧消息，前序和进入后的消息都属于同一委托。position 固定为事务分配的全局消息主键；revision 只作状态版本。模型调用状态与入口 run_state 独立。
+非入口消息用 delegation_id 指向入口，workspace_id 为创建当时的 workspace 或空值。入口的 selected_workspace_id 记录执行目标，对外投影为 workspace_N；选择不修改旧消息，前序和进入后的消息都属于同一委托。position 固定为事务分配的全局消息主键；revision 只作状态版本。模型调用状态与入口 run_state 独立。
 
 tool_catalog_json 只保存本轮 decisionMetadata.catalogJSON.tools 的目录条目数组，包含工具别名、路径、参数名和 definitionJSON。输入 checkpoint 不写工具目录；查询通过同一请求的 decisionMetadata 还原，不转换为字符串数组，也不借用输入根或其他轮次目录。工具定义不存在第二份 WriterRecord 字段或保存接口，清理日志保留目录。
 
@@ -18,7 +18,7 @@ WriterContainer 将本侧历史映射到 UI 详情/导出展示模型；展示�
 
 详情序号按消息自身所属 workspace（前序消息按该委托的前序范围）计算；工具来源仍在同一委托完整链中查询，只为严格较早且唯一匹配的 providerID 返回来源请求地址。所选调用的 model、maximumOutputTokens 和 temperature 从 generation_meta_json 投影为可选值。宿主收尾记录以所属模型调用 ID 写入 runtime_results_json，保留已有的委托完成标记；找不到调用时明确报错。清空日志保留工具来源关系与宿主收尾。
 
-WriterHistoryStore.requestPreviews 透传有界 limit（默认 20，仓库上限 50），供调用方做轻量记录前瞻。Storage 返回查询事实，不决定 UI 页大小或末页显示；WriterContainer 拥有公开分页结果。
+WriterHistoryStore.requestPreviews 透传有界 limit（默认 20，仓库上限 50），供调用方做轻量记录前瞻。工作区消息页按 position 降序，使用排他的 before 游标读取更早一页，轮次编号仍按正序计数。按 after 查询用于近期消息更新、前序历史及导出。Storage 返回查询事实，不决定 UI 页大小或末页显示；WriterContainer 拥有公开分页结果。
 
 忙碌拒绝使用 rejected 入口并记录失败原因与完成时间，计入委托列表但不参与运行上下文选择。委托终态结果由入口 result_json 保存，通知删除或日志清理不改变业务结果。
 

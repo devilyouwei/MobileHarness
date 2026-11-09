@@ -1,5 +1,9 @@
 # 已完成需求归档
 
+- [Writer 按 ID 直接打开和进入](Writer-Direct-Workspace-Access.md)（2026-11-10）。已知工作区 ID 可直接使用，搜索用于发现作品。
+
+- [Writer 精选事件播报](Writer-Selective-Assistant-Feedback.md)（2026-11-10）。接纳、里程碑、追问和终态进入 Assistant 语音与后续对话上下文。
+
 - [相机照片查看、批量保存和直接关闭](Camera-Photo-Review-Actions.md)（2026-11-09）。五张缓存照片可供同轮查看，支持批量保存和无照片确认框的关闭。
 
 - [Writer Markdown 与 Mermaid 渲染](Writer-Markdown-Mermaid.md)（2026-11-09）。离线文档解析、Mermaid 图表和窗口预览验证。
@@ -140,3 +144,7 @@
 - [Writer 工具注册拆分](Writer-Tool-Separation.md)（2026-11-09）。各操作独立注册，Writer 保有委托与编辑会话编排。
 
 - [Writer Skill 统一注册与工作区切换](Writer-Skill-Registration-and-Switching.md)（2026-11-09）。两阶段由 Skill 声明工具与教学，支持保留旧草稿后切换。
+
+- [Writer 工具与工作区身份](Writer-Workspace-Tools-and-Identity.md)（2026-11-10）。统一作品 ID、精简 Skill 教学并验证直接新建和续作。
+
+- [Writer 重复创建与缺入口恢复](Writer-Create-Loop.md)（2026-11-09）。同一委托复用创建分配，初始化时创建入口文件，旧草稿缺入口引导到 edit。

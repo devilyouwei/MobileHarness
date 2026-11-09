@@ -199,11 +199,11 @@ residentContext() exposes only the repository’s initialized committed in-memor
 
 Task 控制通过 task.start/end 管理 Assistant 前台 scope，task.delegate(agent_id,description) 发送独立请求；task.send/cancel 带 agent_id 时发送消息，不带时作用于前台。目标自主选择 task/workspace，外部不提供 taskID。连续 start 排空旧 scope 副作用并取消旧任务后建立新任务；等待用户仍保留活跃 scope。
 
-Writer 的 started 和 userInput 作为认证控制事实更新任务视图。按委派和事件序号去重。终态由 writer.completion 提供，核对 SQLite 不可变通知并标记消费。运行时独立清理并退休执行授权。旧委派的终态只结算原视图，创作不因投递重试而重放。
+Writer 的 started、draftUpdated、recovering 和 userInput 作为认证控制事实更新任务视图。按委派和事件序号去重。终态由 writer.completion 提供，核对 SQLite 不可变通知并标记消费。运行时独立清理并退休执行授权。旧委派的终态只结算原视图，创作不因投递重试而重放。
 
-Writer 回馈由其灵动岛呈现。Assistant 接收回馈时不占用 32 项正式输入 FIFO，不建立模型或语音回合。真实文本接纳或语音开始时捕获当前追问身份。相应问题在该用户请求中作为带引号的数据提供。补充使用 task.send 时核对该输入捕获的追问与当前委派，只有匹配时才转发。面向 Writer 的委派、补充、取消送达成功产生 completed。参数、准入和传输失败保留观察。
+Writer 普通回馈由其灵动岛呈现。精选回馈不占用 32 项正式输入 FIFO。Assistant 在现有 worker 空闲时按序合成与播放简短回报，无模型轮次。至多八项待播，优先移除过时的普通里程碑。认证事实按委托保留最近六条，同一对话的后续用户请求可读取最近两个委托的受限数据块。真实文本接纳或语音开始时捕获当前追问身份。相应问题在该用户请求中作为带引号的数据提供。补充使用 task.send 时核对该输入捕获的追问与当前委派，只有匹配时才转发。面向 Writer 的委派、补充、取消送达成功产生 completed。参数、准入和传输失败保留观察。
 
-模型历史 read-token/begin 短事务与 Assistant 输入接纳共用 admission gate，避免并发接纳使请求历史令牌失效。模型生成和工具执行不占此锁。ReplyActivity 发送占用变化、会话变化和最新语音 root 确认。Writer 回馈不改变语音占用或许可。
+模型历史 read-token/begin 短事务与 Assistant 输入接纳共用 admission gate，避免并发接纳使请求历史令牌失效。模型生成和工具执行不占此锁。ReplyActivity 发送占用变化、会话变化和最新语音 root 确认。Writer 的实际播报复用短回复的占用信号和播放动作，监听许可仍由 SpeechPerception 拥有。
 
 ChatDriver scopes request consumption with InferenceSession.withCleanup, joining the SDK request worker on normal/error/cancellation exits. It owns no model-instance lease and does not unload shared clients.
 

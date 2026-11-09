@@ -143,7 +143,7 @@ erDiagram
         INTEGER schema_version
     }
     workspace_files {
-        INTEGER task_id PK,FK
+        INTEGER workspace_id PK,FK
         TEXT path PK
         INTEGER bytes
         TEXT fingerprint

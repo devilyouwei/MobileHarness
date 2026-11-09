@@ -149,11 +149,11 @@ Each model output contains `records.sqlite`, SQLite workspace catalog and versio
 
 ## Writer records native simulator acceptance
 
-`test-writer-records-simulator.sh` runs actual XCTest clicks against the built application without requiring Simulator.app. Set `WRITER_SIMULATOR_ID` to an isolated booted simulator and `WRITER_SIMULATOR_SEED` to one completed synthetic `evaluate-writer.py` output root. It refuses an existing database, seeds only that simulator, and builds a temporary UI-test runner from `Tests/UITests/WriterRecordsNativeAcceptance.swift`. It checks separate Settings entries, Writer task/request rows, header operations, file navigation and conversation sharing. The printed xcresult contains retained screenshots. It never seeds physical-device data or configures credentials. Synthetic history with real native clicks is distinct from live voice/model acceptance.
+`test-writer-records-simulator.sh` runs actual XCTest clicks against the built application without requiring Simulator.app. Set `WRITER_SIMULATOR_ID` to an isolated booted simulator and `WRITER_SIMULATOR_SEED` to one completed synthetic `evaluate-writer.py` output root. It refuses an existing database, seeds only that simulator, and builds a temporary UI-test runner from `Tests/UITests/WriterRecordsNativeAcceptance.swift`. It checks separate Settings entries, Writer workspace/request rows, header operations, file navigation and conversation sharing. The printed xcresult contains retained screenshots. It never seeds physical-device data or configures credentials. Synthetic history with real native clicks is distinct from live voice/model acceptance.
 
 Writer evaluator --thinking enabled/minimum changes only the paid experiment Provider configuration (default enabled). Reports record the actual value; production Writer configuration and provider output defaults are unchanged. Use the original diagram goal for latency comparisons.
 
-Writer UI acceptance seeds the shared SQLite catalog and copies agent/task_N workspace files. It does not copy a JSON workspace index; native task selection uses an actual task reference from the seeded list rather than a globally allocated task_6 assumption.
+Writer UI acceptance seeds the shared SQLite catalog and copies writer/workspace_N files. It does not copy a JSON workspace index; native workspace selection uses the ID displayed in the seeded list.
 
 ## Agent public resource validation
 
@@ -167,4 +167,4 @@ check-modelkit-boundaries.py validates bundled Agent resource schema v9 and requ
 
 Matrix source fingerprints also include WriterWorkspaces and WriterMessages Swift implementations so request/target/history changes are captured with the Writer runtime. The runner records source, binary and packaged-resource consistency separately from model case outcomes.
 
-Writer record UI acceptance can select `WRITER_UI_ONLY_TEST=testDelegationWorkspaceSeparation`; its seed is the temporary SQLite/workspaces fixture exported by the real-storage integration test through `WRITER_SEPARATION_UI_SEED`. This route validates native navigation without model credentials or a physical-device database.
+Writer record UI acceptance can select `WRITER_UI_ONLY_TEST=testDelegationWorkspaceSeparation`; its seed is the temporary SQLite/workspaces fixture exported by the real-storage integration test through `WRITER_SEPARATION_UI_SEED`. The fixture includes 27 delegations and 40 workspace messages. This route verifies newest-first display, automatic older pages and navigation without model credentials or a physical-device database.

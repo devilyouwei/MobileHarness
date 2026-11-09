@@ -19,10 +19,10 @@ public enum AgentContracts {
             try CommunicationContracts(
                 additional: AgentTaskSignal.contracts + [
                     CommunicationContract(
-                        name: WriterTaskCompletion.contract, kind: .observation, maximumBytes: 131072,
+                        name: WriterDelegationCompletion.contract, kind: .observation, maximumBytes: 131072,
                         startsNewWork: true,
                         validateMessage: { message in
-                            guard let value = message.content(as: WriterTaskCompletion.self) else {
+                            guard let value = message.content(as: WriterDelegationCompletion.self) else {
                                 throw CommunicationError.invalidPayload
                             }
                             try value.validate()

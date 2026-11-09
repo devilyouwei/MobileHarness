@@ -225,7 +225,7 @@ import Foundation
     }
 
     @MainActor
-    private struct HistoryPagingFooter<Cursor: Hashable & Sendable>: View {
+    struct HistoryPagingFooter<Cursor: Hashable & Sendable>: View {
         let cursor: Cursor
         let state: HistoryPageLoading<Cursor>
         var enabled = true

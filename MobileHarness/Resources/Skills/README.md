@@ -45,7 +45,7 @@ Skill 是可复用的流程与能力集合，Task 是运行时目标、状态和
 
 `doc`、参数 Schema、必填项、约束和完成语义来自函数自己的 `@Action`，不放在 Skill.json。函数不注册 examples；全部业务示例放在 Instructions.md，并遵循真实函数参数与当前 Skill 别名。
 
-[WriterWorkspace](WriterWorkspace/Skill.json) 是 Writer 的基础作品库 Skill，[WriterFileEditing](WriterFileEditing/Skill.json) 随编辑域自动激活。作品库 Skill 声明 Gateway 工具与 Writer 本地工具。文件编辑 Skill 依赖作品库 Skill，编辑阶段同时提供两者的工具与教学。详见 [Writer 工作区分域](../../Agents/Writer/README.md#作品库与工作区分域)。
+[WriterWorkspace](WriterWorkspace/Skill.json) 是 Writer 的基础作品库 Skill，[WriterFileEditing](WriterFileEditing/Skill.json) 随编辑域自动激活。作品库 Skill 声明 Gateway 工具与 Writer 本地工具，区分已知 ID 的直接打开或进入与按名称搜索。文件编辑 Skill 依赖作品库 Skill，编辑阶段同时提供两者的工具与教学。详见 [Writer 工作区分域](../../Agents/Writer/README.md#作品库与工作区分域)。
 
 ✅ ExpressionInteraction 教学连续表情演出，提供指定子集的纯串行及“每项语音与表情并行、各项串行”的全量 XML 示例；“所有表情”按当前 express 参数枚举逐项展开，不包括仅用于清除状态的 clear。演出使用完成时等待过渡与恢复的 express，保持默认 Speech/Display Channel；不为有限演出创建需后续用户决策的 Task。资源 revision 随教学递增，通用编排规则由 Core scheduling 模板拥有。
 

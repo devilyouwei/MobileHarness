@@ -15,28 +15,42 @@
             XCTAssertFalse(app.staticTexts["委托来源"].exists)
             XCTAssertFalse(app.buttons["查看委托记录"].exists)
         }
+        private func openSettings(_ app: XCUIApplication) {
+            let skip = app.buttons["welcome.provider.skip"]
+            if skip.waitForExistence(timeout: 30) {
+                skip.tap()
+                XCTAssertTrue(skip.waitForNonExistence(timeout: 20), app.debugDescription)
+            }
+            let settings = app.buttons["app.settings"]
+            XCTAssertTrue(settings.waitForExistence(timeout: 30), app.debugDescription)
+            settings.tap()
+            XCTAssertTrue(app.buttons["settings.writer.records"].waitForExistence(timeout: 20), app.debugDescription)
+        }
         func testDelegationWorkspaceSeparation() throws {
             let app = XCUIApplication(bundleIdentifier: "dev.mobileharness.app")
             app.launch()
             defer { app.terminate() }
-            if app.buttons["welcome.provider.skip"].waitForExistence(timeout: 5) {
-                app.buttons["welcome.provider.skip"].tap()
-            }
-            XCTAssertTrue(app.buttons["app.settings"].waitForExistence(timeout: 30))
-            app.buttons["app.settings"].tap()
+            openSettings(app)
             app.buttons["settings.writer.records"].tap()
             XCTAssertTrue(app.buttons["writer.delegations"].waitForExistence(timeout: 15))
             capture("writer-separated-overview", app: app)
             app.buttons["writer.delegations"].tap()
             XCTAssertTrue(app.navigationBars["委托记录"].waitForExistence(timeout: 10))
-            let delegation = app.buttons.matching(
+            let delegations = app.buttons.matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "writer.delegation."))
+            XCTAssertTrue(delegations.firstMatch.waitForExistence(timeout: 10))
+            XCTAssertTrue(delegations.firstMatch.label.contains("Pagination fixture delegation 25"))
+            let delegation = delegations.matching(
                 NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "writer.delegation.", "Create")
             )
             .firstMatch
-            XCTAssertTrue(delegation.waitForExistence(timeout: 10))
+            XCTAssertFalse(delegation.isHittable)
+            for _ in 0..<25 where !delegation.isHittable { app.swipeUp() }
+            XCTAssertTrue(delegation.isHittable, app.debugDescription)
+            XCTAssertFalse(app.buttons["加载更多"].exists)
             delegation.tap()
             XCTAssertTrue(app.staticTexts["原始输入"].waitForExistence(timeout: 10))
-            XCTAssertTrue(app.staticTexts["进入 Workspace 前的消息"].exists)
+            XCTAssertTrue(app.staticTexts["进入工作区前的消息"].exists)
             capture("writer-delegation-detail", app: app)
             let preflight = app.buttons.matching(
                 NSPredicate(format: "identifier BEGINSWITH %@", "writer.preflight.request.")
@@ -50,21 +64,23 @@
             XCTAssertTrue(app.navigationBars["委托详情"].exists)
             app.navigationBars.buttons.element(boundBy: 0).tap()
             app.navigationBars.buttons.element(boundBy: 0).tap()
-            let workspace = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "writer.task.task_"))
-                .firstMatch
+            let workspace = app.buttons.matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "writer.workspace.workspace_")
+            )
+            .firstMatch
             XCTAssertTrue(workspace.waitForExistence(timeout: 10))
             workspace.tap()
-            XCTAssertTrue(app.navigationBars["Workspace"].waitForExistence(timeout: 10))
-            let more = app.buttons["加载更多"]
-            for _ in 0..<25 where !more.isHittable { app.swipeUp() }
-            XCTAssertTrue(more.isHittable)
-            more.tap()
-            let row = app.buttons.matching(
-                NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "writer.request.", "第40轮")
+            XCTAssertTrue(app.navigationBars["工作区"].waitForExistence(timeout: 10))
+            let messages = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "writer.request."))
+            XCTAssertTrue(messages.firstMatch.waitForExistence(timeout: 10))
+            XCTAssertTrue(messages.firstMatch.label.contains("第40轮"), messages.firstMatch.label)
+            let row = messages.matching(
+                NSPredicate(format: "label CONTAINS %@", "第1轮")
             ).firstMatch
+            XCTAssertFalse(row.isHittable)
             for _ in 0..<25 where !row.isHittable { app.swipeUp() }
             XCTAssertTrue(row.isHittable, app.debugDescription)
-            XCTAssertFalse(more.exists)
+            XCTAssertFalse(app.buttons["加载更多"].exists)
             XCTAssertFalse(app.staticTexts["委托 1"].exists)
             capture("writer-workspace-last-page", app: app)
             let identity = row.identifier
@@ -73,19 +89,14 @@
             capture("writer-request-without-delegation-link", app: app)
             app.navigationBars.buttons.element(boundBy: 0).tap()
             XCTAssertTrue(app.buttons[identity].waitForExistence(timeout: 10))
-            XCTAssertFalse(more.exists)
+            XCTAssertFalse(app.buttons["加载更多"].exists)
             capture("writer-pages-preserved-after-back", app: app)
         }
         func testWriterRecords() throws {
             let app = XCUIApplication(bundleIdentifier: "dev.mobileharness.app")
             app.launch()
             defer { app.terminate() }
-            if app.buttons["welcome.provider.skip"].waitForExistence(timeout: 5) {
-                app.buttons["welcome.provider.skip"].tap()
-            }
-            let settings = app.buttons["app.settings"]
-            XCTAssertTrue(settings.waitForExistence(timeout: 30), app.debugDescription)
-            settings.tap()
+            openSettings(app)
             XCTAssertTrue(app.buttons["settings.assistant.records"].waitForExistence(timeout: 10))
             XCTAssertTrue(app.buttons["settings.writer.records"].exists)
             XCTAssertFalse(app.buttons["settings.agent.records"].exists)
@@ -114,18 +125,20 @@
             app.navigationBars.buttons.element(boundBy: 0).tap()
             app.buttons["settings.writer.records"].tap()
             XCTAssertTrue(app.navigationBars["My Writer"].waitForExistence(timeout: 10))
-            let task = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "writer.task.task_"))
-                .firstMatch
+            let task = app.buttons.matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "writer.workspace.workspace_")
+            )
+            .firstMatch
             XCTAssertTrue(task.waitForExistence(timeout: 15), app.debugDescription)
             capture("writer-task-list", app: app)
             task.tap()
-            XCTAssertTrue(app.buttons["writer.task.files"].waitForExistence(timeout: 10), app.debugDescription)
-            XCTAssertTrue(app.buttons["writer.task.export"].exists)
-            XCTAssertTrue(app.descendants(matching: .any)["writer.task.started"].exists)
-            XCTAssertTrue(app.descendants(matching: .any)["writer.task.updated"].exists)
+            XCTAssertTrue(app.buttons["writer.workspace.files"].waitForExistence(timeout: 10), app.debugDescription)
+            XCTAssertTrue(app.buttons["writer.workspace.export"].exists)
+            XCTAssertTrue(app.descendants(matching: .any)["writer.workspace.started"].exists)
+            XCTAssertTrue(app.descendants(matching: .any)["writer.workspace.updated"].exists)
             XCTAssertFalse(app.staticTexts["最新状态"].exists)
             capture("writer-task-header", app: app)
-            app.buttons["writer.task.files"].tap()
+            app.buttons["writer.workspace.files"].tap()
             XCTAssertTrue(app.staticTexts["index.html"].waitForExistence(timeout: 15), app.debugDescription)
             capture("writer-files", app: app)
             app.buttons["index.html"].tap()
@@ -232,7 +245,7 @@
             }
             XCTAssertTrue(foundSource)
             app.swipeDown()
-            let export = app.buttons["writer.task.export"]
+            let export = app.buttons["writer.workspace.export"]
             XCTAssertTrue(export.waitForExistence(timeout: 10))
             export.tap()
             let share = app.collectionViews["activityCollectionView"]

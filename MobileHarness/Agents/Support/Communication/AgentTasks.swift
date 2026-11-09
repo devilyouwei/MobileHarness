@@ -25,9 +25,11 @@ public struct WriterFailureDiagnostic: Codable, Sendable, Equatable {
 }
 
 /// Writer business evidence carried by the authenticated task transport.
-public struct WriterTaskEvent: Codable, Sendable, Equatable {
+public struct WriterDelegationEvent: Codable, Sendable, Equatable {
     public enum Kind: String, Codable, Sendable {
-        case started, userInput, completed, declined, failed, cancelled
+        case started, draftUpdated, recovering, userInput, completed, declined, failed, cancelled
+
+        var isMilestone: Bool { self == .draftUpdated || self == .recovering }
     }
     public let version: Int
     public let eventID: String
@@ -36,29 +38,27 @@ public struct WriterTaskEvent: Codable, Sendable, Equatable {
     public let workspaceID: String?
     public let goal: String?
     public let windowID: String?
-    public let taskID: String?
     public let delegateID: String?
     public let failure: WriterFailureDiagnostic?
     public init(
         sequence: UInt64, kind: Kind, workspaceID: String? = nil, goal: String? = nil, windowID: String? = nil,
-        taskID: String? = nil,
         delegateID: String? = nil, failure: WriterFailureDiagnostic? = nil,
         eventID: String = UUID().uuidString
     ) {
-        version = 2
+        version = 3
         self.eventID = eventID
         self.sequence = sequence
         self.kind = kind
         self.goal = goal
         self.workspaceID = workspaceID
         self.windowID = windowID
-        self.taskID = taskID
         self.delegateID = delegateID
         self.failure = failure
     }
     public func validate() throws {
-        guard version == 2, UUID(uuidString: eventID) != nil, sequence > 0,
-            [taskID, delegateID].allSatisfy({ $0.map { !$0.isEmpty && $0.utf8.count <= 128 } ?? true })
+        guard version == 3, UUID(uuidString: eventID) != nil, sequence > 0,
+            workspaceID.map({ WorkspaceID(rawValue: $0) != nil }) ?? true,
+            delegateID.map({ !$0.isEmpty && $0.utf8.count <= 128 }) ?? true
         else {
             throw CommunicationError.invalidPayload
         }
@@ -72,10 +72,10 @@ public struct AgentTaskContent: Codable, Sendable, Equatable {
     public let stage: Stage
     public let interactionID: String?
     public let artifactID: String?
-    public let writerEvent: WriterTaskEvent?
+    public let writerEvent: WriterDelegationEvent?
     public init(
         text: String, stage: Stage = .running, interactionID: String? = nil, artifactID: String? = nil,
-        writerEvent: WriterTaskEvent? = nil
+        writerEvent: WriterDelegationEvent? = nil
     )
         throws
     {
@@ -108,7 +108,7 @@ public struct AgentTaskContent: Codable, Sendable, Equatable {
 
 /// A completed Writer fact outlives the execution grant. Gateway authenticates the role;
 /// the Assistant validates its persisted task and event binding before settling its view.
-public struct WriterTaskCompletion: Codable, Sendable, Equatable {
+public struct WriterDelegationCompletion: Codable, Sendable, Equatable {
     public static let contract = "writer.completion"
     public let signal: AgentTaskSignal
     public init(_ signal: AgentTaskSignal) throws {
@@ -133,6 +133,12 @@ public struct WriterTaskCompletion: Codable, Sendable, Equatable {
     }
 }
 
+struct WriterContextFact: Codable, Sendable {
+    let kind: WriterDelegationEvent.Kind
+    let text: String
+    let receivedAt: Date
+}
+
 public struct AgentTaskView: Codable, Sendable {
     public let scope: AgentTaskScope
     public var stage: AgentTaskContent.Stage
@@ -143,9 +149,9 @@ public struct AgentTaskView: Codable, Sendable {
     public var skills: [String]?
     public var createdAt: Date?
     public var terminal: Bool
-    public var businessTaskID: String?
-    public var writerEvent: WriterTaskEvent?
+    public var writerEvent: WriterDelegationEvent?
     public var originDialog: String?
+    var writerFacts: [WriterContextFact]?
     public init(scope: AgentTaskScope, content: AgentTaskContent, terminal: Bool = false) {
         self.scope = scope
         writerEvent = content.writerEvent
@@ -154,6 +160,13 @@ public struct AgentTaskView: Codable, Sendable {
         interactionID = content.interactionID
         artifactID = content.artifactID
         self.terminal = terminal
+    }
+
+    mutating func retainWriterFacts(from previous: Self?) {
+        guard let writerEvent else { return }
+        var facts = previous?.writerFacts ?? []
+        facts.append(.init(kind: writerEvent.kind, text: String(text.prefix(240)), receivedAt: Date()))
+        writerFacts = Array(facts.suffix(6))
     }
 }
 

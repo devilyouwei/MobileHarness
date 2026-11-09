@@ -606,9 +606,9 @@ func historyFunctionCatalogRejectsCorruptSnapshotsRatherThanInventingEmptyGroups
     } catch is CancellationError {}
 }
 
-@Test func writerTaskSummaryExportsDatesAndCountsWithoutExecutionStatus() throws {
-    var task = WriterTaskItem(
-        id: "task_1", dialogID: "writer/task_1", goal: "test", workspaceID: nil,
+@Test func writerWorkspaceSummaryExportsDatesAndCountsWithoutExecutionStatus() throws {
+    var task = WriterWorkspaceItem(
+        workspaceID: "workspace_1", title: "test",
         updatedAt: Date(timeIntervalSince1970: 200))
     task.startedAt = Date(timeIntervalSince1970: 100)
     task.requestCount = 7
@@ -616,7 +616,7 @@ func historyFunctionCatalogRejectsCorruptSnapshotsRatherThanInventingEmptyGroups
     let fields = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
     #expect(fields["status"] == nil && fields["phase"] == nil && fields["failure"] == nil)
     #expect(fields["completedDuration"] == nil && fields["activeSince"] == nil)
-    let restored = try JSONDecoder().decode(WriterTaskItem.self, from: data)
+    let restored = try JSONDecoder().decode(WriterWorkspaceItem.self, from: data)
     #expect(restored.startedAt == task.startedAt && restored.updatedAt == task.updatedAt && restored.requestCount == 7)
 }
 @Test func writerRequestTimingDistinguishesUnknownActiveAndCompleted() {
@@ -830,4 +830,14 @@ private struct WriterPageFixture: Identifiable, Sendable {
     var retry = preserved
     try retry.apply([.init(id: 41)], next: nil, reset: false)
     #expect(retry.items.map(\.id) == Array(1...41) && retry.next == nil)
+}
+
+@Test func writerRecordPagesRefreshNewestWithoutReplacingOlderCursor() throws {
+    var pages = WriterRecordPages<WriterPageFixture, Int>()
+    try pages.apply((21...40).reversed().map { .init(id: $0) }, next: 21, reset: true)
+    try pages.replaceHead((31...43).reversed().map { .init(id: $0, title: "updated") }, replacing: 10)
+    #expect(pages.items.map(\.id) == Array((21...43).reversed()) && pages.next == 21)
+    #expect(pages.items[12].title == "updated" && pages.items[13].title == "original")
+    try pages.apply((1...20).reversed().map { .init(id: $0) }, next: nil, reset: false)
+    #expect(pages.items.map(\.id) == Array((1...43).reversed()) && pages.next == nil)
 }

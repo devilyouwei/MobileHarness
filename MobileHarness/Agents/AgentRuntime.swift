@@ -116,7 +116,7 @@ import StorageFiles
             chatProvider: @escaping @Sendable () async throws -> any ChatCapability
         ) throws -> AgentExecutionPreparation {
             try writerContainer.configureHistory(
-                messages: repositories.writerMessages, tasks: repositories.writerExecutions,
+                messages: repositories.writerMessages, executions: repositories.writerExecutions,
                 communications: repositories.agentMessages, logs: repositories.logs)
             let contextScope = UUID().uuidString
             let assistantContext = try AgentContextRepository(

@@ -4,29 +4,29 @@ import StorageCore
 public protocol WriterExecutionRepository: Sendable {
     var storageScope: UUID { get }
     func createWorkspace(requestID: String, title: String) async throws -> WriterWorkspaceRecord
-    func createWorkspace(requestID: String, title: String, replacing previousTaskID: String) async throws
+    func createWorkspace(requestID: String, title: String, replacing previousWorkspaceID: String) async throws
         -> WriterWorkspaceRecord
-    func switchWorkspace(requestID: String, from previousTaskID: String, to taskID: String) async throws
+    func switchWorkspace(requestID: String, from previousWorkspaceID: String, to workspaceID: String) async throws
     func delegations(before: UInt64?, limit: Int) async throws -> [WriterRequestRecord]
     func delegationCount() async throws -> Int
-    func selectWorkspace(requestID: String, taskID: String) async throws -> WriterWorkspaceRecord
+    func selectWorkspace(requestID: String, workspaceID: String) async throws -> WriterWorkspaceRecord
     func beginRequest(
-        delegateID: String, taskID: String?, goal: String, input: String, sourceDialog: String?, agent: String
+        delegateID: String, workspaceID: String?, goal: String, input: String, sourceDialog: String?, agent: String
     )
         async throws -> WriterRequestRecord
-    func tasks(agent: String, before: Int64?, limit: Int) async throws -> [WriterWorkspaceRecord]
-    func task(_ id: String, agent: String) async throws -> WriterWorkspaceRecord
+    func workspaces(agent: String, before: Int64?, limit: Int) async throws -> [WriterWorkspaceRecord]
+    func workspace(_ id: String, agent: String) async throws -> WriterWorkspaceRecord
     func requests(_ id: String, agent: String) async throws -> [WriterRequestRecord]
     func requestStatus(_ delegateID: String, agent: String) async throws -> String?
     func request(_ delegateID: String, agent: String) async throws -> WriterRequestRecord
-    func completeRequest(_ notification: TaskNotification, status: String, failure: String?) async throws
-    func taskNotification(_ delegateID: String, agent: String) async throws -> TaskNotification?
-    func pendingTaskNotifications(agent: String, retirement: Bool, after: Int64?, limit: Int) async throws
-        -> [TaskNotification]
-    func finishTaskNotification(
+    func completeRequest(_ notification: WriterDelegationNotification, status: String, failure: String?) async throws
+    func delegationNotification(_ delegateID: String, agent: String) async throws -> WriterDelegationNotification?
+    func pendingDelegationNotifications(agent: String, retirement: Bool, after: Int64?, limit: Int) async throws
+        -> [WriterDelegationNotification]
+    func finishDelegationNotification(
         _ delegateID: String, agent: String, retirement: Bool, completed: Bool, failure: String?, claimToken: String?)
         async throws
-    func prepareWorkspace(_ project: String, taskID: String, delegateID: String, agent: String, ready: Bool)
+    func prepareWorkspace(workspaceID: String, delegateID: String, agent: String, ready: Bool)
         async throws
     func updateRequestPhase(requestID: String, phase: String) async throws
     func saveInteraction(delegateID: String, interactionID: String?, data: Data?) async throws
@@ -41,15 +41,17 @@ extension WriterExecutionRepository {
     public func createWorkspace(requestID: String, title: String) async throws -> WriterWorkspaceRecord {
         throw RecordStorageError.invalidRecord
     }
-    public func createWorkspace(requestID: String, title: String, replacing previousTaskID: String) async throws
+    public func createWorkspace(requestID: String, title: String, replacing previousWorkspaceID: String) async throws
         -> WriterWorkspaceRecord
     {
         throw RecordStorageError.invalidRecord
     }
-    public func switchWorkspace(requestID: String, from previousTaskID: String, to taskID: String) async throws {
+    public func switchWorkspace(requestID: String, from previousWorkspaceID: String, to workspaceID: String)
+        async throws
+    {
         throw RecordStorageError.invalidRecord
     }
-    public func selectWorkspace(requestID: String, taskID: String) async throws -> WriterWorkspaceRecord {
+    public func selectWorkspace(requestID: String, workspaceID: String) async throws -> WriterWorkspaceRecord {
         throw RecordStorageError.invalidRecord
     }
     public func saveInteraction(delegateID: String, interactionID: String?, data: Data?) async throws {
@@ -61,47 +63,51 @@ extension WriterExecutionRepository {
     public func request(_ delegateID: String, agent: String) async throws -> WriterRequestRecord {
         throw RecordStorageError.missingRecord
     }
-    public func completeRequest(_ notification: TaskNotification, status: String, failure: String?) async throws {
-        throw RecordStorageError.invalidRecord
-    }
-    public func taskNotification(_ delegateID: String, agent: String) async throws -> TaskNotification? {
-        throw RecordStorageError.invalidRecord
-    }
-    public func pendingTaskNotifications(agent: String, retirement: Bool, after: Int64?, limit: Int) async throws
-        -> [TaskNotification]
+    public func completeRequest(_ notification: WriterDelegationNotification, status: String, failure: String?)
+        async throws
     {
         throw RecordStorageError.invalidRecord
     }
-    public func finishTaskNotification(
+    public func delegationNotification(_ delegateID: String, agent: String) async throws
+        -> WriterDelegationNotification?
+    {
+        throw RecordStorageError.invalidRecord
+    }
+    public func pendingDelegationNotifications(agent: String, retirement: Bool, after: Int64?, limit: Int) async throws
+        -> [WriterDelegationNotification]
+    {
+        throw RecordStorageError.invalidRecord
+    }
+    public func finishDelegationNotification(
         _ delegateID: String, agent: String, retirement: Bool, completed: Bool, failure: String?,
         claimToken: String?
     ) async throws {
         throw RecordStorageError.invalidRecord
     }
-    public func finishTaskNotification(
+    public func finishDelegationNotification(
         _ delegateID: String, agent: String, retirement: Bool, completed: Bool, failure: String?
     ) async throws {
-        try await finishTaskNotification(
+        try await finishDelegationNotification(
             delegateID, agent: agent, retirement: retirement, completed: completed, failure: failure, claimToken: nil)
     }
-    public func prepareWorkspace(_ project: String, taskID: String, delegateID: String, agent: String) async throws {
-        try await prepareWorkspace(project, taskID: taskID, delegateID: delegateID, agent: agent, ready: true)
+    public func prepareWorkspace(workspaceID: String, delegateID: String, agent: String) async throws {
+        try await prepareWorkspace(workspaceID: workspaceID, delegateID: delegateID, agent: agent, ready: true)
     }
     public func beginRequest(
-        delegateID: String, taskID: String?, goal: String, input: String, sourceDialog: String?, agent: String
+        delegateID: String, workspaceID: String?, goal: String, input: String, sourceDialog: String?, agent: String
     )
         async throws -> WriterRequestRecord
     { throw RecordStorageError.invalidRecord }
-    public func tasks(agent: String, before: Int64?, limit: Int) async throws -> [WriterWorkspaceRecord] {
+    public func workspaces(agent: String, before: Int64?, limit: Int) async throws -> [WriterWorkspaceRecord] {
         throw RecordStorageError.invalidRecord
     }
-    public func task(_ id: String, agent: String) async throws -> WriterWorkspaceRecord {
+    public func workspace(_ id: String, agent: String) async throws -> WriterWorkspaceRecord {
         throw RecordStorageError.missingRecord
     }
     public func requests(_ id: String, agent: String) async throws -> [WriterRequestRecord] {
         throw RecordStorageError.missingRecord
     }
-    public func prepareWorkspace(_ project: String, taskID: String, delegateID: String, agent: String, ready: Bool)
+    public func prepareWorkspace(workspaceID: String, delegateID: String, agent: String, ready: Bool)
         async throws
     {
         throw RecordStorageError.invalidRecord

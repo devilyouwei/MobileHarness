@@ -24,7 +24,7 @@ import UI
 
 @Test func artifactProjectEncodingRequiresEntryField() throws {
     let project = ArtifactProject(
-        id: try #require(WorkspaceID(agent: "writer", taskID: "task_1")), revision: UUID(), title: "Current",
+        id: try #require(WorkspaceID(rawValue: "workspace_1")), revision: UUID(), title: "Current",
         files: ["index.html": "index.html"])
     let encoded = try JSONEncoder().encode(project)
     #expect(try JSONDecoder().decode(ArtifactProject.self, from: encoded) == project)

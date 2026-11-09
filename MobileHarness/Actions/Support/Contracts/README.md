@@ -76,3 +76,5 @@ PreviewImageID validates canonical positive numeric preview_N values for live ca
 MultimodalContextSnapshot.resourceBindings and ContextImage.resourceScope are private ownership metadata, distinct from model-facing facts/IDs. ActionExecutionContext carries resource bindings unchanged for domain validation. Camera live photo calls require a matching window-session scope; short preview labels alone are not authorization.
 
 CameraPhotoCommandReceipt represents a saved preview and optional feedback issues; CameraControlCapability exposes photo saving, with session expiry owned by Camera.
+
+ArtifactFilePath 统一 Writer 创建与 Artifacts 文件操作的路径校验。入口仅接受 HTML、Markdown 和纯文本文件路径。

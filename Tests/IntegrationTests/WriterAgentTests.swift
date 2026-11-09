@@ -96,8 +96,8 @@ private actor WriterNativeFixture: ChatCapability {
                 #expect(policy.contains("Workspace library domain"))
                 #expect(!names.contains("edit"))
             } else {
-                #expect(policy.contains("Workspace editing domain") && policy.contains("Active workspace: writer/"))
-                #expect(names.contains("move") && names.contains("open") && names.contains("enter"))
+                #expect(policy.contains("Workspace editing domain") && policy.contains("Active workspace: "))
+                #expect(names.contains("move") && names.contains("workspace.open") && names.contains("workspace.enter"))
                 let edit = try #require(request.tools.first { $0.name == "edit" })
                 let schema = String(decoding: edit.declaration, as: UTF8.self)
                 #expect(schema.contains("decimal") && !schema.contains("workspaceID"))
@@ -123,14 +123,14 @@ private actor WriterNativeFixture: ChatCapability {
                 case 0:
                     command =
                         invalidArguments
-                        ? ["command": "searchWorkspaces", "verification": "ok"]
+                        ? ["command": "workspace.search", "verification": "ok"]
                         : ["command": "ask", "summary": "希望用什么语言？"]
-                case 1: command = ["command": "searchWorkspaces", "query": existing ? "task_1" : "测试问候"]
+                case 1: command = ["command": "workspace.search", "query": existing ? "workspace_1" : "测试问候"]
                 case 2:
                     command =
                         existing
-                        ? ["command": "enter", "taskID": "task_1"]
-                        : ["command": "create", "title": "测试问候", "entry": "document.md"]
+                        ? ["command": "workspace.enter", "workspaceID": "workspace_1"]
+                        : ["command": "workspace.create", "title": "测试问候", "entry": "document.md"]
                 case 3:
                     if !library {
                         #expect(request.messages.count == 2 && !request.messages.contains { $0.role == .tool })
@@ -200,14 +200,14 @@ private actor WriterResultSink: Agent {
                 return
             }
             guard
-                let signal = message.content(as: WriterTaskCompletion.self)?.signal
+                let signal = message.content(as: WriterDelegationCompletion.self)?.signal
                     ?? message.content(as: AgentTaskSignal.self)
             else { return }
             if blocksReports {
                 if let event = try AgentTaskContent.decode(signal).writerEvent { rejectedReports.append(event.eventID) }
                 throw CommunicationError.unavailableTarget
             }
-            if message.content(as: WriterTaskCompletion.self) != nil,
+            if message.content(as: WriterDelegationCompletion.self) != nil,
                 let event = try AgentTaskContent.decode(signal).writerEvent,
                 event.kind == .completed, rejectedCompletion == nil
             {
@@ -269,12 +269,23 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     let background = await WriterBackgroundProbe()
     let startBackground: WriterBackgroundExecution.Start? =
         [1, 12, 14].contains(mode) ? background.start : nil
+    let sink = WriterResultSink(blocksReports: mode == 7)
     let model = WriterNativeFixture(
         asks: asks, failsNetwork: mode == 6, invalidArguments: mode == 8, exactPatch: mode == 9,
         slowContent: mode == 10 || mode == 12, plainTextBeforeFinish: mode == 11, libraryOnly: mode == 13,
         editInstruction: mode == 0 ? "Write greeting. " + String(repeating: "保留标签。", count: 256) : "Write greeting"
     ) { request in
         if mode == 0, request == 3 { #expect(await startup.shown) }
+        if (mode == 0 && request == 5) || (mode == 6 && request == 3) {
+            let expected: WriterDelegationEvent.Kind = mode == 0 ? .draftUpdated : .recovering
+            let deadline = ContinuousClock.now + .seconds(5)
+            while await sink.signals.contains(where: {
+                (try? AgentTaskContent.decode($0).writerEvent?.kind) == expected
+            }) == false {
+                guard ContinuousClock.now < deadline else { throw WriterFailure.incomplete }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+        }
         if mode == 1, request == 2 { await background.expireFirstSegment() }
         if mode == 14, request == 5 { try await Task.sleep(for: .seconds(20)) }
         guard mode == 7, request == 1 || request == 3 else { return }
@@ -294,9 +305,8 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
             if !(await startup.shown) { #expect(try await workspace.inventory().isEmpty) }
             if mode == 3 { throw CancellationError() }
             return ChatModel(capability: model, modelName: "writer-fixture")
-        }, streaming: artifacts, history: journal, tasks: records.writerExecutions,
+        }, streaming: artifacts, history: journal, executions: records.writerExecutions,
         communications: records.agentMessages, startBackground: startBackground)
-    let sink = WriterResultSink(blocksReports: mode == 7)
     let session = UUID().uuidString
     let manager = AgentManager()
     try await manager.register(sink, sessionID: session)
@@ -315,12 +325,12 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     await writer.bind(try await output.consumer(for: writer), messaging: try await output.messaging(for: .writer))
     try await manager.start(.writer)
     let task = try await records.seedDelegation(
-        taskID: nil, goal: "写一段问候", input: "写一段问候", sourceDialog: nil, agent: "writer")
+        workspaceID: nil, goal: "写一段问候", input: "写一段问候", sourceDialog: nil, agent: "writer")
     let scope = try AgentTaskScope(
         id: task.delegateID, requester: .assistant, executor: .writer, sessionID: session, execution: .background)
     let signal = try AgentTaskSignal(
         kind: .request, scope: scope,
-        data: JSONEncoder().encode(["request": "写一段问候", "entry": "document.md"]))
+        data: JSONEncoder().encode(["request": "写一段问候"]))
     let messaging = try await output.messaging(for: .assistant)
     let report = try await messaging.send(
         signal.message(), parent: AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("写作")),
@@ -370,7 +380,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
                 #expect(
                     try await records.writerExecutions.request(task.delegateID, agent: "writer").status == "interrupted"
                 )
-                #expect(try await records.writerExecutions.taskNotification(scope.id, agent: "writer") != nil)
+                #expect(try await records.writerExecutions.delegationNotification(scope.id, agent: "writer") != nil)
                 await output.shutdown()
                 try await records.shutdown()
                 await islandState.stop()
@@ -410,7 +420,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
         try await Task.sleep(for: .milliseconds(10))
     }
     let retiredDeadline = ContinuousClock.now + .seconds(5)
-    while try await records.writerExecutions.taskNotification(scope.id, agent: "writer")?.retired != true {
+    while try await records.writerExecutions.delegationNotification(scope.id, agent: "writer")?.retired != true {
         guard ContinuousClock.now < retiredDeadline else { throw WriterFailure.incomplete }
         try await Task.sleep(for: .milliseconds(10))
     }
@@ -431,7 +441,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
         #expect(resultText.contains("系统已结束 Writer 的后台执行"))
         let saved = try await records.writerExecutions.request(task.delegateID, agent: "writer")
         #expect(saved.status == "interrupted")
-        let project = try await records.writerExecutions.task(saved.taskID, agent: "writer")
+        let project = try await records.writerExecutions.workspace(saved.workspaceID, agent: "writer")
         let id = try #require(WorkspaceID(rawValue: project.workspaceID))
         let checkpoint = try #require(try await workspace.checkpoint(for: id))
         #expect(checkpoint.draft.files["document.md"] == expectedSource)
@@ -449,7 +459,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
         #expect(try await workspace.inventory().isEmpty)
         #expect(await startup.shown == false)
         #expect(await model.requests == 2)
-        #expect(try await records.writerExecutions.task(task.id, agent: "writer").workspaceReady == false)
+        #expect(try await records.writerExecutions.workspace(task.id, agent: "writer").workspaceReady == false)
         await writer.stop()
         await output.shutdown()
         try await records.shutdown()
@@ -458,19 +468,19 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     }
     if mode == 5 {
         #expect(result.status == .failed)
-        let pending = try await records.writerExecutions.task(task.id, agent: "writer")
+        let pending = try await records.writerExecutions.workspace(task.id, agent: "writer")
         let project = pending.workspaceID
         // Files/index are prepared before UI presentation; a failed window does not erase the workspace.
         #expect(pending.workspaceReady)
         await model.restart()
         let retry = try await records.seedDelegation(
-            taskID: task.id, goal: "重试", input: "继续原任务", sourceDialog: nil, agent: "writer")
+            workspaceID: task.id, goal: "重试", input: "继续原任务", sourceDialog: nil, agent: "writer")
         let nextScope = try AgentTaskScope(
             id: retry.delegateID, requester: .assistant, executor: .writer, sessionID: session, execution: .background)
         let next = try AgentTaskSignal(
             kind: .request, scope: nextScope,
             data: JSONEncoder().encode([
-                "goal": "重试", "request": "继续原任务", "entry": "document.md",
+                "goal": "重试", "request": "继续原任务",
             ]))
         let receipt = try await messaging.send(
             next.message(), parent: .init(id: UUID().uuidString, sessionID: session, payload: .text("重试")), to: .writer)
@@ -480,12 +490,12 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
             guard ContinuousClock.now < until else { throw WriterFailure.incomplete }
             try await Task.sleep(for: .milliseconds(10))
         }
-        let completed = try await records.writerExecutions.task(task.id, agent: "writer")
+        let completed = try await records.writerExecutions.workspace(task.id, agent: "writer")
         #expect(completed.workspaceID == project && completed.workspaceReady)
         #expect(try await records.writerExecutions.request(retry.delegateID, agent: "writer").status == "completed")
         let roots = try FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent("writer").path)
         #expect(roots == [task.id])
-        #expect(project == "writer/" + task.id)
+        #expect(project == task.id)
         await writer.stop()
         await output.shutdown()
         try await records.shutdown()
@@ -538,8 +548,8 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
         await writer.setSceneActive(true)
     }
     if mode == 7 { #expect(verifiedIndependent) }
-    let saved = try await records.writerExecutions.task(task.id, agent: "writer")
-    #expect(saved.workspaceReady && saved.workspaceID == "writer/" + saved.id)
+    let saved = try await records.writerExecutions.workspace(task.id, agent: "writer")
+    #expect(saved.workspaceReady && saved.workspaceID == saved.id)
     if !asks { #expect(pausedDelivery) }
     #expect(try AgentTaskContent.decode(result).writerEvent?.eventID == (await sink.rejectedCompletion))
     let evidence = await sink.signals.filter {
@@ -548,9 +558,9 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     #expect(evidence.count == 1)
     #expect(try await workspace.list().first?.files["document.md"] == expectedSource)
     #expect(await model.requests == (mode == 9 ? 8 : asks || [8, 11].contains(mode) ? 7 : 6))
-    #expect(try AgentTaskContent.decode(result).artifactID != nil)
+    #expect(try AgentTaskContent.decode(result).writerEvent?.workspaceID != nil)
     let current = try await journal.readCurrent().current
-    let persistedCount = try await records.writerMessages.timelineCount(task: current.id)
+    let persistedCount = try await records.writerMessages.timelineCount(ownerID: current.id)
     #expect(
         current.turns.count == (mode == 9 ? 8 : asks ? 8 : [8, 11].contains(mode) ? 7 : 6),
         "scope=\(current.id), persisted=\(persistedCount), turns=\(current.turns.map(\.id))")
@@ -570,8 +580,10 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     let updates = await sink.signals.filter { $0.kind == .progress }.compactMap {
         try? AgentTaskContent.decode($0).writerEvent?.kind
     }
-    #expect(updates.allSatisfy { $0 == .started || $0 == .userInput })
-    #expect(updates.filter { $0 == .started }.count <= 1)
+    #expect(updates.allSatisfy { [.started, .userInput, .draftUpdated, .recovering].contains($0) })
+    for kind in [WriterDelegationEvent.Kind.started, .draftUpdated, .recovering] {
+        #expect(updates.filter { $0 == kind }.count <= 1)
+    }
 
     let recordedCalls = current.turns.flatMap { $0.modelRequests ?? [] }.flatMap(\.toolCalls)
     #expect(recordedCalls.allSatisfy { $0.state == .completed || mode == 8 && $0.state == .failed })
@@ -597,14 +609,14 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
         .init(
             call: .init(
                 actionPath: artifactFixturePath(parameters["command"] ?? ""),
-                parameters: parameters.merging(["workspaceID": "writer/task_1", "createWorkspace": "true"]) {
+                parameters: parameters.merging(["workspaceID": "workspace_1", "createWorkspace": "true"]) {
                     existing, _ in existing
                 }),
             context: .init(source: "writer", sessionID: "session", inputID: task, taskID: task),
             executionID: UUID().uuidString, results: ActionReportStore())
     }
     let first = try await service.perform(
-        invocation: invocation("one", ["command": "start", "workspaceID": "writer/task_1", "createWorkspace": "true"]))
+        invocation: invocation("one", ["command": "start", "workspaceID": "workspace_1", "createWorkspace": "true"]))
     let project = try #require(JSONDecoder().decode([String: String].self, from: Data(first.utf8))["workspaceID"])
     await #expect(throws: ArtifactWorkspaceError.busy) {
         try await service.perform(invocation: invocation("two", ["command": "start"]))
@@ -656,7 +668,7 @@ private func writerLifetimeInvocation(_ parameters: [String: String], session: S
     .init(
         call: .init(
             actionPath: artifactFixturePath(parameters["command"] ?? ""),
-            parameters: parameters.merging(["workspaceID": "writer/task_1", "createWorkspace": "true"]) {
+            parameters: parameters.merging(["workspaceID": "workspace_1", "createWorkspace": "true"]) {
                 existing, _ in existing
             }),
         context: .init(source: "writer", sessionID: session, inputID: UUID().uuidString, taskID: "delegate"),
@@ -726,7 +738,7 @@ private func writerLifetimeInvocation(_ parameters: [String: String], session: S
     }
     _ = try await call(["command": "render"])
     _ = try await call(["command": "finish"])
-    let project = try await workspace.project(#require(WorkspaceID(rawValue: "writer/task_1")))
+    let project = try await workspace.project(#require(WorkspaceID(rawValue: "workspace_1")))
     #expect(project.title == title)
     #expect(project.files[path] == source)
     try await service.release(delegateID: "delegate")
@@ -764,7 +776,7 @@ private func writerLifetimeInvocation(_ parameters: [String: String], session: S
     // Cleanup remains legal after revocation and retains the partial draft.
     try await service.abort(streamID: stream, delegateID: "delegate")
     try await service.release(delegateID: "delegate")
-    let id = try #require(WorkspaceID(rawValue: "writer/task_1"))
+    let id = try #require(WorkspaceID(rawValue: "workspace_1"))
     #expect(try await workspace.checkpoint(for: id)?.draft.files["index.html"] == "<p>preserved</p>")
     _ = try await service.perform(invocation: writerLifetimeInvocation(["command": "resume"]))
     await #expect(throws: ArtifactWorkspaceError.conflict) {
@@ -836,7 +848,7 @@ private func writerLifetimeInvocation(_ parameters: [String: String], session: S
     await #expect(throws: CancellationError.self) { try await preview.value }
     try await cleanup.value
     try await repeated.value
-    let id = try #require(WorkspaceID(rawValue: "writer/task_1"))
+    let id = try #require(WorkspaceID(rawValue: "workspace_1"))
     #expect(try await workspace.checkpoint(for: id)?.draft.files["index.html"] == "<p>first</p><p>second</p>")
     if !shutdown {
         _ = try await service.perform(invocation: writerLifetimeInvocation(["command": "resume"]))
@@ -898,7 +910,7 @@ private func writerLifetimeInvocation(_ parameters: [String: String], session: S
     let stream = try #require(JSONDecoder().decode([String: String].self, from: Data(response.utf8))["streamID"])
     try await service.append(streamID: stream, delegateID: "delegate", text: "<p>draft</p>")
     // Explicit filesystem failure fixture: checkpoint cannot create files beneath a regular file.
-    let directory = root.appendingPathComponent("writer/task_1")
+    let directory = root.appendingPathComponent("writer/workspace_1")
     try FileManager.default.removeItem(at: directory)
     try Data("blocked".utf8).write(to: directory)
     await #expect(throws: NativeCleanupFailure.self) { try await service.release(delegateID: "delegate") }
@@ -1006,7 +1018,7 @@ func writerCheckpointRevocationDistinguishesCommitFromCleanup(aborting: Bool) as
     }
     try await release.value
     #expect(await probe.wasCancelled == !aborting)
-    let id = try #require(WorkspaceID(rawValue: "writer/task_1"))
+    let id = try #require(WorkspaceID(rawValue: "workspace_1"))
     #expect(try await workspace.checkpoint(for: id)?.draft.files["index.html"] == "<p>checkpoint</p>")
     _ = try await service.perform(invocation: writerLifetimeInvocation(["command": "resume"]))
     await #expect(throws: ArtifactWorkspaceError.conflict) {
@@ -1042,7 +1054,7 @@ private actor WriterRenderProbe {
             invocation: FunctionInvocation(
                 call: .init(
                     actionPath: artifactFixturePath(parameters["command"] ?? ""),
-                    parameters: parameters.merging(["workspaceID": "writer/task_1", "createWorkspace": "true"]) {
+                    parameters: parameters.merging(["workspaceID": "workspace_1", "createWorkspace": "true"]) {
                         existing, _ in existing
                     }),
                 context: .init(source: "writer", sessionID: "s", inputID: "t", taskID: "t"),
@@ -1053,6 +1065,10 @@ private actor WriterRenderProbe {
     }
     let started = try strings(await call(["command": "start"]))
     let workspaceID = try #require(started["workspaceID"])
+    let namingProject = try #require(WorkspaceID(rawValue: workspaceID))
+    #expect(started["entryExists"] == "true" && started["entryEmpty"] == "true")
+    #expect(try await workspace.checkpoint(for: namingProject)?.draft.files == ["index.html": ""])
+    #expect(try await workspace.published(namingProject) == nil)
     #expect(await probe.prepared == 1)
     let first = try strings(
         await call(["command": "edit", "path": "index.html", "instruction": "Create", "title": "Simple flowchart"]))
@@ -1061,7 +1077,6 @@ private actor WriterRenderProbe {
     try await service.append(streamID: stream, delegateID: "t", text: "<h1 class=diagram>Hello</h1>")
     _ = try await service.complete(streamID: stream, delegateID: "t")
     #expect(await probe.frames.count == 1)  // Only the startup placeholder, no edit-driven render.
-    let namingProject = try #require(WorkspaceID(rawValue: workspaceID))
     #expect(try await workspace.checkpoint(for: namingProject)?.title == "Simple flowchart")
     _ = try await call(["command": "rename", "title": "Project flowchart"])
     #expect(try await workspace.checkpoint(for: namingProject)?.title == "Project flowchart")
@@ -1130,9 +1145,12 @@ private actor WriterRenderProbe {
     _ = try await call(["command": "render"])
     await #expect(throws: ArtifactWorkspaceError.renderRequired) { try await call(["command": "finish"]) }
     try await service.release(delegateID: "t")
-    _ = try await call(["command": "resume", "workspaceID": workspaceID])
+    let resumed = try strings(await call(["command": "resume", "workspaceID": workspaceID]))
+    #expect(resumed["entryExists"] == "true" && resumed["entryEmpty"] == "false")
     #expect(try await workspace.checkpoint(for: namingProject) == nil)
-    #expect(try await workspace.project(namingProject).title == "Project flowchart")
+    let published = try await workspace.project(namingProject)
+    #expect(published.title == "Project flowchart")
+    #expect(published.files["index.html"] == "<h1 class=diagram>Hello</h1>")
 
     #expect(await probe.prepared == 1)
     try await service.release(delegateID: "t")
@@ -1149,13 +1167,13 @@ private actor WriterRenderProbe {
     let store = WriterHistoryStore(
         records: try WriterRecordStore(repository: database.writerMessages, logs: database.logs))
     let task = try await database.seedDelegation(
-        taskID: nil, goal: "绘图", input: "画一张图", sourceDialog: assistant.id, agent: "writer")
+        workspaceID: nil, goal: "绘图", input: "画一张图", sourceDialog: assistant.id, agent: "writer")
     try await database.writerExecutions.prepareWorkspace(
-        task.workspaceID, taskID: task.id, delegateID: task.delegateID, agent: "writer")
+        workspaceID: task.id, delegateID: task.delegateID, agent: "writer")
     let history = WriterHistory(
-        store: store, taskID: task.id, delegateID: task.delegateID, goal: "画一张图 · project abc")
+        store: store, delegateID: task.delegateID, goal: "画一张图 · project abc")
     let definition =
-        #"{"type":"function","function":{"name":"workspace","parameters":{"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}}}"#
+        #"{"type":"function","function":{"name":"read","parameters":{"type":"object","properties":{"path":{"type":"string"},"offset":{"type":"string"}},"required":["path"]}}}"#
     let request = try ChatRequest(
         messages: [.init(role: .system, content: "Writer policy"), .init(role: .user, content: "<h1>中文 🌍</h1>")],
         maximumOutputTokens: 2048, temperature: 0.2,
@@ -1169,10 +1187,10 @@ private actor WriterRenderProbe {
     try await history.event(.text("<h1>完成</h1>"), id: id)
     let largeArguments = String(
         decoding: try JSONEncoder().encode([
-            "command": "read", "path": "index.html", "query": String(repeating: "source", count: 100000),
+            "path": "index.html", "offset": String(repeating: "1", count: 600_000),
         ]), as: UTF8.self)
     try await history.event(
-        .toolCall(.init(id: "call", name: "workspace", argumentsJSON: largeArguments)),
+        .toolCall(.init(id: "call", name: "read", argumentsJSON: largeArguments)),
         id: id)
     try await history.event(.usage(try .init(input: 5, generated: 7, total: 12)), id: id)
     try await history.event(.finished(.stop), id: id)
@@ -1185,7 +1203,7 @@ private actor WriterRenderProbe {
         .init(
             role: .assistant, content: "",
             toolCalls: [
-                .init(id: "call", name: "workspace", argumentsJSON: largeArguments)
+                .init(id: "call", name: "read", argumentsJSON: largeArguments)
             ]),
         .init(role: .tool, content: "Saved artifact abc", toolCallID: "call"),
     ])
@@ -1215,8 +1233,8 @@ private actor WriterRenderProbe {
     let reopened = try SQLiteRepositories(url: url)
     let restored = WriterHistoryStore(
         records: try WriterRecordStore(repository: reopened.writerMessages, logs: reopened.logs))
-    let restoredTask = try await reopened.writerExecutions.task(task.id, agent: "writer")
-    #expect(restoredTask.dialogID != dialog)
+    let restoredTask = try await reopened.writerExecutions.workspace(task.id, agent: "writer")
+    #expect(restoredTask.workspaceID != dialog)
     let value = try await WriterRecordStore(repository: reopened.writerMessages, logs: reopened.logs)
         .read(dialog)
     let record = try #require(value.turns.first { $0.id == id })
@@ -1225,7 +1243,7 @@ private actor WriterRenderProbe {
     let modelRequest = try #require(record.modelRequests?.first)
     #expect(modelRequest.requestParametersJSON?.contains("中文 🌍") == true)
     #expect(modelRequest.response == "<h1>完成</h1>")
-    #expect(modelRequest.decisionMetadata?.taskID == task.id)
+    #expect(modelRequest.decisionMetadata?.workspaceID == task.id)
     let snapshotJSON = try #require(
         value.turns.first { $0.id == largeSnapshot }?.modelRequests?.first?.requestParametersJSON)
     let snapshotRoot = try #require(JSONSerialization.jsonObject(with: Data(snapshotJSON.utf8)) as? [String: Any])
@@ -1249,9 +1267,10 @@ private actor WriterRenderProbe {
 
     let controller = await WriterContainer()
     try await controller.configureHistory(
-        messages: reopened.writerMessages, tasks: reopened.writerExecutions, communications: reopened.agentMessages,
+        messages: reopened.writerMessages, executions: reopened.writerExecutions,
+        communications: reopened.agentMessages,
         logs: reopened.logs)
-    let requestPage = try await controller.requests(taskID: task.id, after: 0)
+    let requestPage = try await controller.requests(workspaceID: task.id, after: 0)
     #expect(requestPage.items.first?.title == "读取 index.html")
     #expect(requestPage.items.first?.statusTitle == "已完成")
     let firstID = try #require(modelRequest.messageID)
@@ -1267,13 +1286,13 @@ private actor WriterRenderProbe {
     #expect(nextDetail.request?.maximumOutputTokens == nil)
     let sameRound = try reopened.writerMessages.detailContext(firstID, toolCallIDs: ["call"])
     #expect(sameRound.toolSources.isEmpty)
-    let completedTask = try await controller.task(task.id)
+    let completedTask = try await controller.workspace(task.id)
     #expect(
-        completedTask.updatedAt == (try await reopened.writerExecutions.task(task.id, agent: "writer")).updatedAt)
+        completedTask.updatedAt == (try await reopened.writerExecutions.workspace(task.id, agent: "writer")).updatedAt)
     #expect(completedTask.startedAt != nil && completedTask.requestCount > 0)
     let continuation = try await reopened.seedDelegation(
-        taskID: task.id, goal: "revise", input: "revise", sourceDialog: nil, agent: "writer")
-    let activeTask = try await controller.task(task.id)
+        workspaceID: task.id, goal: "revise", input: "revise", sourceDialog: nil, agent: "writer")
+    let activeTask = try await controller.workspace(task.id)
     #expect(activeTask.startedAt == completedTask.startedAt && activeTask.updatedAt >= completedTask.updatedAt)
     #expect(activeTask.requestCount == completedTask.requestCount)
     try await reopened.endSeedDelegation(continuation.delegateID, status: "completed", failure: nil)
@@ -1282,7 +1301,7 @@ private actor WriterRenderProbe {
     let failure = try #require(value.turns.first { $0.id == failed }?.modelRequests?.last?.failureDiagnostic)
     #expect(failure == diagnostic.storageValue && failure.details["networkCode"] == "-1001")
     let resumedContext = try await WriterHistory(
-        store: restored, taskID: task.id, delegateID: continuation.delegateID, goal: "Continue"
+        store: restored, delegateID: continuation.delegateID, goal: "Continue"
     ).restoredContext()
     #expect(resumedContext.isEmpty)
 
@@ -1290,8 +1309,8 @@ private actor WriterRenderProbe {
     let timed = try #require(projection.turns.first { $0.id == id }?.modelRequests?.first)
     #expect(WriterRecordPresentation.contentPath(timed) == "index.html")
     let inputTools = try #require(try WriterRecordPresentation.tools(timed))
-    #expect(inputTools.map(\.alias) == ["workspace"])
-    #expect(inputTools.first?.required == ["command"])
+    #expect(inputTools.map(\.alias) == ["read"])
+    #expect(inputTools.first?.required == ["path"])
     #expect(inputTools.first?.definitionJSON == definition)
     let contentOnly = try #require(projection.turns.first { $0.id == largeSnapshot }?.modelRequests?.first)
     #expect(try WriterRecordPresentation.tools(contentOnly)?.isEmpty == true)
@@ -1314,12 +1333,12 @@ private actor WriterRenderProbe {
     #expect(toolInput.logsCleared == true && toolInput.requestParametersJSON == nil)
     #expect(
         toolInput.inputMessages == [
-            .init(role: .tool, content: "Saved artifact abc", toolCallID: "call", toolName: "workspace")
+            .init(role: .tool, content: "Saved artifact abc", toolCallID: "call", toolName: "read")
         ])
     let clearedProjection = try JSONDecoder().decode(HistoryConversation.self, from: JSONEncoder().encode(cleared))
     #expect(
         clearedProjection.turns.first { $0.id == largeSnapshot }?.modelRequests?.first?.inputMessages?.first?.toolName
-            == "workspace")
+            == "read")
     let clearedRequest = try #require(clearedProjection.turns.first { $0.id == id }?.modelRequests?.first)
     #expect(WriterRecordPresentation.contentPath(clearedRequest) == "index.html")
     #expect(try WriterRecordPresentation.tools(clearedRequest)?.first?.definitionJSON == definition)
@@ -1335,8 +1354,8 @@ private actor WriterRenderProbe {
     let store = WriterHistoryStore(
         records: try WriterRecordStore(repository: records.writerMessages, logs: records.logs))
     let task = try await records.seedDelegation(
-        taskID: nil, goal: "Inspect", input: "Render", sourceDialog: nil, agent: "writer")
-    let history = WriterHistory(store: store, taskID: task.id, delegateID: task.delegateID, goal: "Inspect")
+        workspaceID: nil, goal: "Inspect", input: "Render", sourceDialog: nil, agent: "writer")
+    let history = WriterHistory(store: store, delegateID: task.delegateID, goal: "Inspect")
     let bytes = Data([1, 2, 3])  // Byte preservation fixture; not native image decoding.
     let request = try ChatRequest(messages: [
         .init(role: .user, content: "Render", images: [try .init(id: "screenshot", data: bytes)])
@@ -1369,6 +1388,8 @@ private actor WriterStartupProbe {
     func sawPartial() { partial = true }
     var shown = false
     func mark() { shown = true }
+    var placeholderPresentations = 0
+    func markPlaceholder() { placeholderPresentations += 1 }
 }
 
 @Test func delegatedWriterTasksKeepIdentityDirectoryAndNativeHistoryAcrossRuns() async throws {
@@ -1377,14 +1398,14 @@ private actor WriterStartupProbe {
     let database = try SQLiteRepositories(url: url)
     let source = try await database.assistantConversations.current()
     let first = try await database.seedDelegation(
-        taskID: nil, goal: "画流程图", input: "用户原始请求", sourceDialog: source.id, agent: "writer")
-    let project = "writer/" + first.id
+        workspaceID: nil, goal: "画流程图", input: "用户原始请求", sourceDialog: source.id, agent: "writer")
+    let project = first.id
     try await database.writerExecutions.prepareWorkspace(
-        project, taskID: first.id, delegateID: first.delegateID, agent: "writer")
+        workspaceID: first.id, delegateID: first.delegateID, agent: "writer")
     let journal = WriterHistoryStore(
         records: try WriterRecordStore(repository: database.writerMessages, logs: database.logs))
     let history = WriterHistory(
-        store: journal, taskID: first.id, delegateID: first.delegateID, goal: "画流程图", modelName: "fixture-model")
+        store: journal, delegateID: first.delegateID, goal: "画流程图", modelName: "fixture-model")
     let request = try ChatRequest(
         messages: [.init(role: .system, content: "policy"), .init(role: .user, content: "画流程图")],
         maximumOutputTokens: 2048, temperature: 0.2)
@@ -1392,32 +1413,32 @@ private actor WriterStartupProbe {
     try await history.recording(AgentModelRequestRecording(request).snapshot(initial: true), id: input)
     try await history.event(.text("先读文件"), id: input)
     try await history.event(
-        .toolCall(.init(id: "read-1", name: "workspace", argumentsJSON: "{\"command\":\"read\"}")), id: input)
+        .toolCall(.init(id: "read-1", name: "read", argumentsJSON: "{\"path\":\"document.md\"}")), id: input)
     try await history.finish(input)
     try await history.toolOutcome("read-1", output: "node A")
-    let migrated = try await history.restoredContext(availableTools: ["read"])
+    let migrated = try await history.restoredContext(availableTools: ["replace"])
     #expect(migrated.allSatisfy { $0.role != .tool && $0.toolCalls.isEmpty })
     #expect(migrated.contains { $0.content.contains("Earlier tool evidence") && $0.content.contains("node A") })
     try await database.endSeedDelegation(first.delegateID, status: "completed")
     let second = try await database.seedDelegation(
-        taskID: first.id, goal: "改为蓝色", input: "继续改成蓝色", sourceDialog: source.id, agent: "writer")
+        workspaceID: first.id, goal: "改为蓝色", input: "继续改成蓝色", sourceDialog: source.id, agent: "writer")
     #expect(second.id == first.id && second.delegateID != first.delegateID)
-    #expect(second.dialogID == first.dialogID && second.workspaceID == project && second.goal == "画流程图")
+    #expect(second.workspaceID == first.workspaceID && second.workspaceID == project && second.title == "画流程图")
     let restored = try await WriterHistory(
-        store: journal, taskID: first.id, delegateID: second.delegateID, goal: "改为蓝色"
+        store: journal, delegateID: second.delegateID, goal: "改为蓝色"
     )
     .restoredContext()
     #expect(restored.isEmpty)
-    #expect(try await journal.taskHistory(first.dialogID).turns.count == 1)
+    #expect(try await journal.ownerHistory(first.workspaceID).turns.count == 1)
     try await journal.clearRequestLogs(requestID: nil)
     let afterClear = try await WriterHistory(
-        store: journal, taskID: first.id, delegateID: second.delegateID, goal: "改为蓝色"
+        store: journal, delegateID: second.delegateID, goal: "改为蓝色"
     ).restoredContext()
     #expect(afterClear.map(\.content) == restored.map(\.content))
     #expect(afterClear.isEmpty)
     await #expect(throws: (any Error).self) {
         try await database.writerExecutions.prepareWorkspace(
-            UUID().uuidString, taskID: first.id, delegateID: first.delegateID, agent: "writer")
+            workspaceID: first.id, delegateID: first.delegateID, agent: "writer")
     }
     let cancelID = UUID().uuidString
     try await database.agentMessages.enqueueAgentMessage(
@@ -1427,37 +1448,37 @@ private actor WriterStartupProbe {
             replyTo: second.delegateID, dedupeKey: cancelID))
     try await database.endSeedDelegation(second.delegateID, status: "cancelled")
     let third = try await database.seedDelegation(
-        taskID: nil, goal: "新作品", input: "另画一张", sourceDialog: source.id, agent: "writer")
+        workspaceID: nil, goal: "新作品", input: "另画一张", sourceDialog: source.id, agent: "writer")
     #expect(
-        third.id != first.id && third.dialogID != first.dialogID && !third.workspaceReady
-            && third.workspaceID == "writer/" + third.id)
+        third.id != first.id && third.workspaceID != first.workspaceID && !third.workspaceReady
+            && third.workspaceID == third.id)
     #expect(try await journal.readCurrent().current.id == database.writerMessages.current().id)
     try await database.endSeedDelegation(third.delegateID, status: "failed", failure: "fixture failure")
     let resumedAgain = try await database.seedDelegation(
-        taskID: first.id, goal: "再次修改", input: "修改旧任务", sourceDialog: source.id, agent: "writer")
-    #expect(resumedAgain.workspaceID == project && resumedAgain.dialogID == first.dialogID)
+        workspaceID: first.id, goal: "再次修改", input: "修改旧任务", sourceDialog: source.id, agent: "writer")
+    #expect(resumedAgain.workspaceID == project && resumedAgain.workspaceID == first.workspaceID)
     let earlierContext = try await WriterHistory(
-        store: journal, taskID: first.id, delegateID: resumedAgain.delegateID, goal: "再次修改"
+        store: journal, delegateID: resumedAgain.delegateID, goal: "再次修改"
     ).restoredContext()
     #expect(earlierContext.isEmpty)
     try await database.endSeedDelegation(resumedAgain.delegateID, status: "completed")
     // Writer histories have no cascading ownership by the requesting Assistant dialog.
     _ = try await database.assistantConversations.rotate(source.id)
     try await database.assistantConversations.deleteDialog(source.id)
-    #expect(try await database.writerExecutions.task(first.id, agent: "writer").workspaceID == project)
+    #expect(try await database.writerExecutions.workspace(first.id, agent: "writer").workspaceID == project)
     await #expect(throws: RecordStorageError.invalidRecord) {
-        try await database.writerExecutions.tasks(agent: "assistant", before: nil, limit: 20)
+        try await database.writerExecutions.workspaces(agent: "assistant", before: nil, limit: 20)
     }
     try await database.shutdown()
     let reopened = try SQLiteRepositories(url: url)
     #expect(
-        try await reopened.writerExecutions.request(resumedAgain.delegateID, agent: "writer").taskID == first.id)
+        try await reopened.writerExecutions.request(resumedAgain.delegateID, agent: "writer").workspaceID == first.id)
     let runs = try await reopened.writerExecutions.requests(first.id, agent: "writer")
     #expect(runs.count == 3 && runs[1].status == "cancelled" && runs.last?.status == "completed")
     #expect(runs[1].cancellationReason == "Assistant requested cancellation")
     let records = WriterHistoryStore(
         records: try WriterRecordStore(repository: reopened.writerMessages, logs: reopened.logs))
-    let full = try await records.taskHistory(first.dialogID)
+    let full = try await records.ownerHistory(first.workspaceID)
     #expect(full.turns.first?.model == "")
     #expect(full.turns.first?.modelRequests?.first?.decisionMetadata?.delegateID == first.delegateID)
     try await reopened.shutdown()
@@ -1496,20 +1517,20 @@ private actor WriterStartupProbe {
 /// The fake Writer endpoint commits exactly the same trusted completion evidence as production.
 func fixtureWriterCompletion(
     _ content: AgentTaskContent, scope: AgentTaskScope, status: AgentTaskSignal.Status,
-    tasks: any WriterExecutionRepository
-) async throws -> WriterTaskCompletion {
-    let run = try await tasks.request(scope.id, agent: "writer")
+    executions: any WriterExecutionRepository
+) async throws -> WriterDelegationCompletion {
+    let run = try await executions.request(scope.id, agent: "writer")
     let event = try #require(content.writerEvent)
     let canonical = try AgentTaskContent(
         text: content.text, stage: .completed,
         interactionID: content.interactionID, artifactID: content.artifactID,
         writerEvent: .init(
             sequence: event.sequence, kind: event.kind, workspaceID: event.workspaceID,
-            windowID: event.windowID, taskID: run.taskID.isEmpty ? nil : run.taskID, delegateID: run.delegateID,
+            windowID: event.windowID, delegateID: run.delegateID,
             failure: event.failure,
             eventID: event.eventID))
-    let report = try WriterTaskCompletion(canonical.signal(.result, scope: scope, status: status))
-    try await tasks.completeRequest(
+    let report = try WriterDelegationCompletion(canonical.signal(.result, scope: scope, status: status))
+    try await executions.completeRequest(
         .init(
             delegateID: run.delegateID, agent: "writer", eventID: event.eventID,
             data: JSONEncoder().encode(report)), status: status == .succeeded ? "completed" : status.rawValue,
@@ -1544,7 +1565,7 @@ func writerAcceptsTwentyTasksWithAllUserNotificationsRejectedThenRestoresOnlyDel
         model: { await models.acquire() }, streaming: artifacts,
         history: WriterHistoryStore(
             records: try WriterRecordStore(repository: records.writerMessages, logs: records.logs)),
-        tasks: records.writerExecutions, communications: records.agentMessages)
+        executions: records.writerExecutions, communications: records.agentMessages)
     let sink = WriterResultSink(blocksReports: true)
     let session = UUID().uuidString
     let policy = try CommunicationPolicy(
@@ -1565,13 +1586,13 @@ func writerAcceptsTwentyTasksWithAllUserNotificationsRejectedThenRestoresOnlyDel
     var runs: [String] = []
     for index in 0..<20 {
         let record = try await records.seedDelegation(
-            taskID: nil, goal: "Goal \(index)", input: "Write greeting", sourceDialog: nil, agent: "writer")
+            workspaceID: nil, goal: "Goal \(index)", input: "Write greeting", sourceDialog: nil, agent: "writer")
         let scope = AgentTaskScope(
             id: record.delegateID, requester: .assistant, executor: .writer, sessionID: session, execution: .background)
         let request = try AgentTaskSignal(
             kind: .request, scope: scope,
             data: JSONEncoder().encode([
-                "goal": record.goal, "request": "Write greeting", "entry": "document.md",
+                "goal": record.title, "request": "Write greeting",
             ]))
         let receipt = try await port.send(
             request.message(), parent: .init(id: UUID().uuidString, sessionID: session, payload: .text("Write")),
@@ -1581,7 +1602,8 @@ func writerAcceptsTwentyTasksWithAllUserNotificationsRejectedThenRestoresOnlyDel
         while true {
             let run = try await records.writerExecutions.request(record.delegateID, agent: "writer")
             let retired =
-                try await records.writerExecutions.taskNotification(record.delegateID, agent: "writer")?.retired == true
+                try await records.writerExecutions.delegationNotification(record.delegateID, agent: "writer")?.retired
+                == true
             if run.status == "completed", retired { break }
             guard ContinuousClock.now < deadline else { throw WriterFailure.incomplete }
             try await Task.sleep(for: .milliseconds(10))
@@ -1591,7 +1613,7 @@ func writerAcceptsTwentyTasksWithAllUserNotificationsRejectedThenRestoresOnlyDel
             try await manager.taskExecutions(scope)
         }
         let notification = try #require(
-            try await records.writerExecutions.taskNotification(record.delegateID, agent: "writer"))
+            try await records.writerExecutions.delegationNotification(record.delegateID, agent: "writer"))
         #expect(!notification.delivered)
         eventIDs.insert(notification.eventID)
         runs.append(record.delegateID)
@@ -1618,7 +1640,7 @@ func writerAcceptsTwentyTasksWithAllUserNotificationsRejectedThenRestoresOnlyDel
     #expect(Set(terminalRuns) == Set(runs))
     #expect(try await workspace.list().count == 20)
     for run in runs {
-        #expect(try await records.writerExecutions.taskNotification(run, agent: "writer")?.delivered == false)
+        #expect(try await records.writerExecutions.delegationNotification(run, agent: "writer")?.delivered == false)
     }
     await writer.stop()
     await output.shutdown()
@@ -1627,7 +1649,7 @@ func writerAcceptsTwentyTasksWithAllUserNotificationsRejectedThenRestoresOnlyDel
     // Reopen with no execution grants, a new Writer incarnation and no delegated request.
     let reopened = try SQLiteRepositories(url: recordsURL)
     let restored = try WriterAgent(
-        model: { await models.acquire() }, streaming: artifacts, tasks: reopened.writerExecutions,
+        model: { await models.acquire() }, streaming: artifacts, executions: reopened.writerExecutions,
         communications: reopened.agentMessages)
     let resumedSink = WriterResultSink()
     let newManager = AgentManager()
@@ -1645,9 +1667,9 @@ func writerAcceptsTwentyTasksWithAllUserNotificationsRejectedThenRestoresOnlyDel
         try await Task.sleep(for: .milliseconds(20))
     }
     while true {
-        let notices = try await reopened.writerExecutions.pendingTaskNotifications(
+        let notices = try await reopened.writerExecutions.pendingDelegationNotifications(
             agent: "writer", retirement: false, after: nil, limit: 1)
-        let retirements = try await reopened.writerExecutions.pendingTaskNotifications(
+        let retirements = try await reopened.writerExecutions.pendingDelegationNotifications(
             agent: "writer", retirement: true, after: nil, limit: 1)
         if notices.isEmpty && retirements.isEmpty { break }
         guard ContinuousClock.now < deadline else { throw WriterFailure.incomplete }
@@ -1657,7 +1679,7 @@ func writerAcceptsTwentyTasksWithAllUserNotificationsRejectedThenRestoresOnlyDel
     #expect(Set(try delivered.map { try #require(try AgentTaskContent.decode($0).writerEvent?.eventID) }) == eventIDs)
     #expect(await models.count == 20)
     #expect(await restored.observationSnapshot().business["phase"] == .text("idle"))
-    #expect(try await reopened.writerExecutions.tasks(agent: "writer", before: nil, limit: 50).count == 20)
+    #expect(try await reopened.writerExecutions.workspaces(agent: "writer", before: nil, limit: 50).count == 20)
     for run in runs {
         #expect(try await reopened.writerExecutions.request(run, agent: "writer").status == "completed")
     }
@@ -1672,27 +1694,28 @@ func writerAcceptsTwentyTasksWithAllUserNotificationsRejectedThenRestoresOnlyDel
     defer { try? FileManager.default.removeItem(at: url) }
     let database = try SQLiteRepositories(url: url)
     let first = try await database.seedDelegation(
-        taskID: nil, goal: "First", input: "First input", sourceDialog: nil, agent: "writer")
+        workspaceID: nil, goal: "First", input: "First input", sourceDialog: nil, agent: "writer")
     let event = UUID().uuidString
-    let notification = TaskNotification(
+    let notification = WriterDelegationNotification(
         delegateID: first.delegateID, agent: "writer", eventID: event, data: Data("{\"text\":\"immutable fact\"}".utf8))
     try await database.writerExecutions.completeRequest(notification, status: "completed", failure: nil)
     try await database.writerExecutions.completeRequest(notification, status: "completed", failure: nil)
-    try await database.writerExecutions.finishTaskNotification(
+    try await database.writerExecutions.finishDelegationNotification(
         first.delegateID, agent: "writer", retirement: true, completed: true, failure: nil)
     let second = try await database.seedDelegation(
-        taskID: nil, goal: "Second", input: "Second input", sourceDialog: nil, agent: "writer")
+        workspaceID: nil, goal: "Second", input: "Second input", sourceDialog: nil, agent: "writer")
     await #expect(throws: (any Error).self) {
         try await database.writerExecutions.completeRequest(
-            TaskNotification(delegateID: second.delegateID, agent: "writer", eventID: event, data: notification.data),
+            WriterDelegationNotification(
+                delegateID: second.delegateID, agent: "writer", eventID: event, data: notification.data),
             status: "completed", failure: nil)
     }
     // The failed notification insert must roll back the execution terminal update too.
     #expect(try await database.writerExecutions.request(second.delegateID, agent: "writer").status == "running")
-    #expect(try await database.writerExecutions.taskNotification(second.delegateID, agent: "writer") == nil)
+    #expect(try await database.writerExecutions.delegationNotification(second.delegateID, agent: "writer") == nil)
     await #expect(throws: RecordStorageError.conflict) {
         try await database.writerExecutions.completeRequest(
-            TaskNotification(
+            WriterDelegationNotification(
                 delegateID: first.delegateID, agent: "writer", eventID: event,
                 data: Data("{\"text\":\"different\"}".utf8)),
             status: "completed", failure: nil)
@@ -1700,28 +1723,29 @@ func writerAcceptsTwentyTasksWithAllUserNotificationsRejectedThenRestoresOnlyDel
     await #expect(throws: RecordStorageError.invalidRecord) {
         try await database.writerExecutions.request(first.delegateID, agent: "assistant")
     }
-    try await database.writerExecutions.finishTaskNotification(
+    try await database.writerExecutions.finishDelegationNotification(
         first.delegateID, agent: "writer", retirement: true, completed: true, failure: nil)
     #expect(
-        try await database.writerExecutions.pendingTaskNotifications(
+        try await database.writerExecutions.pendingDelegationNotifications(
             agent: "writer", retirement: true, after: nil, limit: 32
         )
         .isEmpty)
     #expect(
-        try await database.writerExecutions.pendingTaskNotifications(
+        try await database.writerExecutions.pendingDelegationNotifications(
             agent: "writer", retirement: false, after: nil, limit: 32
         )
         .count == 1)
     try await database.shutdown()
     let reopened = try SQLiteRepositories(url: url)
-    let restored = try #require(try await reopened.writerExecutions.taskNotification(first.delegateID, agent: "writer"))
+    let restored = try #require(
+        try await reopened.writerExecutions.delegationNotification(first.delegateID, agent: "writer"))
     #expect(restored.data == notification.data && restored.eventID == event)
     #expect(restored.retired && !restored.delivered)
-    try await reopened.writerExecutions.finishTaskNotification(
+    try await reopened.writerExecutions.finishDelegationNotification(
         first.delegateID, agent: "writer", retirement: false, completed: true, failure: nil,
         claimToken: restored.claimToken)
     #expect(
-        try await reopened.writerExecutions.pendingTaskNotifications(
+        try await reopened.writerExecutions.pendingDelegationNotifications(
             agent: "writer", retirement: false, after: nil, limit: 32
         )
         .isEmpty)
@@ -1763,7 +1787,7 @@ private actor WriterBatchEffectProbe {
     defer { try? FileManager.default.removeItem(at: url) }
     let database = try SQLiteRepositories(url: url)
     let task = try await database.seedDelegation(
-        taskID: nil, goal: "Pair recovery", input: "Demo", sourceDialog: nil, agent: "writer")
+        workspaceID: nil, goal: "Pair recovery", input: "Demo", sourceDialog: nil, agent: "writer")
     let store = WriterHistoryStore(
         records: try WriterRecordStore(repository: database.writerMessages, logs: database.logs))
     let model = WriterBatchFailureModel()
@@ -1780,7 +1804,7 @@ private actor WriterBatchEffectProbe {
     await #expect(throws: WriterPermanentFixtureFailure.self) {
         try await WriterWorkflow(
             model: model,
-            history: WriterHistory(store: store, taskID: task.id, delegateID: task.delegateID, goal: "Demo")
+            history: WriterHistory(store: store, delegateID: task.delegateID, goal: "Demo")
         )
         .run(goal: "Demo", scope: task.delegateID, tools: tools)
     }
@@ -1855,15 +1879,15 @@ private actor WriterPreviewProbe {
     defer { try? FileManager.default.removeItem(at: url) }
     let records = try SQLiteRepositories(url: url)
     let delegation = try await records.seedDelegation(
-        taskID: nil, goal: "report", input: "report", sourceDialog: nil, agent: "writer")
+        workspaceID: nil, goal: "report", input: "report", sourceDialog: nil, agent: "writer")
     let store = WriterHistoryStore(
         records: try WriterRecordStore(repository: records.writerMessages, logs: records.logs))
-    let history = WriterHistory(store: store, taskID: delegation.id, delegateID: delegation.delegateID, goal: "report")
+    let history = WriterHistory(store: store, delegateID: delegation.delegateID, goal: "report")
     let request = try ChatRequest(messages: [.init(role: .user, content: "generate")])
     for i in 1...25 {
         let id = try await history.begin(request, phase: "文件内容请求", attempt: i == 25 ? 2 : 1, path: "index.html")
         if i == 1 {
-            let starting = try await store.requestPreviews(delegation.dialogID, after: 0)
+            let starting = try await store.requestPreviews(delegation.workspaceID, after: 0)
             #expect(starting.first?.state == "generating")
             #expect(starting.first?.metadata["path"] == "index.html")
             #expect(starting.first?.response.isEmpty == true)
@@ -1872,10 +1896,10 @@ private actor WriterPreviewProbe {
         try await history.event(.finished(.stop), id: id)
         try await history.finish(id)
     }
-    #expect(try await store.requestCount(delegation.dialogID) == 25)
-    let first = try await store.requestPreviews(delegation.dialogID, after: 0)
+    #expect(try await store.requestCount(delegation.workspaceID) == 25)
+    let first = try await store.requestPreviews(delegation.workspaceID, after: 0)
     #expect(first.count == 20 && first.first?.ordinal == 1 && first.last?.ordinal == 20)
-    let second = try await store.requestPreviews(delegation.dialogID, after: #require(first.last?.position))
+    let second = try await store.requestPreviews(delegation.workspaceID, after: #require(first.last?.position))
     #expect(second.count == 5 && second.last?.ordinal == 25)
     #expect(second.last?.metadata["path"] == "index.html")
     #expect(second.last?.metadata["attempt"] == "2")
@@ -1883,11 +1907,11 @@ private actor WriterPreviewProbe {
     try await records.shutdown()
     let reopened = try SQLiteRepositories(url: url)
     let journal = try WriterRecordStore(repository: reopened.writerMessages, logs: reopened.logs)
-    #expect(try await journal.requestCount(delegation.dialogID) == 25)
+    #expect(try await journal.requestCount(delegation.workspaceID) == 25)
     let other = try AssistantRecordStore(
         repository: reopened.assistantMessages, tasks: reopened.assistantTasks,
         conversations: reopened.assistantConversations, logs: reopened.logs)
-    await #expect(throws: (any Error).self) { try await other.requestPreviews(delegation.dialogID, after: 0) }
+    await #expect(throws: (any Error).self) { try await other.requestPreviews(delegation.workspaceID, after: 0) }
     try await reopened.shutdown()
 }
 
@@ -1909,7 +1933,7 @@ private actor WriterPreviewProbe {
                 pages.closeSessions()
                 try? FileManager.default.removeItem(at: root)
             }
-            let project = try #require(WorkspaceID(agent: "writer", taskID: "task_1"))
+            let project = try #require(WorkspaceID(rawValue: "workspace_1"))
             let source = """
                 # 软件工程流程图
 
@@ -1961,7 +1985,7 @@ private actor WriterPreviewProbe {
                 pages.closeSessions()
                 try? FileManager.default.removeItem(at: root)
             }
-            let project = try #require(WorkspaceID(agent: "writer", taskID: "task_1"))
+            let project = try #require(WorkspaceID(rawValue: "workspace_1"))
             let first = Task { @MainActor in
                 try await presentation.present(
                     id: project, title: "Preview", entry: "pages/index.html",
@@ -2007,14 +2031,14 @@ private actor WriterPreviewProbe {
             #expect(hidden.contains("deferred"))
             #expect(native.title == "Published")
             #expect(try await presentation.snapshot(id: project) == nil)
-            let second = try #require(WorkspaceID(agent: "writer", taskID: "task_2"))
+            let second = try #require(WorkspaceID(rawValue: "workspace_2"))
             _ = try await presentation.present(
                 id: second, title: "Diagram", entry: "index.html",
                 files: ["index.html": "<title>Second background project</title><h1>Second</h1>"], preview: true)
             #expect(windows.windows.count == 1)
             presentation.describe(id: project, title: nil, subtitle: "Saved in background")
             // Reject the next snapshot slot for one window, while allowing its peer to restore.
-            let blockedSlot = root.appendingPathComponent("previews/" + project.rawValue + "/1")
+            let blockedSlot = root.appendingPathComponent("previews/" + project.storagePath + "/1")
             try FileManager.default.removeItem(at: blockedSlot)
             try FileManager.default.createSymbolicLink(at: blockedSlot, withDestinationURL: root)
             windows.setAvailable(true)
@@ -2075,7 +2099,7 @@ private actor WriterPreviewProbe {
             #expect(windows.focusedID == window.id)
             #expect(try await page.observe().title == "Hidden minimized update")
 
-            let previewRoot = root.appendingPathComponent("previews/" + project.rawValue)
+            let previewRoot = root.appendingPathComponent("previews/" + project.storagePath)
             let slots = try FileManager.default.contentsOfDirectory(at: previewRoot, includingPropertiesForKeys: nil)
                 .filter { $0.lastPathComponent != "preview.html" }
             #expect(slots.count == 2)
@@ -2127,7 +2151,7 @@ private actor WriterPreviewProbe {
                 pages.closeSessions()
                 try? FileManager.default.removeItem(at: root)
             }
-            let project = try #require(WorkspaceID(agent: "writer", taskID: "task_1"))
+            let project = try #require(WorkspaceID(rawValue: "workspace_1"))
             await presentation.setSceneActive(false)
             _ = try await presentation.present(
                 id: project, title: "Draft", entry: "index.html", files: ["index.html": "<title>Draft</title>"],
@@ -2164,7 +2188,7 @@ private actor WriterPreviewProbe {
                 pages.closeSessions()
                 try? FileManager.default.removeItem(at: root)
             }
-            let project = try #require(WorkspaceID(agent: "writer", taskID: "task_1"))
+            let project = try #require(WorkspaceID(rawValue: "workspace_1"))
             let opening = Task { @MainActor in
                 try await presentation.present(
                     id: project, title: "Flowchart", entry: "index.html",
@@ -2197,24 +2221,25 @@ private actor WriterPreviewProbe {
 #endif
 
 @Test func writerRequestNamesUseActualCallsAndKeepStatusSeparateFromModelCompletion() throws {
-    func call(_ values: [String: String], state: String = "completed") throws -> WriterToolPreview {
+    func call(_ name: String, _ values: [String: String] = [:], state: String = "completed") throws -> WriterToolPreview
+    {
         .init(
-            name: "workspace", argumentsJSON: String(decoding: try JSONEncoder().encode(values), as: UTF8.self),
+            name: name, argumentsJSON: String(decoding: try JSONEncoder().encode(values), as: UTF8.self),
             state: state)
     }
-    let read = try call(["command": "read", "path": "index.html"])
-    let edit = try call(["command": "edit", "path": "index.html", "instruction": "修改流程图布局"])
+    let read = try call("read", ["path": "index.html"])
+    let edit = try call("edit", ["path": "index.html", "instruction": "修改流程图布局"])
     let combined = WriterRequestNaming.summary(phase: "控制请求", path: nil, calls: [read, read, edit])
     #expect(combined == "读取 index.html、修改流程图布局")
     let content = WriterRequestNaming.summary(phase: "文件内容请求", path: "styles/main.css", calls: [])
     #expect(content == "编写 styles/main.css")
-    let source = try call(["command": "edit", "path": "index.html", "instruction": "<html>code</html>"])
+    let source = try call("edit", ["path": "index.html", "instruction": "<html>code</html>"])
     #expect(WriterRequestNaming.summary(phase: "控制请求", path: nil, calls: [source]) == "编写 index.html")
     #expect(
-        WriterRequestNaming.state(request: "completed", calls: [try call(["command": "read"], state: "failed")])
+        WriterRequestNaming.state(request: "completed", calls: [try call("read", state: "failed")])
             == "failed")
     #expect(
-        WriterRequestNaming.state(request: "completed", calls: [try call(["command": "read"], state: "received")])
+        WriterRequestNaming.state(request: "completed", calls: [try call("read", state: "received")])
             == "executing")
     #expect(WriterRequestNaming.state(request: "cancelled", calls: [read]) == "cancelled")
     #expect(WriterRequestNaming.state(request: "cancelled", calls: [], pending: true) == "cancelled")
@@ -2228,13 +2253,14 @@ private actor WriterPreviewProbe {
     let store = WriterHistoryStore(
         records: try WriterRecordStore(repository: database.writerMessages, logs: database.logs))
     let task = try await database.seedDelegation(
-        taskID: nil, goal: "Large", input: "Large", sourceDialog: nil, agent: "writer")
-    let history = WriterHistory(store: store, taskID: task.id, delegateID: task.delegateID, goal: "Large")
+        workspaceID: nil, goal: "Large", input: "Large", sourceDialog: nil, agent: "writer")
+    let history = WriterHistory(store: store, delegateID: task.delegateID, goal: "Large")
     let request = try ChatRequest(messages: [.init(role: .user, content: "Create")])
     let input = try await history.begin(request, phase: "control")
     let source = String(repeating: "<p>source</p>", count: 30000)
     let result = String(repeating: "file result ", count: 30000)
-    try await history.event(.toolCall(.init(id: "read", name: "workspace", argumentsJSON: "{}")), id: input)
+    try await history.event(
+        .toolCall(.init(id: "read", name: "read", argumentsJSON: #"{"path":"index.html"}"#)), id: input)
     try await history.event(.text(source), id: input)
     try await history.finish(input)
     try await history.toolOutcome("read", output: result)
@@ -2248,12 +2274,13 @@ private actor WriterPreviewProbe {
     let reopened = try SQLiteRepositories(url: url)
     let restored = WriterHistoryStore(
         records: try WriterRecordStore(repository: reopened.writerMessages, logs: reopened.logs))
-    let record = try #require(try await restored.taskHistory(task.dialogID).turns.first)
+    let record = try #require(try await restored.ownerHistory(task.workspaceID).turns.first)
     #expect(record.response == source)
     #expect(record.modelRequests?.first?.toolCalls.first?.output == result)
     let controller = await WriterContainer()
     try await controller.configureHistory(
-        messages: reopened.writerMessages, tasks: reopened.writerExecutions, communications: reopened.agentMessages,
+        messages: reopened.writerMessages, executions: reopened.writerExecutions,
+        communications: reopened.agentMessages,
         logs: reopened.logs)
     let detail = try await controller.requestDetail(try #require(record.modelRequests?.first?.messageID))
     #expect(detail.finalization?.state == .completed && detail.finalization?.result == result)
@@ -2283,18 +2310,18 @@ private actor WriterPreviewProbe {
     defer { try? FileManager.default.removeItem(at: root) }
     let workspace = ArtifactWorkspace(
         disk: try DiskFileStore(root: root), catalog: try await workspaceFixtureRepositories().workspaces)
-    let id = try #require(WorkspaceID(rawValue: "writer/task_1"))
+    let id = try #require(WorkspaceID(rawValue: "workspace_1"))
     let original = try await workspace.publish(
         id: id, expecting: nil, title: "流程图", draft: ArtifactDraft(files: ["index.html": "<p>original</p>"]))
     let service = ArtifactService(workspace: workspace) { target, title, _, files, preview in
         #expect(target == id && title == "流程图" && files == original.files && !preview)
         return #"{"windowID":"window_1"}"#
     }
-    func call(_ command: String, source: String = "writer", task: String = "task_1") -> FunctionInvocation {
+    func call(_ command: String, source: String = "writer", task: String = "workspace_1") -> FunctionInvocation {
         .init(
             call: .init(
                 actionPath: artifactFixturePath(command),
-                parameters: ["command": command, "taskID": task, "query": "流程"]),
+                parameters: ["command": command, "workspaceID": task, "query": "流程"]),
             context: .init(source: source, sessionID: "library", inputID: "lookup", taskID: "delegate"),
             executionID: UUID().uuidString, results: ActionReportStore())
     }
@@ -2308,10 +2335,10 @@ private actor WriterPreviewProbe {
     #expect(try await workspace.project(id) == original)
     #expect(try await workspace.checkpoint(for: id) == nil)
     await #expect(throws: ArtifactWorkspaceError.missingProject) {
-        try await service.perform(invocation: call("open", task: "task_999"))
+        try await service.perform(invocation: call("open", task: "workspace_999"))
     }
     await #expect(throws: ArtifactWorkspaceError.invalidPath) {
-        try await service.perform(invocation: call("open", task: "../task_1"))
+        try await service.perform(invocation: call("open", task: "../workspace_1"))
     }
     #expect(try await workspace.inventory().count == 1)
     _ = try await service.perform(invocation: call("delete"))
@@ -2324,11 +2351,13 @@ private actor WriterCohesionModel: ChatCapability {
     nonisolated let supportsToolCalls = true
     let mode: String
     let target: String
+    let verifyInvalidEntry: @Sendable () async throws -> Void
     var round = 0
     var commands: [String] = []
-    init(mode: String, target: String) {
+    init(mode: String, target: String, verifyInvalidEntry: @escaping @Sendable () async throws -> Void) {
         self.mode = mode
         self.target = target
+        self.verifyInvalidEntry = verifyInvalidEntry
     }
     func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
         let pair = InferenceSession<ChatEvent>.make(limits: try .init(), estimatedBytes: { $0.estimatedBytes })
@@ -2342,11 +2371,11 @@ private actor WriterCohesionModel: ChatCapability {
                 let prompt = try #require(request.messages.first?.content)
                 #expect(prompt.contains(try AgentConfigurations.skillInstructions("writer-workspace")))
                 #expect(!prompt.contains(try AgentConfigurations.skillInstructions("writer-file-editing")))
-                #expect(request.tools.contains { $0.name == "searchWorkspaces" })
+                #expect(request.tools.contains { $0.name == "workspace.search" })
                 #expect(!request.tools.contains { $0.name == "edit" })
                 #expect(
                     !request.messages.contains {
-                        $0.role == .user && $0.content.contains("Workspace: writer/" + target + "\n")
+                        $0.role == .user && $0.content.contains("Workspace: " + target + "\n")
                     })
             }
             guard round < 14 else { throw WriterFailure.incomplete }
@@ -2354,38 +2383,48 @@ private actor WriterCohesionModel: ChatCapability {
             switch mode {
             case "explanation": sequence = ["explanation"]
             case "declined": sequence = ["declined"]
-            case "render-retry": sequence = ["searchWorkspaces", "create", "edit", "finish", "render", "finish"]
+            case "render-retry": sequence = ["workspace.create", "edit", "finish", "render", "finish"]
             case "explanation-after-edit":
-                sequence = ["searchWorkspaces", "create", "edit", "explanation", "render", "finish"]
+                sequence = ["workspace.create", "edit", "explanation", "render", "finish"]
             case "read-before-enter":
-                sequence = ["read", "searchWorkspaces", "enter", "read", "replace", "render", "finish"]
+                sequence = ["read", "workspace.search", "workspace.enter", "read", "replace", "render", "finish"]
             case "clarify-enter":
-                sequence = ["searchWorkspaces", "ask", "enter", "read", "replace", "render", "finish"]
+                sequence = ["workspace.search", "ask", "workspace.enter", "read", "replace", "render", "finish"]
             case "clarify-workspace":
-                sequence = ["searchWorkspaces", "enter", "ask", "read", "replace", "render", "finish"]
+                sequence = ["workspace.search", "workspace.enter", "ask", "read", "replace", "render", "finish"]
             case "switch-after-edit":
                 sequence = [
-                    "searchWorkspaces", "create", "edit", "searchWorkspaces", "open", "enter", "read", "replace",
-                    "render",
+                    "workspace.create", "edit", "workspace.open", "workspace.enter", "read", "replace", "render",
                     "finish",
                 ]
             case "switch-failure":
-                sequence = ["searchWorkspaces", "create", "edit", "searchWorkspaces", "enter", "render", "finish"]
-            case "open": sequence = ["searchWorkspaces", "open", "finish"]
-            case "open-multiple": sequence = ["searchWorkspaces", "openBatch", "finish"]
-            case "open-multiple-partial": sequence = ["searchWorkspaces", "openBatch", "summaryOnly", "finish"]
-            default: sequence = ["searchWorkspaces", "enter", "read", "replace", "render", "finish"]
+                sequence = ["workspace.create", "edit", "workspace.search", "workspace.enter", "render", "finish"]
+            case "duplicate-create":
+                sequence = [
+                    "workspace.create", "workspace.create", "workspace.create", "edit", "render", "finish",
+                ]
+            case "legacy-missing-entry":
+                sequence = ["workspace.search", "workspace.enter", "read", "edit", "render", "finish"]
+            case "open": sequence = ["workspace.open", "finish"]
+            case "direct-enter": sequence = ["workspace.enter", "read", "replace", "render", "finish"]
+            case "unavailable-workspace":
+                sequence = ["workspace.open", "workspace.enter", "workspace.open", "explanation"]
+            case "open-multiple": sequence = ["workspace.search", "openBatch", "finish"]
+            case "open-multiple-partial": sequence = ["workspace.search", "openBatch", "summaryOnly", "finish"]
+            default: sequence = ["workspace.search", "workspace.enter", "read", "replace", "render", "finish"]
             }
             let command = sequence[min(round - 1, sequence.count - 1)]
-            if round > 1, ["enter", "create"].contains(commands.last ?? ""),
-                !mode.hasPrefix("switch-") || commands.last == "create"
+            if round > 1, ["workspace.enter", "workspace.create"].contains(commands.last ?? ""),
+                !mode.hasPrefix("switch-") || commands.last == "workspace.create",
+                mode != "duplicate-create" || round == 3,
+                mode != "unavailable-workspace"
             {
                 let prompt = try #require(request.messages.first?.content)
                 #expect(prompt.contains("Workspace editing domain"))
                 #expect(request.messages.count == 2 && !prompt.contains("Workspace library domain"))
                 #expect(prompt.contains(try AgentConfigurations.skillInstructions("writer-workspace")))
                 #expect(prompt.contains(try AgentConfigurations.skillInstructions("writer-file-editing")))
-                #expect(request.tools.contains { $0.name == "searchWorkspaces" })
+                #expect(request.tools.contains { $0.name == "workspace.search" })
                 #expect(request.tools.contains { $0.name == "edit" })
             }
             if mode == "clarify-workspace", commands.last == "ask" {
@@ -2393,22 +2432,46 @@ private actor WriterCohesionModel: ChatCapability {
                 #expect(prompt.contains("Workspace editing domain"))
                 #expect(prompt.contains(try AgentConfigurations.skillInstructions("writer-file-editing")))
                 let tools = request.messages.flatMap(\.toolCalls)
-                #expect(!tools.contains { $0.name == "searchWorkspaces" })
+                #expect(!tools.contains { $0.name == "workspace.search" })
                 #expect(tools.contains { $0.name == "ask" })
             }
-            if mode == "switch-after-edit", commands.last == "open" {
-                #expect(request.messages.first?.content.contains("Active workspace: writer/task_2") == true)
+            if mode == "switch-after-edit", commands.last == "workspace.open" {
+                #expect(request.messages.first?.content.contains("Active workspace: workspace_2") == true)
                 #expect(request.messages.last(where: { $0.role == .tool })?.content.contains("window_1") == true)
             }
-            if mode == "switch-after-edit", commands.last == "enter" {
-                #expect(request.messages.first?.content.contains("Active workspace: writer/" + target) == true)
+            if mode == "switch-after-edit", commands.last == "workspace.enter" {
+                #expect(request.messages.first?.content.contains("Active workspace: " + target) == true)
                 #expect(request.messages.contains { $0.content.contains("Previous draft retained") })
             }
-            if mode == "switch-failure", commands.last == "enter" {
-                #expect(request.messages.first?.content.contains("Active workspace: writer/task_2") == true)
+            if mode == "switch-failure", commands.last == "workspace.enter" {
+                #expect(request.messages.first?.content.contains("Active workspace: workspace_2") == true)
                 #expect(
                     request.messages.contains { $0.role == .tool && $0.content.contains("Previous workspace restored") }
                 )
+            }
+            if mode == "duplicate-create" {
+                switch round {
+                case 2:
+                    #expect(request.messages.last?.content.contains("invalidEntry") == true)
+                    #expect(request.messages.last?.content.contains("flowchart.html") == true)
+                    try await verifyInvalidEntry()
+                case 3:
+                    #expect(request.messages[1].content.contains("\"entryExists\":true"))
+                    #expect(request.messages[1].content.contains("\"entryEmpty\":true"))
+                case 4:
+                    #expect(request.messages.first?.content.contains("Active workspace: workspace_2") == true)
+                    #expect(request.messages.last?.content.contains("workspaceAlreadyCreated") == true)
+                    #expect(request.messages.last?.content.contains("workspace_2") == true)
+                default: break
+                }
+            }
+            if mode == "legacy-missing-entry", round == 4 {
+                #expect(request.messages[1].content.contains("\"entryExists\":false"))
+                #expect(request.messages.last?.content.contains("workspaceEntryMissing") == true)
+                #expect(request.messages.last?.content.contains("edit(path: document.md") == true)
+            }
+            if mode == "unavailable-workspace", round > 1 {
+                #expect(request.messages.last?.content.contains("workspaceUnavailable") == true)
             }
             commands.append(command)
             if command == "summaryOnly" {
@@ -2423,13 +2486,13 @@ private actor WriterCohesionModel: ChatCapability {
                 let matches = try #require(catalog["matches"] as? [[String: String]])
                 #expect(matches.count == 5)
                 for item in matches {
-                    let id = try #require(item["taskID"])
-                    if mode == "open-multiple-partial", id == "task_5" { continue }
-                    let args = ["taskID": id]
+                    let id = try #require(item["workspaceID"])
+                    if mode == "open-multiple-partial", id == "workspace_5" { continue }
+                    let args = ["workspaceID": id]
                     try pair.emitter.yield(
                         .toolCall(
                             .init(
-                                id: "open-" + id, name: "open",
+                                id: "open-" + id, name: "workspace.open",
                                 argumentsJSON: String(decoding: try JSONEncoder().encode(args), as: UTF8.self))))
                 }
                 try pair.emitter.yield(.finished(.toolCalls))
@@ -2438,15 +2501,14 @@ private actor WriterCohesionModel: ChatCapability {
             }
             var args = ["command": command]
             switch command {
-            case "enter", "open": args["taskID"] = target
-            case "searchWorkspaces":
-                args["query"] =
-                    ["render-retry", "explanation-after-edit", "switch-after-edit", "switch-failure"].contains(mode)
-                        && round == 1
-                    ? "distinct new fixture" : mode.hasPrefix("open-multiple") ? "" : target
-            case "create":
-                args["title"] = "New work"
-                args["entry"] = "document.md"
+            case "workspace.enter", "workspace.open":
+                args["workspaceID"] =
+                    mode == "unavailable-workspace" ? (round == 3 ? "workspace_999" : "workspace_2") : target
+            case "workspace.search":
+                args["query"] = mode.hasPrefix("open-multiple") ? "" : target
+            case "workspace.create":
+                args["title"] = mode == "duplicate-create" && round == 3 ? "  New work  " : "New work"
+                args["entry"] = mode == "duplicate-create" && round == 1 ? "<html>source</html>" : "document.md"
             case "ask": args["summary"] = "请选择要修改的作品。"
             case "read": args["path"] = "document.md"
             case "edit":
@@ -2474,7 +2536,7 @@ private actor WriterCohesionModel: ChatCapability {
                     if mode == "open-multiple-partial" {
                         #expect(results.count == 4)
                         #expect(results.filter { $0["status"] == "failed" }.count == 3)
-                        #expect(opened.first?["workspaceID"] == "writer/task_1")
+                        #expect(opened.first?["workspaceID"] == "workspace_1")
                         #expect(request.messages.contains { $0.content.contains("the delegation is still active") })
                     }
                     args["summary"] = "已打开 \(opened.count) 件作品"
@@ -2486,7 +2548,7 @@ private actor WriterCohesionModel: ChatCapability {
             default: break
             }
             var name = try #require(args["command"])
-            if mode == "read-before-enter", round == 1 { name = "open" }
+            if mode == "read-before-enter", round == 1 { name = "workspace.open" }
             try pair.emitter.yield(
                 .toolCall(
                     .init(
@@ -2506,10 +2568,11 @@ private actor WriterCohesionModel: ChatCapability {
     arguments: [
         "enter", "clarify-enter", "clarify-workspace", "read-before-enter", "open", "open-multiple",
         "open-multiple-partial",
+        "direct-enter", "unavailable-workspace",
         "explanation", "declined",
         "render-retry",
         "explanation-after-edit",
-        "switch-after-edit", "switch-failure",
+        "switch-after-edit", "switch-failure", "duplicate-create", "legacy-missing-entry",
     ])
 func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -2520,16 +2583,28 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
     let workspace = ArtifactWorkspace(
         disk: try DiskFileStore(root: root.appendingPathComponent("files")), catalog: records.workspaces)
     let old = try await records.seedDelegation(
-        taskID: nil, goal: "Saved work", input: "seed", sourceDialog: nil, agent: "writer")
+        workspaceID: nil, goal: "Saved work", input: "seed", sourceDialog: nil, agent: "writer")
     let workspaceID = try #require(WorkspaceID(rawValue: old.workspaceID))
-    _ = try await workspace.publish(
+    let original = try await workspace.publish(
         id: workspaceID, expecting: nil, title: "Saved work",
         draft: ArtifactDraft(files: ["document.md": "# Draft\nKEEP", "style.css": "KEEP_STYLE"]), entry: "document.md")
+    if mode == "legacy-missing-entry" {
+        try await workspace.checkpoint(
+            .init(
+                workspaceID: workspaceID, baseRevision: original.revision, title: original.title, entry: original.entry,
+                draft: ArtifactDraft(files: ["style.css": "KEEP_STYLE"]), interrupted: true))
+    }
     try await records.endSeedDelegation(old.delegateID, status: "completed")
+    if mode == "unavailable-workspace" {
+        let unavailable = try await records.seedDelegation(
+            workspaceID: nil, goal: "Uninitialized work", input: "seed", sourceDialog: nil, agent: "writer")
+        #expect(unavailable.id == "workspace_2")
+        try await records.endSeedDelegation(unavailable.delegateID, status: "failed")
+    }
     if mode.hasPrefix("open-multiple") {
         for index in 2...5 {
             let work = try await records.seedDelegation(
-                taskID: nil, goal: "Work \(index)", input: "seed", sourceDialog: nil, agent: "writer")
+                workspaceID: nil, goal: "Work \(index)", input: "seed", sourceDialog: nil, agent: "writer")
             let id = try #require(WorkspaceID(rawValue: work.workspaceID))
             _ = try await workspace.publish(
                 id: id, expecting: nil, title: "Work \(index)",
@@ -2537,21 +2612,29 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
             try await records.endSeedDelegation(work.delegateID, status: "completed")
         }
     }
-    let model = WriterCohesionModel(mode: mode, target: old.id)
     let journal = WriterHistoryStore(
         records: try WriterRecordStore(repository: records.writerMessages, logs: records.logs))
     let startup = WriterStartupProbe()
+    let model = WriterCohesionModel(mode: mode, target: old.id) {
+        await #expect(throws: RecordStorageError.missingRecord) {
+            try await records.writerExecutions.workspace("workspace_2", agent: "writer")
+        }
+        #expect(await startup.shown == false)
+    }
     let artifacts = ArtifactService(
         workspace: workspace,
-        present: { id, _, _, _, _ in
+        present: { id, _, entry, files, preview in
             await startup.mark()
-            if mode == "open-multiple-partial", id.taskID != "task_1" { throw WindowError.capacity }
+            if preview, files[entry]?.contains("正在准备创作") == true {
+                await startup.markPlaceholder()
+            }
+            if mode == "open-multiple-partial", id.rawValue != "workspace_1" { throw WindowError.capacity }
             if mode == "switch-failure", id == workspaceID { throw WindowError.capacity }
-            return #"{"status":"observed","windowID":"window_\#(id.taskID.dropFirst(5))"}"#
+            return #"{"status":"observed","windowID":"window_\#(id.rawValue.dropFirst("workspace_".count))"}"#
         })
     let writer = try WriterAgent(
         model: { ChatModel(capability: model, modelName: "cohesion-fixture") }, streaming: artifacts, history: journal,
-        tasks: records.writerExecutions, communications: records.agentMessages)
+        executions: records.writerExecutions, communications: records.agentMessages)
     let sink = WriterResultSink()
     let manager = AgentManager()
     let session = UUID().uuidString
@@ -2584,16 +2667,22 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
                 parent: .init(id: UUID().uuidString, sessionID: session, payload: .text("invalid identity")),
                 to: .writer)
             #expect(!rejected.rejected.isEmpty)
-            #expect(try await records.writerExecutions.tasks(agent: "writer", before: nil, limit: 50).count == 1)
+            #expect(try await records.writerExecutions.workspaces(agent: "writer", before: nil, limit: 50).count == 1)
         }
     }
     let requestID = UUID().uuidString
     let scope = AgentTaskScope(
         id: requestID, requester: .assistant, executor: .writer, sessionID: session, execution: .background)
-    let userRequest =
-        mode.hasPrefix("open-multiple")
-        ? "打开所有已保存作品"
-        : mode == "declined" ? "Download an external file" : "Find Saved work and update Draft to Final"
+    let userRequest: String
+    switch mode {
+    case "duplicate-create": userRequest = "重新创建一份新的软件工程流程图"
+    case "open-multiple", "open-multiple-partial": userRequest = "打开所有已保存作品"
+    case "declined": userRequest = "Download an external file"
+    case "open": userRequest = "Open \(old.id)"
+    case "direct-enter": userRequest = "Update Draft to Final in \(old.id)"
+    case "unavailable-workspace": userRequest = "Open and edit workspace_2, then open workspace_999"
+    default: userRequest = "Find Saved work and update Draft to Final"
+    }
     let signal = try AgentTaskSignal(
         kind: .request, scope: scope, data: JSONEncoder().encode(["request": userRequest]))
     let receipt = try await messaging.send(
@@ -2624,81 +2713,111 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
     #expect(completion.status == (mode == "declined" ? .failed : .succeeded))
     let content = try AgentTaskContent.decode(completion)
     let current = try await records.writerExecutions.request(requestID, agent: "writer")
-    let selected = ["enter", "read-before-enter", "clarify-enter", "clarify-workspace"].contains(mode)
+    let selected = ["enter", "direct-enter", "read-before-enter", "clarify-enter", "clarify-workspace"].contains(mode)
     if selected {
-        #expect(current.taskID == old.id && content.writerEvent?.taskID == old.id)
+        #expect(current.workspaceID == old.id && content.writerEvent?.workspaceID == old.id)
         #expect(try await workspace.inventory().count == 1)
         #expect(
             try await workspace.project(workspaceID).files == [
                 "document.md": "# Final\nKEEP", "style.css": "KEEP_STYLE",
             ])
-        if admitted.taskID != old.id {
+        if admitted.workspaceID != old.id {
             await #expect(throws: (any Error).self) {
-                try await records.writerExecutions.task(admitted.taskID, agent: "writer")
+                try await records.writerExecutions.workspace(admitted.workspaceID, agent: "writer")
             }
         }
-        #expect(try await records.writerExecutions.tasks(agent: "writer", before: nil, limit: 50).count == 1)
+        #expect(try await records.writerExecutions.workspaces(agent: "writer", before: nil, limit: 50).count == 1)
         #expect(try await records.writerExecutions.request(old.delegateID, agent: "writer").status == "completed")
+    } else if mode == "legacy-missing-entry" {
+        #expect(current.workspaceID == old.id)
+        #expect(
+            try await workspace.project(workspaceID).files == [
+                "document.md": "# Draft\nKEEP", "style.css": "KEEP_STYLE",
+            ])
     } else if mode == "switch-after-edit" {
-        #expect(current.taskID == old.id && content.artifactID == workspaceID.rawValue)
+        #expect(current.workspaceID == old.id && content.writerEvent?.workspaceID == workspaceID.rawValue)
         #expect(try await workspace.project(workspaceID).files["document.md"] == "# Final\nKEEP")
-        let earlier = try #require(WorkspaceID(rawValue: "writer/task_2"))
+        let earlier = try #require(WorkspaceID(rawValue: "workspace_2"))
         #expect(try await workspace.checkpoint(for: earlier)?.draft.files["document.md"] == "# Draft\nKEEP")
     } else if mode == "open" {
-        #expect(current.taskID.isEmpty && content.artifactID == nil)
+        #expect(current.workspaceID.isEmpty && content.artifactID == nil)
         #expect(await startup.shown)
         #expect(try await workspace.project(workspaceID).files["document.md"] == "# Draft\nKEEP")
         #expect(try await workspace.checkpoint(for: workspaceID) == nil)
         #expect(!content.text.contains("作品已保存"))
     } else if mode.hasPrefix("open-multiple") {
-        #expect(current.taskID.isEmpty && content.artifactID == nil)
+        #expect(current.workspaceID.isEmpty && content.artifactID == nil)
         #expect(content.text == (mode == "open-multiple" ? "已打开 5 件作品" : "已打开 1 件作品"))
         #expect(try await workspace.inventory().count == 5)
-    } else if ["explanation", "declined"].contains(mode) {
+    } else if ["explanation", "declined", "unavailable-workspace"].contains(mode) {
         if mode == "declined" {
             #expect(content.writerEvent?.kind == .declined)
             #expect(content.text == "我无法执行外部下载。")
-            #expect(current.taskID.isEmpty)
+            #expect(current.workspaceID.isEmpty)
             #expect(try await workspace.project(workspaceID).files["document.md"] == "# Draft\nKEEP")
             let deadline = ContinuousClock.now + .seconds(5)
-            while try await records.writerExecutions.taskNotification(requestID, agent: "writer")?.retired != true {
+            while try await records.writerExecutions.delegationNotification(requestID, agent: "writer")?.retired != true
+            {
                 guard ContinuousClock.now < deadline else { throw WriterFailure.incomplete }
                 try await Task.sleep(for: .milliseconds(10))
             }
             await #expect(throws: CommunicationError.scopeClosed) { try await manager.taskExecutions(scope) }
             let persisted = try #require(
-                try await records.writerExecutions.taskNotification(requestID, agent: "writer"))
-            #expect(try JSONDecoder().decode(WriterTaskCompletion.self, from: persisted.data).signal == completion)
+                try await records.writerExecutions.delegationNotification(requestID, agent: "writer"))
+            #expect(
+                try JSONDecoder().decode(WriterDelegationCompletion.self, from: persisted.data).signal == completion)
         }
         #expect(try await workspace.inventory().count == 1)
         #expect(await startup.shown == false)
         #expect(content.artifactID == nil && content.writerEvent?.workspaceID == nil)
         #expect(!content.text.contains("作品已保存"))
     } else {
-        #expect(current.taskID != old.id)
+        #expect(current.workspaceID != old.id)
         #expect(try await workspace.project(workspaceID).files["document.md"] == "# Draft\nKEEP")
-        let created = try #require(WorkspaceID(rawValue: "writer/" + current.taskID))
+        let created = try #require(WorkspaceID(rawValue: current.workspaceID))
         #expect(try await workspace.project(created).files["document.md"] == "# Draft\nKEEP")
     }
+    if mode == "duplicate-create" {
+        #expect(await startup.placeholderPresentations == 1)
+        #expect(try await records.writerExecutions.workspaces(agent: "writer", before: nil, limit: 50).count == 2)
+        #expect(try await workspace.inventory().count == 2)
+    }
     #expect(answered == ["clarify-enter", "clarify-workspace"].contains(mode))
-    let finalTask = current.taskID
+    let finalTask = current.workspaceID
     let requestHistoryID = "writer/request_\(current.messageID)"
-    let history = try await journal.taskHistory(requestHistoryID)
+    let history = try await journal.ownerHistory(requestHistoryID)
     let requests = history.turns.flatMap { $0.modelRequests ?? [] }
     let calls = requests.flatMap(\.toolCalls)
     #expect(!calls.isEmpty && !calls.contains { $0.state == .received })
+    if ["open", "direct-enter", "switch-after-edit", "unavailable-workspace"].contains(mode) {
+        #expect(!calls.contains { $0.name == "workspace.search" })
+    }
+    if mode == "unavailable-workspace" {
+        #expect(calls.filter { $0.state == .failed }.count == 3)
+        #expect(current.workspaceID.isEmpty)
+        #expect(try await records.writerExecutions.workspace("workspace_2", agent: "writer").workspaceReady == false)
+    }
     let libraryRequests = requests.filter { $0.producerMetadata?["controlDomain"] == "library" }
-    #expect(!libraryRequests.isEmpty && libraryRequests.allSatisfy { $0.decisionMetadata?.taskID == nil })
-    if !["explanation", "declined", "open", "open-multiple", "open-multiple-partial"].contains(mode) {
-        let expectedDomain = "workspace:writer/" + current.taskID
+    #expect(!libraryRequests.isEmpty && libraryRequests.allSatisfy { $0.decisionMetadata?.workspaceID == nil })
+    if !["explanation", "declined", "open", "open-multiple", "open-multiple-partial", "unavailable-workspace"].contains(
+        mode)
+    {
+        let expectedDomain = "workspace:" + current.workspaceID
         let scopedRequests = requests.filter { $0.producerMetadata?["controlDomain"] == expectedDomain }
-        #expect(!scopedRequests.isEmpty && scopedRequests.allSatisfy { $0.decisionMetadata?.taskID == current.taskID })
+        #expect(
+            !scopedRequests.isEmpty
+                && scopedRequests.allSatisfy { $0.decisionMetadata?.workspaceID == current.workspaceID })
     }
     if mode == "switch-after-edit" {
-        let prior = requests.filter { $0.producerMetadata?["controlDomain"] == "workspace:writer/task_2" }
-        #expect(!prior.isEmpty && prior.allSatisfy { $0.decisionMetadata?.taskID == "task_2" })
+        let prior = requests.filter { $0.producerMetadata?["controlDomain"] == "workspace:workspace_2" }
+        #expect(!prior.isEmpty && prior.allSatisfy { $0.decisionMetadata?.workspaceID == "workspace_2" })
     }
-    if ["render-retry", "explanation-after-edit", "read-before-enter", "switch-failure"].contains(mode) {
+    if [
+        "render-retry", "explanation-after-edit", "read-before-enter", "switch-failure", "duplicate-create",
+        "legacy-missing-entry",
+    ].contains(
+        mode)
+    {
         #expect(calls.contains { $0.state == .failed })
     }
     let identities = Set(calls.map(\.providerID))
@@ -2709,10 +2828,10 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
     let reopened = try SQLiteRepositories(url: databaseURL)
     let restored = WriterHistoryStore(
         records: try WriterRecordStore(repository: reopened.writerMessages, logs: reopened.logs))
-    let persisted = try await restored.taskHistory(requestHistoryID)
+    let persisted = try await restored.ownerHistory(requestHistoryID)
     #expect(
         Set(persisted.turns.flatMap { $0.modelRequests ?? [] }.flatMap(\.toolCalls).map(\.providerID)) == identities)
-    #expect(try await reopened.writerExecutions.request(requestID, agent: "writer").taskID == finalTask)
+    #expect(try await reopened.writerExecutions.request(requestID, agent: "writer").workspaceID == finalTask)
     try await reopened.shutdown()
 }
 
@@ -2720,14 +2839,16 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
     let records = try SQLiteRepositories.temporary()
     let controller = WriterContainer()
     try controller.configureHistory(
-        messages: records.writerMessages, tasks: records.writerExecutions, communications: records.agentMessages,
+        messages: records.writerMessages, executions: records.writerExecutions, communications: records.agentMessages,
         logs: records.logs)
-    let empty = try await controller.tasks(before: nil)
+    let empty = try await controller.workspaces(before: nil)
     #expect(empty.items.isEmpty && empty.nextID == nil)
+    let emptyDelegations = try await controller.delegations(before: nil)
+    #expect(emptyDelegations.items.isEmpty && emptyDelegations.next == nil && emptyDelegations.total == 0)
     let task = try await records.seedDelegation(
-        taskID: nil, goal: "Paging", input: "Paging", sourceDialog: nil, agent: "writer")
+        workspaceID: nil, goal: "Paging", input: "Paging", sourceDialog: nil, agent: "writer")
     let store = try #require(controller.historyStore)
-    let history = WriterHistory(store: store, taskID: task.id, delegateID: task.delegateID, goal: "Paging")
+    let history = WriterHistory(store: store, delegateID: task.delegateID, goal: "Paging")
     let request = try ChatRequest(messages: [.init(role: .user, content: "Page fixture")])
     var total = 0
     for count in [0, 19, 20, 21, 40] {
@@ -2738,36 +2859,49 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
             try await history.finish(id)
             total += 1
         }
-        let first = try await controller.requests(taskID: task.id, after: 0)
+        let first = try await controller.requests(workspaceID: task.id, before: nil)
         #expect(first.items.count == min(count, 20))
+        #expect(first.items.map(\.number) == Array((1...max(count, 1)).reversed().prefix(min(count, 20))))
         #expect((first.nextPosition != nil) == (count > 20))
         if let next = first.nextPosition {
-            let second = try await controller.requests(taskID: task.id, after: next)
+            #expect(next == first.items.last?.position)
+            let second = try await controller.requests(workspaceID: task.id, before: next)
             #expect(second.items.count == count - 20 && second.nextPosition == nil)
             #expect(Set((first.items + second.items).map(\.id)).count == count)
-            let repeated = try await controller.requests(taskID: task.id, after: next)
-            #expect(repeated.nextPosition == nil)
+            #expect((first.items + second.items).map(\.number) == Array((1...count).reversed()))
+            let detail = try await controller.requestDetail(#require(second.items.first?.id))
+            #expect(detail.summary.number == count - 20)
         }
     }
     try await records.writerExecutions.prepareWorkspace(
-        task.workspaceID, taskID: task.id, delegateID: task.delegateID, agent: "writer")
+        workspaceID: task.id, delegateID: task.delegateID, agent: "writer")
     try await records.endSeedDelegation(task.delegateID, status: "completed")
     var taskCount = 1
     for count in [19, 20, 21, 40] {
         while taskCount < count {
             let added = try await records.seedDelegation(
-                taskID: nil, goal: "Task", input: "Fixture", sourceDialog: nil, agent: "writer")
+                workspaceID: nil, goal: "Task", input: "Fixture", sourceDialog: nil, agent: "writer")
             try await records.writerExecutions.prepareWorkspace(
-                added.workspaceID, taskID: added.id, delegateID: added.delegateID, agent: "writer")
+                workspaceID: added.id, delegateID: added.delegateID, agent: "writer")
             try await records.endSeedDelegation(added.delegateID, status: "completed")
             taskCount += 1
         }
-        let first = try await controller.tasks(before: nil)
+        let first = try await controller.workspaces(before: nil)
         #expect(first.items.count == min(count, 20) && (first.nextID != nil) == (count > 20))
         if let next = first.nextID {
-            let second = try await controller.tasks(before: next)
+            let second = try await controller.workspaces(before: next)
             #expect(second.items.count == count - 20 && second.nextID == nil)
             #expect(Set((first.items + second.items).map(\.id)).count == count)
+        }
+        let delegations = try await controller.delegations(before: nil)
+        #expect(delegations.total == count && delegations.items.count == min(count, 20))
+        #expect((delegations.next != nil) == (count > 20))
+        if let next = delegations.next {
+            #expect(next == delegations.items.last?.position)
+            let older = try await controller.delegations(before: next)
+            #expect(older.items.count == count - 20 && older.next == nil)
+            let positions = (delegations.items + older.items).map(\.position)
+            #expect(Set(positions).count == count && positions == positions.sorted(by: >))
         }
     }
     try await records.shutdown()
@@ -2785,14 +2919,14 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
         id: requestID, requester: "assistant", executor: "writer", goal: "Create", input: "Original input",
         sourceDialog: "source")
     let admission = try await records.writerExecutions.beginRequest(
-        delegateID: requestID, taskID: nil, goal: "Create", input: "Original input", sourceDialog: "source",
+        delegateID: requestID, workspaceID: nil, goal: "Create", input: "Original input", sourceDialog: "source",
         agent: "writer")
-    #expect(admission.taskID.isEmpty)
+    #expect(admission.workspaceID.isEmpty)
     #expect(try await records.writerExecutions.delegationCount() == 1)
-    #expect(try await records.writerExecutions.tasks(agent: "writer", before: nil, limit: 20).isEmpty)
+    #expect(try await records.writerExecutions.workspaces(agent: "writer", before: nil, limit: 20).isEmpty)
     let store = WriterHistoryStore(
         records: try WriterRecordStore(repository: records.writerMessages, logs: records.logs))
-    let history = WriterHistory(store: store, taskID: "", delegateID: requestID, goal: "Create")
+    let history = WriterHistory(store: store, delegateID: requestID, goal: "Create")
     let request = try ChatRequest(messages: [.init(role: .user, content: "original")])
     let first = try await history.begin(request, phase: "控制请求")
     try await history.event(.text("selecting"), id: first)
@@ -2800,7 +2934,7 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
     try await history.finish(first)
     let workspace = try await records.writerExecutions.createWorkspace(requestID: requestID, title: "A workspace")
     try await records.writerExecutions.prepareWorkspace(
-        workspace.workspaceID, taskID: workspace.id, delegateID: requestID, agent: "writer")
+        workspaceID: workspace.id, delegateID: requestID, agent: "writer")
     _ = try await files.publish(
         id: #require(WorkspaceID(rawValue: workspace.workspaceID)), expecting: nil, title: "A workspace",
         draft: ArtifactDraft(files: ["index.html": "<h1>Created</h1>"]))
@@ -2810,10 +2944,10 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
     try await history.finish(second)
     let controller = WriterContainer()
     try controller.configureHistory(
-        messages: records.writerMessages, tasks: records.writerExecutions, communications: records.agentMessages,
+        messages: records.writerMessages, executions: records.writerExecutions, communications: records.agentMessages,
         logs: records.logs)
     let preflight = try await controller.preflight(requestID, after: 0)
-    let inside = try await controller.requests(taskID: workspace.id, after: 0)
+    let inside = try await controller.requests(workspaceID: workspace.id, after: 0)
     #expect(preflight.items.count == 1 && inside.items.count == 1)
     #expect(preflight.items.first?.position ?? 0 < inside.items.first?.position ?? 0)
     #expect(preflight.items.first?.delegateID == requestID && inside.items.first?.delegateID == requestID)
@@ -2826,32 +2960,47 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
         id: secondRequest, requester: "assistant", executor: "writer", goal: "Edit", input: "Continue",
         sourceDialog: nil)
     _ = try await records.writerExecutions.beginRequest(
-        delegateID: secondRequest, taskID: nil, goal: "Edit", input: "Continue", sourceDialog: nil, agent: "writer")
-    _ = try await records.writerExecutions.selectWorkspace(requestID: secondRequest, taskID: workspace.id)
+        delegateID: secondRequest, workspaceID: nil, goal: "Edit", input: "Continue", sourceDialog: nil, agent: "writer"
+    )
+    _ = try await records.writerExecutions.selectWorkspace(requestID: secondRequest, workspaceID: workspace.id)
     #expect(try await records.writerExecutions.delegationCount() == 2)
     #expect(try await controller.preflight(requestID, after: 0).items.count == 1)
-    #expect(try await controller.requests(taskID: workspace.id, after: 0).items.count == 1)
-    let continued = WriterHistory(store: store, taskID: workspace.id, delegateID: secondRequest, goal: "Continue")
+    #expect(try await controller.requests(workspaceID: workspace.id, after: 0).items.count == 1)
+    let continued = WriterHistory(store: store, delegateID: secondRequest, goal: "Continue")
     for index in 1...39 {
         let input = try await continued.begin(request, phase: "控制请求")
         try await continued.event(.text("Workspace message \(index)"), id: input)
         try await continued.finish(input)
     }
-    let firstPage = try await controller.requests(taskID: workspace.id, after: 0)
-    let secondPage = try await controller.requests(taskID: workspace.id, after: #require(firstPage.nextPosition))
+    let firstPage = try await controller.requests(workspaceID: workspace.id, before: nil)
+    let secondPage = try await controller.requests(workspaceID: workspace.id, before: #require(firstPage.nextPosition))
     #expect(firstPage.items.count == 20 && secondPage.items.count == 20 && secondPage.nextPosition == nil)
-    #expect(firstPage.items.first?.delegateID == requestID && secondPage.items.last?.delegateID == secondRequest)
+    #expect(firstPage.items.first?.delegateID == secondRequest && secondPage.items.last?.delegateID == requestID)
     #expect(try await controller.preflight(requestID, after: 0).items.count == 1)
     #expect(try await controller.delegations(before: nil).total == 2)
+    let exported = try await controller.shareWorkspace(workspace.id)
+    let export = try #require(JSONSerialization.jsonObject(with: Data(exported.utf8)) as? [String: Any])
+    let exportedWorkspace = try #require(export["workspace"] as? [String: Any])
+    #expect(exportedWorkspace["workspaceID"] as? String == workspace.id)
+    #expect(export["task"] == nil && exportedWorkspace["taskID"] == nil)
     try await records.endSeedDelegation(secondRequest, status: "completed")
-    for notification in try await records.writerExecutions.pendingTaskNotifications(
+    for notification in try await records.writerExecutions.pendingDelegationNotifications(
         agent: "writer", retirement: false, after: nil, limit: 32)
     {
-        try await records.writerExecutions.finishTaskNotification(
+        try await records.writerExecutions.finishDelegationNotification(
             notification.delegateID, agent: "writer", retirement: false, completed: true, failure: nil,
             claimToken: notification.claimToken)
     }
     if let destination = ProcessInfo.processInfo.environment["WRITER_SEPARATION_UI_SEED"] {
+        for number in 1...25 {
+            let id = UUID().uuidString
+            let goal = "Pagination fixture delegation \(number)"
+            try await records.agentMessages.seedAgentRequest(
+                id: id, requester: "assistant", executor: "writer", goal: goal, input: "Fixture", sourceDialog: nil)
+            _ = try await records.writerExecutions.beginRequest(
+                delegateID: id, workspaceID: nil, goal: goal, input: "Fixture", sourceDialog: nil, agent: "writer")
+            try await records.endSeedDelegation(id, status: "completed")
+        }
         let target = URL(fileURLWithPath: destination)
         let source = try DatabaseQueue(path: root.appendingPathComponent("records.sqlite").path)
         let snapshot = try DatabaseQueue(path: target.appendingPathComponent("records.sqlite").path)

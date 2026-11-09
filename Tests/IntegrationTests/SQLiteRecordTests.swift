@@ -425,7 +425,7 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
     let db = try SQLiteRepositories.temporary()
     let first = try await db.assistantConversations.current()
     _ = try await db.seedDelegation(
-        taskID: nil, goal: "independent", input: "work", sourceDialog: first.id, agent: "writer")
+        workspaceID: nil, goal: "independent", input: "work", sourceDialog: first.id, agent: "writer")
     let second = try await db.writerMessages.current()
     let text = String(repeating: "shared Unicode🙂\n", count: 1000)
     let detail = try JSONSerialization.data(withJSONObject: ["requestJSON": text])
@@ -444,7 +444,7 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
     do {
         let client = UUID().uuidString
         try db.writerMessages.save(
-            task: second.id, revision: 1,
+            ownerID: second.id, revision: 1,
             messages: [
                 .init(
                     clientID: client, inputID: client, role: "assistant", kind: "response", order: 1,
@@ -453,7 +453,7 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
         let payload = String(decoding: try JSONSerialization.data(withJSONObject: ["prompt": text]), as: UTF8.self)
         try await db.logs.writeRequestPayload(client, agent: "writer", json: payload, response: "[]", initial: true)
     }
-    let id = try #require(try db.writerMessages.previews(task: second.id).first?.id)
+    let id = try #require(try db.writerMessages.previews(ownerID: second.id).first?.id)
     let adapter = try AssistantRecordStore(
         repository: db.assistantMessages, tasks: db.assistantTasks, conversations: db.assistantConversations,
         logs: db.logs)

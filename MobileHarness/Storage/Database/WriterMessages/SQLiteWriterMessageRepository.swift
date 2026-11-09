@@ -14,7 +14,7 @@ public final class SQLiteWriterMessageRepository: WriterMessageRepository {
         var request: Bool = false
         var preflight: Bool = false
         var resultsColumn: String { "runtime_results_json" }
-        var id: String { request ? "writer/request_\(key)" : "writer/task_\(key)" }
+        var id: String { request ? "writer/request_\(key)" : "workspace_\(key)" }
     }
     static func owner(_ id: String, db: Database) throws -> Owner {
         if id.hasPrefix("writer/preflight_"), let key = Int64(id.dropFirst("writer/preflight_".count)) {
@@ -30,7 +30,7 @@ public final class SQLiteWriterMessageRepository: WriterMessageRepository {
         guard let workspace = WorkspaceID(rawValue: id), workspace.agent == "writer" else {
             throw RecordStorageError.invalidID
         }
-        let key = try BusinessRecordID.number(workspace.taskID, kind: .task)
+        let key = try BusinessRecordID.number(workspace.rawValue, kind: .workspace)
         guard try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM writer_workspaces WHERE id=?", arguments: [key]) == 1
         else { throw RecordStorageError.missingRecord }
         return Owner(key: key)
@@ -62,26 +62,28 @@ extension SQLiteWriterMessageRepository {
             arguments: [Date().timeIntervalSince1970, Date().timeIntervalSince1970])
     }
 
-    static func saveWriterRoundResult(_ result: [String: Any], task: Int64, invocation: String, db: Database) throws {
+    static func saveWriterRoundResult(_ result: [String: Any], ownerID: Int64, invocation: String, db: Database) throws
+    {
         let saved =
             try String.fetchOne(
                 db,
                 sql:
                     "SELECT runtime_results_json FROM writer_messages WHERE delegation_id=? AND json_extract(assistant_response_json,'$.id')=?",
-                arguments: [task, invocation]) ?? "[]"
+                arguments: [ownerID, invocation]) ?? "[]"
         let markers = (try JSONSerialization.jsonObject(with: Data(saved.utf8)) as? [[String: Any]] ?? []).filter {
             $0["kind"] as? String == "completion"
         }
         try db.execute(
             sql:
                 "UPDATE writer_messages SET runtime_results_json=? WHERE delegation_id=? AND json_extract(assistant_response_json,'$.id')=?",
-            arguments: [try SQLiteRecordCoding.json([result] + markers), task, invocation])
+            arguments: [try SQLiteRecordCoding.json([result] + markers), ownerID, invocation])
         guard db.changesCount == 1 else { throw RecordStorageError.missingRecord }
     }
 
-    static func writerMessageDecision(_ row: Row, task: Int64) throws -> WriterDecisionMetadata {
+    static func writerMessageDecision(_ row: Row) throws -> WriterDecisionMetadata {
         var decision = WriterDecisionMetadata(
-            taskID: (row["workspace_id"] as Int64?).map { "task_\($0)" }, mode: row["phase"] as String? ?? "control",
+            workspaceID: (row["workspace_id"] as Int64?).map { "workspace_\($0)" },
+            mode: row["phase"] as String? ?? "control",
             skills: [:],
             catalogJSON: try SQLiteRecordCoding.json([
                 "actions": [],
@@ -94,7 +96,7 @@ extension SQLiteWriterMessageRepository {
 }
 
 extension SQLiteWriterMessageRepository {
-    @discardableResult public func save(task id: String, revision: UInt64, messages: [WriterMessageRecord]) throws
+    @discardableResult public func save(ownerID id: String, revision: UInt64, messages: [WriterMessageRecord]) throws
         -> [WriterMessageReference]
     {
         guard revision <= Int64.max else { throw RecordStorageError.invalidRecord }

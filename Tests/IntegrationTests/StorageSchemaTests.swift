@@ -195,7 +195,7 @@ import UI
         let assistant = AssistantHistoryStore(records: assistantRecords)
         _ = try await beginLoggedFixture(assistant, input: "assistant-input")
         _ = try await database.seedDelegation(
-            taskID: nil, goal: "Writer", input: "write", sourceDialog: nil, agent: "writer")
+            workspaceID: nil, goal: "Writer", input: "write", sourceDialog: nil, agent: "writer")
         let writerRecords = try WriterRecordStore(repository: database.writerMessages, logs: database.logs)
         let writer = WriterHistoryStore(records: writerRecords)
         _ = try await beginLoggedFixture(writer, input: "writer-input")
@@ -207,7 +207,7 @@ import UI
         let assistantDialog = try await assistant.readCurrent().current.id
         let writerDialog = try await writer.readCurrent().current.id
         let assistantID = try #require(try database.assistantMessages.previews(dialog: assistantDialog).first?.id)
-        let writerID = try #require(try database.writerMessages.previews(task: writerDialog).last?.id)
+        let writerID = try #require(try database.writerMessages.previews(ownerID: writerDialog).last?.id)
         await #expect(throws: RecordStorageError.missingRecord) {
             try await assistantRecords.clearRequestLogs(requestID: writerID)
         }
@@ -250,11 +250,11 @@ import UI
     let database = try await workspaceFixtureRepositories(url: url)
     let disk = try DiskFileStore(root: root.appendingPathComponent("files"))
     let workspace = ArtifactWorkspace(disk: disk, catalog: database.workspaces)
-    let id = try #require(WorkspaceID(agent: "writer", taskID: "task_1"))
+    let id = try #require(WorkspaceID(rawValue: "workspace_1"))
     let original = try await workspace.publish(
         id: id, expecting: nil, title: "Test", draft: ArtifactDraft(files: ["index.html": "before", "empty.css": ""]))
     try await database.workspaces.claim(id, expecting: original.revision, lease: UUID())
-    try await disk.replace(Data("after".utf8), key: id.rawValue + "/index.html")
+    try await disk.replace(Data("after".utf8), key: id.storagePath + "/index.html")
     try await database.shutdown()
     let reopened = try SQLiteRepositories(url: url)
     try reopened.recoverInFlight()
@@ -264,7 +264,7 @@ import UI
     let saved = try await recovered.publish(
         id: id, expecting: original.revision, title: "Saved",
         draft: ArtifactDraft(files: ["index.html": "after", "empty.css": ""]))
-    try await disk.remove(id.rawValue + "/index.html")
+    try await disk.remove(id.storagePath + "/index.html")
     await #expect(throws: FileStorageError.invalidFile) { try await recovered.project(id) }
     #expect(saved.revision != original.revision)
     try await reopened.shutdown()
@@ -275,20 +275,20 @@ import UI
     defer { try? FileManager.default.removeItem(at: root) }
     let database = try SQLiteRepositories.temporary()
     let workspace = ArtifactWorkspace(disk: try DiskFileStore(root: root), catalog: database.workspaces)
-    let id = try #require(WorkspaceID(agent: "writer", taskID: "task_1"))
+    let id = try #require(WorkspaceID(rawValue: "workspace_1"))
     let draft = try ArtifactDraft(files: ["index.html": "test"])
     await #expect(throws: RecordStorageError.missingRecord) {
         try await workspace.publish(id: id, expecting: nil, title: "Unowned", draft: draft)
     }
     let task = try await database.seedDelegation(
-        taskID: nil, goal: "Task", input: "Draw", sourceDialog: nil, agent: "writer")
+        workspaceID: nil, goal: "Task", input: "Draw", sourceDialog: nil, agent: "writer")
     _ = try await workspace.publish(id: id, expecting: nil, title: "Owned", draft: draft)
     await #expect(throws: RecordStorageError.conflict) { try await workspace.delete(id) }
     try await database.endSeedDelegation(task.delegateID, status: "cancelled")
     try await workspace.delete(id)
     let next = try await database.seedDelegation(
-        taskID: nil, goal: "Next", input: "Draw", sourceDialog: nil, agent: "writer")
-    #expect(next.id == "task_2")
+        workspaceID: nil, goal: "Next", input: "Draw", sourceDialog: nil, agent: "writer")
+    #expect(next.id == "workspace_2")
     try await database.shutdown()
 }
 
@@ -328,19 +328,20 @@ func storageSyntheticWriterUIFixture() async throws {
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     let database = try SQLiteRepositories(url: root.appendingPathComponent("records.sqlite"))
     let task = try await database.seedDelegation(
-        taskID: nil, goal: "绘制简单测试流程图", input: "Draw a simple chart", sourceDialog: nil, agent: "writer")
+        workspaceID: nil, goal: "绘制简单测试流程图", input: "Draw a simple chart", sourceDialog: nil, agent: "writer")
     let history = WriterHistoryStore(
         records: try WriterRecordStore(repository: database.writerMessages, logs: database.logs))
     let source = "<!doctype html><meta charset=utf-8><title>测试流程图</title><h1>测试流程图</h1><p>开始 → 检查 → 完成</p>"
     for phase in ["控制请求", "文件内容请求"] {
         let input = UUID().uuidString
         _ = try await history.begin(
-            id: input, user: task.goal, request: [], expecting: history.readCurrent().token, model: "synthetic-fixture")
+            id: input, user: task.title, request: [], expecting: history.readCurrent().token, model: "synthetic-fixture"
+        )
         var decision = WriterDecisionMetadata(
-            taskID: task.id, mode: phase, skills: [:], catalogJSON: "{}", execution: "background")
+            workspaceID: task.id, mode: phase, skills: [:], catalogJSON: "{}", execution: "background")
         decision.delegateID = task.delegateID
         var request = WriterModelRequest(
-            id: UUID().uuidString, input: task.goal, requestJSON: "[]", decisionMetadata: decision)
+            id: UUID().uuidString, input: task.title, requestJSON: "[]", decisionMetadata: decision)
         request.producerMetadata = ["phase": phase, "path": "index.html", "attempt": "1"]
         try await history.beginModelRequest(request, for: input)
         let date = Date()
@@ -357,7 +358,7 @@ func storageSyntheticWriterUIFixture() async throws {
         draft: ArtifactDraft(files: ["index.html": source, "empty.css": ""]))
     try await database.endSeedDelegation(task.delegateID, status: "completed")
     for retirement in [false, true] {
-        try await database.writerExecutions.finishTaskNotification(
+        try await database.writerExecutions.finishDelegationNotification(
             task.delegateID, agent: "writer", retirement: retirement, completed: true, failure: nil)
     }
     try await database.shutdown()
@@ -367,7 +368,7 @@ func storageSyntheticWriterUIFixture() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let database = try await workspaceFixtureRepositories()
-    let task = try await database.writerExecutions.task("task_1", agent: "writer")
+    let task = try await database.writerExecutions.workspace("workspace_1", agent: "writer")
     let records = try AssistantRecordStore(
         repository: database.assistantMessages, tasks: database.assistantTasks,
         conversations: database.assistantConversations, logs: database.logs)
@@ -505,7 +506,7 @@ func storageSyntheticWriterUIFixture() async throws {
     }
     #expect(try await database.assistantMessages.messageEvidence(reserved).last?.body == "<task.start/>")
     await #expect(throws: RecordStorageError.invalidID) {
-        try await database.assistantConversations.dialog("writer/task_1")
+        try await database.assistantConversations.dialog("workspace_1")
     }
     try await database.shutdown()
 }
@@ -518,7 +519,7 @@ func storageSyntheticWriterUIFixture() async throws {
         id: id, requester: "assistant", executor: "writer", goal: "Draw", input: "Draw", sourceDialog: nil)
     #expect(try await database.writerExecutions.requestStatus(id, agent: "writer") == "requested")
     let task = try await database.writerExecutions.beginRequest(
-        delegateID: id, taskID: nil, goal: "Draw", input: "Draw", sourceDialog: nil, agent: "writer")
+        delegateID: id, workspaceID: nil, goal: "Draw", input: "Draw", sourceDialog: nil, agent: "writer")
     #expect(try await database.writerExecutions.requestStatus(id, agent: "writer") == "running")
     #expect(try await database.writerExecutions.request(id, agent: "writer").messageID == task.messageID)
     try await database.shutdown()

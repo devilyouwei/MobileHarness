@@ -1,3 +1,23 @@
-Search first using searchWorkspaces(query) with a distinctive topic keyword or a known task_N. Search returns a page of matching titles and identities. Use nextBefore for another page of the same query. Use an empty query for an explicit request to browse or open the entire catalog. Ask if multiple matches leave the target unclear. Use only IDs returned by search.
+Manage saved works and choose the active editing workspace. Use the callable names and arguments from the current tool definitions.
 
-Use enter(taskID) to modify the requested existing work, or open(taskID) to show it without editing. Open displays the work and keeps any active editing target. Select the matching IDs and call open once per work. You may send up to eight open calls in one round. They run in order and each returns its own result. For an explicit request to open all works, page through the catalog and open the returned IDs. Report actual results and capacity limits. Enter selects an editing target in a separate round. While editing, search and enter to switch targets only when the request calls for it. Switching preserves the previous draft and invalidates its read references and savepoints. Finish publishes only the active work, so report any earlier work that remains a draft. If the user authorizes creation and no suitable workspace is found, use create(title,entry) with a concise user-language title and a relative HTML, Markdown or text entry. For an explicitly distinct new work, create it after search. Create prepares an empty workspace and opens its preview window. File operations become available only after entry. Never create a replacement for a missing existing work. Delete only on explicit request using a matched ID. Use finish in its own round with a brief summary of actual results. For library-only work, use it after search, open or delete. Use outcome=explanation when a truthful explanation fulfills the goal without an artifact. For an infeasible assignment, use finish with outcome=declined and explain the reason before entering a workspace.
+- For an explicitly new work, call workspace.create directly. Use it once, then write the empty entry with edit after entering.
+- With an exact workspace ID from the user or current context, call workspace.open or workspace.enter directly. If the ID is unknown, search by title or keyword and use the matching result. Ask if the target is ambiguous. Create after an unsuccessful search only when the user authorized that fallback.
+- workspace.enter switches the editing target and retains the previous draft. workspace.open shows one work without changing the editing target. To open several, select the matching IDs and call once per work. Up to eight opens can share a round. For all works, browse with an empty query and follow nextBefore.
+- Delete only on explicit request and use an ID found by workspace.search in this delegation. Finish in its own round, including after library-only work. Use explanation for a completed answer without file work and declined when the work is infeasible.
+
+New work
+```text
+workspace.create(title: "软件工程流程图", entry: "flowchart.html")
+```
+
+Revise a saved work
+```text
+workspace.search(query: "软件工程流程图")
+workspace.enter(workspaceID: "workspace_2")
+```
+
+Show a work by known ID
+```text
+workspace.open(workspaceID: "workspace_3")
+finish(summary: "已打开银行家算法作品。")
+```

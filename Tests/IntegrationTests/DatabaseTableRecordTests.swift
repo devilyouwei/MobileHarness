@@ -55,19 +55,20 @@ import Testing
     try repository.database.write { db throws -> Void in
         var task = WriterWorkspaceRow(description: "draft", createdAt: 1, updatedAt: 1)
         try task.insert(db)
-        try WorkspaceFileRow.replace(db, taskID: 1, files: [.init(path: "original", bytes: 1, fingerprint: "original")])
+        try WorkspaceFileRow.replace(
+            db, workspaceID: 1, files: [.init(path: "original", bytes: 1, fingerprint: "original")])
     }
     #expect(throws: (any Error).self) {
         try repository.database.write { db throws -> Void in
             try WorkspaceFileRow.replace(
-                db, taskID: 1,
+                db, workspaceID: 1,
                 files: [
                     .init(path: "duplicate", bytes: 2, fingerprint: "a"),
                     .init(path: "duplicate", bytes: 3, fingerprint: "b"),
                 ])
         }
     }
-    let files = try repository.database.read { try WorkspaceFileRow.files($0, taskID: 1) }
+    let files = try repository.database.read { try WorkspaceFileRow.files($0, workspaceID: 1) }
     #expect(files.count == 1 && files.first?.path == "original")
     try await repository.shutdown()
 }
@@ -156,7 +157,7 @@ import Testing
 @Test func completionOutboxRejectsStaleClaimsAndStopsAfterEightFailures() async throws {
     let repository = try SQLiteRepositories.temporary()
     let request = try await repository.seedDelegation(
-        taskID: nil, goal: "work", input: "work", sourceDialog: nil, agent: "writer")
+        workspaceID: nil, goal: "work", input: "work", sourceDialog: nil, agent: "writer")
     let event = UUID().uuidString
     try await repository.writerExecutions.completeRequest(
         .init(delegateID: request.delegateID, agent: "writer", eventID: event, data: Data("{}".utf8)),
@@ -168,21 +169,21 @@ import Testing
             try $0.execute(sql: "UPDATE agent_messages SET next_attempt_at=0 WHERE id=?", arguments: [event])
         }
         let claimed = try #require(
-            try await repository.writerExecutions.pendingTaskNotifications(
+            try await repository.writerExecutions.pendingDelegationNotifications(
                 agent: "writer", retirement: false, after: nil, limit: 1
             ).first)
         if let prior {
             await #expect(throws: RecordStorageError.conflict) {
-                try await repository.writerExecutions.finishTaskNotification(
+                try await repository.writerExecutions.finishDelegationNotification(
                     request.delegateID, agent: "writer", retirement: false, completed: true, failure: nil,
                     claimToken: prior)
             }
         }
         #expect(
-            try await repository.writerExecutions.pendingTaskNotifications(
+            try await repository.writerExecutions.pendingDelegationNotifications(
                 agent: "writer", retirement: false, after: nil, limit: 1
             ).isEmpty)
-        try await repository.writerExecutions.finishTaskNotification(
+        try await repository.writerExecutions.finishDelegationNotification(
             request.delegateID, agent: "writer", retirement: false, completed: false, failure: "offline",
             claimToken: claimed.claimToken)
         prior = claimed.claimToken
@@ -191,12 +192,12 @@ import Testing
         #expect(stored.deliveryState == (attempt == 8 ? "dead_letter" : "pending"))
     }
     #expect(
-        try await repository.writerExecutions.pendingTaskNotifications(
+        try await repository.writerExecutions.pendingDelegationNotifications(
             agent: "writer", retirement: false, after: nil, limit: 1
         )
         .isEmpty)
     #expect(try repository.database.read { try WriterWorkspaceRow.fetchCount($0) } == 1)
-    try await repository.writerExecutions.finishTaskNotification(
+    try await repository.writerExecutions.finishDelegationNotification(
         request.delegateID, agent: "writer", retirement: true, completed: true, failure: nil)
     #expect(try await repository.writerExecutions.request(request.delegateID, agent: "writer").status == "completed")
     try await repository.shutdown()
@@ -236,14 +237,14 @@ import Testing
     let database = try SQLiteRepositories.temporary()
     let conversation = try database.assistantConversations.current()
     let task = try await database.seedDelegation(
-        taskID: nil, goal: "Independent", input: "write", sourceDialog: conversation.id, agent: "writer")
+        workspaceID: nil, goal: "Independent", input: "write", sourceDialog: conversation.id, agent: "writer")
     let assistant: any AssistantMessageRepository = database.assistantMessages
     let writer: any WriterMessageRepository = database.writerMessages
     let a = try await assistant.beginMessage(
         dialog: conversation.id,
         identity: .init(clientID: "same", inputID: "same", role: "user", kind: "input", order: 1, date: Date()))
     let w = try await writer.beginMessage(
-        task: try await writer.current().id,
+        ownerID: try await writer.current().id,
         identity: .init(clientID: "same", inputID: "same", role: "user", kind: "input", order: 1, date: Date()))
     #expect(a != w)
     #expect(try await assistant.dialogForInput("same") == conversation.id)
@@ -251,10 +252,10 @@ import Testing
     await #expect(throws: RecordStorageError.missingRecord) { _ = try await assistant.messageEvidence(w) }
     await #expect(throws: RecordStorageError.missingRecord) { _ = try await writer.messageEvidence(a) }
     await #expect(throws: RecordStorageError.invalidID) {
-        _ = try await writer.messages(task: conversation.id, after: nil)
+        _ = try await writer.messages(ownerID: conversation.id, after: nil)
     }
     await #expect(throws: RecordStorageError.invalidID) {
-        _ = try await assistant.messages(dialog: task.dialogID, after: nil)
+        _ = try await assistant.messages(dialog: task.workspaceID, after: nil)
     }
     try await database.shutdown()
 }
@@ -303,7 +304,7 @@ import Testing
     let old = try DatabasePool(path: url.path)
     try await old.write { db in
         try db.execute(
-            sql: "CREATE TABLE legacy(value TEXT); INSERT INTO legacy VALUES('old'); PRAGMA user_version=20261108")
+            sql: "CREATE TABLE legacy(value TEXT); INSERT INTO legacy VALUES('old'); PRAGMA user_version=20261109")
     }
     #expect(throws: (any Error).self) {
         try SQLiteSchema.prepare(
@@ -312,6 +313,8 @@ import Testing
     #expect(try await old.read { try String.fetchOne($0, sql: "SELECT value FROM legacy") } == "old")
     try old.close()
     let records = try SQLiteRepositories(url: url, resetWriterFilesAt: artifacts)
+    let fileColumns = try records.database.read { db in try db.columns(in: "workspace_files").map(\.name) }
+    #expect(fileColumns.contains("workspace_id") && !fileColumns.contains("task_id"))
     #expect(!FileManager.default.fileExists(atPath: artifacts.path))
     #expect(try String(contentsOf: config, encoding: .utf8) == "preserved")
     #expect(
@@ -335,9 +338,10 @@ import Testing
         id: id, requester: "assistant", executor: "writer", goal: "Search", input: "original search",
         sourceDialog: "source")
     let first = try await records.writerExecutions.beginRequest(
-        delegateID: id, taskID: nil, goal: "Search", input: "original search", sourceDialog: "source", agent: "writer")
+        delegateID: id, workspaceID: nil, goal: "Search", input: "original search", sourceDialog: "source",
+        agent: "writer")
     let duplicate = try await records.writerExecutions.beginRequest(
-        delegateID: id, taskID: nil, goal: "Changed", input: "changed", sourceDialog: nil, agent: "writer")
+        delegateID: id, workspaceID: nil, goal: "Changed", input: "changed", sourceDialog: nil, agent: "writer")
     #expect(first.messageID == duplicate.messageID && duplicate.input == "original search")
     let question = UUID().uuidString
     try await records.writerExecutions.saveInteraction(
@@ -361,7 +365,7 @@ import Testing
     try await records.agentMessages.seedAgentRequest(
         id: busy, requester: "assistant", executor: "writer", goal: "Another", input: "another", sourceDialog: nil)
     let rejected = try await records.writerExecutions.beginRequest(
-        delegateID: busy, taskID: nil, goal: "Another", input: "another", sourceDialog: nil, agent: "writer")
+        delegateID: busy, workspaceID: nil, goal: "Another", input: "another", sourceDialog: nil, agent: "writer")
     #expect(rejected.status == "failed" && rejected.failure != nil)
     #expect(try records.writerMessages.current().id == "writer/request_\(first.messageID)")
     #expect(try await records.writerExecutions.delegationCount() == 2)
@@ -369,15 +373,15 @@ import Testing
     let reopened = try SQLiteRepositories(url: url)
     try reopened.recoverInFlight()
     #expect(try await reopened.writerExecutions.request(id, agent: "writer").status == "interrupted")
-    #expect(try await reopened.writerExecutions.tasks(agent: "writer", before: nil, limit: 20).isEmpty)
-    let completion = TaskNotification(
+    #expect(try await reopened.writerExecutions.workspaces(agent: "writer", before: nil, limit: 20).isEmpty)
+    let completion = WriterDelegationNotification(
         delegateID: id, agent: "writer", eventID: UUID().uuidString, data: Data("{\"result\":\"search complete\"}".utf8)
     )
     try await reopened.writerExecutions.completeRequest(completion, status: "completed", failure: nil)
     try await reopened.writerExecutions.completeRequest(completion, status: "completed", failure: nil)
     try await reopened.logs.clearRequestLogs(agent: "writer", requestID: nil)
     let done = try await reopened.writerExecutions.request(id, agent: "writer")
-    #expect(done.taskID.isEmpty && done.status == "completed" && done.result?.contains("search complete") == true)
+    #expect(done.workspaceID.isEmpty && done.status == "completed" && done.result?.contains("search complete") == true)
     #expect(
         try reopened.database.read {
             try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM writer_messages WHERE delegation_id IS NOT NULL")
@@ -389,32 +393,32 @@ import Testing
 @Test func writerMessageKeysIgnoreRevisionAndDeletedWorkspaceKeepsItsHistory() async throws {
     let records = try SQLiteRepositories.temporary()
     let fixture = try await records.seedDelegation(
-        taskID: nil, goal: "Stable title", input: "Create", sourceDialog: nil, agent: "writer")
+        workspaceID: nil, goal: "Stable title", input: "Create", sourceDialog: nil, agent: "writer")
     try await records.writerExecutions.prepareWorkspace(
-        fixture.workspaceID, taskID: fixture.id, delegateID: fixture.delegateID, agent: "writer")
+        workspaceID: fixture.id, delegateID: fixture.delegateID, agent: "writer")
     let scope = try records.writerMessages.current().id
     try records.database.write { db in
         try db.execute(sql: "UPDATE sqlite_sequence SET seq=9000000000 WHERE name='business_message'")
         try db.execute(sql: "UPDATE writer_messages SET request_revision=7 WHERE input_kind='delegation'")
     }
     let first = try records.writerMessages.beginMessage(
-        task: scope,
+        ownerID: scope,
         identity: .init(clientID: "one", inputID: "one", role: "user", kind: "input", order: 1, date: Date()))
     let second = try records.writerMessages.beginMessage(
-        task: scope,
+        ownerID: scope,
         identity: .init(clientID: "two", inputID: "two", role: "user", kind: "input", order: 1, date: Date()))
     #expect(try BusinessRecordID.number(first, kind: .message) == 9_000_000_001)
     #expect(try BusinessRecordID.number(second, kind: .message) == 9_000_000_002)
-    let rows = try records.writerMessages.previews(task: fixture.workspaceID, after: 9_000_000_000, limit: 20)
+    let rows = try records.writerMessages.previews(ownerID: fixture.workspaceID, after: 9_000_000_000, limit: 20)
     #expect(rows.map(\.position) == [9_000_000_001, 9_000_000_002])
     try await records.endSeedDelegation(fixture.delegateID, status: "completed")
     let id = try #require(WorkspaceID(rawValue: fixture.workspaceID))
     try await records.workspaces.markDeleting(id)
     try await records.workspaces.finishDeleting(id)
-    #expect(try await records.writerExecutions.task(fixture.id, agent: "writer").status == "deleted")
-    #expect(try records.writerMessages.timelineCount(task: fixture.workspaceID) == 2)
+    #expect(try await records.writerExecutions.workspace(fixture.id, agent: "writer").status == "deleted")
+    #expect(try records.writerMessages.timelineCount(ownerID: fixture.workspaceID) == 2)
     let entry = try await records.writerExecutions.request(fixture.delegateID, agent: "writer")
-    #expect(try records.writerMessages.timelineCount(task: "writer/preflight_\(entry.messageID)") == 0)
+    #expect(try records.writerMessages.timelineCount(ownerID: "writer/preflight_\(entry.messageID)") == 0)
     await #expect(throws: RecordStorageError.conflict) {
         try await records.workspaces.claim(id, expecting: nil, lease: UUID())
     }

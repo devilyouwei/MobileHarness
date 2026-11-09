@@ -30,7 +30,7 @@ public struct WriterBackgroundExecution: Sendable {
 /// Root-owned role lifecycle. It never shuts down the borrowed Gateway roots.
 @MainActor public final class WriterContainer {
     private var agent: WriterAgent?
-    private var tasks: (any WriterExecutionRepository)?
+    private var executions: (any WriterExecutionRepository)?
     private var communications: (any AgentMessageRepository)?
     private var manager: AgentManager?
     private var output: OutputGateway?
@@ -45,14 +45,15 @@ public struct WriterBackgroundExecution: Sendable {
         startBackground = start
     }
     func configureHistory(
-        messages: any WriterMessageRepository, tasks: any WriterExecutionRepository,
+        messages: any WriterMessageRepository, executions: any WriterExecutionRepository,
         communications: any AgentMessageRepository, logs: any ModelRequestLogRepository
     ) throws {
         guard historyStore == nil else { throw WriterFailure.unavailable }
-        guard messages.storageScope == tasks.storageScope, messages.storageScope == communications.storageScope else {
+        guard messages.storageScope == executions.storageScope, messages.storageScope == communications.storageScope
+        else {
             throw RecordStorageError.invalidRecord
         }
-        self.tasks = tasks
+        self.executions = executions
         self.communications = communications
         historyStore = WriterHistoryStore(
             records: try WriterRecordStore(repository: messages, logs: logs))
@@ -61,11 +62,12 @@ public struct WriterBackgroundExecution: Sendable {
         manager: AgentManager, output: OutputGateway, model: @escaping @Sendable () async throws -> ChatModel,
         streaming: any ArtifactStreaming
     ) throws {
-        guard !closed, agent == nil, let historyStore, let tasks, let communications else {
+        guard !closed, agent == nil, let historyStore, let executions, let communications else {
             throw WriterFailure.unavailable
         }
         agent = try WriterAgent(
-            model: model, streaming: streaming, history: historyStore, tasks: tasks, communications: communications,
+            model: model, streaming: streaming, history: historyStore, executions: executions,
+            communications: communications,
             startBackground: startBackground)
         self.manager = manager
         self.output = output
@@ -110,11 +112,11 @@ extension WriterContainer: WriterRecordsControlling {
         try await historyStore.clearRequestLogs(requestID: requestID)
     }
     private func delegationItem(_ row: WriterRequestRecord) async throws -> WriterDelegationItem {
-        var workspace: WriterTaskItem?
-        if !row.taskID.isEmpty { workspace = try await task(row.taskID) }
+        var linkedWorkspace: WriterWorkspaceItem?
+        if !row.workspaceID.isEmpty { linkedWorkspace = try await workspace(row.workspaceID) }
         var result: String?
         if let raw = row.result,
-            let completion = try? JSONDecoder().decode(WriterTaskCompletion.self, from: Data(raw.utf8))
+            let completion = try? JSONDecoder().decode(WriterDelegationCompletion.self, from: Data(raw.utf8))
         {
             result = try AgentTaskContent.decode(completion.signal).text
         }
@@ -126,27 +128,28 @@ extension WriterContainer: WriterRecordsControlling {
             sourceContext: row.sourceContext, date: row.createdAt,
             state: ["closing", "cleanup_failed", "waiting_input", "paused"].contains(row.executionState)
                 ? row.executionState : row.status, result: result,
-            failure: failure, workspace: workspace)
+            failure: failure, workspace: linkedWorkspace)
         if let raw = row.waiting {
             item.waiting = try JSONDecoder().decode(AgentTaskContent.self, from: Data(raw.utf8)).text
         }
         return item
     }
     public func delegations(before: UInt64?) async throws -> WriterDelegationPage {
-        guard !closed, let tasks else { throw WriterFailure.unavailable }
-        let rows = try await tasks.delegations(before: before, limit: 21)
+        guard !closed, let executions else { throw WriterFailure.unavailable }
+        let rows = try await executions.delegations(before: before, limit: 21)
         var items: [WriterDelegationItem] = []
         for row in rows.prefix(20) { items.append(try await delegationItem(row)) }
         return .init(
-            items: items, next: rows.count > 20 ? items.last?.position : nil, total: try await tasks.delegationCount())
+            items: items, next: rows.count > 20 ? items.last?.position : nil,
+            total: try await executions.delegationCount())
     }
     public func delegation(_ id: String) async throws -> WriterDelegationItem {
-        guard !closed, let tasks else { throw WriterFailure.unavailable }
-        return try await delegationItem(tasks.request(id, agent: "writer"))
+        guard !closed, let executions else { throw WriterFailure.unavailable }
+        return try await delegationItem(executions.request(id, agent: "writer"))
     }
     public func preflight(_ id: String, after: UInt64) async throws -> WriterRequestPage {
-        guard !closed, let tasks, let historyStore else { throw WriterFailure.unavailable }
-        let request = try await tasks.request(id, agent: "writer")
+        guard !closed, let executions, let historyStore else { throw WriterFailure.unavailable }
+        let request = try await executions.request(id, agent: "writer")
         let rows = try await historyStore.requestPreviews(
             "writer/preflight_" + String(request.messageID), after: after, limit: 21)
         return Self.messagePage(rows)
@@ -166,38 +169,44 @@ extension WriterContainer: WriterRecordsControlling {
         }
         return .init(items: items, nextPosition: rows.count > 20 ? items.last?.position : nil)
     }
-    public func tasks(before: String?) async throws -> WriterTaskPage {
-        guard !closed, let tasks else { throw WriterFailure.unavailable }
-        let cursor = try before.map { try BusinessRecordID.number($0, kind: .task) }
-        var values: [WriterTaskItem] = []
-        let rows = try await tasks.tasks(agent: "writer", before: cursor, limit: 21)
+    public func workspaces(before: String?) async throws -> WriterWorkspacePage {
+        guard !closed, let executions else { throw WriterFailure.unavailable }
+        let cursor = try before.map { try BusinessRecordID.number($0, kind: .workspace) }
+        var values: [WriterWorkspaceItem] = []
+        let rows = try await executions.workspaces(agent: "writer", before: cursor, limit: 21)
         for record in rows.prefix(20) {
             values.append(try await enrichedItem(record))
         }
         return .init(items: values, nextID: rows.count > 20 ? values.last?.id : nil)
     }
-    private static func item(_ record: WriterWorkspaceRecord) -> WriterTaskItem {
-        WriterTaskItem(
-            id: record.id, dialogID: record.dialogID, goal: record.goal, workspaceID: record.workspaceID,
+    private static func item(_ record: WriterWorkspaceRecord) -> WriterWorkspaceItem {
+        WriterWorkspaceItem(
+            workspaceID: record.workspaceID, title: record.title,
             updatedAt: record.updatedAt)
     }
-    private func enrichedItem(_ record: WriterWorkspaceRecord) async throws -> WriterTaskItem {
+    private func enrichedItem(_ record: WriterWorkspaceRecord) async throws -> WriterWorkspaceItem {
         guard let historyStore else { throw WriterFailure.unavailable }
         var item = Self.item(record)
         item.isDeleted = record.status == "deleted"
-        item.startedAt = try await historyStore.taskMetadata(record.dialogID).createdAt
-        item.requestCount = try await historyStore.requestCount(record.dialogID)
+        item.startedAt = try await historyStore.ownerMetadata(record.workspaceID).createdAt
+        item.requestCount = try await historyStore.requestCount(record.workspaceID)
         return item
     }
-    public func task(_ id: String) async throws -> WriterTaskItem {
-        guard !closed, let tasks else { throw WriterFailure.unavailable }
-        let record = try await tasks.task(id, agent: "writer")
+    public func workspace(_ id: String) async throws -> WriterWorkspaceItem {
+        guard !closed, let executions else { throw WriterFailure.unavailable }
+        let record = try await executions.workspace(id, agent: "writer")
         return try await enrichedItem(record)
     }
-    public func requests(taskID: String, after: UInt64) async throws -> WriterRequestPage {
-        guard !closed, let tasks, let historyStore else { throw WriterFailure.unavailable }
-        let record = try await tasks.task(taskID, agent: "writer")
-        let rows = try await historyStore.requestPreviews(record.dialogID, after: after, limit: 21)
+    public func requests(workspaceID: String, after: UInt64) async throws -> WriterRequestPage {
+        guard !closed, let executions, let historyStore else { throw WriterFailure.unavailable }
+        let record = try await executions.workspace(workspaceID, agent: "writer")
+        let rows = try await historyStore.requestPreviews(record.workspaceID, after: after, limit: 21)
+        return Self.messagePage(rows)
+    }
+    public func requests(workspaceID: String, before: UInt64?) async throws -> WriterRequestPage {
+        guard !closed, let historyStore else { throw WriterFailure.unavailable }
+        guard WorkspaceID(rawValue: workspaceID) != nil else { throw RecordStorageError.invalidID }
+        let rows = try await historyStore.requestPreviews(workspaceID, before: before, limit: 21)
         return Self.messagePage(rows)
     }
     public func requestDetail(_ id: String) async throws -> WriterRequestDetails {
@@ -225,7 +234,8 @@ extension WriterContainer: WriterRecordsControlling {
             title: request == nil
                 ? "用户输入"
                 : WriterRequestNaming.summary(
-                    phase: phase, path: path, calls: calls, domain: metadata?["controlDomain"]))
+                    phase: phase, path: path, calls: calls, domain: metadata?["controlDomain"]),
+            workspaceID: selected.decisionMetadata?.workspaceID)
         let finalization = turn.generationRounds?.first { $0.id == selected.id }.flatMap(Self.finalization)
         return .init(
             summary: summary, request: request, fallbackInput: selected.input.isEmpty ? turn.user : selected.input,
@@ -238,15 +248,15 @@ extension WriterContainer: WriterRecordsControlling {
         else { return nil }
         return .init(state: state, result: fields["result"], error: fields["error"])
     }
-    public func shareTask(_ id: String) async throws -> String {
-        guard !closed, let tasks, let historyStore else { throw WriterFailure.unavailable }
-        let item = try await task(id)
-        let delegations = try await tasks.requests(id, agent: "writer")
+    public func shareWorkspace(_ id: String) async throws -> String {
+        guard !closed, let executions, let historyStore else { throw WriterFailure.unavailable }
+        let item = try await workspace(id)
+        let delegations = try await executions.requests(id, agent: "writer")
         var after: UInt64 = 0
         var messages: [WriterHistorySnapshot] = []
         var bytes = 0
         repeat {
-            let page = try await historyStore.page(item.dialogID, after: after)
+            let page = try await historyStore.page(item.workspaceID, after: after)
             for turn in page.turns {
                 try Task.checkCancellation()
                 guard let message = turn.modelRequests?.first?.messageID ?? turn.messageID else { continue }
@@ -260,13 +270,13 @@ extension WriterContainer: WriterRecordsControlling {
             after = next
         } while true
         struct Export: Encodable {
-            let task: WriterTaskItem
+            let workspace: WriterWorkspaceItem
             let delegations: [WriterRequestRecord]
             let messages: [WriterHistorySnapshot]
         }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(Export(task: item, delegations: delegations, messages: messages))
+        let data = try encoder.encode(Export(workspace: item, delegations: delegations, messages: messages))
         guard data.count <= 32 * 1024 * 1024 else { throw WriterFailure.capacity }
         return String(decoding: data, as: UTF8.self)
     }
@@ -291,12 +301,12 @@ enum WriterRequestNaming {
         for call in calls {
             let args = (try? JSONDecoder().decode([String: String].self, from: Data(call.argumentsJSON.utf8))) ?? [:]
             let title: String
-            switch call.name == "workspace" ? args["command"] : call.name {
-            case "searchWorkspaces": title = "搜索作品库"
-            case "create": title = "创建并进入工作区"
-            case "enter": title = "进入已有工作区"
-            case "open": title = "打开已有作品"
-            case "delete": title = "删除已有作品"
+            switch call.name {
+            case "workspace.search": title = "搜索作品库"
+            case "workspace.create": title = "创建并进入工作区"
+            case "workspace.enter": title = "进入已有工作区"
+            case "workspace.open": title = "打开已有作品"
+            case "workspace.delete": title = "删除已有作品"
             case "list": title = "查看工作区"
             case "read": title = "读取 " + file(args["path"])
             case "search": title = "查找文件内容"
@@ -311,7 +321,7 @@ enum WriterRequestNaming {
             case "remove", "removeTree": title = "删除 " + file(args["path"])
             case "render": title = "渲染并检查页面"
             case "finish":
-                title = domain == "library" ? "汇报作品库结果" : domain?.hasPrefix("view:") == true ? "汇报呈现结果" : "保存作品"
+                title = domain == "library" ? "汇报作品库结果" : "保存作品"
             case "ask": title = "等待补充信息"
             case "rename": title = "修改作品名称"
             case "savepoint": title = "保存编辑检查点"

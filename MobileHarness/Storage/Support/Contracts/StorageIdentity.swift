@@ -2,7 +2,7 @@ import Foundation
 
 /// A committed business reference; formatting never allocates an identifier.
 public struct BusinessRecordID: RawRepresentable, Hashable, Codable, Sendable {
-    public enum Kind: String, Codable, Sendable { case dialog, message, request, task, media, device }
+    public enum Kind: String, Codable, Sendable { case dialog, message, request, task, workspace, media, device }
     public let kind: Kind
     public let number: Int64
     public var rawValue: String { "\(kind.rawValue)_\(number)" }
@@ -41,21 +41,12 @@ public struct BusinessRecordID: RawRepresentable, Hashable, Codable, Sendable {
 
 /// Stable agent-owned workspace identity. Never accepts an absolute path or caller-supplied directory.
 public struct WorkspaceID: RawRepresentable, Hashable, Codable, Sendable, Comparable {
-    public let agent: String
-    public let taskID: String
-    public var rawValue: String { agent + "/" + taskID }
+    public let rawValue: String
+    public var agent: String { "writer" }
+    public var storagePath: String { agent + "/" + rawValue }
     public init?(rawValue: String) {
-        let parts = rawValue.split(separator: "/", omittingEmptySubsequences: false)
-        guard parts.count == 2 else { return nil }
-        self.init(agent: String(parts[0]), taskID: String(parts[1]))
-    }
-    public init?(agent: String, taskID: String) {
-        guard !agent.isEmpty, agent.utf8.count <= 64,
-            agent.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }),
-            BusinessRecordID(rawValue: taskID)?.kind == .task
-        else { return nil }
-        self.agent = agent
-        self.taskID = taskID
+        guard BusinessRecordID(rawValue: rawValue)?.kind == .workspace else { return nil }
+        self.rawValue = rawValue
     }
     public init(from decoder: any Decoder) throws {
         let value = try decoder.singleValueContainer()

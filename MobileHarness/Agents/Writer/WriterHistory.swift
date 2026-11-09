@@ -10,18 +10,16 @@ public actor WriterHistory {
     private var calls: [String: String] = [:]
     private var reasons: [String: String] = [:]
     let store: WriterHistoryStore
-    let taskID: String
     let delegateID: String
     let goal: String
     let modelName: String
     let toolPaths: [String: String]
     public init(
-        store: WriterHistoryStore, taskID: String, delegateID: String, goal: String,
+        store: WriterHistoryStore, delegateID: String, goal: String,
         modelName: String? = nil, toolPaths: [String: String] = [:]
     ) {
         self.modelName = modelName ?? "Writer (model name unavailable)"
         self.store = store
-        self.taskID = taskID
         self.delegateID = delegateID
         self.goal = goal
         self.toolPaths = toolPaths
@@ -100,10 +98,12 @@ public actor WriterHistory {
     ) async throws
         -> String
     {
-        // A query may have selected an existing work since this execution started.
-        let taskID = String(try await store.readCurrent().current.id.split(separator: "/").last ?? "")
+        let ownerID = try await store.readCurrent().current.id
+        let workspaceID = domain.flatMap { value in
+            value.hasPrefix("workspace:") ? WorkspaceID(rawValue: String(value.dropFirst("workspace:".count))) : nil
+        }?.rawValue
         let id = UUID().uuidString
-        let label = "\(phase) · \(taskID)\n" + String(goal.prefix(600))
+        let label = "\(phase) · \(workspaceID ?? ownerID)\n" + String(goal.prefix(600))
         for attempt in 0..<4 {
             let snapshot = try await store.readCurrent()
             do {
@@ -149,8 +149,8 @@ public actor WriterHistory {
                 decoding: try JSONSerialization.data(withJSONObject: ["actions": [], "tools": registrations]),
                 as: UTF8.self)
             var metadata = WriterDecisionMetadata(
-                taskID: taskID, mode: phase, skills: [:], catalogJSON: catalog,
-                taskGoal: String(goal.prefix(1000)), execution: "background")
+                workspaceID: workspaceID, mode: phase, skills: [:], catalogJSON: catalog,
+                delegationGoal: String(goal.prefix(1000)), execution: "background")
             metadata.delegateID = delegateID
             let historyID = try await store.readCurrent().current.id
             let number = try await store.requestCount(historyID)

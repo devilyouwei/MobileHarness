@@ -1,7 +1,7 @@
 import Foundation
 import UI
 
-/// Writer owns task facts; the Island component owns selection, layout and animation.
+/// Writer owns delegation facts; the Island component owns selection, layout and animation.
 /// One immutable in-flight publication and one replaceable latest value, independent of reports.
 actor WriterIslandPresentation {
     enum Phase: String, Sendable {

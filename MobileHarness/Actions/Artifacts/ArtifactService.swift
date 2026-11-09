@@ -6,7 +6,7 @@ public protocol ArtifactCapability: Sendable {
     func perform(invocation: any FunctionInput) async throws -> String
 }
 
-/// Deterministic, task-scoped editing. Model cognition never enters this owner.
+/// Deterministic editing scoped to the authenticated delegation. Model cognition never enters this owner.
 public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
     public typealias Present = @Sendable (WorkspaceID, String, String, [String: String], Bool) async throws -> String
     private struct Session {
@@ -82,7 +82,7 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
                 await workspace.search(query.trimmingCharacters(in: .whitespacesAndNewlines), before: args["before"]))
         }
         if command == "open" || command == "delete" {
-            guard let task = args["taskID"], let id = WorkspaceID(agent: "writer", taskID: task) else {
+            guard let raw = args["workspaceID"], let id = WorkspaceID(rawValue: raw) else {
                 throw ArtifactWorkspaceError.invalidPath
             }
             if command == "open" { return try await openWorkspace(id) }
@@ -114,17 +114,17 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
                     throw ArtifactWorkspaceError.missingProject
                 }
                 let entry = args["entry"] ?? checkpoint?.entry ?? original?.entry ?? "index.html"
-                try ArtifactDraft.validatePath(entry)
-                guard ["html", "md", "txt"].contains((entry as NSString).pathExtension.lowercased()) else {
+                guard ArtifactFilePath.isEntry(entry) else {
                     throw ArtifactWorkspaceError.invalidPath
                 }
                 let title = args["title"] ?? checkpoint?.title ?? original?.title ?? "作品"
                 guard !title.isEmpty else { throw ArtifactWorkspaceError.invalidTitle }
-                let draft = try checkpoint?.draft ?? ArtifactDraft(files: original?.files ?? [:])
-                if original == nil, checkpoint == nil {
+                var draft = try checkpoint?.draft ?? ArtifactDraft(files: original?.files ?? [:])
+                if args["createWorkspace"] == "true", draft.files[entry] == nil {
+                    try draft.create(entry, content: "")
                     try await workspace.checkpoint(
                         .init(
-                            workspaceID: id, baseRevision: nil, title: title, entry: entry, draft: draft,
+                            workspaceID: id, baseRevision: original?.revision, title: title, entry: entry, draft: draft,
                             interrupted: true))
                 }
                 sessions[delegateID] = Session(
@@ -133,14 +133,15 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
                     revision: original?.revision)
                 if command == "start" { try await prepare(id, false) }
                 var visible = draft.files
-                if visible[entry] == nil {
+                if visible[entry]?.isEmpty != false {
                     visible[entry] =
                         entry.hasSuffix(".html")
                         ? "<!doctype html><meta charset=utf-8><h2>Writer</h2><p>正在准备创作…</p>" : "正在准备创作…"
                 }
                 let presentation = try await present(id, title, entry, visible, true)
                 try await describe(id, title, args["subtitle"])
-                return try workspaceEvidence(id, title: title, entry: entry, presentation: presentation)
+                return try workspaceEvidence(
+                    id, title: title, entry: entry, entryContent: draft.files[entry], presentation: presentation)
             } catch {
                 sessions.removeValue(forKey: delegateID)
                 lockedProjects.remove(id)
@@ -298,8 +299,7 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
             guard let instruction = args["instruction"], !instruction.isEmpty else {
                 throw ArtifactWorkspaceError.invalidInstruction
             }
-            let reference = args["reference"]
-            if args["reference"] != nil && reference == nil { throw ArtifactWorkspaceError.readRequired }
+            var reference = args["reference"]
             let rawRefs = (args["contextReferences"] ?? "").split(separator: ",").map {
                 $0.trimmingCharacters(in: .whitespaces)
             }
@@ -307,6 +307,9 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
             let lower = try optionalInteger(args, "start")
             let upper = try optionalInteger(args, "end")
             let base = await session.editor.snapshot()
+            if reference == nil, path == session.entry, base.files[path] == "", lower == nil, upper == nil {
+                reference = try await session.editor.read(path: path).reference
+            }
             let id = try await session.editor.begin(
                 path: path, reference: reference,
                 start: lower, end: upper)
@@ -593,19 +596,27 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
         try await prepare(id, false)
         if let draft = try await workspace.checkpoint(for: id) {
             let presentation = try await present(id, draft.title, draft.entry, draft.draft.files, true)
-            return try workspaceEvidence(id, title: draft.title, entry: draft.entry, presentation: presentation)
+            return try workspaceEvidence(
+                id, title: draft.title, entry: draft.entry, entryContent: draft.draft.files[draft.entry],
+                presentation: presentation)
         }
         let project = try await workspace.project(id)
         let presentation = try await present(id, project.title, project.entry, project.files, false)
-        return try workspaceEvidence(id, title: project.title, entry: project.entry, presentation: presentation)
+        return try workspaceEvidence(
+            id, title: project.title, entry: project.entry, entryContent: project.files[project.entry],
+            presentation: presentation)
     }
 
-    private func workspaceEvidence(_ id: WorkspaceID, title: String, entry: String, presentation: String) throws
+    private func workspaceEvidence(
+        _ id: WorkspaceID, title: String, entry: String, entryContent: String?, presentation: String
+    ) throws
         -> String
     {
         let details = try? JSONDecoder().decode([String: String].self, from: Data(presentation.utf8))
         return try encode([
-            "workspaceID": id.rawValue, "title": title, "entry": entry, "windowID": details?["windowID"] ?? "",
+            "workspaceID": id.rawValue, "title": title, "entry": entry, "entryExists": String(entryContent != nil),
+            "entryEmpty": String(entryContent?.isEmpty == true),
+            "windowID": details?["windowID"] ?? "",
             "presentationStatus": details?["status"] ?? "unverified", "presentation": presentation,
         ])
     }

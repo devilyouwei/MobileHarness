@@ -86,8 +86,12 @@ private actor WriterEvaluationChat: ChatCapability {
                         bytes += value.utf8.count
                         self.records[index]["response", default: ""] += value
                     case .toolCall(let call):
-                        try self.update(
-                            index, ["tool.\(call.id)": call.argumentsJSON, "toolName.\(call.id)": call.name])
+                        var evidence = ["tool.\(call.id)": call.argumentsJSON, "toolName.\(call.id)": call.name]
+                        if self.records[index]["firstTool"] == nil {
+                            evidence["firstTool"] = call.name
+                            evidence["firstToolArguments"] = call.argumentsJSON
+                        }
+                        try self.update(index, evidence)
                         print("WRITER_TOOL \(index) \(call.name) \(call.argumentsJSON)")
                     case .finished(let reason): try self.update(index, ["finish": String(describing: reason)])
                     case .usage(let usage): try self.update(index, ["usage": String(describing: usage)])
@@ -159,7 +163,7 @@ private actor WriterEvaluationChat: ChatCapability {
         if let error { pending?.resume(throwing: error) } else { pending?.resume() }
     }
     func show(_ id: WorkspaceID, entry: String, files: [String: String], preview: Bool) async throws -> String {
-        let directory = root.appendingPathComponent(id.rawValue).appendingPathComponent(UUID().uuidString)
+        let directory = root.appendingPathComponent(id.storagePath).appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         for (path, content) in files {
             let file = directory.appendingPathComponent(path)
@@ -221,7 +225,7 @@ private actor WriterEvaluationSink: Agent {
     func stop() {}
     func receive(_ input: AgentInput) {
         guard case .observation(let message) = input.payload,
-            let signal = message.content(as: WriterTaskCompletion.self)?.signal
+            let signal = message.content(as: WriterDelegationCompletion.self)?.signal
                 ?? message.content(as: AgentTaskSignal.self)
         else { return }
         signals.append(signal)
@@ -296,7 +300,7 @@ func writerRealModelWorkflowRegression() async throws {
         records: try WriterRecordStore(repository: records.writerMessages, logs: records.logs))
     let writer = try WriterAgent(
         model: { ChatModel(capability: model, modelName: modelID) }, streaming: artifacts, history: journal,
-        tasks: records.writerExecutions, communications: records.agentMessages)
+        executions: records.writerExecutions, communications: records.agentMessages)
     let sink = WriterEvaluationSink()
     let island = await IslandState()
     await island.setAvailable(true)
@@ -342,7 +346,7 @@ func writerRealModelWorkflowRegression() async throws {
             item["delegateID"] = delegateID
             let scope = AgentTaskScope(
                 id: delegateID, requester: .assistant, executor: .writer, sessionID: session, execution: .background)
-            let data = ["request": requestGoal, "goal": requestGoal, "entry": scenario.entry]
+            let data = ["request": requestGoal, "goal": requestGoal]
             let signal = try AgentTaskSignal(
                 kind: .request, scope: scope, data: JSONEncoder().encode(data))
             let receipt = try await messaging.send(
@@ -351,13 +355,13 @@ func writerRealModelWorkflowRegression() async throws {
             guard receipt.rejected.isEmpty else { throw WriterFailure.unavailable }
             while true {
                 let current = try await records.writerExecutions.request(delegateID, agent: "writer")
-                item["taskID"] = current.taskID
+                item["workspaceID"] = current.workspaceID
                 if ["completed", "failed", "cancelled", "interrupted"].contains(current.status) {
                     item["status"] = current.status
                     item["failure"] = current.failure
-                    if !current.taskID.isEmpty {
-                        tasks[scenario.resumes ?? scenario.id] = try await records.writerExecutions.task(
-                            current.taskID, agent: "writer")
+                    if !current.workspaceID.isEmpty {
+                        tasks[scenario.resumes ?? scenario.id] = try await records.writerExecutions.workspace(
+                            current.workspaceID, agent: "writer")
                     }
                     if current.status != "completed" { issues.append("Writer terminal: \(current.status)") }
                     break
@@ -481,8 +485,8 @@ func writerRealModelWorkflowRegression() async throws {
     let projects = tasks.values.compactMap(\.workspaceID)
     #expect(Set(projects).count == projects.count)
     for task in tasks.values {
-        #expect(try await reopened.writerExecutions.task(task.id, agent: "writer").workspaceID == task.workspaceID)
-        let history = try await restored.read(task.dialogID)
+        #expect(try await reopened.writerExecutions.workspace(task.id, agent: "writer").workspaceID == task.workspaceID)
+        let history = try await restored.read(task.workspaceID)
         let calls = history.turns.flatMap { $0.modelRequests ?? [] }.flatMap(\.toolCalls)
         #expect(!history.turns.isEmpty)
         #expect(calls.allSatisfy { $0.state != .received })
@@ -497,7 +501,7 @@ func writerEvaluationWebKitReloadsLocalResourcesAndChecksClick() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let renderer = await WriterEvaluationRenderer(root: root)
-    let id = try #require(WorkspaceID(agent: "writer", taskID: "task_1"))
+    let id = try #require(WorkspaceID(rawValue: "workspace_1"))
     let html =
         "<!doctype html><meta charset='utf-8'><button id='increment'>+</button><span id='count'>0</span><script src='app.js'></script>"
     _ = try await renderer.show(
@@ -548,6 +552,7 @@ private struct WriterPromptCase: Decodable {
     var forbiddenFiles: [String]? = nil
     var unchangedFiles: [String]? = nil
     var exactReplacement: [String: String]? = nil
+    var firstCommand: String? = nil
     var requiredCommands: [String]? = nil
     var forbiddenCommands: [String]? = nil
     var domContains: [String]? = nil
@@ -720,7 +725,7 @@ private func writerPromptCase(_ scenario: WriterPromptCase, env: [String: String
         records: try WriterRecordStore(repository: records.writerMessages, logs: records.logs))
     let writer = try WriterAgent(
         model: { ChatModel(capability: model, modelName: modelID) }, streaming: artifacts, history: journal,
-        tasks: records.writerExecutions, communications: records.agentMessages)
+        executions: records.writerExecutions, communications: records.agentMessages)
     let sink = WriterEvaluationSink()
     let island = await IslandState()
     await island.setAvailable(true)
@@ -748,12 +753,12 @@ private func writerPromptCase(_ scenario: WriterPromptCase, env: [String: String
     do {
         for seed in scenario.seeds ?? [] {
             let task = try await records.seedDelegation(
-                taskID: nil, goal: seed.title, input: "Synthetic fixture", sourceDialog: nil, agent: "writer")
+                workspaceID: nil, goal: seed.title, input: "Synthetic fixture", sourceDialog: nil, agent: "writer")
             let id = try #require(WorkspaceID(rawValue: task.workspaceID))
             before[seed.name] = try await workspace.publish(
                 id: id, expecting: nil, title: seed.title, draft: ArtifactDraft(files: seed.files), entry: seed.entry)
             try await records.writerExecutions.prepareWorkspace(
-                id.rawValue, taskID: task.id, delegateID: task.delegateID, agent: "writer")
+                workspaceID: task.id, delegateID: task.delegateID, agent: "writer")
             try await records.endSeedDelegation(task.delegateID, status: "completed")
             seeds[seed.name] = task.workspace
         }
@@ -775,7 +780,7 @@ private func writerPromptCase(_ scenario: WriterPromptCase, env: [String: String
         let scope = AgentTaskScope(
             id: delegateID, requester: .assistant, executor: .writer, sessionID: session, execution: .background)
         item["delegateID"] = delegateID
-        let data = ["request": requestGoal, "goal": requestGoal, "entry": scenario.entry]
+        let data = ["request": requestGoal, "goal": requestGoal]
         let signal = try AgentTaskSignal(
             kind: .request, scope: scope, data: JSONEncoder().encode(data))
         let receipt = try await messaging.send(
@@ -838,7 +843,7 @@ private func writerPromptCase(_ scenario: WriterPromptCase, env: [String: String
             }
             let currentRequest = try await records.writerExecutions.request(delegateID, agent: "writer")
             let current = currentRequest
-            item["taskID"] = current.taskID
+            item["workspaceID"] = current.workspaceID
             if ["completed", "failed", "cancelled", "interrupted"].contains(current.status) {
                 terminal = current.status
                 item["failure"] = current.failure
@@ -873,8 +878,8 @@ private func writerPromptCase(_ scenario: WriterPromptCase, env: [String: String
         item["inventory"] = inventory
         let selectedRequest = try await records.writerExecutions.request(delegateID, agent: "writer")
         let selectedTask =
-            selectedRequest.taskID.isEmpty
-            ? nil : try await records.writerExecutions.task(selectedRequest.taskID, agent: "writer")
+            selectedRequest.workspaceID.isEmpty
+            ? nil : try await records.writerExecutions.workspace(selectedRequest.workspaceID, agent: "writer")
         let target = scenario.targetSeed.flatMap { seeds[$0] } ?? previous ?? selectedTask
         var files: [String: String] = [:]
         if let target, let id = WorkspaceID(rawValue: target.workspaceID),
@@ -934,6 +939,17 @@ private func writerPromptCase(_ scenario: WriterPromptCase, env: [String: String
             record.filter { $0.key.hasPrefix("toolName.") }.map(\.value)
         }
         item["commands"] = commands
+        if let firstRequest = trace.first(where: { $0["firstTool"] != nil }),
+            let firstTool = firstRequest["firstTool"]
+        {
+            item["firstTool"] = firstTool
+            item["firstToolArguments"] = firstRequest["firstToolArguments"]
+            if let expected = scenario.firstCommand, firstTool != expected {
+                issues.append("Expected first operation \(expected), got \(firstTool)")
+            }
+        } else if let expected = scenario.firstCommand {
+            issues.append("Expected first operation \(expected), no tool called")
+        }
         for command in scenario.requiredCommands ?? [] where !commands.contains(command) {
             issues.append("Required operation missing: \(command)")
         }
@@ -1025,7 +1041,7 @@ private func writerPromptCase(_ scenario: WriterPromptCase, env: [String: String
 func writerPromptHostUsesProductionWindowAndRenderingOwners() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     let host = try await WriterPromptHost(root: root, event: nil)
-    let id = try #require(WorkspaceID(agent: "writer", taskID: "task_1"))
+    let id = try #require(WorkspaceID(rawValue: "workspace_1"))
     _ = try await host.present(
         id, title: "Synthetic preflight", entry: "index.html",
         files: ["index.html": "<!doctype html><meta charset=utf-8><h1>Production renderer</h1>"], preview: false)

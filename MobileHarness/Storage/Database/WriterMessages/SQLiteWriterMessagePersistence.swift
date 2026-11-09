@@ -63,7 +63,7 @@ extension SQLiteWriterMessageRepository {
         }
         return key
     }
-    public func beginMessage(task id: String, identity: WriterMessageIdentity) throws -> String {
+    public func beginMessage(ownerID id: String, identity: WriterMessageIdentity) throws -> String {
         try database.write { db in
             let owner = try Self.owner(id, db: db)
             let key = try Self.ensureMessage(
@@ -91,7 +91,7 @@ extension SQLiteWriterMessageRepository {
                 for result in detail["generationRounds"] as? [[String: Any]] ?? [] {
                     guard let invocation = result["id"] as? String else { throw RecordStorageError.invalidRecord }
 
-                    try saveWriterRoundResult(result, task: owner.key, invocation: invocation, db: db)
+                    try saveWriterRoundResult(result, ownerID: owner.key, invocation: invocation, db: db)
 
                 }
             }

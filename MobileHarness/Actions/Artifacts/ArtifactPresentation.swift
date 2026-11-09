@@ -211,7 +211,7 @@ import UI
                     rendered[entry] = "<!doctype html><meta charset=utf-8>"
                 }
                 guard canRender, !dismissed.contains(id) else { throw WebPageError.unavailable }
-                let slotRoot = "previews/" + id.rawValue + "/" + String(slot)
+                let slotRoot = "previews/" + id.storagePath + "/" + String(slot)
                 try await disk.remove(slotRoot)
                 let prefix = slotRoot + "/" + UUID().uuidString
                 for (path, content) in rendered {
@@ -226,7 +226,7 @@ import UI
                 readRoot.deleteLastPathComponent()
                 if preview {
                     // Keep the document's file origin alive while rotating its resource snapshots.
-                    let hostKey = "previews/" + id.rawValue + "/preview.html"
+                    let hostKey = "previews/" + id.storagePath + "/preview.html"
                     if try await disk.info(hostKey) == nil {
                         try await disk.putIfAbsent(
                             Data(
@@ -250,7 +250,7 @@ import UI
                         window: windows.reference(for: window) ?? "")
                 }
                 if dismissed.contains(id) {
-                    try await disk.remove("previews/" + id.rawValue)
+                    try await disk.remove("previews/" + id.storagePath)
                     return try report(
                         status: "unavailable", detail: "Window closed; draft retained. Visual verification unavailable."
                     )
@@ -287,7 +287,7 @@ import UI
             if deleting {
                 latest.removeValue(forKey: id)
                 restoreFailures.remove(id)
-                try await disk.remove("previews/" + id.rawValue)
+                try await disk.remove("previews/" + id.storagePath)
                 if let window = bindings[id], windows.windows.contains(where: { $0.id == window }) {
                     try await windows.change(window, command: .close)
                     pages.removeSession(windowID: window)
@@ -352,7 +352,7 @@ import UI
                 slots.removeValue(forKey: project)
                 serials.removeValue(forKey: project)
                 refreshLabels()
-                try await disk.remove("previews/" + project.rawValue)
+                try await disk.remove("previews/" + project.storagePath)
             }
         }
     }

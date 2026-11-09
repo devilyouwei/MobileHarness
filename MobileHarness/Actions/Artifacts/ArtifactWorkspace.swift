@@ -1,4 +1,5 @@
 import Foundation
+import FunctionContracts
 import StorageCore
 import StorageDatabase
 import StorageFiles
@@ -36,13 +37,7 @@ public struct ArtifactDraft: Codable, Equatable, Sendable {
         try validate()
     }
     public static func validatePath(_ path: String) throws {
-        guard !path.isEmpty,
-            path.split(separator: "/", omittingEmptySubsequences: false).allSatisfy({
-                !$0.isEmpty && $0 != "." && $0 != ".." && !$0.hasPrefix(".")
-                    && $0.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || "._-".contains($0)) }
-            }),
-            ["html", "css", "js", "svg", "json", "txt", "md"].contains((path as NSString).pathExtension.lowercased())
-        else { throw ArtifactWorkspaceError.invalidPath }
+        guard ArtifactFilePath.isFile(path) else { throw ArtifactWorkspaceError.invalidPath }
     }
     public func validate() throws {
         for path in files.keys {
@@ -140,7 +135,7 @@ public actor ArtifactWorkspace {
     }
     private static func metadata(_ item: WorkspaceSummary) -> [String: String] {
         [
-            "agentID": item.id.agent, "taskID": item.id.taskID, "workspaceID": item.id.rawValue, "title": item.title,
+            "workspaceID": item.id.rawValue, "title": item.title,
             "entry": item.entry, "state": item.hasDraft ? "draft" : "saved",
         ]
     }
@@ -154,7 +149,7 @@ public actor ArtifactWorkspace {
         return value
     }
     public func entry(_ project: ArtifactProject) async throws -> URL {
-        try await disk.fileURL(project.id.rawValue + "/" + project.entry, maximumBytes: Int.max)
+        try await disk.fileURL(project.id.storagePath + "/" + project.entry, maximumBytes: Int.max)
     }
     public func publish(
         id: WorkspaceID, expecting token: UUID?, title: String, draft: ArtifactDraft, entry: String = "index.html"
@@ -174,7 +169,7 @@ public actor ArtifactWorkspace {
     }
     public func delete(_ id: WorkspaceID) async throws {
         try await catalog.markDeleting(id)
-        try await disk.remove(id.rawValue)
+        try await disk.remove(id.storagePath)
         try await catalog.finishDeleting(id)
     }
     public func checkpoint(_ value: ArtifactCheckpoint) async throws {

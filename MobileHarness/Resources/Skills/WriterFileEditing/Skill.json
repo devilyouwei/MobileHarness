@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "writer-file-editing",
-  "revision": 4,
+  "revision": 6,
   "description": "Inspect and edit files in the active Writer workspace.",
   "owner": "writer",
   "dependencies": [

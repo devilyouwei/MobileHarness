@@ -200,7 +200,7 @@ Assistant 拥有用户意图、委托请求和面向用户的沟通；执行 Age
 
 通信输出由 [Support 独立消费者](../Support/README.md#lifetime-bounds-and-failures) 持续递送，不受等待该 Task Action 的模型轮次屏障阻塞。角色根拥有消费者及其取消/加入；通信队列与输出队列各自有界，溢出明确失败。消息值与固定任务准入见 [Communication](../Support/Communication/README.md)，执行参数见 [Task Actions](../../Actions/System/Task/README.md)。
 
-当前公开创作执行者是 Writer；`task.delegate` 路径只向已声明且授权的目标开放，并不表示所有 Agent 都支持后台业务。当前 `task.send` 的补充输入适配也仅支持 Writer。Writer 的单行目标/原始输入、忙碌与取消、长期作品任务、灵动岛回馈、追问身份和独立持久终态通知见 [Writer 委托与主动事件](../Writer/README.md#委托与主动事件)。向 Writer 的委派、补充、取消送达成功时只完成调用，拒绝仍是异常观察。Writer 运行不随 Assistant 聆听停止、语音打断或对话关闭而取消；这属于该执行角色的生命周期契约，不能推定为所有角色的统一行为。
+当前公开创作执行者是 Writer；`task.delegate` 路径只向已声明且授权的目标开放，并不表示所有 Agent 都支持后台业务。当前 `task.send` 的补充输入适配也仅支持 Writer。Writer 的单行目标/原始输入、忙碌与取消、长期作品任务、灵动岛回馈、追问身份和独立持久终态通知见 [Writer 委托与主动事件](../Writer/README.md#委托与主动事件)。向 Writer 的委派、补充、取消送达成功时只完成调用，拒绝仍是异常观察。Writer 的接纳、精选里程碑、追问和终态由 Assistant 认证并去重，沿用既有合成与播放链播报，无额外模型请求。播报与正式输入共用执行 worker，已排队用户输入优先。通知队列最多八项，溢出优先淘汰较早的普通里程碑；终态移除未播放的旧里程碑和过期追问。每个委托保留最近六条事实，真实模型请求在原对话中最多读取最近两个委托的摘要。Writer 运行不随 Assistant 聆听停止、语音打断或对话关闭而取消；这属于该执行角色的生命周期契约，不能推定为所有角色的统一行为。
 
 ## ReACT、历史与失败
 

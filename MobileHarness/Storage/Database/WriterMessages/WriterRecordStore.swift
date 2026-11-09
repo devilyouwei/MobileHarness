@@ -27,11 +27,11 @@ public actor WriterRecordStore {
     }
     public func containsInput(_ id: String) async throws -> Bool {
         guard let dialog = try await repository.taskForInput(id) else { return false }
-        _ = try await repository.taskMetadata(dialog)
+        _ = try await repository.ownerMetadata(dialog)
         return true
     }
-    private func ownedTask(_ id: String) async throws -> WriterHistoryMetadata {
-        let row = try await repository.taskMetadata(id)
+    private func historyOwner(_ id: String) async throws -> WriterHistoryMetadata {
+        let row = try await repository.ownerMetadata(id)
         return row
     }
     private static func state(_ raw: String) throws -> WriterRecord.State {
@@ -78,17 +78,17 @@ public actor WriterRecordStore {
     public func isCurrent(_ id: String) async throws -> Bool {
         try await repository.current().id == id
     }
-    public func beginMessage(task id: String, identity: WriterMessageIdentity) async throws -> String {
+    public func beginMessage(ownerID id: String, identity: WriterMessageIdentity) async throws -> String {
         try await writeGate.withAccess { [self] in
-            _ = try await ownedTask(id)
-            return try await repository.beginMessage(task: id, identity: identity)
+            _ = try await historyOwner(id)
+            return try await repository.beginMessage(ownerID: id, identity: identity)
         }
     }
     @discardableResult public func saveCurrent(_ snapshot: WriterCheckpoint) async throws -> [WriterMessageReference] {
         try await writeGate.withAccess(honorCancellation: false) { [self] in try await saveCurrentLocked(snapshot) }
     }
     private func saveCurrentLocked(_ snapshot: WriterCheckpoint) async throws -> [WriterMessageReference] {
-        _ = try await ownedTask(snapshot.conversation.id)
+        _ = try await historyOwner(snapshot.conversation.id)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         var messages: [WriterMessageRecord] = []
@@ -155,7 +155,7 @@ public actor WriterRecordStore {
             }
         }
         let references = try await repository.save(
-            task: snapshot.conversation.id, revision: snapshot.revision,
+            ownerID: snapshot.conversation.id, revision: snapshot.revision,
             messages: messages)
         saved.merge(changes) { _, new in new }
         var retained: Set<String> = []
@@ -174,11 +174,11 @@ public actor WriterRecordStore {
         metadata(try await repository.current())
     }
     public func read(_ id: String) async throws -> WriterHistorySnapshot {
-        var result = metadata(try await ownedTask(id))
+        var result = metadata(try await historyOwner(id))
         var records: [WriterMessageRecord] = []
         var cursor: Int64?
         while true {
-            let page = try await repository.messagePage(task: id, after: cursor, limit: 50)
+            let page = try await repository.messagePage(ownerID: id, after: cursor, limit: 50)
             records += page.records
             guard let next = page.next else { break }
             cursor = next
@@ -226,12 +226,16 @@ public actor WriterRecordStore {
 
 extension WriterRecordStore {
     public func requestCount(_ id: String) async throws -> Int {
-        _ = try await ownedTask(id)
-        return try await repository.timelineCount(task: id)
+        _ = try await historyOwner(id)
+        return try await repository.timelineCount(ownerID: id)
     }
     public func requestPreviews(_ id: String, after: UInt64, limit: Int = 20) async throws -> [WriterMessagePreview] {
-        _ = try await ownedTask(id)
-        return try await repository.previews(task: id, after: after, limit: limit, offset: 0)
+        _ = try await historyOwner(id)
+        return try await repository.previews(ownerID: id, after: after, limit: limit, offset: 0)
+    }
+    public func requestPreviews(_ id: String, before: UInt64?, limit: Int) async throws -> [WriterMessagePreview] {
+        _ = try await historyOwner(id)
+        return try await repository.previews(ownerID: id, before: before, limit: limit)
     }
     public func page(
         _ id: String, after: UInt64 = 0, limit: Int = HistoryPaging.pageSize, offset: Int = 0
@@ -239,10 +243,10 @@ extension WriterRecordStore {
         async throws
         -> WriterHistorySnapshot
     {
-        var result = metadata(try await ownedTask(id))
+        var result = metadata(try await historyOwner(id))
         result.isWindow = true
         let previews = try await repository.previews(
-            task: id, after: after, limit: limit, offset: offset)
+            ownerID: id, after: after, limit: limit, offset: offset)
         for preview in previews {
             var request = WriterModelRequest(
                 id: preview.clientID, input: preview.input, requestJSON: "[]", date: preview.date)
@@ -262,7 +266,7 @@ extension WriterRecordStore {
         return result
     }
     public func message(_ id: String) async throws -> WriterHistorySnapshot {
-        _ = try await ownedTask(try await repository.taskForMessage(id))
+        _ = try await historyOwner(try await repository.taskForMessage(id))
         let rows = try await repository.messageEvidence(id)
         guard let user = rows.first(where: { $0.kind == "input" }),
             let selected = rows.first(where: { $0.id == id })
@@ -312,10 +316,10 @@ extension WriterRecordStore {
 extension WriterRecordStore {
     /// Ten projected blocks, plus admitted unanswered messages. The durable dialog is never truncated.
     public func window(_ id: String, preserving: [WriterRecord] = []) async throws -> WriterHistorySnapshot {
-        var result = metadata(try await ownedTask(id))
+        var result = metadata(try await historyOwner(id))
         result.isWindow = true
         var turns: [String: WriterRecord] = [:]
-        for preview in try await repository.latestPreviews(task: id) where !preview.isInput {
+        for preview in try await repository.latestPreviews(ownerID: id) where !preview.isInput {
             let rows = try await repository.messageEvidence(preview.id)
             guard let input = rows.first(where: { $0.kind == "input" }),
                 let response = rows.first(where: { $0.id == preview.id })
@@ -338,7 +342,7 @@ extension WriterRecordStore {
             turn.modelRequests?.append(request)
             turns[input.clientID] = turn
         }
-        for item in try await repository.unfinishedUserMessages(task: id)
+        for item in try await repository.unfinishedUserMessages(ownerID: id)
         where item.kind == "input" && !item.detail.isEmpty && turns[item.inputID] == nil {
             var turn = try Self.decodeInput(item)
             turn.messageID = item.id
@@ -363,17 +367,17 @@ extension WriterRecordStore {
 }
 
 extension WriterRecordStore {
-    public func taskMetadata(_ id: String) async throws -> WriterHistorySnapshot {
-        metadata(try await ownedTask(id))
+    public func ownerMetadata(_ id: String) async throws -> WriterHistorySnapshot {
+        metadata(try await historyOwner(id))
     }
 }
 
 extension WriterRecordStore {
     public func input(_ id: String) async throws -> WriterHistorySnapshot? {
         guard let dialog = try await repository.taskForInput(id) else { return nil }
-        var result = metadata(try await ownedTask(dialog))
+        var result = metadata(try await historyOwner(dialog))
         result.isWindow = true
-        let rows = try await repository.inputRows(id, task: dialog)
+        let rows = try await repository.inputRows(id, ownerID: dialog)
         guard let user = rows.first(where: { $0.kind == "input" }) else { return nil }
         var turn = try Self.decodeInput(user)
         turn.messageID = user.id

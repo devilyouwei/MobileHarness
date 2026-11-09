@@ -73,3 +73,5 @@ Completed scope: [可读预览编号与合并图片输入](../../completed/Reada
 已完成并归档：[Writer 记录分页](../../completed/Writer-Record-Pagination.md)，包含准确末页、详情返回保留与回归验证。
 
 - [Writer 委托与 Workspace 解耦](Writer-Workspace-Separation.md)：统一消息、独立 workspace、开发重置及验收。
+
+- [Writer 消息倒序与底部自动加载](Writer-Records-Descending-Scroll.md)。分页实现和定向测试已完成，模拟器原生交互待验证。

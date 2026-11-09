@@ -51,14 +51,16 @@ public actor WorkspaceStore {
             let lease = UUID()
             try await index.claim(id, expecting: expecting, lease: lease)
             do {
-                if !wasPresent { try await disk.remove(id.rawValue) }
+                if !wasPresent { try await disk.remove(id.storagePath) }
                 let previous = try await readFiles(id, creating: true)
                 // Each replacement is atomic. A partially committed collection is a draft after failure.
                 for (path, text) in files.sorted(by: { $0.key < $1.key }) where previous[path] != text {
                     try Task.checkCancellation()
-                    try await disk.replace(Data(text.utf8), key: id.rawValue + "/" + path)
+                    try await disk.replace(Data(text.utf8), key: id.storagePath + "/" + path)
                 }
-                for path in previous.keys where files[path] == nil { try await disk.remove(id.rawValue + "/" + path) }
+                for path in previous.keys where files[path] == nil {
+                    try await disk.remove(id.storagePath + "/" + path)
+                }
                 let value = WorkspaceSummary(
                     id: id, title: title, entry: entry, revision: published ? UUID() : expecting, hasDraft: !published,
                     deleting: false, files: Self.fileIndex(files))
@@ -74,8 +76,8 @@ public actor WorkspaceStore {
         }
     }
     private func readFiles(_ id: WorkspaceID, creating: Bool = false) async throws -> [String: String] {
-        if creating { _ = try await disk.directory(id.rawValue) }
-        return try await disk.textFiles(in: id.rawValue)
+        if creating { _ = try await disk.directory(id.storagePath) }
+        return try await disk.textFiles(in: id.storagePath)
     }
     private static func fileIndex(_ files: [String: String]) -> [WorkspaceFile] {
         files.sorted { $0.key < $1.key }.map {

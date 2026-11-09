@@ -59,7 +59,7 @@ public actor WriterHistoryStore {
         loaded = true
     }
 
-    /// Refreshes the task chosen by Writer only at operation boundaries, never per delta.
+    /// Refreshes the delegation history only at operation boundaries, never per delta.
     private func synchronizeCurrentLocked() async throws {
         let current = try await records.currentMetadata()
         guard needsCurrentSynchronization || current.id != value.current.id else { return }
@@ -140,7 +140,7 @@ public actor WriterHistoryStore {
         try await checkpointLocked()
         try await operation()
     }
-    public func taskHistory(_ id: String) async throws -> WriterHistorySnapshot {
+    public func ownerHistory(_ id: String) async throws -> WriterHistorySnapshot {
         try await records.read(id)
     }
 
@@ -159,10 +159,13 @@ public actor WriterHistoryStore {
     public func requestPreviews(_ id: String, after: UInt64, limit: Int = 20) async throws -> [WriterMessagePreview] {
         return try await records.requestPreviews(id, after: after, limit: limit)
     }
+    public func requestPreviews(_ id: String, before: UInt64?, limit: Int) async throws -> [WriterMessagePreview] {
+        try await records.requestPreviews(id, before: before, limit: limit)
+    }
     public func requestCount(_ id: String) async throws -> Int { try await records.requestCount(id) }
 
-    public func taskMetadata(_ id: String) async throws -> WriterHistorySnapshot {
-        try await records.taskMetadata(id)
+    public func ownerMetadata(_ id: String) async throws -> WriterHistorySnapshot {
+        try await records.ownerMetadata(id)
     }
 
     /// Identity-only duplicate lookup across this Agent's dialogs; never imports old dialog context.
@@ -294,13 +297,13 @@ public actor WriterHistoryStore {
 
         if observation {
             admitted.inputMessageID = try await records.beginMessage(
-                task: value.current.id,
+                ownerID: value.current.id,
                 identity: .init(
                     clientID: request.id, inputID: id, role: "user", kind: "observation",
                     order: admitted.historyOrder, date: admitted.date, replyTo: requests.last?.messageID))
         }
         admitted.messageID = try await records.beginMessage(
-            task: value.current.id,
+            ownerID: value.current.id,
             identity: .init(
                 clientID: request.id, inputID: id, role: "assistant", kind: "response",
                 order: admitted.historyOrder, date: admitted.date, replyTo: admitted.inputMessageID,
@@ -472,7 +475,7 @@ public actor WriterHistoryStore {
             request.tokenUsage = turn.tokenUsage
 
             request.messageID = try await records.beginMessage(
-                task: value.current.id,
+                ownerID: value.current.id,
                 identity: .init(
                     clientID: request.id, inputID: id, role: "assistant", kind: "response",
                     order: request.historyOrder, date: request.date, replyTo: turn.messageID,

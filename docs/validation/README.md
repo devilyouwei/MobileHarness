@@ -18,6 +18,11 @@
 | [全局灵动岛](Global-In-App-Island.md) | 设置/记录/相册中的全局状态与展开偏好、导航及生命周期回归、原生界面验收限制。 |
 | [原生音视频故障诊断](Native-Media-Failure-Diagnosis.md) | 保存照片后媒体服务重置的现场证据、错误保真回归及真机调查限制。 |
 | [Writer 执行与续写生命周期](Writer-Execution-Lifetime.md) | 工具接纳后的续写权限、取消/清理并发回归、Simulator 构建与历史失败记录。 |
+| [Writer 消息倒序与自动分页](Writer-Records-Descending-Scroll.md) | 两张列表的排序、末页、滚动加载与导航返回。 |
+| [Writer 按 ID 直接打开和进入](Writer-Direct-Workspace-Access.md) | 真机调用调查、直接选择与无效 ID 回归。 |
+| [Writer 精选事件播报](Writer-Selective-Assistant-Feedback.md) | 替身合成、授权播放、去重、后续模型上下文和设备验收边界。 |
+| [Writer 工具与工作区身份](Writer-Workspace-Tools-and-Identity.md) | 工作区别名、参数恢复、SQLite 重置和模型首个工具验证。 |
+| [Writer 重复创建与缺入口恢复](Writer-Create-Loop.md) | 真机 SQLite 调查、重复调用防重、缺入口修正与构建。 |
 | [Writer Skill 统一注册与工作区切换](Writer-Skill-Registration-and-Switching.md) | 统一注册、叠加 Skill、编辑目标切换与失败恢复。 |
 | [Writer 工具注册拆分](Writer-Tool-Separation.md) | 独立函数、参数校验、分域调用、历史与构建。 |
 | [Writer 显式结束委托与通用作品打开](Writer-Explicit-Finish-and-Open.md) | 控制轮补交 finish、按选中 ID 单开和多开、独立失败以及构建证据。 |

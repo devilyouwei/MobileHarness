@@ -5,10 +5,10 @@ import StorageTasks
 
 /// Durable completion facts have a lifetime independent of creative work and execution grants.
 actor WriterNotifications {
-    typealias Sender = @Sendable (WriterTaskCompletion) async throws -> DeliveryReport
+    typealias Sender = @Sendable (WriterDelegationCompletion) async throws -> DeliveryReport
     typealias Retirement = @Sendable (AgentTaskSignal) async throws -> Void
     private let communications: any AgentMessageRepository
-    private let tasks: any WriterExecutionRepository
+    private let executions: any WriterExecutionRepository
     private var sender: Sender?
     private var retire: Retirement?
     private var running = false
@@ -16,8 +16,8 @@ actor WriterNotifications {
     private var revision: UInt64 = 0
     private var failures: [Bool: String] = [:]
     var lastFailure: String? { failures.values.sorted().last }
-    init(tasks: any WriterExecutionRepository, communications: any AgentMessageRepository) {
-        self.tasks = tasks
+    init(executions: any WriterExecutionRepository, communications: any AgentMessageRepository) {
+        self.executions = executions
         self.communications = communications
     }
     func bind(sender: @escaping Sender, retire: @escaping Retirement) {
@@ -51,7 +51,7 @@ actor WriterNotifications {
         while running, !Task.isCancelled {
             let observed = revision
             do {
-                let page = try await tasks.pendingTaskNotifications(
+                let page = try await executions.pendingDelegationNotifications(
                     agent: "writer", retirement: retirement, after: cursor, limit: retirement ? 32 : 1)
                 if page.isEmpty {
                     if cursor != nil {
@@ -74,7 +74,7 @@ actor WriterNotifications {
                     cursor = row.position
                     do {
                         try Task.checkCancellation()
-                        let completion = try JSONDecoder().decode(WriterTaskCompletion.self, from: row.data)
+                        let completion = try JSONDecoder().decode(WriterDelegationCompletion.self, from: row.data)
                         try completion.validate()
                         guard completion.signal.scope.id == row.delegateID,
                             try AgentTaskContent.decode(completion.signal).writerEvent?.eventID == row.eventID,
@@ -90,14 +90,14 @@ actor WriterNotifications {
                                 report.failure ?? report.rejected[.assistant]
                                 ?? (report.delivered.contains(.assistant) ? nil : "Assistant unavailable")
                         }
-                        try await tasks.finishTaskNotification(
+                        try await executions.finishDelegationNotification(
                             row.delegateID, agent: "writer", retirement: retirement,
                             completed: failure == nil, failure: failure, claimToken: row.claimToken)
                         if let failure { failures[retirement] = failure }
                     } catch {
                         if Task.isCancelled {
                             do {
-                                try await tasks.finishTaskNotification(
+                                try await executions.finishDelegationNotification(
                                     row.delegateID, agent: "writer", retirement: retirement,
                                     completed: false, failure: "Delivery interrupted", claimToken: row.claimToken)
                             } catch { failures[retirement] = String(describing: error) }
@@ -105,7 +105,7 @@ actor WriterNotifications {
                         }
                         let message = String(String(describing: error).prefix(1024))
                         failures[retirement] = message
-                        try await tasks.finishTaskNotification(
+                        try await executions.finishDelegationNotification(
                             row.delegateID, agent: "writer", retirement: retirement,
                             completed: false, failure: message, claimToken: row.claimToken)
                     }

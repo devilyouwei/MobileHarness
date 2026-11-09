@@ -47,19 +47,19 @@ AgentFixedTaskInput.unwrap 只接受 request／input，核对 requester 为 Assi
 Native CameraFrame/PCM and typed UI/container observations reach their owning roles directly. This directory owns derived semantic messages and role-originated coordination, not a universal external-media Signal format. Perception and cognition use the same Agent communication boundary; neither denotes a new module or container. Execution requests are separate from role messages and share Gateway only for their respective transport/scheduling facilities. The cross-module view is maintained in the [overall input and Signal design](../../../README.md#native-input-and-internal-signals).
 
 
-Assistant 通过 task.delegate(agent_id=writer,description) 发送原始用户输入和单行目标。Writer 验证来源、执行范围和容量后接纳，由内部模型判断执行、追问或拒绝。模型拒绝以 declined 业务事件进入 writer.completion，并携带理由。task.progress 回报接纳与追问，writer.completion 回报持久终态。追加输入在文件检查点消费，显式 cancel 加入取消清理。授权退休由 Writer 通过运行时端口发起。
+Assistant 通过 task.delegate(agent_id=writer,description) 发送原始用户输入和单行目标。Writer 验证来源、执行范围和容量后接纳，由内部模型判断执行、追问或拒绝。模型拒绝以 declined 业务事件进入 writer.completion，并携带理由。task.progress 回报接纳、精选里程碑与追问，writer.completion 回报持久终态。追加输入在文件检查点消费，显式 cancel 加入取消清理。授权退休由 Writer 通过运行时端口发起。
 
-WriterTaskEvent 的可选 taskID 是长期作品任务，delegateID 必须匹配可信 scope.id；新版本回报携带两者，接收端同时校验业务绑定。每次续作创建新 scope，不重新打开已终止的通信任务。历史请求保存稳定身份，实时传输/去重使用执行身份。
+WriterDelegationEvent 携带可选 workspace_N 和独立 delegateID，接收端认证 scope 并校验事件顺序。每次续作创建新 scope，不重新打开已终止的通信任务。历史请求保存稳定身份，实时传输/去重使用执行身份。
 
-WriterTaskEvent.failure 是可选 WriterFailureDiagnostic：分类、错误码、阶段、摘要、诊断字段和关联原因均为业务事实。通信值不依赖 Storage；Writer 拥有到持久化 DTO 的转换。失败消息通过认证、去重后更新 Assistant 任务视图；Writer 灵动岛展示任务摘要。
+WriterDelegationEvent.failure 是可选 WriterFailureDiagnostic：分类、错误码、阶段、摘要、诊断字段和关联原因均为业务事实。通信值不依赖 Storage；Writer 拥有到持久化 DTO 的转换。失败消息通过认证、去重后更新 Assistant 任务视图；Writer 灵动岛展示任务摘要。
 
-WriterTaskCompletion（writer.completion）封装已结束的 Writer AgentTaskSignal，限定后台 assistant→writer 身份及业务事件/终态配对。通过无 taskScope 的普通角色通信递送，只携带事实，不恢复旧执行授权。Assistant 额外核对共享 SQLite 中不可变通知与任务归属；控制退休和终态投递独立接纳。该契约不引入 Gateway 调度机制或通用持久消息设施。
+WriterDelegationCompletion（writer.completion）封装已结束的 Writer AgentTaskSignal，限定后台 assistant→writer 身份及业务事件/终态配对。通过无 taskScope 的普通角色通信递送，只携带事实，不恢复旧执行授权。Assistant 额外核对共享 SQLite 中不可变通知与任务归属；控制退休和终态投递独立接纳。该契约不引入 Gateway 调度机制或通用持久消息设施。
 
-普通运行步骤及请求编号由 Writer 自有展示和请求历史保留。跨角色消息承载接纳、追问和终态，Assistant 在控制路径更新关联视图。
+普通运行步骤及请求编号由 Writer 自有展示和请求历史保留。跨角色消息承载接纳、首次草稿保存、首次恢复或渲染异常、追问和终态。Assistant 在控制路径验证并更新关联视图，从原对话向后续真实请求提供短事件事实，并通过现有合成播放播报。
 
-Assistant creates the delegation UUID; Writer allocates its own Agent-local task on acceptance. AgentTaskScope.id is the delegation identity for background requests; event taskID is the stable Agent-local workspace task. Writer events retain internal event/interaction/delegate IDs for verification, while the next real user input can carry the captured pending question as contextual data. Public task.send/task.cancel uses agent_id; runtime injects current delegation and pending interaction after ownership and captured-question checks.
+Assistant creates the delegation UUID in AgentTaskScope.id. Writer allocates a workspace only on explicit creation. The event workspaceID identifies the reusable work. Writer events retain internal event/interaction/delegate IDs for verification, while the next real user input can carry the captured pending question as contextual data. Public task.send/task.cancel uses agent_id; runtime injects current delegation and pending interaction after ownership and captured-question checks.
 
-WriterTaskEvent version 2 carries the stable task key, current goal and optional derived workspace/window metadata, alongside internal UUID delegation/event/question evidence. artifactID for Writer is a reference to the same derived workspace, not an independently allocated project identity.
+WriterDelegationEvent version 3 carries one optional workspaceID, the current goal and window evidence alongside the delegation and event identity.
 
 ## 公开委派适配
 

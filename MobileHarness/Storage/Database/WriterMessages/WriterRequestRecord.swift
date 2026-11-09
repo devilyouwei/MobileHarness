@@ -8,7 +8,7 @@ public struct WriterRequestRecord: Codable, Sendable, Identifiable {
     public var result: String? = nil
     public var executionState: String = ""
     public var waiting: String? = nil
-    public let taskID: String
+    public let workspaceID: String
     public let delegateID: String
     public let goal: String
     public let input: String
@@ -18,12 +18,13 @@ public struct WriterRequestRecord: Codable, Sendable, Identifiable {
     public let createdAt: Date
     public let finishedAt: Date?
     public init(
-        taskID: String, delegateID: String, goal: String, input: String, status: String, cancellationReason: String?,
+        workspaceID: String, delegateID: String, goal: String, input: String, status: String,
+        cancellationReason: String?,
         createdAt: Date, failure: String? = nil, finishedAt: Date? = nil
     ) {
         self.finishedAt = finishedAt
         self.failure = failure
-        self.taskID = taskID
+        self.workspaceID = workspaceID
         self.delegateID = delegateID
         self.goal = goal
         self.input = input
@@ -33,8 +34,8 @@ public struct WriterRequestRecord: Codable, Sendable, Identifiable {
     }
 }
 
-/// Opaque task completion evidence; execution and user-notification delivery have independent receipts.
-public struct TaskNotification: Sendable {
+/// Opaque Writer delegation completion evidence; execution and user-notification delivery have independent receipts.
+public struct WriterDelegationNotification: Sendable {
     public let delegateID: String
     public let claimToken: String?
     public let position: Int64

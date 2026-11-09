@@ -83,7 +83,7 @@ private struct ContractDocument: Codable, Sendable, Equatable { let text: String
     _ = try WriterRecordStore(repository: first.writerMessages, logs: first.logs)
     #expect(throws: RecordStorageError.invalidRecord) {
         try WriterContainer().configureHistory(
-            messages: first.writerMessages, tasks: first.writerExecutions,
+            messages: first.writerMessages, executions: first.writerExecutions,
             communications: second.agentMessages, logs: first.logs)
     }
     _ = try AssistantRecordStore(

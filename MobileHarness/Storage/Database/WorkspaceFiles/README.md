@@ -2,9 +2,9 @@
 
 ## Ownership and interfaces
 
-The primary key is (task_id,path); task_id cascades with writer_workspaces. Each file row stores bytes (nonnegative), fingerprint and updated_at, never file content or versions.
+The primary key is (workspace_id,path); workspace_id cascades with writer_workspaces. Each file row stores bytes (nonnegative), fingerprint and updated_at, never file content or versions.
 
-WorkspaceFileRow.files returns an ordered typed file index. replace deletes the old index and inserts the supplied rows on the caller's Database connection. SQLiteWorkspaceRepository commits this operation together with the writer task's lease/token metadata; a duplicate path/constraint failure rolls back both old-index removal and metadata changes. Disk coordination belongs to [WriterWorkspaces/WorkspaceStore](../WriterWorkspaces/README.md); the table model performs no filesystem I/O and opens no independent transaction.
+WorkspaceFileRow.files returns an ordered typed file index. replace deletes the old index and inserts the supplied rows on the caller's Database connection. SQLiteWorkspaceRepository commits this operation together with the workspace's lease/token metadata; a duplicate path/constraint failure rolls back both old-index removal and metadata changes. Disk coordination belongs to [WriterWorkspaces/WorkspaceStore](../WriterWorkspaces/README.md); the table model performs no filesystem I/O and opens no independent transaction.
 
 ## Implementation and boundaries
 

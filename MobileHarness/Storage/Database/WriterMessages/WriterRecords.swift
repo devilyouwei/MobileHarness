@@ -5,22 +5,22 @@ public enum WriterHistoryError: Error, Equatable, Sendable {
     case busy, capacityExceeded, invalidRecord, missingTurn, conflict
 }
 
-/// Writer phase, task and tool catalog evidence.
+/// Writer phase, workspace and tool catalog evidence.
 public struct WriterDecisionMetadata: Codable, Sendable {
     public var delegateID: String? = nil
-    public let taskID: String?
+    public let workspaceID: String?
     public let mode: String
     public let skills: [String: Int]
     public var catalogJSON: String
-    public let taskGoal: String?
+    public let delegationGoal: String?
     public let execution: String?
     public init(
-        taskID: String?, mode: String, skills: [String: Int], catalogJSON: String, taskGoal: String? = nil,
+        workspaceID: String?, mode: String, skills: [String: Int], catalogJSON: String, delegationGoal: String? = nil,
         execution: String? = nil
     ) {
-        self.taskGoal = taskGoal
+        self.delegationGoal = delegationGoal
         self.execution = execution
-        self.taskID = taskID
+        self.workspaceID = workspaceID
         self.mode = mode
         self.skills = skills
         self.catalogJSON = catalogJSON

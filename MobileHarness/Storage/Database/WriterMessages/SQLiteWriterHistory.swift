@@ -29,7 +29,7 @@ extension SQLiteWriterMessageRepository {
             return try Self.history(Owner(key: key, request: true), db: db)
         }
     }
-    public func taskMetadata(_ id: String) throws -> WriterHistoryMetadata {
+    public func ownerMetadata(_ id: String) throws -> WriterHistoryMetadata {
         try database.read { db in try Self.history(Self.owner(id, db: db), db: db) }
     }
 }

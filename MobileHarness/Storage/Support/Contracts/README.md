@@ -29,4 +29,4 @@ RecordStorageError.notReady 表示数据库端口尚未发布，closed 表示作
 
 All Container/node reads use stateSnapshot() async throws. Reference is Codable path-only metadata; Reader is an unencoded weak-owner capability for exact lookup, and Descriptor.children contains indices rather than descendant descriptors.
 
-WorkspaceID validates the registered-owner-shaped agent/task_N identity and rejects traversal/noncanonical task numbers. It formats identities without allocating them. Task numbers are committed by Storage for the owning Agent; UUIDs are reserved for execution/evidence identities. Dialog history has a readable dialog_N reference and a separate persisted UUID trace identity.
+WorkspaceID validates the canonical workspace_N reference and derives the confined writer/workspace_N storage path. It formats identities without allocating them. Workspace and Assistant Task numbers are independently committed by their owning repositories; UUIDs are reserved for execution/evidence identities. Dialog history has a readable dialog_N reference and a separate persisted UUID trace identity.

@@ -1,8 +1,8 @@
 # Artifacts — 当前作品与编辑
 
-本目录拥有确定性文件编辑、格式验证、运行渲染和导出，不执行模型请求。ArtifactWorkspace使用StorageDatabase.WorkspaceStore协调当前目录与SQLite文件索引；StorageFiles拥有沙盒和原子文件操作。源码仅保存在agent/task_N/relative-path，不保存持久历史版本。支持HTML/CSS/JS/SVG/JSON/TXT/MD，不新增源码或任务累计配额。
+本目录拥有确定性文件编辑、格式验证、运行渲染和导出，不执行模型请求。ArtifactWorkspace使用StorageDatabase.WorkspaceStore协调当前目录与SQLite文件索引；StorageFiles拥有沙盒和原子文件操作。源码仅保存在writer/workspace_N/relative-path，不保存持久历史版本。支持HTML/CSS/JS/SVG/JSON/TXT/MD，不新增源码或任务累计配额。
 
-ArtifactsModule 从 WorkspaceActions 的声明表注册独立的 Artifacts.Workspace 函数。Writer 通过 Gateway direct 调用作品库检索、打开、删除、文件读写和渲染。start/resume/describe/preview/publish 由 Writer 运行时授权并调用。函数地址选择实际操作，各操作有独立的参数声明。Assistant 只能委派，不暴露作品库 Action，服务拒绝其直接调用。Writer 的可信 delegateID 绑定编辑会话，agent/taskID 定位持久工作区，模型参数不能更改所有者。ArtifactService 拥有单项会话准入及项目单写锁；ArtifactEditing 拥有单流、按文件版本失效的读取引用和范围修改。remove 要求有效读取引用且禁止入口删除。完整文件内容通过中立 ArtifactStreaming 端口背压追加，不通过 Tool 参数。发布要求最新草稿已进行显式渲染，存在已报告的运行错误时拒绝发布；窗口不可见时显式返回不能进行视觉验证，不能把保存等同视觉验收。
+ArtifactsModule 从 WorkspaceActions 的声明表注册独立的 Artifacts.Workspace 函数。Writer 通过 Gateway direct 调用作品库检索、打开、删除、文件读写和渲染。start/resume/describe/preview/publish 由 Writer 运行时授权并调用。函数地址选择实际操作，各操作有独立的参数声明。Assistant 只能委派，不暴露作品库 Action，服务拒绝其直接调用。Writer 的可信 delegateID 绑定编辑会话，workspaceID 定位持久工作区，模型参数不能更改所有者。ArtifactService 拥有单项会话准入及项目单写锁；ArtifactEditing 拥有单流、按文件版本失效的读取引用和范围修改。remove 要求有效读取引用且禁止入口删除。完整文件内容通过中立 ArtifactStreaming 端口背压追加，不通过 Tool 参数。发布要求最新草稿已进行显式渲染，存在已报告的运行错误时拒绝发布；窗口不可见时显式返回不能进行视觉验证，不能把保存等同视觉验收。
 
 ## 执行与续写生命周期
 
@@ -37,13 +37,13 @@ HTML/MD/TXT 可导出 PDF；作品窗口、历史文件预览和 PDF 复用 Arti
 
 ArtifactService 只拥有作品业务，不提供历史 startNew/delete/title 命令。Writer 长期任务与对话读取由 Agents/Writer 和 Storage 的委托记录接口管理。
 
-Writer 显式 create 或 enter 时调用工作区 start，显示准备占位或已有内容，返回呈现状态与已确认的窗口身份；占位不写入项目草稿、不视为完成渲染。展示失败撤销内存会话与写锁，保留已落盘草稿。
+Writer 显式 create 或 enter 时调用工作区 start。初始化工作区时，缺失入口随草稿检查点创建为空文件，已有入口保留内容。窗口显示准备占位或已有内容，回执报告真实入口是否存在及为空。写入空入口可由宿主取得零长度读取引用，有内容的文件仍需要模型提供有效读取引用。展示失败撤销内存会话与写锁，保留已落盘草稿。
 
 内部 start 为新委托恢复窗口，resume 为同任务续作保留关闭/最小化偏好；两者均非 Writer 模型可选择的编辑命令。Assistant 显式打开作品也恢复最小化窗口。
 
 任务文件预览使用独立暂存快照与 UI 受控 WebPageContainer，本地资源根、网络阻断和导航策略保持一致。预览和导出各仅一个 worker、零等待队列；根关闭取消并加入，预览离页请求取消并清理。首次临时目录清理由共用的准备任务合并，不能在首次导出时删除正在展示的预览。SVG 使用 HTML 宿主渲染；CSS/JS/JSON 转义显示并可作为文本 PDF 导出。分享关闭才清理对应导出文件。
 
-新项目在显式 create 的首次 checkpoint 中建立 agent/task_N 目录；续作直接修改当前文件。SQL写租约排除并发写者，单文件原子替换后提交索引；失败保留真实文件和草稿状态，后续读取校验索引，不从模型日志恢复代码。
+新项目在显式 create 的首次 checkpoint 中建立 writer/workspace_N 目录；续作直接修改当前文件。SQL写租约排除并发写者，单文件原子替换后提交索引；失败保留真实文件和草稿状态，后续读取校验索引，不从模型日志恢复代码。
 
 start 的 createWorkspace 参数由受信 Writer 运行时为未完成初始化的预留项目传入，不暴露给模型工具 schema；模型循环不允许 start/resume。已有就绪项目缺失保持 missingProject。预览与 PDF 的临时 HTML 使用与发布一致的 UTF-8 BOM，源文件导出保持原始 UTF-8 文本。
 
@@ -69,17 +69,16 @@ replace使用fresh read引用约束字面旧文本，唯一匹配后原子替换
 
 
 
-Writer library open/delete derives WorkspaceID from taskID. ArtifactService uses the canonical function name to select the operation. Each open uses the selected project gate and reports its own window result. Writer may call it for multiple catalog matches. Library inventory includes owner/task/title/entry/state. Runtime-only workspaceID remains a deterministic compound value for Writer setup and UI file previews, not another allocated identity.
+Writer passes a workspace_N identity to library, editing and preview interfaces. ArtifactService dispatches by canonical Action path. Each open uses the selected workspace gate and reports its own window result. Library inventory includes workspaceID, title, entry and state. Storage derives the writer/workspace_N directory from the typed identity.
 
 ## Current workspace persistence
 
 ArtifactWorkspace validates formats and delegates current-directory storage to StorageDatabase.WorkspaceStore.
 The neutral repository indexes files in shared SQLite; source bytes live only in StorageFiles at
-agent/task_N/relative-path. Checkpoints replace current files, and finish marks the current content
+writer/workspace_N/relative-path. Checkpoints replace current files, and finish marks the current content
 accepted after rendering. No historical version catalogue or restore-version tool exists. The UUID
 current token fences stale publication; it is not a retained version. Temporary editor savepoints are
 in-memory undo state for one active session. Web/render/export snapshots remain separately owned,
-short-lived copies and never create workspace history. Missing files fail explicitly. Active task deletion
-requires Writer cancellation/join before directory cleanup and metadata deletion.
+short-lived copies and never create workspace history. Missing files fail explicitly. Deletion requires an inactive workspace without a write lease.
 
-searchWorkspaces、open 和 delete 只接受 Writer 委托调用。searchWorkspaces 通过 SQLite 返回当前页命中元数据。open 和 delete 校验 writer 所有者并取得单项目锁。open 呈现已有入口并返回窗口证据，保留文件与草稿状态。删除先清理展示，再删除存储。显式进入或打开聚焦已有窗口，最小化期间预览仅更新最新快照。窗口转换被打断时保留快照，明确关闭才退休。
+workspace.search、workspace.open 和 workspace.delete 只接受 Writer 委托调用。workspace.search 通过 SQLite 返回当前页命中元数据。open 和 delete 接受精确 workspaceID，校验 writer 所有者并取得单项目锁。删除所需的搜索命中由 Writer 工作流校验。open 呈现已有入口并返回窗口证据，保留文件与草稿状态。删除先清理展示，再删除存储。显式进入或打开聚焦已有窗口，最小化期间预览仅更新最新快照。窗口转换被打断时保留快照，明确关闭才退休。

@@ -149,13 +149,21 @@
     },
     {
       "id": "P01-new-workspace",
-      "goal": "首次创建一个极简index.html，作品名“首次周报”，页面只写“首次创作完成”。",
-      "entry": "index.html",
+      "goal": "重新画一张新的软件工程流程图，作品名“软件工程流程图”，入口用flowchart.html，内容包含需求、开发、评审和发布。保留已有作品。",
+      "firstCommand": "workspace.create",
+      "seeds": [
+        {
+          "name": "旧流程图",
+          "title": "软件工程流程图",
+          "entry": "flowchart.html",
+          "files": { "flowchart.html": "<h1>旧流程图</h1>" }
+        }
+      ],
+      "entry": "flowchart.html",
       "contains": {
-        "index.html": [
-          "首次创作完成"
-        ]
+        "flowchart.html": ["需求", "开发", "评审", "发布"]
       },
+      "forbiddenCommands": ["workspace.search"],
       "windowRule": "one"
     },
     {
@@ -175,14 +183,14 @@
       ],
       "library": true,
       "requiredCommands": [
-        "searchWorkspaces"
+        "workspace.search"
       ],
       "forbiddenCommands": [
         "edit",
         "replace",
         "render",
-        "open",
-        "delete"
+        "workspace.open",
+        "workspace.delete"
       ],
       "windowRule": "none"
     },
@@ -211,18 +219,19 @@
       ],
       "library": true,
       "requiredCommands": [
-        "searchWorkspaces",
-        "open"
+        "workspace.search",
+        "workspace.open"
       ],
       "forbiddenCommands": [
         "edit",
         "replace",
-        "delete"
+        "workspace.delete"
       ],
       "windowRule": "one"
     },
     {
       "id": "P04-find-and-edit",
+      "firstCommand": "workspace.search",
       "goal": "找到已保存的“项目周报”，只把“评审中”改成“已通过”，其他内容及样式文件必须不变，不要新建副本。",
       "entry": "index.html",
       "seeds": [
@@ -255,7 +264,7 @@
         "style.css"
       ],
       "requiredCommands": [
-        "searchWorkspaces",
+        "workspace.search",
         "read"
       ],
       "noNewWorkspace": true
@@ -286,14 +295,14 @@
       "library": true,
       "expectWaiting": true,
       "requiredCommands": [
-        "searchWorkspaces",
+        "workspace.search",
         "ask"
       ],
       "forbiddenCommands": [
-        "open",
+        "workspace.open",
         "edit",
         "replace",
-        "delete"
+        "workspace.delete"
       ],
       "windowRule": "none"
     },
@@ -314,13 +323,13 @@
       ],
       "library": true,
       "requiredCommands": [
-        "searchWorkspaces"
+        "workspace.search"
       ],
       "forbiddenCommands": [
         "edit",
         "replace",
         "render",
-        "delete"
+        "workspace.delete"
       ],
       "windowRule": "none"
     },
@@ -457,8 +466,8 @@
       "library": true,
       "hostEvent": "precloseSeed",
       "requiredCommands": [
-        "searchWorkspaces",
-        "open"
+        "workspace.search",
+        "workspace.open"
       ],
       "windowRule": "one"
     },
@@ -518,10 +527,10 @@
         ]
       },
       "forbiddenCommands": [
-        "delete",
+        "workspace.delete",
         "remove",
         "removeTree",
-        "open"
+        "workspace.open"
       ]
     },
     {
@@ -533,7 +542,7 @@
       "forbiddenCommands": [
         "edit",
         "replace",
-        "delete"
+        "workspace.delete"
       ]
     },
     {
@@ -632,8 +641,8 @@
       "library": true,
       "deleteSeed": "周报",
       "requiredCommands": [
-        "searchWorkspaces",
-        "delete"
+        "workspace.search",
+        "workspace.delete"
       ],
       "forbiddenCommands": [
         "edit",

@@ -141,11 +141,11 @@ ApplicationControl 的配置声明 container.failure/runtime.failure observation
 通信注册表只保留 Agent 消息与执行反馈；删除本地 UI／媒体／环境／故障的历史 schema 和仅供外部来源的测试声明，本地类型自身继续验证。
 
 
-Writer 是面向作品的独立生成角色。Writer 接纳后台 task.request，由私有模型判断能否执行。task.progress 和 writer.completion 将接纳、追问与终态送回 Assistant。普通进度由 Writer 自有灵动岛呈现。工作流与原生工具目录由 Writer 代码拥有。
+Writer 是面向作品的独立生成角色。Writer 接纳后台 task.request，由私有模型判断能否执行。task.progress 和 writer.completion 将接纳、精选里程碑、追问与终态送回 Assistant。普通进度由 Writer 自有灵动岛呈现。接纳、首次草稿保存、首次异常、追问和终态由 Assistant 播报并进入后续对话事实。工作流与原生工具目录由 Writer 代码拥有。
 
-Writer 的公开 description 说明独立执行、委托生命周期和回馈。Writer 自有灵动岛显示进度、追问和终态。Assistant 消费控制事实；真实用户输入可发起后续模型决策。
+Writer 的公开 description 说明独立执行、委托生命周期和回馈。Writer 自有灵动岛显示进度、追问和终态。Assistant 播报经过认证的精选控制事实。真实用户输入可发起后续模型决策。
 
-Writer allocates task_N on explicit workspace creation after authenticated admission. Assistant creates an internal request UUID per communication; Writer alone chooses/reuses its task. Models address active background communication by agent_id and windows by window_N; runtime carries delegation/event/question/trace identity. Writer workspace tasks persist after an assignment completes.
+Writer allocates workspace_N on explicit workspace creation after authenticated admission. Assistant creates an internal request UUID per communication; Writer alone chooses/reuses its workspace. Models address active background communication by agent_id and windows by window_N; runtime carries delegation/event/question/trace identity. Writer workspaces persist after an assignment completes.
 
 BasicSkill 统一教 start/delegate 平级与按目标所有者选择，不维护具体角色用途。Writer 自己的公开 description 拥有作品职责与委派条件。Catalog 不注册 writing，Assistant 无法加载作品库技能。Writer 工具与私有循环由 [Writer](../../Agents/Writer/README.md) 实现。
 

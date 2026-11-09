@@ -224,6 +224,6 @@ WriterRecordsNativeAcceptance同时核对Settings首页英文标题、User四项
 
 Assistant 详情回归验证日志清空后的内存副本和导出移除请求/生成 meta，同时保留 Task/Skill/State/Catalog 业务证据；State 选择区分未记录与空列表。页面颜色、图标和原生列表布局需独立视觉验收。
 
-WriterRecordPages 值测试覆盖已加载两页后的首次成功标志、末页反复刷新不恢复虚假游标、去重和新增记录、显式刷新及取消提交保留列表。它验证页面持有的分页状态，不等同于 SwiftUI 导航点击/滚动的真机验收。
+WriterRecordPages 值测试覆盖已加载两页后的首次成功标志、末页反复刷新不恢复虚假游标、去重和新增记录、显式刷新及取消提交保留列表，并验证刷新倒序头部时保留旧页游标。它验证页面持有的分页状态，不等同于 SwiftUI 导航点击/滚动的真机验收。
 
 `testDelegationWorkspaceSeparation` opens the delegation list/detail, enters the workspace flow, exhausts its pages, traces a message back to its delegation, and verifies loaded rows remain after returning. Run it with `WRITER_UI_ONLY_TEST=testDelegationWorkspaceSeparation` and the synthetic fixture exported by `writerDelegationAndWorkspaceMessagesHaveImmutableScopes`.

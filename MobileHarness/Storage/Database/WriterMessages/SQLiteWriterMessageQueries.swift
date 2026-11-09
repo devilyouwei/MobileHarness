@@ -66,7 +66,7 @@ extension SQLiteWriterMessageRepository {
         request.toolCalls = try JSONDecoder().decode(
             [ModelToolCall].self, from: Data((row["tool_calls_json"] as String).utf8))
         request.decisionMetadata =
-            try writerMessageDecision(row, task: owner.key)
+            try writerMessageDecision(row)
         if let meta = try SQLiteModelRequestLogRepository.generationMetadata(invocation, db: db) {
             let metadata = try SQLiteRecordCoding.object(meta)
             var encoded = try SQLiteRecordCoding.payload(JSONEncoder().encode(request))
@@ -92,7 +92,7 @@ extension SQLiteWriterMessageRepository {
                 id: SQLiteRecordKey.id(.request, key)))
         return result
     }
-    public func messagePage(task id: String, after: Int64? = nil, limit: Int = 50) throws -> WriterMessagePage {
+    public func messagePage(ownerID id: String, after: Int64? = nil, limit: Int = 50) throws -> WriterMessagePage {
         guard (1...50).contains(limit) else { throw RecordStorageError.invalidRecord }
         return try database.read { db in
             let owner = try Self.owner(id, db: db)
@@ -120,8 +120,8 @@ extension SQLiteWriterMessageRepository {
         var roots: Set<String> = []
         return values.filter { $0.kind != "input" || roots.insert($0.clientID).inserted }
     }
-    public func messages(task id: String, after: Int64? = nil, limit: Int = 50) throws -> [WriterMessageRecord] {
-        try messagePage(task: id, after: after, limit: limit).records
+    public func messages(ownerID id: String, after: Int64? = nil, limit: Int = 50) throws -> [WriterMessageRecord] {
+        try messagePage(ownerID: id, after: after, limit: limit).records
     }
     public func messageEvidence(_ id: String) throws -> [WriterMessageRecord] {
         try database.read { db in
@@ -178,7 +178,7 @@ extension SQLiteWriterMessageRepository {
             return owners.first
         }
     }
-    public func inputRows(_ input: String, task id: String) throws -> [WriterMessageRecord] {
+    public func inputRows(_ input: String, ownerID id: String) throws -> [WriterMessageRecord] {
         try database.read { db in
             let owner = try Self.owner(id, db: db)
             return try Row.fetchAll(
@@ -188,7 +188,7 @@ extension SQLiteWriterMessageRepository {
             ).flatMap { try Self.records($0, owner: owner, db: db) }
         }
     }
-    public func unfinishedUserMessages(task id: String) throws -> [WriterMessageRecord] {
+    public func unfinishedUserMessages(ownerID id: String) throws -> [WriterMessageRecord] {
         try database.read { db in
             let owner = try Self.owner(id, db: db)
             return try Row.fetchAll(
@@ -199,53 +199,68 @@ extension SQLiteWriterMessageRepository {
             ).flatMap { try Self.records($0, owner: owner, db: db) }
         }
     }
-    static func previewSQL(owner: Owner) -> String {
+    static func previewSQL(owner: Owner, comparison: String = ">", descending: Bool = false) -> String {
+        let order = descending ? "DESC" : "ASC"
         return
-            "SELECT m.id,m.input_key,m.root_input_key,m.position,m.request_message_id,m.created_at,m.state,m.input_kind,substr(json_extract(m.user_input_json,'$.text'),1,240) AS input_text,substr(json_extract(m.assistant_response_json,'$.text'),1,240) AS response_text,json_extract(m.assistant_response_json,'$.id') AS invocation,(SELECT COALESCE(json_group_array(json_object('id',json_extract(c.value,'$.id'),'providerID',json_extract(c.value,'$.providerID'),'name',json_extract(c.value,'$.name'),'argumentsJSON',substr(CASE WHEN json_valid(json_extract(c.value,'$.argumentsJSON')) THEN (SELECT json_group_object(a.key,substr(CAST(a.value AS TEXT),1,512)) FROM json_each(json_extract(c.value,'$.argumentsJSON')) a WHERE a.key IN ('command','path','title','description','text','reason','agent_id')) ELSE '{}' END,1),'state',json_extract(c.value,'$.state'))),'[]') FROM json_each(m.tool_calls_json) c) AS tool_calls_json,json_extract(m.assistant_response_json,'$.producerMetadata') AS producer_metadata FROM \(owner.table) m WHERE m.\(owner.column)=? AND \(owner.preflight ? "m.workspace_id IS NULL" : "1") AND m.position>? ORDER BY m.position,m.id LIMIT ? OFFSET ?"
+            "SELECT m.id,m.input_key,m.root_input_key,m.position,m.request_message_id,m.created_at,m.state,m.input_kind,substr(json_extract(m.user_input_json,'$.text'),1,240) AS input_text,substr(json_extract(m.assistant_response_json,'$.text'),1,240) AS response_text,json_extract(m.assistant_response_json,'$.id') AS invocation,(SELECT COALESCE(json_group_array(json_object('id',json_extract(c.value,'$.id'),'providerID',json_extract(c.value,'$.providerID'),'name',json_extract(c.value,'$.name'),'argumentsJSON',substr(CASE WHEN json_valid(json_extract(c.value,'$.argumentsJSON')) THEN (SELECT json_group_object(a.key,substr(CAST(a.value AS TEXT),1,512)) FROM json_each(json_extract(c.value,'$.argumentsJSON')) a WHERE a.key IN ('command','path','title','description','text','reason','agent_id')) ELSE '{}' END,1),'state',json_extract(c.value,'$.state'))),'[]') FROM json_each(m.tool_calls_json) c) AS tool_calls_json,json_extract(m.assistant_response_json,'$.producerMetadata') AS producer_metadata FROM \(owner.table) m WHERE m.\(owner.column)=? AND \(owner.preflight ? "m.workspace_id IS NULL" : "1") AND m.position>0 AND m.position\(comparison)? ORDER BY m.position \(order),m.id \(order) LIMIT ? OFFSET ?"
     }
     public func previews(
-        task id: String, after: UInt64 = 0, limit: Int = HistoryPaging.pageSize,
+        ownerID id: String, after: UInt64 = 0, limit: Int = HistoryPaging.pageSize,
         offset: Int = 0
     ) throws -> [WriterMessagePreview] {
-        guard after <= Int64.max, (1...50).contains(limit), offset >= 0 else { throw RecordStorageError.invalidRecord }
+        try readPreviews(ownerID: id, after: after, before: nil, limit: limit, offset: offset)
+    }
+    public func previews(ownerID id: String, before: UInt64?, limit: Int) throws -> [WriterMessagePreview] {
+        try readPreviews(ownerID: id, after: nil, before: before, limit: limit, offset: 0)
+    }
+    private func readPreviews(
+        ownerID id: String, after: UInt64?, before: UInt64?, limit: Int, offset: Int
+    ) throws -> [WriterMessagePreview] {
+        let bound = after ?? before ?? UInt64(Int64.max)
+        guard bound <= Int64.max, (1...50).contains(limit), offset >= 0 else { throw RecordStorageError.invalidRecord }
+        let descending = after == nil
+        let comparison = descending ? (before == nil ? "<=" : "<") : ">"
+        let ordinalComparison = descending ? comparison : "<="
         return try database.read { db in
             let owner = try Self.owner(id, db: db)
             let args = StatementArguments(
-                [owner.key, Int64(after)] + [Int64(limit), Int64(offset)])
+                [owner.key, Int64(bound)] + [Int64(limit), Int64(offset)])
             let preceding =
                 try Int.fetchOne(
                     db,
                     sql:
-                        "SELECT COUNT(*) FROM \(owner.table) m WHERE m.\(owner.column)=? AND \(owner.preflight ? "m.workspace_id IS NULL" : "1") AND m.position>0 AND m.position<=?",
-                    arguments: StatementArguments([owner.key, Int64(after)])) ?? 0
-            return try Row.fetchAll(db, sql: Self.previewSQL(owner: owner), arguments: args)
-                .enumerated().map { index, row in
-                    let invocation: String? = row["invocation"]
-                    var value = WriterMessagePreview(
-                        id: SQLiteRecordKey.id(invocation == nil ? .message : .request, row["id"]),
-                        clientID: invocation ?? row["input_key"], inputID: row["root_input_key"],
-                        input: row["input_text"] as String? ?? "", response: row["response_text"] as String? ?? "",
-                        date: Date(timeIntervalSince1970: row["created_at"]),
-                        position: UInt64(row["position"] as Int64), state: row["state"],
-                        isObservation: row["input_kind"] as String == "react",
-                        isInput: invocation == nil)
-                    value.ordinal = preceding + offset + index + 1
-                    let calls = try JSONDecoder().decode(
-                        [ModelToolCall].self, from: Data((row["tool_calls_json"] as String).utf8))
-                    value.toolCalls = calls.map {
-                        .init(name: $0.name, argumentsJSON: $0.argumentsJSON, state: $0.state.rawValue)
-                    }
-                    if let metadata: String = row["producer_metadata"] {
-                        value.metadata = try JSONDecoder().decode([String: String].self, from: Data(metadata.utf8))
-                    }
-                    value.metadata["delegateID"] = row["request_message_id"]
-                    if calls.contains(where: { $0.state == .received }) { value.metadata["toolsPending"] = "true" }
-                    return value
+                        "SELECT COUNT(*) FROM \(owner.table) m WHERE m.\(owner.column)=? AND \(owner.preflight ? "m.workspace_id IS NULL" : "1") AND m.position>0 AND m.position\(ordinalComparison)?",
+                    arguments: StatementArguments([owner.key, Int64(bound)])) ?? 0
+            return try Row.fetchAll(
+                db, sql: Self.previewSQL(owner: owner, comparison: comparison, descending: descending), arguments: args
+            )
+            .enumerated().map { index, row in
+                let invocation: String? = row["invocation"]
+                var value = WriterMessagePreview(
+                    id: SQLiteRecordKey.id(invocation == nil ? .message : .request, row["id"]),
+                    clientID: invocation ?? row["input_key"], inputID: row["root_input_key"],
+                    input: row["input_text"] as String? ?? "", response: row["response_text"] as String? ?? "",
+                    date: Date(timeIntervalSince1970: row["created_at"]),
+                    position: UInt64(row["position"] as Int64), state: row["state"],
+                    isObservation: row["input_kind"] as String == "react",
+                    isInput: invocation == nil)
+                value.ordinal = descending ? preceding - index : preceding + offset + index + 1
+                let calls = try JSONDecoder().decode(
+                    [ModelToolCall].self, from: Data((row["tool_calls_json"] as String).utf8))
+                value.toolCalls = calls.map {
+                    .init(name: $0.name, argumentsJSON: $0.argumentsJSON, state: $0.state.rawValue)
                 }
+                if let metadata: String = row["producer_metadata"] {
+                    value.metadata = try JSONDecoder().decode([String: String].self, from: Data(metadata.utf8))
+                }
+                value.metadata["delegateID"] = row["request_message_id"]
+                if calls.contains(where: { $0.state == .received }) { value.metadata["toolsPending"] = "true" }
+                return value
+            }
         }
     }
 
-    public func timelineCount(task id: String) throws -> Int {
+    public func timelineCount(ownerID id: String) throws -> Int {
         try database.read { db in
             let owner = try Self.owner(id, db: db)
             let sql = Self.previewSQL(owner: owner)
@@ -253,8 +268,8 @@ extension SQLiteWriterMessageRepository {
                 ?? 0
         }
     }
-    public func latestPreviews(task id: String, limit: Int = 10) throws -> [WriterMessagePreview] {
-        try previews(task: id, limit: limit, offset: max(0, try timelineCount(task: id) - limit))
+    public func latestPreviews(ownerID id: String, limit: Int = 10) throws -> [WriterMessagePreview] {
+        try previews(ownerID: id, limit: limit, offset: max(0, try timelineCount(ownerID: id) - limit))
     }
 
 }

@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "writer-workspace",
-  "revision": 5,
+  "revision": 7,
   "description": "Find saved works and select, show, create or delete a workspace.",
   "owner": "writer",
   "dependencies": [],
@@ -9,27 +9,27 @@
     {
       "path": "Artifacts.Workspace.searchWorkspaces",
       "callType": "tool",
-      "alias": "searchWorkspaces"
+      "alias": "workspace.search"
     },
     {
       "path": "Artifacts.Workspace.open",
       "callType": "tool",
-      "alias": "open"
+      "alias": "workspace.open"
     },
     {
       "path": "Artifacts.Workspace.delete",
       "callType": "tool",
-      "alias": "delete"
+      "alias": "workspace.delete"
     },
     {
       "path": "Agent.Writer.enter",
       "callType": "tool",
-      "alias": "enter"
+      "alias": "workspace.enter"
     },
     {
       "path": "Agent.Writer.create",
       "callType": "tool",
-      "alias": "create"
+      "alias": "workspace.create"
     },
     {
       "path": "Agent.Writer.ask",

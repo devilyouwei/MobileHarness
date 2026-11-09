@@ -13,16 +13,16 @@ extension SQLiteWriterExecutionRepository {
         else { throw RecordStorageError.missingRecord }
         return row
     }
-    static func task(_ row: Row) throws -> WriterWorkspaceRecord {
+    static func workspace(_ row: Row) throws -> WriterWorkspaceRecord {
         let key: Int64 = row["id"]
         var result = WriterWorkspaceRecord(
-            id: "task_\(key)", dialogID: "writer/task_\(key)", goal: row["title"], agentID: "writer",
+            workspaceID: "workspace_\(key)", title: row["title"],
             status: row["workspace_state"], updatedAt: Date(timeIntervalSince1970: row["updated_at"]))
         result.workspaceReady = row["workspace_state"] as String == "ready"
         return result
     }
     public func beginRequest(
-        delegateID: String, taskID: String?, goal: String, input: String, sourceDialog: String?, agent: String
+        delegateID: String, workspaceID: String?, goal: String, input: String, sourceDialog: String?, agent: String
     ) async throws -> WriterRequestRecord {
         guard agent == "writer", !goal.isEmpty else { throw RecordStorageError.invalidRecord }
         return try database.write { db in
@@ -70,8 +70,8 @@ extension SQLiteWriterExecutionRepository {
                     "UPDATE agent_messages SET delivery_state='received',received_at=COALESCE(received_at,?),consumed_at=?,claim_token=NULL,claim_expires_at=NULL WHERE id=?",
                 arguments: [now, now, delegateID])
             // Explicit test/host selection uses the same immutable binding operation as native select.
-            if let taskID, !busy {
-                _ = try Self.bind(delegateID, target: BusinessRecordID.number(taskID, kind: .task), db: db)
+            if let workspaceID, !busy {
+                _ = try Self.bind(delegateID, target: BusinessRecordID.number(workspaceID, kind: .workspace), db: db)
             }
             return try Self.requestView(delegateID, db: db)
         }
@@ -87,17 +87,17 @@ extension SQLiteWriterExecutionRepository {
         else { throw RecordStorageError.conflict }
         if let selected: Int64 = root["selected_workspace_id"] {
             guard selected == target else { throw RecordStorageError.conflict }
-            return try task(row)
+            return try Self.workspace(row)
         }
         guard row["write_lease"] as String? == nil else { throw RecordStorageError.conflict }
         try db.execute(
             sql: "UPDATE writer_messages SET selected_workspace_id=?,request_revision=request_revision+1 WHERE id=?",
             arguments: [target, root["id"] as Int64])
-        return try task(row)
+        return try Self.workspace(row)
     }
-    public func selectWorkspace(requestID: String, taskID: String) async throws -> WriterWorkspaceRecord {
+    public func selectWorkspace(requestID: String, workspaceID: String) async throws -> WriterWorkspaceRecord {
         try database.write { db in
-            let key = try BusinessRecordID.number(taskID, kind: .task)
+            let key = try BusinessRecordID.number(workspaceID, kind: .workspace)
             guard
                 try String.fetchOne(
                     db, sql: "SELECT workspace_state FROM writer_workspaces WHERE id=?", arguments: [key]) == "ready"
@@ -116,12 +116,12 @@ extension SQLiteWriterExecutionRepository {
         }
     }
 
-    public func createWorkspace(requestID: String, title: String, replacing previousTaskID: String) async throws
+    public func createWorkspace(requestID: String, title: String, replacing previousWorkspaceID: String) async throws
         -> WriterWorkspaceRecord
     {
         try database.write { db in
             let root = try Self.entry(requestID, db: db)
-            let previous = try BusinessRecordID.number(previousTaskID, kind: .task)
+            let previous = try BusinessRecordID.number(previousWorkspaceID, kind: .workspace)
             guard root["run_state"] as String == "running", root["selected_workspace_id"] as Int64? == previous else {
                 throw RecordStorageError.conflict
             }
@@ -137,14 +137,16 @@ extension SQLiteWriterExecutionRepository {
         guard let key = row.id,
             let stored = try Row.fetchOne(db, sql: "SELECT * FROM writer_workspaces WHERE id=?", arguments: [key])
         else { throw RecordStorageError.missingRecord }
-        return try task(stored)
+        return try Self.workspace(stored)
     }
 
-    public func switchWorkspace(requestID: String, from previousTaskID: String, to taskID: String) async throws {
+    public func switchWorkspace(requestID: String, from previousWorkspaceID: String, to workspaceID: String)
+        async throws
+    {
         try database.write { db in
             let root = try Self.entry(requestID, db: db)
-            let previous = try BusinessRecordID.number(previousTaskID, kind: .task)
-            let target = try BusinessRecordID.number(taskID, kind: .task)
+            let previous = try BusinessRecordID.number(previousWorkspaceID, kind: .workspace)
+            let target = try BusinessRecordID.number(workspaceID, kind: .workspace)
             guard previous != target, root["run_state"] as String == "running",
                 root["selected_workspace_id"] as Int64? == previous
             else { throw RecordStorageError.conflict }
@@ -190,33 +192,33 @@ extension SQLiteWriterExecutionRepository {
             return true
         }
     }
-    public func tasks(agent: String, before: Int64?, limit: Int) async throws -> [WriterWorkspaceRecord] {
+    public func workspaces(agent: String, before: Int64?, limit: Int) async throws -> [WriterWorkspaceRecord] {
         guard agent == "writer", (1...50).contains(limit) else { throw RecordStorageError.invalidRecord }
         return try database.read { db in
             try Row.fetchAll(
                 db,
                 sql: "SELECT * FROM writer_workspaces WHERE id<? AND workspace_state='ready' ORDER BY id DESC LIMIT ?",
                 arguments: [before ?? Int64.max, limit]
-            ).map(Self.task)
+            ).map(Self.workspace)
         }
     }
-    public func task(_ id: String, agent: String) async throws -> WriterWorkspaceRecord {
+    public func workspace(_ id: String, agent: String) async throws -> WriterWorkspaceRecord {
         guard agent == "writer" else { throw RecordStorageError.invalidRecord }
         return try database.read { db in
             guard
                 let row = try Row.fetchOne(
                     db, sql: "SELECT * FROM writer_workspaces WHERE id=?",
-                    arguments: [try BusinessRecordID.number(id, kind: .task)])
+                    arguments: [try BusinessRecordID.number(id, kind: .workspace)])
             else { throw RecordStorageError.missingRecord }
-            return try Self.task(row)
+            return try Self.workspace(row)
         }
     }
-    public func prepareWorkspace(_ project: String, taskID: String, delegateID: String, agent: String, ready: Bool)
+    public func prepareWorkspace(workspaceID: String, delegateID: String, agent: String, ready: Bool)
         async throws
     {
-        guard agent == "writer", project == "writer/" + taskID else { throw RecordStorageError.invalidRecord }
+        guard agent == "writer" else { throw RecordStorageError.invalidRecord }
         try database.write { db in
-            let key = try BusinessRecordID.number(taskID, kind: .task)
+            let key = try BusinessRecordID.number(workspaceID, kind: .workspace)
             _ = try Self.bind(delegateID, target: key, db: db)
             try db.execute(
                 sql:

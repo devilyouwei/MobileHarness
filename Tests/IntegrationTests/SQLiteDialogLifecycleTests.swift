@@ -56,7 +56,7 @@ private actor DialogPublicationFixture {
     #expect(try await db.assistantConversations.current().id == old.id)
     #expect(try await db.assistantConversations.listDialogs().isEmpty)
     try dialogFixtureSQL(url, "DROP TRIGGER reject_new_dialog")
-    #expect(throws: RecordStorageError.invalidID) { _ = try db.assistantConversations.rotate("writer/task_1") }
+    #expect(throws: RecordStorageError.invalidID) { _ = try db.assistantConversations.rotate("workspace_1") }
     #expect(try await db.assistantConversations.dialog(old.id).archivedAt == nil)
     let next = try db.assistantConversations.rotate(old.id)
     #expect(next.id != old.id && next.archivedAt == nil)

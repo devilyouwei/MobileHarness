@@ -20,17 +20,32 @@ func writerSkillsAreScopedToTheirOwner(id: String) throws {
     let capabilities = try AgentConfigurations.load(named: "Writer").capabilities
     #expect(
         Set(capabilities.tools.map(\.alias)) == [
-            "searchWorkspaces", "open", "delete", "enter", "create", "ask", "finish",
+            "workspace.search", "workspace.open", "workspace.delete", "workspace.enter", "workspace.create", "ask",
+            "finish",
         ])
-    #expect(try capabilities.resolveTool("enter", arguments: ["taskID": "task_1"]).toolPath == "Agent.Writer.enter")
+    #expect(
+        try capabilities.resolveTool("workspace.enter", arguments: ["workspaceID": "workspace_1"]).toolPath
+            == "Agent.Writer.enter")
     let editing = try WriterControlDomain.editing.registry()
     #expect(Set(capabilities.tools.map(\.alias)).isSubset(of: Set(editing.tools.map(\.alias))))
     #expect(try editing.resolveTool("finish", arguments: ["summary": "done"]).toolPath == "Agent.Writer.finish")
     let writer = try WriterAgent.capabilities()
-    #expect(try writer.resolveTool("open", arguments: ["taskID": "task_1"]).toolPath == "Artifacts.Workspace.open")
-    #expect(throws: GenerationError.self) { try writer.resolveTool("open", arguments: [:]) }
+    #expect(
+        try writer.resolveTool("workspace.open", arguments: ["workspaceID": "workspace_1"]).toolPath
+            == "Artifacts.Workspace.open")
+    #expect(throws: GenerationError.self) { try writer.resolveTool("workspace.open", arguments: ["taskID": "task_1"]) }
     #expect(throws: GenerationError.self) {
         try writer.resolveTool("read", arguments: ["path": "document.md", "taskID": "task_1"])
+    }
+    for legacy in ["searchWorkspaces", "create", "enter", "open", "delete"] {
+        #expect(throws: GenerationError.unknownCapability) { try writer.resolveTool(legacy, arguments: [:]) }
+    }
+    #expect(try editing.resolveTool("search", arguments: ["query": "text"]).toolPath == "Artifacts.Workspace.search")
+    #expect(throws: GenerationError.self) {
+        try editing.resolveTool("search", arguments: ["query": "text", "limit": "3"])
+    }
+    #expect(throws: GenerationError.self) {
+        try editing.resolveTool("diff", arguments: ["savepoint": "savepoint_1", "limit": "3"])
     }
     #expect(throws: GenerationError.self) { try writer.resolveTool("publish", arguments: ["summary": "done"]) }
 }

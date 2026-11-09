@@ -17,6 +17,9 @@ root.mkdir(parents=True,exist_ok=True)
 if (root/'records.sqlite').exists():
     raise SystemExit('Refusing to replace an existing simulator database; use a fresh isolated simulator.')
 with sqlite3.connect(f"file:{seed/'records.sqlite'}?mode=ro",uri=True) as source:
+    columns = {row[1] for row in source.execute("PRAGMA table_info(workspace_files)")}
+    if "workspace_id" not in columns or "task_id" in columns:
+        raise SystemExit("Seed must use the current Writer workspace schema.")
     with sqlite3.connect(root/'records.sqlite') as target:
         source.backup(target)
 shutil.copytree(seed/'workspaces',root/'ArtifactWorkspaces',dirs_exist_ok=True)

@@ -34,12 +34,12 @@ extension SQLiteWriterExecutionRepository {
     }
     static func requestView(_ id: String, db: Database) throws -> WriterRequestRecord {
         guard let request = try AgentMessageRow.fetchOne(db, key: id) else { throw RecordStorageError.missingRecord }
-        let task = try Self.entry(id, db: db)
-        let original = try SQLiteRecordCoding.object(task["user_input_json"])
+        let entry = try Self.entry(id, db: db)
+        let original = try SQLiteRecordCoding.object(entry["user_input_json"])
         guard let input = original["text"] as? String, let sourceAgent = original["source_agent"] as? String else {
             throw RecordStorageError.invalidRecord
         }
-        let goal: String = task["request_goal"]
+        let goal: String = entry["request_goal"]
         let status = try requestStatus(id, db: db) ?? "interrupted"
         let cancellationPayload = try String.fetchOne(
             db,
@@ -53,21 +53,22 @@ extension SQLiteWriterExecutionRepository {
             }
             return envelope["text"] as? String
         }
-        let failure: String? = task["failure_json"]
-        let finished = (task["completed_at"] as Double?).map { Date(timeIntervalSince1970: $0) }
+        let failure: String? = entry["failure_json"]
+        let finished = (entry["completed_at"] as Double?).map { Date(timeIntervalSince1970: $0) }
         var value = WriterRequestRecord(
-            taskID: (task["selected_workspace_id"] as Int64?).map { "task_\($0)" } ?? "", delegateID: id, goal: goal,
+            workspaceID: (entry["selected_workspace_id"] as Int64?).map { "workspace_\($0)" } ?? "", delegateID: id,
+            goal: goal,
             input: input,
-            status: status, cancellationReason: cancelled, createdAt: Date(timeIntervalSince1970: task["created_at"]),
+            status: status, cancellationReason: cancelled, createdAt: Date(timeIntervalSince1970: entry["created_at"]),
             failure: failure,
             finishedAt: ["completed", "failed", "cancelled", "interrupted"].contains(status)
                 ? finished : nil)
-        value.messageID = UInt64(task["id"] as Int64)
+        value.messageID = UInt64(entry["id"] as Int64)
         value.sourceAgent = sourceAgent
         value.sourceContext = original["source_context"] as? String
-        value.result = task["result_json"]
-        value.executionState = task["run_state"]
-        value.waiting = task["pending_question_json"]
+        value.result = entry["result_json"]
+        value.executionState = entry["run_state"]
+        value.waiting = entry["pending_question_json"]
         return value
     }
     public func delegationCount() async throws -> Int {
@@ -99,19 +100,21 @@ extension SQLiteWriterExecutionRepository {
                 db,
                 sql:
                     "SELECT request_message_id FROM writer_messages WHERE input_kind='delegation' AND selected_workspace_id=?",
-                arguments: [try BusinessRecordID.number(id, kind: .task)]
+                arguments: [try BusinessRecordID.number(id, kind: .workspace)]
             ).map { try Self.requestView($0, db: db) }.sorted { $0.createdAt < $1.createdAt }
         }
     }
-    public func completeRequest(_ notification: TaskNotification, status: String, failure: String?) async throws {
+    public func completeRequest(_ notification: WriterDelegationNotification, status: String, failure: String?)
+        async throws
+    {
         guard notification.agent == "writer", ["completed", "failed", "cancelled", "interrupted"].contains(status)
         else { throw RecordStorageError.invalidRecord }
         try database.write { db in
             guard let incoming = try AgentMessageRow.fetchOne(db, key: notification.delegateID) else {
                 throw RecordStorageError.missingRecord
             }
-            let task = try Self.entry(notification.delegateID, db: db)
-            let key: Int64 = task["id"]
+            let entry = try Self.entry(notification.delegateID, db: db)
+            let key: Int64 = entry["id"]
             let value = AgentCommunicationRecord(
                 id: notification.eventID, sender: "writer", receiver: incoming.senderAgentID,
                 contract: "writer.completion", payload: notification.data, correlationID: incoming.correlationID,
@@ -121,7 +124,7 @@ extension SQLiteWriterExecutionRepository {
                 return
             }
             guard
-                ["running", "waiting_input", "paused", "closing", "interrupted"].contains(task["run_state"] as String)
+                ["running", "waiting_input", "paused", "closing", "interrupted"].contains(entry["run_state"] as String)
             else {
                 throw RecordStorageError.conflict
             }
@@ -144,18 +147,20 @@ extension SQLiteWriterExecutionRepository {
             try SQLiteAgentMessageRepository.enqueue(value, db: db)
         }
     }
-    static func notification(_ row: Row, db: Database) throws -> TaskNotification {
+    static func notification(_ row: Row, db: Database) throws -> WriterDelegationNotification {
         let request: String = row["correlation_id"]
         let state = try String.fetchOne(
             db, sql: "SELECT run_state FROM writer_messages WHERE input_kind='delegation' AND request_message_id=?",
             arguments: [request])
-        return TaskNotification(
+        return WriterDelegationNotification(
             delegateID: request, agent: "writer", eventID: row["id"], data: Data((row["payload_json"] as String).utf8),
             delivered: row["delivery_state"] as String == "received",
             retired: state == nil || !["closing", "cleanup_failed"].contains(state ?? ""), position: row["position"],
             claimToken: row["claim_token"])
     }
-    public func taskNotification(_ delegateID: String, agent: String) async throws -> TaskNotification? {
+    public func delegationNotification(_ delegateID: String, agent: String) async throws
+        -> WriterDelegationNotification?
+    {
         guard agent == "writer" else { throw RecordStorageError.invalidRecord }
         return try database.read { db in
             try Row.fetchOne(
@@ -166,8 +171,8 @@ extension SQLiteWriterExecutionRepository {
             ).map { try Self.notification($0, db: db) }
         }
     }
-    public func pendingTaskNotifications(agent: String, retirement: Bool, after: Int64?, limit: Int) async throws
-        -> [TaskNotification]
+    public func pendingDelegationNotifications(agent: String, retirement: Bool, after: Int64?, limit: Int) async throws
+        -> [WriterDelegationNotification]
     {
         guard agent == "writer", (1...32).contains(limit) else { throw RecordStorageError.invalidRecord }
         return try database.write { db in
@@ -188,7 +193,7 @@ extension SQLiteWriterExecutionRepository {
                 sql:
                     "SELECT m.rowid AS position,m.* FROM agent_messages m WHERE m.sender_agent_id='writer' AND m.contract='writer.completion' AND m.rowid>? AND \(filter) ORDER BY m.rowid LIMIT ?",
                 arguments: args)
-            var results: [TaskNotification] = []
+            var results: [WriterDelegationNotification] = []
             for row in rows {
                 if !retirement {
                     try db.execute(
@@ -206,7 +211,7 @@ extension SQLiteWriterExecutionRepository {
             return results
         }
     }
-    public func finishTaskNotification(
+    public func finishDelegationNotification(
         _ delegateID: String, agent: String, retirement: Bool, completed: Bool, failure: String?,
         claimToken: String? = nil
     ) async throws {

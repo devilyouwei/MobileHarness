@@ -38,9 +38,15 @@ public struct WriterWorkspaceContext: Sendable, Encodable {
     let workspaceID: String
     let title: String
     let entry: String
+    let entryExists: Bool
+    let entryEmpty: Bool
     let presentationStatus: String
 
     var domain: String { "workspace:" + workspaceID }
+}
+
+enum WriterMilestone: Sendable {
+    case draftUpdated, recovering, renderIssue
 }
 
 enum WriterControlDomain: String {
@@ -76,26 +82,35 @@ enum WriterControlDomain: String {
 }
 enum WriterLocalTools {
     static let declarations: [ActionDeclaration] = [
-        tool("ask", "Pause for essential user information.", [.init("question", description: "Brief question.")]),
+        tool(
+            "ask", "Pause for essential user information.",
+            [.init("question", description: "Nonempty question for the user, up to 2048 UTF-8 bytes.")]),
         tool(
             "finish", "End the delegation in a separate tool round. Report actual results.",
             [
                 .init("summary", description: "Brief factual completion summary."),
                 .init(
                     "outcome", required: false,
-                    description: "Use explanation or declined before editing when appropriate.",
+                    description:
+                        "Defaults to artifact for publishing or reporting library operations. Before editing, use explanation for a completed answer without an artifact or declined for an infeasible request.",
                     values: ["artifact", "explanation", "declined"]),
             ]),
         tool(
             "enter", "Enter a saved workspace for editing or switch to another saved workspace. Call alone.",
             [
-                .init("taskID", description: "Saved task_N returned by searchWorkspaces.")
+                .init(
+                    "workspaceID",
+                    description: "Exact workspace_N known from the user, current context, or workspace.search.")
             ]),
         tool(
-            "create", "Create and enter an authorized new workspace. Call alone.",
+            "create", "Create a new workspace, initialize an empty entry file and enter it for editing. Call alone.",
             [
-                .init("title", description: "Brief work title."),
-                .init("entry", description: "Relative HTML, Markdown or plain-text entry file."),
+                .init("title", description: "Nonempty display title in the user’s language."),
+                .init(
+                    "entry",
+                    description:
+                        "Workspace-relative file path ending in .html, .md or .txt, such as flowchart.html or docs/flowchart.md. Pass the path only. Write source content with edit."
+                ),
             ]),
     ]
 
@@ -142,6 +157,7 @@ public struct WriterWorkflow: Sendable {
     private let requestCounter = WriterRequestCounter()
     private let requestProgress: @Sendable (WriterRequestProgress) async -> Void
     private let roundCompleted: @Sendable (WriterRequestProgress?, String) async -> Void
+    private let milestone: @Sendable (WriterMilestone) async -> Void
     public init(
         model: any ChatCapability, history: WriterHistory? = nil,
         requestProgress: @escaping @Sendable (WriterRequestProgress) async -> Void = { _ in },
@@ -152,17 +168,20 @@ public struct WriterWorkflow: Sendable {
         self.model = model
         self.history = history
         diagnostics = nil
+        milestone = { _ in }
     }
     init(
         model: any ChatCapability, history: WriterHistory?, diagnostics: WriterDiagnosticCapture,
         requestProgress: @escaping @Sendable (WriterRequestProgress) async -> Void = { _ in },
-        roundCompleted: @escaping @Sendable (WriterRequestProgress?, String) async -> Void = { _, _ in }
+        roundCompleted: @escaping @Sendable (WriterRequestProgress?, String) async -> Void = { _, _ in },
+        milestone: @escaping @Sendable (WriterMilestone) async -> Void = { _ in }
     ) {
         self.requestProgress = requestProgress
         self.roundCompleted = roundCompleted
         self.model = model
         self.history = history
         self.diagnostics = diagnostics
+        self.milestone = milestone
     }
     public func run(
         goal: String, scope: String, tools: WriterTools,
@@ -211,7 +230,7 @@ public struct WriterWorkflow: Sendable {
             messages.append(.init(role: .assistant, content: response.text, toolCalls: response.calls))
             let terminalCandidate =
                 response.calls.isEmpty
-                || response.calls.contains { ["finish", "enter", "create"].contains($0.name) }
+                || response.calls.contains { ["finish", "workspace.enter", "workspace.create"].contains($0.name) }
             let late = terminalCandidate ? try await revisions() : []
             if !late.isEmpty {
                 for call in response.calls {
@@ -252,7 +271,9 @@ public struct WriterWorkflow: Sendable {
             var steps: [String] = []
             do {
                 if response.calls.count > 1,
-                    response.calls.contains(where: { ["finish", "ask", "enter", "create"].contains($0.name) })
+                    response.calls.contains(where: {
+                        ["finish", "ask", "workspace.enter", "workspace.create"].contains($0.name)
+                    })
                 {
                     recoveryFailures += 1
                     for call in response.calls {
@@ -349,12 +370,12 @@ public struct WriterWorkflow: Sendable {
                         failedCalls.removeAll()
                         recoveryFailures = 0
                     }
-                    if ["render", "searchWorkspaces"].contains(call.name) {
+                    if ["render", "workspace.search"].contains(call.name) {
                         // Rendering changes publication preconditions, even without changing source bytes.
                         // Do not reset the recovery budget or unblock unrelated failed effects.
                         failedCalls = failedCalls.filter { _, error in
                             guard let failure = error as? WriterToolFailure else { return true }
-                            if call.name == "searchWorkspaces" {
+                            if call.name == "workspace.search" {
                                 return failure.context["condition"] != "workspaceSearchRequired"
                             }
                             return failure.context["command"] != "finish"
@@ -362,6 +383,11 @@ public struct WriterWorkflow: Sendable {
                         }
                     }
                     try await history?.toolOutcome(call.id, output: observation)
+                    if generatedContent || ["replace", "move", "removeTree", "remove", "restore"].contains(call.name) {
+                        await milestone(.draftUpdated)
+                    } else if call.name == "render", observation.contains("\"errors\"") {
+                        await milestone(.renderIssue)
+                    }
                     pending.remove(call.id)
                     let observationBudget = max(
                         0,
@@ -423,11 +449,11 @@ public struct WriterWorkflow: Sendable {
         case "edit", "replace": label = "已更新文件"
         case "read": label = "已读取文件"
         case "list": label = "已查看目录"
-        case "searchWorkspaces": label = "已查询作品库"
-        case "create": label = "已创建并进入工作区"
-        case "enter": label = "已进入已有工作区"
-        case "open": label = "已处理作品呈现请求"
-        case "delete": label = "已删除作品"
+        case "workspace.search": label = "已查询作品库"
+        case "workspace.create": label = "已创建并进入工作区"
+        case "workspace.enter": label = "已进入已有工作区"
+        case "workspace.open": label = "已处理作品呈现请求"
+        case "workspace.delete": label = "已删除作品"
         case "search": label = "已查询文件"
         case "render":
             if observation.contains("\"unavailable\"") || observation.contains("\"deferred\"") {
@@ -469,6 +495,7 @@ public struct WriterWorkflow: Sendable {
                     throw WriterRecoveryFailure(phase: "文件内容请求", attempts: attempt, underlying: error)
                 }
                 previousFailure = WriterRecovery.requestFeedback(error, attempt: attempt, content: true)
+                await milestone(.recovering)
                 await progress("文件生成中断，已清理本次写入，正在重试（\(attempt + 1)/\(WriterRecovery.attempts)）。")
                 try await WriterRecovery.delay(attempt)
                 guard case .write(let id, let instruction, let context) = try await tools.execute(call) else {
@@ -513,6 +540,7 @@ public struct WriterWorkflow: Sendable {
                 }
                 observations.append(
                     .init(role: .user, content: WriterRecovery.requestFeedback(error, attempt: attempt)))
+                await milestone(.recovering)
                 await progress("模型请求暂未成功，正在重试（\(attempt + 1)/\(WriterRecovery.attempts)）。")
                 try await WriterRecovery.delay(attempt)
             }
@@ -727,7 +755,7 @@ public struct WriterWorkflow: Sendable {
         let data = try JSONEncoder().encode(workspace)
         return .init(
             role: .user,
-            content: goal + "\nVerified workspace metadata (data): " + String(decoding: data, as: UTF8.self))
+            content: goal + "\nVerified workspace metadata at entry (data): " + String(decoding: data, as: UTF8.self))
     }
     static func contentInstructions(_ instruction: String, retry: Bool = false) throws -> String {
         let path = instruction.components(separatedBy: "\n").first ?? ""
