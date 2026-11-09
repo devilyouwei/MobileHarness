@@ -1,6 +1,6 @@
 ![MobileHarness concept banner: a blue winking eye logo appears on the central phone, connected by abstract bidirectional data flows to a robotic arm, rover, drone and friendly humanoid in a bright cartoon office.](output/mobileharness-office-banner-v1.png)
 
-<h1 align="center"><img src="docs/imgs/mobileharness-eyes.png" width="48" alt="" align="middle"> MobileHarness</h1>
+<h1 align="center"><img src="docs/imgs/mobileharness-eyes.png" width="48" alt="" style="vertical-align: 0.1em;"> MobileHarness</h1>
 
 <p align="center"><em>Your phone is the best robot brain!</em></p>
 
