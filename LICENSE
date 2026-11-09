@@ -1,0 +1,120 @@
+MobileHarness Noncommercial License
+Version 1.1, November 10, 2026
+
+Copyright (c) 2026 devilyouwei and respective contributors.
+
+This is a source-available license based on the Apache License, Version 2.0,
+with the additional terms below. It is not the unmodified Apache License 2.0
+and must not be represented as an OSI-approved open-source license.
+
+The Apache License 2.0 text in docs/licenses/Apache-2.0.txt is incorporated
+into this license. Its terms apply except where the additional terms below
+provide otherwise; in that case, these additional terms control. References
+to this license mean both documents together. Redistributors must provide
+both documents and preserve these additional terms for the covered Work.
+
+1. Scope and noncommercial permission
+
+This license applies to the original MobileHarness code and project materials
+provided under this license, in Source or Object form, and their Derivative
+Works (together, the Software). Separately licensed third-party components,
+models and materials remain governed by their own licenses. These terms do
+not restrict rights independently granted by their owners or rights available
+under applicable law without a license.
+
+Notwithstanding sections 2 and 3 of the incorporated Apache License 2.0,
+all copyright and patent permissions granted to recipients under this public
+license are limited to noncommercial purposes. You may use, study, reproduce,
+modify and share the Software for those purposes, subject to these terms.
+Personal learning, private experimentation, hobby projects and noncommercial
+research are permitted when not directed toward commercial advantage or a
+commercial product or service. Noncommercial sharing of modified versions is
+permitted under section 3 below. There is no blanket exception based on an
+organization's educational, charitable, governmental or other legal status.
+
+Commercial purposes include uses intended for or directed toward commercial
+advantage, revenue or other business benefit, whether direct or indirect.
+Such use requires a separate written commercial license from the MobileHarness
+project owner, currently devilyouwei, or a successor holding the necessary
+rights (the Project Owner). Section 4 separately governs the additional
+permissions contributors grant to the Project Owner.
+
+2. Uses requiring a separate commercial license
+
+Without that separate written authorization, you may not use, modify,
+distribute or integrate the Software for commercial purposes, including:
+
+(a) selling or licensing an application, charging for downloads, subscriptions,
+    in-app purchases, premium features or access, or monetizing it through
+    advertisements;
+(b) incorporating, preinstalling or bundling it in robots, hardware, software
+    or other products developed, offered or distributed for commercial benefit;
+(c) using it internally for an enterprise's business operations, production,
+    customer delivery or commercial product research and development, even
+    when neither the Software nor access to it is sold separately;
+(d) providing services based on the Software for a fee or other direct or
+    indirect commercial benefit, including hosting, APIs, deployment,
+    customization and support.
+
+These restrictions apply to individuals and organizations, to original and
+modified versions, and whether deployed on a phone, other device, on premises
+or in the cloud. A single-user or single-tenant deployment is not exempt.
+Free distribution or free access is not sufficient to make a commercial use
+noncommercial. Conversely, multiple users or tenants alone do not make an
+otherwise noncommercial use commercial. Keeping the original logo does not
+authorize commercial use. The permission to charge for support or warranties
+in section 9 of the incorporated Apache License 2.0 does not override these
+commercial-use restrictions.
+
+3. Sharing, notices and branding
+
+When sharing the Software for noncommercial purposes, provide this license
+and the incorporated Apache License 2.0 text, preserve applicable copyright,
+license and attribution notices, identify modifications, and retain these
+noncommercial conditions for the covered Software. Do not grant recipients
+commercial rights to the Software that you do not hold. Recipients may use
+the Software only under this public license or a separate valid authorization.
+
+Modified versions must be clearly identified as unofficial. You may adapt
+the interface and branding of a noncommercial modified version, but must
+retain a readable attribution to MobileHarness and the applicable notices
+in its documentation or legal notices. No trademark rights or right to imply
+endorsement are granted beyond the attribution permitted by the incorporated
+Apache License 2.0.
+
+4. Contributions and alternative licensing
+
+By intentionally submitting a Contribution for inclusion in MobileHarness
+under these terms, you represent that you have the authority to license it.
+You retain ownership of your Contribution and provide it under this license.
+In addition, you grant the Project Owner a perpetual, worldwide,
+non-exclusive, royalty-free, irrevocable copyright license to use, reproduce,
+modify, distribute and sublicense your Contribution under other terms,
+including more restrictive or more permissive terms and commercial licenses.
+This includes use in hosted services and other commercial products. The
+Project Owner may transfer this additional grant with ownership of the
+project. For the Project Owner's use of your Contribution, the patent grant
+in section 3 of the incorporated Apache License 2.0 also applies without the
+noncommercial limitation in section 1 above. Its scope and patent-litigation
+termination provisions remain unchanged. This does not grant rights to
+patents you cannot license or automatically sublicense patent rights to
+commercial customers; those rights must be addressed where necessary in
+separate agreements.
+
+This section applies to Contributions intentionally submitted under these
+terms; it does not assert ownership of existing third-party contributions or
+retroactively change their licenses. Future licensing changes do not revoke
+rights already granted for previously received versions under their terms.
+Any separately executed contribution agreement controls to the extent of a
+conflict with this section.
+
+5. Commercial licensing contact
+
+Contact the Project Owner through https://github.com/devilyouwei to request
+a separate written commercial license. A request, payment without an
+agreement, or silence does not constitute authorization. The Project Owner
+can authorize only rights it holds; third-party obligations remain separate.
+
+The warranty disclaimers and liability limitations in the incorporated
+Apache License 2.0 apply. No patent ownership or registration is asserted
+merely by publishing this license.

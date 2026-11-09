@@ -1,4 +1,6 @@
-# Third-party licenses
+# Project and third-party licenses
+
+Project-owned material is covered by the root [MobileHarness Noncommercial License](../../LICENSE), incorporating the unchanged [Apache License 2.0 text](Apache-2.0.txt) with overriding noncommercial conditions. Noncommercial use, modification and sharing are permitted. Commercial apps, advertising, commercial product integration, internal business use and paid or commercially operated services require separate written authorization. See the [licensing decision and boundaries](Project-License.md). Third-party notices below retain their independent terms.
 
 Purpose: preserve license notices for model artifacts and runtime dependencies. Design goals: retain the original legal text unchanged and distinguish current distribution from historical or comparison-only artifacts.
 

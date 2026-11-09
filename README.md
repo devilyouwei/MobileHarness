@@ -204,6 +204,6 @@ Do not commit or post credentials, signing settings, model weights, recordings o
 
 ## License and Acknowledgments
 
-**A project license has not yet been selected.** There is no root LICENSE granting an open-source license; a license must be chosen before an open-source release.
+MobileHarness is source-available under the [MobileHarness Noncommercial License](LICENSE), incorporating [Apache License 2.0](docs/licenses/Apache-2.0.txt) with overriding noncommercial conditions. **Noncommercial use, learning, modification and sharing are permitted. Commercial use requires a separate written license**, including paid or ad-supported apps, commercial hardware or software integration, internal business use, and paid or commercially operated services. These rules apply to individuals and organizations, on-device and cloud deployments alike. See the [license](LICENSE) for the full terms and the [project owner](https://github.com/devilyouwei) for commercial licensing. This is not standard Apache-2.0 or an OSI-approved open-source license.
 
 MobileHarness builds on Apple frameworks, CoreAI, Gemma 4 E2B, Nemotron, Silero, MOSS-TTS-Nano and Ultralytics YOLO. Kokoro remains an optional adapter/test integration rather than the production default. Dependencies and model artifacts retain their own redistribution conditions; the configured YOLO26 pose artifact declares AGPL-3.0. See [license notices](docs/licenses/README.md) and [resource profiles](MobileHarness/Resources/Models/README.md).
