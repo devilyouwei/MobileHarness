@@ -18,4 +18,4 @@ This directory contains the conceptual diagrams and feature examples used by the
 | [writer-visual-flowchart.png](writer-visual-flowchart.png) | A Writer-created visual processing flowchart reopened from saved work. |
 | [web-browsing.png](web-browsing.png) | Search results in the in-app browser. |
 
-PNG screenshots are resized proportionally to 480 pixels wide without cropping. GIFs retain their original animation at 480 pixels wide; SVG diagrams remain scalable. The feature table displays clickable 160-pixel-wide previews. Screenshots preserve their captured interface language and visible state; they are examples, not acceptance-test results.
+PNG screenshots are resized proportionally to 480 pixels wide without cropping. GIFs retain their original animation at 480 pixels wide; SVG diagrams remain scalable. The project README separates its text-only feature table from a four-column example gallery. All ten screenshots and animations have their own cells, arranged in rows of four, four and two. Previews are 200 pixels high and clickable. Screenshots preserve their captured interface language and visible state; they are examples, not acceptance-test results.

@@ -102,14 +102,67 @@ For offline development and opt-in Mac/model tests, existing `scripts/download-*
 
 ## Features
 
-| Feature | What you can do today | Example |
-| --- | --- | --- |
-| **Everyday interaction** | Have multi-turn voice conversations with the Assistant, with live captions, spoken replies and expressive eyes and gaze. | [<img src="docs/imgs/everyday-voice-interaction.png" width="160" alt="Voice conversation with captions, expressive eyes and pose overlays">](docs/imgs/everyday-voice-interaction.png) |
-| **Interactive UI** | Interact with generated pages, charts and small tools, manage content windows, and follow task progress in the in-app Island. | [<img src="docs/imgs/interactive-multiwindow.png" width="160" alt="Multiple browser and Writer windows on the home screen">](docs/imgs/interactive-multiwindow.png) [<img src="docs/imgs/interactive-minimized-windows.png" width="160" alt="Browser and Writer windows minimized after a voice request">](docs/imgs/interactive-minimized-windows.png) |
-| **NexArm robotic-arm control** | Control a **NexArm** by voice, move individual joints, perform gestures such as nodding and waving, and aim using visual pose tracking. | [<img src="docs/imgs/nexarm-control-demo.gif" width="160" alt="Animated demonstration of a phone mounted on a NexArm robotic arm">](docs/imgs/nexarm-control-demo.gif) [<img src="docs/imgs/nexarm-motion-demo.gif" width="160" alt="NexArm moving the mounted phone during an Assistant interaction">](docs/imgs/nexarm-motion-demo.gif) |
-| **Intelligent photography and album** | Take photos and videos by voice or on-screen controls, adjust countdown, flash and zoom, and use NexArm for pose-driven aiming. Browse, replay, export and delete saved photos and videos in the app album. | [<img src="docs/imgs/photography-camera.png" width="160" alt="Ongoing photography task with camera controls and recent-photo thumbnails">](docs/imgs/photography-camera.png) [<img src="docs/imgs/photography-album.png" width="160" alt="App album displaying a grid of saved photos">](docs/imgs/photography-album.png) |
-| **Writer text and visual authoring** | Create articles, illustrated layouts, diagrams and interactive content. Preview results as they develop, refine them through conversation, and reopen or export saved work. | [<img src="docs/imgs/writer-illustrated-article.png" width="160" alt="Writer article explaining the banker algorithm with tables and diagrams">](docs/imgs/writer-illustrated-article.png) [<img src="docs/imgs/writer-visual-flowchart.png" width="160" alt="Writer-created visual processing flowchart reopened from saved work">](docs/imgs/writer-visual-flowchart.png) |
-| **Web browsing** | Ask the Assistant to open and read web pages, inspect page content and navigate in an in-app browser. | [<img src="docs/imgs/web-browsing.png" width="160" alt="Web search results shown in the in-app browser">](docs/imgs/web-browsing.png) |
+| Feature | What you can do today |
+| --- | --- |
+| **Everyday interaction** | Have multi-turn voice conversations with the Assistant, with live captions, spoken replies and expressive eyes and gaze. |
+| **Interactive UI** | Interact with generated pages, charts and small tools, manage content windows, and follow task progress in the in-app Island. |
+| **NexArm robotic-arm control** | Control a **NexArm** by voice, move individual joints, perform gestures such as nodding and waving, and aim using visual pose tracking. |
+| **Intelligent photography and album** | Take photos and videos by voice or on-screen controls, adjust countdown, flash and zoom, and use NexArm for pose-driven aiming. Browse, replay, export and delete saved photos and videos in the app album. |
+| **Writer text and visual authoring** | Create articles, illustrated layouts, diagrams and interactive content. Preview results as they develop, refine them through conversation, and reopen or export saved work. |
+| **Web browsing** | Ask the Assistant to open and read web pages, inspect page content and navigate in an in-app browser. |
+
+## Examples
+
+Click any preview to view it at full size.
+
+<table>
+  <tr>
+    <td align="center" valign="top" width="25%">
+      <strong>Everyday interaction</strong><br><br>
+      <a href="docs/imgs/everyday-voice-interaction.png"><img src="docs/imgs/everyday-voice-interaction.png" height="200" alt="Voice conversation with captions, expressive eyes and pose overlays"></a>
+    </td>
+    <td align="center" valign="top" width="25%">
+      <strong>Multiple windows</strong><br><br>
+      <a href="docs/imgs/interactive-multiwindow.png"><img src="docs/imgs/interactive-multiwindow.png" height="200" alt="Multiple browser and Writer windows on the home screen"></a>
+    </td>
+    <td align="center" valign="top" width="25%">
+      <strong>Voice-controlled windows</strong><br><br>
+      <a href="docs/imgs/interactive-minimized-windows.png"><img src="docs/imgs/interactive-minimized-windows.png" height="200" alt="Browser and Writer windows minimized after a voice request"></a>
+    </td>
+    <td align="center" valign="top" width="25%">
+      <strong>Web browsing</strong><br><br>
+      <a href="docs/imgs/web-browsing.png"><img src="docs/imgs/web-browsing.png" height="200" alt="Web search results shown in the in-app browser"></a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top" width="25%">
+      <strong>Photography</strong><br><br>
+      <a href="docs/imgs/photography-camera.png"><img src="docs/imgs/photography-camera.png" height="200" alt="Ongoing photography task with camera controls and recent-photo thumbnails"></a>
+    </td>
+    <td align="center" valign="top" width="25%">
+      <strong>Photo album</strong><br><br>
+      <a href="docs/imgs/photography-album.png"><img src="docs/imgs/photography-album.png" height="200" alt="App album displaying a grid of saved photos"></a>
+    </td>
+    <td align="center" valign="top" width="25%">
+      <strong>Illustrated writing</strong><br><br>
+      <a href="docs/imgs/writer-illustrated-article.png"><img src="docs/imgs/writer-illustrated-article.png" height="200" alt="Writer article explaining the banker algorithm with tables and diagrams"></a>
+    </td>
+    <td align="center" valign="top" width="25%">
+      <strong>Visual diagrams</strong><br><br>
+      <a href="docs/imgs/writer-visual-flowchart.png"><img src="docs/imgs/writer-visual-flowchart.png" height="200" alt="Writer-created visual processing flowchart reopened from saved work"></a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top" width="25%">
+      <strong>NexArm control</strong><br><br>
+      <a href="docs/imgs/nexarm-control-demo.gif"><img src="docs/imgs/nexarm-control-demo.gif" height="200" alt="Animated demonstration of a phone mounted on a NexArm robotic arm"></a>
+    </td>
+    <td align="center" valign="top" width="25%">
+      <strong>NexArm motion</strong><br><br>
+      <a href="docs/imgs/nexarm-motion-demo.gif"><img src="docs/imgs/nexarm-motion-demo.gif" height="200" alt="NexArm moving the mounted phone during an Assistant interaction"></a>
+    </td>
+  </tr>
+</table>
 
 ## Planned and Ongoing Work
 
