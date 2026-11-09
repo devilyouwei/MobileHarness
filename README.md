@@ -7,13 +7,13 @@
 MobileHarness is an Apple-native, bio-inspired multimodal Agent app that turns your iPhone into a harness for independent, stateful Agents. Built around a **Perception → Cognition → Action** loop, it coordinates the phone's hardware and sensors, such as its camera, microphone and speaker, so Agents can perceive the world, understand users, reason, converse and act. Its current robotic-body integration targets **NexArm**, allowing the phone to serve as the brain of an embodied Agent.
 
 <p align="center">
-  <img src="./agent-loop.svg" alt="Perception, Cognition and Action form a counterclockwise loop connected by Internal Signals. A dashed External Signal arrow enters Perception from outside the loop.">
+  <img src="docs/imgs/perception-cognition-action.svg" alt="Perception, Cognition and Action form a counterclockwise loop connected by Internal Signals. A dashed External Signal arrow enters Perception from outside the loop.">
 </p>
 
 **Signals carry information through the Perception → Cognition → Action loop.** External Signals bring observations from the world and user interactions into perception; Internal Signals connect the three stages, carrying interpreted information, intent and feedback. Native inputs reach their responsible Agents through typed ports, while Gateway coordinates inter-Agent communication and Action execution. Agents interpret inputs, decide what to do and act through the phone's capabilities; actual outcomes feed back into the loop. See the [Signal flow design](MobileHarness/README.md#native-input-and-internal-signals) for delivery paths and execution feedback.
 
 <p align="center">
-  <img src="./agent-task-skill-action.svg" alt="An Agent manages a Task and loads Skills. Each Skill declares Actions, read-only States, Instructions and dependencies on other Skills.">
+  <img src="docs/imgs/task-skill-capabilities.svg" alt="An Agent manages a Task and loads Skills. Each Skill declares Actions, read-only States, Instructions and dependencies on other Skills.">
 </p>
 
 **Tasks** preserve goals and context across conversation turns, while **Skills** provide the capabilities needed to pursue them. Each Skill declares **Actions** (operations), **States** (current facts), **Instructions** (workflow guidance) and **dependencies** (other Skills). Agents load Skills as needed and use actual results to guide their next decisions.
@@ -21,7 +21,7 @@ MobileHarness is an Apple-native, bio-inspired multimodal Agent app that turns y
 States give Agents a form of **proprioception**: awareness of current capabilities and conditions, such as camera activity or a robotic arm's target and measured position. Selected facts refresh on each model request; the underlying modules retain ownership of live state. See the [Skill catalog](MobileHarness/Resources/Skills/README.md) and [Agent design](MobileHarness/Agents/README.md).
 
 <p align="center">
-  <img src="./agent-communication.svg" alt="Assistant delegates a goal and sends follow-up input to Writer through Gateway. Writer returns progress, questions and completion or failure while each Agent retains its own context and responsibilities.">
+  <img src="docs/imgs/multi-agent-communication.svg" alt="Assistant delegates a goal and sends follow-up input to Writer through Gateway. Writer returns progress, questions and completion or failure while each Agent retains its own context and responsibilities.">
 </p>
 
 **Multi-Agent collaboration** lets specialized Agents exchange messages and delegate work through **Gateway**, within their declared communication permissions. For example, **Assistant** understands a user's request to write an illustrated article and delegates that goal to **Writer**, which owns its creation workflow, context and workspace. Assistant remains available for conversation and can forward the user's follow-up requirements; Writer sends progress, asks for clarification when needed and reports completion or failure so Assistant can respond to the user. Accepting a delegation means the work has been admitted, not that it is finished. Each Agent retains ownership of its own work, and Writer's delegation does not replace Assistant's foreground Task. See the [Agent communication flow](MobileHarness/README.md#assistant-agent-delegation).
@@ -102,14 +102,14 @@ For offline development and opt-in Mac/model tests, existing `scripts/download-*
 
 ## Features
 
-| Feature | What you can do today |
-| --- | --- |
-| **Everyday interaction** | Have multi-turn voice conversations with the Assistant, with live captions, spoken replies and expressive eyes and gaze. |
-| **Interactive UI** | Interact with generated pages, charts and small tools, manage content windows, and follow task progress in the in-app Island. |
-| **NexArm robotic-arm control** | Control a **NexArm** by voice, move individual joints, perform gestures such as nodding and waving, and aim using visual pose tracking. |
-| **Intelligent photography and album** | Take photos and videos by voice or on-screen controls, adjust countdown, flash and zoom, and use NexArm for pose-driven aiming. Browse, replay, export and delete saved photos and videos in the app album. |
-| **Writer text and visual authoring** | Create articles, illustrated layouts, diagrams and interactive content. Preview results as they develop, refine them through conversation, and reopen or export saved work. |
-| **Web browsing** | Ask the Assistant to open and read web pages, inspect page content and navigate in an in-app browser. |
+| Feature | What you can do today | Example |
+| --- | --- | --- |
+| **Everyday interaction** | Have multi-turn voice conversations with the Assistant, with live captions, spoken replies and expressive eyes and gaze. | [<img src="docs/imgs/everyday-voice-interaction.png" width="160" alt="Voice conversation with captions, expressive eyes and pose overlays">](docs/imgs/everyday-voice-interaction.png) |
+| **Interactive UI** | Interact with generated pages, charts and small tools, manage content windows, and follow task progress in the in-app Island. | [<img src="docs/imgs/interactive-multiwindow.png" width="160" alt="Multiple browser and Writer windows on the home screen">](docs/imgs/interactive-multiwindow.png) |
+| **NexArm robotic-arm control** | Control a **NexArm** by voice, move individual joints, perform gestures such as nodding and waving, and aim using visual pose tracking. | [<img src="docs/imgs/nexarm-control-demo.gif" width="160" alt="Animated demonstration of a phone mounted on a NexArm robotic arm">](docs/imgs/nexarm-control-demo.gif) |
+| **Intelligent photography and album** | Take photos and videos by voice or on-screen controls, adjust countdown, flash and zoom, and use NexArm for pose-driven aiming. Browse, replay, export and delete saved photos and videos in the app album. | [<img src="docs/imgs/photography-camera.png" width="160" alt="Camera window with capture controls and recent-photo thumbnails">](docs/imgs/photography-camera.png) |
+| **Writer text and visual authoring** | Create articles, illustrated layouts, diagrams and interactive content. Preview results as they develop, refine them through conversation, and reopen or export saved work. | [<img src="docs/imgs/writer-illustrated-article.png" width="160" alt="Writer article explaining the banker algorithm with tables and diagrams">](docs/imgs/writer-illustrated-article.png) |
+| **Web browsing** | Ask the Assistant to open and read web pages, inspect page content and navigate in an in-app browser. | [<img src="docs/imgs/web-browsing.png" width="160" alt="Web search results shown in the in-app browser">](docs/imgs/web-browsing.png) |
 
 ## Planned and Ongoing Work
 

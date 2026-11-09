@@ -13,6 +13,7 @@
 | [adr/](adr/README.md) | 架构决策、理由和替代关系。 |
 | [measurements/](measurements/README.md) | 保留的原始测量数据及解释约束。 |
 | [licenses/](licenses/README.md) | 第三方许可和分发说明。 |
+| [imgs/](imgs/README.md) | 项目 README 使用的概念图、功能截图与演示动画。 |
 
 ## 当前产品与架构说明
 
