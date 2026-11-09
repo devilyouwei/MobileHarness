@@ -6,7 +6,7 @@
 
 按 [MobileHarness/README.md 的项目结构](MobileHarness/README.md#target-map)放置源码并核对 target 映射；docs/history/Tech_Design.md 与 Technical_Design.docx 保留为历史设计来源。MobileHarness/App 中非 Package 管理的宿主 Swift 文件新增后加入 Xcode App target；独立 Workflows、BehaviorAssembly、UI 及其他共享模块由根 Package.swift 的显式 path 管理，不重复加入 App 的 Compile Sources。Xcode 导航分组也应同步更新。Tests 位于仓库根目录，使用 Swift Testing。依赖版本需要可复现；增加第三方依赖后提交相应 Package.resolved，并检查许可证。模型权重不入仓库，后续使用有校验和与许可证元数据的独立制品存储。
 
-不要将签名证书、Team 私钥、API key、真实用户音视频、设备令牌写入代码、日志或测试数据。项目采用 [MobileHarness Noncommercial License](LICENSE)，允许非商业使用、修改和分享，商业用途须另行书面授权，属于源码公开许可，并非标准 Apache-2.0。
+不要将签名证书、Team 私钥、API key、真实用户音视频、设备令牌写入代码、日志或测试数据。项目采用标准 [PolyForm Noncommercial License 1.0.0](LICENSE)，允许条款规定的非商业用途及特定机构用途，属于源码公开许可。
 
 新 Agent 必须声明输入、输出、函数和工具能力；跨 Agent 通过网关事件通信。所有队列注明容量与满载策略。硬件动作必须在平台层验证参数、权限、取消和断开行为。禁止通过 `@unchecked Sendable` 或 private API 绕开架构问题。
 
@@ -18,4 +18,4 @@ Organize ModelKit and PlatformKit by capability domain. PlatformKit owns device/
 
 ## Contribution licensing
 
-提交贡献前请阅读 [LICENSE 第 4 节](LICENSE)。你保留贡献的版权，并须有权提交；贡献按项目许可提供，同时授予项目所有者将贡献用于商业产品及按其他条款再许可的权利。项目所有者使用贡献的专利授权按 LICENSE 第 4 节及 Apache 第 3 节处理，不自动授予商业客户专利再许可。该额外授权可随项目所有权转移，不意味着版权自动转让，也不追溯改变第三方已有贡献的许可。单独签订的贡献协议如有冲突，以其约定为准。请保留第三方来源和许可，不提交你无权授权的代码或素材。
+提交贡献前请阅读 [LICENSE](LICENSE)。除非另有书面约定，有意提交并供本项目纳入的贡献按同一 PolyForm Noncommercial License 1.0.0 提供。你保留贡献版权，并须有权提交；请保留第三方来源和许可。此流程不包含版权转让或额外商业再许可授权，项目维护者不会仅因接受 PR 就取得这些权利。若需将外部贡献纳入商业授权版本，须先与相关权利人另行取得适当书面授权；尚未设立独立 CLA。此前有效签订或授出的授权不因此说明自动撤销。

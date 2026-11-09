@@ -2,7 +2,9 @@
 
 ## Minimal dark eyes candidate
 
-The [enlarged chevron wink v4](mobile-eyes-wink-v4.png) follows the user's selected expression direction and enlarges the eye pair to approximately 72% of the icon width. Built-in ImageGen edited v3 with the [scale refinement prompt](mobile-eyes-wink-v4-prompt.txt). Visual review confirms increased coverage, centered composition and the rounded left-facing wink. The saved image is an opaque 1254×1254 concept; it is normalized to opaque 1024×1024 eyes-wink.png and selected into the production AppIcon asset.
+The [spacing revision v5](mobile-eyes-wink-v5.png) is the current production source. Built-in ImageGen edited v4 with the [spacing prompt](mobile-eyes-wink-v5-prompt.txt) after review of the user's iOS home-screen screenshot. Both eyes are slightly smaller and substantially closer together, with more balanced side margins. Visual review estimates a combined width around 55% and side margins around 22%; these are composition observations, not Apple requirements. The opaque artwork is normalized to 1024×1024 eyes-wink.png and copied into AppIcon.png. The user's screenshot is not stored in the repository; installed appearance of this revision remains unverified.
+
+The [enlarged chevron wink v4](mobile-eyes-wink-v4.png) follows the user's selected expression direction and enlarges the eye pair to approximately 72% of the icon width. Built-in ImageGen edited v3 with the [scale refinement prompt](mobile-eyes-wink-v4-prompt.txt). Visual review confirms increased coverage, centered composition and the rounded left-facing wink. The saved image is an opaque 1254×1254 concept; it was normalized and selected into production before being superseded by v5.
 
 The [rounded chevron wink v3](mobile-eyes-wink-v3.png) refines option 1 with a viewer-right closed eye shaped like `<`: a left-facing rounded joint and two thick blue arms with soft tips. Built-in ImageGen edited v2 using the [preserved prompt](mobile-eyes-wink-v3-prompt.txt). Visual review confirms the requested direction, open left eye and minimal composition; the opaque square preview remains separate from production selection.
 

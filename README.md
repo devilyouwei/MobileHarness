@@ -204,6 +204,9 @@ Do not commit or post credentials, signing settings, model weights, recordings o
 
 ## License and Acknowledgments
 
-MobileHarness is source-available under the [MobileHarness Noncommercial License](LICENSE), incorporating [Apache License 2.0](docs/licenses/Apache-2.0.txt) with overriding noncommercial conditions. **Noncommercial use, learning, modification and sharing are permitted. Commercial use requires a separate written license**, including paid or ad-supported apps, commercial hardware or software integration, internal business use, and paid or commercially operated services. These rules apply to individuals and organizations, on-device and cloud deployments alike. See the [license](LICENSE) for the full terms and the [project owner](https://github.com/devilyouwei) for commercial licensing. This is not standard Apache-2.0 or an OSI-approved open-source license.
+MobileHarness is source-available under the standard [PolyForm Noncommercial License 1.0.0](LICENSE). Noncommercial use, modification and redistribution are permitted under its terms. The license also expressly permits use by specified charitable, educational, public research, public safety or health, environmental protection and government organizations, regardless of funding source or resulting funding obligations. Uses outside the license's permitted purposes require separate authorization from the relevant rights holders; contact the [project owner](https://github.com/devilyouwei) for commercial licensing. This is a source-available license, not an OSI-approved open-source license.
+
+Required Notice: Copyright (c) 2026 devilyouwei (https://github.com/devilyouwei)
+
 
 MobileHarness builds on Apple frameworks, CoreAI, Gemma 4 E2B, Nemotron, Silero, MOSS-TTS-Nano and Ultralytics YOLO. Kokoro remains an optional adapter/test integration rather than the production default. Dependencies and model artifacts retain their own redistribution conditions; the configured YOLO26 pose artifact declares AGPL-3.0. See [license notices](docs/licenses/README.md) and [resource profiles](MobileHarness/Resources/Models/README.md).
