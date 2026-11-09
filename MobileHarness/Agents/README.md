@@ -130,3 +130,5 @@ Assistant 的 start 与 delegate 是按所有者选择的平级入口，Writer �
 Each role owns its public description in Resources/Agents/<Role>/Agent.json and its private model instructions in its own resource directory. Support validates resource schema v8 and projects the existing v7 compiled contract. Assistant combines its own identity with generic Core/Skill rules and a public peer directory filtered by the actual instance communication policy and the shared executable delegation adapter. Public descriptions create no permissions and expose no private instructions. Writer owns its content-format templates; deterministic roles do not require artificial model prompts. See [resource contracts](../Resources/Agents/README.md).
 
 Writer 运行以委托入口为身份，workspace 是可选编辑目标；前序与 workspace 消息保持同一请求链，界面分别查询。
+
+Generation resolves Action and text-mapped output to registration-owned Channels. Camera UI inputs expose capture, saving and window controls; closing releases the photo session.

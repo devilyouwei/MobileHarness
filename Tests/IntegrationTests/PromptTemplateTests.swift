@@ -430,7 +430,7 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
             #expect(prompt.contains(try AgentConfigurations.skillInstructions("photography")))
             #expect(prompt.contains("emit these in separate requests"))
             #expect(prompt.contains("preparation was already spoken"))
-            #expect(prompt.contains("Standalone save/ignore/close/lens operations need no new Task"))
+            #expect(prompt.contains("Standalone save/close/lens operations need no new Task"))
             #expect(prompt.contains("<savePhoto previewID=\"preview_1\"/>"))
             #expect(prompt.contains("Await operation=close and enabled=false"))
             #expect(prompt.contains("never Vision.close"))
@@ -557,12 +557,12 @@ func businessSkillTeachingCannotFinishAnAbsentOrUnrelatedTask(skill: String) thr
     #expect(try CapabilityContextBuilder.catalog(native).contains("exact API-native Tool"))
 }
 
-@Test(.actionCatalog) func ignoredPhotoTerminalExampleParsesWithoutStartingOrRepeatingEffects() throws {
+@Test(.actionCatalog) func closedPhotoTerminalExampleParsesWithoutStartingOrRepeatingEffects() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     let catalog = try AgentSkillLoader.registry(
         AgentConfigurations.baseSkills(named: "Assistant") + ["photography"], fixed: config.capabilities)
     let examples = try skillResponseExamples("photography")
-    let terminal = try #require(examples.first { $0.contains("照片已忽略。<task.end") })
+    let terminal = try #require(examples.first { $0.contains("相机已关闭。<task.end") })
     var trace = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
     try trace.append(terminal)
     trace.finish()
@@ -570,6 +570,20 @@ func businessSkillTeachingCannotFinishAnAbsentOrUnrelatedTask(skill: String) thr
     let business = trace.calls.filter { $0.actionPath.domain != "Speech" && $0.actionPath.domain != "UI" }
     #expect(business.count == 1 && business.first?.actionPath.description == "Agent.Task.finishTask")
     #expect(business.first?.parameters["continueDecision"] == nil)
+}
+
+@Test(.actionCatalog) func retiredPhotoActionIsAbsentFromCatalogAndTeaching() throws {
+    let config = try AgentConfigurations.load(named: "Assistant")
+    let catalog = try AgentSkillLoader.registry(["photography"], fixed: config.capabilities)
+    for alias in ["ignorePhoto", "discardPhoto"] {
+        #expect(!catalog.actions.contains { $0.alias == alias })
+        #expect(throws: GenerationError.unknownCapability) {
+            try catalog.resolveAction(alias, parameters: ["previewID": "preview_1"])
+        }
+        #expect(!(try skillResponseExamples("photography")).contains { $0.contains(alias) })
+    }
+    let prompt = try CapabilityContextBuilder.catalog(catalog)
+    #expect(!prompt.contains("<channel."))
 }
 
 @Test(.actionCatalog) func photographyExamplesCoverVideoLifecycleWithoutModeSetup() throws {

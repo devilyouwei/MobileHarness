@@ -20,7 +20,7 @@ public struct CapabilityRegistry: Sendable {
         guard Set(paths).count == paths.count else { throw GenerationError.duplicateAlias }
         let aliases = actions.map(\.alias) + tools.map(\.alias)
         guard Set(aliases).count == aliases.count else { throw GenerationError.duplicateAlias }
-        guard aliases.allSatisfy({ Self.validName($0) && $0 != "wait" && !$0.hasPrefix("channel.") }),
+        guard aliases.allSatisfy({ Self.validName($0) && $0 != "wait" }),
             channels.allSatisfy(Self.validName),
             actions.allSatisfy({
                 Self.validName($0.defaultChannel) && $0.path.isValid
@@ -52,18 +52,17 @@ public struct CapabilityRegistry: Sendable {
         guard self.channels.count <= 16 else { throw GenerationError.limitExceeded }
     }
 
-    public func resolveAction(_ alias: String, parameters: [String: String], channel: String? = nil) throws
+    public func resolveAction(_ alias: String, parameters: [String: String]) throws
         -> ActionCall
     {
         guard let action = actions.first(where: { $0.alias == alias }) else { throw GenerationError.unknownCapability }
         try Self.validate(
             parameters, required: action.requiredParameters, optional: action.optionalParameters,
             ignoringUnknownKeys: true)
-        let selected = channel ?? action.defaultChannel
-        guard channels.contains(selected) else { throw GenerationError.forbiddenChannel }
         let allowed = action.requiredParameters.union(action.optionalParameters)
         return ActionCall(
-            actionPath: action.path, channel: selected, parameters: parameters.filter { allowed.contains($0.key) })
+            actionPath: action.path, channel: action.defaultChannel,
+            parameters: parameters.filter { allowed.contains($0.key) })
     }
 
     public func resolveTool(_ alias: String, arguments: [String: String], id: String? = nil) throws -> ToolCall {
@@ -84,13 +83,13 @@ public struct CapabilityRegistry: Sendable {
     public func permits(_ call: ActionCall) -> Bool {
         guard channels.contains(call.channel) else { return false }
         return actions.contains {
-            $0.path == call.actionPath
+            $0.path == call.actionPath && $0.defaultChannel == call.channel
                 && (try? Self.validate(
                     call.parameters,
                     required: $0.requiredParameters, optional: $0.optionalParameters)) != nil
         }
             || internalActions.contains {
-                $0.path == call.actionPath
+                $0.path == call.actionPath && $0.channel == call.channel
                     && (try? Self.validate(
                         call.parameters,
                         required: $0.requiredParameters, optional: $0.optionalParameters)) != nil

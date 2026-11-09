@@ -159,7 +159,7 @@ extension PhotographerAgent {
         #if os(iOS)
             if camera.capturedPhoto != nil {
                 return .init(
-                    title: "照片待处置", subtitle: "打开相机保存或忽略", primary: .symbol(name: "photo"), priority: .high)
+                    title: "照片待保存", subtitle: "打开相机查看或保存", primary: .symbol(name: "photo"), priority: .high)
             }
         #endif
         return nil

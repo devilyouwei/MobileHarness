@@ -7,7 +7,7 @@ import StorageCore
 public struct PhotographerCameraIntent: Codable, Sendable, Equatable {
     public static let contract = "photography.camera"
     public enum Operation: String, Codable, Sendable {
-        case open, close, flip, retry, takePhoto, savePhoto, ignorePhoto, configure, cancelCapture, startRecording,
+        case open, close, flip, retry, takePhoto, savePhoto, configure, cancelCapture, startRecording,
             stopRecording, saveVideo, ignoreVideo, cancel
         case perceptionOpen, perceptionClose, perceptionFlip, perceptionRetry
         var actionPath: String {
@@ -49,7 +49,7 @@ public struct PhotographerCameraIntent: Codable, Sendable, Equatable {
                         == (intent.recordingID != nil),
                     intent.recordingID.map({ UUID(uuidString: $0) != nil }) ?? true,
                     (intent.operation == .flip || intent.operation == .perceptionFlip) == (intent.facing != nil),
-                    intent.previewID == nil || intent.operation == .savePhoto || intent.operation == .ignorePhoto,
+                    intent.previewID == nil || intent.operation == .savePhoto,
                     !intent.requestID.isEmpty, intent.requestID.utf8.count <= 128,
                     intent.previewID.map({ !$0.isEmpty && $0.utf8.count <= 128 }) ?? true
                 else {

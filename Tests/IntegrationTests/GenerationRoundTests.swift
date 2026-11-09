@@ -301,7 +301,7 @@ private func roundHarness(
     let input = InputGateway(manager: manager)
     let paths = [
         "UI.Expression.express", "UI.Caption.print", "UI.Caption.beginReplyTurn", "Speech.Playback.speak",
-        "Camera.Capture.takePhoto", "Camera.Capture.savePhoto", "Camera.Capture.ignorePhoto",
+        "Camera.Capture.takePhoto", "Camera.Capture.savePhoto",
         "System.Device.readStatus",
     ]
     var definitions = paths.map { path -> ActionBinding in
@@ -772,11 +772,11 @@ private actor PhotoFunctionEndpoint: CameraControlCapability {
     #expect(await endpoint.captures == 1)
 }
 
-@Test(.actionCatalog, arguments: ["savePhoto", "ignorePhoto"], [false, true])
+@Test(.actionCatalog, arguments: ["savePhoto"], [false, true])
 func photoDispositionObservationDrivesReplyWithoutAnotherImageOrCapture(_ command: String, _ denied: Bool) async throws
 {
     let id = UUID().uuidString
-    let receipt = CameraPhotoCommandReceipt(previewID: id, state: command == "savePhoto" ? .saved : .ignored)
+    let receipt = CameraPhotoCommandReceipt(previewID: id, state: .saved)
     let value = String(decoding: try JSONEncoder().encode(receipt), as: UTF8.self)
     let harness = try await roundHarness(
         action: false, toolCount: 0, photoCommand: command + " previewID=\"" + id + "\"",

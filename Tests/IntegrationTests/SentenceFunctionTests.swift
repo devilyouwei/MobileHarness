@@ -245,7 +245,7 @@ private struct ExcessiveSentencesChat: ChatCapability {
         segmentation: try AssistantAgent.textSegmentation)
     #expect(try generator.append("你好，先想一下").isEmpty)
     let events =
-        try generator.append("<express emotion='thinking'/><channel.Speech>然后回答</channel.Speech>尾巴")
+        try generator.append("<express emotion='thinking'/><wait>然后回答</wait>尾巴")
         + generator.finish()
     let calls = events.compactMap(\.actionCall).filter { $0.actionPath.module != "Caption" }
     #expect(calls.map { $0.actionPath.function } == ["speak", "express", "speak", "speak"])

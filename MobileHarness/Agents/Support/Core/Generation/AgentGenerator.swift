@@ -3,11 +3,10 @@ import Foundation
 /// Shared model-output interpreter. It owns one parser and sentence buffer per generation.
 public struct AgentGenerator: Sendable {
     private let capabilities: CapabilityRegistry
-    public typealias TextMapping = @Sendable (String, String?) throws -> [GenerationEvent]
+    public typealias TextMapping = @Sendable (String) throws -> [GenerationEvent]
     private let mapTextCalls: TextMapping?
     private var parser = FunctionTokenParser()
     private var sentences: SentenceFunctionBuffer
-    private var textChannel: String?
     private var calls = 0
     private var closed = false
 
@@ -55,27 +54,20 @@ public struct AgentGenerator: Sendable {
         var result: [GenerationEvent] = []
         for token in tokens {
             switch token {
-            case .text(let text, let channel):
+            case .text(let text):
                 guard mapTextCalls != nil || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                     throw GenerationError.unknownCapability
                 }
-                if let channel, !capabilities.channels.contains(channel) { throw GenerationError.forbiddenChannel }
-                if channel != textChannel {
-                    result += try flush()
-                    textChannel = channel
-                }
                 result += try mapText(sentences.append(text))
-            case .boundary:
-                result += try flush()
             case .scheduling(let directive):
                 result += try flush()
                 result.append(.scheduling(directive))
-            case .action(let alias, let parameters, let channel):
+            case .action(let alias, let parameters):
                 result += try flush()
                 try reserve(1)
                 do {
                     result.append(
-                        .action(try capabilities.resolveAction(alias, parameters: parameters, channel: channel)))
+                        .action(try capabilities.resolveAction(alias, parameters: parameters)))
                 } catch let error as GenerationError where error == .unknownCapability || error == .invalidParameters {
                     result.append(.rejected(CallRejection(kind: .action, alias: alias, reason: error)))
                 }
@@ -90,7 +82,7 @@ public struct AgentGenerator: Sendable {
         var output: [GenerationEvent] = []
         for chunk in chunks {
             guard let mapTextCalls else { throw GenerationError.unknownCapability }
-            let calls = try mapTextCalls(chunk, textChannel)
+            let calls = try mapTextCalls(chunk)
             guard !calls.isEmpty, calls.count <= 8 else { throw GenerationError.limitExceeded }
             try reserve(calls.count)
             output += calls.map { event in

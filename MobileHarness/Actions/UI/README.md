@@ -48,7 +48,7 @@ express 支持 closed/smile/happy/laugh/thinking/surprised/sad/love/angry/scared
 
 print 要求非空 text，最多 2000 UTF-8 字节；setTranscript 允许空文本作为清除，最多 4096 字节。beginReplyTurn 和 finishTranscript 拒绝参数。Gaze 校验有限数值范围。showPose 的实际参数读取及载荷上限见 [Pose](Pose/README.md)。
 
-playCue 默认为 wake、volume=0.85；vibrate 默认为 heavy、intensity=1、count=1、intervalMS=80。七种 cue 和五种触觉风格是封闭枚举；volume/intensity 为有限 0…1，count 为 1…3，intervalMS 为 40…250。原生音频准入和触觉可用性属于宿主。
+playCue 默认为 wake、volume=0.85；vibrate 默认为 heavy、intensity=1、count=1、intervalMS=80。六种 cue 和五种触觉风格是封闭枚举；volume/intensity 为有限 0…1，count 为 1…3，intervalMS 为 40…250。原生音频准入和触觉可用性属于宿主。
 
 Notice 的非空文字限 1024 UTF-8 字节，tone 为 info/warning/error（默认 warning），默认期限 8000 毫秒。Light 的 x/y/initialOpacity/intensity 为有限 0…1，默认 0.5/0.4/0.85/1，默认期限 3000 毫秒。两类期限范围为 500…30000 毫秒；本域只提交请求，宿主拥有过期与清理任务。清除请求不表示清除真实错误记录或聆听策略。
 

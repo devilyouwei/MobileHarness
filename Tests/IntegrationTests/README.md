@@ -311,7 +311,7 @@ WorkspaceRepositoryTests owns relational catalog integration: over-8MiB independ
 
 Agent展示所有权回归在IslandIntegrationTests、VoiceTests和AssistantChatTests：验证各角色通过自身Gateway身份独立发布/结束，展示不可用重试，合成完成与播放完成区分，迟到结束与停机隔离，以及同一路径按LLM/内部来源决定ReACT。模型文本测试和历史预览同时接受显式action与代码展开runtimeAction；诊断装配包含实际Island执行工具。所有语音/模型结果使用测试替身，不代表原生音频或真实模型验收。
 
-Preview regressions cover session-local IDs, FIFO20, failed reservation retention, save/ignore flags and reload, session close/reopen and late-load fencing, scoped history expiry with independent album persistence, visibility suspension, private execution/audit bindings and original-user image merging.
+Preview regressions cover session-local IDs, FIFO20, failed reservation retention, save flags, reshoot retention and reload, session close/reopen and late-load fencing, scoped history expiry with independent album persistence, visibility suspension, private execution/audit bindings and original-user image merging.
 
 StorageSchemaTests exercises persisted request details referencing one preview across user turns, live-cache history reads without State mutation, new scoped references expiring after close/reopen while album bytes remain independently readable, unscoped/old-session expiry even when album records exist, no persisted preview identity, and independent album reads after database reopening.
 

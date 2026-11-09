@@ -127,11 +127,11 @@ Artifacts receives the shared SQLite WorkspaceRepository through ActionsDependen
 
 Artifacts consumes the neutral StorageDatabase.Workspaces contracts/coordinator and StorageFiles primitives. It never imports SQLite/GRDB; formats, rendering and acceptance remain Actions responsibilities.
 
-Camera owns memory-only photo capture, automatic latest and explicit image selections, and save/ignore by previewID. Its scoped State reader supplies immutable image attachments; ordinary inspection remains metadata-only. Storage owns bytes/persistence, Agents owns Skill selection, and App binds the interfaces.
+Camera owns memory-only photo capture, automatic latest and explicit image selections, and saving by previewID. Its scoped State reader supplies immutable image attachments; ordinary inspection remains metadata-only. Storage owns bytes/persistence, Agents owns Skill selection, and App binds the interfaces.
 
 History validates recorded attachment identity and reads logged request bytes only. Clearing logs removes their images and generation metadata. No history read loads State or triggers model feedback.
 
-Camera uses memory-only preview_N references within one window lifetime, independently of saved media_N. Private resource bindings fence reused labels. Save/ignore retain flagged cache entries; window close clears them, while minimization/background only suspends model delivery.
+Camera uses memory-only preview_N references within one window lifetime, independently of saved media_N. Private resource bindings fence reused labels. Saving retains marked cache entries; window close clears them, while minimization/background only suspends model delivery.
 
 History.Conversation.clearLogs为用户日志管理提供内部业务函数：按request_N或共享全库物理删除可选日志。Memory拥有调用与结果处理，Storage保留对话、消息和业务请求记录，UI仅刷新Prompts可用性。
 

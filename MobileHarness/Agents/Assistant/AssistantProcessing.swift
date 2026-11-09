@@ -57,7 +57,7 @@ public struct AssistantContextState: AgentChatContextState {
     public static func systemPrompt(
         _ capabilities: CapabilityRegistry, skills: AgentTaskSkillState?, communication: CommunicationDeclaration
     ) throws -> String {
-        guard capabilities.channels.contains("Speech") else { throw GenerationError.forbiddenChannel }
+        guard capabilities.channels.contains("Speech") else { throw GenerationError.unknownCapability }
         var base = AgentTaskSkillState()
         if skills == nil {
             try base.initialize(

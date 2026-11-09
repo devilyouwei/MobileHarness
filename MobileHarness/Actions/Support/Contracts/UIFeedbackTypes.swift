@@ -1,7 +1,7 @@
 import Foundation
 
 extension UIActions {
-    public enum Cue: String, CaseIterable, Sendable { case wake, confirm, cancel, error, soft, save, discard }
+    public enum Cue: String, CaseIterable, Sendable { case wake, confirm, cancel, error, soft, save }
     public enum HapticStyle: String, CaseIterable, Sendable { case light, medium, heavy, rigid, soft }
     public enum FeedbackError: Error, Sendable { case unavailable }
     public struct CueRequest: Sendable, Equatable {

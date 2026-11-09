@@ -64,9 +64,9 @@ flowchart LR
 
 resolveTool 在参数及枚举校验成功后原样保留显式 id，缺省 id 直接使用非抛错的 UUID 字符串；throws 只用于真实解析／验证失败。
 
-JSON 至多 64 KiB；模型能力与内部授权合计 128，Channel 16，单函数参数集合 32。组键定义默认 Channel，空组只声明 Channel；别名全局唯一，排序遍历保证目录确定。配置只接受声明的字段，未知字段明确拒绝。
+JSON 至多 64 KiB；模型能力与内部授权合计 128，Channel 16，单函数参数集合 32。组键定义固定 Channel，空组只声明 Channel；别名全局唯一，排序遍历保证目录确定。配置只接受声明的字段，未知字段明确拒绝。
 
-Action 以 canonical domain/module/function 地址注册，并通过独立模型 alias 暴露；native Tool 保留 provider 定义，适配器负责传输格式。required 与 optional 不可重叠。XML Action 先验证原始参数数量／名称／值及必填项，再丢弃未在可见参数集中声明的键；native Tool parsing and Actions preparation strictly validate constructed argument keys and enumerations。未知别名或缺参返回真实拒绝，不获取内部参数权。
+Action 以 canonical domain/module/function 地址注册，并通过独立模型 alias 暴露；native Tool 保留 provider 定义，适配器负责传输格式。required 与 optional 不可重叠。Action 解析和 InternalAction.call 只采用注册 Channel，permits 要求路径与该声明的 Channel 同时匹配。XML Action 先验证原始参数数量／名称／值及必填项，再丢弃未在可见参数集中声明的键；native Tool parsing and Actions preparation strictly validate constructed argument keys and enumerations。未知别名或缺参返回真实拒绝，不获取内部参数权。
 
 InternalAction/InternalTool 参与 permits，不参与模型 resolve，也不生成 XML alias。Skill 指令或可见目录不替代实例／任务／资源授权。
 

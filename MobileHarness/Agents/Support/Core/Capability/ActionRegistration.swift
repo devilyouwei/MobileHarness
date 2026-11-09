@@ -37,8 +37,8 @@ public struct InternalAction: Sendable {
         optionalParameters = optional
     }
 
-    public func call(_ parameters: [String: String] = [:], channel: String? = nil) throws -> ActionCall {
+    public func call(_ parameters: [String: String] = [:]) throws -> ActionCall {
         try CapabilityRegistry.validate(parameters, required: requiredParameters, optional: optionalParameters)
-        return ActionCall(actionPath: path, channel: channel ?? self.channel, parameters: parameters)
+        return ActionCall(actionPath: path, channel: channel, parameters: parameters)
     }
 }

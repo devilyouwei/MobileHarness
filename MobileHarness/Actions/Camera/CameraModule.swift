@@ -50,9 +50,6 @@ public struct CameraModule: CapabilityModule {
             CameraActions.savePhotoDefinition(completing: { [camera] invocation in
                 .value(try await CameraActions.savePhoto(invocation: invocation, using: camera))
             }),
-            CameraActions.ignorePhotoDefinition(completing: { [camera] invocation in
-                .value(try await CameraActions.ignorePhoto(invocation: invocation, using: camera))
-            }),
             CameraActions.takePhotoDefinition(completing: { [camera] invocation in
                 .value(try await CameraActions.takePhoto(invocation: invocation, using: camera))
             }),

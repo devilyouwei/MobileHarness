@@ -49,7 +49,6 @@ import UI
     public func retryPerception() { submit(.perceptionRetry) }
     public func switchPerceptionCamera() { submit(.perceptionFlip, facing: state.facing == .front ? .back : .front) }
     public func savePhoto(_ id: String) { submitPhoto(.savePhoto, id: id) }
-    public func ignorePhoto(_ id: String) { submitPhoto(.ignorePhoto, id: id) }
     private func submitPhoto(_ operation: CameraInput.Operation, id: String) {
         guard let previewID = PreviewImageID(rawValue: id) else {
             presentation.present(.photoMessage("照片引用无效"))

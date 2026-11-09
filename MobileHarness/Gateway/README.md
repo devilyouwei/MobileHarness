@@ -78,3 +78,5 @@ Scheduled entry checks the root admission fence before creating preparation work
 Gateway State queue depths, endpoint/delivery counts, scheduling/direct work, resource holdings/leases and cleanup counts are Runtime. Its engineering health/issues remain separate; no transport counter is a Business attribute.
 
 ResourceCoordinator exposes current-context execution, coordinated lease acquisition and atomic settlement queries. App adapters consume these operations rather than interpret holdings or resolve leases.
+
+Agent-provided Action calls use their registration Channel; Gateway schedules these resolved calls and ordered wait events. Model text cannot override routing.

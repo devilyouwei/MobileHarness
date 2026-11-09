@@ -271,7 +271,7 @@ public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
 public struct CameraInput: Sendable {
     public let previewSession: String?
     public enum Operation: String, Sendable {
-        case open, close, flip, retry, takePhoto, savePhoto, ignorePhoto, configure, cancelCapture, startRecording,
+        case open, close, flip, retry, takePhoto, savePhoto, configure, cancelCapture, startRecording,
             stopRecording, saveVideo, ignoreVideo, perceptionOpen, perceptionClose,
             perceptionFlip, perceptionRetry
     }

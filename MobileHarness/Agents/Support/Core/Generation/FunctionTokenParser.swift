@@ -9,7 +9,8 @@ public struct FunctionTokenParser: Sendable {
     private var quote: Unicode.Scalar?
     private var entity: String?
     private var text = ""
-    private var channels = ChannelParser()
+    private var waitDepth = 0
+    private var waitCount = 0
     private var totalBytes = 0
     private var tokenCount = 0
     private var closed = false
@@ -59,7 +60,7 @@ public struct FunctionTokenParser: Sendable {
     public mutating func finish() throws -> [FunctionToken] {
         guard !closed else { throw GenerationError.closed }
         closed = true
-        guard utf8.isEmpty, tag == nil, entity == nil, channels.isEmpty else {
+        guard utf8.isEmpty, tag == nil, entity == nil, waitDepth == 0 else {
             throw GenerationError.incompleteDocument
         }
         var result: [FunctionToken] = []
@@ -69,7 +70,7 @@ public struct FunctionTokenParser: Sendable {
 
     private mutating func flushText(into result: inout [FunctionToken]) {
         if !text.isEmpty {
-            result.append(.text(text, channel: channels.current))
+            result.append(.text(text))
             text = ""
         }
     }
@@ -116,25 +117,16 @@ public struct FunctionTokenParser: Sendable {
         guard tokenCount <= 1024 else { throw GenerationError.limitExceeded }
         let content = String(value.dropFirst().dropLast())
         if content == "wait" {
-            try channels.openWait()
+            guard waitCount < 32, waitDepth < 8 else { throw GenerationError.limitExceeded }
+            waitCount += 1
+            waitDepth += 1
             result.append(.scheduling(.beginWait))
             return
         }
         if content == "/wait" {
-            try channels.closeWait()
+            guard waitDepth > 0 else { throw GenerationError.malformedMarkup }
+            waitDepth -= 1
             result.append(.scheduling(.endWait))
-            return
-        }
-        if content.hasPrefix("/channel.") {
-            let name = String(content.dropFirst(9))
-            try channels.close(name)
-            result.append(.boundary)
-            return
-        }
-        if content.hasPrefix("channel.") {
-            let name = String(content.dropFirst(8))
-            try channels.open(name)
-            result.append(.boundary)
             return
         }
         guard content.hasSuffix("/") else { throw GenerationError.malformedMarkup }
@@ -148,7 +140,7 @@ public struct FunctionTokenParser: Sendable {
         }
         func skip() { while index < chars.count, whitespace(chars[index]) { index += 1 } }
         let alias = name()
-        guard CapabilityRegistry.validName(alias), alias != "wait", !alias.hasPrefix("channel.") else {
+        guard CapabilityRegistry.validName(alias), alias != "wait" else {
             throw GenerationError.malformedMarkup
         }
         var params: [String: String] = [:]
@@ -174,7 +166,7 @@ public struct FunctionTokenParser: Sendable {
             guard params.count <= 32 else { throw GenerationError.limitExceeded }
             index += 1
         }
-        result.append(.action(name: alias, parameters: params, channel: channels.current))
+        result.append(.action(name: alias, parameters: params))
     }
 
     private static func decodeAttribute(_ value: String) throws -> String {

@@ -9,7 +9,7 @@ extension UIActions {
         parameters: [
             .init(
                 "cue", type: .string, required: false, description: "Cue profile; default wake.",
-                values: ["wake", "confirm", "cancel", "error", "soft", "save", "discard"]),
+                values: ["wake", "confirm", "cancel", "error", "soft", "save"]),
             .init(
                 "volume", type: .number, required: false, description: "Relative PCM gain; default 0.85.",
                 constraints: "Finite 0 through 1; system volume remains user-owned."),

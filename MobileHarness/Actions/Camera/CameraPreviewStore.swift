@@ -228,11 +228,10 @@ import StorageCore
             facts: try JSONEncoder().encode(facts), revision: revision, images: ids.compactMap { images[$0] },
             resourceScope: active ? sessionID : nil)
     }
-    public func dispose(_ id: String, save: Bool) async throws -> CameraPhotoCommandReceipt {
+    public func save(_ id: String) async throws -> CameraPhotoCommandReceipt {
         try validateSession(sessionID)
         guard let entry = cache.entries.first(where: { $0.id == id }) else { throw CameraControlError.photoUnavailable }
         guard !busy else { throw CameraControlError.busy }
-        if entry.disposition == .saved, !save { throw CameraControlError.photoUnavailable }
         busy = true
         defer {
             finishBusy()
@@ -240,8 +239,8 @@ import StorageCore
         }
         try Task.checkCancellation()
         var mediaID = entry.mediaID
-        if save, mediaID == nil { mediaID = try await persist(cache.read(id)) }
-        try cache.mark(id, disposition: save ? .saved : .ignored, mediaID: mediaID)
+        if mediaID == nil { mediaID = try await persist(cache.read(id)) }
+        try cache.mark(id, disposition: .saved, mediaID: mediaID)
         generation += 1
         for scope in selections.keys { selections[scope]?.removeAll { $0 == id } }
         if latest == id { latest = nil }
@@ -249,7 +248,7 @@ import StorageCore
         cache.removeAnalysis(id)
         changed()
         return .init(
-            previewID: id, mediaID: mediaID, state: save ? .saved : .ignored, alreadySaved: save && entry.mediaID != nil
+            previewID: id, mediaID: mediaID, state: .saved, alreadySaved: entry.mediaID != nil
         )
     }
     private func releaseUnused() {

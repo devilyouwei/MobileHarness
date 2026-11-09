@@ -39,14 +39,6 @@ func invalidShortCuePCMNeverProducesPlayableBytes(_ samples: [Float]) async {
     #expect(throws: PCMClipEncoding.Failure.self) { try PCMClipEncoding.wav16(samples: [0], sampleRate: rate) }
 }
 
-@Test func saveAndDiscardHaveDistinctBoundedNativeCuePayloads() throws {
-    let saved = try FeedbackTone.samples(for: .init(cue: .save))
-    let discarded = try FeedbackTone.samples(for: .init(cue: .discard))
-    let saveWAV = try PCMClipEncoding.wav16(samples: saved, sampleRate: FeedbackTone.sampleRate)
-    let discardWAV = try PCMClipEncoding.wav16(samples: discarded, sampleRate: FeedbackTone.sampleRate)
-    #expect(saveWAV != discardWAV && saved.count == 29760 && discarded.count == 27840)
-}
-
 private actor PreviewPersistenceProbe {
     var values: [Data] = []
     var fails = false
@@ -57,6 +49,30 @@ private actor PreviewPersistenceProbe {
         return "media_\(values.count)"
     }
     var count: Int { values.count }
+}
+
+@Test @MainActor func reshootKeepsEarlierPhotoReadableUntilCameraSessionCloses() async throws {
+    let root = CacheContainer()
+    let store = CameraPreviewStore(
+        cache: root.cameraImages, prepare: { .init(data: $0, width: 1, height: 1) },
+        persist: { _ in throw CameraControlError.unavailable })
+    try store.openSession()
+    let first = try await store.reserve()
+    try await store.publish(Data([1]), id: first, width: 1, height: 1)
+    let replacement = try await store.reserve()
+    try await store.publish(Data([2]), id: replacement, width: 1, height: 1)
+    #expect(store.catalog.map(\.previewID) == [first, replacement])
+    #expect(store.catalog.allSatisfy { $0.status == "pending" })
+    #expect(try store.snapshot(scope: "s").images.map(\.id) == [replacement])
+    try await store.load(first, scope: "s")
+    #expect(try store.snapshot(scope: "s").images.map(\.id) == [replacement, first])
+    #expect(try store.original(first) == Data([1]))
+    await store.endSession()
+    #expect(store.catalog.isEmpty && root.cameraImages.retainedBytes == 0)
+    #expect(try store.snapshot(scope: "s").images.isEmpty)
+    await #expect(throws: (any Error).self) { try await store.load(first, scope: "s") }
+    try await store.close()
+    await root.close()
 }
 
 @Test @MainActor func previewStateSurvivesTurnsAndSelectsOldImagesWithoutPersisting() async throws {
@@ -95,24 +111,23 @@ private actor PreviewPersistenceProbe {
     #expect(try store.snapshot(scope: "s").images.map(\.id) == [b])
     try await store.load(a, scope: "s")
     await persistence.fail(true)
-    await #expect(throws: CameraControlError.self) { try await store.dispose(a, save: true) }
+    await #expect(throws: CameraControlError.self) { try await store.save(a) }
     #expect(try store.snapshot(scope: "s").images.count == 2)
     await persistence.fail(false)
-    let saved = try await store.dispose(a, save: true)
+    let saved = try await store.save(a)
     #expect(saved.previewID == a && saved.mediaID == "media_1")
-    #expect(try await store.dispose(a, save: true).alreadySaved)
+    #expect(try await store.save(a).alreadySaved)
     #expect(await persistence.count == 1)
     try await store.load(a, scope: "s")
     #expect(try store.snapshot(scope: "s").images.map(\.id) == [b, a])
     try store.unload(a, scope: "s")
     #expect(try store.snapshot(scope: "s").images.map(\.id) == [b])
-    _ = try await store.dispose(b, save: false)
     #expect(try store.original(b) == Data([3, 4]))
-    #expect(try store.snapshot(scope: "s").images.isEmpty)
+    #expect(try store.snapshot(scope: "s").images.map(\.id) == [b])
     #expect(store.cache.entries.count == 2)
     try await store.load(b, scope: "s")
     #expect(try store.snapshot(scope: "s").images.map(\.id) == [b])
-    _ = try await store.dispose(b, save: true)
+    _ = try await store.save(b)
     #expect(store.catalog.allSatisfy { $0.status == "saved" })
     try await store.close()
     await root.close()
@@ -280,12 +295,11 @@ func invalidAndLegacyPreviewIDsCannotBecomeLiveActions(_ value: String) {
         try await store.publish(Data([UInt8(n)]), id: id, width: 1, height: 1)
         if n == 1 { try await store.load(id, scope: "s") }
     }
-    _ = try await store.dispose("preview_2", save: false)
     let next = try await store.reserve()
     #expect(store.catalog.count == 20)
     try await store.publish(Data([21]), id: next, width: 1, height: 1)
     #expect(store.catalog.first?.previewID == "preview_2" && store.catalog.last?.previewID == "preview_21")
-    #expect(store.catalog.first?.status == "ignored")
+    #expect(store.catalog.first?.status == "pending")
     #expect(try store.snapshot(scope: "s").images.map(\.id) == ["preview_21"])
     #expect(throws: (any Error).self) { try store.original("preview_1") }
     store.modelVisible = false
@@ -357,10 +371,9 @@ func invalidAndLegacyPreviewIDsCannotBecomeLiveActions(_ value: String) {
         try await store.publish(Data([UInt8(n)]), id: id, width: 1, height: 1)
     }
     #expect(store.pendingCount == 3)
-    _ = try await store.dispose("preview_1", save: true)
-    _ = try await store.dispose("preview_2", save: false)
-    #expect(store.pendingCount == 1 && store.catalog.count == 3)
-    _ = try await store.dispose("preview_3", save: false)
-    #expect(store.pendingCount == 0 && store.catalog.count == 3)
+    _ = try await store.save("preview_1")
+    #expect(store.pendingCount == 2 && store.catalog.count == 3)
+    await store.endSession()
+    #expect(store.pendingCount == 0 && store.catalog.isEmpty)
     try await store.close()
 }

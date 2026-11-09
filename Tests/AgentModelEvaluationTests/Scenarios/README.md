@@ -20,6 +20,8 @@ Design goals: explicit ownership, capability boundaries and no duplicate product
 
 Robot-prefixed cases cover motor anatomy, signed relative angles, native parameters, ambiguous absolute angle origins, axis limits, readiness, ordered multi-motor/gesture composition and conditional failure. `robotSequence` asserts the exact count, order, axis and required parameters of every NexArm call; it is evaluation data and is never injected into model prompts. The full fixture is bounded to 96 scenarios.
 
+Photo scenarios cover saving, explicit window close and direct reshoot within the same Task. Closing clears temporary previews; reshoot does not require a disposal action. Static cases.json teaching uses registration-owned Channels. Historical evaluation IDs and outcomes remain in docs/validation and are not current scenario contracts.
+
 writer-window-discover-read/maximize从默认目录开始；公开Writer artifact窗口身份来自合成State。用户只要求看文字或放大，断言按需加载与指定ID的XML Action，不把评分字段注入请求。
 
 skill-discovery 场景覆盖默认目录的“浏览b站”和直接 URL、已加载浏览不重载、访问失败不重试、普通网站知识不联网及未提供的视频控制。用例不把 Skill ID 写入用户输入；必需调用、轮次隔离、次数和 Task 状态仅用于评分。Web 返回值由执行替身提供，实际模型回复的能力边界仍需审阅证据。

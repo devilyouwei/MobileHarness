@@ -288,10 +288,10 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     }
 
     /// Agent-owned text expansion. Speech text is replaced with an audioID before Gateway admission.
-    public nonisolated static func mapText(_ text: String, channel: String?) throws -> [GenerationEvent] {
+    public nonisolated static func mapText(_ text: String) throws -> [GenerationEvent] {
         [
             .action(
-                ActionCall(actionPath: playback.path, channel: channel ?? playback.channel, parameters: ["text": text])),
+                ActionCall(actionPath: playback.path, channel: playback.channel, parameters: ["text": text])),
             .action(try caption.call(["text": text])),
         ]
     }
@@ -1861,7 +1861,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                 }
                 do {
                     try Task.checkCancellation()
-                    call = try Self.playback.call(["audioID": request.audioID], channel: original.channel)
+                    call = try Self.playback.call(["audioID": request.audioID])
                     guard try emitAction(call, for: input, modelGenerated: modelGenerated) else {
                         throw HarnessError.queueFull
                     }

@@ -643,7 +643,7 @@ func storageSyntheticWriterUIFixture() async throws {
     }
     #expect(try previews.snapshot(scope: "history").revision == revision)
     #expect(try await media.albumPage().items.isEmpty)
-    let saved = try await previews.dispose(photo, save: true)
+    let saved = try await previews.save(photo)
     #expect(try previews.snapshot(scope: "history").images.isEmpty)
     #expect(try await workflow.imageData(photo, for: detailIDs[0]) == Data([9]))
     try await previews.close()

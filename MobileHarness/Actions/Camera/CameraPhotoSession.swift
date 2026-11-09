@@ -74,30 +74,19 @@ import FunctionContracts
             _ = await photoTask?.result
             _ = await photoCommand?.result
         }
-        public func ignorePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt
-        {
-            try await dispose(id, save: false, invocation: invocation)
-        }
         public func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
-            try await dispose(id, save: true, invocation: invocation)
-        }
-        private func dispose(_ id: String?, save: Bool, invocation: any FunctionInput) async throws
-            -> CameraPhotoCommandReceipt
-        {
             try Task.checkCancellation()
             guard foreground else { throw CameraControlError.notForeground }
             guard photoTask == nil, photoCommand == nil else { throw CameraControlError.busy }
             guard let id else { throw CameraControlError.photoUnavailable }
             let task = Task<CameraPhotoCommandReceipt, Error> {
-                let receipt = try await previews.dispose(id, save: save)
-                if save {
-                    presentation.present(.savedPreviewID(id))
-                    presentation.present(.savedMediaID(receipt.mediaID))
-                }
+                let receipt = try await previews.save(id)
+                presentation.present(.savedPreviewID(id))
+                presentation.present(.savedMediaID(receipt.mediaID))
                 var issues: [String] = []
                 if !receipt.alreadySaved {
                     issues = await PhotoDispositionWorkflow.feedback {
-                        try await dispositionFeedback(save: save, invocation: invocation)
+                        try await saveFeedback(invocation: invocation)
                     }
                 }
                 return .init(
@@ -117,7 +106,7 @@ import FunctionContracts
             }
         }
 
-        private func dispositionFeedback(save: Bool, invocation: any FunctionInput) async throws {
+        private func saveFeedback(invocation: any FunctionInput) async throws {
             photoFeedbackContext = invocation.context
             defer { photoFeedbackContext = nil }
             guard
@@ -128,7 +117,7 @@ import FunctionContracts
             let child = FunctionInvocation(
                 call: FunctionRequest(
                     actionPath: definition.path,
-                    parameters: ["cue": save ? "save" : "discard", "volume": "0.85"]),
+                    parameters: ["cue": "save", "volume": "0.85"]),
                 context: invocation.context, executionID: UUID().uuidString, results: ActionReportStore())
             let completion = try await FunctionExecutor.perform(child, definition: definition)
             if case .report(let report) = completion, report.hasFailures || report.isCancelled {
@@ -139,7 +128,7 @@ import FunctionContracts
         public func playCue(_ request: UIActions.CueRequest, invocation: any FunctionInput) async throws {
             try Task.checkCancellation()
             guard foreground, photoCommand != nil, photoFeedbackContext == invocation.context,
-                request.cue == .save || request.cue == .discard
+                request.cue == .save
             else { throw CancellationError() }
             let samples = try await Task.detached(priority: .userInitiated) { try FeedbackTone.samples(for: request) }
                 .value

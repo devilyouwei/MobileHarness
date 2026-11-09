@@ -29,7 +29,6 @@ flowchart LR
 | --- | --- |
 | [FunctionToken.swift](FunctionToken.swift) | 解析事件、CallRejection、GenerationError 与调度边界值 |
 | [FunctionTokenParser.swift](FunctionTokenParser.swift) | 增量 UTF-8／XML 词法、实体与资源限制 |
-| [ChannelParser.swift](ChannelParser.swift) | 嵌套 Channel／wait 作用域及调度顺序 |
 | [SentenceFunctionBuffer.swift](SentenceFunctionBuffer.swift) | 句子／安全词边界与首段／后续软长度分段 |
 | [AgentGenerator.swift](AgentGenerator.swift) | 文本映射、Action 目录解析及有序输出事件 |
 | [ToolCallParser.swift](ToolCallParser.swift) | 完整 native 调用的字符串参数 JSON 校验与解析 |
@@ -42,7 +41,7 @@ flowchart LR
 ```mermaid
 flowchart LR
  S["UTF-8 fragments"]:::host
- P["FunctionTokenParser／ChannelParser"]:::host
+ P["FunctionTokenParser"]:::host
  B["SentenceFunctionBuffer"]:::host
  R["AgentGenerator：映射／目录解析"]:::host
  N["ToolCallParser：native 参数 JSON"]:::host
@@ -65,17 +64,17 @@ flowchart LR
 
 ## Syntax and ordering
 
-Function Token protocol is natural text plus restricted XML without a document root. FunctionToken is a parsed event, not a model token/network fragment/character. Self-closing Action tags resolve aliases; paired `<channel.Name>` scopes change default routing; paired `<wait>` scopes emit begin/end scheduling. Paired Actions, self-closing Channels/waits, attributes on scopes and crossing lexical scopes reject.
+Function Token protocol is natural text plus restricted XML without a document root. FunctionToken is a parsed event, not a model token/network fragment/character. Self-closing Action tags resolve aliases; paired `<wait>` scopes emit begin/end scheduling. Paired Actions, self-closing waits, attributes on scopes and crossing lexical scopes reject.
 
 ```xml
 <express emotion="happy"/>
 Hello.
-<wait><channel.Robot><moveMotor motor="1" target="0"/></channel.Robot></wait>
+<wait><moveMotor motor="1" target="0"/></wait>
 ```
 
 Literal `<` and `&` in natural text must be escaped. Quoted attributes support the five predefined XML entities and valid numeric character references; decoded markup is not parsed again. Duplicate attributes, comments, DOCTYPE, CDATA and processing instructions reject. Internal permissions never create XML aliases. Model tokens, received fragments, parsed FunctionTokens and emitted calls have independent boundaries.
 
-Examples illustrate syntax; aliases/parameters must be declared by the caller. Scope boundaries flush preceding text. Closing a nested Channel restores its parent; outer close restores per-function defaults. No Channel has implicit blocking meaning. Wait preserves each Action's effective Channel and synchronizes its parent's preceding work and continuation. Already completed tags can emit before scope closure; XML completion is not effect completion.
+Examples illustrate syntax; aliases/parameters must be declared by the caller. Wait boundaries flush preceding text. Each Action and text mapping uses its registered Channel. No Channel has implicit blocking meaning. Wait preserves each Action's registered Channel and synchronizes its parent's preceding work and continuation. Already completed tags can emit before scope closure; XML completion is not effect completion.
 
 ## Bounds and errors
 
@@ -88,9 +87,9 @@ Examples illustrate syntax; aliases/parameters must be declared by the caller. S
 | Pending sentence text | 2000 UTF-8 bytes, independent of soft character limits |
 | Native argument JSON | No fixed byte ceiling; string values only |
 
-UTF-8 decoding handles arbitrary byte boundaries. Text segmentation uses sentence/safe-word boundaries and explicit soft limits of 1–2000 Characters; no timer flush exists. Text mapping returns at most eight ordered events per chunk; generation permits 120 calls. Wait count is 32 and combined lexical depth eight. Native Tool parsing is separate and creates no XML aliases or Channel/wait membership.
+UTF-8 decoding handles arbitrary byte boundaries. Text segmentation uses sentence/safe-word boundaries and explicit soft limits of 1–2000 Characters; no timer flush exists. Text mapping returns at most eight ordered events per chunk; generation permits 120 calls. Wait count is 32 and wait nesting depth eight. Native Tool parsing is separate and creates no XML aliases or Channel/wait membership.
 
-XML Action resolution discards undeclared attributes after raw input bounds validation; syntax parsing rejects duplicate attributes and enforces the limits above. Unknown aliases and invalid/missing required parameters produce ordered non-executable CallRejection and continue, counting toward the call bound. Malformed XML, forbidden Channels, resource limits and cancellation terminate parsing. Finish flushes only normal completion; failed/cancelled models do not finish partial syntax or replay emitted effects.
+XML Action resolution discards undeclared attributes after raw input bounds validation; syntax parsing rejects duplicate attributes and enforces the limits above. Unknown aliases and invalid/missing required parameters produce ordered non-executable CallRejection and continue, counting toward the call bound. Malformed XML, resource limits and cancellation terminate parsing. Finish flushes only normal completion; failed/cancelled models do not finish partial syntax or replay emitted effects.
 
 GenerationTrace retains exact raw fragments up to 256 KiB/8192 fragments, including empties, without eviction. It retains the first parse error/location, stops interpretation and continues bounded raw collection. append throwing does not partially recover events. Trace retains ordered action/rejection/wait events and owns no worker, persistence or dispatch.
 

@@ -4,7 +4,7 @@ import Synchronization
 
 /// A session-scoped ordered image store. Consumers own selection and disposition policy.
 public final class PreviewImageCache: Sendable {
-    public enum Disposition: String, Codable, Sendable { case pending, ignored, saved }
+    public enum Disposition: String, Codable, Sendable { case pending, saved }
     public struct Entry: Sendable, Equatable {
         public let id: String
         public let bytes: Int

@@ -167,7 +167,7 @@ private actor SkillModel: ChatCapability {
                 } else {
                     switch round {
                     case 5, 7:
-                        let alias = round == 7 && followUpAlias == "discardPhoto" ? "ignorePhoto" : followUpAlias
+                        let alias = followUpAlias
                         let parameters = alias == "closeCamera" ? "" : " previewID=\"\(mediaID)\""
                         output = "<\(alias)\(parameters)/>"
                     case 6: output = "<loadSkills skills='[\"photography\"]'/>"
@@ -237,9 +237,8 @@ private actor SkillEffects {
         currentPhoto = id
         return id
     }
-    func resolvePhoto(_ id: String?, discard: Bool) throws {
+    func resolvePhoto(_ id: String?) throws {
         guard id != nil && id == currentPhoto else { throw CommunicationError.invalidPayload }
-        if discard { currentPhoto = nil }
     }
     func performed(_ path: String) { paths.append(path) }
     func capture(_ owner: String) { owners.append(owner) }
@@ -340,7 +339,7 @@ private func photographyAcceptance(
     let input = InputGateway(manager: manager)
     let effects = SkillEffects()
     let definitions = [
-        "Camera.Capture.takePhoto", "Camera.Capture.savePhoto", "Camera.Capture.ignorePhoto", "Camera.Capture.open",
+        "Camera.Capture.takePhoto", "Camera.Capture.savePhoto", "Camera.Capture.open",
         "Camera.Capture.close", "Camera.Capture.flip", "Camera.Capture.retry", "NexArm.Gesture.nodHead",
         "NexArm.Gesture.waveWrist", "UI.Caption.beginReplyTurn", "UI.Caption.print",
         "Speech.Playback.speak", "UI.Expression.express",
@@ -371,9 +370,9 @@ private func photographyAcceptance(
                     let captureCount = await effects.paths.filter { $0 == "Camera.Capture.takePhoto" }.count
                     if path == "Camera.Capture.takePhoto" && (live || captureCount > 1) {
                         id = await effects.newPhoto()
-                    } else if live && ["Camera.Capture.savePhoto", "Camera.Capture.ignorePhoto"].contains(path) {
+                    } else if live && ["Camera.Capture.savePhoto"].contains(path) {
                         id = try #require(invocation.call.parameters["previewID"])
-                        try await effects.resolvePhoto(id, discard: path == "Camera.Capture.ignorePhoto")
+                        try await effects.resolvePhoto(id)
                     } else {
                         id = photo
                     }
@@ -384,15 +383,14 @@ private func photographyAcceptance(
                             fact.savedMediaID = id
                             fact.displayedMediaID = nil
                         }
-                        if path == "Camera.Capture.ignorePhoto" { fact.displayedMediaID = nil }
                         state = fact
                     }
-                    if live && ["Camera.Capture.savePhoto", "Camera.Capture.ignorePhoto"].contains(path) {
+                    if live && ["Camera.Capture.savePhoto"].contains(path) {
                         return .value(
                             String(
                                 decoding: try JSONEncoder().encode(
                                     CameraPhotoCommandReceipt(
-                                        previewID: id, state: path == "Camera.Capture.savePhoto" ? .saved : .ignored)),
+                                        previewID: id, state: .saved)),
                                 as: UTF8.self))
                     }
                     return .value(
@@ -534,10 +532,7 @@ private func photographyAcceptance(
                         request.messages.last?.content.contains("\"action\":\"loadSkills\"") != true
                     })
             }
-            let path =
-                ["discardPhoto", "ignorePhoto"].contains(alias)
-                ? "Camera.Capture.ignorePhoto"
-                : (alias == "closeCamera" ? "Camera.Capture.close" : "Camera.Capture.savePhoto")
+            let path = alias == "closeCamera" ? "Camera.Capture.close" : "Camera.Capture.savePhoto"
             #expect(
                 await effects.paths.filter { $0.hasPrefix("Camera.") } == [
                     "Camera.Capture.open", "Camera.Capture.takePhoto", path,
@@ -592,9 +587,9 @@ private func photographyAcceptance(
             return completed == 2 || failures.contains { $0.hasPrefix("agent.error:") }
         }
         let paths = await effects.paths
-        let firstIgnore = try #require(paths.firstIndex(of: "Camera.Capture.ignorePhoto"))
+        let firstCapture = try #require(paths.firstIndex(of: "Camera.Capture.takePhoto"))
         let secondCapture = try #require(paths.lastIndex(of: "Camera.Capture.takePhoto"))
-        #expect(firstIgnore < secondCapture)
+        #expect(firstCapture < secondCapture)
     }
     if replaceForeground {
         _ = try await manager.receiveLocally(
@@ -650,8 +645,8 @@ private func photographyAcceptance(
         saved.state.skillState?.tasks.last?.inputIDs.first == first.id
             && saved.state.skillState?.tasks.last?.inputIDs.last == second.id)
     #expect(await effects.owners.allSatisfy { $0 == "assistant" })
-    #expect(await effects.owners.count == (live && run == 2 ? 4 : 2))
-    if live && run == 1 { #expect(await effects.paths.contains("Camera.Capture.ignorePhoto")) }
+    #expect(await effects.owners.count == (live && run == 2 ? 3 : (live && run == 1 ? 1 : 2)))
+    if live && run == 1 { #expect(await effects.paths.contains("Camera.Capture.close")) }
     var archive = try await store.snapshot()
     if let persistentRecords {
         archive.current = try await AssistantRecordStore(
@@ -1232,12 +1227,12 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
         let attributes = arguments.sorted { $0.key < $1.key }.map { "\($0.key)=\"\($0.value)\"" }.joined(separator: " ")
         let tokens = try parser.append("<\(alias) \(attributes)/>") + parser.finish()
         #expect(tokens.count == 1)
-        guard case .action(let parsedAlias, let parameters, let channel) = tokens[0] else {
+        guard case .action(let parsedAlias, let parameters) = tokens[0] else {
             Issue.record("Expected a parsed Action")
             continue
         }
         #expect(
-            try registry.resolveAction(parsedAlias, parameters: parameters, channel: channel).actionPath.description
+            try registry.resolveAction(parsedAlias, parameters: parameters).actionPath.description
                 == path)
     }
     for alias in ["ModelResources.snapshot", "Provider.readSettings", "Bluetooth.readStatus"] {
@@ -1263,7 +1258,6 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
     let photo = "preview_1"
     for (alias, parameters) in [
         ("takePhoto", [:]), ("savePhoto", ["previewID": photo]),
-        ("ignorePhoto", ["previewID": photo]),
     ] {
         let call = try registry.resolveAction(alias, parameters: parameters)
         #expect(call.channel == "Camera")
@@ -1531,12 +1525,12 @@ func terminalTaskCompressionKeepsChronologyAndAllSourceEvidence(status: String) 
     #expect(retained.history.current.turns.first?.raw == "done")
 }
 
-@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: ["savePhoto", "discardPhoto", "closeCamera"])
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: ["savePhoto", "closeCamera"])
 func cameraFollowUpReplansRejectedAliasAfterTemporarySkillExpires(alias: String) async throws {
     try await photographyAcceptance(live: false, captureOnly: true, followUpAlias: alias, expireBeforeFollowUp: true)
 }
 
-@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: ["savePhoto", "ignorePhoto", "closeCamera"])
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: ["savePhoto", "closeCamera"])
 func cameraFollowUpReusesSkillAcrossUserDecisions(alias: String) async throws {
     try await photographyAcceptance(live: false, captureOnly: true, followUpAlias: alias)
 }

@@ -229,11 +229,6 @@
             try await photos.read(
                 id, owner: .init(namespace: "photos", source: source, session: sessionID, input: inputID))
         }
-        public func ignorePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt
-        {
-            try validatePreview(invocation)
-            return try await photoSession.ignorePhoto(id, invocation: invocation)
-        }
         public func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
             try validatePreview(invocation)
             return try await photoSession.savePhoto(id, invocation: invocation)
@@ -359,7 +354,7 @@
                 let choice = try await windows.ask(
                     item.id,
                     prompt: .init(
-                        title: "还有 \(pending) 张照片未保存或忽略，关闭后将清空预览。",
+                        title: "还有 \(pending) 张照片未保存，关闭后将清空预览。",
                         choices: [.init(id: "return", title: "返回查看"), .init(id: "clear", title: "关闭并清空")]))
                 guard choice == "clear" else { throw CancellationError() }
             }

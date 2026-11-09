@@ -22,9 +22,9 @@ import Testing
     ui.present(
         .gallery(
             "first",
-            [.init(id: "preview_1", status: "ignored"), .init(id: "preview_2", status: "saved", mediaID: "media_1")]))
+            [.init(id: "preview_1", status: "pending"), .init(id: "preview_2", status: "saved", mediaID: "media_1")]))
     #expect(ui.snapshot.previews.count == 2)
-    #expect(ui.snapshot.previews.first?.status == "ignored")
+    #expect(ui.snapshot.previews.first?.status == "pending")
     ui.present(.gallery(nil, []))
     #expect(ui.snapshot.gallerySession == nil && ui.snapshot.previews.isEmpty)
 }

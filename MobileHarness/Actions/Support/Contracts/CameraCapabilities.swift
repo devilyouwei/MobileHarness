@@ -46,7 +46,7 @@ public struct CameraPhotoReceipt: Codable, Sendable, Equatable {
     }
 }
 public struct CameraPhotoCommandReceipt: Codable, Sendable, Equatable {
-    public enum State: String, Codable, Sendable { case saved, ignored }
+    public enum State: String, Codable, Sendable { case saved }
     public let previewID: String
     public let mediaID: String?
     public let state: State
@@ -105,7 +105,6 @@ public protocol CameraControlCapability: Sendable {
     func setPerceptionEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws
     func flipPerception(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws
     func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt
-    func ignorePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt
     func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt
     func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws
@@ -129,7 +128,7 @@ public enum CameraControlError: Error, Equatable, Sendable, ActionExecutionFailu
         case .permissionDenied: "未获得所需权限，请在系统设置中允许"
         case .unavailable: "相机或照片能力暂不可用"
         case .lensNotOwned: "请使用当前最上层的相机画面切换镜头"
-        case .photoUnavailable: "这张照片已被忽略或替换，当前没有可操作的照片"
+        case .photoUnavailable: "这张照片不在当前相机会话缓存中，无法操作"
         }
     }
     public var executionFailureCode: ActionExecutionFailureCode {
@@ -175,9 +174,6 @@ extension CameraControlCapability {
         throw CameraControlError.unavailable
     }
     public func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
-        throw CameraControlError.unavailable
-    }
-    public func ignorePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
         throw CameraControlError.unavailable
     }
     public func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt {

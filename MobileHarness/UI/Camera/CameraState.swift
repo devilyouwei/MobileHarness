@@ -274,7 +274,6 @@ public protocol CameraControlling: AnyObject {
     func switchPerceptionCamera()
     func retry()
     func savePhoto(_ id: String)
-    func ignorePhoto(_ id: String)
 }
 
 public enum CameraPresentationUpdate {

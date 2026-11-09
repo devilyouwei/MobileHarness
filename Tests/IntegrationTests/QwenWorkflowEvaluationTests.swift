@@ -290,16 +290,15 @@ private actor QwenEffects {
                     return .value(#"{"status":"uncertain","captureMayHaveOccurred":true,"doNotReplay":true}"#)
                 }
                 return .value(#"{"mediaID":"\#(id)","width":640,"height":480}"#)
-            case "savePhoto", "ignorePhoto":
+            case "savePhoto":
                 let id = try facts.camera.read().displayedMediaID
                 guard id != nil, id == args["mediaID"] else { throw CameraControlError.photoUnavailable }
                 if scenario.failure == "saveFailure" { throw QwenEvalError.syntheticFailure }
-                let saved = invocation.call.actionPath.function == "savePhoto"
                 try facts.change {
-                    if saved { $0.savedMediaID = id }
+                    $0.savedMediaID = id
                     $0.displayedMediaID = nil
                 }
-                var receipt: [String: Any] = ["mediaID": id ?? "", "state": saved ? "saved" : "ignored"]
+                var receipt: [String: Any] = ["mediaID": id ?? "", "state": "saved"]
                 if scenario.failure == "saveFeedback" { receipt["feedbackIssues"] = ["animationFailed"] }
                 return .value(try Self.json(receipt))
             default: throw QwenEvalError.fixture

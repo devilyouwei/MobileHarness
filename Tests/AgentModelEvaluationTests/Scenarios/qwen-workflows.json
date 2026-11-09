@@ -126,8 +126,7 @@
           "forbidden": [
             "task.start",
             "task.end",
-            "savePhoto",
-            "ignorePhoto"
+            "savePhoto"
           ],
           "task": false,
           "counts": {
@@ -155,8 +154,7 @@
             "task.start",
             "openCamera",
             "task.end",
-            "savePhoto",
-            "ignorePhoto"
+            "savePhoto"
           ],
           "counts": {
             "takePhoto": 1
@@ -173,7 +171,7 @@
       "category": "photography",
       "turns": [
         {
-          "user": "帮我拍张照片，拍好后让我选择保存还是忽略。",
+          "user": "帮我拍张照片，拍好后让我选择保存还是关闭。",
           "required": [
             "task.start",
             "openCamera",
@@ -211,7 +209,7 @@
       ]
     },
     {
-      "id": "photo-ignore-workflow",
+      "id": "photo-close-workflow",
       "category": "photography",
       "turns": [
         {
@@ -223,9 +221,9 @@
           "task": true
         },
         {
-          "user": "忽略这张。",
+          "user": "不保存照片了，关闭相机。",
           "required": [
-            "ignorePhoto",
+            "closeCamera",
             "task.end"
           ],
           "forbidden": [
@@ -244,7 +242,6 @@
         {
           "user": "重拍这张。",
           "required": [
-            "ignorePhoto",
             "takePhoto"
           ],
           "forbidden": [
@@ -252,14 +249,7 @@
             "task.end"
           ],
           "ordered": [
-            "ignorePhoto",
             "takePhoto"
-          ],
-          "separateRounds": [
-            [
-              "ignorePhoto",
-              "takePhoto"
-            ]
           ],
           "task": true,
           "counts": {
@@ -285,7 +275,7 @@
       ],
       "cameraEnabled": true,
       "preview": "media_41",
-      "taskGoal": "拍照并让用户选择保存或忽略"
+      "taskGoal": "拍照并让用户选择保存或关闭"
     },
     {
       "id": "standalone-save-preview",
@@ -316,19 +306,15 @@
       "preview": "media_41"
     },
     {
-      "id": "standalone-ignore-preview",
+      "id": "standalone-close-preview",
       "category": "photography",
       "turns": [
         {
-          "user": "忽略当前照片。",
+          "user": "不保存照片了，关闭相机。",
           "required": [
-            "ignorePhoto"
+            "closeCamera"
           ],
-          "parameters": {
-            "ignorePhoto": {
-              "mediaID": "media_41"
-            }
-          },
+          "parameters": {},
           "forbidden": [
             "task.start",
             "task.end",
@@ -350,7 +336,6 @@
           "user": "保存这张照片。",
           "forbidden": [
             "savePhoto",
-            "ignorePhoto",
             "takePhoto",
             "task.start"
           ]
@@ -454,8 +439,7 @@
             "savePhoto": 1
           },
           "forbidden": [
-            "takePhoto",
-            "ignorePhoto"
+            "takePhoto"
           ]
         }
       ],
@@ -506,8 +490,7 @@
             "takePhoto": 1
           },
           "forbidden": [
-            "savePhoto",
-            "ignorePhoto"
+            "savePhoto"
           ]
         }
       ],
@@ -658,7 +641,7 @@
           "task": false
         },
         {
-          "user": "再帮我拍一张，拍好后我再决定保存还是忽略。",
+          "user": "再帮我拍一张，拍好后我再决定保存还是关闭。",
           "required": [
             "task.start",
             "takePhoto"
@@ -687,7 +670,6 @@
           ],
           "forbidden": [
             "closeCamera",
-            "ignorePhoto",
             "savePhoto"
           ],
           "unloaded": [
@@ -957,7 +939,6 @@
         {
           "user": "删除手机相册里所有照片。",
           "forbidden": [
-            "ignorePhoto",
             "savePhoto",
             "takePhoto",
             "task.start"
@@ -1362,7 +1343,6 @@
             "task.cancel",
             "releaseSkills",
             "takePhoto",
-            "ignorePhoto",
             "savePhoto"
           ]
         },
@@ -1377,7 +1357,6 @@
             "task.cancel",
             "releaseSkills",
             "takePhoto",
-            "ignorePhoto",
             "savePhoto"
           ]
         },
@@ -1392,7 +1371,6 @@
             "task.cancel",
             "releaseSkills",
             "takePhoto",
-            "ignorePhoto",
             "savePhoto"
           ]
         },
@@ -1407,7 +1385,6 @@
             "task.cancel",
             "releaseSkills",
             "takePhoto",
-            "ignorePhoto",
             "savePhoto"
           ]
         },
@@ -1422,7 +1399,6 @@
             "task.cancel",
             "releaseSkills",
             "takePhoto",
-            "ignorePhoto",
             "savePhoto"
           ]
         },
@@ -1497,7 +1473,6 @@
             "History.list",
             "task.start",
             "savePhoto",
-            "ignorePhoto",
             "takePhoto"
           ]
         }
@@ -1735,7 +1710,7 @@
       "skills": [
         "photography"
       ],
-      "taskGoal": "拍照并等待用户决定保存或忽略"
+      "taskGoal": "拍照并等待用户决定保存或关闭"
     },
     {
       "id": "robot-right-90",

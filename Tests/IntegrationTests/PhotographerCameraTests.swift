@@ -29,10 +29,6 @@ private actor CameraProbe {
         guard photoVisible, id == nil || id == previewID else { throw CameraControlError.photoUnavailable }
         operations.append(operation)
         sources.append(source)
-        if operation == .ignorePhoto {
-            photoVisible = false
-            return .init(previewID: previewID, state: .ignored)
-        }
         if failSave {
             failSave = false
             throw CameraControlError.permissionDenied
@@ -106,9 +102,6 @@ private actor CameraBridge: CameraControlCapability {
     func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
         try await photo(.savePhoto, id: id, invocation: invocation)
     }
-    func ignorePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
-        try await photo(.ignorePhoto, id: id, invocation: invocation)
-    }
     private func photo(_ operation: PhotographerCameraIntent.Operation, id: String?, invocation: any FunctionInput)
         async throws -> CameraPhotoCommandReceipt
     {
@@ -174,7 +167,7 @@ private struct CameraFixture {
         let bindings = CameraModule(camera: bridge).definitions.map {
             ActionBinding(
                 function: $0,
-                protocols: ["savePhoto", "ignorePhoto"].contains($0.path.function) ? [.action, .tool] : [.tool],
+                protocols: ["savePhoto"].contains($0.path.function) ? [.action, .tool] : [.tool],
                 executionPolicy: .direct, directResultPolicy: .returning)
         }
         let tools = try ToolRegistry(modules: [CameraTools(definitions: bindings)])
@@ -367,12 +360,9 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
     #expect(try JSONDecoder().decode(CameraPhotoCommandReceipt.self, from: Data(repeated.utf8)).alreadySaved)
     #expect(await fixture.probe.exports == 1)
     await #expect(throws: PhotographerIntentFailure.self) {
-        try await fixture.runtime.perform(.ignorePhoto, previewID: UUID().uuidString)
+        try await fixture.runtime.perform(.savePhoto, previewID: UUID().uuidString)
     }
     #expect(await fixture.probe.photoVisible)
-    let ignored = try #require(try await fixture.runtime.perform(.ignorePhoto, previewID: id))
-    #expect(try JSONDecoder().decode(CameraPhotoCommandReceipt.self, from: Data(ignored.utf8)).state == .ignored)
-    #expect(await fixture.probe.photoVisible == false)
     await #expect(throws: PhotographerIntentFailure.self) { try await fixture.runtime.perform(.savePhoto) }
     try await fixture.runtime.perform(.open)
     #expect(await fixture.probe.sources.allSatisfy { $0 == "photographer" })
@@ -384,7 +374,7 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
     try await fixture.runtime.prepareForInteraction()
     let caller = fixture.runtime.agent
     let capabilities = caller.descriptor.capabilities
-    for (alias, state) in [("savePhoto", CameraPhotoCommandReceipt.State.saved), ("ignorePhoto", .ignored)] {
+    for (alias, state) in [("savePhoto", CameraPhotoCommandReceipt.State.saved)] {
         let input = AgentInput(
             id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text(alias))
         let call = try capabilities.resolveAction(
@@ -409,7 +399,7 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
         #expect(try JSONDecoder().decode(CameraPhotoCommandReceipt.self, from: Data(raw.utf8)).state == state)
     }
     #expect(await fixture.probe.exports == 1)
-    #expect(await fixture.probe.photoVisible == false)
+    #expect(await fixture.probe.photoVisible)
     await fixture.runtime.shutdown()
 }
 

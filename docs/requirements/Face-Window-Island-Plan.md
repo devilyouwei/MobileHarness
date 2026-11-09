@@ -709,7 +709,7 @@ flowchart LR
 
 ### Action / State 与界面入口
 
-- 保留 Camera.Capture.open/close/flip/retry/takePhoto/savePhoto/ignorePhoto，语义限定拍摄用途；UI.Window 生命周期调用只增减对应窗口需求。enabled 明确指该用途，硬件 running 独立报告。
+- 保留 Camera.Capture.open/close/flip/retry/takePhoto/savePhoto，语义限定拍摄用途；UI.Window 生命周期调用只增减对应窗口需求。enabled 明确指该用途，硬件 running 独立报告。
 - 建议新增 Camera.Perception.open/close/retry 作为背景视觉入口，避免将具体 YOLO 模型名固化到 Action 路径。按现有 @Action、纯 preflight、显式 Module/Capability 绑定、协议策略、Skill 声明及测试流程开发，不增加绕过 Gateway 的 UI 设备控制。
 - Face 相机按钮继续打开拍摄窗口；新增独立“视觉/跟随”开关控制背景及默认跟随。既有视觉/跟踪业务显式申请背景视觉用途，不再靠打开拍摄窗口顺带启动 YOLO。两个入口均可独立启动 Camera，未启用的另一用途保持关闭。
 - 提示词将“打开视觉、开启跟随、人物跟随、姿态跟随”等意图归入背景视觉入口；该入口接纳默认跟随意图。将“打开拍摄、打开拍照、拍摄照片”等归入 Camera.Capture；“拍摄视频”归入后续录像入口，录像尚未实现时明确说明不可用，不能借用视觉/跟随入口假装录制。仅请求拍照/录像不能隐式开启背景视觉或跟随；用户明确要求“跟随拍摄”等组合行为时才组合两路。“关闭视觉/停止跟随”撤销背景用途，不关闭拍摄窗口；“关闭拍摄”不撤销背景用途。

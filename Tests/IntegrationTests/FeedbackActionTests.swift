@@ -81,7 +81,7 @@ func invalidHapticArgumentsNeverInvokeNativeEffect(_ arguments: [String: String]
     let cue = try #require(feedback.first { $0.path.function == "playCue" })
     #expect(
         cue.parameters.first { $0.name == "cue" }?.values == [
-            "wake", "confirm", "cancel", "error", "soft", "save", "discard",
+            "wake", "confirm", "cancel", "error", "soft", "save",
         ])
 }
 

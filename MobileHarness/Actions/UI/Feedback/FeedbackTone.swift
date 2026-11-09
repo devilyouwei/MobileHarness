@@ -1,7 +1,7 @@
 import Foundation
 import FunctionContracts
 
-/// Seven finite original PCM profiles; no system/private sound ID or user recording is packaged.
+/// Six finite original PCM profiles; no system/private sound ID or user recording is packaged.
 public enum FeedbackTone {
     public static let sampleRate = 48000
     private struct Voice {
@@ -63,7 +63,6 @@ public enum FeedbackTone {
                 Voice(frequency: 880, onset: 0.075, gain: 0.32, decay: 6),
                 Voice(frequency: 1318.5, onset: 0.14, gain: 0.16, decay: 8),
             ]
-        case .discard: return renderDiscard()
         }
         return (0..<Int((duration * Double(sampleRate)).rounded())).map { i in
             let t = Double(i) / Double(sampleRate)
@@ -79,27 +78,6 @@ public enum FeedbackTone {
                 return result + voice.gain * envelope * (sin(phase) + 0.035 * sin(2 * phase))
             }
             return Float(value * tail * 0.42)
-        }
-    }
-    private static func renderDiscard() -> [Float] {
-        let duration = 0.58
-        var seed: UInt32 = 0x4D48_5048
-        var filtered = 0.0
-        return (0..<Int((duration * Double(sampleRate)).rounded())).map { i in
-            let t = Double(i) / Double(sampleRate)
-            seed = seed &* 1_664_525 &+ 1_013_904_223
-            let noise = Double(seed) / Double(UInt32.max) * 2 - 1
-            filtered += 0.08 * (noise - filtered)
-            let attack = min(1, t / 0.018)
-            let fade = min(1, (duration - t) / 0.14)
-            let envelope = attack * attack * (3 - 2 * attack) * fade * fade * (3 - 2 * fade)
-            // Falling soft air, a crumpling noise burst and a small rounded bin-like click.
-            let sweepPhase = 2 * Double.pi * (180 * t + 1700 * (1 - exp(-9 * t)) / 9)
-            let air = filtered * (0.45 * exp(-4 * t) + 0.32 * exp(-pow((t - 0.24) / 0.065, 2)))
-            let falling = 0.18 * sin(sweepPhase) * exp(-6 * t)
-            let age = max(0, t - 0.31)
-            let click = t > 0.31 ? 0.1 * sin(2 * Double.pi * 240 * age) * exp(-60 * age) : 0
-            return Float((air + falling + click) * envelope * 0.42)
         }
     }
 }

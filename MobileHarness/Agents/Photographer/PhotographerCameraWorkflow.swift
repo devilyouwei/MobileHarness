@@ -11,13 +11,13 @@ struct PhotographerCameraWorkflow {
     private var pending: Pending?
     private(set) var lastResult: ToolResult?
     private static let permissions = [
-        "open", "close", "flip", "retry", "takePhoto", "savePhoto", "ignorePhoto", "configure", "cancelCapture",
+        "open", "close", "flip", "retry", "takePhoto", "savePhoto", "configure", "cancelCapture",
     ].map {
         InternalTool(
             path: "Camera.Capture." + $0, required: $0 == "flip" ? ["facing"] : [],
             optional: $0 == "configure"
                 ? ["mode", "delaySeconds", "flash", "zoom", "durationSeconds"]
-                : $0 == "savePhoto" || $0 == "ignorePhoto" ? ["previewID"] : [])
+                : $0 == "savePhoto" ? ["previewID"] : [])
     }
     private static let videoPermissions = ["startRecording", "stopRecording", "saveVideo", "ignoreVideo"].map {
         InternalTool(

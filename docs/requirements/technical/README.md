@@ -1,5 +1,7 @@
 # 技术需求
 
+已完成：[删除 Channel 覆盖与照片忽略](../../completed/Remove-Channel-Override-And-Photo-Ignore.md)，包括配置、教学、UI和专用音效清理，以及固定路由、重拍保留与完整检查。
+
 - [BasicSkill 控制教学](BasicSkill-Control-Teaching.md)：Task / Skill 概念、上下文、动作效果、生效时机和失败语义的通用教学重组。
 
 - [按意图发现 Skill](Skill-Discovery-Before-Denial.md)：避免将未加载的浏览等能力误判为不支持，覆盖加载前教学与模型回归。

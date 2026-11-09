@@ -114,3 +114,5 @@
 - [前台任务启动加载 Skill](Task-Start-Initial-Skills.md)（2026-11-08）：单次 task.start 携带必要 Skill 的教学、单项/多项示例与下一轮能力可用性回归。
 
 - [Writer 记录分页](Writer-Record-Pagination.md)：准确末页与导航返回保留；完整自动检查和 iOS 构建通过，原生交互另行复验。
+
+- [删除 Channel 覆盖与照片忽略](Remove-Channel-Override-And-Photo-Ignore.md)（2026-11-09）：固定注册 Channel，删除照片忽略 Action/UI/缓存状态/音效/教学；完整检查和四项 iOS 构建通过。

@@ -76,8 +76,6 @@ import Foundation
                             Spacer(minLength: 0)
                             Button(item.status == "saved" ? "已保存" : "保存") { controls.savePhoto(item.id) }
                                 .disabled(camera.photoBusy || camera.controlBusy || item.status == "saved")
-                            Button(item.status == "ignored" ? "已忽略" : "忽略") { controls.ignorePhoto(item.id) }
-                                .disabled(camera.photoBusy || camera.controlBusy || item.status != "pending")
                             Spacer(minLength: 0)
                             Button {
                                 page(1)

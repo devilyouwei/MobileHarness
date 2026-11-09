@@ -24,7 +24,7 @@
 | ListeningActivationTests / ListeningCaptureWorkflowTests | 能力/权限准备→首帧收音→并行 cue/haptic、阶段失败保留实际效果、取消 join、同意/占用、半双工与快速切换 |
 | NativeInteractionWorkflowTests | UI 手势到 root intent、角色/会话围栏与取消；相机请求失活明确提示重试，保留已保存照片事实 |
 | CameraVisionRestartTests | camera/vision 代际替换、取消加入、失效回调和重启次序 |
-| PhotoDispositionWorkflowTests | 保存/忽略提交后的反馈失败与取消，不撤销已发生效果 |
+| PhotoDispositionWorkflowTests | 保存提交后的反馈失败与取消，不撤销已发生效果 |
 | HomeEffectsTests | notice/light/caption 的 owner、替换、时限及纯取消展示 |
 
 所有 façade 只观察注入的结果，不查询/拼装未授权的底层能力。偏好提交后的应用失败保留真实持久化结果；错误处理和状态轮询不得隐式重放效果。Root-owned 操作独立于页面，取消和替换必须加入实际清理。

@@ -152,3 +152,5 @@ refactor, Agent-only model recording, current-file recovery and automated/build/
 - [task_7 委托分组调查](Writer-Task7-Delegation-Diagnosis.md)：手机 SQLite 真实请求与虚假分组、顺序回落和归属回退证据。
 
 - [Writer 委托与 Workspace 解耦验证](Writer-Workspace-Separation.md)：真实 SQLite 回归、构建及独立原生页面验收。
+
+- [Channel override and photo-ignore removal](Remove-Channel-Override-And-Photo-Ignore.md): routing, retained reshoot previews, removed declarations/UI/cues and automated/build evidence.

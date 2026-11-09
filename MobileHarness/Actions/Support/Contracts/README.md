@@ -74,3 +74,5 @@ MultimodalContextSnapshot carries facts, revision and immutable ContextImage att
 PreviewImageID validates canonical positive numeric preview_N values for live calls and State. History decodes images exclusively from model request logs and does not resolve preview identifiers through live caches.
 
 MultimodalContextSnapshot.resourceBindings and ContextImage.resourceScope are private ownership metadata, distinct from model-facing facts/IDs. ActionExecutionContext carries resource bindings unchanged for domain validation. Camera live photo calls require a matching window-session scope; short preview labels alone are not authorization.
+
+CameraPhotoCommandReceipt represents a saved preview and optional feedback issues; CameraControlCapability exposes photo saving, with session expiry owned by Camera.

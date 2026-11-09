@@ -15,7 +15,7 @@ extension SpeechActions {
                 constraints: "Positive integer."),
             .init(
                 "cue", required: false, description: "Wake cue; default wake.",
-                values: ["wake", "confirm", "cancel", "error", "soft", "save", "discard"]),
+                values: ["wake", "confirm", "cancel", "error", "soft", "save"]),
             .init(
                 "volume", type: .number, required: false, description: "Cue gain; default 0.85.",
                 constraints: "Finite 0…1."),

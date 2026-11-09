@@ -199,8 +199,11 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     let config = try decode(root)
     #expect(config.capabilities.channels == ["screen", "main"])
     #expect(try config.capabilities.resolveAction("render", parameters: ["text": "Hi"]).channel == "screen")
+    let registered = try config.capabilities.resolveAction("render", parameters: ["text": "Hi"])
+    #expect(config.capabilities.permits(registered))
     #expect(
-        try config.capabilities.resolveAction("render", parameters: ["text": "Hi"], channel: "main").channel == "main")
+        !config.capabilities.permits(
+            ActionCall(actionPath: registered.actionPath, channel: "main", parameters: registered.parameters)))
     let actions = root["actions"] as! [String: [[String: Any]]]
     root["actions"] = ["screen": actions["screen"]!, "other": actions["screen"]!]
     #expect(throws: GenerationError.duplicateAlias) { try decode(root) }
@@ -215,7 +218,7 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     let prompt = try AssistantAgent.systemPrompt(capabilities: registry)
     #expect(prompt.contains("Available Channels: Control, Display, ListeningControl, Speech\n"))
     #expect(prompt.contains("Action express:"))
-    #expect(prompt.contains("Use listed default Channels."))
+    #expect(prompt.contains("Each Action uses its registered Channel."))
     #expect(!prompt.contains("Action dance:"))
     #expect(!prompt.contains("Action takePhoto:"))
     #expect(prompt.contains("# BasicSkill"))
@@ -314,7 +317,7 @@ func malformedNativeToolsFailExplicitly(_ mutation: String) throws {
     for count in [0, 9] {
         var invalid = AgentGenerator(
             capabilities: model,
-            textMapping: { _, _ in
+            textMapping: { _ in
                 Array(
                     repeating: GenerationEvent.action(
                         ActionCall(
@@ -336,9 +339,9 @@ func malformedNativeToolsFailExplicitly(_ mutation: String) throws {
     let action = InternalAction(
         domain: "UI", module: "Caption", function: "print", channel: "Display", required: ["text"])
     #expect(throws: GenerationError.invalidParameters) { try action.call() }
-    let registry = try CapabilityRegistry(internalActions: [action])
+    let registry = try CapabilityRegistry(channels: ["Other"], internalActions: [action])
     #expect(registry.permits(try action.call(["text": "Hi"])))
-    #expect(!registry.permits(try action.call(["text": "Hi"], channel: "unknown")))
+    #expect(!registry.permits(ActionCall(actionPath: action.path, channel: "Other", parameters: ["text": "Hi"])))
     #expect(
         !registry.permits(
             ActionCall(
@@ -412,7 +415,7 @@ func threeLevelConfigurationRejectsAmbiguousBindings(_ mutation: String) throws 
         #expect(!other.actions.contains { $0.path.domain == "NexArm" })
         for action in robot {
             #expect(throws: GenerationError.unknownCapability) {
-                try other.resolveAction(action.alias, parameters: [:], channel: "Robot")
+                try other.resolveAction(action.alias, parameters: [:])
             }
         }
     }
@@ -424,7 +427,7 @@ func threeLevelConfigurationRejectsAmbiguousBindings(_ mutation: String) throws 
 @Test(.actionCatalog) func photographerCameraModelCallsUseScheduledActions() throws {
     let capabilities = try AgentConfigurations.load(named: "Photographer").capabilities
     #expect(capabilities.tools.isEmpty)
-    for alias in ["openCamera", "closeCamera", "flipCamera", "retryCamera", "takePhoto", "savePhoto", "ignorePhoto"] {
+    for alias in ["openCamera", "closeCamera", "flipCamera", "retryCamera", "takePhoto", "savePhoto"] {
         let registration = try #require(capabilities.actions.first { $0.alias == alias })
         #expect(registration.defaultChannel == "Camera")
         #expect(registration.path.domain == "Camera")
@@ -449,7 +452,7 @@ func threeLevelConfigurationRejectsAmbiguousBindings(_ mutation: String) throws 
     }
     let controls = try AgentConfigurations.load(named: "ApplicationControl").capabilities
     #expect(
-        try controls.resolveAction("openPage", parameters: ["destination": "settings"], channel: nil).actionPath
+        try controls.resolveAction("openPage", parameters: ["destination": "settings"]).actionPath
             .description == "UI.Navigation.open")
 }
 

@@ -59,10 +59,6 @@ import FunctionContracts
         try validate(invocation)
         return try await camera.savePhoto(id, invocation: invocation)
     }
-    public func ignorePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
-        try validate(invocation)
-        return try await camera.ignorePhoto(id, invocation: invocation)
-    }
     public func loadPreviewImage(_ id: String, invocation: any FunctionInput) async throws -> String {
         try validate(invocation)
         return try await camera.loadPreviewImage(id, invocation: invocation)
