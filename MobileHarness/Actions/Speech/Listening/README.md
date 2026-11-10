@@ -29,7 +29,7 @@ VoiceSessionCoordinator is retained and cleaned by ActionsContainer. Voice outpu
 
 startListening / stopListening 由 @Action 声明并在 SpeechModule 显式绑定；参数校验位于能力调用前，可用于纯 preflight。VoiceSessionCoordinator.setListening 验证根会话、已启动与设置状态，经 VoicePerceptionHandling.setListening 取得权威 enabled/paused/revision，复用内部策略应用。revision 拒绝迟到快照；启动保留权限、反馈、清理加入及半双工屏障。
 
-stopListening 先撤销感知许可，再同步停止原生播放、失效采集代并屏蔽麦克风，返回前加入 cleanupTask（含既有清理、采集关闭与感知 closeCapture）。Action 关闭分支不调用 cancelReply，避免当前执行取消并等待自己；它不隐式关闭业务 Task。UI 手势、系统中断与生命周期原路径仍取消回复。取消不会恢复已撤销许可；后续回复活动和播放清理只能在许可有效时恢复采集。下一次启用由长按或用户明确要求的 startListening 发起。
+stopListening 先撤销感知许可，再同步停止原生播放、失效采集代并屏蔽麦克风，返回前加入 cleanupTask（含既有清理、采集关闭与感知 closeCapture）。Action 关闭分支不调用 cancelReply，避免当前执行取消并等待自己；它不隐式关闭业务 Task。UI 手势关闭与生命周期停机仍取消回复；系统音频中断只退役采集，保留回复。取消不会恢复已撤销许可；后续回复活动和播放清理只能在许可有效时恢复采集。下一次启用由长按或用户明确要求的 startListening 发起。
 
 明确关闭在未启动或已关闭时同样归一为“语音已停止”；内部策略停机保留已有失败诊断状态。
 
@@ -47,6 +47,14 @@ SpeechListening日志记录策略收到/应用的revision和enabled/paused、播
 
 ## 播放事实与展示归属
 
-VoiceNativeEffects在首个有效PCM和播放drain/失败清理边界加入activeChanged回调；VoiceSessionCoordinator将audioID和active沿VoiceSessionConnections传回SpeechSynthesis。回调不依赖页面和UI状态观察，不改变原始播放错误。频谱worker仍由播放器持有、取消并加入，通过专用UI端口更新平滑数值及清零；不逐帧提交Island Action。聆听激活的音效/震动仍与采集接纳共同完成，展示角色不能绕过原生资源与清理。
+VoiceNativeEffects在首个有效PCM和播放drain/失败清理边界加入activeChanged回调；VoiceSessionCoordinator将audioID和active沿VoiceSessionConnections传回Assistant的语音子能力。回调不依赖页面和UI状态观察，不改变原始播放错误。频谱worker仍由播放器持有、取消并加入，通过专用UI端口更新平滑数值及清零；不逐帧提交Island Action。聆听激活的音效/震动仍与采集接纳共同完成，展示角色不能绕过原生资源与清理。
 
 提示音参数使用共享 UIFeedbackTypes.Cue 的六项封闭枚举，算法和长度由 [UI/Feedback](../../UI/Feedback/README.md) 定义。
+
+## 采集故障隔离与受限恢复
+
+普通 Action 的失败由执行结果回传上游，不调用 stopVoice。原生 PCM 终止、音频事件失败和媒体服务重置由 captureFault 退役损坏的音频，不取消 Assistant 回复、不发布 listening stop/captureEnded，也不撤销用户的聆听意图。麦克风不可用立即清除 isVoiceActive/动画并显示实际故障。
+
+VoiceCaptureRecovery 拥有单 worker 和一个合并的最新故障槽；重复事件合并，任一明确不允许重启的事件保留该限制。同一次明确开启最多自动重建一次：先取消并加入事件消费、麦克风、播放及完整原生停止，检查 cleanupFailure，再 openCapture 并经过现有回复/录像屏障恢复。原生恢复等待上限 10 秒，取消后仍加入原生清理；首帧接纳前不显示已恢复。新故障或恢复失败只退役并显示不可用，不能无限重试或自动重放拍照/保存等操作。系统 interruption/routeChanged 不自动重启；PCM interrupted 同样禁止恢复，后续 reset 不能在同一会话解除该限制。
+
+恢复期间暂停的回复或录像完成后才接纳新采集；故障不可用时普通 reply-activity 快照不能绕过 blocked。用户明确 startListening 可以重新建立恢复预算，关闭再开启也可建立新会话。用户关闭、设置切换、shutdown 同步失效恢复并加入 worker，迟到完成不得重新开麦。页面不拥有恢复生命周期。

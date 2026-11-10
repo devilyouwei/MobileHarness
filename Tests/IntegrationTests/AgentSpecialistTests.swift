@@ -114,24 +114,6 @@ private struct SpecialistTools: ToolModule { let definitions: [ActionBinding] }
     await gateway.shutdown()
 }
 
-private actor SpecialistSpeech: Agent {
-    nonisolated let descriptor = AgentDescriptor(
-        id: AgentID(rawValue: "speechSynthesis"), name: "Synthetic synthesis", inputs: [.observation], outputs: [])
-    nonisolated let outputs = AsyncStream<OutputEnvelope> { $0.finish() }
-    private(set) var requests = 0
-    func start() {}
-    func pause() {}
-    func resume() {}
-    func stop() {}
-    func receive(_ input: AgentInput) throws {
-        guard case .observation(let message) = input.payload, case .speechSynthesis? = message.perception else {
-            throw CommunicationError.invalidPayload
-        }
-        requests += 1
-    }
-    func status() -> AgentStatus { .init(lifecycle: .running, queuedInputs: 0, processedInputs: requests) }
-}
-
 private actor SpecialistPendingModel: ChatCapability {
     nonisolated let availability: CapabilityAvailability = .available
     private(set) var requests = 0

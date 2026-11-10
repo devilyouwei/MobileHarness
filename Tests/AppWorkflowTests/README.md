@@ -164,3 +164,5 @@ History image regressions cover persistent and preview identity validation, exac
 Welcome 设置回归覆盖成功恢复前不提示、恢复失败不覆盖、已有 Provider 不重新引导、空 URL 默认 OpenAI、自定义 URL/Key 修剪、无效输入拒绝、保存失败重试、单次保存接纳、停止后不再发布以及重新创建控制器后的持久配置恢复。测试使用设置操作替身，不访问真实凭据或云端服务。
 
 首次配置后仅为 Writer 选择云端的回归，验证保存/恢复保留 Provider key，不被未启用 Assistant 的空凭据覆盖。
+
+ListeningCaptureWorkflowTests 另覆盖 Actions 的 VoiceCaptureRecovery：先退役再重建、每会话一次恢复、重建失败清理、超时加入取消、用户关闭期间不复活及中断不自动重启。它们验证替身生命周期，不验证 iOS 媒体服务或麦克风实际恢复。

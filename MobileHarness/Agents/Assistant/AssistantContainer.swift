@@ -11,6 +11,7 @@
             try Task.checkCancellation()
             let status = await session?.agent.status()
             let context = await session?.agent.residentContext()
+            let speech = await session?.speech?.snapshot()
             return AgentStateSnapshot(
                 path: "agents.assistant",
                 business: [
@@ -19,6 +20,10 @@
                     }).map { .text($0.status) } ?? .unknown
                 ],
                 runtime: [
+                    "speechInstalled": speech.map { .flag($0.installed) } ?? .flag(false),
+                    "speechQueued": speech.map { .count($0.queued) } ?? .unknown,
+                    "speechProcessed": speech.map { .count($0.processed) } ?? .unknown,
+                    "speechPresentationFailure": speech?.presentationFailure.map { .text($0) } ?? .unknown,
                     "rolePhase": status.map { .text($0.lifecycle.rawValue) } ?? .unknown,
                     "queuedInputs": status.map { .count($0.queuedInputs) } ?? .unknown,
                     "processedInputs": status.map { .count($0.processedInputs) } ?? .unknown,

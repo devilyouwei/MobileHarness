@@ -27,7 +27,7 @@ func communicationConfiguration(_ id: String, subscribes: Bool = false, publishe
     return try AgentConfiguration(
         contracts: AgentContracts.communication,
         data: JSONSerialization.data(withJSONObject: [
-            "version": 7, "id": id, "actions": [String: [String]](), "tools": [],
+            "version": 8, "category": "cognition", "id": id, "actions": [String: [String]](), "tools": [],
             "communication": communication,
         ]))
 }
@@ -47,7 +47,8 @@ actor ObservationRecorder: Agent {
         self.ownedExecutions = executions
         self.blockText = blockText
         self.reject = reject
-        descriptor = AgentDescriptor(id: AgentID(rawValue: id), name: id, inputs: [.observation], outputs: [])
+        descriptor = AgentDescriptor(
+            category: .cognition, id: AgentID(rawValue: id), name: id, inputs: [.observation], outputs: [])
     }
     func start() { lifecycle = .running }
     func pause() { lifecycle = .paused }
@@ -261,7 +262,7 @@ extension LiveRuntimeTests {
     let config = try communicationConfiguration("receiver")
     #expect(config.agentID.rawValue == "receiver")
     var root: [String: Any] = [
-        "version": 3, "id": "receiver", "actions": [String: [String]](), "tools": [],
+        "version": 3, "category": "cognition", "id": "receiver", "actions": [String: [String]](), "tools": [],
         "communication": ["inputs": [], "subscriptions": [], "publications": [], "sends": []],
     ]
     #expect(throws: AgentConfigurationError.unsupportedVersion(3)) {
@@ -282,20 +283,16 @@ extension LiveRuntimeTests {
 }
 
 @Test(.actionCatalog) func domainValueErrorsPreserveCommunicationAdmissionRejection() throws {
-    #expect(throws: SpeechValidationError.invalidRequest) { try SpeechSynthesisInput(text: "") }
+    #expect(throws: SpeechValidationError.invalidRequest) { try AssistantSpeechOutput.validate(text: "") }
     #expect(throws: VisionValidationError.invalidObservation) {
         try PoseObservation(width: 0, height: 480, sequence: 1, timestamp: 0, rotation: 0, people: [])
     }
     // Codable construction does not use the validating initializer: transport must still validate.
-    let request = try JSONDecoder().decode(
-        SpeechSynthesisInput.self,
-        from: Data("{\"audioID\":\"audio_1\",\"text\":\"\",\"locale\":\"auto\"}".utf8))
-    #expect(throws: CommunicationError.invalidPayload) { try AgentMessage.speechSynthesis(request).validatedSize() }
     let pose = try JSONDecoder().decode(
         PoseObservation.self,
         from: Data("{\"width\":0,\"height\":480,\"sequence\":1,\"timestamp\":0,\"rotation\":0,\"people\":[]}".utf8))
     #expect(throws: CommunicationError.invalidPayload) { try AgentMessage.pose(pose).validatedSize() }
-    let valid = AgentMessage.speechSynthesis(try SpeechSynthesisInput(text: "hello", locale: "en-US"))
+    let valid = AgentMessage.transcript("hello", final: true)
     #expect(try JSONDecoder().decode(PerceptionMessage.self, from: valid.encodedContent()) == valid.perception)
     #expect(try valid.validatedSize() > 0)
 }
@@ -319,7 +316,7 @@ private func registeredFixtureConfiguration(
     try AgentConfiguration(
         contracts: contracts,
         data: JSONSerialization.data(withJSONObject: [
-            "version": 7, "id": id, "actions": [String: [String]](), "tools": [],
+            "version": 8, "category": "cognition", "id": id, "actions": [String: [String]](), "tools": [],
             "communication": [
                 "inputs": [["contract": "fixture.custom", "version": 1, "kind": "observation"]],
                 "subscriptions": publishes

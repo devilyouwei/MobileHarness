@@ -13,6 +13,7 @@ public struct AgentConfiguration: Sendable {
     public let version: Int
     public let communication: CommunicationDeclaration
     public let agentID: AgentID
+    public let category: AgentCategory
     public let capabilities: CapabilityRegistry
 
     /// Derive a smaller communication scope without adding authority or mutating the original configuration.
@@ -26,15 +27,18 @@ public struct AgentConfiguration: Sendable {
             sends: communication.sends.filter { allowed.contains($0.contract) })
         try declaration.validate(contracts: contracts)
         return AgentConfiguration(
-            version: version, communication: declaration, agentID: agentID, capabilities: capabilities)
+            version: version, communication: declaration, agentID: agentID, category: category,
+            capabilities: capabilities)
     }
 
     private init(
-        version: Int, communication: CommunicationDeclaration, agentID: AgentID, capabilities: CapabilityRegistry
+        version: Int, communication: CommunicationDeclaration, agentID: AgentID, category: AgentCategory,
+        capabilities: CapabilityRegistry
     ) {
         self.version = version
         self.communication = communication
         self.agentID = agentID
+        self.category = category
         self.capabilities = capabilities
     }
 
@@ -45,16 +49,17 @@ public struct AgentConfiguration: Sendable {
             throw AgentConfigurationError.invalidFormat
         }
         let root = try Self.dictionary(
-            raw, keys: ["version", "id", "actions", "tools", "communication"],
+            raw, keys: ["version", "id", "category", "actions", "tools", "communication"],
             field: "root")
         let decoded: Document
         do { decoded = try JSONDecoder().decode(Document.self, from: data) } catch {
             throw AgentConfigurationError.invalidFormat
         }
-        guard decoded.version == 7 else {
+        guard decoded.version == 8 else {
             throw AgentConfigurationError.unsupportedVersion(decoded.version)
         }
         version = decoded.version
+        category = decoded.category
         let communicationObject = try Self.dictionary(
             root["communication"] ?? NSNull(),
             keys: ["inputs", "subscriptions", "publications", "sends"], field: "communication")
@@ -195,6 +200,7 @@ public struct AgentConfiguration: Sendable {
         let communication: CommunicationDeclaration
         let version: Int
         let id: String
+        let category: AgentCategory
         let actions: [String: [Action]]
         struct Action: Decodable {
             let alias: String

@@ -1,5 +1,5 @@
 /// Device events are facts, not automatic container execution failures.
-public enum NativeAudioEvent: String, Sendable { case interrupted, routeChanged }
+public enum NativeAudioEvent: String, Sendable { case interrupted, routeChanged, mediaServicesReset }
 
 struct AudioRouteIdentity: Equatable, Sendable {
     let inputs: [String]

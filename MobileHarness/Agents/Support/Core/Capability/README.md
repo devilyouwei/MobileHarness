@@ -38,7 +38,7 @@ Agents uses the frozen capability catalog before submission to Gateway. Gateway 
 
 ```mermaid
 flowchart LR
- J["AgentConfiguration：JSON v7"]:::host
+ J["AgentConfiguration：JSON v8"]:::host
  V["结构／身份／通信声明验证"]:::host
  R["CapabilityRegistry：可见 Action／Tool"]:::host
  I["代码持有 InternalAction／InternalTool"]:::host
@@ -78,6 +78,8 @@ CapabilityContextBuilder 从当前不可变目录渲染 Channel、Action 别名�
 
 restrictingCommunication 仅保留原声明中允许的 contract，对新不可变配置重新验证，不新增 source/target/grant，不改缓存资源。Core 不认识诊断场景或具体角色。
 
-Agent 配置只接受当前 version=7；Action 配置字段不包含内嵌 examples，示例属于明确引用的 Instruction。不解析旧版导入配置。
+Agent 配置只接受当前 version=8；Action 配置字段不包含内嵌 examples，示例属于明确引用的 Instruction。不解析旧版导入配置。
 
 Native parameter values have no generic byte ceiling in capability resolution/permission checks. Required/optional keys, key names/count, alias ownership and declared enums remain validated; concrete domains own semantic constraints. XML generation retains its separate tag grammar limits.
+
+AgentConfiguration v8 必须携带合法 category；身份与类别随通信收窄原样保留。类别不参与权限验证或函数目录生成。旧版本、缺失类别、未知值和错误类型均拒绝，不猜测角色类别。

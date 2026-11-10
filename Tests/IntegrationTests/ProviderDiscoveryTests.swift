@@ -155,12 +155,19 @@ private func providerDiscoveryRejectsMalformedModelLists(value: InvalidProviderM
     await agent.stop()
 }
 private actor HeldDiscovery {
+    nonisolated let cancellationObserved = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     nonisolated let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     private var waiter: CheckedContinuation<Void, Never>?
     var cancelled = false
     func query(_ configuration: ProviderDiscoveryConfiguration) async -> [String] {
-        entered.continuation.yield(())
-        await withCheckedContinuation { waiter = $0 }
+        await withTaskCancellationHandler {
+            await withCheckedContinuation {
+                waiter = $0
+                entered.continuation.yield(())
+            }
+        } onCancel: {
+            cancellationObserved.continuation.yield(())
+        }
         cancelled = Task.isCancelled
         return ["chat-small"]
     }
@@ -169,7 +176,9 @@ private actor HeldDiscovery {
         waiter = nil
     }
 }
-@Test(.actionCatalog) func providerDiscoveryPageCancellationCancelsAndJoinsActualQuery() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func providerDiscoveryPageCancellationCancelsAndJoinsActualQuery()
+    async throws
+{
     let native = HeldDiscovery()
     let requests = ProviderDiscoveryRequests { await native.query($0) }
     let runtime = try await resourceRuntime(UnusedModelResourceCapability(), providerDiscovery: requests)
@@ -180,6 +189,9 @@ private actor HeldDiscovery {
     }
     _ = await iterator.next()
     caller.cancel()
+    // UI request cancellation crosses an asynchronous MainActor boundary before reaching the native query.
+    var cancellation = native.cancellationObserved.stream.makeAsyncIterator()
+    _ = await cancellation.next()
     await native.release()
     await #expect(throws: CancellationError.self) { _ = try await caller.value }
     await runtime.shutdown()

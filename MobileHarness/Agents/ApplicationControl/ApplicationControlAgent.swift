@@ -113,6 +113,7 @@ public actor ApplicationControlAgent: Agent {
         let configuration = try configuration ?? AgentConfigurations.load(named: "ApplicationControl")
         guard configuration.agentID == .applicationControl else { throw AgentConfigurationError.identityMismatch }
         descriptor = AgentDescriptor(
+            category: configuration.category,
             id: .applicationControl, name: "ApplicationControl",
             inputs: Set(configuration.communication.inputs.map(\.kind)),
             outputs: [.communication, .actionCall, .toolCall, .control, .scheduling],

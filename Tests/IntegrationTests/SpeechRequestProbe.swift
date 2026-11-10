@@ -5,13 +5,27 @@ import StorageCore
 @testable import Agents
 
 /// Tests inspect the text-to-handle boundary without running a model or device.
-actor SpeechRequestProbe {
+actor SpeechRequestProbe: AgentSpeechOutput {
     var requests: [String: String] = [:]
-    func receive(_ message: AgentMessage) {
-        if case .speechSynthesis(let request)? = message.perception {
-            requests[request.audioID] = request.text
-        }
+    var beforePrepare: (@Sendable () async throws -> Void)?
+    var prepared: (@Sendable (String, String) async -> Void)?
+    init(
+        beforePrepare: (@Sendable () async throws -> Void)? = nil,
+        prepared: (@Sendable (String, String) async -> Void)? = nil
+    ) {
+        self.beforePrepare = beforePrepare
+        self.prepared = prepared
     }
+    func prepare(text: String, input: AgentInput) async throws -> String {
+        try await beforePrepare?()
+        let id = UUID().uuidString
+        requests[id] = text
+        await prepared?(id, text)
+        return id
+    }
+    func cancel(audioID: String, input: AgentInput) {}
+    func cancel(input: AgentInput) {}
+    func stop() {}
     func text(_ id: String) -> String? { requests[id] }
     func restored(_ output: AgentOutput) -> AgentOutput {
         guard case .actionCall(let call) = output, let id = call.parameters["audioID"], let text = requests[id] else {
@@ -21,15 +35,16 @@ actor SpeechRequestProbe {
     }
     func restored(_ outputs: [AgentOutput]) -> [AgentOutput] { outputs.map(restored) }
 }
+private protocol FixtureSpeechBindable: Sendable {
+    func bindSpeechOutput(_ value: any AgentSpeechOutput) async throws
+}
+extension AgentChatWorker: FixtureSpeechBindable {}
 func bindSpeechRequests(_ agent: any Agent) async throws -> SpeechRequestProbe {
     let probe = SpeechRequestProbe()
+    guard let target = agent as? any FixtureSpeechBindable else { throw HarnessError.unsupportedInput }
+    try await target.bindSpeechOutput(probe)
     try bindFixtureCommunications(
-        agent,
-        port:
-            AgentMessaging { message, _, target in
-                await probe.receive(message)
-                return DeliveryReport(delivered: target.map { [$0] } ?? [])
-            })
+        agent, port: AgentMessaging { _, _, target in DeliveryReport(delivered: target.map { [$0] } ?? []) })
     return probe
 }
 

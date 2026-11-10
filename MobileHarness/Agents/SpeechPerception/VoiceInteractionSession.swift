@@ -106,7 +106,7 @@
             home: UIHomeContainer, diagnostics: UIDiagnosticsContainer,
             language: any ModelLanguageProviding, speech: any ModelSpeechProviding,
             memoryPressure: @escaping @Sendable () async -> Void, audio: AudioContainer, runtime: AgentRuntime,
-            perceptionContainer: SpeechPerceptionContainer, synthesisContainer: SpeechSynthesisContainer,
+            perceptionContainer: SpeechPerceptionContainer,
             modelName: @escaping @Sendable () async throws -> String,
             progress: @MainActor (String) -> Void
         ) async throws {
@@ -133,9 +133,7 @@
                     cancelReply: runtime.voiceDependencies.cancelReply,
                     detection: AudioDetectionAgentSession.connections(
                         recognition: recognition, vad: vad, gateway: runtime.observations),
-                    playbackChanged: { [weak synthesisContainer] id, active in
-                        await synthesisContainer?.playbackChanged(audioID: id, active: active)
-                    }))
+                    playbackChanged: runtime.voiceDependencies.playbackChanged))
             let spectrum = native.spectrum
             diagnostic = native.diagnostic
             stopDiagnostic = native.stopDiagnostic
@@ -144,7 +142,7 @@
             #endif
             let voiceAgents = VoiceAgentSession(
                 runtime: runtime.voiceDependencies, spectrum: spectrum,
-                perception: perceptionContainer, synthesis: synthesisContainer)
+                perception: perceptionContainer)
             self.voiceAgents = voiceAgents
             self.lifecycle = native.lifecycle
             self.audioDetection = native.detection

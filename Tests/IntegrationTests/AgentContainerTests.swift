@@ -324,9 +324,9 @@ private enum ContainerTestFailure: Error { case startup, cleanup }
         func children(_ root: AgentContainer) -> [ObjectIdentifier] {
             [
                 ObjectIdentifier(root.assistant), ObjectIdentifier(root.applicationControl),
-                ObjectIdentifier(root.memory),
+                ObjectIdentifier(root.memory), ObjectIdentifier(root.writer),
                 ObjectIdentifier(root.photographer), ObjectIdentifier(root.speechPerception),
-                ObjectIdentifier(root.speechSynthesis), ObjectIdentifier(root.visionPerception),
+                ObjectIdentifier(root.visionPerception),
             ]
         }
         #expect(first === same && first !== second)

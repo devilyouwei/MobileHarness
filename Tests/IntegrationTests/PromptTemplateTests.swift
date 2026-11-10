@@ -61,6 +61,12 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
         baseSkills: try AgentConfigurations.baseSkills(named: "Assistant"))
     let registry = try skills.registry(fixed: try AssistantAgent.runtimeCapabilities(config.capabilities))
     let system = try AssistantContextState.systemPrompt(registry, skills: skills)
+    let windowRule = "Window lifetime is independent of Task and Skill lifetime."
+    #expect(try AgentConfigurations.skillInstructions("basic-skill").contains(windowRule))
+    #expect(system.components(separatedBy: windowRule).count == 2)
+    for skill in ["photography", "application-control", "web-browsing"] {
+        #expect(!(try AgentConfigurations.skillInstructions(skill)).contains(windowRule))
+    }
     #expect(system.hasPrefix(try CapabilityContextBuilder.protocolRules(registry)))
     #expect(system.contains(try CapabilityContextBuilder.catalog(registry)))
     #expect(system.contains("<wait>你好。</wait><express emotion=\"happy\"/>"))
@@ -451,13 +457,13 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
     }
 }
 
-@Test(.actionCatalog) func photographyCleanupExamplesWaitForCloseBeforeTaskTermination() throws {
+@Test(.actionCatalog) func photographyTaskCompletionPreservesWindowUnlessClosureRequested() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     let catalog = try AgentSkillLoader.registry(
         AgentConfigurations.baseSkills(named: "Assistant") + ["photography"], fixed: config.capabilities)
     let examples = try skillResponseExamples("photography")
     var closures = 0
-    for (index, example) in examples.enumerated() where example.contains("<task.end") {
+    for (index, example) in examples.enumerated() where example.contains("相机已关闭。<task.end") {
         #expect(index > 0 && examples[index - 1] == "<closeCamera/>")
         var close = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
         try close.append(examples[index - 1])
@@ -473,7 +479,13 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
         #expect(!finish.calls.contains { $0.actionPath.domain == "Camera" })
         closures += 1
     }
-    #expect(closures == 4)
+    #expect(closures == 1)
+    #expect(examples.contains { $0.contains("照片已保存") && $0.contains("<task.end") })
+    let instructions = try AgentConfigurations.skillInstructions("photography")
+    #expect(instructions.contains("finish that Task while retaining the Camera window"))
+    #expect(!instructions.contains("Cancel or replacement waits for close"))
+    #expect(!instructions.contains("Web.browse"))
+    #expect(!instructions.contains("Baidu"))
 }
 
 @Test(.actionCatalog) func bundledCompletionAndIntentExamplesSeparateTaskClosureFromStandaloneSuccess() throws {
@@ -688,7 +700,7 @@ func webSkillExamplesParseAgainstTheirEffectiveCatalogAndStayWithinBudget(skill:
     #expect(prompt.contains("Agent ID=writer; description="))
     #expect(prompt.contains(try AgentConfigurations.publicDescription(named: "Writer")))
     for role in [
-        "photographer", "memory", "speechPerception", "speechSynthesis", "visionPerception", "applicationControl",
+        "photographer", "memory", "speechPerception", "visionPerception", "applicationControl",
     ] {
         #expect(!prompt.contains("Agent ID=" + role + ";"))
     }

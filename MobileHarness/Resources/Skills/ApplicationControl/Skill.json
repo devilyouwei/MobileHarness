@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "application-control",
-  "revision": 21,
+  "revision": 23,
   "description": "Manage all windows (including Writer), app pages/settings, Bluetooth and background vision.",
   "dependencies": [],
   "useActions": [

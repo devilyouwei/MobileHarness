@@ -102,6 +102,7 @@ public actor WriterAgent: Agent {
         self.streaming = streaming
         let config = try AgentConfigurations.load(named: "Writer")
         descriptor = AgentDescriptor(
+            category: config.category,
             id: .writer, name: "Writer", inputs: Set(config.communication.inputs.map(\.kind)),
             outputs: [.toolCall, .communication, .control], capabilities: try Self.capabilities())
         let pair = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(16))

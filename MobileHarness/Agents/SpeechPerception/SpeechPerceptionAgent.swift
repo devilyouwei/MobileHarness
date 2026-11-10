@@ -132,6 +132,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         self.residentListening = residentListening
         self.captureOpen = !residentListening
         descriptor = AgentDescriptor(
+            category: configuration.category,
             id: configuration.agentID, name: "Speech Perception",
             inputs: Set(configuration.communication.inputs.map(\.kind)),
             outputs: mode == .speechAndSoundSource

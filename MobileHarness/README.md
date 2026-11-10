@@ -62,7 +62,7 @@ flowchart TB
 
 **App constructs the module roots**, connects their public interfaces through **dependency injection** and coordinates startup, foreground transitions, shutdown and replacement. **Each module owns its internal services and long-running work**; cancellation and cleanup follow that owner's lifecycle independently of individual pages.
 
-**UI requests and native observations enter the responsible Agents directly**. **Perception roles** process audio, images and device observations; **cognitive roles** interpret intent, maintain goals and context, manage **Skill/Task scope** and coordinate specialized roles. Agents use deterministic processing or model inference to decide which operations to request.
+**UI requests and native observations enter the responsible Agents directly**. **Perception roles** process audio, images and device observations; **cognitive roles** interpret intent, maintain goals and context, manage **Skill/Task scope** and coordinate specialized roles. Agents use deterministic processing or model inference to decide which operations to request. Each role declares a required `perception` or `cognition` category in its packaged configuration; the loader preserves it in the immutable AgentDescriptor. Classification and its limits are defined in [Agents categories](Agents/README.md#agent-categories).
 
 **Gateway delivers Agent messages**, validates identity and admission, and coordinates execution permissions, scheduling and shared resources. **Actions validates business inputs and preconditions**, performs the admitted operations and returns completion or failure through Gateway to the requesting Agent. **Request identity is preserved through execution and feedback** so the Agent can relate each outcome to its goal and decide what to do next.
 
@@ -220,7 +220,7 @@ Inversion of Control (IoC) separates dependency assembly from capability use. Ap
 
 | App-owned module root | Containerized capabilities within the root                                                                                                              |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AgentContainer        | Assistant, ApplicationControl, Memory, Photographer, SpeechPerception, SpeechSynthesis and VisionPerception role containers                             |
+| AgentContainer        | Assistant, ApplicationControl, Memory, Photographer, SpeechPerception and VisionPerception role containers                             |
 | GatewayContainer      | Bound communication endpoints, scheduling, resources and correlated feedback services                                                                   |
 | ActionsContainer      | Function catalogs, validation and execution services; business domains and individual functions remain library declarations without separate containers |
 | UIContainer           | Home, Camera, Settings, ModelResources, Navigation, Album, History, Devices and Diagnostics containers                                                  |
@@ -590,7 +590,7 @@ Execution and completion contracts follow the shared workflow above; local prese
 
 UIContainer owns WindowState and the `ui.windows` reader. ApplicationControl consumes typed window requests and invokes registered UI.Window functions through Gateway. Actions delegates domain lifecycle to WindowContentLifecycle; CameraCoordinator retains media ownership independently of view mounting. `Camera.Capture.open` combines photo-window presentation with capture readiness and completes without a business value; `Camera.Perception.openVision` enables vision independently of that window.
 
-UI owns geometry, focus, stacking and presentation completion. Camera owns device leases and media disposition. Closing clears temporary photo previews directly. Pending videos require explicit disposition. Photography Skill awaits the close receipt after the matching Task's successful final disposition before Task termination. Completion, cancellation and replacement join that cleanup; failure retains the Task and pending media requires user disposition. Closing photography leaves independently enabled vision running. Photography can select five cached images for model review and save all pending photos in the current window session. See [window execution](Actions/UI/Navigation/README.md), [Camera](Actions/Camera/README.md) and [Skill lifecycle](Agents/Support/README.md).
+UI owns geometry, focus, stacking and presentation completion. Camera owns device leases and media disposition. Closing clears temporary photo previews directly. Pending videos require explicit disposition. Windows have independent lifetimes. Task completion, cancellation/replacement and opening another window do not authorize closing Camera or discarding its previews. Photography closes only on explicit close/discard intent, awaits that receipt before confirming closure, and retains the Task/window on a failed close. Closing photography leaves independently enabled vision running. Photography can select five cached images for model review and save all pending photos in the current window session. See [window execution](Actions/UI/Navigation/README.md), [Camera](Actions/Camera/README.md) and [Skill lifecycle](Agents/Support/README.md).
 
 #### Web browsing and artifact presentation
 
@@ -1049,9 +1049,9 @@ Recognition and reply captions have separate business owners. SpeechPerception b
 
 ```mermaid
 sequenceDiagram
-    box rgb(240,234,255) Agents · Reply and synthesis roles
+    box rgb(240,234,255) Agents · Assistant and owned speech producer
         participant A as Assistant / reply owner
-        participant T as SpeechSynthesis
+        participant T as Assistant speech producer
     end
     box rgb(255,242,217) Gateway · Communication and scheduling
         participant G as Signal / execution ports
@@ -1068,9 +1068,9 @@ sequenceDiagram
     box rgb(234,247,237) PlatformKit · Native output
         participant N as Audio playback
     end
-    A->>G: authorized directed synthesis request / audioID
-    G-->>T: text and causal identity
+    A->>T: prepare text under reply input identity
     T->>C: reserve owner-bound stream
+    T-->>A: admitted audioID
     par produce ordered PCM
         T->>M: synthesize when producer starts
         M-->>T: PCM frames
@@ -1090,9 +1090,9 @@ sequenceDiagram
     Note over A,P: Listening restoration follows consent and session policy
 ```
 
-Assistant maps natural text into an authorized directed synthesis request and a playback call. SpeechSynthesis owns the ModelKit TTS producer and reserves an owner-bound AudioCache ID; it does not issue playback itself. Actions checks out the matching single-use stream and waits for native output drain. Synthesis admission, producer completion, playback drain and listening restoration are joined separately.
+Assistant maps natural text through its injected speech-output interface into an owner-bound AudioCache ID and a playback call. Its private speech producer owns ModelKit TTS, bounded FIFO admission and joined cancellation; it has no separate Agent registration or messaging endpoint. Actions checks out the matching single-use stream and waits for native output drain. Synthesis admission, producer completion, playback drain and listening restoration are joined separately.
 
-Explicit role messages coordinate half-duplex reply occupancy. Cancellation requests native stop, joins model production, cached streaming, scheduled playback and cleanup, then restores listening according to consent/session policy. Reply occupancy snapshots remain deliverable while execution cancellation joins playback, including already admitted publications; they retain role/session authorization and receiver revision fencing. A terminal fact releases only its source occupancy and cannot renew explicitly revoked listening consent. Writer feedback uses its own Island presentation and does not enter reply occupancy. Emitted audio cannot be undone; restored listening cannot turn failed playback into success. Model-load waiting and ordinary reply waiting use separate identity and completion conditions. See [SpeechSynthesis](Agents/SpeechSynthesis/README.md), [Speech](Actions/Speech/README.md) and [AudioCache](Storage/Cache/Audio/README.md).
+Explicit role messages coordinate half-duplex reply occupancy. Cancellation requests native stop, joins model production, cached streaming, scheduled playback and cleanup, then restores listening according to consent/session policy. Reply occupancy snapshots remain deliverable while execution cancellation joins playback, including already admitted publications; they retain role/session authorization and receiver revision fencing. A terminal fact releases only its source occupancy and cannot renew explicitly revoked listening consent. Writer feedback uses its own Island presentation and does not enter reply occupancy. Emitted audio cannot be undone; restored listening cannot turn failed playback into success. Model-load waiting and ordinary reply waiting use separate identity and completion conditions. See [Assistant speech](Agents/Assistant/README.md#语音生产与播放), [Speech](Actions/Speech/README.md) and [AudioCache](Storage/Cache/Audio/README.md).
 
 ### 13. Camera preview, vision and tracking
 
@@ -1608,7 +1608,7 @@ UI presentation admission differs from native completion. Finite expressions awa
 
 #### Shared in-app and system Island presentation
 
-Each Agent owns its presentation intent and calls registered UI.Island internal tools through its own Gateway identity. Writer and Assistant own their task islands; Assistant separately owns inference waiting. SpeechPerception owns listening/recognition and captions. SpeechSynthesis owns synthesis and actual playback presentation; Actions' player returns joined start/end facts through an App-bound neutral callback, never through an Assistant delegation or UI-state observer. Photographer uses its existing camera fact input and ApplicationControl its connection input for their own presentation. Shared AgentIslandPublication owns only bounded delivery/retry and cleanup, not role policy. Actions executes validated calls, while UI owns arbitration, layout, animation and ActivityKit. Playback spectra use a dedicated data port without Action/ActivityKit updates per frame. System submission failure does not erase local content; iOS controls actual system display.
+Each Agent owns its presentation intent and calls registered UI.Island internal tools through its own Gateway identity. Writer and Assistant own their task islands; Assistant separately owns inference waiting. SpeechPerception owns listening/recognition and captions. Assistant owns synthesis and actual playback presentation through its speech subcomponent; Actions' player returns joined start/end facts through an App-bound neutral callback, without a peer-Agent delegation or UI-state observer. Photographer uses its existing camera fact input and ApplicationControl its connection input for their own presentation. Shared AgentIslandPublication owns only bounded delivery/retry and cleanup, not role policy. Actions executes validated calls, while UI owns arbitration, layout, animation and ActivityKit. Playback spectra use a dedicated data port without Action/ActivityKit updates per frame. System submission failure does not erase local content; iOS controls actual system display.
 
 The producer-bound internal-completion port accepts only the registered role’s declared internal native tools outside model rounds. Gateway validates permission, resources and execution, returning real outcomes directly to the presenting workflow without Signal/InputGateway ToolResult feedback. Model/native protocol calls retain their paired feedback. Internal presentation receipts can synchronize execution and playback without becoming cognitive input; ownership and session fences remain unchanged. See [Agents Support](Agents/Support/README.md).
 
@@ -1692,3 +1692,5 @@ App requests iOS continued processing for each foreground user-initiated Writer 
 | Navigation/inactivity            | UI lifetime or App invalidation → owned cancellation/join.                                              | Committed creations remain; root cleanup outlives pages.       |
 
 Automated checks, iOS builds, real-model samples, native UI and physical-device acceptance are separate evidence categories maintained in [validation](../docs/validation/README.md). Requirements and decisions live in [requirements](../docs/requirements/README.md) and [ADR](../docs/adr/README.md); historical design rationale lives in [documentation history](../docs/history/Documentation-History.md).
+
+Native audio failure is separate from reply cancellation. Actions retires failed capture and owns one bounded recovery attempt per explicit listening session; PlatformKit rebuilds stopped audio graphs, while Agents retains the current decision and listening intent. Explicit model Action failures continue through reliable execution observations/ReACT. Same-round internal output failures cannot suppress those business observations. User stop and root shutdown retain cancellation/join authority. See [Listening recovery](Actions/Speech/Listening/README.md#采集故障隔离与受限恢复).

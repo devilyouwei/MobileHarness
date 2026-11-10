@@ -1,5 +1,7 @@
 # Photographer — 摄影事务与机械跟踪
 
+本角色的静态类别由资源 Agent.json 声明并传入 Descriptor，归类与语义见 [Agents 分类](../README.md#agent-categories)。
+
 ## 角色容器
 
 [PhotographerContainer.swift](PhotographerContainer.swift) 是 AgentContainer 的稳定子能力。持有角色执行会话、相机 UI 控制和跟踪输出生命周期。CameraCoordinator 由 Actions 实现，经根连接；跟踪 attach／detach 属于会话，停止加入角色和跟踪工作。

@@ -52,7 +52,7 @@ func writerSkillsAreScopedToTheirOwner(id: String) throws {
 
 private func document() -> [String: Any] {
     [
-        "version": 7,
+        "version": 8, "category": "cognition",
         "communication": [
             "inputs": [
                 ["contract": "tool.result", "version": 1, "kind": "toolResult"]
@@ -155,9 +155,9 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     #expect(throws: (any Error).self) { try decode(root) }
 }
 
-@Test(.actionCatalog) func bundledV7ConfigurationsSeparateFixedAndSkillFunctions() throws {
+@Test(.actionCatalog) func bundledConfigurationsSeparateFixedAndSkillFunctions() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
-    #expect(config.version == 7 && config.agentID == .assistant)
+    #expect(config.version == 8 && config.agentID == .assistant)
     #expect(config.capabilities.actions.contains { $0.alias == "express" })
     #expect(config.capabilities.actions.contains { $0.alias == "task.start" })
     #expect(config.capabilities.tools.isEmpty)
@@ -203,7 +203,7 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
                     CallRejection(kind: .action, alias: name, reason: .unknownCapability))
             ])
     }
-    for name in ["SpeechPerception", "VisionPerception", "SpeechSynthesis"] {
+    for name in ["SpeechPerception", "VisionPerception"] {
         let other = try AgentConfigurations.load(named: name)
         #expect(other.capabilities.actions.isEmpty && other.capabilities.tools.isEmpty)
     }
@@ -614,13 +614,13 @@ func skillUseStateRejectsInvalidDeclarations(_ mutation: String) throws {
 
 @Test(.actionCatalog) func bundledAgentResourceDescriptionsProjectToExistingFunctionContract() throws {
     for name in [
-        "Assistant", "Writer", "Memory", "Photographer", "ApplicationControl", "SpeechPerception", "SpeechSynthesis",
+        "Assistant", "Writer", "Memory", "Photographer", "ApplicationControl", "SpeechPerception",
         "VisionPerception",
     ] {
         let configuration = try AgentConfigurations.load(named: name)
         let data = try AgentConfigurations.data("Agents/" + name + "/Agent.json")
         let resource = try AgentConfigurations.decodeResource(data, expectedID: configuration.agentID)
-        #expect(resource.version == 9 && configuration.version == 7)
+        #expect(resource.version == 10 && configuration.version == 8)
         #expect(!resource.description.isEmpty && resource.description.utf8.count <= 2048)
         #expect(try AgentConfigurations.publicDescription(named: name) == resource.description)
     }
@@ -659,4 +659,60 @@ func invalidPublicAgentDescriptionsFailExplicitly(failure: String) throws {
     }
     let mutated = try JSONSerialization.data(withJSONObject: resource)
     #expect(throws: (any Error).self) { try AgentConfigurations.decodeResource(mutated, expectedID: .writer) }
+}
+
+@Test(.actionCatalog) func bundledAgentsDeclareTheirCategories() throws {
+    let expected: [String: AgentCategory] = [
+        "Assistant": .cognition, "Writer": .cognition, "Memory": .cognition,
+        "SpeechPerception": .perception, "VisionPerception": .perception,
+        "Photographer": .perception, "ApplicationControl": .perception,
+    ]
+    #expect(try AgentConfigurations.all().count == expected.count)
+    for (name, category) in expected {
+        let config = try AgentConfigurations.load(named: name)
+        let data = try AgentConfigurations.data("Agents/" + name + "/Agent.json")
+        let resource = try AgentConfigurations.decodeResource(data, expectedID: config.agentID)
+        #expect(resource.category == category)
+        #expect(config.category == category)
+        #expect(try config.restrictingCommunication(to: []).category == category)
+    }
+}
+
+@Test(.actionCatalog, arguments: [AgentCategory.perception, .cognition])
+func agentDescriptorsPreserveConfiguredCategory(category: AgentCategory) throws {
+    var json = document()
+    json["category"] = category.rawValue
+    let assistant = try AssistantAgent(
+        stateContext: publicStateFixture(), configuration: decode(json),
+        context: AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: AssistantContextState()))
+    #expect(assistant.descriptor.category == category)
+    json["id"] = "memory"
+    let memory = try MemoryAgent(
+        sessionID: UUID().uuidString, configuration: decode(json),
+        context: AgentContextRepository(agent: .memory, scope: UUID().uuidString, state: MemoryContextState()))
+    #expect(memory.descriptor.category == category)
+}
+
+@Test(.actionCatalog, arguments: ["missing", "null", "unknown", "uppercase", "number", "array", "oldVersion"])
+func agentCategoryRejectsInvalidResourceAndCompiledConfiguration(mutation: String) throws {
+    let data = try AgentConfigurations.data("Agents/Assistant/Agent.json")
+    var resource = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    var compiled = document()
+    func mutate(_ value: inout [String: Any], previousVersion: Int) {
+        switch mutation {
+        case "missing": value.removeValue(forKey: "category")
+        case "null": value["category"] = NSNull()
+        case "unknown": value["category"] = "execution"
+        case "uppercase": value["category"] = "Cognition"
+        case "number": value["category"] = 1
+        case "array": value["category"] = ["cognition"]
+        default: value["version"] = previousVersion
+        }
+    }
+    mutate(&resource, previousVersion: 9)
+    mutate(&compiled, previousVersion: 7)
+    #expect(throws: (any Error).self) {
+        try AgentConfigurations.decodeResource(JSONSerialization.data(withJSONObject: resource), expectedID: .assistant)
+    }
+    #expect(throws: AgentConfigurationError.self) { try decode(compiled) }
 }

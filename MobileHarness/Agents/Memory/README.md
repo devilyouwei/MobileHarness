@@ -1,5 +1,7 @@
 # Memory — 历史事务与标题生成
 
+本角色的静态类别由资源 Agent.json 声明并传入 Descriptor，归类与语义见 [Agents 分类](../README.md#agent-categories)。
+
 ## 角色容器
 
 [MemoryContainer.swift](MemoryContainer.swift) 是 AgentContainer 的稳定子能力。持有角色执行会话和历史工作流，启动绑定唯一角色／输出消费者，停止加入已接纳工作。历史请求继续以 UI 回执和 Gateway 真实完成为边界。

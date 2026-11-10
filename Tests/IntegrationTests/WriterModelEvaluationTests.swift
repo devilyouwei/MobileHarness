@@ -215,6 +215,7 @@ private actor WriterEvaluationChat: ChatCapability {
 
 private actor WriterEvaluationSink: Agent {
     nonisolated let descriptor = AgentDescriptor(
+        category: .cognition,
         id: .assistant, name: "Evaluation requester", inputs: [.observation, .communicationReceipt],
         outputs: [.communication])
     nonisolated let outputs = AsyncStream<OutputEnvelope> { $0.finish() }

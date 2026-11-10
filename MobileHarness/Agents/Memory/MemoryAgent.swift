@@ -54,6 +54,7 @@ public actor MemoryAgent: Agent {
         let configuration = try configuration ?? AgentConfigurations.load(named: "Memory")
         guard configuration.agentID == .memory else { throw AgentConfigurationError.identityMismatch }
         descriptor = AgentDescriptor(
+            category: configuration.category,
             id: .memory, name: "Memory", inputs: Set(configuration.communication.inputs.map(\.kind)),
             outputs: [.communication, .actionCall, .toolCall, .control, .scheduling],
             capabilities: try Self.runtimeCapabilities(configuration.capabilities))

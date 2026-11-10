@@ -1,5 +1,6 @@
 {
-  "version": 9,
+  "version": 10,
+  "category": "perception",
   "id": "applicationControl",
   "description": "I own application settings, provider and model-resource configuration, device administration and diagnostic presentation through supported application interfaces.",
   "communication": {

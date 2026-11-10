@@ -112,8 +112,7 @@ private func contractDefinition(
         AgentConfigurations.load(named: "SpeechPerception").capabilities)
     let vision = try VisionPerceptionAgent.runtimeCapabilities(
         AgentConfigurations.load(named: "VisionPerception").capabilities)
-    let synthesis = try AgentConfigurations.load(named: "SpeechSynthesis").capabilities
-    let catalogs = [assistant, speech, vision, synthesis]
+    let catalogs = [assistant, speech, vision]
     let paths = Set(catalogs.flatMap { $0.actions.map(\.path) + $0.internalActions.map(\.path) })
     #expect(paths.contains(ActionPath(domain: "Speech", module: "Playback", function: "speak")))
     #expect(!paths.contains(ActionPath(domain: "UI", module: "Gaze", function: "moveEyes")))

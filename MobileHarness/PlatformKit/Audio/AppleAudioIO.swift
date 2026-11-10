@@ -1,5 +1,6 @@
 #if os(iOS)
     import AVFAudio
+    import AVFoundation
     import Foundation
     import OSLog
     import Synchronization
@@ -98,6 +99,19 @@
             rate = nil
         }
 
+        func reset() {
+            guard token == nil else { return }
+            if installed {
+                player.stop()
+                engine.stop()
+                engine.mainMixerNode.removeTap(onBus: 0)
+            }
+            engine = AVAudioEngine()
+            player = AVAudioPlayerNode()
+            installed = false
+            rate = nil
+        }
+
     }
 
     @MainActor
@@ -172,6 +186,20 @@
                         }
                     }
                 },
+                Task { [weak self] in
+                    for await _ in NotificationCenter.default.notifications(
+                        named: AVAudioSession.mediaServicesWereResetNotification)
+                    {
+                        guard !Task.isCancelled, let self else { return }
+                        let error = NSError(
+                            domain: AVFoundationErrorDomain, code: AVError.mediaServicesWereReset.rawValue)
+                        admission?.report("audio", "mediaServicesReset", error)
+                        self.captureReadiness?.resolve(.failure(error))
+                        self.captureSource?.finish(throwing: error)
+                        if let token = self.playbackToken { self.failPlayback(token: token, error: error) }
+                        events.send(.mediaServicesReset)
+                    }
+                },
             ]
         }
         private static func routeIdentity(_ route: AVAudioSessionRouteDescription) -> AudioRouteIdentity {
@@ -191,7 +219,7 @@
             }
         }
         private let admitAvailability: @MainActor () throws -> Void
-        private let captureEngine = AVAudioEngine()
+        private var captureEngine = AVAudioEngine()
         private let playback: NativePlaybackGraph
         private var playbackCleanup: Task<Void, Never>?
         private var stopOperation: Task<Void, Never>?
@@ -605,6 +633,8 @@
             stopPlayback()
             await playbackCleanup?.value
             playbackCleanup = nil
+            await playback.reset()
+            captureEngine = AVAudioEngine()
             if owned {
                 do { try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation) } catch
                 {

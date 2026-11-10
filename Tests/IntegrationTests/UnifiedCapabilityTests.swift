@@ -124,7 +124,7 @@ private actor UnifiedReceiptAgent: Agent {
     private(set) var receipts: [ToolResult] = []
     init(capabilities: CapabilityRegistry) {
         descriptor = .init(
-            id: .init(rawValue: "fixture"), name: "Unified fixture", inputs: [.toolResult],
+            category: .cognition, id: .init(rawValue: "fixture"), name: "Unified fixture", inputs: [.toolResult],
             outputs: [.actionCall, .toolCall], capabilities: capabilities)
     }
     func start() { lifecycle = .running }

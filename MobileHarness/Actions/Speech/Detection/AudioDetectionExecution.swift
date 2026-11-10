@@ -160,9 +160,11 @@ private func diagnosticError(_ error: any Error) -> any Error {
                 do {
                     for try await event in events {
                         guard !Task.isCancelled else { return }
-                        await fail(
-                            event == .interrupted
-                                ? AudioDetectionError.interrupted : AudioDetectionError.routeChanged)
+                        switch event {
+                        case .interrupted: await fail(AudioDetectionError.interrupted)
+                        case .routeChanged: await fail(AudioDetectionError.routeChanged)
+                        case .mediaServicesReset: await fail(AudioIOError.runtimeFailed)
+                        }
                         return
                     }
                 } catch { await fail(error) }

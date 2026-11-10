@@ -43,41 +43,29 @@ private actor PlaybackSynthesisFixture: SpeechSynthesisCapability {
     }
 }
 private func admit(
-    _ text: String, agent: SpeechSynthesisAgent, source: String = "assistant",
-    session: String = UUID().uuidString
+    _ text: String, agent: AssistantSpeechOutput, session: String = UUID().uuidString
 )
     async throws -> (String, AudioCache.Owner, any FunctionInput)
 {
     let parent = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text(text))
-    let request = try SpeechSynthesisInput(text: text)
-    let payload = InputPayload.observation(.speechSynthesis(request))
-    try await agent.receive(
-        AgentInput(
-            id: UUID().uuidString,
-            sessionID: session, payload: payload,
-            metadata: InputMetadata(
-                payload: payload, source: source, rootID: UUID().uuidString, parentID: parent.id)))
+    let audioID = try await agent.prepare(text: text, input: parent)
     let call = ActionCall(
         actionPath: ActionPath(domain: "Speech", module: "Playback", function: "speak"), channel: "Speech",
-        parameters: ["audioID": request.audioID])
+        parameters: ["audioID": audioID])
     return (
-        request.audioID, .init(source: source, session: session, input: parent.id),
-        ActionInvocation(source: AgentID(rawValue: source), input: parent, call: call, sequence: 1)
+        audioID, .init(source: "assistant", session: session, input: parent.id),
+        ActionInvocation(source: .assistant, input: parent, call: call, sequence: 1)
     )
 }
-@Test(.actionCatalog, .timeLimit(.minutes(1))) func synthesisFIFOIsIndependentOfPlaybackAndSupportsMultipleAgents()
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func assistantSynthesisFIFOIsIndependentOfPlayback()
     async throws
 {
     let store = AudioCache()
     let model = PlaybackSynthesisFixture()
-    let agent = try SpeechSynthesisAgent(
-        synthesis: model, store: store,
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState())
-    )
-    try await agent.start()
+    let agent = AssistantSpeechOutput()
+    try await agent.configure(synthesis: model, store: store)
     let one = try await admit("one", agent: agent)
-    let two = try await admit("two", agent: agent, source: "narrator")
+    let two = try await admit("two", agent: agent)
     let three = try await admit("three", agent: agent)
     let playback = SpeechPlayback(store: store)
     for job in [three, one, two] {
@@ -99,15 +87,11 @@ private func admit(
 @Test(.actionCatalog) func cacheOverflowFailsExplicitlyAndDoesNotBlockFollowingSynthesis() async throws {
     let store = AudioCache(audioBytes: 16)
     let model = PlaybackSynthesisFixture()
-    let agent = try SpeechSynthesisAgent(
-        synthesis: model, store: store,
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState())
-    )
-    try await agent.start()
+    let agent = AssistantSpeechOutput()
+    try await agent.configure(synthesis: model, store: store)
     let one = try await admit("one", agent: agent)
     let two = try await admit("two", agent: agent)
-    for _ in 0..<100 where await agent.status().processedInputs < 2 { try await Task.sleep(for: .milliseconds(2)) }
+    for _ in 0..<100 where await agent.snapshot().processed < 2 { try await Task.sleep(for: .milliseconds(2)) }
     for job in [one, two] {
         await #expect(throws: AudioCacheError.capacityExceeded) { try await store.validate(job.0, owner: job.1) }
     }
@@ -225,85 +209,6 @@ private struct NeverCompletingSpeech: SpeechSynthesisCapability {
     await store.shutdown()
 }
 
-private actor SynthesisClient: Agent {
-    nonisolated let descriptor: AgentDescriptor
-    nonisolated let outputs = AsyncStream<OutputEnvelope> { $0.finish() }
-    init(_ config: AgentConfiguration) {
-        descriptor = AgentDescriptor(
-            id: config.agentID, name: "Test sender", inputs: [], outputs: [], capabilities: config.capabilities)
-    }
-    func start() {}
-    func pause() {}
-    func resume() {}
-    func stop() {}
-    func status() -> AgentStatus { AgentStatus(lifecycle: .running, queuedInputs: 0, processedInputs: 0) }
-    func receive(_ input: AgentInput) throws { throw HarnessError.unsupportedInput }
-}
-private func synthesisClientConfiguration(_ name: String, permitted: Bool) throws -> AgentConfiguration {
-    try AgentConfiguration(
-        contracts: AgentContracts.communication,
-        data: JSONSerialization.data(withJSONObject: [
-            "version": 7, "id": name, "actions": [String: [String]](), "tools": [],
-            "communication": [
-                "inputs": [], "subscriptions": [], "publications": [],
-                "sends": permitted ? [["contract": "speech.synthesize", "target": "speechSynthesis"]] : [],
-            ],
-        ]))
-}
-@Test(.actionCatalog) func directedSynthesisPermissionsSupportIndependentSenders() async throws {
-    let configs = try [
-        synthesisClientConfiguration("alpha", permitted: true), synthesisClientConfiguration("beta", permitted: true),
-        synthesisClientConfiguration("denied", permitted: false), AgentConfigurations.load(named: "SpeechSynthesis"),
-    ]
-    let policy = try CommunicationPolicy(
-        contracts: AgentContracts.communication, configurations: configs)
-    let manager = AgentManager()
-    let store = AudioCache()
-    let model = PlaybackSynthesisFixture()
-    let synthesizer = try SpeechSynthesisAgent(
-        synthesis: model, store: store,
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState())
-    )
-    try await manager.register(synthesizer)
-    try await synthesizer.start()
-    let gateway = await OutputGateway(
-        manager: manager, requests: InputGateway(manager: manager, policy: policy),
-        tools: ToolRegistry(),
-        policy: policy, sink: { _ in })
-    for config in configs.prefix(3) {
-        let client = SynthesisClient(config)
-        try await manager.register(client)
-        try await manager.start(config.agentID)
-        let port = try await gateway.messaging(for: config.agentID)
-        // A segment generated after the originating input's admission TTL is still fresh work.
-        let payload = InputPayload.text("test")
-        let parent = AgentInput(
-            id: UUID().uuidString,
-            sessionID: UUID().uuidString, payload: payload,
-            metadata: InputMetadata(
-                payload: payload, rootID: UUID().uuidString, deadline: .now.advanced(by: .seconds(-1))))
-        let request = try SpeechSynthesisInput(text: config.agentID.rawValue)
-        if config.agentID.rawValue == "denied" {
-            await #expect(throws: CommunicationError.unauthorized) {
-                _ = try await port.send(.speechSynthesis(request), parent: parent, to: synthesizer.descriptor.id)
-            }
-        } else {
-            let report = try await port.send(.speechSynthesis(request), parent: parent, to: synthesizer.descriptor.id)
-            #expect(report.delivered == [synthesizer.descriptor.id])
-            let owner = AudioCache.Owner(
-                source: config.agentID.rawValue, session: parent.sessionID, input: parent.id)
-            let audio = try await store.checkout(request.audioID, owner: owner)
-            var count = 0
-            while try await audio.next() != nil { count += 1 }
-            #expect(count == 2)
-            try await store.release(request.audioID, owner: owner)
-        }
-    }
-    #expect(await model.texts == ["alpha", "beta"])
-    await manager.stopAll()
-    await store.shutdown()
-}
 private struct UnusedPlaybackChat: ChatCapability {
     let availability: CapabilityAvailability = .available
     func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> { throw AudioCacheError.closed }
@@ -320,6 +225,110 @@ private actor ReplyCompletionGate {
         opened = true
         waiter?.resume()
         waiter = nil
+    }
+}
+
+@Test(.actionCatalog) func assistantSpeechKeepsInputOwnershipAndRejectsOverflow() async throws {
+    let store = AudioCache(capacity: 1)
+    let speech = AssistantSpeechOutput()
+    try await speech.configure(synthesis: PlaybackSynthesisFixture(), store: store)
+    let first = AgentInput(id: UUID().uuidString, sessionID: "conversation", payload: .text("first"))
+    let other = AgentInput(id: UUID().uuidString, sessionID: "conversation", payload: .text("other"))
+    let id = try await speech.prepare(text: "first", input: first)
+    await #expect(throws: AudioCacheError.forbidden) { try await speech.cancel(audioID: id, input: other) }
+    await #expect(throws: AudioCacheError.capacityExceeded) {
+        _ = try await speech.prepare(text: "second", input: other)
+    }
+    try await store.validate(id, owner: .init(source: "assistant", session: first.sessionID, input: first.id))
+    await speech.cancel(input: other)
+    try await store.validate(id, owner: .init(source: "assistant", session: first.sessionID, input: first.id))
+    await speech.cancel(input: first)
+    let next = try await speech.prepare(text: "next", input: other)
+    let audio = try await store.checkout(
+        next, owner: .init(source: "assistant", session: other.sessionID, input: other.id))
+    var count = 0
+    while try await audio.next() != nil { count += 1 }
+    #expect(count == 2)
+    await speech.stop()
+    await #expect(throws: HarnessError.notRunning) { _ = try await speech.prepare(text: "late", input: other) }
+}
+
+private struct JoinedSpeechFixture: SpeechSynthesisCapability {
+    let availability: CapabilityAvailability = .available
+    let entered: ReplyCompletionGate
+    let cleanupEntered: ReplyCompletionGate
+    let cleanupRelease: ReplyCompletionGate
+    func synthesize(_ request: SpeechSynthesisRequest) async throws -> InferenceSession<SynthesisEvent> {
+        let pair = InferenceSession<SynthesisEvent>.make(
+            context: request.context, limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes },
+            waitForCompletion: {
+                await cleanupEntered.open()
+                await cleanupRelease.wait()
+            })
+        try pair.emitter.yield(.audio(pcm()))
+        await entered.open()
+        return pair.session
+    }
+}
+
+@Test(.actionCatalog) func assistantSpeechCancellationIncludesSessionIdentity() async throws {
+    let store = AudioCache()
+    let speech = AssistantSpeechOutput()
+    try await speech.configure(synthesis: PlaybackSynthesisFixture(), store: store)
+    let first = AgentInput(id: "same-input", sessionID: "one", payload: .text("first"))
+    let second = AgentInput(id: "same-input", sessionID: "two", payload: .text("second"))
+    _ = try await speech.prepare(text: "first", input: first)
+    let id = try await speech.prepare(text: "second", input: second)
+    await speech.cancel(input: first)
+    let audio = try await store.checkout(id, owner: .init(source: "assistant", session: "two", input: "same-input"))
+    var frames = 0
+    while try await audio.next() != nil { frames += 1 }
+    #expect(frames == 2)
+    await speech.stop()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func assistantSpeechBoundsProductionEvenWithLargerCache() async throws {
+    let speech = AssistantSpeechOutput()
+    try await speech.configure(synthesis: NeverCompletingSpeech(), store: AudioCache(capacity: 64))
+    let input = AgentInput(id: "input", sessionID: "session", payload: .text("speech"))
+    for _ in 0..<32 { _ = try await speech.prepare(text: "queued", input: input) }
+    await #expect(throws: HarnessError.queueFull) { _ = try await speech.prepare(text: "overflow", input: input) }
+    await speech.stop()
+    #expect(await speech.snapshot().queued == 0)
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func assistantSpeechStopJoinsProviderAndRetiresQueuedAudio() async throws
+{
+    let entered = ReplyCompletionGate()
+    let cleanupEntered = ReplyCompletionGate()
+    let cleanupRelease = ReplyCompletionGate()
+    let store = AudioCache()
+    let speech = AssistantSpeechOutput()
+    try await speech.configure(
+        synthesis: JoinedSpeechFixture(
+            entered: entered, cleanupEntered: cleanupEntered, cleanupRelease: cleanupRelease),
+        store: store)
+    let input = AgentInput(id: UUID().uuidString, sessionID: "session", payload: .text("speak"))
+    let first = try await speech.prepare(text: "active", input: input)
+    await entered.wait()
+    let second = try await speech.prepare(text: "queued", input: input)
+    let finished = Mutex(false)
+    let stopping = Task {
+        await speech.stop()
+        finished.withLock { $0 = true }
+    }
+    await cleanupEntered.wait()
+    #expect(!finished.withLock { $0 })
+    await #expect(throws: HarnessError.notRunning) { _ = try await speech.prepare(text: "late", input: input) }
+    await cleanupRelease.open()
+    await stopping.value
+    #expect(finished.withLock { $0 })
+    #expect(await speech.snapshot().queued == 0)
+    for id in [first, second] {
+        await #expect(throws: AudioCacheError.closed) {
+            _ = try await store.checkout(
+                id, owner: .init(source: "assistant", session: input.sessionID, input: input.id))
+        }
     }
 }
 
@@ -459,12 +468,8 @@ private enum ReplyInterruptionFailure: Error, Equatable { case unavailable }
 }
 @Test(.actionCatalog) func rejectedPlaybackAdmissionLetsCallerReleaseSynthesizedHandle() async throws {
     let store = AudioCache()
-    let synth = try SpeechSynthesisAgent(
-        synthesis: PlaybackSynthesisFixture(), store: store,
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState())
-    )
-    try await synth.start()
+    let synth = AssistantSpeechOutput()
+    try await synth.configure(synthesis: PlaybackSynthesisFixture(), store: store)
     let job = try await admit("rejected", agent: synth)
     let manager = AgentManager()
     try await manager.register(
@@ -489,12 +494,8 @@ private enum ReplyInterruptionFailure: Error, Equatable { case unavailable }
 }
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func synthesisWaitsUntilOwnerStops() async throws {
     let store = AudioCache()
-    let agent = try SpeechSynthesisAgent(
-        synthesis: NeverCompletingSpeech(), store: store,
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState())
-    )
-    try await agent.start()
+    let agent = AssistantSpeechOutput()
+    try await agent.configure(synthesis: NeverCompletingSpeech(), store: store)
     let job = try await admit("wait", agent: agent)
     let audio = try await store.checkout(job.0, owner: job.1)
     let read = Task { try await audio.next() }
@@ -528,12 +529,9 @@ private struct SlowPlaybackSynthesis: SpeechSynthesisCapability {
 @Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [true, false])
 func slowSynthesisDoesNotTruncatePlayback(delayBeforeFirstFrame: Bool) async throws {
     let store = AudioCache()
-    let agent = try SpeechSynthesisAgent(
-        synthesis: SlowPlaybackSynthesis(delayBeforeFirstFrame: delayBeforeFirstFrame), store: store,
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "speechSynthesis"), scope: UUID().uuidString, state: SpeechSynthesisContextState())
-    )
-    try await agent.start()
+    let agent = AssistantSpeechOutput()
+    try await agent.configure(
+        synthesis: SlowPlaybackSynthesis(delayBeforeFirstFrame: delayBeforeFirstFrame), store: store)
     let job = try await admit("complete speech", agent: agent)
     let playback = SpeechPlayback(store: store)
     try await playback.play(job.2) { audio, _ in

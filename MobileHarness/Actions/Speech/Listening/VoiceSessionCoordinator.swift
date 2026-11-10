@@ -1,6 +1,108 @@
 import Foundation
 import PlatformKit
 
+/// A capture fault never owns reply cancellation. One restart per explicit listening session,
+/// one worker and one coalesced pending fault; user shutdown cancels and joins the worker.
+@MainActor public final class VoiceCaptureRecovery {
+    public enum Failure: Error { case timedOut }
+    public private(set) var blocked = false
+    private var attempted = false
+    private var restartPermitted = true
+    private var closed = false
+    private var pending: (message: String, restart: Bool)?
+    private var worker: Task<Void, Never>?
+    private let retire: @MainActor () async throws -> Void
+    private let restore: @MainActor () async throws -> Void
+    private let resume: @MainActor () async throws -> Void
+    private let interruptRestore: @MainActor () -> Void
+    private let report: @MainActor (String) -> Void
+    private let timeout: Duration
+
+    public init(
+        retire: @escaping @MainActor () async throws -> Void,
+        restore: @escaping @MainActor () async throws -> Void,
+        resume: @escaping @MainActor () async throws -> Void = {},
+        interruptRestore: @escaping @MainActor () -> Void = {},
+        report: @escaping @MainActor (String) -> Void,
+        timeout: Duration = .seconds(10)
+    ) {
+        self.retire = retire
+        self.restore = restore
+        self.resume = resume
+        self.interruptRestore = interruptRestore
+        self.report = report
+        self.timeout = timeout
+    }
+
+    public func request(_ message: String, restart: Bool = true) {
+        guard !closed else { return }
+        if !restart {
+            restartPermitted = false
+            interruptRestore()
+            worker?.cancel()
+        }
+        blocked = true
+        pending = (message, restart && (pending?.restart ?? true))
+        guard worker == nil else { return }
+        worker = Task {
+            defer { worker = nil }
+            while let fault = pending, !closed {
+                pending = nil
+                do {
+                    try await retire()
+                    try Task.checkCancellation()
+                    guard !closed else { return }
+                    guard fault.restart, restartPermitted, !attempted else {
+                        report(fault.message + "；请重新开启聆听")
+                        continue
+                    }
+                    attempted = true
+                    try await withThrowingTaskGroup(of: Void.self) { group in
+                        group.addTask { try await self.restoreAndResume() }
+                        group.addTask {
+                            try await Task.sleep(for: self.timeout)
+                            await self.interruptRestore()
+                            throw Failure.timedOut
+                        }
+                        defer { group.cancelAll() }
+                        _ = try await group.next()
+                    }
+                    try Task.checkCancellation()
+                    if !closed, pending == nil { blocked = false }
+                } catch {
+                    guard !closed else { return }
+                    // A failed restart is terminal for this session, including cleanup failure.
+                    blocked = true
+                    attempted = true
+                    do { try await retire() } catch {
+                        report(fault.message + "；聆听清理失败：\(error)")
+                    }
+                    guard !closed else { return }
+                    report(fault.message + "；聆听恢复失败：\(error)，请重新开启聆听")
+                }
+            }
+        }
+    }
+
+    public func invalidate() {
+        closed = true
+        blocked = true
+        pending = nil
+        interruptRestore()
+        worker?.cancel()
+    }
+    public func wait() async { await worker?.value }
+
+    private func restoreAndResume() async throws {
+        try await restore()
+        try Task.checkCancellation()
+        guard !closed, pending == nil else { return }
+        // Let concurrent reply/video completion resume too; native admission coalesces the requests.
+        blocked = false
+        try await resume()
+    }
+}
+
 /// A native audio handoff includes owner release, not just stopping microphone samples.
 @MainActor enum VoiceRecordingAudioHandoff {
     static func run(audio: any AudioCaptureControlling, pause: () async throws -> Void) async throws {
@@ -95,6 +197,7 @@ public enum VoiceReplyCancellation {
         private var started = false
         private var captureTask: Task<Void, Never>?
         private var captureEpoch: String?
+        private lazy var captureRecovery = makeCaptureRecovery()
         private var replyCancellationTask: Task<Void, Never>?
         private lazy var microphone = ListeningCaptureWorkflow(
             start: { [weak self] in
@@ -216,6 +319,7 @@ public enum VoiceReplyCancellation {
                 throw CancellationError()
             }
             projection.beginPresentationSession()
+            captureRecovery = makeCaptureRecovery()
             let generation = UUID().uuidString
             voiceGeneration = generation
             resetExpression()
@@ -262,16 +366,15 @@ public enum VoiceReplyCancellation {
                 do {
                     for try await event in events {
                         guard !Task.isCancelled, let self, self.voiceGeneration == generation else { return }
-                        try await self.speech?.closeCapture()
-                        guard !Task.isCancelled, self.voiceGeneration == generation else { return }
-                        self.stopVoice(
-                            message: event == .interrupted
-                                ? "音频被系统中断，请按住双眼重新开始" : "音频设备已变化，请按住双眼重新开始")
+                        self.captureFault(
+                            event == .mediaServicesReset
+                                ? "系统音频服务已重置" : (event == .interrupted ? "音频被系统中断" : "音频设备已变化"),
+                            restart: event == .mediaServicesReset)
                         return
                     }
                 } catch {
                     guard !Task.isCancelled, let self, self.voiceGeneration == generation else { return }
-                    self.stopVoice(message: "音频事件接入失败：\(error)")
+                    self.captureFault("音频事件接入失败：\(error)")
                 }
             }
         }
@@ -372,7 +475,7 @@ public enum VoiceReplyCancellation {
                     } else {
                         message = "录音中断：\(String(describing: error))"
                     }
-                    await self.stopPerception(message: message)
+                    await self.stopPerception(message: message, restart: error as? AudioIOError != .interrupted)
                 }
             }
         }
@@ -457,6 +560,21 @@ public enum VoiceReplyCancellation {
             try await applyListening(
                 enabled: policy.enabled, paused: policy.paused, revision: policy.revision, feedback: feedback,
                 invocation: invocation, cancelReply: false)
+            if enabled, captureRecovery.blocked, let generation = voiceGeneration {
+                let previous = captureRecovery
+                previous.invalidate()
+                await previous.wait()
+                try Task.checkCancellation()
+                guard voiceGeneration == generation, listeningRevision == policy.revision else {
+                    throw CancellationError()
+                }
+                let replacement = makeCaptureRecovery()
+                captureRecovery = replacement
+                replacement.request("重新开启聆听")
+                await replacement.wait()
+                try Task.checkCancellation()
+                if replacement.blocked { throw SpeechActionError.listeningUnavailable }
+            }
             if !enabled { await cleanupTask?.value }
         }
 
@@ -521,7 +639,7 @@ public enum VoiceReplyCancellation {
                     guard let self else { return }
                     do {
                         try await self.pauseListening(generation: generation, revision: revision)
-                    } catch is CancellationError {} catch { self.stopVoice(message: "聆听暂停异常：\(error)") }
+                    } catch is CancellationError {} catch { self.captureFault("聆听暂停异常：\(error)") }
                 }
             } else if !hasPlaybackBarrier && !videoAudioHeld {
                 try await resumeListening(generation: generation)
@@ -552,9 +670,57 @@ public enum VoiceReplyCancellation {
             state.present(.voiceStatus("正在回复 · 聆听已暂停"))
         }
 
-        private func stopPerception(message: String) async {
-            stopVoice(message: message)
+        private func stopPerception(message: String, restart: Bool = true) async {
+            captureFault(message, restart: restart)
+        }
+
+        private func captureFault(_ message: String, restart: Bool = true) {
+            guard voiceGeneration != nil else { return }
+            // Schedule retirement separately: the capture/event consumer must return before it is joined.
+            captureEpoch = nil
+            routeTask?.cancel()
+            state.present(.isVoiceActive(false))
+            state.present(.listeningAnimationID(nil))
+            presentationPhase = .failed
+            state.present(.voiceStatus(message + (restart ? " · 正在恢复聆听…" : " · 请重新开启聆听")))
             record(message)
+            captureRecovery.request(message, restart: restart)
+        }
+
+        private func makeCaptureRecovery() -> VoiceCaptureRecovery {
+            VoiceCaptureRecovery(
+                retire: { [weak self] in
+                    guard let self else { throw CancellationError() }
+                    let events = self.routeTask
+                    self.routeTask = nil
+                    events?.cancel()
+                    await events?.value
+                    await self.microphone.stop()
+                    await self.audio.stop()
+                    await self.speech?.closeCapture()
+                    if let failure = self.audio.cleanupFailure { throw failure }
+                },
+                restore: { [weak self] in
+                    guard let self, let generation = self.voiceGeneration,
+                        self.state.isReady, !self.changingSettings
+                    else { throw CancellationError() }
+                    try Task.checkCancellation()
+                    try await self.speech?.openCapture(sessionID: generation)
+                    try Task.checkCancellation()
+                    guard self.voiceGeneration == generation else { throw CancellationError() }
+                },
+                resume: { [weak self] in
+                    guard let self, let generation = self.voiceGeneration else { throw CancellationError() }
+                    try await self.resumeListening(generation: generation)
+                },
+                interruptRestore: { [weak self] in self?.microphone.invalidate() },
+                report: { [weak self] message in
+                    self?.state.present(.isVoiceActive(false))
+                    self?.state.present(.listeningAnimationID(nil))
+                    self?.state.present(.voiceStatus(message))
+                    self?.presentationPhase = .failed
+                    self?.record(message)
+                })
         }
 
         public func stopVoice(message: String = "语音已停止") {
@@ -562,6 +728,8 @@ public enum VoiceReplyCancellation {
         }
 
         private func stopVoice(message: String, cancelReply: Bool) {
+            let previousRecovery = captureRecovery
+            previousRecovery.invalidate()
             let oldGeneration = voiceGeneration
             if cancelReply,
                 oldGeneration != nil || startupTask != nil || handlingTurn || hasPlaybackBarrier || state.isReplyActive
@@ -595,6 +763,7 @@ public enum VoiceReplyCancellation {
             previousPause?.cancel()
             cleanupTask = Task {
                 await previousCleanup?.value
+                await previousRecovery.wait()
                 await previousEvents?.value
                 await audio.waitForPlaybackStop()
                 await microphone.stop()
@@ -635,6 +804,7 @@ public enum VoiceReplyCancellation {
             defer { traceListening("resume.end") }
             func canResume() -> Bool {
                 voiceGeneration == generation && !listeningPaused && !hasPlaybackBarrier && !videoAudioHeld
+                    && !captureRecovery.blocked
             }
             guard canResume() else { return }
             do { try await speech?.resumeListening() } catch is CancellationError {
@@ -654,7 +824,7 @@ public enum VoiceReplyCancellation {
             do { try await microphone.setEnabled(true) } catch is CancellationError {
                 throw CancellationError()
             } catch {
-                if voiceGeneration == generation { stopVoice(message: "麦克风恢复失败：\(error)") }
+                if voiceGeneration == generation { captureFault("麦克风恢复失败：\(error)") }
                 throw error
             }
             guard canResume() else { return }
@@ -714,7 +884,7 @@ public enum VoiceReplyCancellation {
                 return CancellationError()
             } catch {
                 record("聆听恢复失败：\(error)")
-                stopVoice(message: "聆听恢复失败：\(error)")
+                captureFault("聆听恢复失败：\(error)")
                 return error
             }
         }

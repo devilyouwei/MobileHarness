@@ -895,7 +895,7 @@ Model exposure comes from [../../Resources/Agents/SpeechPerception/Agent.json](.
 
 ## MobileHarness/Agents/SpeechSynthesis/README.md
 
-[现行 README](../../MobileHarness/Agents/SpeechSynthesis/README.md)
+[现行设计（2026-11-10 起合成归属 Assistant）](../../MobileHarness/Agents/Assistant/README.md#语音生产与播放)
 
 ````markdown
 ## Function and communication registration

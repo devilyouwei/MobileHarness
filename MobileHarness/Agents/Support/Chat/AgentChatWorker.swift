@@ -28,6 +28,12 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
 
     // MARK: - State and dependencies
 
+    private(set) var speechOutput: (any AgentSpeechOutput)?
+    public func bindSpeechOutput(_ value: any AgentSpeechOutput) throws {
+        guard speechOutput == nil, worker == nil, lifecycle != .stopped else { throw HarnessError.invalidTransition }
+        speechOutput = value
+    }
+
     private let taskRecords: (any AssistantTaskRepository)?
     private let communications: (any AgentMessageRepository)?
     private func requireCommunications() throws -> any AgentMessageRepository {
@@ -192,6 +198,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
 
     public init(
         stateContext: AgentStateContext? = nil,
+        speechOutput: (any AgentSpeechOutput)? = nil,
         uiHome: UIHomeContainer? = nil, uiSessionID: String? = nil,
         capacity: Int = 32, reportsReplyActivity: Bool = false,
         outputCapacity: Int = 256, chat: (any ChatCapability)? = nil,
@@ -207,6 +214,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         capabilities: CapabilityRegistry? = nil,
         prompt: (@Sendable (CapabilityRegistry) throws -> String)? = nil
     ) throws {
+        self.speechOutput = speechOutput
         self.uiHome = uiHome
         self.uiSessionID = uiSessionID
         guard uiHome == nil || uiSessionID != nil else { throw CommunicationError.invalidPayload }
@@ -225,6 +233,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         guard configuration.agentID == State.agentID else { throw AgentConfigurationError.identityMismatch }
         let runtimeCapabilities = try State.runtimeCapabilities(capabilities ?? configuration.capabilities)
         descriptor = AgentDescriptor(
+            category: configuration.category,
             id: configuration.agentID, name: State.configurationName,
             inputs: Set(configuration.communication.inputs.map(\.kind)),
             outputs: [.communication, .actionCall, .toolCall, .control, .scheduling],
@@ -357,6 +366,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         let pending = queue.inputs
         for input in pending { queue.remove(id: input.id) }
         worker?.cancel()
+        if let current { await speechOutput?.cancel(input: current) }
         await worker?.value
         for input in pending + (current.map { [$0] } ?? []) {
             continuationRounds[input.id] = nil
@@ -419,6 +429,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         await communicationReceipts.close()
         for task in routingWorkers.values { await task.value }
         routingWorkers.removeAll()
+        await speechOutput?.stop()
         await worker?.value
         replyInputs.removeAll()
         replyTasks.removeAll()
@@ -602,8 +613,11 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                 reportHostCancellationFailure = false
                 let cancelledActive = activeInput.flatMap { $0.sessionID == input.sessionID ? $0 : nil }
                 let cancelledRound = cancelledActive == nil ? nil : roundID
-                if cancelledActive != nil { worker?.cancel() }
-                if let cancelledActive { hostCancelledInput = (cancelledActive.id, cancelledRound) }
+                if let cancelledActive {
+                    hostCancelledInput = (cancelledActive.id, cancelledRound)
+                    worker?.cancel()
+                    await speechOutput?.cancel(input: cancelledActive)
+                }
                 let cancelledQueued = queue.inputs.filter {
                     closesSession && $0.sessionID == input.sessionID && $0.id != cancelledActive?.id
                 }
@@ -1066,6 +1080,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             try await conversations.finish(input.id, state: .completed, reason: generationFinishReason)
             emit(.control("agent.finished"), for: input)
         } catch {
+            await speechOutput?.cancel(input: input)
             continuationRounds[input.id] = nil
             queue.remove(id: input.id)
             let cancelled = Task.isCancelled || error is CancellationError
@@ -1283,7 +1298,8 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                 .init(id: roundID, resultsJSON: String(decoding: journal, as: UTF8.self)), for: input.id)
             if let generationError { throw generationError }
             if let failed = roundCalls.first(where: { isInternalRuntimeCall($0) && $0.result?.hasFailure == true }),
-                let result = failed.result
+                let result = failed.result,
+                !roundCalls.contains(where: { !isInternalRuntimeCall($0) && $0.result?.requiresReasoning == true })
             {
                 throw CapabilityError.unavailable(
                     "Internal execution failed at \(failed.path): \(try Self.observationText(result))")
@@ -1853,29 +1869,16 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     }
 
     private func emitPlayback(_ text: String, for input: AgentInput, modelGenerated: Bool = false) async throws {
-        let request = try SpeechSynthesisInput(text: text)
-        let target = AgentID(rawValue: "speechSynthesis")
-        let report = try await communicate(.speechSynthesis(request), parent: input, to: target)
-        guard report.delivered.contains(target), report.rejected.isEmpty, report.failure == nil else {
-            throw CapabilityError.unavailable(
-                "Speech synthesis delivery rejected: "
-                    + (report.failure ?? report.rejected.values.first ?? "Target did not admit the request"))
-        }
+        guard let speechOutput else { throw CapabilityError.unavailable("Speech output not configured") }
+        let audioID = try await speechOutput.prepare(text: text, input: input)
         do {
             try Task.checkCancellation()
-            let call = try Self.playback.call(["audioID": request.audioID])
-            guard try emitAction(call, for: input, modelGenerated: modelGenerated) else {
-                throw HarnessError.queueFull
-            }
+            let call = try Self.playback.call(["audioID": audioID])
+            guard try emitAction(call, for: input, modelGenerated: modelGenerated) else { throw HarnessError.queueFull }
         } catch {
-            let cleanup = try CommunicationAction(message: .cancelSpeech(request.audioID), target: target)
-            try await communicationReceipts.register(cleanup.id)
-            if emit(.communication(cleanup), for: input) {
-                do { _ = try await communicationReceipts.wait(cleanup.id) } catch {
-                    await communicationReceipts.cancel(cleanup.id)
-                }
-            } else {
-                await communicationReceipts.cancel(cleanup.id)
+            do { try await speechOutput.cancel(audioID: audioID, input: input) } catch let cleanup {
+                throw AgentFailure(
+                    component: "assistant", operation: "speech.submit", underlying: error, cleanupErrors: [cleanup])
             }
             throw error
         }

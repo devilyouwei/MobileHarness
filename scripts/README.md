@@ -168,3 +168,5 @@ check-modelkit-boundaries.py validates bundled Agent resource schema v9 and requ
 Matrix source fingerprints also include WriterWorkspaces and WriterMessages Swift implementations so request/target/history changes are captured with the Writer runtime. The runner records source, binary and packaged-resource consistency separately from model case outcomes.
 
 Writer record UI acceptance can select `WRITER_UI_ONLY_TEST=testDelegationWorkspaceSeparation`; its seed is the temporary SQLite/workspaces fixture exported by the real-storage integration test through `WRITER_SEPARATION_UI_SEED`. The fixture includes 27 delegations and 40 workspace messages. This route verifies newest-first display, automatic older pages and navigation without model credentials or a physical-device database.
+
+Agent 资源静态检查与运行时 schema 一致：Agent.json 使用 v10，category 必须为 perception 或 cognition；角色的实际归类由各自资源声明。

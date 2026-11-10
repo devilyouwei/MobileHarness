@@ -1,5 +1,17 @@
 # Documentation and architecture change history
 
+## 2026-11-10 — Agent 静态类别
+
+- 新增 perception/cognition 两值的 AgentCategory 和必填 Descriptor.category；生产角色的类别唯一声明在各自 Agent.json。
+- Assistant、Writer、Memory 为 cognition，其余四个现有角色为 perception。配置严格校验类别，通信收窄和有效能力投影保留类别，不改变执行策略。
+- 资源/内部配置分别升级至 v10/v8，分类和非法输入回归及构建证据见[验证记录](../validation/Agent-Categories.md)。
+
+## 2026-11-10 — Assistant 内聚语音合成
+
+- 合成改由 Assistant 私有生产器拥有，预留句柄后立即返回；合成可与播放及其他 Action 并行，保留 FIFO 和现有半双工感知。
+- 删除 SpeechSynthesis 角色、容器、通信协议和资源；同步状态投影、展示身份、构建引用及当前设计。
+- 生产器限制活句柄与在途接纳，按 session/input 取消，并在退出时等待 provider cleanup。验证与独立真机验收范围见[专项记录](../validation/Assistant-Owned-Speech.md)。
+
 ## 2026-11-09 — README 暖色办公室 banner
 
 - 标题前增加独立透明蓝色眼睛 PNG，使用内置 ImageGen 生成并保留提示词；Signal 段首先说明“every input is a Signal; every output is an Action”，段尾将拟人的多通道 Signal 输入／Action 输出明确为最终愿景。

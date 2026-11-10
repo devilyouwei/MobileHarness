@@ -75,6 +75,7 @@ public actor PhotographerAgent: Agent {
         let configuration = try configuration ?? AgentConfigurations.load(named: "Photographer")
         guard configuration.agentID == .photographer else { throw AgentConfigurationError.identityMismatch }
         descriptor = AgentDescriptor(
+            category: configuration.category,
             id: configuration.agentID, name: "Photographer",
             inputs: Set(configuration.communication.inputs.map(\.kind)),
             outputs: [.communication, .actionCall, .toolCall, .control, .scheduling],

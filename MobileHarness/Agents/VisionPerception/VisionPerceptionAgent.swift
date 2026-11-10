@@ -81,6 +81,7 @@ public actor VisionPerceptionAgent: Agent {
         let configuration = try configuration ?? AgentConfigurations.load(named: "VisionPerception")
         guard configuration.agentID == .visionPerception else { throw AgentConfigurationError.identityMismatch }
         descriptor = AgentDescriptor(
+            category: configuration.category,
             id: configuration.agentID, name: "VisionPerception",
             inputs: Set(configuration.communication.inputs.map(\.kind)),
             outputs: [.communication, .toolCall, .control],

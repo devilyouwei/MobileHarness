@@ -17,7 +17,9 @@
         let interactionSessionID: String
         let startInteraction: @MainActor () async throws -> Void
         let cancelReply: @MainActor () async throws -> Void
-        let makeSynthesis: (any SpeechSynthesisCapability, AudioCache) throws -> SpeechSynthesisAgent
+        let startSpeech: (any SpeechSynthesisCapability, AudioCache) async throws -> Void
+        let stopSpeech: () async -> Void
+        let playbackChanged: @Sendable (String, Bool) async -> Void
         let makePerception:
             (
                 any SpeechRecognitionCapability, any VoiceActivityCapability, String, any AudioCaptureObserving,
@@ -32,15 +34,13 @@
         private let runtime: VoiceRuntimeDependencies
         private let spectrum: any SpectrumPresenting
         private unowned let perception: SpeechPerceptionContainer
-        private unowned let synthesis: SpeechSynthesisContainer
         init(
             runtime: VoiceRuntimeDependencies, spectrum: any SpectrumPresenting,
-            perception: SpeechPerceptionContainer, synthesis: SpeechSynthesisContainer
+            perception: SpeechPerceptionContainer
         ) {
             self.runtime = runtime
             self.spectrum = spectrum
             self.perception = perception
-            self.synthesis = synthesis
         }
         func audioStore() async throws -> AudioCache {
             try await runtime.cache.audioScope(runtime.interactionSessionID)
@@ -50,7 +50,7 @@
             _ recognition: any SpeechRecognitionCapability, vad: any VoiceActivityCapability,
             synthesis capability: any SpeechSynthesisCapability, input: any AudioCaptureObserving, store: AudioCache
         ) async throws -> any VoicePerceptionHandling {
-            try await synthesis.start(synthesis: capability, store: store, runtime: runtime)
+            try await runtime.startSpeech(capability, store)
             return try await perception.start(
                 recognition: recognition, vad: vad, input: input,
                 spectrum: spectrum, runtime: runtime)
@@ -58,7 +58,7 @@
         func stop() async throws {
             var errors: [any Error] = []
             do { try await perception.endSession() } catch { errors.append(error) }
-            do { try await synthesis.endSession() } catch { errors.append(error) }
+            await runtime.stopSpeech()
             await runtime.cache.closeAudioScope(runtime.interactionSessionID)
             if let primary = errors.first {
                 throw AgentFailure(

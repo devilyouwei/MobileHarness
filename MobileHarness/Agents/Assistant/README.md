@@ -1,5 +1,7 @@
 # Assistant — 对话、Task 与可扩展 Skill
 
+本角色的静态类别由资源 Agent.json 声明并传入 Descriptor，归类与语义见 [Agents 分类](../README.md#agent-categories)。
+
 ## 角色容器
 
 [AssistantContainer.swift](AssistantContainer.swift) 是 AgentContainer 的稳定子能力。持有 AssistantExecutionSession，通过会话管理角色私有 Context、注册与绑定输出任务，并提供首页会话／活动投影。仅启停 Assistant，不控制平级角色。
@@ -41,22 +43,22 @@ flowchart LR
  A <-->|"受身份绑定的输出与反馈"| G
  U["UI.home"]:::ui
  U -->|"Agent 订阅文本数据"| A
- M["ModelKit.language"]:::model
+ M["ModelKit.language / speech.synthesis"]:::model
  A <-->|"Chat 请求／事件"| M
  S["Storage · Chat / Task repositories"]:::storage
  A <--> S
+ AC["Storage.cache.audio"]:::storage
+ A -->|"PCM 生产与句柄所有权"| AC
  P["PlatformKit：注入 JPEG 准备能力"]:::platform
  A --> P
  X["Actions：函数声明／执行服务公开接口"]:::action
  A -.-> X
  subgraph Peers["其他 Agent：仅经 Gateway 通信"]
  SP["SpeechPerception"]:::agent
- SS["SpeechSynthesis"]:::agent
  Fixed["Photographer／Memory／ApplicationControl"]:::agent
  end
  SP -->|"speech.final／speech.phase"| G
  G -->|"interaction.replyActivity"| SP
- G -->|"speech.synthesize／speech.cancel"| SS
  G -->|"task.request／input／cancel"| Fixed
  Fixed -->|"task.progress／result"| G
 
@@ -271,3 +273,17 @@ task.start 保留 Assistant 自己执行的前台目标；task.delegate 将目�
 ## 提示词所有权
 
 Assistant/Instructions.md 只维护自身用户对话、协调、输出和事实汇报责任，Prompts.json 只维护证据模板。AssistantContextState 组合 Core 协议、Skill 教学和目录、有效 Action 目录，以及各 Agent 自己的公开 description；DELEGATABLE AGENTS 根据实际实例权限和已实现适配过滤，不包含其他角色私有提示词。start/delegate 平级教学归 BasicSkill，Writer 业务用途和委派条件归 Writer/Agent.json。
+
+## 语音生产与播放
+
+[AssistantSpeechOutput.swift](AssistantSpeechOutput.swift) 是 AssistantExecutionSession 拥有的稳定子能力，不注册 Agent 或消费 Signal。共享 Chat 通过 [AgentSpeechOutput](../Support/Chat/AgentSpeechOutput.swift) 请求文本转音频句柄，具体生产与展示属于 Assistant。AgentRuntime 将同一实例注入 Worker 和执行会话；原生语音启动安装 ModelKit TTS 与该交互的 AudioCache，实际播放仍走 Gateway → Actions。子能力的安装、队列、完成计数和展示失败投影在 agents.assistant。
+
+prepare 校验非空、至多 2000 UTF-8 字节的文本，生成唯一 audioID，按 assistant/session/input 预留缓存并再次校验生命周期。预留成功即返回，不等待完整 PCM。locale 为 auto；ModelKit 自行选择适用语言。一个串行 producer 并行于播放及其他 Action；生产器的活句柄及尚未注册的接纳合计最多 32 个，AudioCache 独立限制最多 32 个活句柄、每段 8 MiB，满载明确拒绝。缓存释放/失败回调退休生产器中的句柄关联。生产保持 FIFO，播放顺序由 Speech Channel/wait 决定。模型身份、单声道 Float32、稳定格式、递增序号、非空音频与显式 finished 必须全部有效。
+
+每个推理 session 在成功、失败和取消时都加入 provider cleanup，之后才完成或失败音频缓存。失败保留原始模型/缓存错误并唤醒读者；生产者通过 TaskLocal 避免缓存取消回调等待自身。提交播放失败取消对应句柄并保留清理错误；中断按 session/input 二元身份清理，根停止关闭接纳，加入所有在途预留和生产。原生交互关闭先卸载绑定并清理 AudioCache，再释放 scope；替代绑定必须等待清理完成。Assistant 的执行消费者在真实终态屏障后退休本输入残余句柄，不重放业务 Action。
+
+生产/播放展示使用 Assistant 自己的内部 UI.Island 权限，与任务岛、推理等待岛分别持有活动身份。App 绑定的原生播放事实携带 audioID；生产结束不能撤下仍播放的活动，旧 audioID 的结束不能撤下新播放。播放优先显示“正在说话”，其余生产显示“正在合成语音”；频谱仍由播放器直达 UI。停止先加入最终展示清理再退休 Assistant 注册。合成接纳、provider 清理、真实播放 drain 是不同完成边界。
+
+[SpeechPlaybackFailure.swift](SpeechPlaybackFailure.swift) 在 App 注入的播放错误边界、实际清理后适配合成/缓存失败文案，保留 underlying 原始错误。
+
+常驻 BasicSkill 独占通用窗口与 Task/Skill 生命周期教学，Assistant 身份指令不复制业务流程。摄影教学只维护自身媒体处置、窗口关闭和真实回执语义，不包含跨业务场景。普通 Action 失败作为观察继续决策，内部语音/字幕失败不能遮蔽同轮业务观察。

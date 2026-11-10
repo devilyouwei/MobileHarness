@@ -1,8 +1,10 @@
 # SpeechPerception — PCM 消费、语音识别与聆听政策
 
+本角色的静态类别由资源 Agent.json 声明并传入 Descriptor，归类与语义见 [Agents 分类](../README.md#agent-categories)。
+
 ## 角色容器
 
-[SpeechPerceptionContainer.swift](SpeechPerceptionContainer.swift) 是 AgentContainer 的稳定子能力。独立持有感知角色注册、输出任务及内部 VoiceInteractionSession。向 App 公开 ready、状态、请求和诊断投影，不公开内部会话；VoiceAgentSession 仅连接感知／合成容器与 Actions 执行端口，不注册角色或停止共享 runtime。结束当前会话清理该代注册，根停止终结容器并加入交互／检测清理。
+[SpeechPerceptionContainer.swift](SpeechPerceptionContainer.swift) 是 AgentContainer 的稳定子能力。独立持有感知角色注册、输出任务及内部 VoiceInteractionSession。向 App 公开 ready、状态、请求和诊断投影，不公开内部会话；VoiceAgentSession 连接感知容器、Assistant 语音子能力与 Actions 执行端口，不注册合成角色或停止共享 runtime。结束当前会话清理该代注册，根停止终结容器并加入交互／检测清理。
 
 生命周期由[模块根](../README.md#agent-container)统一编排；子容器能力不授予执行权。
 
@@ -23,10 +25,9 @@ UI.home.listeningRequests 是本角色单独订阅的控制源，提供 enabled/
 | [SpeechPerceptionAgent.swift](SpeechPerceptionAgent.swift) | 聆听策略、输入代际、VAD／ASR 协调与角色消息 |
 | [SpeechPerceptionMicrophone.swift](SpeechPerceptionMicrophone.swift) | 只读 PCM 的唯一角色订阅、布局校验与模型输入转换 |
 | [SpeechPerceptionProcessing.swift](SpeechPerceptionProcessing.swift) | 感知角色私有 Context、预处理和聆听策略 |
-| [SpeechPlaybackFailure.swift](SpeechPlaybackFailure.swift) | 播放清理边界的用户错误适配，保留合成／缓存原始错误 |
 | [SpeechRecognitionTurn.swift](SpeechRecognitionTurn.swift) | 已提交片段、冷启动前缀和转写聚合的有界工作 |
 | [VoiceActivitySegmenter.swift](VoiceActivitySegmenter.swift) | VAD 分段、尾静音及实际片段结束判定 |
-| [VoiceAgentSession.swift](VoiceAgentSession.swift) | 独立感知／合成容器与 Actions 语音执行的连接适配器 |
+| [VoiceAgentSession.swift](VoiceAgentSession.swift) | 感知容器、Assistant 语音子能力与 Actions 语音执行的连接适配器 |
 | [VoiceInteractionSession.swift](VoiceInteractionSession.swift) | 容器内部的语音／诊断组合与生命周期，不向 App 暴露 |
 
 ## 外部关系（一层）
@@ -163,7 +164,7 @@ Mono publishes unavailable once per format/listening epoch and still supports AS
 
 通信见 [Agent.json](../../Resources/Agents/SpeechPerception/Agent.json)，原生执行见 [Actions/Speech](../../Actions/Speech/Support/README.md)。
 
-AudioDetectionAgentSession 只注册检测角色、构造模型 Context 并绑定结果泵；Actions 中的 AudioDetectionSession 经中立连接端口组合该角色与 AudioDetectionExecution，不消费或转交原始 PCM。SpeechPlaybackFailure 在已加入播放清理后转换可展示文案，原始合成／缓存错误仍保留。
+AudioDetectionAgentSession 只注册检测角色、构造模型 Context 并绑定结果泵；Actions 中的 AudioDetectionSession 经中立连接端口组合该角色与 AudioDetectionExecution，不消费或转交原始 PCM。播放失败文案由 [Assistant](../Assistant/README.md#语音生产与播放) 拥有，感知角色只处理识别与聆听政策。
 
 ## App-owned diagnostic transport
 
@@ -198,4 +199,4 @@ SpeechListening日志只记录策略与生命周期检查点：enabled/paused、
 
 ## 自有灵动岛
 
-SpeechPerception在capture、聆听许可、识别phase和播放准入边界直接更新自有活动：可接纳输入时显示聆听/人声，ASR收尾显示识别；等待回复、关闭采集或停止撤下。连续聆听/人声保留elapsed起点，退出后重新计时，不依赖UI.voicePhase。容器绑定本角色consumer，复用共享有界发布，展示失败通过presentationFailure及容器runtime公开；停止在身份退休前加入最终end。不调用Assistant或SpeechSynthesis代发；字幕边界保持独立。
+SpeechPerception在capture、聆听许可、识别phase和播放准入边界直接更新自有活动：可接纳输入时显示聆听/人声，ASR收尾显示识别；等待回复、关闭采集或停止撤下。连续聆听/人声保留elapsed起点，退出后重新计时，不依赖UI.voicePhase。容器绑定本角色consumer，复用共享有界发布，展示失败通过presentationFailure及容器runtime公开；停止在身份退休前加入最终end。不调用Assistant代发；字幕边界保持独立。

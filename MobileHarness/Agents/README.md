@@ -31,17 +31,27 @@ flowchart LR
 
 App binds camera/device/voice and maintenance collaboration through neutral ports. No adapter retains or searches an Actions/Gateway upstream container. The complete execution path is in the [overall design](../README.md); this diagram shows only direct neighbors.
 
+## Agent categories
+
+每个角色的 `Agent.json.category` 是生产分类的唯一声明，加载器严格验证后通过 AgentConfiguration 传入不可变的 `AgentDescriptor.category`。AgentCategory 定义在 [AgentCore 身份契约](Support/Core/AgentDescriptor.swift)，只包含 perception 与 cognition，无默认类别。
+
+| category | 角色 |
+| --- | --- |
+| cognition | Assistant、Writer、Memory |
+| perception | SpeechPerception、VisionPerception、Photographer、ApplicationControl |
+
+cognition 表示认知职责；perception 包括感知预处理、快速响应及确定性执行。类别不等于是否调用模型，不授予权限，也不自动改变调度、队列、模型选择或持久化。通信收窄和轮次有效能力投影保留原类别。
+
 ## Roles and internal structure
 
 | Owner | Inputs and collaboration |
 | --- | --- |
-| [Assistant](Assistant/README.md) | Home text, Chat and private decision context; receives speech finals, requests synthesis and delegates fixed Tasks; selects dynamic Skills. |
+| [Assistant](Assistant/README.md) | Home text, Chat and private decision context; receives speech finals, owns asynchronous synthesis and delegates fixed Tasks; selects dynamic Skills. |
 | [ApplicationControl](ApplicationControl/README.md) | Settings/resources/devices/diagnostics requests and device/artifact/failure observations; owns administrative and diagnostic policy. |
 | [Memory](Memory/README.md) | History requests and private context; authorizes history calls and fixed Task results. |
 | [Writer](Writer/README.md) | Background authoring tasks, workspace-scoped Skills and native tool schemas, raw file streams, fixed model selections and recoverable artifacts. |
 | [Photographer](Photographer/README.md) | Camera/album requests, pose and tracking availability; owns capture/tracking intent and policy. Consumes PlatformKit position-update cadence; tracking dispatch retains only the newest pending intent. |
 | [SpeechPerception](SpeechPerception/README.md) | Listening requests, native PCM, VAD/ASR and sound-source computation; owns consent/half-duplex policy and transcript messages. |
-| [SpeechSynthesis](SpeechSynthesis/README.md) | Directed synthesis/cancel, TTS and owned cache production; does not issue playback calls itself. |
 | [VisionPerception](VisionPerception/README.md) | Read-only camera frames, Pose inference and projection; publishes pose and requests protected presentation. |
 | [Support](Support/README.md) | Cognitive Gateway adapters, policy, routing, coverage, Chat, Context and common lifecycle mechanisms. |
 
@@ -113,7 +123,7 @@ Agent task presentation belongs to the executing role: Writer publishes its crea
 
 SpeechPerception owns recognition-caption onset; Assistant independently handles the speaking control fact and clears only its own reply without inference. Final ASR text retains the formal FIFO. A failed perception round emits the existing empty-phase fact and joins presentation cleanup; Assistant releases that recognition binding. Restoration follows capture/consent/reply occupancy, preserving the original recognition error. Caption lifetime is not inferred by UI from playback completion. See [SpeechPerception](SpeechPerception/README.md) and [Assistant](Assistant/README.md#输入开始与自有回复字幕).
 
-各角色均通过自己绑定的 Gateway consumer 调用内部灵动岛工具：SpeechPerception 拥有聆听/识别，SpeechSynthesis 拥有合成/真实播放，Photographer 沿既有相机输入处理摄影，ApplicationControl 沿连接输入处理蓝牙提示；Assistant 仅管理自身任务、推理等待和本身输出。Actions 不设集中 UI 状态观察器代发。内部调用结果（含异常）由所属执行者处理，只有显式 LLM 调用反馈能触发 ReACT；共享机制见 [Support/Chat](Support/Chat/README.md)。
+各角色均通过自己绑定的 Gateway consumer 调用内部灵动岛工具：SpeechPerception 拥有聆听/识别，Assistant 的语音子能力拥有合成/真实播放，Photographer 沿既有相机输入处理摄影，ApplicationControl 沿连接输入处理蓝牙提示；Assistant 同时管理自身任务、推理等待和语音输出。Actions 不设集中 UI 状态观察器代发。内部调用结果（含异常）由所属执行者处理，只有显式 LLM 调用反馈能触发 ReACT；共享机制见 [Support/Chat](Support/Chat/README.md)。
 
 Skill-selected State can carry immutable images. Camera preview policy stays in Actions; shared Context/Chat handles scope reset, request assembly, budget protection and metadata-only audit. New user input retains images; a new dialog releases explicit selections through the owner callback.
 
@@ -127,7 +137,7 @@ Assistant 的 start 与 delegate 是按所有者选择的平级入口，Writer �
 
 ## Prompt ownership and discovery
 
-Each role owns its public description in Resources/Agents/<Role>/Agent.json and its private model instructions in its own resource directory. Support validates resource schema v9 and projects the existing v7 compiled contract. Assistant combines its own identity with generic Core/Skill rules and a public peer directory filtered by the actual instance communication policy and the shared executable delegation adapter. Public descriptions create no permissions and expose no private instructions. Writer owns its content-format templates; deterministic roles do not require artificial model prompts. See [resource contracts](../Resources/Agents/README.md).
+Each role owns its public description in Resources/Agents/<Role>/Agent.json and its private model instructions in its own resource directory. Support validates resource schema v10 and projects the v8 compiled contract. Assistant combines its own identity with generic Core/Skill rules and a public peer directory filtered by the actual instance communication policy and the shared executable delegation adapter. Public descriptions create no permissions and expose no private instructions. Writer owns its content-format templates; deterministic roles do not require artificial model prompts. See [resource contracts](../Resources/Agents/README.md).
 
 Writer 运行以委托入口为身份，workspace 是可选编辑目标；前序与 workspace 消息保持同一请求链，界面分别查询。
 

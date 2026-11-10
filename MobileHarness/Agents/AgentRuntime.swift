@@ -181,7 +181,7 @@ import StorageFiles
                 let policy = try CommunicationPolicy(
                     contracts: AgentContracts.communication,
                     configurations: [
-                        "Assistant", "SpeechPerception", "VisionPerception", "Photographer", "SpeechSynthesis",
+                        "Assistant", "SpeechPerception", "VisionPerception", "Photographer",
                         "Memory", "ApplicationControl", "Writer",
                     ]
                     .map {
@@ -211,7 +211,6 @@ import StorageFiles
                             AgentConfigurations.load(named: "VisionPerception").capabilities),
                         PhotographerAgent.runtimeCapabilities(
                             AgentConfigurations.load(named: "Photographer").capabilities),
-                        AgentConfigurations.load(named: "SpeechSynthesis").capabilities,
                         historyAgent.descriptor.capabilities, applicationControlAgent.descriptor.capabilities,
                         WriterAgent.capabilities(),
                     ] + AgentConfigurations.skillRegistries())
@@ -329,8 +328,9 @@ import StorageFiles
                 read: { scope in
                     try await cameraControl.previewSnapshot(scope: scope)
                 }, reset: { scope in await cameraControl.resetPreviewSelection(scope: scope) })
+            let speechOutput = AssistantSpeechOutput()
             let main = try AssistantAgent(
-                stateContext: stateContext,
+                stateContext: stateContext, speechOutput: speechOutput,
                 uiHome: home, uiSessionID: applicationControlSessionID,
                 reportsReplyActivity: true, chatProvider: chatProvider, conversations: conversations,
                 communications: communications,
@@ -358,7 +358,7 @@ import StorageFiles
                     })
             }
             let interaction = AssistantExecutionSession(
-                agent: main, manager: manager, output: gateway,
+                agent: main, manager: manager, output: gateway, speech: speechOutput,
                 report: { message in
                     Logger(subsystem: "dev.mobileharness", category: "Agents").error("\(message, privacy: .private)")
                 })
@@ -454,11 +454,13 @@ import StorageFiles
                 cancelReply: { [interaction, interactionSessionID] in
                     try await interaction.interruptConversation(sessionID: interactionSessionID)
                 },
-                makeSynthesis: { [contextScope] in
-                    try SpeechSynthesisAgent(
-                        synthesis: $0, store: $1,
-                        context: try Self.context(
-                            AgentID(rawValue: "speechSynthesis"), SpeechSynthesisContextState(), scope: contextScope))
+                startSpeech: { [interaction] synthesis, store in
+                    guard let speech = interaction.speech else { throw AgentContainerError.unavailable }
+                    try await speech.configure(synthesis: synthesis, store: store)
+                },
+                stopSpeech: { [interaction] in await interaction.speech?.endSession() },
+                playbackChanged: { [interaction] id, active in
+                    await interaction.speech?.playbackChanged(audioID: id, active: active)
                 },
                 makePerception: { [interactionSessionID, uiHome, contextScope] in
                     try SpeechPerceptionAgent(

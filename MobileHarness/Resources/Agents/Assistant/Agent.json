@@ -1,5 +1,6 @@
 {
-  "version": 9,
+  "version": 10,
+  "category": "cognition",
   "id": "assistant",
   "description": "I handle user conversation, understand goals, coordinate available capabilities and report actual results clearly. I own my foreground goals and respect other Agents' private contexts.",
   "communication": {
@@ -81,14 +82,6 @@
       "interaction.replyActivity"
     ],
     "sends": [
-      {
-        "contract": "speech.synthesize",
-        "target": "speechSynthesis"
-      },
-      {
-        "contract": "speech.cancel",
-        "target": "speechSynthesis"
-      },
       {
         "contract": "task.request",
         "target": "photographer"

@@ -1049,7 +1049,7 @@ core_prompt = (ROOT / 'MobileHarness/Agents/Support/Core/Capability/CapabilityCo
 if any(marker in core_prompt for marker in ('speechChannel', 'audio playback', 'Speak-then-act')):
     errors.append('Assistant speech policy must not enter AgentCore prompt construction')
 for source in (ROOT / 'MobileHarness/Agents/Support/Core').rglob('*.swift'):
-    if re.search(r'public (?:struct|enum) (?:PoseObservation|SpeechPhase|SpeechSynthesisInput)\b', source.read_text()):
+    if re.search(r'public (?:struct|enum) (?:PoseObservation|SpeechPhase)\b', source.read_text()):
         errors.append('Agent communication domain values belong to Agents/Support/Communication')
 
 # Generic communication infrastructure must not regain application domain schemas or camera samples.
@@ -1155,7 +1155,7 @@ if targets['Agents'].get('path') != 'MobileHarness' or targets['Agents'].get('so
     errors.append('Agents must compile only Agents sources while packaging shared assets')
 asset_root = ROOT / 'MobileHarness/Resources'
 asset_catalog = json.loads((asset_root / 'Catalog.json').read_text())
-for group, version in [('agents', 9), ('skills', 3)]:
+for group, version in [('agents', 10), ('skills', 3)]:
     for name, relative in asset_catalog[group].items():
         source = asset_root / relative
         parts = Path(relative).parts
@@ -1168,6 +1168,8 @@ for group, version in [('agents', 9), ('skills', 3)]:
         if configuration.get('version') != version:
             errors.append(f'Invalid {group} version: {relative}')
         if group == 'agents':
+            if configuration.get('category') not in ('perception', 'cognition'):
+                errors.append(f'Invalid Agent category: {relative}')
             description = configuration.get('description')
             if not isinstance(description, str) or not description.strip() or len(description.encode('utf-8')) > 2048:
                 errors.append(f'Invalid Agent public description: {relative}')
@@ -1249,12 +1251,12 @@ if 'resolveImage:' in (ROOT / 'MobileHarness/Agents/AgentContainer.swift').read_
 print('SDK-owned values and caller-owned model input adaptation passed.')
 
 # Generic input contracts cannot own business Agent messages.
-domain_names = {'SpeechPhase', 'SpeechSynthesisInput', 'SpeechValidationError', 'PoseObservation', 'VisionValidationError'}
+domain_names = {'SpeechPhase', 'SpeechValidationError', 'PoseObservation', 'VisionValidationError'}
 for source in (ROOT / 'MobileHarness/Agents/Support/Core/Input').rglob('*.swift'):
     declared = set(re.findall(r'\b(?:struct|enum|protocol|typealias)\s+(\w+)', source.read_text()))
     if declared & domain_names:
         raise SystemExit(f'Agent-domain value in generic input contracts: {source.relative_to(ROOT)}')
-for name, filename in [('SpeechPhase', 'SpeechValues.swift'), ('SpeechSynthesisInput', 'SpeechValues.swift'), ('PoseObservation', 'PoseObservation.swift')]:
+for name, filename in [('SpeechPhase', 'SpeechValues.swift'), ('PoseObservation', 'PoseObservation.swift')]:
     source = ROOT / 'MobileHarness/Agents/Support/Communication' / filename
     if not source.is_file() or not re.search(r'public (?:struct|enum) ' + name + r'\b', source.read_text()):
         raise SystemExit(f'Missing Agent-owned domain value: {name}')
@@ -1432,7 +1434,7 @@ conversation_view_source = (ROOT / 'MobileHarness/UI/Conversation/ConversationVi
 if '.task(id: issue.id)' in conversation_view_source:
     raise SystemExit('Toast expiry belongs to the UI root, never the page.')
 for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
-    if source.name in {'AgentContainer.swift', 'AssistantContainer.swift', 'ApplicationControlContainer.swift', 'MemoryContainer.swift', 'PhotographerContainer.swift', 'SpeechPerceptionContainer.swift', 'SpeechSynthesisContainer.swift', 'VisionPerceptionContainer.swift', 'VoiceInteractionSession.swift'}:
+    if source.name in {'AgentContainer.swift', 'AssistantContainer.swift', 'ApplicationControlContainer.swift', 'MemoryContainer.swift', 'PhotographerContainer.swift', 'SpeechPerceptionContainer.swift', 'VisionPerceptionContainer.swift', 'VoiceInteractionSession.swift'}:
         continue  # Read-only view-provider fields, not business mutation handles.
     if re.search(r':\s*(?:' + '|'.join(ui_model_names[:9]) + r')\b', source.read_text()):
         raise SystemExit(f'Agent business consumers require narrow presentation interfaces: {source.relative_to(ROOT)}')

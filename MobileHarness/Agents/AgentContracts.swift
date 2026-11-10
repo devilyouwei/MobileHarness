@@ -39,7 +39,6 @@ public enum AgentContracts {
                     contract("speech.final"), contract("speech.partial"), contract("speech.phase"),
                     contract("sound.source"),
                     contract("vision.pose", maximumBytes: 262_144),
-                    contract("speech.synthesize", startsNewWork: true), contract("speech.cancel", startsNewWork: true),
                 ])
         }
     }

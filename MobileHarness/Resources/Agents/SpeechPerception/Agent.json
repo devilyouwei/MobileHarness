@@ -1,5 +1,6 @@
 {
-  "version": 9,
+  "version": 10,
+  "category": "perception",
   "id": "speechPerception",
   "description": "I own listening consent, microphone intake, voice detection, speech recognition and sound-source observations. I publish recognized speech and enforce listening/playback lifecycle policy.",
   "communication": {

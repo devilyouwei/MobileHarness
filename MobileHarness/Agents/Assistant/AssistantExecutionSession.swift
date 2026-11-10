@@ -9,11 +9,15 @@ import UI
 public actor AssistantExecutionSession {
     public nonisolated let agent: AssistantAgent
     public private(set) var cleanupFailure: AgentFailure?
+    let speech: AssistantSpeechOutput?
     private let island = AgentIslandPublication()
     private let waitingIsland = AgentIslandPublication()
     public var presentationFailure: String? {
         get async {
-            let failures = [await island.lastFailure, await waitingIsland.lastFailure].compactMap { $0 }
+            let failures = [
+                await island.lastFailure, await waitingIsland.lastFailure, await speech?.snapshot().presentationFailure,
+            ]
+            .compactMap { $0 }
             return failures.isEmpty ? nil : failures.joined(separator: "; ")
         }
     }
@@ -31,9 +35,21 @@ public actor AssistantExecutionSession {
         agent: AssistantAgent, manager: AgentManager, output: OutputGateway,
         report: @escaping @Sendable (String) async -> Void = { _ in }
     ) {
+        self.speech = nil
         self.agent = agent
         self.manager = manager
         self.output = output
+        self.report = report
+    }
+
+    init(
+        agent: AssistantAgent, manager: AgentManager, output: OutputGateway, speech: AssistantSpeechOutput,
+        report: @escaping @Sendable (String) async -> Void
+    ) {
+        self.agent = agent
+        self.manager = manager
+        self.output = output
+        self.speech = speech
         self.report = report
     }
 
@@ -71,6 +87,7 @@ public actor AssistantExecutionSession {
                 await island.start()
                 await waitingIsland.bind(consumer: consumer, source: .assistant)
                 await waitingIsland.start()
+                await speech?.bindPresentation(consumer)
                 await agent.bindReplyWaiting { [waitingIsland] waiting in
                     await waitingIsland.submit(waiting ? Self.waitingContent : nil)
                 }
@@ -87,12 +104,22 @@ public actor AssistantExecutionSession {
                                 // Explicit host cancellation releases a playback seal without closing this reader.
                                 try Task.checkCancellation()
                             } catch { await self.report("Agent output failed: \(error)") }
+                            if case .control(let value) = envelope.output,
+                                value == "agent.finished" || value == "agent.cancelled"
+                                    || value.hasPrefix("agent.error:")
+                            {
+                                // The execution boundary has drained or rejected its effects. Retire orphaned handles too.
+                                await self.speech?.cancel(
+                                    input: AgentInput(
+                                        id: envelope.inputID, sessionID: envelope.sessionID, payload: .text("")))
+                            }
                         }
                     } catch is CancellationError {} catch { await report("Agent output transport stopped: \(error)") }
                 }
                 guard !closed else { throw CommunicationError.scopeClosed }
                 started = true
             } catch {
+                await speech?.stop()
                 await waitingIsland.stop()
                 await island.stop()
                 await removeRegistration()
@@ -181,6 +208,7 @@ public actor AssistantExecutionSession {
         let task = Task {
             starting?.cancel()
             _ = await starting?.result
+            await speech?.stop()
             await waitingIsland.stop()
             await island.stop()
             await removeRegistration()

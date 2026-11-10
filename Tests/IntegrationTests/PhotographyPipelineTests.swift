@@ -230,7 +230,7 @@ extension LiveRuntimeTests {
         let secondConfig = try AgentConfiguration(
             contracts: AgentContracts.communication,
             data: JSONSerialization.data(withJSONObject: [
-                "version": 7, "id": "second", "actions": [String: [String]](), "tools": [],
+                "version": 8, "category": "cognition", "id": "second", "actions": [String: [String]](), "tools": [],
                 "communication": [
                     "inputs": [["contract": "vision.pose", "version": 1, "kind": "observation"]],
                     "subscriptions": [
@@ -242,7 +242,7 @@ extension LiveRuntimeTests {
         let thirdConfig = try AgentConfiguration(
             contracts: AgentContracts.communication,
             data: JSONSerialization.data(withJSONObject: [
-                "version": 7, "id": "third", "actions": [String: [String]](), "tools": [],
+                "version": 8, "category": "cognition", "id": "third", "actions": [String: [String]](), "tools": [],
                 "communication": [
                     "inputs": [["contract": "vision.pose", "version": 1, "kind": "observation"]],
                     "subscriptions": [

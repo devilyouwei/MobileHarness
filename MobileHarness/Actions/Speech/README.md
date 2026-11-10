@@ -43,3 +43,5 @@ update 的固定使用者是 SpeechPerception；实际 source/session/revision �
 ## 公开聆听控制
 
 `Speech.Listening.startListening` / `stopListening` 均为无参数有限 Action，拒绝未知键，timeout 为 90 秒。SpeechModule 通过显式 SpeechListeningCapability.setListening 绑定；未绑定能力或不支持控制时抛出 listeningUnavailable。SpeechExecutionEndpoint 校验根会话并调用弱绑定的 VoiceOutputHandling。启停直接取得感知策略并实际应用，不通过 UI 请求或二次 Action 排队。模型不能提交内部 update 的 revision/paused。完成及取消边界见 [Listening](Listening/README.md)。
+
+Assistant 的语音子能力预留并生产 AudioCache 句柄；Speech.Playback.speak 可在生产期间开始读取，接纳不证明已有 PCM。Actions 不选择 TTS 模型或注册合成角色，取消/失败经同一句柄加入生产者与原生播放清理。

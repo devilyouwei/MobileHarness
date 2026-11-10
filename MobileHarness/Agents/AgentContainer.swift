@@ -64,7 +64,7 @@ import StorageFiles
                 children: [
                     .init(path: "agents.assistant"), .init(path: "agents.applicationcontrol"),
                     .init(path: "agents.writer"), .init(path: "agents.memory"), .init(path: "agents.photographer"),
-                    .init(path: "agents.speechperception"), .init(path: "agents.speechsynthesis"),
+                    .init(path: "agents.speechperception"),
                     .init(path: "agents.visionperception"),
                 ])
         }
@@ -79,9 +79,6 @@ import StorageFiles
                 "agents.memory": AgentStateSnapshot.reader(of: memory) { try await $0.stateSnapshot() },
                 "agents.photographer": AgentStateSnapshot.reader(of: photographer) { try await $0.stateSnapshot() },
                 "agents.speechperception": AgentStateSnapshot.reader(of: speechPerception) {
-                    try await $0.stateSnapshot()
-                },
-                "agents.speechsynthesis": AgentStateSnapshot.reader(of: speechSynthesis) {
                     try await $0.stateSnapshot()
                 },
                 "agents.visionperception": AgentStateSnapshot.reader(of: visionPerception) {
@@ -154,7 +151,6 @@ import StorageFiles
         public let memory: MemoryContainer
         public let photographer: PhotographerContainer
         public let speechPerception: SpeechPerceptionContainer
-        public let speechSynthesis = SpeechSynthesisContainer()
         public let visionPerception = VisionPerceptionContainer()
         @ObservationIgnored private lazy var lifecycle = AgentContainerLifecycle(
             start: { [unowned self] in try await self.startServices() },
@@ -379,7 +375,6 @@ import StorageFiles
             _ = await preparation?.result
             var cleanupErrors: [any Error] = []
             do { try await speechPerception.stop() } catch { cleanupErrors.append(error) }
-            do { try await speechSynthesis.stop() } catch { cleanupErrors.append(error) }
             do { try await visionPerception.stop() } catch { cleanupErrors.append(error) }
             if !cleanupErrors.isEmpty { throw NativeCleanupFailure(errors: cleanupErrors) }
         }
@@ -459,7 +454,7 @@ import StorageFiles
             let prepared = try await VoiceInteractionSession(
                 home: homeUI, diagnostics: diagnosticsUI, language: languageModels, speech: speechModels,
                 memoryPressure: memoryPressure, audio: audio, runtime: runtime(),
-                perceptionContainer: speechPerception, synthesisContainer: speechSynthesis,
+                perceptionContainer: speechPerception,
                 modelName: { [applicationControl] in await applicationControl.modelName },
                 progress: progress)
             try Task.checkCancellation()

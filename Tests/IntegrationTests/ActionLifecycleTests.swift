@@ -51,6 +51,7 @@ private actor ReceiptAgent: Agent {
     init(id: AgentID = .assistant, rejectOnce: Bool = false, capabilities: CapabilityRegistry? = nil) throws {
         self.rejectOnce = rejectOnce
         descriptor = AgentDescriptor(
+            category: .cognition,
             id: id, name: "Receipt fixture", inputs: [.actionResult, .activityEvent],
             outputs: [.actionCall, .toolCall],
             capabilities: try capabilities ?? CapabilityRegistry())

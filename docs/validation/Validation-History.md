@@ -2,6 +2,10 @@
 
 本文件是按日期追加的跨模块验证日志。每节中的版本、数字、失败与未执行范围只对应该轮，不作为当前设计；专项模型和硬件样本在 [验证索引](README.md) 所列报告中拥有正文。相同运行的摘要与专项报告不能算作两次独立验收。
 
+## 2026-11-10 — Assistant 内聚语音合成
+
+在 `codex/assistant-owned-speech` 完成合成生产、播放展示及取消归属迁移；删除独立 SpeechSynthesis 角色与通信。完整检查、四个 iOS Simulator 构建及资源校验通过；新回归覆盖容量、session/input 隔离和停止加入。真实模型、iPhone 播放与打断尚未验收。工具链过程、具体命令及证据边界见[专项验证](Assistant-Owned-Speech.md)。
+
 
 
 
@@ -1790,7 +1794,7 @@ Every row passed the shared structure, graph, link, navigation and current-desig
 | 17 | [MobileHarness/Agents/Memory/README.md](../../MobileHarness/Agents/Memory/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 18 | [MobileHarness/Agents/Photographer/README.md](../../MobileHarness/Agents/Photographer/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 19 | [MobileHarness/Agents/SpeechPerception/README.md](../../MobileHarness/Agents/SpeechPerception/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
-| 20 | [MobileHarness/Agents/SpeechSynthesis/README.md](../../MobileHarness/Agents/SpeechSynthesis/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 20 | [MobileHarness/Agents/SpeechSynthesis/README.md](../../MobileHarness/Agents/Assistant/README.md#语音生产与播放) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 21 | [MobileHarness/Agents/Support/README.md](../../MobileHarness/Agents/Support/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
 | 22 | [MobileHarness/Agents/VisionPerception/README.md](../../MobileHarness/Agents/VisionPerception/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 23 | [MobileHarness/Agents/Support/Chat/README.md](../../MobileHarness/Agents/Support/Chat/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
@@ -2025,7 +2029,7 @@ Documentation-only inspection of all 19 `MobileHarness/Agents/**/README.md` docu
 | [Memory](../../MobileHarness/Agents/Memory/README.md) | Actor/history workflow, State hooks, title generator and prompts; separate fixed transactions/Chat/title inference and document title sampling, output bounds and timeout. |
 | [ApplicationControl](../../MobileHarness/Agents/ApplicationControl/README.md) | Fixed transaction actor, classifiers/grants, Chat hooks and prompts; add source composition and integrate prompt ownership while retaining native/Action/internal registration distinctions. |
 | [SpeechPerception](../../MobileHarness/Agents/SpeechPerception/README.md) | Resident actor, listening policy, resampler/segmentation/ASR and sound estimator; add internal processing flow, explicit FIFO/output overflow and confirmed diagnostic-yield limitation. |
-| [SpeechSynthesis](../../MobileHarness/Agents/SpeechSynthesis/README.md) | Actor, context request builder and PCM producer; distinguish queued admissions from the active producer/global handle bound, configurable timeout and pause behavior. |
+| [SpeechSynthesis](../../MobileHarness/Agents/Assistant/README.md#语音生产与播放) | Actor, context request builder and PCM producer; distinguish queued admissions from the active producer/global handle bound, configurable timeout and pause behavior. |
 | [VisionPerception](../../MobileHarness/Agents/VisionPerception/README.md) | Actor, cadence, motion, overlay/gaze and generic mailbox; add internal flow and correct the shared 18-slot capacity with keyed coalescing and no reserved per-kind partition. |
 | [Support](../../MobileHarness/Agents/Support/README.md) | Target imports/resources and adapter source; correct component table and distinguish business schemas, prompt loading and Core protocol packaging. |
 | [Support/Chat](../../MobileHarness/Agents/Support/Chat/README.md) | All six source files and role call sites; redraw independent consumers, document per-generation parser ownership, exact ten-request-block history, prompt keys/errors, checked secondary queues and joined cleanup. |

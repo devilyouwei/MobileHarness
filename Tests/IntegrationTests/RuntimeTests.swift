@@ -74,7 +74,8 @@ import Testing
             descriptor: descriptor)
     }
     try OutputValidator.validate(.scheduling(.beginWait), descriptor: descriptor)
-    let restricted = AgentDescriptor(id: .assistant, name: "restricted", inputs: [.text], outputs: [.text])
+    let restricted = AgentDescriptor(
+        category: .cognition, id: .assistant, name: "restricted", inputs: [.text], outputs: [.text])
     #expect(throws: HarnessError.forbiddenOutput) {
         try OutputValidator.validate(.control("start"), descriptor: restricted)
     }
@@ -555,6 +556,7 @@ private actor SignalFeedbackRecorder: Agent {
     private var lifecycle: AgentLifecycle = .registered
     init() throws {
         descriptor = AgentDescriptor(
+            category: .cognition,
             id: .assistant, name: "Signal feedback fixture", inputs: [.text, .toolResult], outputs: [.toolCall],
             capabilities: try CapabilityRegistry(internalTools: [InternalTool(path: "System.Runtime.runtimeInfo")]))
     }
@@ -588,7 +590,7 @@ private actor SignalFeedbackRecorder: Agent {
     let configuration = try AgentConfiguration(
         data: Data(
             #"""
-            {"version":7,"id":"assistant","actions":{},"tools":[],"communication":{
+            {"version":8,"category":"cognition","id":"assistant","actions":{},"tools":[],"communication":{
             "inputs":[{"contract":"tool.result","version":1,"kind":"toolResult"}],
             "subscriptions":[],"publications":[],"sends":[]}}
             """#.utf8))
@@ -731,6 +733,7 @@ private actor RuntimeToolFixture: Agent {
     nonisolated let descriptor: AgentDescriptor
     init(id: AgentID = .assistant, extraTools: [InternalTool] = []) throws {
         descriptor = AgentDescriptor(
+            category: .cognition,
             id: id, name: "Native fixture", inputs: [.text, .toolResult],
             outputs: [.actionCall, .toolCall, .control],
             capabilities: try CapabilityRegistry(

@@ -836,6 +836,7 @@ public actor OutputGateway {
                     let effective = try await manager.agent(envelope.source).effectiveCapabilities(for: roundID)
                 {
                     validationDescriptor = AgentDescriptor(
+                        category: descriptor.category,
                         id: descriptor.id, name: descriptor.name, version: descriptor.version,
                         inputs: descriptor.inputs, outputs: descriptor.outputs, capabilities: effective)
                 }

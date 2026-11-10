@@ -191,7 +191,7 @@ private func taskFixtureConfiguration(parent: Bool) throws -> AgentConfiguration
     return try AgentConfiguration(
         contracts: AgentContracts.communication,
         data: JSONSerialization.data(withJSONObject: [
-            "version": 7, "id": id, "actions": actions, "tools": [],
+            "version": 8, "category": "cognition", "id": id, "actions": actions, "tools": [],
             "communication": [
                 "inputs": inputs, "subscriptions": [], "publications": [],
                 "sends": sends.map { ["contract": $0, "target": peer] },
@@ -215,6 +215,7 @@ private actor TaskFixtureAgent: Agent {
     private var requestCalls: [String: String] = [:]
     init(configuration: AgentConfiguration, model: TaskFixtureChat? = nil) throws {
         descriptor = AgentDescriptor(
+            category: .cognition,
             id: configuration.agentID, name: configuration.agentID.rawValue,
             inputs: Set(configuration.communication.inputs.map(\.kind)),
             outputs: [.communication, .actionCall, .control],

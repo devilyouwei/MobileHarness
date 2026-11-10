@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "photography",
-  "revision": 44,
+  "revision": 46,
   "description": "Photo/video capture, camera controls, photo saving and video save/ignore. Tracking: application-control.",
   "dependencies": [],
   "useActions": [

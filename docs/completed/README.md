@@ -1,5 +1,7 @@
 # 已完成需求归档
 
+- [Agent 静态类别](Agent-Categories.md)（2026-11-10）：perception/cognition 资源声明、运行时身份保留与严格配置校验。
+
 - [Writer 按 ID 直接打开和进入](Writer-Direct-Workspace-Access.md)（2026-11-10）。已知工作区 ID 可直接使用，搜索用于发现作品。
 
 - [Writer 精选事件播报](Writer-Selective-Assistant-Feedback.md)（2026-11-10）。接纳、里程碑、追问和终态进入 Assistant 语音与后续对话上下文。
@@ -148,3 +150,5 @@
 - [Writer 工具与工作区身份](Writer-Workspace-Tools-and-Identity.md)（2026-11-10）。统一作品 ID、精简 Skill 教学并验证直接新建和续作。
 
 - [Writer 重复创建与缺入口恢复](Writer-Create-Loop.md)（2026-11-09）。同一委托复用创建分配，初始化时创建入口文件，旧草稿缺入口引导到 edit。
+
+- [D3 Edge Core AI conversion](D3-Edge-CoreAI-Conversion.md)：文本模型转换、对照验证与 Hugging Face 发布完成；业务误判、数值漂移和平台边界见专项验证。

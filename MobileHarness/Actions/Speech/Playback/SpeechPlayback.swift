@@ -4,7 +4,7 @@ import StorageCache
 import StorageCore
 import Synchronization
 
-/// Typed audio checkout, playback and cleanup only. Synthesis belongs to SpeechSynthesisAgent.
+/// Typed audio checkout, playback and cleanup only. Synthesis belongs to Assistant.
 public actor SpeechPlayback {
     private let store: AudioCache
     public init(store: AudioCache) { self.store = store }

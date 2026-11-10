@@ -111,7 +111,7 @@ Camera与Web在创建UI窗口时显式提供各自图标。Actions只选择显�
 
 生产 BehaviorAssembly 将公开 Action 投影为 scheduled 执行，Tool 投影保留 direct；同一函数可有两种协议适配，业务实现及资源检查仍共享。Assistant 所有 Skill 函数采用 XML Action；Writer 使用独立 Tool 目录。显式测试/宿主注入的注册策略不被生产投影重写。
 
-UI.Island工具执行生产者自己决定的语义内容。Writer与Assistant管理自身任务，Assistant另管理推理等待；SpeechPerception管理聆听/识别，SpeechSynthesis管理合成/真实播放，Photographer和ApplicationControl管理摄影与连接展示。Actions不从UI状态或任务日志推断角色展示。
+UI.Island工具执行生产者自己决定的语义内容。Writer与Assistant管理自身任务，Assistant另管理推理等待；SpeechPerception管理聆听/识别，Assistant的语音子能力管理合成/真实播放，Photographer和ApplicationControl管理摄影与连接展示。Actions不从UI状态或任务日志推断角色展示。
 
 Writer workspace commands, including preview/describe, enter through Gateway direct tools. The admitted edit returns a stream identity; source append/complete/abort use the host-bound ArtifactStreaming continuation with delegate/stream validation and caller backpressure. Revoke closes ordinary continuation admission; release joins actual work before retiring the editor, and Actions root shutdown provides final cleanup. Tool completion, file completion and Writer task completion are separate boundaries. Source intake only checkpoints the draft; independently scheduled safe previews do not block it. Explicit render joins pending previews and executes complete scripts; finish requires a current successful render and publishes once. Detailed bounds and failure semantics belong to [Artifacts](Artifacts/README.md#执行与续写生命周期); the UI/Storage modules do not own creative-loop or progress policies.
 
@@ -140,3 +140,5 @@ History.Conversation.clearLogs为用户日志管理提供内部业务函数：�
 Task Actions expose foreground task.start/end and independent task.delegate; agent_id on task.send/cancel selects communication, without selecting the receiver's workspace. History reads role-owned messages and shared log details. Prompt images decode only logged request bytes; no history-to-camera-cache or history-to-album fallback port is assembled.
 
 历史 UI facade 只注入真实读取、分页、摘要、删除及日志清理端口；不注入对旧回复重新解析的 execution preview formatter。
+
+原生采集故障由 Speech/Listening 局部退役与有限恢复，不取消业务回复。显式用户停止与生命周期关闭保留全会话取消；失败和清理证据仍沿既有结果/容器通道上报，普通 Action 失败不触发全局聆听退出。

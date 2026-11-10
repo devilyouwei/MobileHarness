@@ -124,7 +124,6 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
             SpeechPerceptionAgent.runtimeCapabilities(AgentConfigurations.load(named: "SpeechPerception").capabilities),
             VisionPerceptionAgent.runtimeCapabilities(AgentConfigurations.load(named: "VisionPerception").capabilities),
             PhotographerAgent.runtimeCapabilities(AgentConfigurations.load(named: "Photographer").capabilities),
-            AgentConfigurations.load(named: "SpeechSynthesis").capabilities,
             try ApplicationControlAgent(
                 sessionID: UUID().uuidString,
                 context: try AgentContextRepository(

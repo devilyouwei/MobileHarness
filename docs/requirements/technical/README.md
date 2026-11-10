@@ -75,3 +75,5 @@ Completed scope: [可读预览编号与合并图片输入](../../completed/Reada
 - [Writer 委托与 Workspace 解耦](Writer-Workspace-Separation.md)：统一消息、独立 workspace、开发重置及验收。
 
 - [Writer 消息倒序与底部自动加载](Writer-Records-Descending-Scroll.md)。分页实现和定向测试已完成，模拟器原生交互待验证。
+
+- [Assistant 内聚语音合成](Assistant-Owned-Speech.md)：语音生产所有权、旧角色移除及后续输入协调边界。

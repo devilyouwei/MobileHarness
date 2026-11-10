@@ -6,8 +6,6 @@ public enum PerceptionMessage: Codable, Sendable, Equatable {
     case speechPhase(SpeechPhase)
     case soundSource(SoundSourceObservation)
     case pose(PoseObservation)
-    case speechSynthesis(SpeechSynthesisInput)
-    case cancelSpeech(String)
     public var contract: String {
         switch self {
         case .transcript(_, true): "speech.final"
@@ -15,8 +13,6 @@ public enum PerceptionMessage: Codable, Sendable, Equatable {
         case .speechPhase: "speech.phase"
         case .soundSource: "sound.source"
         case .pose: "vision.pose"
-        case .speechSynthesis: "speech.synthesize"
-        case .cancelSpeech: "speech.cancel"
         }
     }
     public func validate() throws {
@@ -25,9 +21,7 @@ public enum PerceptionMessage: Codable, Sendable, Equatable {
             guard text.utf8.count <= (final ? 4096 : 16300), !final || !text.isEmpty else {
                 throw CommunicationError.invalidPayload
             }
-        case .speechSynthesis(let request):
-            do { try request.validate() } catch { throw CommunicationError.invalidPayload }
-        case .cancelSpeech, .speechPhase: break
+        case .speechPhase: break
         case .soundSource(let value):
             do { try value.validate() } catch { throw CommunicationError.invalidPayload }
         case .pose(let pose):
@@ -43,10 +37,6 @@ extension AgentMessage {
     public static func speechPhase(_ phase: SpeechPhase) -> AgentMessage { wrap(.speechPhase(phase)) }
     public static func soundSource(_ value: SoundSourceObservation) -> AgentMessage { wrap(.soundSource(value)) }
     public static func pose(_ pose: PoseObservation) -> AgentMessage { wrap(.pose(pose)) }
-    public static func speechSynthesis(_ request: SpeechSynthesisInput) -> AgentMessage {
-        wrap(.speechSynthesis(request))
-    }
-    public static func cancelSpeech(_ id: String) -> AgentMessage { wrap(.cancelSpeech(id)) }
     private static func wrap(_ value: PerceptionMessage) -> AgentMessage {
         AgentMessage(
             contract: value.contract, content: value,

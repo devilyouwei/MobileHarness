@@ -177,6 +177,7 @@ private actor WriterFailureOutputProbe {
 }
 private actor WriterResultSink: Agent {
     nonisolated let descriptor = AgentDescriptor(
+        category: .cognition,
         id: .assistant, name: "Assistant fixture", inputs: [.observation, .communicationReceipt],
         outputs: [.communication])
     nonisolated let outputs = AsyncStream<OutputEnvelope> { $0.finish() }

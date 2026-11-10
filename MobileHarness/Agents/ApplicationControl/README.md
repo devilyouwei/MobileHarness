@@ -1,5 +1,7 @@
 # ApplicationControl — 设置、资源、设备与故障策略
 
+本角色的静态类别由资源 Agent.json 声明并传入 Descriptor，归类与语义见 [Agents 分类](../README.md#agent-categories)。
+
 ## 角色容器
 
 [ApplicationControlContainer.swift](ApplicationControlContainer.swift) 是 AgentContainer 的稳定子能力。持有角色执行会话、设置／资源／设备工作流、环境事实 worker 和观察生命周期。停止先加入环境 worker，再清理角色；Provider 事务和原生执行仍归 Actions。

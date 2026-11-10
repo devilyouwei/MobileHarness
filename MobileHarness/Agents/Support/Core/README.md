@@ -9,7 +9,7 @@
 | 文件 | 职责 |
 | --- | --- |
 | [Agent.swift](Agent.swift) | Actor 协议：生命周期、输入接纳、输出流、状态及按轮有效目录 |
-| [AgentDescriptor.swift](AgentDescriptor.swift) | 身份、版本、输入／输出种类和初始能力声明 |
+| [AgentDescriptor.swift](AgentDescriptor.swift) | AgentCategory、必填静态类别、身份、版本、输入／输出种类和初始能力声明 |
 | [AgentID.swift](AgentID.swift) | 中立身份值，不内置生产角色名称 |
 | [AgentInput.swift](AgentInput.swift) | 输入载荷、因果元数据、SignalOrigin 及中立故障值 |
 | [InputKind.swift](InputKind.swift) | InputPayload 对应的种类集合 |
@@ -95,3 +95,5 @@ ContainerContext.swift 定义 ContainerContextProviding 异步只读协议、泛
 ContainerContextSource is the single type-erased snapshot reader. Its generic initializer encodes an Encodable value; its explicit `encoded:` initializer passes existing JSON Data through unchanged. The source owns no facts, cache or lifecycle. Agents/Support/Context performs bounded JSON collection and session fencing; actual owners produce and validate snapshots.
 
 ContainerContext exposes the shared multimodal snapshot/image contracts through AgentCore aliases. These request-time values do not put image bytes into the private AgentContext journal.
+
+AgentCategory 是 perception/cognition 两值的 Codable 枚举；AgentDescriptor.category 必填且不可变，没有默认值。Core 只定义分类值，生产角色归类由各角色资源拥有，见 [Agents 分类](../../README.md#agent-categories)。

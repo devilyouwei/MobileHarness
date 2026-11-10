@@ -6,7 +6,6 @@
     "Memory": "Agents/Memory/Agent.json",
     "ApplicationControl": "Agents/ApplicationControl/Agent.json",
     "SpeechPerception": "Agents/SpeechPerception/Agent.json",
-    "SpeechSynthesis": "Agents/SpeechSynthesis/Agent.json",
     "VisionPerception": "Agents/VisionPerception/Agent.json",
     "Writer": "Agents/Writer/Agent.json"
   },

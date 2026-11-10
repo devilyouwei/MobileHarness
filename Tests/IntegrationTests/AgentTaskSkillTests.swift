@@ -1080,7 +1080,7 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
 
 @Test(.actionCatalog) func baseSkillsAreTheOnlyRoleModelFunctionSource() throws {
     for name in [
-        "Assistant", "Photographer", "Memory", "ApplicationControl", "SpeechPerception", "SpeechSynthesis",
+        "Assistant", "Photographer", "Memory", "ApplicationControl", "SpeechPerception",
         "VisionPerception",
     ] {
         let configuration = try AgentConfigurations.load(named: name)
@@ -2376,11 +2376,9 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         context: context)
     let child = ObservationRecorder(
         id: "writer", reject: outcome.hasPrefix("rejected"), executions: database.writerExecutions)
-    let speech = ObservationRecorder(id: "speechSynthesis")
     let manager = AgentManager()
     try await manager.register(assistant, sessionID: session)
     try await manager.register(child, sessionID: session)
-    try await manager.register(speech, sessionID: session)
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication, configurations: AgentConfigurations.all())
     let input = InputGateway(manager: manager, policy: policy)
@@ -2406,8 +2404,11 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         manager: manager, requests: input, tools: assembly.tools, actions: scheduler, policy: policy, sink: { _ in })
     try await assistant.start()
     await child.start()
-    await speech.start()
     let log = WriterOutputLog()
+    try await assistant.bindSpeechOutput(
+        SpeechRequestProbe(prepared: { id, text in
+            await log.synthesized(id: id, text: text)
+        }))
     let consumer = try await output.consumer(for: assistant)
     let collection = Task {
         do {
@@ -2458,7 +2459,6 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         await assistant.stop()
         try await collection.value
         await child.stop()
-        await speech.stop()
         await output.shutdown()
         try await database.shutdown()
         return
@@ -2529,7 +2529,6 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         await assistant.stop()
         try await collection.value
         await child.stop()
-        await speech.stop()
         await output.shutdown()
         try await database.shutdown()
         return
@@ -2593,7 +2592,6 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         await assistant.stop()
         try await collection.value
         await child.stop()
-        await speech.stop()
         await output.shutdown()
         try await database.shutdown()
         return
@@ -2709,7 +2707,6 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
     #expect(await log.failure == nil)
     #expect(await log.finishedDecisions.count == decisions)
     await child.stop()
-    await speech.stop()
     await output.shutdown()
     try await database.shutdown()
 }
@@ -2762,14 +2759,9 @@ private actor WriterOutputLog {
     func failed(_ error: String) { failure = error }
     var values: [OutputEnvelope] = []
     func append(_ envelope: OutputEnvelope) { values.append(envelope) }
-    private var writerSpeech: [SpeechSynthesisInput] {
-        values.compactMap {
-            guard case .communication(let action) = $0.output,
-                case .speechSynthesis(let request)? = action.message.perception,
-                request.text.hasPrefix("Writer。")
-            else { return nil }
-            return request
-        }
+    private var writerSpeech: [(audioID: String, text: String)] = []
+    func synthesized(id: String, text: String) {
+        if text.hasPrefix("Writer。") { writerSpeech.append((id, text)) }
     }
     var writerSpokenTexts: [String] { writerSpeech.map(\.text) }
     var writerPlaybackCount: Int {

@@ -4,7 +4,7 @@
 
 本目录保存随 App 打包的 Agent 身份、基础 Skill、通信声明及必要的运行时提示词。加载与组合由 [AgentConfigurations](../../Agents/Support/AgentConfigurations.swift)、[AgentSkillLoader](../../Agents/Support/AgentSkillLoader.swift) 负责，业务实现与生命周期由 [Agents](../../Agents/README.md) 负责。
 
-Assistant 是唯一面向用户的对话 Agent；摄影、历史查询、应用控制的对话流程通过 Skill 执行。Photographer、Memory、ApplicationControl 保留确定性事务，Memory 可在独立标题事务中调用模型。感知、合成 Agent 不因此变成对话 Agent。
+Assistant 是唯一面向用户的对话 Agent；摄影、历史查询、应用控制的对话流程通过 Skill 执行。Photographer、Memory、ApplicationControl 保留确定性事务，Memory 可在独立标题事务中调用模型。感知 Agent 不因此变成对话 Agent。
 
 开发必须遵循本规范。各角色资源子目录不放 README；代码目录的 README 继续说明职责、状态、队列、取消、恢复及具体函数。资源中不得放 Swift、脚本、函数实现、凭据、模型权重或用户数据。
 
@@ -13,7 +13,7 @@ Assistant 是唯一面向用户的对话 Agent；摄影、历史查询、应用�
 | 文件 | 作用与要求 |
 | --- | --- |
 | `../Catalog.json` | 唯一显式资源索引。`version` 为 1；`agents` 的键为代码使用的配置名，如 `Assistant`，值为相对 Resources 的 `Agents/Assistant/Agent.json`；`skills` 由 [Skill 规范](../Skills/README.md) 定义。不得靠目录扫描或第二套配置生效。 |
-| `<AgentName>/Agent.json` | 必需。v9 身份、角色自有公开 description、通信权限和基础 Skill。 |
+| `<AgentName>/Agent.json` | 必需。v10 身份、角色自有公开 description、通信权限和基础 Skill。 |
 | `Assistant/Instructions.md` | Assistant 自身的身份、用户沟通和如实汇报责任。普通业务流程放 Skill，通用函数协议放 AgentCore。 |
 | `Assistant/Prompts.json` | Assistant 请求与历史适配使用的命名模板，不是另一套函数注册。 |
 | `Writer/Instructions.md` | Writer 私有共用身份，仅供自己的控制请求。 |
@@ -28,8 +28,9 @@ Assistant 是唯一面向用户的对话 Agent；摄影、历史查询、应用�
 
 | 字段 | 类型 | 作用 |
 | --- | --- | --- |
-| `version` | integer | 资源 Schema 版本，当前固定为 9；不是角色发布版本。加载器投影为 AgentCore v7 函数/通信契约。 |
+| `version` | integer | 资源 Schema 版本，当前固定为 10；不是角色发布版本。加载器投影为 AgentCore v8 函数/通信契约。 |
 | `id` | string | 实际 Agent 身份，用于执行所有权、通信和上下文隔离；必须与代码创建的身份一致且全局唯一。 |
+| `category` | string | 必填的静态类别，只接受 `perception` 或 `cognition`；缺失、null、错误类型及未知值拒绝加载。加载后进入 AgentConfiguration 和 AgentDescriptor。 |
 | `description` | string | 角色自己维护的公开用途、输入要求与对外约束；非空，最多 2048 UTF-8 字节。不包含私有执行指令，不授予权限。 |
 | `communication` | object | 输入接纳协议、广播订阅、发布权限和定向发送权限，见下表。 |
 | `baseSkills` | string array | 基础 Skill ID，无重复、最多 16 个；对支持 Skill 的角色用于初始化有效目录。确定性角色通常为空，不会因填写而自动获得 Skill worker。 |
@@ -83,7 +84,7 @@ Assistant 当前模板契约：
 
 1. 先确定 Agent 是否必要。用户对话流程优先作为 Skill；独立感知、设备状态机、事务或后台流程才由独立 Agent 承担。先更新代码目录设计，说明上下文所有权、输入预处理、容量、取消、清理、失败和重启行为。
 2. 新目录必须按仓库规则取得批准。角色代码放 Agents，纯资源放本目录，索引登记到 Catalog；不新增顶层模块或第二套加载路径。
-3. 创建 v9 Agent.json，维护自身公开介绍并声明已实现的通信契约和基础 Skill；不创建 Permissions.json，不复制 Skill 的业务函数。配置名、运行时 id、代码身份、通信 source / target 分别核对，不能混用。
+3. 创建 v10 Agent.json，维护自身公开介绍并声明已实现的通信契约和基础 Skill；不创建 Permissions.json，不复制 Skill 的业务函数。配置名、运行时 id、代码身份、通信 source / target 分别核对，不能混用。
 4. 需要对话时遵守 Assistant + Skill 边界；确定性 Agent 不复制 Assistant Chat worker。需要标题等模型事务时使用事务专用模板，不创建普通历史记录。
 5. 能力变更更新 canonical 元数据、拥有者代码 README 和对应 Skills；同一函数绑定保持一致。身份和协议不兼容变更必须设计迁移，不能用改文件名隐式迁移持久化数据。
 6. 新增可委派角色需要实现接收、执行、取消和终态，并在通信中声明消息权限。投递接纳与终态分别确认。角色的私有上下文由自己持有。
@@ -151,8 +152,12 @@ BasicSkill 统一教 start/delegate 平级与按目标所有者选择，不维�
 
 ## 公开目录装配与失败
 
-AgentConfigurations 按 Catalog 读取 v9 资源并校验必填字段、身份、通信声明与容量；缺失、未知字段、错误类型、旧版本和超限均明确失败，不用旧介绍兜底。最多 32 个角色，每条介绍最多 2048 UTF-8 字节，最终目录最多 8192 字节，超限不截断。
+AgentConfigurations 按 Catalog 读取 v10 资源并校验必填字段、身份、通信声明与容量；缺失、未知字段、错误类型、旧版本和超限均明确失败，不用旧介绍兜底。最多 32 个角色，每条介绍最多 2048 UTF-8 字节，最终目录最多 8192 字节，超限不截断。
 
 Assistant 的实际请求传入实例 communicationPolicy；目录与 task.delegate 执行共用 AgentTaskDelegation 适配查询。当前只有 assistant→writer 适配，且必须有 task.request 发送权限和接收端声明。有效函数目录没有 delegateTask 时不展示目标。其他角色虽维护公开介绍，注册和描述本身不会创建委派入口。实时 busy、暂停和结果保持在 State/证据数据中。
 
 Writer 控制请求组合 Instructions.md 与 control.library 或 control.workspace。内容请求读取 content.base、content.web/markdown/json/svg/text 和可选 content.retry 模板。扩展名选择、请求顺序、工具参数 Schema、恢复和校验仍由 Writer 代码拥有。公开目录不读取这些私有文件；确定性角色没有为形式统一增加 Instructions。
+
+语音合成属于 Assistant 的内部能力，没有独立角色资源或 speech.synthesize/speech.cancel 通信授权。Assistant 的实际播放与呈现继续使用其运行时内部 Action/Tool 声明。
+
+BasicSkill 的 Lifetime and completion 独占通用窗口生命周期教学：窗口独立于 Task/Skill，操作一个窗口不隐式关闭其他窗口，关闭/丢弃需要明确意图。Assistant 身份不承载窗口流程；Photography、ApplicationControl、WebBrowsing 只说明各自操作与完成语义，不复制通用规则或嵌入跨业务场景。资源 revision 随教学更新。

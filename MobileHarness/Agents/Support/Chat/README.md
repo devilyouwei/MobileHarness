@@ -11,6 +11,7 @@ AgentChatWorker 将注入 ChatCapability、UIHomeContainer、AgentStateContext�
 | [AgentChatContext.swift](AgentChatContext.swift) | 角色 Context 协议、通用会话控制意图与历史事务适配 |
 | [AgentChatContextBuilder.swift](AgentChatContextBuilder.swift) | 历史／执行观察投影、请求预算及公开 State 消息选择 |
 | [AgentChatDriver.swift](AgentChatDriver.swift) | Provider 会话、文本与 native 事件消费和取消加入 |
+| [AgentSpeechOutput.swift](AgentSpeechOutput.swift) | 调用者注入的语音句柄生产、按输入取消与停止接口；不拥有具体合成实现 |
 | [AgentChatWorker.swift](AgentChatWorker.swift) | Decision／ReACT、UI 接纳、Task／Skill 控制、输出与结果屏障 |
 | [AgentCommunicationAdapter.swift](AgentCommunicationAdapter.swift) | 定向消息内容和因果元数据校验 |
 | [AgentPrompts.swift](AgentPrompts.swift) | 按显式配置读取和校验 Chat 模板 |
@@ -222,7 +223,7 @@ gate from the newest complete snapshot even when transport overtakes the origina
 Occupancy and explicit listening consent remain independent; no task waiting state forces a microphone
 restart or bypasses playback drain.
 
-内部执行与模型观察按每次调用的modelGenerated来源分开，不能根据internalActions/internalTools目录或路径推测。AgentGenerator将代码的自然文本展开标记为runtimeAction；显式模型Action、Tool及解析拒绝保持模型来源。字幕/播放/等待态可加入本轮执行屏障和历史留证，但内部值、失败、异常不进入ReACT观察，也不触发续轮；内部执行失败由worker按运行失败处理。未关联的Tool反馈拒绝，不作为新输入启动推理。共享Chat提供等待事实回调，角色决定展示文案和调用。
+内部执行与模型观察按每次调用的modelGenerated来源分开，不能根据internalActions/internalTools目录或路径推测。AgentGenerator将代码的自然文本展开标记为runtimeAction；显式模型Action、Tool及解析拒绝保持模型来源。字幕/播放/等待态可加入本轮执行屏障和历史留证，但内部值、失败、异常不进入ReACT观察，也不触发续轮；内部执行失败保留实际记录；同轮存在显式模型调用的可推理业务观察时继续交付该观察，不能被字幕/播放失败阻断；没有业务观察时由 worker 按运行失败处理。未关联的Tool反馈拒绝，不作为新输入启动推理。共享Chat提供等待事实回调，角色决定展示文案和调用。
 
 ## Request-only State images
 
@@ -238,3 +239,9 @@ Database 根目录拥有连接、schema 装配与生命周期；Shared 只保存
 ## 公开能力目录与实例权限
 
 AgentChatContextState 的 systemPrompt(capabilities,skills,communication) 接收当前实例 communicationPolicy；初始请求与 executeRound 每轮重建两处装配路径都显式传入。Assistant 通过该入口组合自己的身份、Core 协议、Skill 目录/教学、有效函数及权限过滤后的 Agent 自有公开介绍。默认协议实现兼容不使用该目录的状态类型。两参数便利入口使用角色默认配置；真实请求不通过该入口绕过权限收窄。
+
+## 语音输出注入
+
+Worker 通过 AgentSpeechOutput.prepare 预留音频句柄，再发出 Speech.Playback.speak；具体能力由拥有角色构造。未配置时显式 unavailable，不转发合成 Signal。播放提交前检查取消；提交失败加入句柄清理并保留两类错误。输入取消/生成异常清理其生产，停止加入语音子能力；正常结果与 ReACT 仍依赖原有执行屏障。接口绑定一次且不能替换正在工作的生产者。Assistant 的具体队列、缓存与呈现见 [语音生产](../../Assistant/README.md#语音生产与播放)。
+
+Worker 从注入或加载的 AgentConfiguration 复制 category 到 Descriptor，不根据 State.agentID 或模型依赖推断类别。

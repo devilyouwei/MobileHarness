@@ -60,7 +60,7 @@ HapticFeedbackProviding使用公开支持检查、缓存生成器和一个有主
 
 NativeAudioEvent 是事实而非Error。路由按前后输入／输出portType+UID比较，categoryChange/override及同设备重配不打断流；实际设备变化、不可用路由和缺少旧快照保守投递routeChanged，不直接上报容器故障。
 
-中断仅在began且实例有活动采集／播放时报告AudioIOError.interrupted；ended不重复终止。格式、连续性、overflow、执行和清理失败保留原throw及注入报告。事件两个worker由原生所有者取消并加入，不由页面持有。
+中断仅在began且实例有活动采集／播放时报告AudioIOError.interrupted；ended不重复终止。格式、连续性、overflow、执行和清理失败保留原throw及注入报告。事件三个worker由原生所有者取消并加入，不由页面持有。
 
 ❌ 原生路由、实际声音／触觉、持续模型负载及硬件连续性仍需真机验收。
 
@@ -100,3 +100,5 @@ The Runtime scope owner is encoded using Scope.rawValue with a finite descriptor
 ## Camera audio reservation
 
 PlatformContainer injects AudioContainer's native owner fence into VisionContainer/AppleCamera. acquireCameraRecording requires no current owner and reserves camera scope; voice, diagnostic and detection I/O then reject busy. Native movie finalization removes its microphone and releases that reservation. The shared synchronous AVAudioSession setup is reused within PlatformKit; it permits native system sounds while recording. This module does not decide whether listening should resume; Actions owns that intent and generation fence.
+
+完整 AppleAudioIO.stop 在加入采集与播放清理后替换 mono AVAudioEngine，并在 NativePlaybackGraph actor 内释放 mixer tap、引擎、player 和格式连接；下一次启动重新配置 AVAudioSession 并创建新图。健康的单次 stopPlayback 仍复用图。媒体服务 reset 观察保留 AVFoundation 原生错误，结束 PCM/首帧等待和播放等待，并投递 mediaServicesReset 事实；不在 PlatformKit 决定业务恢复或重放效果。被动 NativeAudioState 与主动事件契约独立。

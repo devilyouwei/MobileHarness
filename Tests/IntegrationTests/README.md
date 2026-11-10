@@ -327,7 +327,7 @@ Assistant State 选择回归验证每轮快照跟随实际 Skill 选择变化，
 
 ## Prompt ownership coverage
 
-AgentConfigurationTests cover v9 public role metadata projected to the v7 compiled contract, missing/invalid/oversized descriptions, unknown fields and identity mismatch. PromptTemplateTests cover instance-permission filtering, exclusion of unsupported peers and private instructions, generic peer Task teaching, and Writer format/retry templates. Existing task, cancellation, library and Writer workflow tests exercise the execution boundary independently of public descriptions.
+AgentConfigurationTests cover v10 public role metadata projected to the v8 compiled contract, missing/invalid/oversized descriptions, unknown fields and identity mismatch. PromptTemplateTests cover instance-permission filtering, exclusion of unsupported peers and private instructions, generic peer Task teaching, and Writer format/retry templates. Existing task, cancellation, library and Writer workflow tests exercise the execution boundary independently of public descriptions.
 
 ## Writer JSON prompt evaluation
 
@@ -342,3 +342,11 @@ Test-owned single- and multi-Skill task.start calls are validated against the de
 WriterContainer 分页回归使用真实 SQLite 和 WriterHistory，通过 0/19/20/21/40 条消息、委托及工作区验证准确末页、消息倒序、稳定轮次编号、最多 20 条输出和跨页无遗漏或重复；不调用真实模型。
 
 Writer separation regression uses real temporary SQLite: immutable preflight/workspace scope, two delegations sharing one workspace, exact 20/40 pagination, unique entries and supplemental input, terminal results without a workspace, restart interruption, high message keys independent of revision, tombstones, and fail-closed format reset preserving service configuration. `WRITER_SEPARATION_UI_SEED` optionally exports the synthetic 27-delegation/40-message fixture for the native simulator runner; it does not call a model or read device data.
+
+AssistantSpeechOutput 使用真实缓存/播放与替身 TTS 验证生产 FIFO、输入所有权、溢出、失败保真、停止加入 provider cleanup 和拒绝迟到提交。SpeechRequestProbe 通过窄语音接口检查分段与音频句柄，不模拟合成 Agent 通信。VoiceTests 通过 Assistant 身份验证合成/播放岛与 SpeechPerception 岛独立，旧播放结束不覆盖新活动；真实 Gateway 往返仍验证文本、合成、播放和字幕。原生与真实模型验收独立记录。
+
+AgentCategory 回归验证七个打包角色的分类、配置到 Assistant/Memory Descriptor 的原样传递、通信收窄保留分类，以及两层 schema 对缺失/null/未知/大小写/错误类型和旧版本的拒绝。
+
+ProviderDiscovery 取消回归通过有界信号等待底层取消处理器被调用后释放替身，避免把 UI 主线程异步转发的先后顺序误当成同步保证；生产取消实现保持独立。
+
+GenerationRoundTests 验证业务 Action 抛出原生风格错误且同轮语音输出失败时，仍交付业务观察、继续 ReACT 并接纳下一输入。PromptTemplateTests 验证常驻多窗口规则、摄影保存完成与显式窗口关闭的独立性；提示词契约测试不等同真实模型遵从验收。

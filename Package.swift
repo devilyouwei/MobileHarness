@@ -321,7 +321,7 @@ let package = Package(
                 "Agents/ApplicationControl/README.md", "Agents/Assistant/README.md", "Agents/Memory/README.md",
                 "Agents/Writer/README.md", "Agents/Photographer/README.md", "Agents/README.md",
                 "Agents/SpeechPerception/README.md",
-                "Agents/SpeechSynthesis/README.md", "Agents/Support/Chat/README.md",
+                "Agents/Support/Chat/README.md",
                 "Agents/Support/Communication/README.md", "Agents/Support/Context/README.md", "Agents/Support/Core",
                 "Agents/Support/Core/Capability/README.md", "Agents/Support/Core/Communication/README.md",
                 "Agents/Support/Core/Generation/README.md", "Agents/Support/Core/Input/README.md",

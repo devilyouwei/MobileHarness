@@ -103,7 +103,7 @@ AppComposition 持有一个 WriterContinuedProcessing 适配器，向每个根�
 
 ActionsDependencies receives a lazy WorkspaceRepository getter from the existing Storage database, alongside media/device getters. It is resolved after foundation readiness and creates no parallel database or JSON catalog.
 
-ApplicationActionAssembly透传AgentVoiceHost.playbackChanged到ActionsVoiceHost。SpeechSynthesisContainer接收真实播放事实并在本角色内决定展示；App只连接接口，Actions不导入Agents，基础UI不接收业务接口。播放频谱仍直连UI的专用数据接口。
+ApplicationActionAssembly透传AgentVoiceHost.playbackChanged到ActionsVoiceHost。Assistant的语音子能力接收真实播放事实并决定展示；App只连接接口，Actions不导入Agents，基础UI不接收业务接口。播放频谱仍直连UI的专用数据接口。
 
 Composition passes the root Storage cache to Actions and adapts scoped previewSnapshot/resetPreviewSelection through neutral host ports. It does not prepare images or own selections. Agents registers actions.camera.preview against the same Camera owner used by UI capture.
 

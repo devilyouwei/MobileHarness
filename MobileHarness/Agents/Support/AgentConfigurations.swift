@@ -101,10 +101,11 @@ public enum AgentConfigurations {
             else { throw AgentConfigurationError.invalidFormat }
         }
     }
-    /// Bundled role metadata is separate from the compiled v7 function/communication contract.
+    /// Bundled role metadata is separate from the compiled v8 function/communication contract.
     struct Resource: Decodable {
         let version: Int
         let id: String
+        let category: AgentCategory
         let description: String
         let communication: CommunicationDeclaration
         let baseSkills: [String]
@@ -115,19 +116,20 @@ public enum AgentConfigurations {
             init?(intValue: Int) { return nil }
         }
         private enum CodingKeys: String, CodingKey {
-            case version, id, description, communication, baseSkills
+            case version, id, category, description, communication, baseSkills
         }
         init(from decoder: any Decoder) throws {
             let all = try decoder.container(keyedBy: Key.self)
             guard
                 Set(all.allKeys.map(\.stringValue)) == [
-                    "version", "id", "description", "communication", "baseSkills",
+                    "version", "id", "category", "description", "communication", "baseSkills",
                 ]
             else { throw AgentConfigurationError.invalidFormat }
             let fields = try decoder.container(keyedBy: CodingKeys.self)
             version = try fields.decode(Int.self, forKey: .version)
-            guard version == 9 else { throw AgentConfigurationError.unsupportedVersion(version) }
+            guard version == 10 else { throw AgentConfigurationError.unsupportedVersion(version) }
             id = try fields.decode(String.self, forKey: .id)
+            category = try fields.decode(AgentCategory.self, forKey: .category)
             description = try fields.decode(String.self, forKey: .description)
             communication = try fields.decode(CommunicationDeclaration.self, forKey: .communication)
             baseSkills = try fields.decode([String].self, forKey: .baseSkills)
@@ -279,7 +281,7 @@ public enum AgentConfigurations {
         let generated = try declaration(AgentSkillLoader.bindings(expanded, owner: owner))
         root.removeValue(forKey: "baseSkills")
         root.removeValue(forKey: "description")
-        root["version"] = 7
+        root["version"] = 8
         root["actions"] = generated.actions
         root["tools"] = generated.tools
         let configuration = try AgentConfiguration(
@@ -291,7 +293,7 @@ public enum AgentConfigurations {
     public static func registry(_ bindings: [Binding]) throws -> CapabilityRegistry {
         let d = try declaration(bindings)
         let root: [String: Any] = [
-            "version": 7, "id": "catalog", "actions": d.actions, "tools": d.tools,
+            "version": 8, "id": "catalog", "category": "perception", "actions": d.actions, "tools": d.tools,
             "communication": ["inputs": [], "subscriptions": [], "publications": [], "sends": []],
         ]
         let configuration = try AgentConfiguration(data: JSONSerialization.data(withJSONObject: root))

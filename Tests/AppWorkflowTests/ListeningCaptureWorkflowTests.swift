@@ -123,3 +123,136 @@ private enum CaptureTransitionFailure: Error, Equatable { case unavailable }
     _ = try await (policyPause, playbackPause)
     #expect(probe.stops == 1 && !probe.running)
 }
+
+@Test @MainActor func captureRecoveryRetiresBeforeRestoreAndNeverRetriesTwice() async {
+    var trace: [String] = []
+    var failures: [String] = []
+    let recovery = VoiceCaptureRecovery(
+        retire: { trace.append("retired") }, restore: { trace.append("firstPCM") },
+        report: { failures.append($0) })
+    recovery.request("native reset")
+    #expect(recovery.blocked)
+    await recovery.wait()
+    #expect(trace == ["retired", "firstPCM"] && !recovery.blocked)
+    recovery.request("second fault")
+    await recovery.wait()
+    #expect(trace == ["retired", "firstPCM", "retired"] && recovery.blocked)
+    #expect(failures.count == 1 && failures[0].contains("second fault"))
+}
+
+@Test @MainActor func captureRecoveryFailureKeepsUnavailableAndRetiresPartialStart() async {
+    var retired = 0
+    var started = 0
+    var failures: [String] = []
+    let recovery = VoiceCaptureRecovery(
+        retire: { retired += 1 },
+        restore: {
+            started += 1
+            throw CaptureTransitionFailure.unavailable
+        }, report: { failures.append($0) })
+    recovery.request("reset")
+    await recovery.wait()
+    #expect(recovery.blocked && retired == 2 && started == 1)
+    #expect(failures.count == 1 && failures[0].contains("unavailable"))
+    recovery.request("again")
+    await recovery.wait()
+    #expect(started == 1 && retired == 3)
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor func captureRecoveryUserOffJoinsRetirementAndCannotRestore() async {
+    let gate = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    var release: CheckedContinuation<Void, Never>?
+    var starts = 0
+    var reports = 0
+    let recovery = VoiceCaptureRecovery(
+        retire: {
+            await withCheckedContinuation {
+                release = $0
+                gate.continuation.yield(())
+            }
+        }, restore: { starts += 1 }, report: { _ in reports += 1 })
+    recovery.request("reset")
+    var entered = gate.stream.makeAsyncIterator()
+    await entered.next()
+    recovery.invalidate()
+    recovery.request("late reset")
+    release?.resume()
+    await recovery.wait()
+    #expect(recovery.blocked && starts == 0 && reports == 0)
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor func captureRecoveryTimeoutJoinsCancelledRestore() async {
+    var retired = 0
+    var restoreJoined = false
+    var reports: [String] = []
+    let recovery = VoiceCaptureRecovery(
+        retire: { retired += 1 },
+        restore: {
+            defer { restoreJoined = true }
+            try await Task.sleep(for: .seconds(30))
+        }, report: { reports.append($0) }, timeout: .milliseconds(50))
+    recovery.request("reset")
+    await recovery.wait()
+    #expect(recovery.blocked && restoreJoined && retired == 2)
+    #expect(reports.count == 1 && reports[0].contains("timedOut"))
+}
+
+@Test @MainActor func captureInterruptionRetiresWithoutAutomaticRestart() async {
+    var retired = 0
+    var starts = 0
+    let recovery = VoiceCaptureRecovery(
+        retire: { retired += 1 }, restore: { starts += 1 }, report: { _ in })
+    recovery.request("interrupted", restart: false)
+    await recovery.wait()
+    #expect(recovery.blocked && retired == 1 && starts == 0)
+    recovery.request("later reset")
+    await recovery.wait()
+    #expect(recovery.blocked && retired == 2 && starts == 0)
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor func captureFaultDuringRestoreCannotBeClearedByLateSuccess() async {
+    let gate = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    var release: CheckedContinuation<Void, Never>?
+    var restores = 0
+    var retired = 0
+    let recovery = VoiceCaptureRecovery(
+        retire: { retired += 1 },
+        restore: {
+            restores += 1
+            await withCheckedContinuation {
+                release = $0
+                gate.continuation.yield(())
+            }
+        }, report: { _ in })
+    recovery.request("reset")
+    var entered = gate.stream.makeAsyncIterator()
+    await entered.next()
+    recovery.request("new capture failed")
+    release?.resume()
+    await recovery.wait()
+    #expect(recovery.blocked && restores == 1 && retired == 2)
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor func captureRecoveryTimeoutCancelsOwnedNativeStartup() async {
+    var nativeCancelled = false
+    var nativeJoined = false
+    var stops = 0
+    let capture = ListeningCaptureWorkflow(
+        start: {
+            defer {
+                nativeCancelled = Task.isCancelled
+                nativeJoined = true
+            }
+            try await Task.sleep(for: .seconds(30))
+        }, stop: { stops += 1 })
+    let recovery = VoiceCaptureRecovery(
+        retire: { await capture.stop() }, restore: {},
+        resume: { try await capture.setEnabled(true) }, interruptRestore: { capture.invalidate() },
+        report: { _ in }, timeout: .seconds(2))
+    recovery.request("reset")
+    await recovery.wait()
+    #expect(nativeCancelled)
+    #expect(nativeJoined)
+    #expect(stops == 1)
+    #expect(recovery.blocked)
+}

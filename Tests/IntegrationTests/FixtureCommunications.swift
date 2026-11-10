@@ -91,7 +91,10 @@ func bindFixtureCommunications(_ agent: any Agent, port: AgentMessaging) throws 
 
 func fixtureOutputs(_ agent: any Agent) -> AsyncStream<OutputEnvelope> { FixtureCommunicationStreams.outputs(agent) }
 extension AgentChatWorker {
-    func bind(_ port: AgentMessaging) throws { try FixtureCommunicationStreams.bind(self, port: port) }
+    func bind(_ port: AgentMessaging) throws {
+        if speechOutput == nil { try bindSpeechOutput(SpeechRequestProbe()) }
+        try FixtureCommunicationStreams.bind(self, port: port)
+    }
 }
 extension SpeechPerceptionAgent {
     func bind(_ port: AgentMessaging) throws { try FixtureCommunicationStreams.bind(self, port: port) }

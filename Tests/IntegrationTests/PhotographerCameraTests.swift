@@ -134,6 +134,7 @@ private actor CameraCaller: Agent {
     nonisolated let outputs = AsyncStream<OutputEnvelope> { $0.finish() }
     init() throws {
         descriptor = AgentDescriptor(
+            category: .cognition,
             id: .assistant, name: "Assistant fixture", inputs: [], outputs: [.toolCall, .actionCall, .control],
             capabilities: try AgentSkillLoader.registry(
                 ["photography"], fixed: AgentConfigurations.load(named: "Assistant").capabilities))

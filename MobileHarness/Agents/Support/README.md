@@ -76,12 +76,14 @@ GatewayOutputConsumer 的退休端口绑定注册执行者的身份。OutputGate
 默认内部动作过滤同时覆盖识别字幕/封口、回复字幕、等待态、语音状态和灵动岛呈现，不把这些
 成功的运行时维护调用混入业务记录；用户打开内部动作后可查看。失败仍沿现有诊断策略可见。
 
-AgentIslandPublication.permissions和bind(consumer:source:)只复用内部工具声明、可信身份接入及结果检查。内容、时机和终态仍在角色目录；成功/错误/异常在调用者自己的发布循环处理。SpeechPerception/SpeechSynthesis/Photographer/ApplicationControl复用相同机制，互不代发。App绑定的播放事实回调只报告实际audioID开始/结束，不包含角色展示策略。
+AgentIslandPublication.permissions和bind(consumer:source:)只复用内部工具声明、可信身份接入及结果检查。内容、时机和终态仍在角色目录；成功/错误/异常在调用者自己的发布循环处理。SpeechPerception/Assistant/Photographer/ApplicationControl复用相同机制，互不代发。App绑定的播放事实回调只报告实际audioID开始/结束，不包含角色展示策略。
 
 OutputGateway binds only AgentMessageRepository for durable Agent communication. Task/workspace ownership APIs are not exposed through this dependency.
 
 ## Agent 公开元数据
 
-AgentConfigurations 校验 Catalog 索引的 v9 Agent 资源（description、身份、通信和 baseSkills），再投影为 AgentCore v7 的函数/通信配置。公开 description 由各角色维护，单条最多 2048 UTF-8 字节。delegationOverview 与任务执行共用 Communication/AgentTaskDelegation 的真实适配和调用者权限；总目录最多 8192 字节，超限或无效配置明确失败。它只组装公开介绍，不加载同伴私有指令；模型上下文采用当前实例的通信策略，实时可用性由 State 提供。
+AgentConfigurations 校验 Catalog 索引的 v10 Agent 资源（category、description、身份、通信和 baseSkills），再投影为 AgentCore v8 的函数/通信配置。公开 description 由各角色维护，单条最多 2048 UTF-8 字节。delegationOverview 与任务执行共用 Communication/AgentTaskDelegation 的真实适配和调用者权限；总目录最多 8192 字节，超限或无效配置明确失败。它只组装公开介绍，不加载同伴私有指令；模型上下文采用当前实例的通信策略，实时可用性由 State 提供。
 
 AgentSkillLoader 共享依赖展开、函数绑定和教学读取。Skill 可声明 owner 限定运行时 Agent ID。共享发现仅列出无 owner 的 Skill，共享 Task/Skill 加载按同一规则校验根 Skill 和依赖。Agent 基础目录按可信配置身份解析；Writer 以自己的身份组合各控制域的 Skill。共享目录也解析 Writer 专属的 Agent.Writer 工具声明，校验 Skill 所有者并为其生成同样的模型参数。Gateway 覆盖检查只要求外部执行入口，本地工具由 Writer 消费。
+
+角色类别从资源进入 AgentConfiguration，再由各角色构造 AgentDescriptor；OutputGateway 复制轮次有效能力时保留 category。只编译函数的 registry 临时配置显式携带 perception 以满足 schema，不注册角色，也不生成分类策略。

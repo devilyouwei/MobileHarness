@@ -4,6 +4,8 @@
 
 ## 当前验收入口
 
+[Assistant 内聚语音合成](Assistant-Owned-Speech.md)：内部 FIFO、会话隔离、停止清理、角色资源移除及构建/真机验收边界。
+
 [BasicSkill 控制教学](BasicSkill-Control-Teaching.md)：六部分通用教学、九项动作效果、完整检查、资源打包和实模通过/失败边界。
 
 [Skill 发现与能力拒绝教学](Skill-Discovery-Before-Denial.md)：加载前决策教学、浏览回归场景与当前工作区构建阻塞，区分静态检查与尚未执行的模型/设备验收。
@@ -167,3 +169,7 @@ refactor, Agent-only model recording, current-file recovery and automated/build/
 - [Writer 通信精简](Writer-Communication-Reduction.md) 记录授权关闭、通知拒收与恢复、任务诊断及构建验证。
 
 - [Writer 委派接纳与业务拒绝](Writer-Delegation-Admission.md) 记录正常接纳、模型拒绝、持久理由、授权释放及构建证据。
+
+- [Agent 静态类别](Agent-Categories.md)：类别配置、运行时保留、非法配置拒绝与构建证据。
+
+- [D3 Edge Core AI](D3-Edge-CoreAI.md)：本机 Core AI/PyTorch/Swift 对照、全双工文本三分类、性能与实验性发布证据。

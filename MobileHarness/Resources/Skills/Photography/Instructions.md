@@ -16,8 +16,8 @@ Ready means ENDED, not saved. State actual duration/fileName and ask save/ignore
 configureCamera updates supplied fields only: mode/photo-video, delaySeconds0...30, flash/off-on-auto, zoom1...6 (hardware-limited), durationSeconds1...600. Omit unrelated fields; video flash=off. Unsupported settings fail explicitly. No mode change over pending media. Countdown is local to takePhoto; cancelCapture cancels/joins it, no model timer.
 configureCamera and unloadPreviewImage complete without a business result on success. Read actual applied settings and current preview selections from State when a later request needs them.
 ### Task cleanup (photo and video)
-After confirmed photo save or video save/ignore resolves a matching Task: separately closeCamera. For unwanted photos, closeCamera clears the session. Await operation=close and enabled=false, then task.end. Never combine disposal/close/finish in one response. Close Capture only, never Vision.close. Already closed needs no close.
-Cancel or replacement waits for close. An authorized close clears temporary unsaved photos immediately. A pending video must be explicitly saved or ignored before closeCamera can finish. Cancelled/failed close retains Task/window: report without replaying committed operations. Reshoot retains the SAME Task/window. No matching Task: confirm, no automatic close/finish; never finish unrelated tasks.
+After confirmed photo save or video save/ignore resolves a matching Task, finish that Task while retaining the Camera window. Explicit discard of unwanted photos uses closeCamera to clear the temporary session.
+For an explicitly requested close: Await operation=close and enabled=false before confirming closure or finishing a matching close goal. Never combine disposal/close/finish in one response. Close Capture only, never Vision.close. Already closed needs no close. A pending video must be explicitly saved or ignored before closeCamera can finish. Cancelled/failed close retains Task/window: report without replaying committed operations. Reshoot retains the SAME Task/window. No matching Task: confirm, no automatic close/finish; never finish unrelated tasks.
 ### Windows and Island
 Window.* needs real windowID from ui.windows; move uses x/y0...1. openCamera is for preview only; success does not trigger a model continuation. Minimize retains capture/recording and yields lens control to Face vision. Restore before disposition. closeCamera closes without opening a confirmation dialog. The window button still offers a choice for pending video. Background stops capture; reopening is explicit.
 Island.setPresentation uses real activityID and size=compact/expanded; only detail text/thumbnail expands. New detail auto-expands; updates preserve manual collapse/content. Task detail and transient status are independent. Details/listening timers are automatic: no duplicates, periodic updates or forced expansion. Component owns animation/size. Submitted is not settled; localStatus/systemStatus are independent, iOS controls system expansion.
@@ -54,11 +54,7 @@ User requests a reshoot; retained earlier photos remain readable:
 ```xml
 <takePhoto/>
 ```
-Confirmed disposal, matching Task:
-```xml
-<closeCamera/>
-```
-Close succeeded after save:
+Save confirmed, matching Task; keep Camera open:
 ```xml
 照片已保存到 App 相册。<task.end summary="照片已保存到 App 相册"/>
 ```
@@ -99,19 +95,11 @@ User authorizes ignore:
 ```xml
 <ignoreVideo recordingID="11111111-2222-4333-8444-555555555555"/>
 ```
-Confirmed disposal, matching Task:
-```xml
-<closeCamera/>
-```
-Close succeeded after save:
+Save confirmed, matching Task; keep Camera open:
 ```xml
 视频已保存到 App 相册。<task.end summary="视频已保存到 App 相册"/>
 ```
-Confirmed ignore, matching Task:
-```xml
-<closeCamera/>
-```
-Close succeeded after ignore:
+Ignore confirmed, matching Task; keep Camera open:
 ```xml
 视频已忽略。<task.end summary="视频已忽略"/>
 ```

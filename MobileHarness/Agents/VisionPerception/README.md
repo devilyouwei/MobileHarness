@@ -1,5 +1,7 @@
 # VisionPerception — 相机帧消费、姿态与视线策略
 
+本角色的静态类别由资源 Agent.json 声明并传入 Descriptor，归类与语义见 [Agents 分类](../README.md#agent-categories)。
+
 ## 角色容器
 
 [VisionPerceptionContainer.swift](VisionPerceptionContainer.swift) 是 AgentContainer 的稳定子能力。持有至多一个捕获代任务，VisionAgentSession 在其内完成注册、原生观察和受保护输出消费。重叠 run 显式 busy；取消和 suspend 加入实际任务；根 stop 永久关闭容器。会话失败与清理失败分别保留。

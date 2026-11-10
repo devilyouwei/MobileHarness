@@ -137,14 +137,16 @@ private actor RoundModel: ChatCapability {
     let actionCount: Int
     let toolCount: Int
     let requestRounds: Int
+    let speakBeforeAction: Bool
     let photo: Bool
     let photoCommand: String?
     let supportsImages: Bool
     private(set) var requests: [ChatRequest] = []
     init(
         action: Bool, toolCount: Int, photo: Bool = false, supportsImages: Bool = false, photoCommand: String? = nil,
-        requestRounds: Int = 1, actionCount: Int = 1
+        requestRounds: Int = 1, actionCount: Int = 1, speakBeforeAction: Bool = false
     ) {
+        self.speakBeforeAction = speakBeforeAction
         self.photoCommand = photoCommand
         self.action = action
         self.actionCount = actionCount
@@ -163,6 +165,7 @@ private actor RoundModel: ChatCapability {
             try pair.emitter.yield(.text(value))
         }
         if requests.count <= requestRounds {
+            if speakBeforeAction { try text("<wait>正在处理。</wait>") }
             if photo, requests.count == 1 { try text("<takePhoto/>") }
             if let photoCommand { try text("<" + photoCommand + "/>") }
             if action {
@@ -235,12 +238,13 @@ private func roundHarness(
     deviceStatus: Bool = false, playbackDelay: Duration = .zero, requestRounds: Int = 1, actionCount: Int = 1,
     photoObservation: (@Sendable (String, AgentInput) async throws -> ChatImage)? = nil,
     camera: (any CameraControlCapability)? = nil,
+    speakBeforeAction: Bool = false, runtimeHandler: ActionCompletionHandler? = nil,
     handler: @escaping ActionCompletionHandler
 ) async throws -> RoundHarness {
     let model = RoundModel(
         action: action, toolCount: toolCount, photo: photo, supportsImages: supportsImages,
         photoCommand: deviceStatus ? "Bluetooth.readStatus" : photoCommand, requestRounds: requestRounds,
-        actionCount: actionCount)
+        actionCount: actionCount, speakBeforeAction: speakBeforeAction)
     let store = AssistantHistoryStore()
     let agent: any Agent
     if photo || photoCommand != nil || deviceStatus {
@@ -316,6 +320,7 @@ private func roundHarness(
                 {
                     return try await handler(invocation)
                 }
+                if let runtimeHandler { return try await runtimeHandler(invocation) }
                 return .completed
             })
     }
@@ -821,20 +826,17 @@ private struct IndependentProtocolModel: ChatCapability {
     let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let release = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let observed = AsyncStream<AgentOutput>.makeStream(bufferingPolicy: .bufferingOldest(16))
-    try await agent.bind(
-        AgentMessaging { message, _, target in
-            if case .speechSynthesis? = message.perception {
-                entered.continuation.yield(())
-                await withTaskCancellationHandler {
-                    var iterator = release.stream.makeAsyncIterator()
-                    _ = await iterator.next()
-                } onCancel: {
-                    release.continuation.finish()
-                }
-                try Task.checkCancellation()
+    try await agent.bindSpeechOutput(
+        SpeechRequestProbe(beforePrepare: {
+            entered.continuation.yield(())
+            await withTaskCancellationHandler {
+                var iterator = release.stream.makeAsyncIterator()
+                _ = await iterator.next()
+            } onCancel: {
+                release.continuation.finish()
             }
-            return DeliveryReport(delivered: target.map { [$0] } ?? [])
-        })
+            try Task.checkCancellation()
+        }))
     try await agent.start()
     let consumer = Task {
         for await envelope in fixtureOutputs(agent) {
@@ -1733,4 +1735,56 @@ func stateImagesMergeIntoOriginalInputWithOrderedSystemMetadata(_ continuation: 
         try AgentChatContextBuilder.applyingStateImages(
             [image], to: messages, user: "missing input", supportsImages: true)
     }
+}
+
+private actor RuntimeOutputFailureOnce {
+    private(set) var failed = false
+    private var terminals = 0
+    func nextTerminal() -> Int {
+        terminals += 1
+        return terminals
+    }
+    func execute(_ invocation: any FunctionInput) throws -> ActionCompletion {
+        if invocation.call.actionPath.description == "Speech.Playback.speak", !failed {
+            failed = true
+            throw RoundFailure.expected
+        }
+        return .completed
+    }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func actionFailureContinuesReActDespiteSpeechFailureAndAcceptsNextInput() async throws {
+    let runtime = RuntimeOutputFailureOnce()
+    let harness = try await roundHarness(
+        action: true, toolCount: 0, speakBeforeAction: true,
+        runtimeHandler: { try await runtime.execute($0) },
+        handler: { _ in
+            throw NSError(domain: "AVFoundationErrorDomain", code: -11819)
+        })
+    let session = UUID().uuidString
+    try await harness.agent.start()
+    try await harness.agent.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("first request")))
+    try await IndependentOutputWorkflow.consumeGeneration(fixtureOutputs(harness.agent)) { envelope in
+        let result = try await harness.gateway.execute(envelope)
+        await harness.log.record(envelope, result: result)
+        if case .control(let value) = envelope.output,
+            value == "agent.finished" || value == "agent.cancelled" || value.hasPrefix("agent.error:")
+        {
+            #expect(value == "agent.finished")
+            if await runtime.nextTerminal() == 1 {
+                try await harness.agent.receive(
+                    .init(id: UUID().uuidString, sessionID: session, payload: .text("next request")))
+            } else {
+                await harness.agent.stop()
+            }
+        }
+    }
+    let requests = await harness.model.requests
+    #expect(requests.count == 3)
+    #expect(requests[1].messages.contains { $0.content.contains("handlerFailed") })
+    #expect(await runtime.failed)
+    let records = try await harness.store.snapshot().current.turns
+    #expect(records.count == 2 && records.allSatisfy { $0.state == .completed })
+    await harness.close()
 }

@@ -366,7 +366,7 @@ extension LiveRuntimeTests {
     @Test(.actionCatalog) func soundSourceBroadcastCrossesGatewaysWithBoundIdentityAndCaptureDeadline() async throws {
         let speechConfiguration = try AgentConfigurations.load(named: "SpeechPerception")
         let listenerData: [String: Any] = [
-            "version": 7, "id": "soundListener", "actions": [:], "tools": [],
+            "version": 8, "category": "cognition", "id": "soundListener", "actions": [:], "tools": [],
             "communication": [
                 "inputs": [["contract": "sound.source", "version": 1, "kind": "observation"]],
                 "subscriptions": [["contract": "sound.source", "source": "speechPerception", "topic": "sound.source"]],
