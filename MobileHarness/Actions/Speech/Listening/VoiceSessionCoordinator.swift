@@ -241,8 +241,17 @@ public enum VoiceReplyCancellation {
         private var playbackCount = 0 {
             didSet { updateReplyActivity() }
         }
-        private var hasPlaybackBarrier: Bool { playbackCount > 0 }
-        private func updateReplyActivity() { state.present(.isReplyActive(listeningPaused || hasPlaybackBarrier)) }
+        private var listeningStatus: String {
+            let context = audio.captureContext
+            guard context.supportsFullDuplex else { return "受限聆听 · 回声消除不可用，播报期间暂停识别" }
+            switch context.echoCancellation {
+            case .systemInput: return "全双工聆听 · 系统回声消除"
+            case .voiceProcessing: return "全双工聆听 · 语音回声消除"
+            case .unknown, .unavailable: return "全双工聆听 · 可在回复时说话"
+            }
+        }
+        private var hasPlaybackBarrier: Bool { playbackCount > 0 && !audio.captureContext.supportsFullDuplex }
+        private func updateReplyActivity() { state.present(.isReplyActive(listeningPaused || playbackCount > 0)) }
         private var listeningPause: Task<Void, Never>?
         private var handlingTurn = false
         private let log = Logger(subsystem: "dev.mobileharness", category: "AppLifecycle")
@@ -439,7 +448,7 @@ public enum VoiceReplyCancellation {
             else {
                 throw CancellationError()
             }
-            try await audio.startCapture(preferSpatial: true)
+            try await audio.startCapture(preferSpatial: false)
             try Task.checkCancellation()
             guard voiceGeneration == generation, !listeningPaused, !hasPlaybackBarrier, !videoAudioHeld else {
                 throw CancellationError()
@@ -448,6 +457,7 @@ public enum VoiceReplyCancellation {
             captureEpoch = epoch
             state.present(.isVoiceActive(true))
             state.present(.listeningAnimationID(generation))
+            state.present(.voiceStatus(listeningStatus))
             try await speech.startInput(sessionID: generation)
             captureTask = Task { [weak self] in
                 do {
@@ -831,7 +841,7 @@ public enum VoiceReplyCancellation {
             try observeAudioEvents(generation: generation)
             // Commit after resume acknowledgment; its emitted perception update may arrive while admission is closed.
             presentationPhase = .listening
-            state.present(.voiceStatus("正在聆听 · 停顿后自动识别"))
+            state.present(.voiceStatus(listeningStatus))
             traceListening("resume.committed")
             runtime.endpoints.presentation.homeEffects.replyDidFinish()
         }

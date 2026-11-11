@@ -67,7 +67,7 @@ class ModelArchiveTests(unittest.TestCase):
 class SourceCatalogTests(unittest.TestCase):
     def test_production_profiles_share_catalog_and_nemotron_is_cross_platform(self):
         from model_download import load_config
-        for name in ('nemotron', 'silero', 'moss-tts-nano', 'gemma4-e2b', 'yolo26-pose'):
+        for name in ('nemotron', 'silero', 'moss-tts-nano', 'gemma4-e2b', 'yolo26-pose', 'd3-edge'):
             config = load_config(name)
             self.assertIn('declaration', config)
             self.assertNotIn('files', config)
@@ -82,6 +82,14 @@ class SourceCatalogTests(unittest.TestCase):
         self.assertEqual(gemma['declaration']['revision'], mac_gemma['declaration']['revision'])
         self.assertIn('aotc_h18p', gemma['declaration']['allowPatterns'][0])
         self.assertNotIn('aotc_h18p', mac_gemma['declaration']['allowPatterns'][0])
+
+    def test_d3_includes_native_graph_directory_members(self):
+        from model_download import load_config
+        config = load_config('d3-edge')
+        self.assertIn('decision.aimodel/**', config['declaration']['allowPatterns'])
+        self.assertIn('decision.aimodel/main.mlirb', config['requiredFiles'])
+        self.assertNotIn('decision.aimodel', config['requiredFiles'])
+        self.assertEqual(len(config['declaration']['revision']), 40)
 
     def test_hub_selection_prefix_metadata_and_mirror(self):
         from model_download import resolve_hub

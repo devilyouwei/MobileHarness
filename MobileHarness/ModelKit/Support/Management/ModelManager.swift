@@ -402,8 +402,8 @@ extension CapabilityKey where Value == any SpeechSynthesisCapability {
 extension CapabilityKey where Value == any VoiceActivityCapability {
     public static var voiceActivity: Self { Self(kind: .voiceActivity, select: { $0.voiceActivity }) }
 }
-extension CapabilityKey where Value == any JudgeCapability {
-    public static var judge: Self { Self(kind: .judge, select: { $0.judge }) }
+extension CapabilityKey where Value == any DecisionCapability {
+    public static var decision: Self { Self(kind: .decision, select: { $0.decision }) }
 }
 
 extension CapabilityKey where Value == any PoseCapability {

@@ -7,6 +7,7 @@ public struct ExecutionEnvelope: Sendable {
     public let sessionID: String
     public let inputID: String
     public let schedulingID: String
+    public let orderingScope: String?
     public let sequence: UInt64
     public let roundID: String?
     public let callID: String?
@@ -15,8 +16,9 @@ public struct ExecutionEnvelope: Sendable {
     public init(
         source: String, sessionID: String, inputID: String, schedulingID: String,
         sequence: UInt64 = 0, roundID: String? = nil, callID: String? = nil,
-        context: ActionExecutionContext, correlation: (any Sendable)? = nil
+        context: ActionExecutionContext, correlation: (any Sendable)? = nil, orderingScope: String? = nil
     ) {
+        self.orderingScope = orderingScope
         self.source = source
         self.sessionID = sessionID
         self.inputID = inputID

@@ -17,3 +17,5 @@ Generic graph/tensor execution is implemented.
 ## 待实现
 
 - A general stateful graph abstraction is not implemented.
+
+ComputeUnits.automatic uses SpecializationOptions.default without a heterogeneous placement preference. D3 uses this option to match the published artifact validation path; existing graph defaults are unchanged.

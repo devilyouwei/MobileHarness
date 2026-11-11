@@ -101,3 +101,54 @@ Writer 的介绍由 Writer 资源注入独立的协作目录段。因此 Writer 
 - AgentChatContextState 增加接收实际 CommunicationDeclaration 的提示词装配入口；两条实际模型请求路径传入实例 communicationPolicy，避免权限收窄后仍展示默认可委派目标。
 - 公开目录总量最多 8192 UTF-8 字节，超限明确失败；角色资源必须完整可校验。Writer 模板通过普通 PromptTemplates 加载，不要求具有 Assistant 的证据模板键。
 - 配置、请求装配、权限收窄、Writer 格式模板与打包回归同步更新。所有文件均落在已有目录。
+
+## Assistant 主对话的 System 协议整理
+
+- 新建 `MobileHarness/Resources/Agents/System/` 保存 `InputProtocol.json` 与 `OutputProtocol.json`，随 Agents 资源包加载。Input 描述时间线、来源和回应取舍。Assistant `Prompts.json` 继续提供执行观察与历史证据模板。Output 仅维护 XML Action、Channel、`wait` 和目录排版，移除原生 Tool 调用教学和 `RESPONSE CHECK`。原生 Tool 继续通过模型请求的结构化定义交付。
+- `Agents/Support/Chat/AgentPrompts.swift` 缓存并校验 System 模板，`AssistantProcessing.swift` 从中装配 Output 和 Input，角色段取 Assistant 自己的 `Instructions.md`。继续通过打包的 Catalog、Skill.json、Agent.json 和本轮授权动态装配 Skill 概览、可委派角色、已加载指令及有效 Action 目录。动态 State 与历史投影的装配契约保持原样。
+- AgentCore 保留 `PromptTemplates` 和 `CapabilityContextBuilder`，由 Agents 调用方传入已加载输出模板。同步 `AgentCommunicationAdapter.swift` 和 `AgentSkillLoader.swift` 的渲染入口及目录预算，保持 AgentCore、Agents 的编译目标和依赖方向。更新 SwiftPM 和 Xcode 资源引用、应用包字节校验和评估源哈希，移除旧 Core 资源及加载入口。
+- 同步 Assistant、资源、Core、Chat、脚本和总体设计中的所有权说明。回归检查实际请求的静态段落顺序、动态目录、无 `RESPONSE CHECK` 与原生 Tool 教学，以及现有时间线和技能预算。执行 `scripts/check.sh` 和 `scripts/build-ios.sh`，核对两份协议的最终包路径和字节。
+
+### 检查并清理职责重叠
+
+- `System/OutputProtocol.json` 移除旧 `communication.*` 任务用法。生产 Skill 目录通过 BasicSkill 讲授 `task.delegate`、`task.send`、`task.cancel` 和 Task 生命周期。`AgentCommunicationAdapter` 从实例权限生成低层 `send` 的目标与消息种类，精确参数规则随 `AgentTaskCommunication.sendDeclaration` 提供。
+- `System/InputProtocol.json` 专注输入的结构和证据取舍，执行效果的重放约束由 BasicSkill 教学提供。Assistant `Instructions.md` 收拢语音、字幕、表情和回应风格，BasicSkill 集中维护任务、Skill、聆听控制及结果反馈的业务流程。更新 BasicSkill revision、提示词职责回归及所属技术 README。
+
+### 分离输出协议与目录排版
+
+- 在现有 `Resources/Agents/System/` 增加 `ActionCatalog.json`，承接 Channel 标题、Action 别名和参数行三个排版模板。`OutputProtocol.json` 保存 XML 调用和 Channel／wait 调度两段规则。
+- `AgentPrompts` 加载两个独立模板并构造共享 `CapabilityContextBuilder`。Core 使用输出协议渲染规则，使用目录模板渲染有效 Action。Assistant 装配、Skill 预算与测试共用同一个渲染器。实际目录文本、顺序和参数来源沿用现有契约。
+- 同步 Xcode 资源引用、最终包校验及所属 README。验证输出协议与目录键归属、实际 Assistant 请求、Skill 预算和应用资源完整性。
+
+### 统一提示词资源加载
+
+- 将单段固定的 `System/InputProtocol.json` 原文迁到 `InputProtocol.md`。`OutputProtocol.json` 和 `ActionCatalog.json` 分别承载同一职责下的多个具名模板。保持原正文与请求顺序，更新 Xcode 引用和最终包校验。
+- `Agents/Support/Chat/AgentPrompts.swift` 集中拥有资源的 `load`、`render` 和 `unload`。使用 Agents Bundle 中的受限读取，按扩展名选择 Markdown、TXT 或 JSON。成功的不可变模板在有界缓存中共享，卸载移除对应路径缓存，已取得的模板可供在途请求继续使用。读取失败显式传播，下次加载可重试。
+- AgentCore 的 `PromptTemplates` 复用同一个变量编译器。Markdown 和 TXT 是单段正文，JSON 提供具名片段。三种格式均支持 `{{name}}`、严格变量集合、单次替换与 UTF-8 容量检查。PromptTemplates 专注编译和渲染，由 AgentPrompts 统一读取提示词资产。
+- Assistant、Writer、Memory 及 Skill 通过既有角色装配路径使用共享加载器。Agent/Skill 声明索引、实际上下文、提示词所有者与部署范围保持原设计。将本轮审查中仍散落的动态上下文和快决策文案作为后续归类建议。覆盖多格式渲染、缓存卸载和应用打包回归。
+
+### 后续提示词归类建议
+
+| 建议文件 | 管理范围 |
+| --- | --- |
+| `System/RequestContext.json` | 共用运行时状态、Agent 上下文和图片清单的标题、事实说明与排版。数据选择、授权、插入位置和容量由 Swift 控制。 |
+| `Assistant/ConversationContext.json` | 由现有 `Assistant/Prompts.json` 重命名，收拢执行证据、Writer 追问与事件在 Assistant 请求里的呈现、Web 图片观察、前台任务历史。 |
+| `Assistant/InputDecisionPrompts.json` | 快速输入分类请求的业务规则和输入字段排版。D3 的模型专用序列化留在 ModelKit，云端原生分类工具 Schema 留在代码。 |
+| `Writer/ControlPrompts.json`、`Writer/ContentPrompts.json` | 分别维护作品库和工作区控制请求，以及内容生成、格式约束和重试请求。两类模板目前共用 `Writer/Prompts.json`。 |
+
+`Memory/TitlePrompts.json` 的三个具名片段服务同一标题事务。Agent 身份、BasicSkill 通用任务教学及各 Skill 的业务说明继续各自管理。
+
+审查时，旧 `System/OutputProtocol.json` 将不同任务的同名 Channel 描述为相互独立。Gateway 会对同一顺序域的同名 Channel 跨任务排队，Assistant 为会话设置该顺序域。协议措辞随下方 Markdown 迁移一并修正。
+
+### 固定输出协议与动态 Channel 归属
+
+- 将 `System/OutputProtocol.json` 迁为单份 `OutputProtocol.md`。正文保存 XML Action、抽象 Channel、同一顺序域、资源约束和 `wait` 规则。说明 Action 的 Channel 从本轮有效目录读取，Skill 加载成功后新增 Action 可出现在下一轮目录。
+- `CapabilityContextBuilder.protocolRules()` 读取固定正文。删除对 Registry Channels 的协议插值，`catalog(_:)` 继续用 `ActionCatalog.json` 按本轮真实 Channel 分组展示 Action。Assistant 自身的语音与字幕映射仍由角色指令描述。
+- 同步 Agents 加载路径、Xcode 资源引用、最终包校验和 Assistant／Capability／Resources 技术 README。用基础与加载 Skill 两种目录验证协议正文一致且具体 Channel 随目录变化。
+
+### Assistant system 章节模板归入资源
+
+- 在现有 `System/` 下加入 `SkillCatalog.json`、`AgentCatalog.json` 和 `RequestContext.json`。分别拥有 Skill 目录标题与行格式、可委派 Agent 目录标题与行格式、当前 Task／Skill／State 和图片清单的事实框架。`ActionCatalog.json` 同时维护有效目录的标题和现有行模板。
+- `Assistant/Instructions.md` 维护自身角色标题。`Assistant/Prompts.json` 维护 Writer 追问和近期事件在 Assistant system 中的呈现。Swift 使用共享模板加载器并提供动态值。资源索引、授权筛选、预算、快照选择、消息顺序及序列化仍由现有代码负责。
+- Writer 控制请求复用 `SkillCatalog.json` 的已加载教学标题，继续使用 Writer 自己的 Skill 与提示词。
+- 保持两条 system 消息的正文、顺序和边界，移除 Swift 中的重复标题和排版字符串。同步 Xcode 引用、应用包校验及所属技术 README。对比迁移前的首条 system 正文，并验证 Skill／委派目录、State、图片清单和 Writer 上下文进入实际请求。

@@ -94,6 +94,17 @@
         }
         func prepare(_ request: ActionsBusinessRequest) throws -> ActionsBusinessBindings {
             let files = self.files
+            let preferences = ModelResourcePreferencesService(
+                store: {
+                    try files.document(
+                        ModelResourcePreferences.self, in: files.models, name: "download-source.json",
+                        maximumBytes: 4096)
+                }, validate: { try await SettingsModelResourcesAdapter.validatePreferences($0) },
+                installed: {
+                    let manager = try await request.maintenance.artifacts()
+                    return Set(
+                        try await manager.artifactSnapshots().filter { $0.phase == .installed }.map { $0.artifact.id })
+                })
             let providerService = ProviderSettingsService(
                 store: ProviderSettingsStore(
                     credentials: SettingsCredentialAdapter(),
@@ -102,7 +113,14 @@
                     }),
                 runtime: SettingsProviderAdapter.runtime(
                     language: model.language,
-                    beginChange: request.maintenance.beginSettings, endChange: request.maintenance.endSettings))
+                    beginChange: request.maintenance.beginSettings, endChange: request.maintenance.endSettings),
+                legacyDecision: { try await preferences.legacyDecisionSelection() },
+                isDecisionInstalled: {
+                    let manager = try await request.maintenance.artifacts()
+                    return try await manager.artifactSnapshots().contains {
+                        $0.artifact.id == "d3-edge" && $0.phase == .installed
+                    }
+                })
             let providerSettings = ProviderSettingsRequests(service: providerService)
             let discovery = ProviderDiscoveryRequests(discover: SettingsProviderAdapter.discoverModels)
             let providerPresentation = ProviderPresentationAdapter(
@@ -137,17 +155,6 @@
             let resourceAdapter = ModelResourceCapabilityAdapter(
                 artifacts: request.maintenance.artifacts,
                 quiesce: request.maintenance.quiesce, bindSpeech: request.maintenance.bindSpeech)
-            let preferences = ModelResourcePreferencesService(
-                store: {
-                    try files.document(
-                        ModelResourcePreferences.self, in: files.models, name: "download-source.json",
-                        maximumBytes: 4096)
-                }, validate: { try await SettingsModelResourcesAdapter.validatePreferences($0) },
-                installed: {
-                    let manager = try await request.maintenance.artifacts()
-                    return Set(
-                        try await manager.artifactSnapshots().filter { $0.phase == .installed }.map { $0.artifact.id })
-                })
             let album = PhotoAlbumService(
                 photos: photos, export: { [platform] data in try await platform.vision.savePhoto(data) },
                 exportVideo: { [platform] file in try await platform.vision.saveVideo(file) })
@@ -253,6 +260,25 @@
                             baseURL: OpenAIChatConfiguration.endpoint(selected.url), apiKey: selected.key,
                             model: selected.model, thinking: selected.writerThinking ? .enabled : .minimum) : nil
                     return try await model.language.chatModel(configuration: configuration)
+                },
+                decisionConfiguration: { [model] in
+                    let saved = try await providerService.decisionSnapshot()
+                    let useLocal = saved.decisionUsesLocal == true
+                    guard saved.decisionProviderID != nil else { return (useLocal, nil) }
+                    return (
+                        useLocal,
+                        {
+                            let selected = try await ProviderSettingsService.decisionConfiguration(saved)
+                            let configuration = try OpenAIChatConfiguration(
+                                baseURL: OpenAIChatConfiguration.endpoint(selected.url), apiKey: selected.key,
+                                model: selected.model, thinking: .minimum)
+                            return try await model.language.chatModel(configuration: configuration)
+                        }
+                    )
+                },
+                decisionStatus: { [ui] value in ui.modelResources.presentation.present(.decisionStatus(value)) },
+                inputQueueStatus: { [ui] ready, classifying in
+                    ui.home.conversationPresentation.present(.inputQueue(ready: ready, classifying: classifying))
                 },
                 settings: providerSettings, discovery: discovery, providerPresentation: providerPresentation,
                 tasks: endpoints.tasks,

@@ -19,7 +19,9 @@ import Foundation
             enabled: state.isEnabled, url: state.url.trimmingCharacters(in: .whitespacesAndNewlines),
             key: state.key.trimmingCharacters(in: .whitespacesAndNewlines), model: state.selectedModel,
             providers: state.providers, writerProviderID: state.writerProviderID, writerModel: state.writerModel,
-            writerThinking: state.writerThinking)
+            writerThinking: state.writerThinking,
+            decisionProviderID: state.decisionProviderID, decisionModel: state.decisionModel,
+            decisionUsesLocal: state.decisionUsesLocal)
     }
     public func restore() async throws {
         guard !stopped else { throw CancellationError() }
@@ -28,6 +30,9 @@ import Foundation
         // A coalesced restore must not overwrite edits after the first caller applied its result.
         guard !restored else { return }
         if !operations.presentsResults {
+            state.decisionProviderID = value.decisionProviderID
+            state.decisionModel = value.decisionModel
+            state.decisionUsesLocal = value.decisionUsesLocal
             state.writerProviderID = value.writerProviderID
             state.writerModel = value.writerModel
             state.writerThinking = value.writerThinking
@@ -72,6 +77,7 @@ import Foundation
         if state.isEnabled, let provider = state.providers.first(where: { $0.url == state.url }) {
             ids.insert(provider.id)
         }
+        if let id = state.decisionProviderID { ids.insert(id) }
         if let id = state.writerProviderID { ids.insert(id) }
         for id in ids { loadModels(providerID: id) }
     }
@@ -133,6 +139,73 @@ import Foundation
         }
         return await save(value)
     }
+    public func save(_ change: BrainSettingsChange) async -> Bool {
+        guard restored, !stopped, !state.isSaving else { return false }
+        let previous = draft
+        var candidate = previous
+        switch change {
+        case .providers(let providers):
+            candidate.providers = providers
+            if candidate.enabled {
+                let selectedID = previous.providers.first { $0.url == previous.url }?.id
+                let selected = providers.first { $0.id == selectedID }
+                Self.setAssistant(&candidate, provider: selected, model: selected == nil ? "" : previous.model)
+            }
+            if !providers.contains(where: { $0.id == candidate.writerProviderID }) {
+                candidate.writerProviderID = nil
+                candidate.writerModel = ""
+            }
+            if !providers.contains(where: { $0.id == candidate.decisionProviderID }) {
+                candidate.decisionProviderID = nil
+                candidate.decisionModel = ""
+            }
+        case .brain(let brain, let choice):
+            let selected = previous.providers.first { $0.id == choice.providerID }
+            let model = choice.model.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard choice.providerID == nil || (selected != nil && !model.isEmpty) else {
+                state.present(.error("请选择已保存的 Provider 和模型"))
+                return false
+            }
+            switch brain {
+            case .assistant:
+                guard choice.usesLocal || selected != nil else {
+                    state.present(.error("请选择 Provider"))
+                    return false
+                }
+                Self.setAssistant(
+                    &candidate, provider: choice.usesLocal ? nil : selected, model: choice.usesLocal ? "" : model)
+            case .writer:
+                guard !choice.usesLocal else {
+                    state.present(.error("本地模型不支持 Writer 所需的原生工具调用"))
+                    return false
+                }
+                candidate.writerProviderID = selected?.id
+                candidate.writerModel = selected == nil ? "" : model
+                candidate.writerThinking = choice.writerThinking
+            case .decision:
+                candidate.decisionUsesLocal = choice.usesLocal
+                candidate.decisionProviderID = selected?.id
+                candidate.decisionModel = selected == nil ? "" : model
+            }
+        }
+        guard await save(candidate) else { return false }
+        guard !stopped, state.isPresentationAvailable else { return true }
+        for provider in previous.providers {
+            let current = candidate.providers.first { $0.id == provider.id }
+            if provider.url != current?.url || provider.key != current?.key {
+                state.modelCatalogs[provider.id] = nil
+                state.modelErrors[provider.id] = nil
+            }
+        }
+        _ = state.presentRestored(candidate, revision: state.revision)
+        return true
+    }
+    private static func setAssistant(_ draft: inout CloudSettingsDraft, provider: CloudSettingsDraft?, model: String) {
+        draft.enabled = provider != nil
+        draft.url = provider?.url ?? ""
+        draft.key = provider?.key ?? ""
+        draft.model = model
+    }
     private func save(_ value: CloudSettingsDraft) async -> Bool {
         state.present(.isSaving(true))
         state.present(.error(nil))
@@ -141,7 +214,7 @@ import Foundation
         do {
             try await operations.save(value)
             restored = true
-            if !operations.presentsResults { state.present(.notice("已保存智能体大脑配置")) }
+            if !operations.presentsResults { state.present(.notice("已保存模型配置")) }
             return true
         } catch {
             if (error as? any SettingsFailurePresenting)?.wasPresented != true {

@@ -108,3 +108,7 @@ ApplicationActionAssembly透传AgentVoiceHost.playbackChanged到ActionsVoiceHost
 Composition passes the root Storage cache to Actions and adapts scoped previewSnapshot/resetPreviewSelection through neutral host ports. It does not prepare images or own selections. Agents registers actions.camera.preview against the same Camera owner used by UI capture.
 
 ApplicationActionAssembly 不再向 Actions 注入 Memory 的历史执行预览函数；Assistant 详情直接消费既有 History 读取接口及已记录业务快照。
+
+ApplicationActionAssembly 传递 Decision 配置读取、分类状态与队列投影闭包。配置快照包含本地模式和可选云端工厂，由 Actions 提供。业务分类在 Agents，原生模型在 ModelKit。
+
+Assistant 会话使用角色自身的 UI.Island 权限发布 Decision 反馈。App 继续装配通用 Gateway 与 UI 渲染端口。

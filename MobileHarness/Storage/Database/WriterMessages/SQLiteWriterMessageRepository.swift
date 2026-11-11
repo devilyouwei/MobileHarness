@@ -22,7 +22,7 @@ public final class SQLiteWriterMessageRepository: WriterMessageRepository {
         }
         if id.hasPrefix("writer/request_"), let key = Int64(id.dropFirst("writer/request_".count)),
             try Int.fetchOne(
-                db, sql: "SELECT COUNT(*) FROM writer_messages WHERE id=? AND input_kind='delegation'", arguments: [key]
+                db, sql: "SELECT COUNT(*) FROM writer_executions WHERE id=?", arguments: [key]
             ) == 1
         {
             return Owner(key: key, request: true)
@@ -105,7 +105,7 @@ extension SQLiteWriterMessageRepository {
             let references = try messages.map { try Self.saveMessage($0, owner: owner, db: db) }
 
             try db.execute(
-                sql: "UPDATE writer_messages SET request_revision=MAX(request_revision+1,?) WHERE id=?",
+                sql: "UPDATE writer_executions SET request_revision=MAX(request_revision+1,?) WHERE id=?",
                 arguments: [Int64(revision), owner.key])
             return references
         }

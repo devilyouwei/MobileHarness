@@ -74,14 +74,14 @@ private actor AudioRecorder {
         _ = try AudioFrame(data: Data([0]), format: format, sequence: 0, timestamp: 0)
     }
     #expect(throws: CapabilityError.self) { _ = try SpeechSynthesisRequest(text: " ", locale: "zh-CN") }
-    let request = try JudgeRequest(text: "hello", candidates: ["chat", "camera"])
+    let request = try DecisionRequest(text: "hello", candidates: ["chat", "camera"])
     #expect(throws: CapabilityError.self) {
-        _ = try JudgeResult(decision: .selected(label: "move", score: 1), for: request)
+        _ = try DecisionResult(decision: .selected(label: "move", score: 1), for: request)
     }
     #expect(throws: CapabilityError.self) {
-        _ = try JudgeResult(decision: .selected(label: "chat", score: .nan), for: request)
+        _ = try DecisionResult(decision: .selected(label: "chat", score: .nan), for: request)
     }
-    #expect(try JudgeResult(decision: .abstained, for: request).decision == .abstained)
+    #expect(try DecisionResult(decision: .abstained, for: request).decision == .abstained)
 }
 
 private actor InputGate {

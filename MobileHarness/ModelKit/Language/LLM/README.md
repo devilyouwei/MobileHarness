@@ -93,3 +93,7 @@ ChatModel 保存固定模型选择的 ChatCapability 和可选 modelName；无 c
 ChatFailureDiagnostic carries safe provider HTTP fields and network classification/code as capability evidence. Adapters sanitize messages and preserve received HTTP status, request ID and protocol-stage evidence; consumers own user-facing explanations and retry policy. See [Responses adapter](OpenAI/README.md).
 
 The Responses adapter retains each active SSE frame without a cumulative stream/line/frame output-size ceiling. Large text deltas use Unicode-safe event chunks and the existing bounded backpressured queue. Provider output defaults remain unchanged; recovery belongs to the consuming Agent.
+
+ChatRequest.toolChoice 默认为 automatic；required(name:) 要求工具已声明。云端编码强制命名函数并禁用并行工具调用；调用方仍必须验证真实返回。
+
+ChatRequest.onDispatch 是中立的实际开始回调。OpenAI 在请求校验/资源准备成功后、HTTP 发送前调用，Gemma 在实际 generate 前调用；回调失败阻止推理。业务方拥有历史提交，ModelKit 不导入 Storage。

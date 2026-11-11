@@ -37,7 +37,7 @@ extension SQLiteWriterMessageRepository {
         guard owner.request else { throw RecordStorageError.invalidRecord }
         guard
             let root = try Row.fetchOne(
-                db, sql: "SELECT * FROM writer_messages WHERE id=? AND input_kind='delegation'", arguments: [owner.key])
+                db, sql: "SELECT * FROM writer_executions WHERE id=?", arguments: [owner.key])
         else { throw RecordStorageError.missingRecord }
         let key = try SQLiteRecordCoding.allocateMessage(db)
         let cause = try Int64.fetchOne(

@@ -77,3 +77,7 @@ The adapter never retries model generation itself. Writer owns classified bounde
 ChatRequest.transportCapture 是 ModelKit 定义的可选中立回调。OpenAI adapter 在发送前提供实际 method/URL/headers/body，接收 status/headers 后按最多 64 KiB 块提供响应应用层字节，包含 SSE 和非成功状态正文。回调逐块 await，形成背压；EOF 标完成，提前停止标 partial。采集不改变真实模型结果，业务层自行处理存储错误。
 
 凭据型 headers 和 URL 参数脱敏；URLSession 可见传输解码后的字节不宣称为 TLS 抓包。ModelKit 不导入 Storage、也不拥有日志表或 Agent 身份。
+
+ChatToolChoice.required 按请求工具名称映射写入 Responses tool_choice，parallel_tool_calls=false。它不改变配置选择或执行工具；Assistant Decision 验证恰好一次合法分类返回。
+
+onDispatch 在配置校验、资源接纳和取消检查之后、HTTP 发送之前调用一次；传输证据随后进入 transportCapture。准备失败不报告开始，网络/HTTP 错误保留已经发起的事实。

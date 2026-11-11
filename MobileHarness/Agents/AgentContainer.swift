@@ -223,13 +223,16 @@ import StorageFiles
             return languageModels
         }
         private func quiesceForModelRemoval(_ id: String) async {
-            if id == "yolo26n-pose" {
+            if id == "d3-edge" {
+                await inputDecisionService?.quiesceLocal()
+            } else if id == "yolo26n-pose" {
                 await camera.pauseVisionForModelMaintenance()
             } else {
                 await speechPerception.beginSettingsChange()
                 speechPerception.endSettingsChange()
             }
         }
+        @ObservationIgnored private var inputDecisionService: AssistantInputDecision?
         private var executionPreparationStarted = false
         /// Called by App's executionBindings node after foundational repositories are ready.
         public func prepareExecutionBindings(
@@ -261,8 +264,27 @@ import StorageFiles
                     self?.speechPerception.endSettingsChange()
                     self?.onModelConfigurationChanged?()
                 },
-                resourcesPresented: { [weak self] in self?.applicationControl.acceptResourceSnapshot() })
+                resourcesPresented: { [weak self] in
+                    self?.applicationControl.acceptResourceSnapshot()
+                    if let service = self?.inputDecisionService { Task { await service.resetLocalFailure() } }
+                })
+            let makeDecision: @MainActor (AgentBusinessBindings) -> AssistantInputDecision = { business in
+                let configuration = business.decisionConfiguration
+                let reportDecision = business.decisionStatus
+                let service = AssistantInputDecision(
+                    local: self.languageModels.decision,
+                    configuration: {
+                        guard let configuration else { return (false, nil) }
+                        let (useLocal, cloud) = try await configuration()
+                        guard let cloud else { return (useLocal, nil) }
+                        return (useLocal, { try await cloud().capability })
+                    },
+                    report: { value in await reportDecision(value) })
+                self.inputDecisionService = service
+                return service
+            }
             return try AgentRuntime.prepare(
+                makeInputDecision: makeDecision,
                 maintenance: maintenance,
                 containerFailures: containerFailures, home: homeUI,
                 assistantContainer: assistant, applicationControlContainer: applicationControl,

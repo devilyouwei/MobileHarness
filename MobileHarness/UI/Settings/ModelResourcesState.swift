@@ -36,13 +36,14 @@ public struct ModelResourceItem: Identifiable, Sendable {
     }
 }
 public enum ModelResourceGroup: String, Sendable, CaseIterable {
-    case recognition, synthesis, language, vision
+    case recognition, synthesis, language, vision, decision
     public var title: String {
         switch self {
         case .recognition: "音频识别"
         case .synthesis: "语音合成"
         case .language: "大模型"
         case .vision: "视觉识别"
+        case .decision: "Decision"
         }
     }
     public var modelIDs: Set<String> {
@@ -51,6 +52,7 @@ public enum ModelResourceGroup: String, Sendable, CaseIterable {
         case .synthesis: ["moss-tts-nano"]
         case .language: ["gemma4-e2b"]
         case .vision: ["yolo26n-pose"]
+        case .decision: ["d3-edge"]
         }
     }
     public var installationMessage: String {
@@ -59,6 +61,7 @@ public enum ModelResourceGroup: String, Sendable, CaseIterable {
         case .synthesis: "请先下载并安装 MOSS 语音合成模型，再开启自定义模型。"
         case .language: "请先下载并安装 Gemma 4 E2B 大模型，再切换到本地模型。"
         case .vision: "请先下载并安装 YOLO 姿态模型。"
+        case .decision: "请先下载 D3 Decision 模型，再选择本地。"
         }
     }
 }
@@ -67,14 +70,27 @@ public struct ModelResourceSourceDraft: Codable, Sendable {
     public var allowsCellular: Bool
     public var useCustomRecognition: Bool
     public var useCustomSynthesis: Bool
+    public var useLocalDecision: Bool
+    private enum CodingKeys: String, CodingKey {
+        case endpoint, allowsCellular, useCustomRecognition, useCustomSynthesis, useLocalDecision
+    }
+    public init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        endpoint = try values.decode(String.self, forKey: .endpoint)
+        allowsCellular = try values.decode(Bool.self, forKey: .allowsCellular)
+        useCustomRecognition = try values.decode(Bool.self, forKey: .useCustomRecognition)
+        useCustomSynthesis = try values.decode(Bool.self, forKey: .useCustomSynthesis)
+        useLocalDecision = try values.decodeIfPresent(Bool.self, forKey: .useLocalDecision) ?? false
+    }
     public init(
         endpoint: String = "https://huggingface.co", allowsCellular: Bool = true,
-        useCustomRecognition: Bool = false, useCustomSynthesis: Bool = false
+        useCustomRecognition: Bool = false, useCustomSynthesis: Bool = false, useLocalDecision: Bool = false
     ) {
         self.endpoint = endpoint
         self.allowsCellular = allowsCellular
         self.useCustomRecognition = useCustomRecognition
         self.useCustomSynthesis = useCustomSynthesis
+        self.useLocalDecision = useLocalDecision
     }
 
 }
@@ -106,6 +122,7 @@ public final class ModelResourcesState {
     @ObservationIgnored var presentationAdmission: UIPresentationAdmission?
     public var isPresentationAvailable: Bool { presentationAdmission.map { $0.started && !$0.stopped } ?? true }
 
+    public private(set) var decisionStatus = "尚无决策记录"
     public internal(set) var source = ModelResourceSourceDraft()
     public internal(set) var items: [ModelResourceItem] = []
     public internal(set) var installedGroups: Set<ModelResourceGroup> = []
@@ -178,6 +195,7 @@ public final class ModelResourcesState {
         case .sourceAllowsCellular(let value): source.allowsCellular = value
         case .sourceUseCustomRecognition(let value): source.useCustomRecognition = value
         case .sourceUseCustomSynthesis(let value): source.useCustomSynthesis = value
+        case .decisionStatus(let value): decisionStatus = value
         case .source(let value): source = value
         case .items(let value): items = value
         case .installedGroups(let value): installedGroups = value
@@ -197,6 +215,7 @@ public enum ModelResourcesUpdate {
     case sourceAllowsCellular(Bool)
     case sourceUseCustomRecognition(Bool)
     case sourceUseCustomSynthesis(Bool)
+    case decisionStatus(String)
     case source(ModelResourceSourceDraft)
     case items([ModelResourceItem])
     case installedGroups(Set<ModelResourceGroup>)

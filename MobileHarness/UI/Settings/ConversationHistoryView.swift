@@ -414,6 +414,9 @@ import Foundation
                         HStack(spacing: 6) {
                             Text([turn.dateReport, turn.stateReport].filter { !$0.isEmpty }.joined(separator: " · "))
                                 .font(.caption).foregroundStyle(.secondary)
+                            if turn.coordination?.decision != nil {
+                                typeBadge(turn.decisionReport, color: .blue)
+                            }
                             if turn.isReACT == true {
                                 typeBadge("ReACT", color: .orange)
                             }
@@ -619,8 +622,30 @@ import Foundation
                     selectable(turn.displayInput)
                 }
                 Section("Assistant Response") {
-                    if !turn.raw.isEmpty || (turn.toolCalls ?? []).isEmpty { selectable(turn.raw) }
+                    if !turn.raw.isEmpty {
+                        selectable(turn.raw)
+                    } else if (turn.toolCalls ?? []).isEmpty {
+                        Text(turn.responseStatus).foregroundStyle(.secondary)
+                    }
                     ForEach(turn.toolCalls ?? []) { call in selectable(call.responseReport) }
+                }
+                if let evidence = turn.coordination {
+                    Section("输入决策") {
+                        Text("决策：" + turn.decisionReport)
+                        selectable("来源：" + evidence.source)
+                        selectable("采集时间标记：" + evidence.capturedAt)
+                        if let route = evidence.route { selectable("决策路径：" + route) }
+                        if evidence.decision == "interrupt" {
+                            Text("打断是决策结果，不代表所有执行都已停止。")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        if let batch = evidence.batchID { selectable("批次主输入：" + batch) }
+                        if let members = evidence.memberIDs, !members.isEmpty {
+                            DisclosureGroup("批次成员 · \(members.count)") {
+                                ForEach(members, id: \.self) { selectable($0) }
+                            }
+                        }
+                    }
                 }
                 Section {
                     VStack(alignment: .leading, spacing: 12) {
@@ -659,7 +684,8 @@ import Foundation
                             ScrollView(.horizontal) {
                                 HStack(spacing: 12) {
                                     ForEach(turn.attachedImages) { reference in
-                                        HistoryImageThumbnail(reference: reference, turnID: turn.id, controls: controls)
+                                        HistoryImageThumbnail(
+                                            reference: reference, turnID: turn.id, controls: controls)
                                     }
                                 }
                             }
@@ -841,6 +867,7 @@ import Foundation
         private func selectable(_ text: String) -> some View {
             Text(verbatim: text)
                 .font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+                .lineLimit(nil).fixedSize(horizontal: false, vertical: true)
         }
     }
 

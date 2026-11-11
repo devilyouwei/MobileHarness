@@ -652,6 +652,7 @@ public struct WriterWorkflow: Sendable {
         do {
             id = try await history?.begin(request, phase: phase, attempt: attempt, path: path, domain: domain)
             if let id {
+                request.onDispatch = { [history] in try await history?.dispatched(id) }
                 try await history?.recording(try evidence.snapshot(initial: true), id: id)
                 request.transportCapture = evidence.transportRecorder { [history] value in
                     try await history?.recording(value, id: id)
@@ -739,11 +740,13 @@ public struct WriterWorkflow: Sendable {
         throws
         -> [ChatMessage]
     {
-        let templates = try PromptTemplates(data: AgentConfigurations.promptData(named: "Writer"))
+        let templates = try AgentPrompts.roleTemplates(named: "Writer")
         let identity = try AgentConfigurations.identityInstructions(named: "Writer")
         let template = try templates.render("control." + domain.rawValue)
         let instructions = try AgentSkillLoader.instructions(domain.skillIDs(), owner: .writer)
-        let teaching = instructions.isEmpty ? "" : "\n\n# LOADED SKILL INSTRUCTIONS\n" + instructions
+        let teaching =
+            instructions.isEmpty
+            ? "" : "\n\n" + (try AgentPrompts.skillCatalog().render("loadedHeading")) + "\n" + instructions
         let context = workspace.map { "\nActive workspace: " + $0.workspaceID } ?? ""
         return [
             .init(role: .system, content: identity + "\n\n" + template + teaching + context),
@@ -768,7 +771,7 @@ public struct WriterWorkflow: Sendable {
         case "svg": format = "svg"
         default: format = "text"
         }
-        let templates = try PromptTemplates(data: AgentConfigurations.promptData(named: "Writer"))
+        let templates = try AgentPrompts.roleTemplates(named: "Writer")
         return try templates.render("content.base") + templates.render("content." + format)
             + (retry ? templates.render("content.retry") : "")
     }

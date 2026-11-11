@@ -183,7 +183,9 @@ import UI
         }
     }
     public func setCustomModel(_ group: ModelResourceGroup, enabled: Bool) async {
-        guard !stopped, !state.saving, group == .recognition || group == .synthesis else { return }
+        guard !stopped, !state.saving, group == .recognition || group == .synthesis else {
+            return
+        }
         state.present(.saving(true))
         defer { finishSaving() }
         do {

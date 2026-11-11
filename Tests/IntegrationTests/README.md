@@ -350,3 +350,19 @@ AgentCategory 回归验证七个打包角色的分类、配置到 Assistant/Memo
 ProviderDiscovery 取消回归通过有界信号等待底层取消处理器被调用后释放替身，避免把 UI 主线程异步转发的先后顺序误当成同步保证；生产取消实现保持独立。
 
 GenerationRoundTests 验证业务 Action 抛出原生风格错误且同轮语音输出失败时，仍交付业务观察、继续 ReACT 并接纳下一输入。PromptTemplateTests 验证常驻多窗口规则、摄影保存完成与显式窗口关闭的独立性；提示词契约测试不等同真实模型遵从验收。
+
+Full-duplex fixtures verify whole-Q freezing, independent generation/execution, ready native-result pairing, interrupt settlement, short forced-tool Decision and conservative fallback, consent policy, and additive SQLite migration. These synthetic tests do not establish cloud accuracy or physical audio echo quality.
+
+历史完整文本回归覆盖首次批次、ReACT、后续checkpoint、SQLite重开、日志清理、详情/窗口/输入读取与UI双角色完整投影；旧批次仅从身份匹配的记录日志恢复。
+
+请求落盘回归使用真实 SQLite 验证准备/排队/discard 零消息、发送后一次建行、网络失败留证和整Q一行；Writer 委托独立存储。旧格式迁移保留请求、执行结果、日志和外键并清除无调用输入，discard 通过真实 Worker 验证通知且主模型未调用。
+
+多来源批次回归由 InputDecisionTests 与 GenerationRoundTests 覆盖：用户专属分类、Agent 直接入 Q、ASR 时间与身份、SQLite 一批一行、准备失败不落库且保留、Action 单个结果提前请求、成功 Void 不续轮与 native 配对去重。真实模型的选择性回复效果仍需设备验收。
+
+输入时间线回归覆盖跨来源和同秒排序、正文中的仿来源行、设备时区投影、旧 JSON 回放和含旧格式示例的当代正文。PromptTemplateTests 核对输入样例、ASR 澄清规则与既有提示词预算。
+
+ProviderSettingsTests 覆盖 Decision 独立 Provider/模型持久化重开、旧文档可选字段、未配置/无效选择拒绝、共享 Provider 不同角色模型、私有 UI 暂存及呈现链路；InputDecisionTests 的云端路由为 cloud:decision。使用凭据与模型替身，不证明真实服务分类效果。
+
+AudioCaptureReadinessTests 覆盖 AEC 实际启用结果的选择、失败保留、未支持回退及避免重复处理；配置替身不证明设备回声抑制效果。
+
+Assistant 前台结束回归使用 SQLite、模型流替身和实际 ChannelScheduler。模型流与 Display Action 同时阻塞时验证 Control Action 持久化任务终态及折叠来源；分别放行后验证原消息的回复、Action journal 与任务折叠。

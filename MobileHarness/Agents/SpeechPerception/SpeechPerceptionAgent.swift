@@ -200,6 +200,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     /// Runtime flow control, independent of a full audio inbox.
     public func isUtteranceActive() -> Bool { phase == .speaking || phase == .processing }
     public func acquirePlaybackAdmission() async -> Bool {
+        if listeningPolicy.fullDuplex { return lifecycle == .running }
         guard lifecycle == .running, !isUtteranceActive() else { return false }
         awaitingReply = true
         await refreshIsland()
@@ -256,6 +257,14 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     }
 
     /// A microphone epoch is independent of the resident policy Agent's lifetime.
+    func setCaptureDuplex(_ enabled: Bool) {
+        listeningPolicy.fullDuplex = enabled
+        if enabled {
+            awaitingReply = false
+        } else if residentListening {
+            awaitingReply = !captureOpen || !listeningPolicy.enabled || listeningPolicy.paused
+        }
+    }
     public func openCapture(sessionID: String) async throws {
         guard residentListening, lifecycle == .running, listeningPolicy.enabled else {
             throw HarnessError.notRunning
@@ -740,6 +749,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             try await applyListeningPolicy(parent: input)
         }
         try await communicate(.transcript(text, final: true), parent: input)
+        if listeningPolicy.fullDuplex { try await resetListening(after: input) }
         // The reply producer reports occupancy; no subscriber receipt is expected.
     }
     private func reportError(_ error: any Error, input: AgentInput) {

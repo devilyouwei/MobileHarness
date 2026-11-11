@@ -83,7 +83,9 @@ Select the **MobileHarness** scheme, choose your connected iPhone, then build an
 - **Press and hold the companion's eyes for half a second** to enable continuous listening, prepare the selected speech capabilities and request microphone permission. Release after activation; speak, then pause to end the utterance. Partial captions become a final input and spoken reply.
 - Press and hold the eyes again to withdraw listening consent and stop microphone capture. Camera controls independently switch lenses or close preview.
 
-Listening pauses during recognition completion and replies, then resumes through the App's native audio completion barriers. The current frontend has no text-entry field. Native/model failures are explicit; active inference never silently switches to another provider.
+On an audio route with active echo cancellation, the Assistant keeps listening while it thinks or speaks. Configure a local D3 or cloud Decision model under **Agent Brains → Decision** to classify interruptions. Other audio routes pause recognition during replies and resume it while listening consent remains active. See [full-duplex interaction](MobileHarness/README.md#assistant-full-duplex-interaction).
+
+The current frontend has no text-entry field. Native and model failures are reported explicitly. An active inference request stays with its selected provider.
 
 Model downloads use an explicit official Hugging Face, HF-Mirror or custom HTTPS source; YOLO retains its declared ZIP source. Production revisions remain pinned. Background transfer and resume depend on the OS and server; force-quit does not guarantee continued transfer. See [model resources](MobileHarness/Resources/Models/README.md) and the [Hub adapter](MobileHarness/ModelKit/Support/Management/HuggingFace/README.md) for acquisition, compatibility and recovery details.
 
@@ -105,6 +107,7 @@ For offline development and opt-in Mac/model tests, existing `scripts/download-*
 | Feature | What you can do today |
 | --- | --- |
 | **Everyday interaction** | Have multi-turn voice conversations with the Assistant, with live captions, spoken replies and expressive eyes and gaze. |
+| **Full-duplex voice interaction** | On supported audio routes, speak while the Assistant is thinking or replying. The configured Decision model can queue a follow-up or confirm an interruption. [Technical design](MobileHarness/README.md#assistant-full-duplex-interaction) |
 | **Interactive UI** | Interact with generated pages, charts and small tools, manage content windows, and follow task progress in the in-app Island. |
 | **NexArm robotic-arm control** | Control a **NexArm** by voice, move individual joints, perform gestures such as nodding and waving, and aim using visual pose tracking. |
 | **Intelligent photography and album** | Take photos and videos by voice or on-screen controls, adjust countdown, flash and zoom, and use NexArm for pose-driven aiming. Browse, replay, export and delete saved photos and videos in the app album. |
@@ -166,7 +169,6 @@ Click any preview to view it at full size.
 
 ## Planned and Ongoing Work
 
-- **Full-duplex interaction:** Keep listening while the Assistant thinks or speaks, distinguish user interruptions from echo and noise, and hand over to a new utterance without losing its beginning. See [speech interaction plan](docs/requirements/product/Model-Web-Speech-Plan.md).
 - **Long-term memory:** Remember user preferences and important experiences, organize diary-style memories, and recall past conversations and creations. See [unified memory](docs/requirements/Unified-Memory-Plan.md).
 - **Autonomous photography:** Compose shots, follow subjects and move the camera according to the user's intent, with manual takeover when needed. See [photography plan](docs/requirements/Photographer-Proposal.md).
 - **Media understanding and search:** Describe and organize photos and videos, then find relevant images or video moments through natural-language requests. See [album extensions](docs/requirements/product/User-Album-Memory-Plan.md).

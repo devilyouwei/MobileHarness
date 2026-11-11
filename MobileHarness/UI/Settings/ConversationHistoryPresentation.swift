@@ -46,6 +46,7 @@ public enum ConversationHistoryPresentation {
         generationRounds: [HistoryRuntimeEffect]? = nil
     ) -> HistoryTurn {
         HistoryTurn(
+            coordination: turn.coordination,
             logsCleared: true, generationRounds: generationRounds, messageID: turn.messageID,
             historyOrder: turn.historyOrder,
             id: turn.id, date: turn.date, user: turn.user, request: [], model: "", maximumOutputTokens: nil,
@@ -112,6 +113,7 @@ public enum ConversationHistoryPresentation {
         decisionMetadata: HistoryDecisionMetadata? = nil, historyTaskID: String? = nil, historyOrder: UInt64 = 0
     ) -> HistoryTurn {
         HistoryTurn(
+            coordination: parent.coordination,
             messageID: messageID, historyOrder: historyOrder, id: id, date: date, user: input,
             request: requestJSON.flatMap { try? JSONDecoder().decode([HistoryMessage].self, from: Data($0.utf8)) }
                 ?? [],
@@ -170,10 +172,29 @@ extension HistoryTurn {
     public var dateReport: String { date.formatted() }
     public var stateReport: String { state.rawValue }
 
+    public var decisionReport: String {
+        switch coordination?.decision {
+        case "enqueue": "排队"
+        case "discard": "丢弃"
+        case "interrupt": "打断"
+        case .some(let value): value
+        case nil: "未记录决策"
+        }
+    }
+    public var responseStatus: String {
+        switch state {
+        case .generating: return "请求进行中，尚未记录回复。"
+        case .failed: return "请求失败，未记录回复。"
+        case .cancelled: return "请求已取消，未记录回复。"
+        case .interrupted: return "请求已中断，未记录回复。"
+        case .completed: return "请求已结束，未记录文本回复或工具调用。"
+        }
+    }
+
     public var outputSummary: String {
         if !raw.isEmpty { return raw }
         guard let calls = toolCalls, !calls.isEmpty else {
-            return ""
+            return responseStatus
         }
         return "Tool Call：" + calls.map(\.name).joined(separator: "、")
     }

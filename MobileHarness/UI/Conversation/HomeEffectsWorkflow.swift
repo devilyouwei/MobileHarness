@@ -45,7 +45,7 @@ public final class HomeEffectsWorkflow: HomeEffectsPresenting {
         guard (500...30000).contains(durationMS), !notice.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
             notice.text.utf8.count <= 1024
         else { throw Error.invalidArguments }
-        guard activity.errorToast == nil else { throw Error.busy }
+        guard notice.placement == .toast || activity.errorToast == nil else { throw Error.busy }
         noticeExpiry?.cancel()
         activity.notice = notice
         noticeOwner = owner

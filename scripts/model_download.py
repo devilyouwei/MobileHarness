@@ -22,7 +22,7 @@ def file_hash(path):
             digest.update(chunk)
     return digest.hexdigest()
 
-PRODUCTION = {"nemotron": "nemotron", "silero": "silero", "moss-tts-nano": "moss-tts-nano", "gemma4-e2b": "gemma4-e2b", "yolo26-pose": "yolo26n-pose"}
+PRODUCTION = {"d3-edge": "d3-edge", "nemotron": "nemotron", "silero": "silero", "moss-tts-nano": "moss-tts-nano", "gemma4-e2b": "gemma4-e2b", "yolo26-pose": "yolo26n-pose"}
 
 
 def load_config(profile, platform=None):

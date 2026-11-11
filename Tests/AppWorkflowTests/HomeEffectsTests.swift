@@ -132,3 +132,29 @@ func listeningRestorationRetainsFinalUserCaptionEvenWithoutReplyText(reply: Stri
     #expect(state.liveTranscript == "下一轮正在说话" && !state.transcriptFinalized)
     await effects.stopAndWait()
 }
+
+@Test @MainActor func transientToastRemainsIndependentOfReplyCaptionsAndErrorNotice() async throws {
+    let activity = ActionActivityState()
+    let state = ConversationState()
+    state.assistantReply = "正在回复"
+    state.liveTranscript = "嗯嗯"
+    let effects = HomeEffectsWorkflow(activity: activity)
+    effects.bind(state)
+    let owner = PresentationOwner(source: "assistant.input", session: "discard")
+    try await effects.showNotice(
+        .init(text: "已丢弃：嗯嗯", tone: .info, placement: .toast), durationMS: 500, owner: owner)
+    #expect(activity.transientToast?.text == "已丢弃：嗯嗯")
+    #expect(activity.visibleNotice == nil)
+    #expect(state.assistantReply == "正在回复" && state.liveTranscript == "嗯嗯")
+    activity.recordIssue(.init(title: "失败", source: "assistant", message: "真实异常"))
+    try await effects.showNotice(
+        .init(text: "已丢弃：好的", tone: .info, placement: .toast), durationMS: 500, owner: owner)
+    #expect(activity.visibleNotice?.text == "真实异常")
+    #expect(activity.transientToast?.text == "已丢弃：好的")
+    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+    while activity.transientToast != nil, ContinuousClock.now < deadline {
+        try await Task.sleep(for: .milliseconds(20))
+    }
+    #expect(activity.transientToast == nil && activity.errorToast != nil)
+    await effects.stopAndWait()
+}

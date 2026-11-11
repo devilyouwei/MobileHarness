@@ -8,17 +8,6 @@ root = pathlib.Path(__file__).resolve().parent.parent
 app = pathlib.Path(sys.argv[1])
 
 
-def verify(bundle, expected):
-    actual = {p.name: p for p in bundle.glob('*.json')}
-    if set(expected) != set(actual):
-        raise SystemExit(f'{bundle.name} resource mismatch: missing={sorted(set(expected)-set(actual))}, stale={sorted(set(actual)-set(expected))}')
-    for name, source in expected.items():
-        if source.read_bytes() != actual[name].read_bytes():
-            raise SystemExit(f'Stale packaged resource: {name}')
-    return len(expected)
-
-
-agents = root / 'MobileHarness/Agents'
 source = root / 'MobileHarness/Resources'
 bundle = app / 'HarnessKit_Agents.bundle'
 # Exercise Foundation Bundle lookup, not just filesystem presence: iOS resourceURL
@@ -37,6 +26,10 @@ if pathlib.Path(lookup).resolve() != (bundle / 'Catalog.json').resolve():
 expected = {pathlib.Path('Catalog.json'): source / 'Catalog.json'}
 for group in ('Agents', 'Skills'):
     expected.update({p.relative_to(source): p for p in (source / group).rglob('*') if p.is_file()})
+for name in ('InputProtocol.md', 'OutputProtocol.md', 'ActionCatalog.json', 'SkillCatalog.json', 'AgentCatalog.json', 'RequestContext.json'):
+    path = pathlib.Path('Agents/System') / name
+    if path not in expected:
+        raise SystemExit(f'Missing System prompt source: {path}')
 signature_metadata = {
     pathlib.Path('_CodeSignature') / name
     for name in ('CodeResources', 'CodeRequirements', 'CodeDirectory', 'CodeSignature')
@@ -50,8 +43,8 @@ if set(expected) != set(actual):
 for path, original in expected.items():
     if original.read_bytes() != actual[path].read_bytes():
         raise SystemExit(f'Stale Agent asset: {path}')
-core = agents / 'Support/Core/Generation/FunctionTokenPrompts.json'
-verify(app / 'HarnessKit_AgentCore.bundle', {core.name: core})
+if list(app.rglob('FunctionTokenPrompts.json')):
+    raise SystemExit('Retired Core protocol resource remains packaged')
 if list(app.rglob('FunctionMetadata.json')):
     raise SystemExit('Retired centralized function metadata remains packaged')
-print(f'Final app Skill resources verified: {len(expected)} assets; Core protocol; function declarations compiled with Actions.')
+print(f'Final app Agent/Skill resources verified: {len(expected)} assets, including System protocols and Action catalog templates.')

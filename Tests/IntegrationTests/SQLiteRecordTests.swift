@@ -79,7 +79,7 @@ import Testing
     let input = UUID().uuidString
     let snapshot = try await store.readCurrent()
     _ = try await store.begin(id: input, user: "hello", request: [], expecting: snapshot.token, model: "fixture")
-    #expect(await adapter.checkpointCount == 1)
+    #expect(await adapter.checkpointCount == 0)
     let first = UUID().uuidString
     try await store.beginModelRequest(.init(id: first, input: "hello", requestJSON: "[]"), for: input)
     for _ in 0..<10 { try await store.append("a", to: input) }
@@ -296,7 +296,7 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
     #expect(saved.sources.count == 32)
 }
 
-@Test func sqliteCompletedUserWithoutResponseRemainsReadableWithoutFabricatingResponse() async throws {
+@Test func sqliteQueuedInputWithoutRequestDoesNotAppearAfterRecovery() async throws {
     let db = try SQLiteRepositories.temporary()
     let store = AssistantHistoryStore(
         records: try AssistantRecordStore(
@@ -306,13 +306,8 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
     _ = try await store.begin(
         id: UUID().uuidString, user: "unfinished request", request: [], expecting: snapshot.token, model: "fixture")
     try db.recoverInFlight()
-    let page = try await store.page(snapshot.current.id)
-    #expect(page.turns.count == 1)
-    let id = try #require(page.turns.first?.modelRequests?.first?.messageID)
-    let detail = try await store.message(id)
-    #expect(detail.turns.first?.modelRequests?.first?.input == "unfinished request")
-    #expect(detail.turns.first?.modelRequests?.first?.response == "")
-    #expect(detail.turns.first?.modelRequests?.first?.state == .completed)
+    #expect(try await store.page(snapshot.current.id).turns.isEmpty)
+    #expect(try db.assistantMessages.messages(dialog: snapshot.current.id).isEmpty)
 }
 
 @Test func sqliteTaskOnLaterHistoryPageFoldsExpandsAndSurvivesArchival() async throws {
@@ -511,7 +506,7 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
     #expect(try db.assistantMessages.messageEvidence(preview.id).first?.body == body)
 }
 
-@Test func sqliteMessageIdentityExistsBeforeGenerationAndDeltasNeverWrite() async throws {
+@Test func sqliteMessageIdentityStartsAtDispatchAndDeltasNeverWrite() async throws {
     let db = try SQLiteRepositories.temporary()
     let records = try AssistantRecordStore(
         repository: db.assistantMessages, tasks: db.assistantTasks, conversations: db.assistantConversations,
@@ -521,19 +516,17 @@ func sqliteHundredThousandMessagesHaveBoundedIndexedPages() async throws {
     let input = UUID().uuidString
     let writesBeforeAdmission = db.committedWriteCount
     let user = try await store.begin(id: input, user: "hello", request: [], expecting: read.token, model: "fixture")
-    let userID = try #require(user.messageID)
-    #expect(db.committedWriteCount == writesBeforeAdmission + 1)
-    let accepted = try await db.assistantMessages.messages(dialog: read.current.id)
-    #expect(accepted.count == 1)
-    #expect(accepted.first?.id == userID && accepted.first?.body == "hello")
-    #expect(accepted.first?.state == "completed" && accepted.first?.detail.isEmpty == false)
-    #expect(try await store.readCurrent().current.turns.first?.messageID == userID)
-    #expect(try await db.assistantConversations.dialog(read.current.id).count == 1)
-    try await store.checkpoint(inputID: input)
-    #expect(try await db.assistantMessages.messages(dialog: read.current.id).map(\.id) == [userID])
-    #expect(try await db.assistantConversations.dialog(read.current.id).count == 1)
+    #expect(user.messageID == nil)
+    #expect(db.committedWriteCount == writesBeforeAdmission)
+    #expect(try db.assistantMessages.messages(dialog: read.current.id).isEmpty)
     let requestID = UUID().uuidString
-    try await store.beginModelRequest(.init(id: requestID, input: "hello", requestJSON: "[]"), for: input)
+    try await store.beginModelRequest(
+        .init(id: requestID, input: "hello", requestJSON: "[]"), for: input, awaitingDispatch: true)
+    try await store.checkpoint(inputID: input)
+    #expect(db.committedWriteCount == writesBeforeAdmission)
+    try await store.markModelRequestDispatched(input)
+    let userID = try #require(try await store.readCurrent().current.turns.first?.messageID)
+    #expect(try await db.assistantConversations.dialog(read.current.id).count == 1)
     let request = try #require(try await store.snapshot().current.turns.first?.modelRequests?.first)
     let responseID = try #require(request.messageID)
     #expect(request.inputMessageID == userID && responseID != userID)
@@ -570,7 +563,7 @@ private actor UserIdentityPublicationFixture {
     }
 }
 
-@Test func sqliteCompletedUserInsertRetriesFailedIdentityPublicationWithoutDuplicates() async throws {
+@Test func sqliteDispatchedRequestRetriesFailedIdentityPublicationWithoutDuplicates() async throws {
     let db = try SQLiteRepositories.temporary()
     let records = try AssistantRecordStore(
         repository: db.assistantMessages, tasks: db.assistantTasks, conversations: db.assistantConversations,
@@ -581,9 +574,11 @@ private actor UserIdentityPublicationFixture {
         identity: "fixture", load: { await memory.load() }, commit: { try await memory.commit($0) })
     let read = try await store.readCurrent()
     let input = UUID().uuidString
+    _ = try await store.begin(
+        id: input, user: "final transcript", request: [], expecting: read.token, model: "fixture")
     await #expect(throws: AssistantHistoryError.conflict) {
-        _ = try await store.begin(
-            id: input, user: "final transcript", request: [], expecting: read.token, model: "fixture")
+        try await store.beginModelRequest(
+            .init(id: "request", input: "final transcript", requestJSON: "[]"), for: input)
     }
     let committed = try #require(try await db.assistantMessages.messages(dialog: read.current.id).first)
     #expect(committed.body == "final transcript" && committed.state == "completed")
@@ -591,7 +586,8 @@ private actor UserIdentityPublicationFixture {
     #expect(await store.lastCheckpointError != nil)
     try await store.checkpoint()
     #expect(try await store.readCurrent().current.turns.first?.messageID == committed.id)
-    #expect(try await db.assistantMessages.messages(dialog: read.current.id).map(\.id) == [committed.id])
+    let saved = try db.assistantMessages.messages(dialog: read.current.id)
+    #expect(saved.count == 2 && saved.first?.id == committed.id)
     #expect(try await db.assistantConversations.dialog(read.current.id).count == 1)
     #expect(await store.lastCheckpointError == nil)
 }
@@ -648,7 +644,7 @@ private actor UserIdentityPublicationFixture {
     let db = try SQLiteRepositories.temporary()
     let dialog = try await db.assistantConversations.current()
     _ = try await db.assistantTasks.createTask(dialog: dialog.id, agent: "assistant", goal: "never activated")
-    let id = try db.assistantMessages.beginMessage(
+    _ = try db.assistantMessages.beginMessage(
         dialog: dialog.id,
         identity: .init(
             clientID: "lost-input", inputID: "lost-input", role: "user", kind: "input", order: 1, date: Date()))
@@ -658,7 +654,6 @@ private actor UserIdentityPublicationFixture {
         logs: db.logs)
     #expect(try await records.window(dialog.id).turns.isEmpty)
     let page = try await records.page(dialog.id)
-    #expect(page.turns.count == 1 && page.turns.first?.modelRequests?.first?.messageID == id)
-    #expect(page.turns.first?.state == .interrupted)
+    #expect(page.turns.isEmpty)
     #expect(try await db.assistantTasks.compressionData(dialog: dialog.id).isEmpty)
 }

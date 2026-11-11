@@ -56,3 +56,11 @@ Settings 首页保留原有分区顺序及模型入口顺序，界面标题/分�
 修改UI/Settings/SettingsView与既有蓝牙状态显示投影，状态转换及业务不变；同步Settings README、相关既有状态断言。使用原生模拟器验证英文入口、顺序、图标和原有导航；执行check.sh/build-ios.sh，真机安装另行记录。
 
 本节实现及Settings技术README已对齐；检查脚本/四目标构建、原生模拟器名称顺序与截图核对完成。原生通用套件日志缺口及真机未安装分别记录于docs/validation/Provider-Management.md。
+
+## Agent Brains 总页与独立配置
+
+- Settings 的 Agent Brains 总页依次显示 Cloud Providers、Assistant/Writer/Decision 子页入口及本地模型下载。共用 Provider 与模型发现缓存，角色独立选择。旧 Decision 导航进入同一个子页；Memory 延用 Assistant。Gemma 4 E2B 和 D3 在同一个下载区使用同一下载源，按模型 ID 分别操作，复用既有下载容量与生命周期。
+- UI/Settings 子页持有独立草稿，显示已提交的 Provider，返回时放弃该子页未保存的编辑。总页 Provider 草稿在进入子页时不提交。角色列表整行可点，标题与状态使用系统主、次正文色。SettingsFormController 在现有私有设置请求上以已保存配置合并当前页改动，单个保存门阻止竞争，成功后发布已提交状态；失败保留页面草稿。删除 Provider 时 Assistant 回到本地，Writer 未配置，Decision 清除引用并保留本地模式。Root 更新原生路径与可访问性标识。
+- Assistant 使用本地 Gemma 或云端。Writer 云端要求原生工具，保留深度思考和旧无 Provider 状态。Decision 主 Provider 选择包含本地 D3 或云端，选本地可单独选云端备用。首次选 D3 时校验安装；既有本地选择在模型缺失时继续保留。最近路径在收到分类状态前显示尚无记录。下载不触发自动选择。
+- Actions Provider 设置文档新增可选 Decision 本地模式字段。旧文档缺字段时从下载设置读取原值，不因读取而重写；首次保存将有效值写入同一设置事务，主用、备用随之原子提交。下载设置中的旧字段仅为迁移读取保留，新下载设置写入保留旧值。移除原资源保存通道的 Decision 安装错误映射，安装校验由 Provider 保存事务返回。Actions 通过 App 向 Assistant 输入分类交付冻结的模式和可选云端模型工厂，分类过程中沿用该快照。设置提交期间的新分类读取上一次成功提交的快照，保存失败时继续使用该快照。D3 不可用时使用已保存备用，否则保守入队。非 Assistant 配置变更不重配 Assistant 模型。
+- 实现后同步 UI、Root、Provider、模型资源与总体设计。验收覆盖导航、独立提交和回滚、模型发现、迁移、删除、分类回退以及两种模型的独立下载操作。运行全量检查及 iOS 构建，原生导航与真机/真实模型证据分开记录。

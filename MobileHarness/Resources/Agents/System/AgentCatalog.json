@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "templates": {
+    "heading": "# DELEGATABLE AGENTS",
+    "entry": "Agent ID={{id}}; description={{description}}"
+  }
+}

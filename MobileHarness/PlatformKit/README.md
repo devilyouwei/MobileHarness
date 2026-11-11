@@ -62,3 +62,7 @@ PlatformContainer injects AudioContainer's native owner reservation into VisionC
 PlatformContainer.systemStatus() exposes a typed read of resident power/network facts for host adapters. PlatformSystemStatus belongs to Core; reading neither starts monitoring nor samples hardware. UI types and display policy are not dependencies.
 
 Audio reports media-services reset as a native event and terminates affected PCM/playback waits with the original error. Full native stop joins work and replaces audio engines/connections; the execution owner decides whether and when to request a fresh capture. This SDK neither cancels model replies nor replays business actions. See [Audio lifecycle](Audio/README.md#原生事件错误与约束).
+
+Audio 的语音模式复用同一采集/播放引擎并报告实际 voice-processing 能力，采集与播放分别取消；不支持时向上层返回受限能力。双工业务策略和字幕由调用方拥有，原生图与 PCM 适配见 [Audio](Audio/README.md)。
+
+Audio 捕获事实包含实际回声消除路径。原生所有者优先受支持的系统 echo-cancelled input，回退到双 I/O 语音处理，只有验证启用后才提供全双工能力；路由失效交由原有生命周期终止/重建。SDK 不用识别文本推断回声，具体接口见 [Audio](Audio/README.md)。

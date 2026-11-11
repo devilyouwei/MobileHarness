@@ -38,7 +38,7 @@ Each task root contains phases and nested wait groups. A wait joins preceding pa
 | Runtime wait depth | Eight; parser also bounds combined lexical depth |
 | Finish | One terminal signal and one waiter; duplicate finish rejects |
 
-Collect active phase lane heads, sorted by admission sequence. Each idle lane may execute its head; its next job starts only after joined handler cleanup. Same-lane jobs do not overtake. Different Channels/tasks can run concurrently even for the same function/module. Channel names do not create a global FIFO. ResourceCoordinator rejects unconfigured execution conflicts instead of adding a waiting queue; explicit host takeover remains separate.
+Collect active phase lane heads in admission order. An optional neutral orderingScope adds same source/session/Channel FIFO across round trees, including earlier dormant jobs and running cleanup. Assistant supplies this scope; unrelated producers and Channels retain independent eligibility. Resource arbitration still applies, and waits join only their own tree. A cancelled job releases the lane after actual handler cleanup, never at cancellation request time.
 
 Overflow never evicts admitted work and provides no backpressure/retry queue. Production Gateway records admission failure and cancels the owning tree; direct callers must finish/cancel after errors.
 

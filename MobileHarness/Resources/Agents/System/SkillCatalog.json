@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "templates": {
+    "availableHeading": "# AVAILABLE SKILLS",
+    "loadedHeading": "# LOADED SKILL INSTRUCTIONS",
+    "entry": "Skill ID={{id}}; description={{description}}"
+  }
+}

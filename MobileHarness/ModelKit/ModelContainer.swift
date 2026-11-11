@@ -11,6 +11,7 @@ public protocol ModelResourceControlling: Sendable {
     func status() async throws -> ModelState
 }
 public protocol ModelLanguageProviding: ChatCapability, ModelResourceControlling {
+    var decision: any ModelDecisionProviding { get }
     func configure(_ configuration: OpenAIChatConfiguration?) async throws
     func chatModel(configuration: OpenAIChatConfiguration?) async throws -> ChatModel
 }
@@ -30,6 +31,7 @@ public protocol ModelSpeechProviding: Sendable {
     func unload(_ capability: ProvidedCapability) async throws
     func status(_ capability: ProvidedCapability) async throws -> ModelState
 }
+public protocol ModelDecisionProviding: DecisionCapability, ModelResourceControlling {}
 public protocol ModelVisionProviding: PoseCapability, ModelResourceControlling {}
 public protocol ModelArtifactsManaging: Sendable {
     func prepare() async throws
@@ -102,7 +104,7 @@ public struct ModelArtifactConfiguration: Sendable {
             "model.artifacts": ModelStateSnapshot.reader(of: artifacts) { try await $0.stateSnapshot() },
         ]
         for (component, capabilities) in [
-            ("language", [ProvidedCapability.chat]), ("speech", [.recognition, .synthesis, .voiceActivity]),
+            ("language", [ProvidedCapability.chat, .decision]), ("speech", [.recognition, .synthesis, .voiceActivity]),
             ("vision", [.pose]),
         ] {
             readers.merge(try await scope.resourceStateReaders(component, capabilities: capabilities)) { _, new in new }
@@ -453,11 +455,15 @@ private struct ConfiguredChat: ChatCapability {
 public final class ModelLanguageContainer: ModelLanguageProviding, Sendable {
     public func stateSnapshot() async throws -> ModelStateSnapshot {
         try Task.checkCancellation()
-        return try await scope.stateSnapshot("language", capabilities: [.chat])
+        return try await scope.stateSnapshot("language", capabilities: [.chat, .decision])
     }
 
     private let scope: ModelScope
-    fileprivate init(scope: ModelScope) { self.scope = scope }
+    fileprivate init(scope: ModelScope) {
+        self.scope = scope
+        self.decision = ModelDecisionContainer(scope: scope)
+    }
+    public let decision: any ModelDecisionProviding
     public var availability: CapabilityAvailability {
         get async {
             do { return await (try await scope.selectedChat()).availability } catch {
@@ -714,6 +720,7 @@ enum DefaultModelAssembly {
             try await manager.register(chatRegistration(resources: resources, configuration: nil), defaults: [.chat])
             try await registerSpeechDefaults(manager: manager, selection: selection)
             try await registerVision(manager: manager, resources: resources)
+            try await registerDecision(manager: manager, resources: resources)
             return manager
         } catch {
             await manager.shutdown()
@@ -882,5 +889,36 @@ extension ModelContainer {
                     return value == .ready || value == .unmanaged
                 }, prepare: warmup)
         }
+    }
+}
+
+public final class ModelDecisionContainer: ModelDecisionProviding, Sendable {
+    public func stateSnapshot() async throws -> ModelStateSnapshot {
+        try await scope.stateSnapshot("decision", capabilities: [.decision])
+    }
+    private let scope: ModelScope
+    fileprivate init(scope: ModelScope) { self.scope = scope }
+    public var availability: CapabilityAvailability {
+        get async {
+            do {
+                return try await scope.perform("decision", "availability", inference: false) {
+                    try await $0.get(.decision).availability
+                }
+            } catch { return .unavailable(reason: String(describing: error)) }
+        }
+    }
+    public func decide(_ request: DecisionRequest) async throws -> InferenceSession<DecisionResult> {
+        try await scope.perform("decision", "decide") { try await $0.get(.decision).decide(request) }
+    }
+    public func warmup() async throws { try await warmup(reportLoading: { _ in }) }
+    public func warmup(reportLoading: @escaping @Sendable (Bool) async -> Void) async throws {
+        try await scope.perform("decision", "warmup") { try await $0.warmup(.decision, reportLoading: reportLoading) }
+    }
+    public func load() async throws { try await scope.perform("decision", "load") { try await $0.load(.decision) } }
+    public func unload() async throws {
+        try await scope.perform("decision", "unload", inference: false) { try await $0.unload(.decision) }
+    }
+    public func status() async throws -> ModelState {
+        try await scope.perform("decision", "status", inference: false) { try await $0.status(.decision) }
     }
 }

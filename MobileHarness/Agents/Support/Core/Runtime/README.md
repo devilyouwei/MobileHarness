@@ -88,3 +88,9 @@ AgentRoundCoordinator 每轮最多登记 120 个调用，去重实际结果，�
 AgentTaskBudget 跨同一输入的续轮累计用量，正数可选限制显式生效，生产 request/native 上限为 nil；计数饱和安全。新的用户输入有独立 Decision 预算，即使仍属于同一前台 Task。provider 网络和 Action 执行截止时间另有 owner，不等于整个 Decision 时限。
 
 AgentRoundCoordinator validates call/round pairing and single outcome ownership without truncating or rejecting values by byte count. Model-visible projections are caller-owned.
+
+## 批次选择
+
+SignalInbox.takeAll 按接纳序号冻结同会话全部未排除成员；结果/续轮身份由调用者排除或并入。AgentDecisionContext 使用显式 memberIDs 验证 SignalBatch，保留主输入作为执行和回复所有者；Core 不制定语义分类政策。
+
+SignalInbox.take(excluding:) 允许拥有者暂时跳过阻塞输入，仍按 priority/sequence 取最高优先项；takeAll 在同一 actor 的同步冻结阶段提取同会话成员。Core 不解释 Decision、语义身份或准备失败重试策略，这些由 Assistant Worker 拥有。

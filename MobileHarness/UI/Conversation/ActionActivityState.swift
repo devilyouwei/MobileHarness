@@ -137,8 +137,9 @@ public final class ActionActivityState {
                 text: errorToast.userMessage ?? errorToast.message.replacingOccurrences(of: "agent.error: ", with: ""),
                 tone: .error)
         }
-        return notice
+        return notice?.placement == .caption ? notice : nil
     }
+    public var transientToast: HomeNotice? { notice?.placement == .toast ? notice : nil }
     public private(set) var errorToast: ExecutionIssue?
     @ObservationIgnored var toastDuration = Duration.seconds(8)
     @ObservationIgnored private var toastExpiry: Task<Void, Never>?
@@ -361,10 +362,13 @@ public final class ActionActivityState {
 /// A display notice is never an ExecutionIssue or a task goal.
 public struct HomeNotice: Sendable, Equatable {
     public enum Tone: String, Sendable { case info, warning, error }
+    public enum Placement: Sendable { case caption, toast }
+    public let placement: Placement
     public let id: String
     public let text: String
     public let tone: Tone
-    public init(id: String = UUID().uuidString, text: String, tone: Tone) {
+    public init(id: String = UUID().uuidString, text: String, tone: Tone, placement: Placement = .caption) {
+        self.placement = placement
         self.id = id
         self.text = text
         self.tone = tone

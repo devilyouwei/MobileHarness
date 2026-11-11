@@ -56,6 +56,7 @@ private actor WriterNativeFixture: ChatCapability {
         requests += 1
         try await observe(requests)
         #expect(request.timing != nil)
+        try await request.onDispatch?()
         request.timing?.start()
         if failsNetwork, requests >= 2 { throw WriterNetworkFixtureFailure() }
         let pair = InferenceSession<ChatEvent>.make(limits: try .init(), estimatedBytes: { $0.estimatedBytes })
@@ -563,7 +564,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     let current = try await journal.readCurrent().current
     let persistedCount = try await records.writerMessages.timelineCount(ownerID: current.id)
     #expect(
-        current.turns.count == (mode == 9 ? 8 : asks ? 8 : [8, 11].contains(mode) ? 7 : 6),
+        current.turns.count == (mode == 9 ? 8 : asks || [8, 11].contains(mode) ? 7 : 6),
         "scope=\(current.id), persisted=\(persistedCount), turns=\(current.turns.map(\.id))")
     #expect(
         current.turns.flatMap { $0.modelRequests ?? [] }.allSatisfy {
@@ -1180,6 +1181,7 @@ private actor WriterRenderProbe {
         maximumOutputTokens: 2048, temperature: 0.2,
         tools: [try ChatToolDefinition(declaration: Data(definition.utf8))])
     let id = try await history.begin(request, phase: "内容", path: "index.html")
+    try await history.dispatched(id)
     try await history.recording(AgentModelRequestRecording(request).snapshot(initial: true), id: id)
     let timing = ChatTiming()
     timing.start()
@@ -1209,6 +1211,7 @@ private actor WriterRenderProbe {
         .init(role: .tool, content: "Saved artifact abc", toolCallID: "call"),
     ])
     let largeSnapshot = try await history.begin(nextRequest, phase: "control")
+    try await history.dispatched(largeSnapshot)
     try await history.recording(AgentModelRequestRecording(nextRequest).snapshot(initial: true), id: largeSnapshot)
     try await history.finish(largeSnapshot)
     try await store.recordHostFinalization(
@@ -1220,9 +1223,12 @@ private actor WriterRenderProbe {
     try await store.checkpoint(inputID: largeSnapshot)
 
     let cancelled = try await history.begin(request, phase: "控制")
+
+    try await history.dispatched(cancelled)
     try await history.event(.text("partial"), id: cancelled)
     try await history.finish(cancelled, error: CancellationError())
     let failed = try await history.begin(request, phase: "控制请求")
+    try await history.dispatched(failed)
     let diagnostic = WriterDiagnostics.make(
         WriterNetworkFixtureFailure(), stage: "控制请求", details: ["model": "fixture", "elapsedSeconds": "60.030"])
     try await history.finish(failed, error: WriterNetworkFixtureFailure(), diagnostic: diagnostic)
@@ -1362,6 +1368,7 @@ private actor WriterRenderProbe {
         .init(role: .user, content: "Render", images: [try .init(id: "screenshot", data: bytes)])
     ])
     let id = try await history.begin(request, phase: "控制请求")
+    try await history.dispatched(id)
     try await history.recording(AgentModelRequestRecording(request).snapshot(initial: true), id: id)
     try await history.event(.text("Observed screenshot"), id: id)
     try await history.finish(id)
@@ -1411,6 +1418,7 @@ private actor WriterStartupProbe {
         messages: [.init(role: .system, content: "policy"), .init(role: .user, content: "画流程图")],
         maximumOutputTokens: 2048, temperature: 0.2)
     let input = try await history.begin(request, phase: "控制请求")
+    try await history.dispatched(input)
     try await history.recording(AgentModelRequestRecording(request).snapshot(initial: true), id: input)
     try await history.event(.text("先读文件"), id: input)
     try await history.event(
@@ -1887,6 +1895,7 @@ private actor WriterPreviewProbe {
     let request = try ChatRequest(messages: [.init(role: .user, content: "generate")])
     for i in 1...25 {
         let id = try await history.begin(request, phase: "文件内容请求", attempt: i == 25 ? 2 : 1, path: "index.html")
+        try await history.dispatched(id)
         if i == 1 {
             let starting = try await store.requestPreviews(delegation.workspaceID, after: 0)
             #expect(starting.first?.state == "generating")
@@ -2258,6 +2267,7 @@ private actor WriterPreviewProbe {
     let history = WriterHistory(store: store, delegateID: task.delegateID, goal: "Large")
     let request = try ChatRequest(messages: [.init(role: .user, content: "Create")])
     let input = try await history.begin(request, phase: "control")
+    try await history.dispatched(input)
     let source = String(repeating: "<p>source</p>", count: 30000)
     let result = String(repeating: "file result ", count: 30000)
     try await history.event(
@@ -2855,6 +2865,7 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
     for count in [0, 19, 20, 21, 40] {
         while total < count {
             let id = try await history.begin(request, phase: "控制请求")
+            try await history.dispatched(id)
             try await history.event(.text("row"), id: id)
             try await history.event(.finished(.stop), id: id)
             try await history.finish(id)
@@ -2930,6 +2941,7 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
     let history = WriterHistory(store: store, delegateID: requestID, goal: "Create")
     let request = try ChatRequest(messages: [.init(role: .user, content: "original")])
     let first = try await history.begin(request, phase: "控制请求")
+    try await history.dispatched(first)
     try await history.event(.text("selecting"), id: first)
     try await history.event(.finished(.stop), id: first)
     try await history.finish(first)
@@ -2940,6 +2952,7 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
         id: #require(WorkspaceID(rawValue: workspace.workspaceID)), expecting: nil, title: "A workspace",
         draft: ArtifactDraft(files: ["index.html": "<h1>Created</h1>"]))
     let second = try await history.begin(request, phase: "文件内容请求", path: "index.html")
+    try await history.dispatched(second)
     try await history.event(.text("<h1>Created</h1>"), id: second)
     try await history.event(.finished(.stop), id: second)
     try await history.finish(second)
@@ -2970,6 +2983,7 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
     let continued = WriterHistory(store: store, delegateID: secondRequest, goal: "Continue")
     for index in 1...39 {
         let input = try await continued.begin(request, phase: "控制请求")
+        try await continued.dispatched(input)
         try await continued.event(.text("Workspace message \(index)"), id: input)
         try await continued.finish(input)
     }

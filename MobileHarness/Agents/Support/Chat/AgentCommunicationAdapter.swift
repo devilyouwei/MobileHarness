@@ -20,9 +20,7 @@ public enum AgentCommunicationAdapter {
         if !taskSends.isEmpty {
             let required: Set<String> = ["target", "kind", "content"]
             let optional: Set<String> = ["taskID", "artifactID"]
-            let kinds = Set(taskSends.map { $0.contract.replacingOccurrences(of: "task.", with: "") }).sorted()
-            let targets = Set(taskSends.map(\.target)).sorted()
-            let templates = try FunctionTokenPrompts.load()
+            let grants = Set(taskSends.map { "\($0.target): \($0.contract.dropFirst("task.".count))" }).sorted()
             actions.append(
                 ActionRegistration(
                     alias: "send", path: ActionPath(domain: "Agent", module: "Communication", function: "send"),
@@ -30,15 +28,8 @@ public enum AgentCommunicationAdapter {
                     documentation: try JSONDecoder().decode(
                         CapabilityDocumentation.self,
                         from: JSONSerialization.data(withJSONObject: [
-                            "doc": (registration.documentation?.doc ?? "") + "\n"
-                                + (try templates.render(
-                                    "communicationDescription",
-                                    variables: [
-                                        "targets": targets.joined(separator: ", "),
-                                        "kinds": kinds.joined(separator: ", "),
-                                        "usage": try kinds.map { try templates.render("communication." + $0) }.joined(
-                                            separator: " "),
-                                    ])),
+                            "doc": (registration.documentation?.doc ?? "") + "\nAllowed target/kind pairs: "
+                                + grants.joined(separator: ", ") + ".",
                             "parameters": (registration.documentation?.parameters ?? []).map {
                                 [
                                     "name": $0.name, "valueType": $0.valueType.rawValue,

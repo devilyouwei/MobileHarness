@@ -94,3 +94,11 @@ Camera gallery renders supplied session catalog metadata and scoped read results
 Settings历史详情支持清空单条请求日志，历史列表支持清空Assistant/Writer共享全库。确认后 Prompts 和 Generation Meta 显示“已清空”，回复、Action 和工具结果等业务区块保留。新历史图片来自完整模型请求中的Base64，与Camera缓存寿命独立。
 
 首次云端配置由 Root 组合 Settings 的 WelcomeProviderView：恢复完成后按实际 Provider 列表判断展示；表单通过既有 SettingsControlling/SettingsOperating 提交，业务持久化仍由外部 Actions 拥有。成功后进入模型选择，UI 不推定服务支持的模型，也不访问钥匙串或网络。
+
+Settings 的 Agent Brains 总页管理共享 Cloud Providers 和本地下载，并进入独立保存的 Assistant、Writer、Decision 配置。Decision 子页展示业务投影的实际决策路径。Conversation 同时呈现用户与助手字幕、采集/播放状态及待分类/排队数量。具体接口见 [Settings](Settings/README.md) 与 [Conversation](Conversation/README.md)。
+
+Settings 历史只呈现实际发起的模型请求及其完整输入输出、来源、批次和失败证据。被丢弃的 Signal 不产生历史条目，Assistant 发布瞬时灵动岛反馈。
+
+HomeNotice 的独立 toast 由 Root 导航外层显示，Conversation 拥有单槽替换与到期清理；它与保留的双方字幕、错误 notice 独立，不写业务记录。
+
+Conversation 将用户字幕固定上方、助手字幕固定下方，不随定稿或活动漂移；共用 Components 的文字淡入，布局与区域约束归 Conversation。

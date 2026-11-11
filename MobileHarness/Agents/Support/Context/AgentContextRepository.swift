@@ -70,6 +70,7 @@ public actor AgentContextRepository<State: AgentContextState> {
     }
 
     public func transaction<Result: Sendable>(
+        beforePublishing: (@Sendable () async throws -> Void)? = nil,
         _ mutation: @Sendable (inout AgentContext<State>) throws -> Result
     ) async throws -> Result {
         try await acquire()
@@ -79,6 +80,12 @@ public actor AgentContextRepository<State: AgentContextState> {
         let result = try mutation(&next)
         try next.advanceRevision()
         try next.validate(agent: agentID, scope: scopeID)
+        if let beforePublishing {
+            // This context is the in-memory projection of the business transaction.
+            guard persistence == nil else { throw CommunicationError.invalidPayload }
+            try Task.checkCancellation()
+            try await beforePublishing()
+        }
         try await persistence?.commit(next, committedRevision)
         memory = next
         committedRevision = next.revision

@@ -65,13 +65,14 @@
         @Bindable var state: ModelResourcesState
         let controls: any ModelResourcesControlling
         let group: ModelResourceGroup
+        var includesDecision = false
         @State private var selectedSource = "official"
         @State private var removal: ModelResourceItem?
         private func percentage(_ progress: Double) -> String {
             progress < 0.001 ? "<0.1%" : String(format: "%.1f%%", progress * 100)
         }
         @ViewBuilder var body: some View {
-            Section(group == .language ? "本地大模型" : "自定义模型") {
+            Section(group == .language ? "本地模型下载" : "自定义模型") {
                 if group != .vision {
                     Picker("下载源", selection: $selectedSource) {
                         Text("Hugging Face 官方").tag("official")
@@ -98,7 +99,14 @@
                         .disabled(state.saving || !state.hasRestored)
                     }
                 }
-                ForEach(state.items.filter { group.modelIDs.contains($0.id) }) { item in
+                if includesDecision {
+                    Button("保存下载设置") { Task { _ = await controls.saveDownloadSource() } }
+                        .disabled(state.saving || !state.hasRestored)
+                        .accessibilityIdentifier("settings.brains.downloadSource.save")
+                }
+                let modelIDs =
+                    includesDecision ? group.modelIDs.union(ModelResourceGroup.decision.modelIDs) : group.modelIDs
+                ForEach(state.items.filter { modelIDs.contains($0.id) }) { item in
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(alignment: .center, spacing: 16) {
                             VStack(alignment: .leading, spacing: 4) {
@@ -121,14 +129,17 @@
                                     Button(state.isCancelling(item.id) ? "正在取消…" : "取消下载") {
                                         Task { await controls.perform(item.id, operation: .cancel) }
                                     }.frame(minHeight: 44).disabled(state.isCancelling(item.id))
+                                        .accessibilityIdentifier("settings.model.\(item.id).cancel")
                                 } else if !state.isBusy(item) {
                                     if !item.installed {
                                         Button(item.failure == nil ? "下载" : "继续下载") {
                                             Task { await controls.perform(item.id, operation: .download) }
                                         }.frame(minHeight: 44).disabled(state.saving || !state.hasRestored)
+                                            .accessibilityIdentifier("settings.model.\(item.id).download")
                                     }
                                     if item.installed || item.failure != nil {
                                         Button("删除", role: .destructive) { removal = item }.frame(minHeight: 44)
+                                            .accessibilityIdentifier("settings.model.\(item.id).delete")
                                     }
                                 }
                             }.buttonStyle(.borderless)
@@ -177,9 +188,11 @@
                         ? "删除后将使用基础声音检测。"
                         : group == .recognition || group == .synthesis
                             ? "删除后将使用 Apple 语音，再次启用需重新下载。"
-                            : group == .language
-                                ? "删除后需要使用云端大模型，或重新下载 Gemma 4 E2B 才能进行本地对话。"
-                                : "删除后需要重新下载 YOLO 才能使用本地姿态识别。")
+                            : removal?.id == "d3-edge"
+                                ? "删除后 Decision 将使用已配置的云端备用；云端不可用时保留输入并排队。"
+                                : group == .language
+                                    ? "删除后需要使用云端大模型，或重新下载 Gemma 4 E2B 才能进行本地对话。"
+                                    : "删除后需要重新下载 YOLO 才能使用本地姿态识别。")
             }
             .task {
                 await controls.restore()

@@ -104,7 +104,7 @@ Writer 私有控制提示只教本角色的选择、文件操作、追问与完�
 
 默认 BasicSkill 的后台入口与 task.start 平级，同一目标不先建立前台 Task，也不加载 Skill；运行时发送单行 goal 与当前真实用户输入。单任务忙碌时明确拒绝，Assistant 根据用户意图选择补充或取消；再次委派必须等待旧执行清理，不能因为通知尚未到达而重复创作。忙碌由 WriterMessages 的单活跃委托入口约束；Assistant 通过可信通信结果更新委派视图。具体公开参数由 [Task Actions](../../Actions/System/Task/README.md) 拥有。
 
-Writer 自有灵动岛显示接纳、补充、取消、进度、追问和终态。普通进度也更新窗口副标题和 State。Assistant 验证接纳、精选里程碑、追问和持久终态后更新委托视图，直接安排语音播报，并将事件摘要提供给原对话的后续用户请求。播报无需额外模型轮次。追问保存 interactionID，补充必须匹配当前委托及追问。终态经 writer.completion 持久投递，Assistant 验证不可变通知后标记消费。
+Writer 自有灵动岛显示接纳、补充、取消、进度、追问和终态。普通进度也更新窗口副标题和 State。Assistant 验证接纳、精选里程碑、追问和持久终态后更新委托视图。在全双工模式下，这些语义摘要保留 Agent 身份进入统一 Q，不经过 Decision；下一批 LLM 综合选择性呈现，不强制逐条播报。同步轮次兼容模式仍使用直接通知播报。追问保存 interactionID，补充必须匹配当前委托及追问。终态经 writer.completion 持久投递，Assistant 验证不可变通知后标记消费。
 
 Writer 接收 task.request、task.input 和 task.cancel。工作区工具结果直接返回调用方。task.progress 与 writer.completion 通过绑定注册身份的 AgentMessaging 直接取得投递报告。独立收尾 worker 加入执行清理并退休原授权。旧委派终态不能覆盖新执行。投递失败保留出站状态并独立重试。
 
@@ -114,7 +114,7 @@ Assistant 只发送 task.delegate(agent_id,description)，不分配 Writer works
 
 create 和 enter 的触发请求保留发起时的历史归属。Writer 在历史写门内 checkpoint 后绑定编辑工作区。后续读取、编辑与发布使用该目标，模型消息携带 workspace_id。open 展示指定作品并保持当前阶段，同一轮可顺序执行最多八个 open。
 
-writer_workspaces 保存 workspace 及文件 fence；writer_messages 保存委托入口、执行状态及完整消息。前序与 workspace 消息由字段区分，来源从持久化关联读取，不从当前请求兜底。Assistant 前台任务与 Writer 执行独立。
+writer_workspaces 保存 workspace 及文件 fence；writer_executions 保存委托入口和执行状态，writer_messages 只保存已发出的模型请求及完整消息。前序与 workspace 消息由字段区分，来源从持久化关联读取，不从当前请求兜底。Assistant 前台任务与 Writer 执行独立。
 
 Artifacts 使用 WorkspaceID(workspace_N)。显式 create 建立空目录并准备入口窗口，enter 复用已有目录并打开或聚焦窗口，open 只呈现已有作品。窗口隐藏时记录 deferred。会话内暂停或追问恢复使用 resume 并尊重关闭或最小化。旧回调仍校验委托范围。
 
@@ -210,4 +210,4 @@ workspace.create(title,entry) 直接处理明确新建请求。入口路径在�
 
 ## 私有指令与公开介绍
 
-Resources/Agents/Writer/Agent.json.description 提供公开用途。Instructions.md 保存私有共用身份，Prompts.json 的 control.library 和 control.workspace 分别管理作品库和编辑两个控制域。每个控制请求持久化域标识，恢复只加载当前域的调用/结果配对。无工具内容请求继续使用 content.base、格式模板和 content.retry。
+Resources/Agents/Writer/Agent.json.description 提供公开用途。Instructions.md 保存私有共用身份，Prompts.json 的 control.library 和 control.workspace 分别管理作品库和编辑两个控制域。控制请求的已加载 Skill 教学标题由共用 [SkillCatalog.json](../../Resources/Agents/System/SkillCatalog.json) 提供。每个控制请求持久化域标识，恢复只加载当前域的调用/结果配对。无工具内容请求继续使用 content.base、格式模板和 content.retry。

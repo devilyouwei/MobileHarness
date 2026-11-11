@@ -737,10 +737,11 @@ public actor ApplicationControlAgent: Agent {
                 }
                 switch intent {
                 case .restoreSource: call = try ApplicationControlFunctions.restoration.call([:])
-                case .saveSource(let endpoint, let cellular, let recognition, let synthesis):
+                case .saveSource(let endpoint, let cellular, let recognition, let synthesis, let decision):
                     call = try ApplicationControlFunctions.saving.call([
                         "endpoint": endpoint, "allowsCellular": cellular ? "true" : "false",
                         "recognition": recognition ? "true" : "false", "synthesis": synthesis ? "true" : "false",
+                        "decision": decision ? "true" : "false",
                     ])
                 default: throw CommunicationError.invalidPayload
                 }

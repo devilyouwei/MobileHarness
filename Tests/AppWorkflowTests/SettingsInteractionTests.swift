@@ -126,7 +126,8 @@ func restoringSettingsAgainPreservesUnsavedFormEdits() async throws {
     let state = SettingsState(
         initial: .init(
             enabled: true, url: a.url, key: a.key, model: "saved-a",
-            providers: [a, b], writerProviderID: b.id, writerModel: "saved-b"))
+            providers: [a, b], writerProviderID: b.id, writerModel: "saved-b",
+            decisionProviderID: b.id, decisionModel: "decision-b"))
     let fixture = BrainDiscoveryFixture()
     let controls = SettingsFormController(state: state, operations: fixture, defaultModel: "unused")
     controls.refreshModels()
@@ -148,12 +149,13 @@ func restoringSettingsAgainPreservesUnsavedFormEdits() async throws {
     fixture.pending[0].1.resume(returning: ["stale"])
     while !state.loadingProviderIDs.isEmpty { await Task.yield() }
     #expect(state.modelCatalogs["a"] == ["current"])
-    #expect(state.writerModel == "saved-b")
+    #expect(state.writerModel == "saved-b" && state.decisionModel == "decision-b")
     state.removeProvider("a")
     #expect(state.assistantProviderID == nil && !state.isEnabled)
     #expect(state.writerProviderID == "b")
     state.removeProvider("b")
     #expect(state.writerProviderID == nil && state.writerModel.isEmpty)
+    #expect(state.decisionProviderID == nil && state.decisionModel.isEmpty)
     await controls.shutdown()
 }
 
@@ -177,6 +179,49 @@ func restoringSettingsAgainPreservesUnsavedFormEdits() async throws {
     }
 }
 private enum WelcomeFixtureError: Error { case failed }
+
+@Test @MainActor func agentBrainPagesCommitOnlyTheirOwnSettings() async throws {
+    let fixture = WelcomeSettingsFixture()
+    let provider = CloudSettingsDraft(
+        enabled: false, url: "https://shared.test/v1", key: "fixture", model: "", name: "Shared", id: "shared")
+    fixture.stored = .init(
+        enabled: true, url: provider.url, key: provider.key, model: "assistant-model", providers: [provider],
+        writerProviderID: provider.id, writerModel: "writer-model", decisionProviderID: provider.id,
+        decisionModel: "decision-model")
+    let state = SettingsState(initial: fixture.stored)
+    let controls = SettingsFormController(state: state, operations: fixture, defaultModel: "default")
+    try await controls.restore()
+    var decision = state.brainDraft(.decision)
+    decision.usesLocal = true
+    decision.model = "fallback-model"
+    var writer = state.brainDraft(.writer)
+    writer.writerThinking = true
+    #expect(await controls.save(.brain(.decision, decision)))
+    #expect(fixture.stored.decisionUsesLocal && fixture.stored.decisionModel == "fallback-model")
+    #expect(fixture.stored.model == "assistant-model" && !fixture.stored.writerThinking)
+    #expect(await controls.save(.brain(.writer, writer)))
+    #expect(fixture.stored.writerThinking && fixture.stored.decisionUsesLocal)
+    #expect(state.brainDraft(.decision) == decision)
+
+    fixture.failsSave = true
+    #expect(await !controls.save(.providers([])))
+    #expect(state.providers == [provider] && state.brainDraft(.writer) == writer)
+    fixture.failsSave = false
+    #expect(await controls.save(.providers([])))
+    #expect(state.providers.isEmpty && state.brainDraft(.assistant).usesLocal)
+    #expect(state.brainDraft(.writer).providerID == nil)
+    #expect(state.brainDraft(.decision).usesLocal && state.brainDraft(.decision).providerID == nil)
+}
+
+@Test @MainActor func agentBrainNavigationKeepsTheSharedParent() {
+    let navigation = NavigationState()
+    navigation.show(.assistantBrain)
+    #expect(navigation.path == [.settings, .language, .assistantBrain])
+    navigation.show(.writerBrain)
+    #expect(navigation.path == [.settings, .language, .writerBrain])
+    navigation.show(.decision)
+    #expect(navigation.path == [.settings, .language, .decision])
+}
 
 @Test @MainActor func welcomeRequiresSuccessfulRestoreAndDoesNotReplaceAnExistingProvider() async throws {
     let fixture = WelcomeSettingsFixture()
@@ -272,4 +317,41 @@ private enum WelcomeFixtureError: Error { case failed }
     try await restarted.restore()
     #expect(!restarted.needsWelcome && restored.providers.first?.key == "fixture-key")
     #expect(restored.writerProviderID == provider.id && restored.writerModel == "writer-model")
+}
+
+@Test @MainActor func decisionFormSelectionSavesRestoresAndKeepsOtherBrainsIndependent() async throws {
+    let fixture = WelcomeSettingsFixture()
+    let a = CloudSettingsDraft(enabled: false, url: "https://a.invalid", key: "fixture-a", model: "default", id: "a")
+    let b = CloudSettingsDraft(enabled: false, url: "https://b.invalid", key: "fixture-b", model: "default", id: "b")
+    fixture.stored = .init(
+        enabled: true, url: a.url, key: a.key, model: "assistant", providers: [a, b], writerProviderID: a.id,
+        writerModel: "writer")
+    let state = SettingsState(initial: fixture.stored)
+    let controls = SettingsFormController(state: state, operations: fixture, defaultModel: "default")
+    try await controls.restore()
+    let revision = state.revision
+    state.selectDecisionProvider(b.id)
+    #expect(!state.canSave)
+    state.decisionModel = "decision"
+    #expect(state.canSave && state.revision > revision)
+    #expect(await controls.save())
+    #expect(fixture.stored.decisionProviderID == "b" && fixture.stored.decisionModel == "decision")
+    #expect(fixture.stored.model == "assistant" && fixture.stored.writerModel == "writer")
+    let restored = SettingsState(initial: .init(enabled: false, url: "", key: "", model: ""))
+    let restarted = SettingsFormController(state: restored, operations: fixture, defaultModel: "default")
+    try await restarted.restore()
+    #expect(restored.decisionProviderID == "b" && restored.decisionModel == "decision")
+    restored.selectAssistantProvider("b")
+    restored.selectedModel = "other-assistant"
+    #expect(restored.decisionModel == "decision")
+    restored.selectDecisionProvider("a")
+    #expect(restored.decisionModel.isEmpty && !restored.canSave)
+    restored.decisionModel = "new-decision"
+    restored.removeProvider("a")
+    #expect(restored.decisionProviderID == nil && restored.decisionModel.isEmpty)
+    #expect(restored.assistantProviderID == "b" && restored.selectedModel == "other-assistant")
+    #expect(await restarted.save())
+    #expect(fixture.stored.decisionProviderID == nil && fixture.stored.decisionModel.isEmpty)
+    await controls.shutdown()
+    await restarted.shutdown()
 }

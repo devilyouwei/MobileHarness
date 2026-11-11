@@ -4,7 +4,7 @@
 
 默认装配测试验证 App 管理的 ModelContainer，不取得进程单例或直接注册生产模型。覆盖根／四子能力隔离、缺失资源目录时无副作用启动、暂停与恢复、重复停止、旧端口拒绝，以及保留的聊天端口随配置变化切换且不影响另一根。
 
-模型工厂只建立轻量对象；测试不运行真实推理、不初始化 GPU 权重、不请求设备权限、不发送网络请求。资源取消加入／权重保留与不合作加载在 ModelKitRuntimeTests 覆盖；App 缓存一致性在 IntegrationTests 覆盖。构建与真机验收独立记录。
+模型工厂只建立轻量对象；默认测试不运行真实推理、不初始化 GPU 权重、不请求设备权限、不发送网络请求。资源取消加入／权重保留与不合作加载在 ModelKitRuntimeTests 覆盖；App 缓存一致性在 IntegrationTests 覆盖。构建与真机验收独立记录。
 
 
 ✅ 模型根停止后start／setForeground的错误断言使用ModelFailure；底层能力端口仍验证原始InferenceAdmissionError，明确根与领域接口边界。
@@ -12,3 +12,7 @@
 Preparation-step tests cover requested-order deduplication, registered-but-not-ready status and explicit rejection after root shutdown, without loading models.
 
 ChatExecutionTests exercises root-owned local FIFO (one active/eight pending), overflow, immediate cancellation slot reuse, native cleanup joining, failure advancement and retained completed handles, using an explicit fake Chat provider. Immutable cloud selections/configuration reuse and root retirement are checked without HTTP. Provider HTTP concurrency is tested in OpenAIChatTests.
+
+D3NativeTests is explicitly opt-in via D3_TEST_RESOURCES. It performs real Swift tokenizer/Core AI inference against a locally supplied published fixture, compares selection/score and rejects oversized input. Ordinary default tests remain artifact-free; native results are recorded separately in docs/validation.
+
+显式启用的 D3 业务探测记录8条中文输入的期望与实际标签，汇报探索性准确率；该测试通过只说明原生执行成功，不将错误分类视为业务验收通过。

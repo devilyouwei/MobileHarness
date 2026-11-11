@@ -81,3 +81,7 @@ ConversationHistoryWorkflow.records 为独立 Agent 仓库组合相同的分页/
 Assistant 历史投影透传 decisionMetadata.states 的已记录路径，与 Task/Skill 业务证据一起读取；日志清空不删除这些路径。Actions 不按当前 Skill 推算历史 State，不因 UI 隐藏原始请求 JSON 改变日志持有和清理职责。
 
 ConversationHistoryWorkflow 提供真实记录读取、分页、摘要、删除和日志清理；详情直接使用持久化输入、回复及业务快照。真实执行结果随原有记录保存。
+
+Assistant 完整请求详情使用 Storage 保存的本次请求文本和完整回复，原样投影到 User Request / Assistant Response；列表仍是有界预览。旧批次的日志恢复与原文保留由 AssistantMessages 拥有，Actions 不按当前对话重组历史。
+
+历史投影只接收实际模型请求，保留请求的 coordination、完整输入输出与失败证据；不制造原始输入占位请求。discard 提示是独立瞬时 UI 通知，不进入历史查询。

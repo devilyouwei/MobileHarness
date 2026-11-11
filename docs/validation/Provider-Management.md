@@ -87,3 +87,10 @@ Settings 首页分区/入口/标题及蓝牙状态摘要英文化；User顺序�
 ### 2026-11-05 Settings 英文首页真机安装
 
 按用户要求构建并覆盖安装到已配对 iPhone 17 Pro，版本0.1.0（2026110505）。设备构建成功，严格深层签名、30项Skill和Live Activity资源校验通过；安装回执序号5948，随后devicectl确认应用成功启动并读回版本。覆盖安装保留现有应用数据，没有卸载或清空SQLite。日志 /tmp/settings-english-device-build.log、/tmp/settings-english-device-install.log、/tmp/settings-english-device-launch.log、/tmp/settings-english-device-version.log。仅确认安装和启动，未代替用户完成真机触控/模型/蓝牙验收；当前安装亦包含数字徽标双色修改。
+
+## 2026-11-11 Agent Brains 总页与独立配置
+
+- 串行定向回归通过，共 8 项集成测试、2 项工作流测试。覆盖旧 Decision 模式读取、磁盘保存及重开、保存期间读取上次已提交快照、角色独立保存、Provider 删除与失败保留、旧导航和分类队列。首轮全量检查遇到的四项测试（含两个参数分支）均在该轮复跑通过。日志 `/tmp/mobileharness-agent-brains-regression.log`。
+- 最终 `scripts/check.sh` 的格式、边界、Python、plist、188 项工作流和 229 项 LiveRuntimeTests 通过。集成阶段有一项 `assistantPhotographyForegroundTasksPersistThroughSQLite` 失败，报 `agent.error: conflict` 且没有活跃任务 ID，因此脚本退出 1。该项串行单独复跑在 90 秒后以 `.expired` 失败。此用例直接构造 Assistant 与 SQLite 仓库，使用拍照替身。NativePresentationTests 只有开始记录，缺少完成证据。日志 `/tmp/mobileharness-agent-brains-final-check.log`、`/tmp/mobileharness-agent-brains-photo-regression.log`。
+- `scripts/build-ios.sh` 四个目标通过，最终 UI 调整后再次构建 `MobileHarnessSimulator` 并通过。两次均验证了 33 项 Agent/Skill 资源及内嵌 Live Activity。日志 `/tmp/mobileharness-agent-brains-ios.log`、`/tmp/mobileharness-agent-brains-final-ios.log`。
+- 独立 iPhone 18 Pro / iOS 27 模拟器原生点击通过，覆盖 Settings 下的 Agent Brains、三个子页的 Provider 与保存控件、Writer 的本地说明、Decision 无分类记录提示、Provider 草稿在往返子页时保留，以及共享区的 Gemma 与 D3 入口。最终结果包 `/tmp/mobileharness-agent-brains-ui.VAIOUr/AgentBrains-final.xcresult`。真实 Provider 请求、模型下载与推理需要单独验收，本轮未安装真机。

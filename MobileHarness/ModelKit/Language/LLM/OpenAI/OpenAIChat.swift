@@ -50,6 +50,7 @@ public actor OpenAIChat: ChatCapability {
             var capture = HTTPByteCapture(sink: request.transportCapture)
             do {
                 try Task.checkCancellation()
+                try await request.onDispatch?()
                 request.timing?.start()
                 await request.transportCapture?(
                     .request(

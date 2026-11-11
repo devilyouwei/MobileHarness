@@ -8,7 +8,7 @@ extension SQLiteWriterExecutionRepository {
     static func entry(_ id: String, db: Database) throws -> Row {
         guard
             let row = try Row.fetchOne(
-                db, sql: "SELECT * FROM writer_messages WHERE input_kind='delegation' AND request_message_id=?",
+                db, sql: "SELECT * FROM writer_executions WHERE request_message_id=?",
                 arguments: [id])
         else { throw RecordStorageError.missingRecord }
         return row
@@ -27,7 +27,7 @@ extension SQLiteWriterExecutionRepository {
         guard agent == "writer", !goal.isEmpty else { throw RecordStorageError.invalidRecord }
         return try database.write { db in
             if try Row.fetchOne(
-                db, sql: "SELECT * FROM writer_messages WHERE input_kind='delegation' AND request_message_id=?",
+                db, sql: "SELECT * FROM writer_executions WHERE request_message_id=?",
                 arguments: [delegateID]) != nil
             {
                 return try Self.requestView(delegateID, db: db)
@@ -39,15 +39,15 @@ extension SQLiteWriterExecutionRepository {
                 try Int.fetchOne(
                     db,
                     sql:
-                        "SELECT COUNT(*) FROM writer_messages WHERE input_kind='delegation' AND run_state IN \(Self.writerActive)"
+                        "SELECT COUNT(*) FROM writer_executions WHERE run_state IN \(Self.writerActive)"
                 ) != 0
             let key = try SQLiteRecordCoding.allocateMessage(db)
             let now = Date().timeIntervalSince1970
             try db.execute(
                 sql:
-                    "INSERT INTO writer_messages(id,input_key,root_input_key,position,input_kind,state,request_message_id,user_input_json,request_goal,run_state,created_at,updated_at) VALUES(?,?,?,?,'delegation','completed',?,?,?,?,?,?)",
+                    "INSERT INTO writer_executions(id,request_message_id,user_input_json,request_goal,run_state,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
                 arguments: [
-                    key, delegateID, delegateID, key, delegateID,
+                    key, delegateID,
                     try SQLiteRecordCoding.json([
                         "text": input, "source_agent": incoming.senderAgentID,
                         "source_context": incoming.senderContext as Any? ?? NSNull(),
@@ -57,7 +57,8 @@ extension SQLiteWriterExecutionRepository {
                 ])
             if busy {
                 try db.execute(
-                    sql: "UPDATE writer_messages SET terminal_state='failed',completed_at=?,failure_json=? WHERE id=?",
+                    sql:
+                        "UPDATE writer_executions SET terminal_state='failed',completed_at=?,failure_json=? WHERE id=?",
                     arguments: [
                         now,
                         try SQLiteRecordCoding.json([
@@ -91,7 +92,7 @@ extension SQLiteWriterExecutionRepository {
         }
         guard row["write_lease"] as String? == nil else { throw RecordStorageError.conflict }
         try db.execute(
-            sql: "UPDATE writer_messages SET selected_workspace_id=?,request_revision=request_revision+1 WHERE id=?",
+            sql: "UPDATE writer_executions SET selected_workspace_id=?,request_revision=request_revision+1 WHERE id=?",
             arguments: [target, root["id"] as Int64])
         return try Self.workspace(row)
     }
@@ -158,7 +159,7 @@ extension SQLiteWriterExecutionRepository {
             guard db.changesCount == 1 else { throw RecordStorageError.conflict }
             try db.execute(
                 sql:
-                    "UPDATE writer_messages SET selected_workspace_id=?,request_revision=request_revision+1 WHERE id=?",
+                    "UPDATE writer_executions SET selected_workspace_id=?,request_revision=request_revision+1 WHERE id=?",
                 arguments: [target, root["id"] as Int64])
         }
     }
@@ -176,15 +177,7 @@ extension SQLiteWriterExecutionRepository {
             guard incoming.contract == "task.cancel" || (root["pending_question_id"] as String?) == questionID else {
                 throw RecordStorageError.conflict
             }
-            let key = try SQLiteRecordCoding.allocateMessage(db)
             let now = Date().timeIntervalSince1970
-            try db.execute(
-                sql:
-                    "INSERT INTO writer_messages(id,workspace_id,delegation_id,request_message_id,input_key,root_input_key,position,input_kind,state,user_input_json,created_at,updated_at,completed_at) VALUES(?,?,?,?,?,?,?,'agent','completed',?,?,?,?)",
-                arguments: [
-                    key, root["selected_workspace_id"] as Int64?, root["id"] as Int64, requestID, id, id, key,
-                    try SQLiteRecordCoding.json(["text": text, "source_agent_message_id": id]), now, now, now,
-                ])
             try db.execute(
                 sql:
                     "UPDATE agent_messages SET delivery_state='received',received_at=COALESCE(received_at,?),consumed_at=? WHERE id=?",
@@ -236,7 +229,7 @@ extension SQLiteWriterExecutionRepository {
         try database.write { db in
             try db.execute(
                 sql:
-                    "UPDATE writer_messages SET run_state=?,request_revision=request_revision+1,updated_at=? WHERE input_kind='delegation' AND request_message_id=? AND run_state IN \(Self.writerActive)",
+                    "UPDATE writer_executions SET run_state=?,request_revision=request_revision+1,updated_at=? WHERE request_message_id=? AND run_state IN \(Self.writerActive)",
                 arguments: [state, Date().timeIntervalSince1970, requestID])
             guard db.changesCount == 1 else { throw RecordStorageError.conflict }
         }
@@ -256,7 +249,7 @@ extension SQLiteWriterExecutionRepository {
             }
             try db.execute(
                 sql:
-                    "UPDATE writer_messages SET pending_question_id=?,pending_question_json=?,run_state=?,request_revision=request_revision+1 WHERE input_kind='delegation' AND request_message_id=? AND run_state IN ('running','waiting_input','paused')",
+                    "UPDATE writer_executions SET pending_question_id=?,pending_question_json=?,run_state=?,request_revision=request_revision+1 WHERE request_message_id=? AND run_state IN ('running','waiting_input','paused')",
                 arguments: [
                     interactionID, data.map { String(decoding: $0, as: UTF8.self) },
                     interactionID == nil ? "running" : "waiting_input", delegateID,
@@ -271,7 +264,7 @@ extension SQLiteWriterExecutionRepository {
         )
         try db.execute(
             sql:
-                "UPDATE writer_messages SET run_state='interrupted',terminal_state='interrupted',completed_at=strftime('%s','now'),pending_question_id=NULL,pending_question_json=NULL,failure_json=?,updated_at=? WHERE input_kind='delegation' AND run_state IN ('running','waiting_input','paused')",
+                "UPDATE writer_executions SET run_state='interrupted',terminal_state='interrupted',completed_at=strftime('%s','now'),pending_question_id=NULL,pending_question_json=NULL,failure_json=?,updated_at=? WHERE run_state IN ('running','waiting_input','paused')",
             arguments: [
                 "{\"message\":\"Process interrupted; external effects are never replayed\"}",
                 Date().timeIntervalSince1970,

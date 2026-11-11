@@ -252,6 +252,147 @@ private func skillEventually(_ predicate: @Sendable () async throws -> Bool) asy
     }
 }
 
+private actor ForegroundEndModel: ChatCapability {
+    let availability: CapabilityAvailability = .available
+    private var ending: InferenceEmitter<ChatEvent>?
+    private(set) var requestCount = 0
+
+    func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
+        try await request.onDispatch?()
+        requestCount += 1
+        let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
+        if request.context.requestID == "foreground-end" {
+            ending = pair.emitter
+            try pair.emitter.yield(.text(#"<express emotion="happy"/><task.end summary="同声传译结束"/>"#))
+        } else {
+            let output =
+                requestCount == 1
+                ? #"<task.start description="同声传译" skills='["photography"]'/>"#
+                : #"<express emotion="happy"/>"#
+            try pair.emitter.yield(.text(output))
+            try pair.emitter.yield(.finished(.stop))
+            pair.emitter.finish()
+        }
+        return pair.session
+    }
+
+    func finishEndingRequest() throws {
+        let emitter = try #require(ending)
+        try emitter.yield(.finished(.stop))
+        emitter.finish()
+        ending = nil
+    }
+}
+
+private actor ForegroundEndActionGate {
+    private(set) var entered = false
+    private var released = false
+
+    func wait() async throws {
+        entered = true
+        while !released { try await Task.sleep(for: .milliseconds(5)) }
+    }
+
+    func release() { released = true }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func fullDuplexTaskEndPersistsAndFoldsWhileGenerationAndAnotherChannelAreRunning() async throws {
+    let database = try SQLiteRepositories.temporary()
+    let context = try AgentContextRepository(
+        agent: .assistant, scope: UUID().uuidString, state: AssistantContextState())
+    let store = try AssistantConversationStorage.store(
+        repository: context, messages: database.assistantMessages, tasks: database.assistantTasks,
+        conversations: database.assistantConversations, logs: database.logs)
+    let model = ForegroundEndModel()
+    let gate = ForegroundEndActionGate()
+    let agent = try AssistantAgent(
+        stateContext: PublicStateFixtureOwner(ready: true).context(), fullDuplex: true, chat: model,
+        conversations: store, context: context)
+    let manager = AgentManager()
+    try await manager.register(agent)
+    let input = InputGateway(manager: manager)
+    let controls = TaskControlModule(capability: SkillControls(agent: agent))
+    let assembly = try BehaviorAssembly(capabilityModules: [controls])
+    struct Module: ActionModule { let definitions: [ActionBinding] }
+    let express = ActionBinding(
+        path: .init(domain: "UI", module: "Expression", function: "express"), displayName: "Fixture expression",
+        kind: .finite, completion: "Fixture expression completed",
+        completing: { invocation in
+            if invocation.context.inputID == "foreground-end" { try await gate.wait() }
+            return .completed
+        })
+    let bindings = try controls.definitions.map { try assembly.actions.definition(for: $0.path) }
+    let scheduler = ChannelScheduler(registry: try ActionRegistry(modules: [Module(definitions: bindings + [express])]))
+    {
+        await input.deliverActionResult($0)
+    }
+    let gateway = await OutputGateway(
+        manager: manager, requests: input, tools: assembly.tools, actions: scheduler, sink: { _ in })
+    try await agent.start()
+    let consumer = try await gateway.consumer(for: agent)
+    let pump = Task {
+        try await AssistantGenerationTransport.consume(fixtureOutputs(agent)) { output in
+            _ = try await consumer.execute(output)
+        }
+    }
+    defer { pump.cancel() }
+
+    let session = UUID().uuidString
+    try await agent.receive(.init(id: "foreground-start", sessionID: session, payload: .text("开始同声传译")))
+    try await skillEventually {
+        let snapshot = try await context.snapshot()
+        return await model.requestCount == 2 && snapshot.state.skillState?.tasks.last?.status == "waitingUser"
+            && snapshot.state.history.current.turns.filter { $0.state == .completed }.count == 2
+    }
+    let dialog = try await store.readCurrent().current.id
+    let task = try #require(try await context.snapshot().state.skillState?.activeTaskID)
+    try await agent.receive(.init(id: "foreground-end", sessionID: session, payload: .text("结束同声传译")))
+    try await skillEventually {
+        let snapshot = try await context.snapshot()
+        return await gate.entered && snapshot.state.skillState?.activeTaskID == nil
+    }
+    #expect(try await context.snapshot().state.skillState?.loaded.contains("photography") == false)
+    let encoded = try #require(try await database.assistantTasks.compressionData(dialog: dialog).first)
+    let compression = try JSONDecoder().decode(AssistantTaskCompression.self, from: encoded)
+    #expect(compression.taskID == task && compression.status == .completed)
+    #expect(compression.reportedSummary == "同声传译结束")
+    #expect(compression.sources.count == 3 && compression.sources.last?.inputID == "foreground-end")
+    let generated = try #require(compression.sources.last?.requestID)
+    let pending = try #require(
+        try await database.assistantMessages.messages(dialog: dialog).first { $0.clientID == generated })
+    #expect(pending.state == "generating")
+
+    try await model.finishEndingRequest()
+    try await skillEventually {
+        try await database.assistantMessages.messages(dialog: dialog).contains {
+            $0.clientID == generated && $0.state == "completed" && $0.body.contains("同声传译结束")
+        }
+    }
+    #expect(try await database.assistantTasks.compressionData(dialog: dialog).count == 1)
+    await gate.release()
+    let raw = try AssistantRecordStore(
+        repository: database.assistantMessages, tasks: database.assistantTasks,
+        conversations: database.assistantConversations, logs: database.logs)
+    try await skillEventually {
+        try await raw.read(dialog).turns.first { $0.id == "foreground-end" }?.generationRounds?.last?.resultsJSON
+            .contains("Agent.Task.finishTask") == true
+    }
+    #expect(await model.requestCount == 3)
+    #expect(try await database.assistantTasks.compressionData(dialog: dialog).count == 1)
+    let detail = try await raw.read(dialog)
+    let end = try #require(detail.turns.first { $0.id == "foreground-end" })
+    #expect(end.generationRounds?.last?.resultsJSON.contains("Agent.Task.finishTask") == true)
+    #expect(end.generationRounds?.last?.resultsJSON.contains("UI.Expression.express") == true)
+    let projected = try detail.indexedHistory()
+    #expect(projected.count == 1)
+    await agent.stop()
+    _ = await pump.result
+    await gateway.shutdown()
+    await manager.stopAll()
+    try await database.shutdown()
+}
+
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func assistantPhotographyUsesLocalTaskAcrossUserInputsAndReACT()
     async throws
 {
@@ -2653,6 +2794,11 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         #expect(signal.kind == .input && signal.scope == request.scope)
         #expect(try AgentTaskContent.decode(signal).interactionID == interactionID)
         #expect(await model.requests.count == 2)
+        let replyRequest = try #require(await model.requests.last)
+        #expect(
+            replyRequest.messages.contains {
+                $0.role == .system && $0.content.contains("# WRITER QUESTION") && $0.content.contains("需要颜色")
+            })
     }
 
     let kind: WriterDelegationEvent.Kind =

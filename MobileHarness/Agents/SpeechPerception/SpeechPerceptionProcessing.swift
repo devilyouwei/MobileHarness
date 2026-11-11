@@ -62,8 +62,9 @@ struct SpeechListeningPolicy {
     var enabled = false
     var revision: UInt64 = 0
     var activities: [String: Activity] = [:]
+    var fullDuplex = false
     var pendingFinal: String?
-    var paused: Bool { pendingFinal != nil || activities.values.contains { $0.occupied } }
+    var paused: Bool { !fullDuplex && (pendingFinal != nil || activities.values.contains { $0.occupied }) }
     mutating func accept(_ value: ReplyActivity, source: String, incarnation: String) throws -> Bool {
         try value.validate()
         guard ["assistant", "photographer", "memory", "applicationControl"].contains(source) else {

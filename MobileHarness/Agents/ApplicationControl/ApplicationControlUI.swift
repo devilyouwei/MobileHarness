@@ -188,7 +188,9 @@ extension ApplicationControlAgent {
                         providers: draft.providers.map {
                             .init(enabled: false, url: $0.url, key: $0.key, model: $0.model, name: $0.name, id: $0.id)
                         }, writerProviderID: draft.writerProviderID, writerModel: draft.writerModel,
-                        writerThinking: draft.writerThinking),
+                        writerThinking: draft.writerThinking,
+                        decisionProviderID: draft.decisionProviderID, decisionModel: draft.decisionModel,
+                        decisionUsesLocal: draft.decisionUsesLocal),
                     sessionID: sessionID)
             } else {
                 operation = .restore
@@ -210,7 +212,9 @@ extension ApplicationControlAgent {
                         providers: stored.providers.map {
                             .init(enabled: false, url: $0.url, key: $0.key, model: $0.model, name: $0.name, id: $0.id)
                         }, writerProviderID: stored.writerProviderID, writerModel: stored.writerModel,
-                        writerThinking: stored.writerThinking))
+                        writerThinking: stored.writerThinking,
+                        decisionProviderID: stored.decisionProviderID, decisionModel: stored.decisionModel,
+                        decisionUsesLocal: stored.decisionUsesLocal == true))
             } catch {
                 await settings.discard(id, sessionID: sessionID)
                 await presentation.discard(id)
@@ -246,7 +250,8 @@ extension ApplicationControlAgent {
         case .save(let draft):
             intent = .saveSource(
                 endpoint: draft.endpoint, allowsCellular: draft.allowsCellular,
-                recognition: draft.useCustomRecognition, synthesis: draft.useCustomSynthesis)
+                recognition: draft.useCustomRecognition, synthesis: draft.useCustomSynthesis,
+                decision: draft.useLocalDecision)
         case .download(let id, let draft):
             intent = .download(id: id, endpoint: draft.endpoint, allowsCellular: draft.allowsCellular)
         case .cancel(let id): intent = .cancel(id)

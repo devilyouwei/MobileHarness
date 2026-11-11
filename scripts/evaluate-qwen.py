@@ -55,7 +55,6 @@ def source_hashes():
     paths = list((ROOT / "MobileHarness/Resources").rglob("*.json"))
     paths += list((ROOT / "MobileHarness/Resources").rglob("*.md"))
     paths += [ROOT / relative for relative in (
-        "MobileHarness/Agents/Support/Core/Generation/FunctionTokenPrompts.json",
         "MobileHarness/Agents/Assistant/AssistantProcessing.swift",
         "MobileHarness/Agents/Support/Chat/AgentChatWorker.swift",
         "Tests/IntegrationTests/QwenWorkflowEvaluationTests.swift",

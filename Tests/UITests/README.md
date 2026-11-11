@@ -227,3 +227,5 @@ Assistant 详情回归验证日志清空后的内存副本和导出移除请求/
 WriterRecordPages 值测试覆盖已加载两页后的首次成功标志、末页反复刷新不恢复虚假游标、去重和新增记录、显式刷新及取消提交保留列表，并验证刷新倒序头部时保留旧页游标。它验证页面持有的分页状态，不等同于 SwiftUI 导航点击/滚动的真机验收。
 
 `testDelegationWorkspaceSeparation` opens the delegation list/detail, enters the workspace flow, exhausts its pages, traces a message back to its delegation, and verifies loaded rows remain after returning. Run it with `WRITER_UI_ONLY_TEST=testDelegationWorkspaceSeparation` and the synthetic fixture exported by `writerDelegationAndWorkspaceMessagesHaveImmutableScopes`.
+
+ExecutionLogTests 验证上下角色字幕在不同屏幕高度下保留间隔、范围有界；字幕位置不接受定稿或任务活动输入。

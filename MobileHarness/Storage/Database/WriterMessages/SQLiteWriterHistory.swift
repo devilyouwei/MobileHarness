@@ -5,7 +5,7 @@ import StorageCore
 
 extension SQLiteWriterMessageRepository {
     static func history(_ owner: Owner, db: Database) throws -> WriterHistoryMetadata {
-        let table = owner.request ? "writer_messages" : "writer_workspaces"
+        let table = owner.request ? "writer_executions" : "writer_workspaces"
         guard let row = try Row.fetchOne(db, sql: "SELECT * FROM \(table) WHERE id=?", arguments: [owner.key]) else {
             throw RecordStorageError.missingRecord
         }
@@ -23,7 +23,7 @@ extension SQLiteWriterMessageRepository {
                 let key = try Int64.fetchOne(
                     db,
                     sql:
-                        "SELECT id FROM writer_messages WHERE input_kind='delegation' AND run_state!='rejected' ORDER BY CASE WHEN run_state IN ('running','waiting_input','paused','closing','cleanup_failed') THEN 0 ELSE 1 END,id DESC LIMIT 1"
+                        "SELECT id FROM writer_executions WHERE run_state!='rejected' ORDER BY CASE WHEN run_state IN ('running','waiting_input','paused','closing','cleanup_failed') THEN 0 ELSE 1 END,id DESC LIMIT 1"
                 )
             else { throw RecordStorageError.missingRecord }
             return try Self.history(Owner(key: key, request: true), db: db)

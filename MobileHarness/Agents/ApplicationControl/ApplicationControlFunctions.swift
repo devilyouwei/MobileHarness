@@ -43,7 +43,8 @@ enum ApplicationControlFunctions {
         path: "UI.ResourcePresentation.showResourcePreferenceFailure", required: ["reason", "message"])
     static let restoration = InternalTool(path: "System.ModelResources.restoreSource")
     static let saving = InternalTool(
-        path: "System.ModelResources.saveSource", required: ["endpoint", "allowsCellular", "recognition", "synthesis"])
+        path: "System.ModelResources.saveSource", required: ["endpoint", "allowsCellular", "recognition", "synthesis"],
+        optional: ["decision"])
     static let speechBinding = InternalTool(
         path: "System.ModelResources.configureSpeech", required: ["recognition", "synthesis"])
 

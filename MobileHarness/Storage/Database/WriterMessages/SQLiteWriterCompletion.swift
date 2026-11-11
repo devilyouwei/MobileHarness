@@ -7,7 +7,7 @@ extension SQLiteWriterExecutionRepository {
     static func completionState(_ id: String, db: Database) throws -> String? {
         try String.fetchOne(
             db,
-            sql: "SELECT terminal_state FROM writer_messages WHERE input_kind='delegation' AND request_message_id=?",
+            sql: "SELECT terminal_state FROM writer_executions WHERE request_message_id=?",
             arguments: [id])
     }
     static func requestStatus(_ id: String, db: Database) throws -> String? {
@@ -15,7 +15,7 @@ extension SQLiteWriterExecutionRepository {
             let row = try Row.fetchOne(
                 db,
                 sql:
-                    "SELECT run_state,terminal_state FROM writer_messages WHERE input_kind='delegation' AND request_message_id=?",
+                    "SELECT run_state,terminal_state FROM writer_executions WHERE request_message_id=?",
                 arguments: [id])
         else {
             guard let message = try AgentMessageRow.fetchOne(db, key: id),
@@ -73,7 +73,7 @@ extension SQLiteWriterExecutionRepository {
     }
     public func delegationCount() async throws -> Int {
         try database.read {
-            try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM writer_messages WHERE input_kind='delegation'") ?? 0
+            try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM writer_executions") ?? 0
         }
     }
     public func delegations(before: UInt64?, limit: Int) async throws -> [WriterRequestRecord] {
@@ -84,7 +84,7 @@ extension SQLiteWriterExecutionRepository {
             try String.fetchAll(
                 db,
                 sql:
-                    "SELECT request_message_id FROM writer_messages WHERE input_kind='delegation' AND id<? ORDER BY id DESC LIMIT ?",
+                    "SELECT request_message_id FROM writer_executions WHERE id<? ORDER BY id DESC LIMIT ?",
                 arguments: [before.map(Int64.init) ?? Int64.max, limit]
             ).map { try Self.requestView($0, db: db) }
         }
@@ -99,7 +99,7 @@ extension SQLiteWriterExecutionRepository {
             try String.fetchAll(
                 db,
                 sql:
-                    "SELECT request_message_id FROM writer_messages WHERE input_kind='delegation' AND selected_workspace_id=?",
+                    "SELECT request_message_id FROM writer_executions WHERE selected_workspace_id=?",
                 arguments: [try BusinessRecordID.number(id, kind: .workspace)]
             ).map { try Self.requestView($0, db: db) }.sorted { $0.createdAt < $1.createdAt }
         }
@@ -133,11 +133,11 @@ extension SQLiteWriterExecutionRepository {
             ])
             try db.execute(
                 sql:
-                    "UPDATE writer_messages SET runtime_results_json=json_insert(runtime_results_json,'$[#]',json(?)),completed_at=?,updated_at=? WHERE id=?",
+                    "UPDATE writer_executions SET runtime_results_json=json_insert(runtime_results_json,'$[#]',json(?)),completed_at=?,updated_at=? WHERE id=?",
                 arguments: [marker, Date().timeIntervalSince1970, Date().timeIntervalSince1970, key])
             try db.execute(
                 sql:
-                    "UPDATE writer_messages SET run_state='closing',terminal_state=?,result_json=?,pending_question_id=NULL,pending_question_json=NULL,failure_json=?,updated_at=?,request_revision=request_revision+1 WHERE id=?",
+                    "UPDATE writer_executions SET run_state='closing',terminal_state=?,result_json=?,pending_question_id=NULL,pending_question_json=NULL,failure_json=?,updated_at=?,request_revision=request_revision+1 WHERE id=?",
                 arguments: [
                     status, String(decoding: notification.data, as: UTF8.self),
                     try failure.map { try SQLiteRecordCoding.json(["message": $0]) },
@@ -150,7 +150,7 @@ extension SQLiteWriterExecutionRepository {
     static func notification(_ row: Row, db: Database) throws -> WriterDelegationNotification {
         let request: String = row["correlation_id"]
         let state = try String.fetchOne(
-            db, sql: "SELECT run_state FROM writer_messages WHERE input_kind='delegation' AND request_message_id=?",
+            db, sql: "SELECT run_state FROM writer_executions WHERE request_message_id=?",
             arguments: [request])
         return WriterDelegationNotification(
             delegateID: request, agent: "writer", eventID: row["id"], data: Data((row["payload_json"] as String).utf8),
@@ -183,7 +183,7 @@ extension SQLiteWriterExecutionRepository {
                 arguments: [now])
             let filter =
                 retirement
-                ? "EXISTS(SELECT 1 FROM writer_messages t WHERE t.input_kind='delegation' AND t.request_message_id=m.correlation_id AND t.run_state IN ('closing','cleanup_failed'))"
+                ? "EXISTS(SELECT 1 FROM writer_executions t WHERE t.request_message_id=m.correlation_id AND t.run_state IN ('closing','cleanup_failed'))"
                 : "m.attempt_count<8 AND ((m.delivery_state='pending' AND COALESCE(m.next_attempt_at,0)<=?) OR (m.delivery_state='in_flight' AND m.claim_expires_at<=?))"
             var args: StatementArguments = [after ?? 0]
             if !retirement { args += [now, now] }
@@ -223,7 +223,7 @@ extension SQLiteWriterExecutionRepository {
                 }
                 try db.execute(
                     sql:
-                        "UPDATE writer_messages SET run_state=?,failure_json=CASE WHEN ? THEN failure_json ELSE ? END,updated_at=?,request_revision=request_revision+1 WHERE input_kind='delegation' AND request_message_id=? AND run_state IN ('closing','cleanup_failed')",
+                        "UPDATE writer_executions SET run_state=?,failure_json=CASE WHEN ? THEN failure_json ELSE ? END,updated_at=?,request_revision=request_revision+1 WHERE request_message_id=? AND run_state IN ('closing','cleanup_failed')",
                     arguments: [
                         completed ? state : "cleanup_failed", completed,
                         try failure.map { try SQLiteRecordCoding.json(["message": $0, "stage": "cleanup"]) },

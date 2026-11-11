@@ -225,3 +225,46 @@ private enum CaptureReadinessFixtureError: Error, Equatable { case invalidPCM }
         AudioSessionEventPolicy.routeChange(
             applicationChange: false, unavailable: true, previous: builtIn, current: builtIn) == .routeChanged)
 }
+
+@Test func echoCancellationUsesConfirmedSystemInputWithoutEnablingSecondProcessor() {
+    var voiceAttempts = 0
+    let selected = AudioEchoCancellationSelection.select(
+        systemInput: { true },
+        voiceProcessing: {
+            voiceAttempts += 1
+            return true
+        },
+        report: { _ in Issue.record("Unexpected failure") })
+    #expect(selected == .systemInput && voiceAttempts == 0)
+}
+
+@Test(arguments: [false, true])
+func echoCancellationFallsBackAfterUnsupportedOrFailedSystemInput(fails: Bool) {
+    var reports: [AudioIOError] = []
+    var voiceAttempts = 0
+    let selected = AudioEchoCancellationSelection.select(
+        systemInput: {
+            if fails { throw AudioIOError.startFailed }
+            return false
+        },
+        voiceProcessing: {
+            voiceAttempts += 1
+            return true
+        },
+        report: { if let error = $0 as? AudioIOError { reports.append(error) } })
+    #expect(selected == .voiceProcessing && voiceAttempts == 1)
+    #expect(reports == (fails ? [.startFailed] : []))
+}
+
+@Test func echoCancellationFailuresRemainVisibleAndNeverClaimDuplex() {
+    var reports: [AudioIOError] = []
+    let selected = AudioEchoCancellationSelection.select(
+        systemInput: { throw AudioIOError.startFailed },
+        voiceProcessing: { throw AudioIOError.runtimeFailed },
+        report: { if let error = $0 as? AudioIOError { reports.append(error) } })
+    #expect(selected == .unavailable)
+    #expect(reports == [.startFailed, .runtimeFailed])
+    let notEnabled = AudioEchoCancellationSelection.select(
+        systemInput: { false }, voiceProcessing: { false }, report: { _ in Issue.record("Unexpected failure") })
+    #expect(notEnabled == .unavailable)
+}

@@ -142,3 +142,7 @@ Task Actions expose foreground task.start/end and independent task.delegate; age
 历史 UI facade 只注入真实读取、分页、摘要、删除及日志清理端口；不注入对旧回复重新解析的 execution preview formatter。
 
 原生采集故障由 Speech/Listening 局部退役与有限恢复，不取消业务回复。显式用户停止与生命周期关闭保留全会话取消；失败和清理证据仍沿既有结果/容器通道上报，普通 Action 失败不触发全局聆听退出。
+
+ActionsBusinessBindings 为每次 Decision 分类提供一份已提交的配置，包含本地模式与可选云端工厂。工厂通过该快照中的 Decision Provider ID、模型和共享凭据构建模型句柄。只读事实适配将分类路径和队列数量投影到 UI，输入分类与取消政策由 Agents 持有。
+
+Decision 瞬时反馈由 Assistant 通过已有 UI.Island 工具发布。Actions 只执行通用活动发布及结束。

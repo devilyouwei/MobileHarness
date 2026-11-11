@@ -89,9 +89,13 @@ public enum AudioIOError: Error, Equatable {
 /// The native generation and its single ordered source; no forwarding queue.
 public struct MicrophoneCaptureInput: Sendable {
     public let generation: String
+    public let supportsFullDuplex: Bool
     public let frames: AsyncThrowingStream<MicrophoneFrame, any Error>
-    public init(generation: String, frames: AsyncThrowingStream<MicrophoneFrame, any Error>) {
+    public init(
+        generation: String, frames: AsyncThrowingStream<MicrophoneFrame, any Error>, supportsFullDuplex: Bool = false
+    ) {
         self.generation = generation
+        self.supportsFullDuplex = supportsFullDuplex
         self.frames = frames
     }
 }
@@ -106,7 +110,9 @@ final class MicrophoneCapture: Sendable {
         var subscribed = false
     }
     private let state = Mutex(State())
-    init() {
+    private let supportsFullDuplex: Bool
+    init(supportsFullDuplex: Bool = false) {
+        self.supportsFullDuplex = supportsFullDuplex
         let pair = AsyncThrowingStream<MicrophoneFrame, any Error>.makeStream(bufferingPolicy: .bufferingOldest(64))
         frames = pair.stream
         continuation = pair.continuation
@@ -116,7 +122,8 @@ final class MicrophoneCapture: Sendable {
         try state.withLock {
             guard !$0.subscribed else { throw AudioIOError.busy }
             $0.subscribed = true
-            return MicrophoneCaptureInput(generation: generation, frames: frames)
+            return MicrophoneCaptureInput(
+                generation: generation, frames: frames, supportsFullDuplex: supportsFullDuplex)
         }
     }
     @discardableResult func send(_ frame: MicrophoneFrame) throws -> Bool {

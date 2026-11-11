@@ -3,6 +3,9 @@ import Foundation
 /// Private in-process configuration; credentials never enter a Codable payload.
 public struct ProviderSettings: Equatable, Sendable {
     public let id: String
+    public let decisionProviderID: String?
+    public let decisionModel: String
+    public var decisionUsesLocal: Bool?
     public let writerProviderID: String?
     public let writerModel: String
     public let writerThinking: Bool
@@ -14,9 +17,13 @@ public struct ProviderSettings: Equatable, Sendable {
     public let model: String
     public init(
         enabled: Bool, url: String, key: String, model: String, providers: [ProviderSettings] = [], name: String = "",
-        id: String? = nil, writerProviderID: String? = nil, writerModel: String = "", writerThinking: Bool = false
+        id: String? = nil, writerProviderID: String? = nil, writerModel: String = "", writerThinking: Bool = false,
+        decisionProviderID: String? = nil, decisionModel: String = "", decisionUsesLocal: Bool? = nil
     ) {
         self.id = id ?? url
+        self.decisionProviderID = decisionProviderID
+        self.decisionModel = decisionModel
+        self.decisionUsesLocal = decisionUsesLocal
         self.writerProviderID = writerProviderID
         self.writerModel = writerModel
         self.writerThinking = writerThinking

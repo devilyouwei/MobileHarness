@@ -24,7 +24,7 @@ AudioContainer 按有限命名作用域缓存原生实现，对外返回 AudioIn
 
 ## 录音与输入
 
-✅ startCapture 在支持的内置路由优先尝试FOA，否则选择mono。空间启动失败必须停止并加入后再尝试mono；仅允许接纳前回退。已接纳流不改变布局，格式／中断／连续性失败明确终止。
+startCapture 仅在调用方明确 preferSpatial 时尝试 FOA；对话路径优先系统回声消除输入，其次共享语音处理图。空间后端启动失败必须加入清理再尝试单声道；已经接纳的流不改变布局。
 
 两后端都在首个有效入队PCM后返回就绪，静音也有效，不伪造首帧超时回退。mono请求1024样本，回调验证1…8192帧；FOA为四声道ACN/SN3D，时间连续误差不超过两样本，每传输包最多4000帧／16000标量。
 
@@ -102,3 +102,9 @@ The Runtime scope owner is encoded using Scope.rawValue with a finite descriptor
 PlatformContainer injects AudioContainer's native owner fence into VisionContainer/AppleCamera. acquireCameraRecording requires no current owner and reserves camera scope; voice, diagnostic and detection I/O then reject busy. Native movie finalization removes its microphone and releases that reservation. The shared synchronous AVAudioSession setup is reused within PlatformKit; it permits native system sounds while recording. This module does not decide whether listening should resume; Actions owns that intent and generation fence.
 
 完整 AppleAudioIO.stop 在加入采集与播放清理后替换 mono AVAudioEngine，并在 NativePlaybackGraph actor 内释放 mixer tap、引擎、player 和格式连接；下一次启动重新配置 AVAudioSession 并创建新图。健康的单次 stopPlayback 仍复用图。媒体服务 reset 观察保留 AVFoundation 原生错误，结束 PCM/首帧等待和播放等待，并投递 mediaServicesReset 事实；不在 PlatformKit 决定业务恢复或重放效果。被动 NativeAudioState 与主动事件契约独立。
+
+## 语音处理采播图
+
+AppleAudioIO 的单声道语音路径在同一 NativePlaybackGraph 中连接输入、mixer 和 player。优先设置 playAndRecord/default，检测 isEchoCancelledInputAvailable，启用并在激活后确认 isEchoCancelledInputEnabled；不支持、未启用或失败时，回退 voiceChat/voice processing，明确关闭 bypass 并核对输入/输出节点。两个处理器不叠加，配置失败通过原生报告端口保留。I/O 模式配置先于 mixer tap 的安装。采集时固定输出24000Hz，其他 TTS 采样率先转换，播放启停不重建正在采集的图。首个真实PCM确认就绪；输入/输出停止分别加入，完整stop关闭共享图。
+
+AudioCaptureContext.echoCancellation 记录 systemInput/voiceProcessing/unavailable（未采样默认 unknown）。supportsFullDuplex 只来自确认启用的实际能力；无法启用时返回受限采集，业务暂停播放期间的识别。启动、首 PCM 完成与采集中每次播放提交前复核 session/图状态；丢失 AEC 明确失败。原生路由通知即使是 categoryChange/override，也先确认 AEC 仍有效，丢失时发送 routeChanged 以关闭旧代。开启 AEC 的事实不等于已测量实际回声抑制效果。路由变化终止旧捕获代并重新获取能力。startCapture 默认不请求空间后端；明确 preferSpatial 的调用仍可使用既有FOA路径，不能同时宣称FOA与回声处理能力。

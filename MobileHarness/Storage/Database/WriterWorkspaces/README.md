@@ -9,3 +9,5 @@ WorkspaceRepository/SQLiteWorkspaceRepository 与 WorkspaceStore 协作管理文
 删除要求没有活跃委托绑定和写租约；文件清理后保留 deleted 行及消息关联，目录查询不返回已删除项。历史页面可以继续显示其证据，文件读取明确不可用。SQL-free 文件协作编入 StorageDatabase，值/接口编入 StorageTasks，SQL 实现编入 StorageSQLite；[Database](../README.md) 负责连接与装配。
 
 作品库搜索在 SQLite 内对就绪记录按标题、描述或精确 workspace_N 身份匹配。每页最多十二项，游标使用 workspace_N，按降序 ID 返回元数据和继续游标。搜索无需读取文件内容或完整目录。
+
+工作区删除前的活动委托检查读取 writer_executions；writer_messages 仅提供已发出的模型请求及不可变 workspace 归属。

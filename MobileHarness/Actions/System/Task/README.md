@@ -25,7 +25,7 @@ BasicSkill 的公开别名为 task.start、task.end、task.delegate、task.cance
 | Action | 参数与语义 |
 | --- | --- |
 | task.start | description、可选 skills JSON 数组；原子启动并加载初始 Skill，下一请求可用，无需重复 loadSkills。平铺前台 scope。有旧任务时先加入其非 Control 效果，保存 superseded，再新建 |
-| task.end | summary、可选 continueDecision；只结束前台摘要 scope |
+| task.end | summary、可选 continueDecision；Assistant 全双工的 Action 在 Control channel 提交前台终态和摘要后返回成功 |
 | task.delegate | agent_id、description；向目标发送请求，目标决定 task/workspace |
 | task.cancel | reason、可选 agent_id；省略目标取消前台，带目标发送当前通信链的取消 |
 | task.send | text、可选 agent_id；省略目标补充前台，带目标发送补充/待答输入 |

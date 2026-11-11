@@ -79,7 +79,7 @@ public enum AgentChatContextBuilder {
                 withJSONObject: compactResult(result, rejection: rejection), options: [.sortedKeys]), as: UTF8.self)
     }
 
-    private static func compactResult(
+    static func compactResult(
         _ result: ToolResult, action: ActionResult? = nil, rejection: CallRejection? = nil
     ) -> [String: Any] {
         let report: AgentActionReport?
@@ -207,7 +207,7 @@ public enum AgentChatContextBuilder {
             case .task(let compression):
                 selected.append([try compressionMessage(compression)])
             case .request(_, let request):
-                guard request.state != .generating else { continue }
+                guard request.state != .generating, request.awaitingDispatch != true else { continue }
                 let paired = request.state == .completed && request.toolCalls.allSatisfy({ $0.state != .received })
                 selected.append(
                     try messages(for: request, nativeHistory: nativeHistory && paired, templates: templates))
@@ -233,6 +233,7 @@ public enum AgentChatContextBuilder {
     public static func messages(
         for invocation: AssistantModelRequest, nativeHistory: Bool = true, templates: PromptTemplates
     ) throws -> [ChatMessage] {
+        let input = AssistantInputBatch.historyText(invocation.input)
         if !nativeHistory {
             let evidence = try invocation.toolCalls.map { call in
                 try templates.render(
@@ -243,13 +244,13 @@ public enum AgentChatContextBuilder {
                     ])
             }.joined(separator: "\n")
             let text = invocation.response + (evidence.isEmpty ? "" : "\n" + evidence)
-            return [.init(role: .user, content: invocation.input), .init(role: .assistant, content: text)]
+            return [.init(role: .user, content: input), .init(role: .assistant, content: text)]
         }
         let calls = invocation.toolCalls.map {
             ChatToolCall(id: $0.providerID, name: $0.name, argumentsJSON: $0.argumentsJSON)
         }
         var messages = [
-            ChatMessage(role: .user, content: invocation.input),
+            ChatMessage(role: .user, content: input),
             ChatMessage(role: .assistant, content: invocation.response, toolCalls: calls),
         ]
         for call in invocation.toolCalls {
@@ -279,6 +280,13 @@ struct AgentChatRequestBuilder<State: AgentChatContextState>: ContextBuilder {
     func build(state: AgentDecisionContext<State>, batch: SignalBatch) throws -> Request {
         let input = try state.selected(by: batch)
         var conversation = state.snapshot.state.history.current
+        if batch.signalIDs.count > 1 {
+            let members = Set(batch.signalIDs)
+            conversation.turns.removeAll { members.contains($0.id) }
+            conversation.taskCompressions.removeAll { compression in
+                compression.sources.contains { members.contains($0.inputID) }
+            }
+        }
         if let task = input.taskScope {
             let ids = Set(
                 state.snapshot.records.filter { $0.taskID == task.id }.compactMap {

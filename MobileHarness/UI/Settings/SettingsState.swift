@@ -3,6 +3,9 @@ import Observation
 
 public struct CloudSettingsDraft: Sendable, Equatable {
     public var id: String
+    public var decisionProviderID: String?
+    public var decisionModel: String
+    public var decisionUsesLocal: Bool
     public var writerProviderID: String?
     public var writerModel: String
     public var writerThinking: Bool
@@ -14,9 +17,13 @@ public struct CloudSettingsDraft: Sendable, Equatable {
     public var model: String
     public init(
         enabled: Bool, url: String, key: String, model: String, providers: [CloudSettingsDraft] = [], name: String = "",
-        id: String? = nil, writerProviderID: String? = nil, writerModel: String = "", writerThinking: Bool = false
+        id: String? = nil, writerProviderID: String? = nil, writerModel: String = "", writerThinking: Bool = false,
+        decisionProviderID: String? = nil, decisionModel: String = "", decisionUsesLocal: Bool = false
     ) {
         self.id = id ?? url
+        self.decisionProviderID = decisionProviderID
+        self.decisionModel = decisionModel
+        self.decisionUsesLocal = decisionUsesLocal
         self.writerProviderID = writerProviderID
         self.writerModel = writerModel
         self.writerThinking = writerThinking
@@ -27,6 +34,24 @@ public struct CloudSettingsDraft: Sendable, Equatable {
         self.key = key
         self.model = model
     }
+}
+
+public enum AgentBrain: String, CaseIterable, Identifiable, Sendable {
+    case assistant, writer, decision
+    public var id: String { rawValue }
+    public var title: String { rawValue.capitalized }
+}
+
+public struct AgentBrainDraft: Equatable, Sendable {
+    public var providerID: String?
+    public var model: String
+    public var usesLocal: Bool
+    public var writerThinking: Bool
+}
+
+public enum BrainSettingsChange: Sendable {
+    case providers([CloudSettingsDraft])
+    case brain(AgentBrain, AgentBrainDraft)
 }
 
 /// Local modal draft. Dismissal discards this value without changing the selected provider.
@@ -96,6 +121,7 @@ public protocol SettingsControlling: AnyObject {
     func loadModels(providerID: String)
     func refreshModels()
     func save() async -> Bool
+    func save(_ change: BrainSettingsChange) async -> Bool
     func cancelDiscovery()
 }
 
@@ -119,10 +145,16 @@ public final class SettingsState {
     public internal(set) var error: String?
     public internal(set) var notice: String?
     public private(set) var revision: UInt64 = 0
+    public var decisionProviderID: String? { didSet { if oldValue != decisionProviderID { revision += 1 } } }
+    public var decisionModel = "" { didSet { if oldValue != decisionModel { revision += 1 } } }
+    public var decisionUsesLocal = false { didSet { if oldValue != decisionUsesLocal { revision += 1 } } }
     public var writerProviderID: String? { didSet { if oldValue != writerProviderID { revision += 1 } } }
     public var writerModel = "" { didSet { if oldValue != writerModel { revision += 1 } } }
     public var writerThinking = false { didSet { if oldValue != writerThinking { revision += 1 } } }
     public init(initial: CloudSettingsDraft) {
+        decisionProviderID = initial.decisionProviderID
+        decisionModel = initial.decisionModel
+        decisionUsesLocal = initial.decisionUsesLocal
         writerProviderID = initial.writerProviderID
         writerModel = initial.writerModel
         writerThinking = initial.writerThinking
@@ -134,6 +166,20 @@ public final class SettingsState {
     }
     public var assistantProviderID: String? {
         isEnabled ? providers.first(where: { $0.url == url })?.id : nil
+    }
+    public func brainDraft(_ brain: AgentBrain) -> AgentBrainDraft {
+        switch brain {
+        case .assistant:
+            .init(
+                providerID: assistantProviderID, model: isEnabled ? selectedModel : "", usesLocal: !isEnabled,
+                writerThinking: false)
+        case .writer:
+            .init(providerID: writerProviderID, model: writerModel, usesLocal: false, writerThinking: writerThinking)
+        case .decision:
+            .init(
+                providerID: decisionProviderID, model: decisionModel, usesLocal: decisionUsesLocal,
+                writerThinking: false)
+        }
     }
     public func selectAssistantProvider(_ id: String?) {
         guard let provider = providers.first(where: { $0.id == id }) else {
@@ -148,6 +194,10 @@ public final class SettingsState {
         key = provider.key
         selectedModel = ""
         invalidateRevision()
+    }
+    public func selectDecisionProvider(_ id: String?) {
+        decisionProviderID = id
+        decisionModel = ""
     }
     public func selectWriterProvider(_ id: String?) {
         writerProviderID = id
@@ -170,6 +220,7 @@ public final class SettingsState {
     }
     public func removeProvider(_ id: String) {
         if assistantProviderID == id { selectAssistantProvider(nil) }
+        if decisionProviderID == id { selectDecisionProvider(nil) }
         if writerProviderID == id { selectWriterProvider(nil) }
         providers.removeAll { $0.id == id }
         modelCatalogs[id] = nil
@@ -179,6 +230,8 @@ public final class SettingsState {
     public var canLoad: Bool { !isLoading && !isSaving }
     public var canSave: Bool {
         !isSaving && (!isEnabled || !selectedModel.isEmpty)
+            && (decisionProviderID == nil
+                || (!decisionModel.isEmpty && providers.contains { $0.id == decisionProviderID }))
             && (writerProviderID == nil || (!writerModel.isEmpty && providers.contains { $0.id == writerProviderID }))
     }
     @discardableResult
@@ -193,6 +246,9 @@ public final class SettingsState {
     public func presentRestored(_ value: CloudSettingsDraft, revision: UInt64) -> Bool {
         guard presentationAdmission?.acceptsRetained() ?? true else { return false }
         guard revision == self.revision else { return false }
+        decisionProviderID = value.decisionProviderID
+        decisionModel = value.decisionModel
+        decisionUsesLocal = value.decisionUsesLocal
         writerProviderID = value.writerProviderID
         writerModel = value.writerModel
         writerThinking = value.writerThinking
@@ -257,6 +313,9 @@ public protocol SettingsPresenting: UIPresentationAccess {
     var modelCatalogs: [String: [String]] { get set }
     var loadingProviderIDs: Set<String> { get set }
     var modelErrors: [String: String] { get set }
+    var decisionProviderID: String? { get set }
+    var decisionModel: String { get set }
+    var decisionUsesLocal: Bool { get set }
     var writerProviderID: String? { get set }
     var writerModel: String { get set }
     var writerThinking: Bool { get set }

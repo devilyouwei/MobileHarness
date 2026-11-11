@@ -26,9 +26,19 @@ extension SQLiteAssistantMessageRepository {
             maximumOutputTokens: parameters["maximumOutputTokens"] as? Int,
             temperature: parameters["temperature"] as? Double ?? 0)
         turn.historyOrder = UInt64(original["position"] as Int64)
+        if let coordination = originalInput["coordination"] {
+            turn.coordination = try JSONDecoder().decode(
+                AssistantInputCoordination.self,
+                from: Data(SQLiteRecordCoding.json(coordination).utf8))
+        }
         turn.awaitingModel = originalInput["awaitingModel"] as? Bool ?? false
         turn.executionError = originalInput["executionError"] as? String
-        turn.state = AssistantRecord.State(rawValue: original["state"]) ?? .interrupted
+        turn.error = originalInput["error"] as? String
+        turn.finishReason = originalInput["finishReason"] as? String
+        let inputState: String =
+            originalResponse["id"] == nil
+            ? original["state"] : (originalInput["state"] as? String ?? original["state"])
+        turn.state = AssistantRecord.State(rawValue: inputState) ?? .interrupted
         let rounds = try String.fetchAll(
             db,
             sql:
@@ -55,7 +65,8 @@ extension SQLiteAssistantMessageRepository {
         guard let invocation = response["id"] as? String else { return result }
         let task: Int64? = row["task_id"]
         var request = AssistantModelRequest(
-            id: invocation, input: input["text"] as? String ?? turn.user, requestJSON: "[]",
+            id: invocation, input: input["requestText"] as? String ?? input["text"] as? String ?? turn.user,
+            requestJSON: "[]",
             historyTaskID: task.map { "task_\($0)" }, date: Date(timeIntervalSince1970: row["created_at"]))
         request.historyOrder = UInt64(row["position"] as Int64)
         request.state = AssistantRecord.State(rawValue: row["state"]) ?? .interrupted
@@ -169,7 +180,7 @@ extension SQLiteAssistantMessageRepository {
     static func previewSQL(owner: Owner, task: Bool) -> String {
         let scope = assistantPreviewScope(task: task)
         return
-            "SELECT m.id,m.input_key,m.root_input_key,m.position,m.created_at,m.state,m.input_kind,substr(json_extract(m.user_input_json,'$.text'),1,240) AS input_text,substr(json_extract(m.assistant_response_json,'$.text'),1,240) AS response_text,json_extract(m.assistant_response_json,'$.id') AS invocation,\(scope.taskColumn),(SELECT COALESCE(json_group_array(json_object('id',json_extract(c.value,'$.id'),'providerID',json_extract(c.value,'$.providerID'),'name',json_extract(c.value,'$.name'),'argumentsJSON',substr(CASE WHEN json_valid(json_extract(c.value,'$.argumentsJSON')) THEN (SELECT json_group_object(a.key,substr(CAST(a.value AS TEXT),1,512)) FROM json_each(json_extract(c.value,'$.argumentsJSON')) a WHERE a.key IN ('command','path','title','description','text','reason','agent_id')) ELSE '{}' END,1),'state',json_extract(c.value,'$.state'))),'[]') FROM json_each(m.tool_calls_json) c) AS tool_calls_json,json_extract(m.assistant_response_json,'$.producerMetadata') AS producer_metadata FROM \(owner.table) m\(scope.join) WHERE m.\(owner.column)=? AND m.position>?\(scope.filter) ORDER BY m.position,m.id LIMIT ? OFFSET ?"
+            "SELECT m.id,m.input_key,m.root_input_key,m.position,m.created_at,m.state,m.input_kind,json_extract(m.user_input_json,'$.coordination') AS coordination,substr(COALESCE(json_extract(m.user_input_json,'$.requestText'),json_extract(m.user_input_json,'$.text')),1,240) AS input_text,substr(json_extract(m.assistant_response_json,'$.text'),1,240) AS response_text,json_extract(m.assistant_response_json,'$.id') AS invocation,\(scope.taskColumn),(SELECT COALESCE(json_group_array(json_object('id',json_extract(c.value,'$.id'),'providerID',json_extract(c.value,'$.providerID'),'name',json_extract(c.value,'$.name'),'argumentsJSON',substr(CASE WHEN json_valid(json_extract(c.value,'$.argumentsJSON')) THEN (SELECT json_group_object(a.key,substr(CAST(a.value AS TEXT),1,512)) FROM json_each(json_extract(c.value,'$.argumentsJSON')) a WHERE a.key IN ('command','path','title','description','text','reason','agent_id')) ELSE '{}' END,1),'state',json_extract(c.value,'$.state'))),'[]') FROM json_each(m.tool_calls_json) c) AS tool_calls_json,json_extract(m.assistant_response_json,'$.producerMetadata') AS producer_metadata FROM \(owner.table) m\(scope.join) WHERE m.\(owner.column)=? AND json_extract(m.assistant_response_json,'$.id') IS NOT NULL AND m.position>?\(scope.filter) ORDER BY m.position,m.id LIMIT ? OFFSET ?"
     }
     public func previews(
         dialog id: String, after: UInt64 = 0, taskID: String? = nil, limit: Int = HistoryPaging.pageSize,
@@ -188,7 +199,7 @@ extension SQLiteAssistantMessageRepository {
                 try Int.fetchOne(
                     db,
                     sql:
-                        "SELECT COUNT(*) FROM \(owner.table) m\(scope.join) WHERE m.\(owner.column)=? AND m.position>0 AND m.position<=?\(scope.filter)",
+                        "SELECT COUNT(*) FROM \(owner.table) m\(scope.join) WHERE m.\(owner.column)=? AND json_extract(m.assistant_response_json,'$.id') IS NOT NULL AND m.position>0 AND m.position<=?\(scope.filter)",
                     arguments: StatementArguments([owner.key, Int64(after)] + (task.map { [$0] } ?? []))) ?? 0
             return try Row.fetchAll(db, sql: Self.previewSQL(owner: owner, task: task != nil), arguments: args)
                 .enumerated().map { index, row in
@@ -203,6 +214,10 @@ extension SQLiteAssistantMessageRepository {
                         taskID: task.map { "task_\($0)" }, isObservation: row["input_kind"] as String == "react",
                         isInput: invocation == nil)
                     value.ordinal = preceding + offset + index + 1
+                    if let coordination: String = row["coordination"] {
+                        value.coordination = try JSONDecoder().decode(
+                            AssistantInputCoordination.self, from: Data(coordination.utf8))
+                    }
                     let calls = try JSONDecoder().decode(
                         [ModelToolCall].self, from: Data((row["tool_calls_json"] as String).utf8))
                     value.toolCalls = calls.map {

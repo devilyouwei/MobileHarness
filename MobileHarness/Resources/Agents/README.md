@@ -13,9 +13,12 @@ Assistant 是唯一面向用户的对话 Agent；摄影、历史查询、应用�
 | 文件 | 作用与要求 |
 | --- | --- |
 | `../Catalog.json` | 唯一显式资源索引。`version` 为 1；`agents` 的键为代码使用的配置名，如 `Assistant`，值为相对 Resources 的 `Agents/Assistant/Agent.json`；`skills` 由 [Skill 规范](../Skills/README.md) 定义。不得靠目录扫描或第二套配置生效。 |
+| `System/InputProtocol.md`、`System/OutputProtocol.md` | 模型输入时间线与通用输出协议。 |
+| `System/SkillCatalog.json`、`System/AgentCatalog.json`、`System/ActionCatalog.json` | 目录标题及条目排版。Swift 填入公开 Skill、获准委派的 Agent 和本轮有效 Action。 |
+| `System/RequestContext.json` | Task／Skill／State 快照和图片清单在独立 system 消息中的事实框架。 |
 | `<AgentName>/Agent.json` | 必需。v10 身份、角色自有公开 description、通信权限和基础 Skill。 |
-| `Assistant/Instructions.md` | Assistant 自身的身份、用户沟通和如实汇报责任。普通业务流程放 Skill，通用函数协议放 AgentCore。 |
-| `Assistant/Prompts.json` | Assistant 请求与历史适配使用的命名模板，不是另一套函数注册。 |
+| `Assistant/Instructions.md` | Assistant 自身的身份、用户沟通和如实汇报责任。业务流程归 Skill，共用协议提示词归 `System/`。 |
+| `Assistant/Prompts.json` | Assistant 请求与历史适配使用的命名模板，包含执行证据和 Writer 协作事实的呈现。 |
 | `Writer/Instructions.md` | Writer 私有共用身份，仅供自己的控制请求。 |
 | `Writer/Prompts.json` | Writer 作品库、工作区编辑、查看和格式化内容输出的私有模板。 |
 | `Memory/TitlePrompts.json` | 标题生成事务的专用模板，不生成普通历史记录。其他确定性 Agent 不添加普通对话模板。 |
@@ -64,11 +67,11 @@ Skill.json 声明 path、callType、alias，以及 Action 的 channel。具体�
 
 ## 提示词与模板字段
 
-`Instructions.md` 是 UTF-8 的可信静态指令。只说明自身身份、职责与交互约束；其他角色用途读取各自 Agent.json.description；不要写具体用户目标、历史任务、设备当前状态或执行结果。那些内容由结构化 Context Builder 作为数据组装。不要复制 Core 协议或 Skill 流程，避免重复指令和 token 膨胀。
+`Instructions.md` 是 UTF-8 的可信静态指令，说明自身身份、职责与交互约束。其他角色用途读取各自的 Agent.json.description。用户目标、历史任务、设备状态和执行结果由 Context Builder 作为数据组装。共用协议和业务流程分别引用 System 与 Skill 的指令。
 
-Assistant/Instructions.md 维护简短回复、如实汇报和自身输出边界。Task 入口和 wait 的具体约束继续由 BasicSkill 拥有，业务分轮示例由 Photography 拥有，不增加结果去重或输出改写器。
+`System/OutputProtocol.md` 固定描述 XML Action、Channel／wait 调度和 Skill 加载后的目录更新时机。`System/ActionCatalog.json` 定义有效目录中的具体 Channel 标题、Action 别名和参数行排版。`System/InputProtocol.md` 提供 Assistant 时间线格式、多来源取舍、ASR 澄清和回应优先级。System 提示词随 Agents Bundle 分发。Agents 加载资源，AgentCore 读取输出协议并渲染当前 Action 目录。`Assistant/Instructions.md` 维护角色职责、回应风格与语音、字幕、表情呈现。Task、Skill、聆听控制和执行反馈由 BasicSkill 教学维护。Photography 维护自己的业务流程与分轮示例。
 
-模板 JSON 只有 `version` 和 `templates`：version 为 1，templates 为名称到字符串的映射，1–64 项；每段最多 16 KiB。变量写作 `{{name}}`，渲染调用提供的变量集合必须与模板完全一致；插入值不会再次作为模板解析。修改变量名必须同步修改调用点。单次模板渲染及 Assistant system 输出均最多 64 KiB。
+单段提示词使用 UTF-8 Markdown 或 TXT，加载为 `body`。多个具名模板共用一个 JSON 文件，包含 `version` 和 `templates`，版本为 1，最多 64 项，每项最多 16 KiB。三种格式都使用 `{{name}}` 插入变量，变量集合须与该模板完全一致。插入值按字面输出。资源、单段正文、单次渲染和 Assistant system 输出均最多 64 KiB。加载与卸载见 [AgentPrompts](../../Agents/Support/Chat/README.md#请求提示词与快照)。
 
 Assistant 当前模板契约：
 
@@ -78,7 +81,7 @@ Assistant 当前模板契约：
 | `historicalExecution` | 历史动作证据 | `name`、`state`、`arguments`、`result`、`error` |
 | `toolFailure` | 真实执行错误及输出 | `error`、`output` |
 
-当前 Builder 从 Instructions.md 注入唯一角色/风格说明，单独组合 Core 协议、通用 Skill 教学和由角色自有 description 生成的 DELEGATABLE AGENTS；Prompts.json 不再包含 system 模板。任务报告模板渲染的是请求相关数据，不应把全部任务日志拼到 system。Memory 模板为 `title.system`（无变量）、`title.excerpt`（user / assistant）、`title.user`（excerpts）；仅供标题事务。
+Assistant 先拼接 System 的输出和输入协议，再读取带角色标题的 `Instructions.md`。三个目录模板提供标题与排版。Swift 从索引、当前授权及本轮 Skill 快照取值，并按本轮有效 Action 生成目录。独立 system 消息由 `RequestContext.json` 提供事实框架，`Assistant/Prompts.json` 提供 Writer 追问、近期事件与请求中的执行证据模板。Memory 模板 `title.system`、`title.excerpt` 和 `title.user` 供标题事务读取。
 
 ## 新增与修改 Agent 的开发标准
 
@@ -142,9 +145,9 @@ ApplicationControl 的配置声明 container.failure/runtime.failure observation
 通信注册表只保留 Agent 消息与执行反馈；删除本地 UI／媒体／环境／故障的历史 schema 和仅供外部来源的测试声明，本地类型自身继续验证。
 
 
-Writer 是面向作品的独立生成角色。Writer 接纳后台 task.request，由私有模型判断能否执行。task.progress 和 writer.completion 将接纳、精选里程碑、追问与终态送回 Assistant。普通进度由 Writer 自有灵动岛呈现。接纳、首次草稿保存、首次异常、追问和终态由 Assistant 播报并进入后续对话事实。工作流与原生工具目录由 Writer 代码拥有。
+Writer 是面向作品的独立生成角色。Writer 接纳后台 task.request，由私有模型判断能否执行。task.progress 和 writer.completion 将接纳、精选里程碑、追问与终态送回 Assistant。普通进度由 Writer 自有灵动岛呈现。接纳、首次草稿保存、首次异常、追问和终态进入 Assistant 的统一 Q，由下一批模型选择性呈现，并保留后续对话事实。工作流与原生工具目录由 Writer 代码拥有。
 
-Writer 的公开 description 说明独立执行、委托生命周期和回馈。Writer 自有灵动岛显示进度、追问和终态。Assistant 播报经过认证的精选控制事实。真实用户输入可发起后续模型决策。
+Writer 的公开 description 说明独立执行、委托生命周期和回馈。Writer 自有灵动岛显示进度、追问和终态。Assistant 将经过认证的精选控制事实按 Agent 来源入 Q，合并和选择性回复。真实用户输入可发起后续模型决策。
 
 Writer allocates workspace_N on explicit workspace creation after authenticated admission. Assistant creates an internal request UUID per communication; Writer alone chooses/reuses its workspace. Models address active background communication by agent_id and windows by window_N; runtime carries delegation/event/question/trace identity. Writer workspaces persist after an assignment completes.
 

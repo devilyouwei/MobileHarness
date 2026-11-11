@@ -47,7 +47,7 @@ ProviderSettingsStore 是 actor，以 busy 排斥重叠读写，保存 version=1
 
 ## 多 Provider 管理
 
-沿用私有设置事务传递至多 32 个 URL 唯一的 provider；当前配置与其余配置一起保存。“智能体大脑”先显示名称/URL 的 Provider 管理列表，末行添加，左滑编辑/删除；不设置全局 Provider 单选。Assistant 和 Writer 各自选择 Provider/模型，本地选项隐藏二级模型。删除 Provider 将引用它的草稿选择切换为本地。保存提交后生效，Key 保持钥匙串存储；Provider 列表只从当前文档读取。
+共享 Provider 列表至多 32 项，URL 唯一，Key 使用钥匙串。总页提交列表，Assistant、Writer 与 Decision 各自提交配置；UI 控制器在共享已提交快照上合并当前页改动，经原有私有设置事务保存。仅 Assistant 有效模型发生变化时应用其运行时配置，失败继续使用既有回滚机制。
 
 Provider 名称与稳定 ID 是当前文档的必填字段，通过私有配置链路保存。新增/编辑采用独立 modal 草稿（name/url/key），默认生成未占用的 Provider N 名称；取消不修改选择和凭据，确认校验 URL 唯一性与名称。列表名称为主、URL 单行省略为辅，保留三字段粘贴和 Key 脱敏。
 
@@ -60,10 +60,12 @@ SettingsProviderAdapter 的结果呈现调用显式忽略 UI 返回的接纳布�
 ProviderSettingsClient is an Actions-owned facade with coalesced restoration (at most 32 waiters) and joined shutdown. Provider draft/configuration and staging ports live in FunctionContracts; ApplicationControl owns cognitive authorization. UI SettingsFormController owns bounded discovery presentation workers and exposes joined shutdown, invoked by Actions cleanup.
 
 
-设置文档包含 Assistant 选择 cloud、其余 providers 列表及 Writer 选择；每个 Provider 的稳定 id/name 和 writerModel 必填，writerProviderID 可为空以表示本地，后续编辑保留 Provider ID。Writer 获取明确选择的配置，使用已有钥匙串凭据，未选云端 Provider 时使用共享本地串行能力，不回退 Assistant。
+设置文档包含 Assistant 选择 cloud、共享 providers 列表和 Writer、Decision 的独立选择。编辑 Provider 保留稳定 ID。Writer 获取其绑定的 Provider 和钥匙串凭据。未绑定云端时，旧设置仍可解析到本地能力，Agent Brains 将 Writer 显示为未配置，因为 Gemma 缺少其所需的原生工具调用。
 
-模型发现按稳定 Provider ID 缓存，页面进入刷新两个已选 Provider，切换 Provider 和编辑凭据自动查询；同 Provider 可共享列表而不共享 Agent 的模型选择。返回值经 ApplicationControl/Gateway 后由表单控制器呈现，凭据快照/请求 ID 阻止迟到覆盖。最多 32 个查询（包括尚未退出的取消任务），溢出明确显示错误；离页取消，根关闭加入。刷新不清空已保存模型，失败提供重试。保存仍走既有业务事务，密钥留钥匙串。
+模型发现由角色子页发起，进入时刷新已选云端 Provider，切换时查询新选择。表单控制器按 Provider ID 缓存结果，凭据快照和请求 ID 围栏迟到结果。模型选择由各角色保存，密钥留在钥匙串。UI 请求生命周期见 [Settings](../../../UI/Settings/README.md)。
 
 Writer配置的writerThinking是独立选择，默认false；可选持久覆盖缺省表示当前角色默认低思考。恢复/保存/回滚通过原有事务传递，不改Provider/模型选择。新委托/续作模型选择按布尔值选择minimum/enabled，Assistant保持minimum；当前执行及其恢复时的模型选择持有原配置。
 
 首次 Welcome 使用同一 SettingsOperating 保存完整 Provider 配置，沿 ApplicationControl/Gateway 请求与现有 ProviderSettingsService/ProviderSettingsStore 事务写入。仅新增 Provider 且尚未选择角色模型时保持既有本地配置；密钥仍经 credentialID 引用保存到钥匙串。Welcome 不引入新的凭据仓库、发现端点或模型默认策略。
+
+Decision 在同一 Provider 设置文档提交 decisionUsesLocal、decisionProviderID 和 decisionModel。旧文档缺少模式字段时读取下载设置的历史模式，首次保存写入有效值。首次选择本地 D3 校验安装，既有本地模式可在制品缺失时保留。每次分类从一份已提交快照取得模式与可选云端工厂。进行中的保存继续提供上一次成功提交的快照。工厂按稳定 ID 解析 Provider 并使用 Decision 模型和最低思考。保存校验模型最长 512 字节，Provider 引用有效且有模型，清空引用时清空模型。

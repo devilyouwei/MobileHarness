@@ -84,9 +84,11 @@ flowchart TB
         T0["无 Task"] -->|"startTask"| T1["Task 执行中"]
         T1 -->|"需要用户补充或确认"| T2["等待用户"]
         T2 -->|"用户继续"| T1
-        T1 -->|"完成 / 失败 / 取消 / 所属会话关闭"| T3["Task 收尾：加入执行与取消清理屏障"]
-        T2 -->|"完成 / 失败 / 取消 / 所属会话关闭"| T3
-        T3 --> T4["Task 终态：回收持有的根 Skill"]
+        T1 -->|"全双工 task.end 持久化"| T4["Task 终态：回收持有的根 Skill"]
+        T2 -->|"全双工 task.end 持久化"| T4
+        T1 -->|"失败 / 取消 / 所属会话关闭"| T3["Task 收尾：加入执行与取消清理屏障"]
+        T2 -->|"失败 / 取消 / 所属会话关闭"| T3
+        T3 --> T4
         T4 --> T0
     end
 
@@ -117,18 +119,18 @@ flowchart TB
 ```
 
 - 一个完整用户 Decision 可以包含多轮 ReACT，只在 Decision 最终结束时结算一次；包含 Task 的 Decision 不扣近期项计数，即使 Task 在该 Decision 内结束。
-- Task 收尾须加入已接纳执行与取消清理屏障，再提交真实终态。等待用户期间保留 Task 及其 Skill；主动 releaseSkills 只释放能力，不结束 Task 或撤销设备效果。
+- 取消及会话关闭加入已接纳执行与清理。等待用户期间保留 Task 及其 Skill；新输入绑定只将 waitingUser 恢复为 running，保留进行中的取消或收尾状态。
 - 图中的回收指移除根引用并重算依赖；其他根仍引用的共享依赖继续保留。显式释放基础项、非根项或仍被其他根依赖的指定 Skill 会拒绝，失败不改变状态。
 - Task 持有项和在途 Decision 已使用项受容量淘汰保护；没有可淘汰空间时加载失败。定义缓存及已发出的模型请求、历史目录不因回收改变。
 - 新对话要求没有活跃 Task；定向会话关闭只清理匹配会话的近期项，并取消匹配的 Task。全局会话重置和进程重启清空全部会话保留，不重放工作。
 
-A pure Skill transition receives an already committed Task ID. The Chat worker validates a candidate, inserts running in SQLite, binds memory, and explicitly closes a failed binding. Recent Skill counters/Decision-use sets, Task registries/views, queues and awaiting-feedback stages remain memory-only. Finish/cancel/failure waits for actual execution barriers, then persists terminal state/summary and sources through normalized repositories.
+A pure Skill transition receives an already committed Task ID. The Chat worker validates a candidate, inserts running in SQLite, binds memory, and explicitly closes a failed binding. Recent Skill counters/Decision-use sets, Task registries/views, queues and awaiting-feedback stages remain memory-only. For full-duplex `task.end`, the Context transaction validates the candidate, commits the business record and publishes terminal Skill and history state together. Non-duplex execution and cancellation settle through their execution barriers.
 
 Task entry preserves ordinary background context and complete current-task evidence. Only terminal Tasks compress their process at the first source position; sources remain queryable. finishTask ends the decision unless continueDecision=true explicitly authorizes another objective; cancelTask ends it. Camera/media access does not require a Task authorization record.
 
 ## 中断、完成与限制
 
-中断移除指定 Decision 使用集合而不扣数，保留 Task/Skill 并回到 waitingUser；显式新对话／匹配会话关闭／根关闭按所属清理规则释放。Task 终态必须加入真实执行／取消屏障，持久化失败保留待提交证据并阻止依赖后续模型接纳。取消等待者仍释放已授槽位，错误不降为成功。
+中断移除指定 Decision 使用集合而不扣数，保留 Task/Skill 并回到 waitingUser；显式新对话／匹配会话关闭／根关闭按所属清理规则释放。持久化失败由控制调用返回，候选 Context 不发布。取消等待者仍释放已授槽位，错误不降为成功。
 
 
 AgentStateContext 管理只读来源和会话接纳，不持有Task副本；关闭后旧读取失效。

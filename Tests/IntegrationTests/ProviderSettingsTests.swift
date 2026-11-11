@@ -73,6 +73,54 @@ private final class ProviderTransactionFixture: ProviderSettingsPersistence {
     #expect(fixture.events == ["prepare:invalid"])
     #expect(fixture.value?.model == "old")
 }
+
+@Test @MainActor func agentBrainDecisionMigratesAndSavesWithoutReconfiguringAssistant() async throws {
+    let fixture = ProviderTransactionFixture()
+    let initial = try #require(fixture.value)
+    let runtime = ProviderSettingsRuntime(
+        initial: initial, prepare: { _ in { fixture.events.append("apply") } },
+        beginChange: { fixture.events.append("begin") }, endChange: { fixture.events.append("end") })
+    let service = ProviderSettingsService(store: fixture, runtime: runtime, legacyDecision: { true })
+    var settings = try await service.restore()
+    #expect(settings.decisionUsesLocal == true)
+    #expect(fixture.value?.decisionUsesLocal == nil)
+    fixture.events.removeAll()
+    settings.decisionUsesLocal = false
+    _ = try await service.save(settings)
+    #expect(fixture.events == ["persist:old"])
+    #expect(fixture.value?.decisionUsesLocal == false)
+
+    let reopened = ProviderSettingsService(store: fixture, runtime: runtime, legacyDecision: { true })
+    #expect(try await reopened.restore().decisionUsesLocal == false)
+    settings.decisionUsesLocal = true
+    await #expect(throws: ProviderSettingsError.self) { _ = try await reopened.save(settings) }
+    #expect(fixture.value?.decisionUsesLocal == false)
+}
+
+@Test @MainActor func agentBrainDecisionReadsCommittedSnapshotDuringSave() async throws {
+    let fixture = ProviderTransactionFixture()
+    let initial = try #require(fixture.value)
+    var service: ProviderSettingsService?
+    let runtime = ProviderSettingsRuntime(
+        initial: initial, prepare: { _ in {} },
+        beginChange: {
+            do {
+                let inFlight = try await service?.decisionSnapshot()
+                #expect(inFlight?.decisionUsesLocal == true)
+            } catch {
+                Issue.record("Expected committed Decision configuration while saving: \(error)")
+            }
+        }, endChange: {})
+    let settings = ProviderSettingsService(store: fixture, runtime: runtime, legacyDecision: { true })
+    service = settings
+    defer { service = nil }
+    _ = try await settings.restore()
+    let next = ProviderSettings(
+        enabled: true, url: initial.url, key: initial.key, model: initial.model, decisionUsesLocal: false)
+    _ = try await settings.save(next)
+    #expect(try await settings.decisionSnapshot().decisionUsesLocal == false)
+}
+
 @Test(.actionCatalog) @MainActor func providerSettingsReturningPipelineKeepsPrivateResultsAndRollbackCauses()
     async throws
 {
@@ -470,4 +518,109 @@ func settingsContainerRunsInItsAgentWithPrivateStagingAndActualPresentation() as
     _ = try await service.save(value(false))
     #expect(try await service.writerConfiguration().writerThinking == false)
     #expect(try await service.restore().model == "assistant")
+}
+
+@Test(.actionCatalog) @MainActor func decisionSelectionPersistsIndependentlyAndMissingFieldsStayUnconfigured()
+    async throws
+{
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(
+        "decision-providers-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: url) }
+    let credentials = ProviderCredentialFixture()
+    func makeStore() -> ProviderSettingsStore {
+        ProviderSettingsStore(
+            credentials: credentials, document: { try FileDocumentStore<UserSettingsDocument>(url: url) })
+    }
+    let store = makeStore()
+    _ = try await store.load()
+    let provider = ProviderSettings(
+        enabled: false, url: "https://decision.invalid/v1", key: "decision-fixture-secret", model: "catalog-default",
+        id: "decision-provider")
+    let settings = ProviderSettings(
+        enabled: true, url: "https://assistant.invalid/v1", key: "assistant-fixture-secret", model: "assistant-model",
+        providers: [provider], writerProviderID: provider.id, writerModel: "writer-model",
+        decisionProviderID: provider.id, decisionModel: "decision-model", decisionUsesLocal: true)
+    try await store.save(settings)
+    let reopened = makeStore()
+    #expect(try await reopened.load() == settings)
+    let service = ProviderSettingsService(
+        store: reopened, runtime: .init(initial: settings, prepare: { _ in {} }, beginChange: {}, endChange: {}))
+    let selected = try await service.decisionConfiguration()
+    #expect(selected.id == provider.id && selected.model == "decision-model" && selected.url == provider.url)
+    #expect(selected.key == provider.key && !selected.writerThinking)
+    #expect(try await service.writerConfiguration().model == "writer-model")
+    #expect(try await service.restore().model == "assistant-model")
+    let data = try Data(contentsOf: url)
+    #expect(!String(decoding: data, as: UTF8.self).contains("fixture-secret"))
+    // The immediately preceding document format remains readable, without implicit Assistant inheritance.
+    var envelope = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    var value = try #require(envelope["value"] as? [String: Any])
+    value.removeValue(forKey: "decisionProviderID")
+    value.removeValue(forKey: "decisionModel")
+    value.removeValue(forKey: "decisionUsesLocal")
+    envelope["value"] = value
+    try JSONSerialization.data(withJSONObject: envelope).write(to: url)
+    let legacy = makeStore()
+    let restored = try #require(await legacy.load())
+    #expect(restored.decisionProviderID == nil && restored.decisionModel.isEmpty)
+    #expect(restored.decisionUsesLocal == nil)
+    #expect(restored.writerModel == "writer-model" && restored.model == "assistant-model")
+    let legacyService = ProviderSettingsService(
+        store: legacy, runtime: .init(initial: settings, prepare: { _ in {} }, beginChange: {}, endChange: {}))
+    await #expect(throws: ProviderSettingsError.self) { try await legacyService.decisionConfiguration() }
+}
+
+@Test(.actionCatalog) @MainActor func decisionSelectionRejectsDanglingProviderAndRoundTripsPrivateUITransport()
+    async throws
+{
+    let ui = UIContainer()
+    try ui.start()
+    let fixture = ProviderTransactionFixture()
+    fixture.failApply = false
+    let service = fixture.service()
+    let requests = ProviderSettingsRequests(service: service)
+    let discovery = ProviderDiscoveryRequests { _ in ["decision-model"] }
+    let session = UUID().uuidString
+    let providerPresentation = ProviderPresentationAdapter(
+        state: ui.settings.presentation, sessionID: session, settings: requests)
+    let presentation = ResourcePresentationAdapter(
+        state: ui.modelResources.presentation, sessionID: session, provider: providerPresentation,
+        navigation: ui.navigation.presentation, acknowledge: {})
+    let host = try await resourceRuntime(
+        UnusedModelResourceCapability(), presentation: presentation, providerDiscovery: discovery,
+        providerSettings: requests, uiSettings: ui.settings, uiProviderSettings: requests,
+        uiProviderDiscovery: discovery, uiProviderPresentation: providerPresentation, sessionID: session)
+    try await host.prepareForInteraction()
+    _ = try await ui.settings.requests.submit(.restore)
+    let provider = CloudSettingsDraft(
+        enabled: false, url: "https://decision.invalid/v1", key: "decision-fixture", model: "catalog-default",
+        id: "decision")
+    let draft = CloudSettingsDraft(
+        enabled: true, url: "https://assistant.invalid/v1", key: "assistant-fixture", model: "assistant-model",
+        providers: [provider], decisionProviderID: provider.id, decisionModel: "decision-model")
+    _ = try await ui.settings.requests.submit(.save(draft))
+    let selected = try await service.decisionConfiguration()
+    #expect(selected.id == "decision" && selected.model == "decision-model" && selected.key == "decision-fixture")
+    guard case .draft(let restored) = try await ui.settings.requests.submit(.restore) else {
+        Issue.record("Missing settings restore")
+        await host.shutdown()
+        await ui.stop()
+        return
+    }
+    #expect(restored.decisionProviderID == "decision" && restored.decisionModel == "decision-model")
+    #expect(ui.settings.state.decisionProviderID == "decision" && ui.settings.state.decisionModel == "decision-model")
+    #expect(restored.model == "assistant-model")
+    for (id, model) in [("missing", "model"), ("decision", " "), ("decision", String(repeating: "x", count: 513))] {
+        #expect(throws: ProviderSettingsError.self) {
+            try requests.stageSave(
+                .init(
+                    enabled: false, url: "", key: "", model: "", providers: [selected], decisionProviderID: id,
+                    decisionModel: model), sessionID: session)
+        }
+    }
+    _ = try await service.save(.init(enabled: true, url: draft.url, key: draft.key, model: draft.model))
+    await #expect(throws: ProviderSettingsError.self) { try await service.decisionConfiguration() }
+    #expect(try await service.restore().model == "assistant-model")
+    await host.shutdown()
+    await ui.stop()
 }

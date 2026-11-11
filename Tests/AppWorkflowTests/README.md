@@ -166,3 +166,9 @@ Welcome 设置回归覆盖成功恢复前不提示、恢复失败不覆盖、已
 首次配置后仅为 Writer 选择云端的回归，验证保存/恢复保留 Provider key，不被未启用 Assistant 的空凭据覆盖。
 
 ListeningCaptureWorkflowTests 另覆盖 Actions 的 VoiceCaptureRecovery：先退役再重建、每会话一次恢复、重建失败清理、超时加入取消、用户关闭期间不复活及中断不自动重启。它们验证替身生命周期，不验证 iOS 媒体服务或麦克风实际恢复。
+
+HomeEffects 回归覆盖独立 toast 与保留字幕、错误 notice 共存，自动到期及根清理；状态测试不替代原生目视验收。
+
+丢弃 toast 回归按有界截止时间等待可见状态消失，随后断言真实错误提示和对话字幕独立保留；不假定并发测试负载下 MainActor 定时任务会在固定额外 200ms 内获得调度。
+
+SettingsInteractionTests 覆盖 Decision 选择、保存、恢复、独立模型保留、Provider 删除清理及共享发现缓存；页面原生布局需另行验收。

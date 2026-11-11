@@ -33,8 +33,7 @@ flowchart LR
 | [AgentGenerator.swift](AgentGenerator.swift) | 文本映射、Action 目录解析及有序输出事件 |
 | [ToolCallParser.swift](ToolCallParser.swift) | 完整 native 调用的字符串参数 JSON 校验与解析 |
 | [GenerationTrace.swift](GenerationTrace.swift) | 有界原始片段、解析错误位置和非执行事件证据 |
-| [PromptTemplates.swift](PromptTemplates.swift) | 严格模板加载、编译、缓存与单次替换 |
-| [FunctionTokenPrompts.json](FunctionTokenPrompts.json) | 通用输出协议、调度与目录模板资源 |
+| [PromptTemplates.swift](PromptTemplates.swift) | 模板解析、编译与单次变量替换 |
 
 ## 内部结构
 
@@ -95,9 +94,9 @@ GenerationTrace retains exact raw fragments up to 256 KiB/8192 fragments, includ
 
 ## Prompt resources and rendering
 
-PromptTemplates is an independent runtime framework JSON loader/compiler/renderer. Placeholders are `{{name}}`; substitution is single-pass, with no expression execution, recursion or automatic escaping. [FunctionTokenPrompts.json](FunctionTokenPrompts.json) owns generic protocol syntax/Channel/wait guidance, catalog formatting and communication usage metadata; it contains no concrete Agent identity or speech policy. Bundled immutable resources load once and preserve errors.
+PromptTemplates compiles and renders caller-supplied bytes. A JSON document provides named templates, while UTF-8 Markdown and plain text compile as one `body` template. Placeholders use `{{name}}`. Substitution is single-pass and treats inserted values as literal text. Agents owns file loading and caching. See [System prompt resources](../../../../Resources/Agents/README.md#提示词与模板字段).
 
-Names are 1–64 ASCII bytes from letters, digits, `_` and `.`. The document has exactly `version` and `templates` fields, version 1 and 1–64 entries, with 65536 UTF-8 bytes per document/output and 16384 per template. Placeholders accept names only; stray closing delimiters, missing delimiters and invalid names reject at compilation. Every render requires exactly the referenced variable keys, including rejection of extra keys. `load(named:bundle:)` reads at most 65537 bytes to detect oversized resources; `FunctionTokenPrompts.load()` caches the Core bundle resource or its error.
+Names are 1–64 ASCII bytes from letters, digits, `_` and `.`. A JSON document has exactly `version` and `templates`, version 1 and 1–64 entries, with at most 16384 UTF-8 bytes per named template. Documents, single text bodies and rendered output are limited to 65536 UTF-8 bytes. Compilation rejects stray closing delimiters, missing delimiters and invalid names. Rendering requires exactly the referenced variable keys.
 
 ```mermaid
 flowchart LR
@@ -114,7 +113,7 @@ Role assets are described by [shared Chat](../../Chat/README.md#请求提示词�
 
 ## 协议教学与分段
 
-FunctionTokenPrompts.json 包含 protocol、Action-only protocol、catalog 与 boundary，复用统一 Channel/wait/scheduling 约束；有可见 Tool 才呈现双协议教学。native 名称以实际定义为准，不从业务 prose 推断；具体角色、Task、设备步骤和业务例子归 Skill。
+调用方提供 XML Action、Channel 和 wait 的输出协议，以及独立的 Action 目录排版模板。原生 Tool 由实际模型请求携带结构化定义。Task 流程由 BasicSkill 教学，设备流程见对应 Skill，语音与字幕呈现由角色指令说明。
 
 同一响应可为已确定的多步输出连续 wait，每组内不同 Channel 可并行；依赖结果才能选择的步骤必须等待真实反馈。同名 Channel 跨 Task 独立，资源约束另外校验；模板不授予执行权。
 

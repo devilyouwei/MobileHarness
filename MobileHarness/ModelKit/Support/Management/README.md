@@ -162,3 +162,5 @@ ChatDefaults 注册工厂接受中立 ModelID，ModelScope 按固定云端配置
 HF 只使用当前传输计划和完成文件；不从 .hub-snapshot 搬迁旧 SDK 文件。安装收据失效应显式删除/重新下载，不自动修复旧路径。
 
 SerialChat forwards full native calls through the existing 128-event queued session without a single-event byte ceiling. Local pending-request bounds and cancellation/cleanup FIFO are independent of argument size; backend capability and token-window errors remain explicit.
+
+The default assembly registers d3-edge as decision with retained resource ownership and artifact ID d3-edge. D3Edge contains graph, manifest and tokenizer; removal joins the decision provider lease before deleting files.

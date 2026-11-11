@@ -17,3 +17,5 @@ showResources 返回本次呈现的资源快照。Provider 结果和错误展示
 | [ResourcePresentationModule.swift](ResourcePresentationModule.swift) | 资源呈现函数绑定 |
 
 [所属域设计](../README.md) · [Actions 模块](../../README.md)
+
+D3 下载沿用通用制品状态和失败呈现。选择本地 Decision 的安装错误经 Provider 设置呈现通道返回。

@@ -44,7 +44,7 @@ Pinned schema-v2 catalog, metadata/notices staging, privacy declaration and app-
 
 Runtime/server/device acceptance belongs in [validation history](../../docs/validation/Validation-History.md).
 
-Agents packages Agents/, Skills/ and Catalog.json from this shared source root; Models and app assets remain independently packaged. AgentCore separately packages its generic Function Token prompt resource. The final app resource verifier checks exact source bytes and missing/stale files for both bundles.
+Agents packages Agents/, Skills/ and Catalog.json, including the [System input and output protocols and Action catalog templates](Agents/README.md#提示词与模板字段). Models and app assets are independently packaged. The final app resource verifier checks exact source bytes and missing or stale resources in the Agents bundle.
 
 ## Related design
 
@@ -52,9 +52,9 @@ Agents packages Agents/, Skills/ and Catalog.json from this shared source root; 
 
 ## 职责与组织
 
-纯随 App 打包的配置与文本，由 Catalog.json 显式索引。Agents 保存 v10 身份、静态类别、角色自有公开 description、私有角色指令、通信契约和 baseSkills；Skills 保存 v3 配置、revision、可选的角色归属、流程说明和函数引用。Task 目标仅作为运行时数据。
+随 App 打包的 Agent 与 Skill 配置由 Catalog.json 显式索引。Agents 保存 v10 身份、静态类别、角色自有公开 description、私有角色指令、通信契约和 baseSkills。System 协议由 Agents 按固定资源路径读取。Skills 保存 v3 配置、revision、可选的角色归属、流程说明和函数引用。Task 目标作为运行时数据。
 
-这里不包含 Swift、脚本、函数实现、凭据或用户媒体。Actions 独立提供实现，FunctionContracts 提供中立元数据。Catalog 是唯一资源索引。
+Actions 独立提供函数实现，FunctionContracts 提供中立元数据。Catalog 是 Agent 与 Skill 定义的唯一索引。
 
 ## 加载与验证
 

@@ -61,10 +61,10 @@ public enum AgentSkillLoader {
         let instructionBytes = try loaded.filter { !base.contains($0) }.reduce(0) {
             try $0 + AgentConfigurations.skillInstructions($1).utf8.count
         }
+        let capabilityContext = try AgentPrompts.capabilityContext()
         let actionBytes = max(
             0,
-            try CapabilityContextBuilder.catalog(allRegistry).utf8.count
-                - CapabilityContextBuilder.catalog(baseRegistry).utf8.count)
+            try capabilityContext.catalog(allRegistry).utf8.count - capabilityContext.catalog(baseRegistry).utf8.count)
         let baseTools = Set(baseRegistry.tools.map(\.path))
         let toolBytes = try allRegistry.tools.filter { !baseTools.contains($0.path) }.reduce(0) { bytes, tool in
             try bytes + (tool.definition.map { try JSONEncoder().encode($0).count } ?? 0)

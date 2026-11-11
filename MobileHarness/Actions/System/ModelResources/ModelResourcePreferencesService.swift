@@ -9,14 +9,27 @@ public struct ModelResourcePreferences: Codable, Sendable, Equatable {
     public var allowsCellular: Bool
     public var useCustomRecognition: Bool
     public var useCustomSynthesis: Bool
+    public var useLocalDecision: Bool
+    private enum CodingKeys: String, CodingKey {
+        case endpoint, allowsCellular, useCustomRecognition, useCustomSynthesis, useLocalDecision
+    }
+    public init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        endpoint = try values.decode(String.self, forKey: .endpoint)
+        allowsCellular = try values.decode(Bool.self, forKey: .allowsCellular)
+        useCustomRecognition = try values.decode(Bool.self, forKey: .useCustomRecognition)
+        useCustomSynthesis = try values.decode(Bool.self, forKey: .useCustomSynthesis)
+        useLocalDecision = try values.decodeIfPresent(Bool.self, forKey: .useLocalDecision) ?? false
+    }
     public init(
         endpoint: String = "https://huggingface.co", allowsCellular: Bool = true,
-        useCustomRecognition: Bool = false, useCustomSynthesis: Bool = false
+        useCustomRecognition: Bool = false, useCustomSynthesis: Bool = false, useLocalDecision: Bool = false
     ) {
         self.endpoint = endpoint
         self.allowsCellular = allowsCellular
         self.useCustomRecognition = useCustomRecognition
         self.useCustomSynthesis = useCustomSynthesis
+        self.useLocalDecision = useLocalDecision
     }
     public func encoded() throws -> String {
         let data = try JSONEncoder().encode(self)
@@ -60,6 +73,9 @@ public actor ModelResourcePreferencesService: ModelResourcePreferencesCapability
         store = value
         return value
     }
+    public func legacyDecisionSelection() async throws -> Bool {
+        try await persistence().load()?.value.useLocalDecision ?? false
+    }
     public func restoreSource() async throws -> ModelResourcePreferences {
         guard !changing else { throw DocumentStorageError.conflict }
         changing = true
@@ -85,7 +101,7 @@ public actor ModelResourcePreferencesService: ModelResourcePreferencesCapability
         changing = true
         defer { changing = false }
         try Task.checkCancellation()
-        let value = try await validate(preferences)
+        var value = try await validate(preferences)
         let ids = try await installed()
         if value.useCustomRecognition && !ResourceModelGroup.recognition.isInstalled(in: ids) {
             throw ModelResourcePreferenceError.recognitionRequired
@@ -94,6 +110,7 @@ public actor ModelResourcePreferencesService: ModelResourcePreferencesCapability
             throw ModelResourcePreferenceError.synthesisRequired
         }
         let current = try await persistence().load()
+        value.useLocalDecision = current?.value.useLocalDecision ?? false
         try Task.checkCancellation()
         try await persistence().save(value, expecting: current?.revision)
         return value

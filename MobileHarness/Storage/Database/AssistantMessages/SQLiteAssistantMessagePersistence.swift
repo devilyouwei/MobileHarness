@@ -70,6 +70,10 @@ extension SQLiteAssistantMessageRepository {
             let key = try Self.ensureMessage(
                 owner: owner, client: identity.clientID, input: identity.inputID, task: identity.taskID,
                 position: identity.order, date: identity.date, invocation: identity.kind != "input", db: db)
+            if identity.role == "assistant", let detail = identity.detail {
+                try Self.saveRequestText(
+                    try SQLiteRecordCoding.payload(detail)["input"] as? String, key: key, owner: owner, db: db)
+            }
             return SQLiteRecordKey.id(identity.kind == "input" ? .message : .request, key)
         }
     }
@@ -81,11 +85,18 @@ extension SQLiteAssistantMessageRepository {
             date: value.date, invocation: value.kind != "input", db: db)
         let now = Date().timeIntervalSince1970
         if value.role == "user" {
-            var input: [String: Any] = ["text": value.body]
+            let existing = try String.fetchOne(
+                db, sql: "SELECT user_input_json FROM \(owner.table) WHERE id=?", arguments: [key])
+            var input = try SQLiteRecordCoding.object(existing ?? "{}")
+            input["text"] = value.body
             if value.kind == "input" {
                 let detail = try SQLiteRecordCoding.payload(value.detail)
                 input["awaitingModel"] = detail["awaitingModel"]
                 input["executionError"] = detail["executionError"]
+                input["coordination"] = detail["coordination"]
+                input["state"] = detail["state"]
+                input["error"] = detail["error"]
+                input["finishReason"] = detail["finishReason"]
                 if let definitions = detail["toolDefinitions"] {
                     try db.execute(
                         sql: "UPDATE \(owner.table) SET tool_catalog_json=? WHERE id=?",
@@ -118,6 +129,7 @@ extension SQLiteAssistantMessageRepository {
             }
         } else {
             var detail = try SQLiteRecordCoding.payload(value.detail)
+            try saveRequestText(detail["input"] as? String, key: key, owner: owner, db: db)
             let meta = detail.filter {
                 SQLiteModelRequestLogRepository.generationKeys.contains($0.key)
                     || ["error", "failureDiagnostic"].contains($0.key)
@@ -125,7 +137,7 @@ extension SQLiteAssistantMessageRepository {
             try SQLiteModelRequestLogRepository.saveGenerationMetadata(
                 meta, invocation: value.clientID, at: now, db: db)
             let tools = detail.removeValue(forKey: "toolCalls") ?? []
-            var decision = detail.removeValue(forKey: "decisionMetadata") as? [String: Any] ?? [:]
+            let decision = detail.removeValue(forKey: "decisionMetadata") as? [String: Any] ?? [:]
             for name in SQLiteModelRequestLogRepository.generationKeys.union([
                 "messageID", "inputMessageID", "historyTaskID", "historyOrder", "date", "id", "input", "state",
             ]) { detail[name] = nil }
@@ -154,4 +166,12 @@ extension SQLiteAssistantMessageRepository {
             id: SQLiteRecordKey.id(value.role == "user" && value.kind == "input" ? .message : .request, key),
             clientID: value.clientID, role: value.role)
     }
+    private static func saveRequestText(_ text: String?, key: Int64, owner: Owner, db: Database) throws {
+        guard let text else { return }
+        guard text.utf8.count <= 65_536 else { throw RecordStorageError.invalidRecord }
+        try db.execute(
+            sql: "UPDATE \(owner.table) SET user_input_json=json_set(user_input_json,'$.requestText',?) WHERE id=?",
+            arguments: [text, key])
+    }
+
 }

@@ -19,7 +19,7 @@ public enum ConversationTitleGenerator {
         guard !conversation.turns.isEmpty else { throw AssistantHistoryError.emptyConversation }
         // Bounded excerpts cover the whole conversation, rather than only its final exchange.
         let selected = samplePositions(count: conversation.turns.count).map { conversation.turns[$0] }
-        let templates = try PromptTemplates(data: AgentConfigurations.titlePromptData())
+        let templates = try AgentPrompts.titleTemplates()
         let excerpts = try selected.map {
             try templates.render(
                 "title.excerpt",

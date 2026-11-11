@@ -39,7 +39,9 @@ final class ApplicationActionAssembly {
         return AgentBusinessBindings(
             executor: ports.executor, catalog: ports.catalog, artifactStreaming: ports.artifactStreaming,
             writerArtifacts: ports.writerArtifacts,
-            writerModel: ports.writerModel, settings: ports.settings,
+            writerModel: ports.writerModel, decisionConfiguration: ports.decisionConfiguration,
+            decisionStatus: ports.decisionStatus,
+            inputQueueStatus: ports.inputQueueStatus, settings: ports.settings,
             discovery: ports.discovery, providerPresentation: ports.providerPresentation, tasks: ports.tasks,
             resources: ports.resources, connectionFacts: ports.connectionFacts,
             trackingAvailable: ports.trackingAvailable,

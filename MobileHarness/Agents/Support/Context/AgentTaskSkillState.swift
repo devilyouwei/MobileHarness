@@ -85,7 +85,7 @@ public struct AgentTaskSkillState: Codable, Sendable {
             let retained = Set(tasks.filter { $0.id == activeTaskID }.flatMap(\.inputIDs))
             for key in inputBindings.keys where !retained.contains(key) { inputBindings[key] = nil }
         }
-        tasks[index].status = "running"
+        if tasks[index].status == "waitingUser" { tasks[index].status = "running" }
         tasks[index].updatedAt = Date()
     }
     public mutating func initialize(fixed fixedCapabilities: CapabilityRegistry, baseSkills: [String]) throws {
@@ -304,11 +304,12 @@ public struct AgentTaskSkillState: Codable, Sendable {
     }
     /// Task closure is separate from input settlement: finishTask can continue to another goal.
     public mutating func settleTask(
-        failed: Bool, fixed fixedCapabilities: CapabilityRegistry, failure: String? = nil, cancelled: Bool = false
+        failed: Bool, fixed fixedCapabilities: CapabilityRegistry, failure: String? = nil, cancelled: Bool = false,
+        finishedAt: Date = Date()
     ) throws {
         guard let id = activeTaskID, let index = tasks.firstIndex(where: { $0.id == id }) else { return }
         var next = self
-        next.tasks[index].updatedAt = Date()
+        next.tasks[index].updatedAt = finishedAt
         if failed && !cancelled { next.tasks[index].failure = failure.map { String($0.prefix(4096)) } }
         let status = next.tasks[index].status
         if failed || cancelled || status == "finishing" || status == "cancelling" {
@@ -434,9 +435,12 @@ public struct AgentTaskSkillState: Codable, Sendable {
         else { throw CommunicationError.invalidPayload }
     }
     public func instructions(includeOverview: Bool = true) throws -> String {
-        let overview = includeOverview ? "\n# AVAILABLE SKILLS\n" + (try AgentConfigurations.skillOverview()) : ""
+        let templates = try AgentPrompts.skillCatalog()
+        let overview =
+            includeOverview
+            ? "\n" + (try templates.render("availableHeading")) + "\n" + (try AgentConfigurations.skillOverview()) : ""
         return overview
-            + "\n# LOADED SKILL INSTRUCTIONS\n"
+            + "\n" + (try templates.render("loadedHeading")) + "\n"
             + (try AgentSkillLoader.instructions(loaded))
     }
 }

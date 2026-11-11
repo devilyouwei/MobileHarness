@@ -110,7 +110,7 @@ public final class SQLiteWorkspaceRepository: WorkspaceRepository {
         try database.write { db in
             try db.execute(
                 sql:
-                    "UPDATE writer_workspaces SET workspace_state='deleting',revision=revision+1 WHERE id=? AND write_lease IS NULL AND NOT EXISTS(SELECT 1 FROM writer_messages m WHERE m.input_kind='delegation' AND m.selected_workspace_id=writer_workspaces.id AND m.run_state IN ('running','waiting_input','paused','closing','cleanup_failed'))",
+                    "UPDATE writer_workspaces SET workspace_state='deleting',revision=revision+1 WHERE id=? AND write_lease IS NULL AND NOT EXISTS(SELECT 1 FROM writer_executions m WHERE m.selected_workspace_id=writer_workspaces.id AND m.run_state IN ('running','waiting_input','paused','closing','cleanup_failed'))",
                 arguments: [try Self.number(id)])
             guard db.changesCount == 1 else { throw RecordStorageError.conflict }
         }

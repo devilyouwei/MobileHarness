@@ -169,6 +169,48 @@
       "requiredFiles": [
         "yolo26n-pose.mlpackage/Data/com.apple.CoreML/model.mlmodel"
       ]
+    },
+    {
+      "id": "d3-edge",
+      "name": "D3 Decision",
+      "capability": "decision",
+      "directory": "D3Edge",
+      "minimumOS": 27,
+      "requiresPhysicalDevice": true,
+      "deviceRequirement": null,
+      "license": "Apache-2.0",
+      "estimatedBytes": 1013189709,
+      "source": {
+        "kind": "huggingface",
+        "repoId": "hugging-mac/d3-edge-CoreAI",
+        "revision": "0690c04ee1640c1c3fa11a882323751dda6d086a",
+        "allowPatterns": [
+          "decision.aimodel/**",
+          "manifest.json",
+          "decision_config.json",
+          "tokenizer.json",
+          "tokenizer_config.json",
+          "vocab.json",
+          "merges.txt",
+          "chat_template.jinja",
+          "NOTICE",
+          "LICENSE"
+        ]
+      },
+      "requiredFiles": [
+        "decision.aimodel/main.mlirb",
+        "decision.aimodel/main.hash",
+        "decision.aimodel/metadata.json",
+        "manifest.json",
+        "decision_config.json",
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "vocab.json",
+        "merges.txt",
+        "chat_template.jinja",
+        "NOTICE",
+        "LICENSE"
+      ]
     }
   ]
 }

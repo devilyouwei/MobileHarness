@@ -160,6 +160,7 @@ public enum AgentConfigurations {
     public static func delegationOverview(
         requester: AgentID, communication: CommunicationDeclaration
     ) throws -> String {
+        let templates = try AgentPrompts.agentCatalog()
         var entries: [String] = []
         for name in try catalog().agents.keys.sorted() {
             let value = try resource(named: name)
@@ -171,7 +172,8 @@ public enum AgentConfigurations {
             guard target.communication.inputs.contains(where: { $0.contract == "task.request" }) else {
                 throw CommunicationError.unsupportedContract
             }
-            entries.append("Agent ID=\(value.id); description=\(value.description)")
+            entries.append(
+                try templates.render("entry", variables: ["id": value.id, "description": value.description]))
         }
         let result = entries.joined(separator: "\n")
         guard result.utf8.count <= 8192 else { throw AgentConfigurationError.invalidField("Agent discovery capacity") }
@@ -195,16 +197,20 @@ public enum AgentConfigurations {
         }
         return catalog.deletingLastPathComponent()
     }
-    static func data(_ path: String) throws -> Data {
+    static func readAsset(_ path: String) throws -> Data {
         guard !path.hasPrefix("/"), !path.contains("\\"),
             path.split(separator: "/").allSatisfy({ $0 != ".." && $0 != "." })
         else { throw AgentConfigurationError.resourceMissing(path) }
         let root = try resourceRoot(in: Bundle.module)
-        if let cached = cache.lock.withLock({ cache.assets[path] }) { return cached }
         let file = try FileHandle(forReadingFrom: root.appendingPathComponent(path))
         defer { try? file.close() }
         let data = try file.read(upToCount: 65_537) ?? Data()
         guard data.count <= 65_536 else { throw AgentConfigurationError.invalidFormat }
+        return data
+    }
+    static func data(_ path: String) throws -> Data {
+        if let cached = cache.lock.withLock({ cache.assets[path] }) { return cached }
+        let data = try readAsset(path)
         try cache.lock.withLock {
             guard cache.assets.count < 256 || cache.assets[path] != nil else {
                 throw AgentConfigurationError.invalidFormat
@@ -234,40 +240,34 @@ public enum AgentConfigurations {
     public static func skillInstructions(_ id: String) throws -> String {
         guard let path = try catalog().skills[id] else { throw AgentConfigurationError.resourceMissing(id) }
         let root = String(path.dropLast("Skill.json".count))
-        return try skill(id).useInstructions.map { name in
-            guard let text = String(data: try data(root + name), encoding: .utf8) else {
-                throw AgentConfigurationError.invalidFormat
-            }
-            return text
-        }.joined(separator: "\n\n")
+        return try skill(id).useInstructions.map { try AgentPrompts.shared.render(root + $0) }.joined(separator: "\n\n")
     }
     public static func skillOverview() throws -> String {
+        let templates = try AgentPrompts.skillCatalog()
         let skills = try catalog().skills.keys.sorted().map { try skill($0) }.filter { $0.owner == nil }
-        let prefixes = skills.map { "Skill ID=\($0.id); description=" }
-        let overhead = prefixes.reduce(0) { $0 + $1.utf8.count } + max(0, skills.count - 1)
+        let overhead = try skills.reduce(max(0, skills.count - 1)) { bytes, skill in
+            try bytes + templates.render("entry", variables: ["id": skill.id, "description": ""]).utf8.count
+        }
         guard overhead <= 4096 else { throw AgentConfigurationError.invalidField("Skill discovery capacity") }
         let perDescription = (4096 - overhead) / max(1, skills.count)
-        return zip(skills, prefixes).map { skill, prefix in
+        let result = try skills.map { skill in
             var description = ""
             for character in skill.description {
                 guard description.utf8.count + String(character).utf8.count <= perDescription else { break }
                 description.append(character)
             }
-            return prefix + description
+            return try templates.render("entry", variables: ["id": skill.id, "description": description])
         }.joined(separator: "\n")
+        guard result.utf8.count <= 4096 else { throw AgentConfigurationError.invalidField("Skill discovery capacity") }
+        return result
     }
     public static func identityInstructions(named name: String) throws -> String {
-        guard let path = try catalog().agents[name],
-            let text = String(
-                data: try data(String(path.dropLast("Agent.json".count)) + "Instructions.md"), encoding: .utf8)
-        else { throw AgentConfigurationError.resourceMissing(name) }
-        return text
-    }
-    public static func titlePromptData() throws -> Data { try data("Agents/Memory/TitlePrompts.json") }
-    public static func promptData(named name: String) throws -> Data {
         guard let path = try catalog().agents[name] else { throw AgentConfigurationError.resourceMissing(name) }
-        // Each role owns its template keys; callers validate the keys they consume.
-        return try data(String(path.dropLast("Agent.json".count)) + "Prompts.json")
+        return try AgentPrompts.shared.render(String(path.dropLast("Agent.json".count)) + "Instructions.md")
+    }
+    static func promptPath(named name: String) throws -> String {
+        guard let path = try catalog().agents[name] else { throw AgentConfigurationError.resourceMissing(name) }
+        return String(path.dropLast("Agent.json".count)) + "Prompts.json"
     }
     public static func load(named name: String) throws -> AgentConfiguration {
         if let cached = cache.lock.withLock({ cache.agents[name] }) { return cached }

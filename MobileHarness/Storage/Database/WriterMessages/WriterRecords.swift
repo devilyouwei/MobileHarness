@@ -47,6 +47,8 @@ public struct WriterInputMessage: Codable, Sendable, Equatable {
 
 /// One model invocation, nested under the input that owns its execution lifecycle.
 public struct WriterModelRequest: Codable, Sendable, Identifiable {
+    /// Prepared in memory; cleared only when the provider actually starts.
+    public var awaitingDispatch: Bool? = nil
     public var inputMessages: [WriterInputMessage]? = nil
     public var logsCleared: Bool? = nil
     public var requestParametersJSON: String? = nil
@@ -59,7 +61,7 @@ public struct WriterModelRequest: Codable, Sendable, Identifiable {
     public var inputMessageID: String? = nil
     public var isObservation: Bool? = nil
     public let id: String
-    public let date: Date
+    public var date: Date
     public var input: String
     public var requestJSON: String
     public var historyOrder: UInt64 = 0

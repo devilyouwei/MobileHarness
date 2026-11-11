@@ -4,6 +4,8 @@
 
 ## 当前验收入口
 
+[Assistant 全双工与 Decision](Assistant-Full-Duplex.md)：整批输入、跨轮执行、分类回退、真实 D3 与音频/UI 验收边界。
+
 [Assistant 内聚语音合成](Assistant-Owned-Speech.md)：内部 FIFO、会话隔离、停止清理、角色资源移除及构建/真机验收边界。
 
 [BasicSkill 控制教学](BasicSkill-Control-Teaching.md)：六部分通用教学、九项动作效果、完整检查、资源打包和实模通过/失败边界。
@@ -173,3 +175,4 @@ refactor, Agent-only model recording, current-file recovery and automated/build/
 - [Agent 静态类别](Agent-Categories.md)：类别配置、运行时保留、非法配置拒绝与构建证据。
 
 - [D3 Edge Core AI](D3-Edge-CoreAI.md)：本机 Core AI/PyTorch/Swift 对照、全双工文本三分类、性能与实验性发布证据。
+- [Mac 本地 Decision 模型对照](Decision-Model-Mac-Comparison.md)记录 D3、Laya 和 UniMC 在同一组全双工样例上的分类错误与热调用时延。

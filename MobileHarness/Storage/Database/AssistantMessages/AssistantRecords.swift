@@ -32,6 +32,8 @@ public struct AssistantDecisionMetadata: Codable, Sendable {
 
 /// One model invocation, nested under the input that owns its execution lifecycle.
 public struct AssistantModelRequest: Codable, Sendable, Identifiable {
+    /// Prepared in memory; cleared only when the provider actually starts.
+    public var awaitingDispatch: Bool? = nil
     public var logsCleared: Bool? = nil
     public var requestParametersJSON: String? = nil
     public var responseEventsJSON: String? = nil
@@ -40,7 +42,7 @@ public struct AssistantModelRequest: Codable, Sendable, Identifiable {
     public var inputMessageID: String? = nil
     public var isObservation: Bool? = nil
     public let id: String
-    public let date: Date
+    public var date: Date
     public var input: String
     public var requestJSON: String
     public var historyOrder: UInt64 = 0
@@ -70,7 +72,39 @@ public struct AssistantModelRequest: Codable, Sendable, Identifiable {
     }
 }
 
+/// Optional additive input evidence; a batch has one response owner and preserves every source.
+public struct AssistantInputCoordination: Codable, Sendable {
+    public struct Member: Codable, Sendable {
+        public let id: String
+        public let source: String
+        public let capturedAt: String
+        public let decision: String?
+        public let route: String?
+
+        public init(id: String, evidence: AssistantInputCoordination) {
+            self.id = id
+            source = evidence.source
+            capturedAt = evidence.capturedAt
+            decision = evidence.decision
+            route = evidence.route
+        }
+    }
+
+    public let source: String
+    public let capturedAt: String
+    public var decision: String?
+    public var route: String?
+    public var batchID: String?
+    public var memberIDs: [String]?
+    public var members: [Member]?
+    public init(source: String, capturedAt: String) {
+        self.source = source
+        self.capturedAt = capturedAt
+    }
+}
+
 public struct AssistantRecord: Codable, Sendable, Identifiable {
+    public var coordination: AssistantInputCoordination? = nil
     public var messageID: String? = nil
     public var historyOrder: UInt64 = 0
     public enum State: String, Codable, Sendable { case generating, completed, failed, cancelled, interrupted }
@@ -128,9 +162,10 @@ public struct AssistantTaskCompression: Codable, Sendable, Identifiable {
     public let failure: String?
     public let completedAt: Date
     public let sources: [AssistantHistoryReference]
+    public let closedAtAction: Bool?
     public init(
         taskID: String, goal: String, status: AssistantRecord.State, reportedSummary: String?, failure: String?,
-        completedAt: Date, sources: [AssistantHistoryReference]
+        completedAt: Date, sources: [AssistantHistoryReference], closedAtAction: Bool? = nil
     ) {
         self.taskID = taskID
         self.goal = goal
@@ -139,6 +174,7 @@ public struct AssistantTaskCompression: Codable, Sendable, Identifiable {
         self.failure = failure
         self.completedAt = completedAt
         self.sources = sources
+        self.closedAtAction = closedAtAction
     }
 }
 

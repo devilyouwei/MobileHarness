@@ -24,7 +24,7 @@ public struct ModelID: Hashable, Sendable {
 }
 
 public enum ProvidedCapability: String, CaseIterable, Hashable, Sendable {
-    case chat, recognition, synthesis, judge, voiceActivity, pose
+    case chat, recognition, synthesis, decision, voiceActivity, pose
 }
 
 public enum ModelRegistrationError: Error, Equatable, Sendable {
@@ -43,21 +43,21 @@ public struct ProvidedCapabilities: Sendable {
     public let chat: (any ChatCapability)?
     public let recognition: (any SpeechRecognitionCapability)?
     public let synthesis: (any SpeechSynthesisCapability)?
-    public let judge: (any JudgeCapability)?
+    public let decision: (any DecisionCapability)?
     public let pose: (any PoseCapability)?
     public let voiceActivity: (any VoiceActivityCapability)?
 
     public init(
         warmup: (@Sendable () async throws -> Void)? = nil,
         chat: (any ChatCapability)? = nil, recognition: (any SpeechRecognitionCapability)? = nil,
-        synthesis: (any SpeechSynthesisCapability)? = nil, judge: (any JudgeCapability)? = nil,
+        synthesis: (any SpeechSynthesisCapability)? = nil, decision: (any DecisionCapability)? = nil,
         voiceActivity: (any VoiceActivityCapability)? = nil, pose: (any PoseCapability)? = nil
     ) {
         self.warmup = warmup
         self.chat = chat
         self.recognition = recognition
         self.synthesis = synthesis
-        self.judge = judge
+        self.decision = decision
         self.voiceActivity = voiceActivity
         self.pose = pose
     }
@@ -68,7 +68,7 @@ public struct ProvidedCapabilities: Sendable {
         case .recognition:
             return await recognition?.availability ?? .unavailable(reason: "Capability is not registered")
         case .synthesis: return await synthesis?.availability ?? .unavailable(reason: "Capability is not registered")
-        case .judge: return await judge?.availability ?? .unavailable(reason: "Capability is not registered")
+        case .decision: return await decision?.availability ?? .unavailable(reason: "Capability is not registered")
         case .voiceActivity:
             return await voiceActivity?.availability ?? .unavailable(reason: "Capability is not registered")
         }
@@ -79,7 +79,7 @@ public struct ProvidedCapabilities: Sendable {
         if chat != nil { result.insert(.chat) }
         if recognition != nil { result.insert(.recognition) }
         if synthesis != nil { result.insert(.synthesis) }
-        if judge != nil { result.insert(.judge) }
+        if decision != nil { result.insert(.decision) }
         if voiceActivity != nil { result.insert(.voiceActivity) }
         return result
     }

@@ -114,6 +114,21 @@ public actor WriterHistoryStore {
                     attachedIdentity = true
                 }
             }
+            for reference in references where reference.role == "assistant" {
+                for input in next.current.turns.indices {
+                    guard
+                        let request = next.current.turns[input].modelRequests?.firstIndex(where: {
+                            $0.id == reference.clientID
+                        })
+                    else { continue }
+                    next.current.turns[input].modelRequests?[request].messageID = reference.id
+                    let inputMessageID = next.current.turns[input].messageID
+                    next.current.turns[input].modelRequests?[request].inputMessageID = inputMessageID
+                    next.current.turns[input].modelRequests?[request].historyOrder = UInt64(
+                        try BusinessRecordID.number(reference.id, kind: .request))
+                    attachedIdentity = true
+                }
+            }
             if attachedIdentity { try await commit(next) }
             dirtyInputs.subtract(snapshot.changedInputs ?? [])
             savedID = snapshot.conversation.id
@@ -273,7 +288,9 @@ public actor WriterHistoryStore {
         }
     }
 
-    public func beginModelRequest(_ request: WriterModelRequest, for id: String) async throws {
+    public func beginModelRequest(_ request: WriterModelRequest, for id: String, awaitingDispatch: Bool = false)
+        async throws
+    {
         try await acquireWrite()
         defer { releaseWrite() }
         try await load()
@@ -295,28 +312,32 @@ public actor WriterHistoryStore {
         admitted.isObservation = observation
         admitted.inputMessageID = next.current.turns[index].messageID
 
-        if observation {
-            admitted.inputMessageID = try await records.beginMessage(
-                ownerID: value.current.id,
-                identity: .init(
-                    clientID: request.id, inputID: id, role: "user", kind: "observation",
-                    order: admitted.historyOrder, date: admitted.date, replyTo: requests.last?.messageID))
-        }
-        admitted.messageID = try await records.beginMessage(
-            ownerID: value.current.id,
-            identity: .init(
-                clientID: request.id, inputID: id, role: "assistant", kind: "response",
-                order: admitted.historyOrder, date: admitted.date, replyTo: admitted.inputMessageID,
-                detail: try JSONEncoder().encode(admitted)))
-
-        if let identity = admitted.messageID {
-            admitted.historyOrder = UInt64(try BusinessRecordID.number(identity, kind: .request))
-        }
+        admitted.awaitingDispatch = awaitingDispatch
         requests.append(admitted)
         next.current.turns[index].modelRequests = requests
         dirtyInputs.insert(id)
         try await commit(next)
-        if observation { try await checkpointLocked() }
+        if !awaitingDispatch { try await checkpointLocked() }
+    }
+
+    public func markModelRequestDispatched(_ id: String) async throws {
+        try await acquireWrite()
+        defer { releaseWrite() }
+        try await load()
+        guard let input = value.current.turns.firstIndex(where: { $0.id == id }),
+            let request = value.current.turns[input].modelRequests?.indices.last
+        else { throw WriterHistoryError.missingTurn }
+        guard value.current.turns[input].modelRequests?[request].awaitingDispatch == true else { return }
+        try Task.checkCancellation()
+        guard value.current.turns[input].state == .generating,
+            value.current.turns[input].modelRequests?[request].state == .generating
+        else { throw WriterHistoryError.invalidRecord }
+        var next = value
+        next.current.turns[input].modelRequests?[request].awaitingDispatch = false
+        next.current.turns[input].modelRequests?[request].date = Date()
+        dirtyInputs.insert(id)
+        try await commit(next)
+        try await checkpointLocked()
     }
 
     public func clearRequestLogs(requestID: String?) async throws {
@@ -324,6 +345,7 @@ public actor WriterHistoryStore {
     }
 
     public func recordModelTransport(_ update: ModelRequestLogUpdate, for id: String) async throws {
+        if case .request = update { try await markModelRequestDispatched(id) }
         let snapshot = try await readCurrent()
         guard let request = snapshot.current.turns.first(where: { $0.id == id })?.modelRequests?.last else {
             throw WriterHistoryError.missingTurn
@@ -339,7 +361,10 @@ public actor WriterHistoryStore {
             guard let request = snapshot.current.turns.first(where: { $0.id == id })?.modelRequests?.last else {
                 throw WriterHistoryError.missingTurn
             }
-            try await records.writeRequestPayload(request.id, json: requestJSON, response: response, initial: initial)
+            if request.awaitingDispatch != true {
+                try await records.writeRequestPayload(
+                    request.id, json: requestJSON, response: response, initial: initial)
+            }
         }
         try await updateTurn(id) { turn in
             guard let index = turn.modelRequests?.indices.last else { throw WriterHistoryError.missingTurn }
@@ -464,6 +489,7 @@ public actor WriterHistoryStore {
         else { throw WriterHistoryError.missingTurn }
         var next = value
         var turn = next.current.turns[index]
+        let directProducer = turn.modelRequests?.isEmpty ?? true
         // Direct text producers start their message on its first content event. Managed models
         // use beginModelRequest before invoking the provider, so their deltas perform no writes.
         if turn.modelRequests?.isEmpty ?? true {
@@ -474,17 +500,15 @@ public actor WriterHistoryStore {
             request.toolCalls = turn.toolCalls ?? []
             request.tokenUsage = turn.tokenUsage
 
-            request.messageID = try await records.beginMessage(
-                ownerID: value.current.id,
-                identity: .init(
-                    clientID: request.id, inputID: id, role: "assistant", kind: "response",
-                    order: request.historyOrder, date: request.date, replyTo: turn.messageID,
-                    detail: try JSONEncoder().encode(request)))
-
-            if let identity = request.messageID {
-                request.historyOrder = UInt64(try BusinessRecordID.number(identity, kind: .request))
-            }
             turn.modelRequests = [request]
+        }
+        if directProducer {
+            next.current.turns[index] = turn
+            dirtyInputs.insert(id)
+            try await commit(next)
+            try await checkpointLocked()
+            next = value
+            turn = next.current.turns[index]
         }
         turn.response += delta
         if let request = turn.modelRequests?.indices.last { turn.modelRequests?[request].response += delta }

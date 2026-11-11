@@ -77,7 +77,7 @@ SettingsFormController 只拥有草稿规范化、默认选项、请求忙态和
 
 ## 多 Provider 管理
 
-沿用私有设置事务传递至多 32 个 URL 唯一的 provider；当前配置与其余配置一起保存。“智能体大脑”先显示名称/URL 的 Provider 管理列表，末行添加，左滑编辑/删除；不设置全局 Provider 单选。Assistant 和 Writer 各自选择 Provider/模型，本地选项隐藏二级模型。删除 Provider 将引用它的草稿选择切换为本地。保存提交后生效，Key 保持钥匙串存储；Provider 列表只从当前文档读取。
+Agent Brains 总页依次展示 Cloud Providers、Assistant／Writer／Decision 子页入口和本地模型下载。角色入口整行可点，标题和状态使用系统主、次正文色。Provider 列表按名称和 URL 显示，支持添加及左滑编辑／删除；总页草稿随导航保留到离开 Agent Brains。子页各自持有草稿，返回时放弃未保存的编辑。根 SettingsFormController 在共享已提交快照上合并当前页改动，成功后发布；失败保留草稿。Provider 凭据留在既有私有设置链路。下载区使用统一下载源，按模型身份管理 Gemma 4 E2B 与 D3 Decision。
 
 Provider 名称与稳定 ID 是当前文档的必填字段，通过私有配置链路保存。新增/编辑采用独立 modal 草稿（name/url/key），默认生成未占用的 Provider N 名称；取消不修改选择和凭据，确认校验 URL 唯一性与名称。列表名称为主、URL 单行省略为辅，保留三字段粘贴和 Key 脱敏。
 
@@ -131,7 +131,7 @@ UIHistoryContainer owns Assistant conversations. My Writer 的上方入口显示
 
 Workspace titles and Assistant conversation titles use the same HistoryRecordRow: a vertically centered 20pt icon in a 24pt column, body title with two-line tail truncation, 6pt gap, caption metadata and 12pt vertical padding. Assistant icons are blue; Writer icons are muted purple. Titles use primary text and separators begin at the text column. My Assistant keeps Current Conversation/Past Conversations and New Conversation; My Writer opens the workspace list directly. Assistant metadata shows actual turnCount (falling back to loaded turns only when absent) and createdAt, never an inferred last-active date. Writer metadata shows stable workspace ID, cumulative requestCount and updatedAt; a reusable workspace has no latest-execution status badge. Metadata and dates share a line where space permits and stack at narrow widths/large text sizes without dropping fields. HistoryListPresentation formats dates in the supplied/current calendar and time zone as MM/dd HH:mm or yyyy/MM/dd HH:mm across years. Workspace header combines a vertically centered purple icon with a text column: small secondary monospaced workspace ID above the full wrapping title. Start time, update time, total rounds and file browsing follow in that order. Workspace conversation export is an icon button in the top-right toolbar, retaining the existing share and failure flow. Request-row number badges use smaller subheadline digits and remain gray, red only for failed requests; titles, retries, timestamps and state capsules remain unchanged. WriterArtifactsControlling owns snapshot reads, native previews and source/ZIP/PDF export.
 
-模型发现按稳定 Provider ID 缓存，页面进入刷新两个已选 Provider，切换 Provider 和编辑凭据自动查询；同 Provider 可共享列表而不共享 Agent 的模型选择。返回值经 ApplicationControl/Gateway 后由表单控制器呈现，凭据快照/请求 ID 阻止迟到覆盖。最多 32 个查询（包括尚未退出的取消任务），溢出明确显示错误；离页取消，根关闭加入。刷新不清空已保存模型，失败提供重试。保存仍走既有业务事务，密钥留钥匙串。
+模型发现按稳定 Provider ID 缓存。子页进入时刷新该角色的已选云端 Provider，切换时查询新选择。凭据变更提交后，控制器清除对应缓存。同一 Provider 的模型列表可供多个角色使用，各角色单独保存模型选择。结果经 ApplicationControl/Gateway 返回，凭据快照和请求 ID 围栏迟到结果。最多 32 个查询（含尚未退出的取消任务），溢出时显示错误。离页取消，根关闭加入，发现失败可重试并保留已选模型。
 
 Provider 左滑删除先显示原生确认弹窗，取消不改变草稿。保存按钮保留忙态，实际保存回执完成后显示成功（3秒）或失败（6秒）Toast，不再占用常驻表单行；失败保留实际错误。页面只有一个可替换 Toast，展示计时随页面取消，已接纳的保存仍由根拥有。恢复失败也以 Toast 提示，模型发现错误保留各 Provider 的重试入口。
 
@@ -156,8 +156,14 @@ Assistant 对话详情和 Writer 请求详情提供单条日志清空按钮及�
 
 历史详情只消费 UI 投影。Assistant 页可携带前台任务摘要；Writer 页只携带本侧消息轮次，解码时缺少 taskCompressions 表示空摘要列表，不要求 Writer 存储提供 Assistant 字段。消息身份、创建时间和轮次结构仍是必需数据。
 
-WelcomeProviderView 提供可选 URL（空值使用 OpenAI）与必填 SecureField API key，两项均使用用户主动触发的系统 PasteButton。SettingsFormController.needsWelcome 仅在恢复成功且 Provider 列表为空时成立；saveWelcomeProvider 复用现有 URL/长度校验及设置保存事务，成功后发布 Provider 列表，失败保留输入和错误。保存时阻止重复提交、编辑和关闭；停止后不发布新 Provider。Welcome 创建独立服务配置，不预设自定义服务的模型 ID，随后由现有智能体大脑页面分别选择 Assistant/Writer 模型。稍后设置不写持久化标记。
+WelcomeProviderView 提供可选 URL（空值使用 OpenAI）与必填 SecureField API key，两项均使用用户主动触发的系统 PasteButton。SettingsFormController.needsWelcome 仅在恢复成功且 Provider 列表为空时成立；saveWelcomeProvider 复用现有 URL/长度校验及设置保存事务，成功后发布 Provider 列表，失败保留输入和错误。保存时阻止重复提交、编辑和关闭；停止后不发布新 Provider。Welcome 创建共享 Provider 配置，模型在 Agent Brains 的 Assistant、Writer 和 Decision 子页选择。稍后设置不写持久化标记。
 
 保存配置仅在 Assistant 启用云端时将其草稿 key/model 同步到选中 Provider；Assistant 为本地时保持 Provider 列表的独立凭据，Writer 单独选择云端不会被 Assistant 的空草稿覆盖。
 
 Assistant 详情在实际删除成功后生成去日志的内存副本，保留业务信息，移除请求、图片来源与生成 meta，导出同一副本；无需通过二次读取才能确认已提交的删除。删除失败保留原详情并显示错误，忙态阻止重复提交。
+
+子页从已提交的共享 Provider 列表选择各自模型。Assistant 可选本地 Gemma；Writer 需要云端原生工具，显示不可选本地项及独立深度思考。Decision 的 Provider 菜单同时含本地 D3 和云端，选本地时可配置云端备用并查看最近决策路径。主用和备用点击同一个保存按钮生效。首次选择本地须安装 D3。ProviderModelPicker 保留已选模型并展示发现失败和重试；发现任务由根控制器拥有，离页取消发现，已准入保存继续。删除 Provider 后 Assistant 回到本地，Writer 未配置，Decision 清除云端引用并保留本地偏好。下载和模型生命周期由业务层拥有。
+
+Assistant 请求详情的 User Request / Assistant Response 使用完整业务文本、允许选择复制和纵向换行，不限制行数。User Request 可包含多来源输入的完整批次，数据由历史读取端提供；列表预览的长度限制不用于详情。
+
+Assistant 历史仅呈现实际发起的模型请求。列表和详情可显示该请求采用的 enqueue/interrupt、来源、采集时间标记、决策路径及批次关联；discard 不产生历史条目。真实模型请求无正文且无工具调用时显示生成中、失败、取消、中断或结束无输出的具体状态；只有工具调用时保留完整调用信息。协调证据随导出和清理日志后的投影保留。

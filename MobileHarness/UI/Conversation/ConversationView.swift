@@ -43,7 +43,7 @@ import Foundation
             VoiceBars(
                 placement: placement,
                 bands: placement == .bottom ? state.microphoneSpectrum : state.playbackSpectrum,
-                active: state.voicePhase == (placement == .bottom ? .listening : .speaking),
+                active: placement == .bottom ? state.isVoiceActive : state.isReplyActive,
                 reduceMotion: reduceMotion)
         }
     }
@@ -75,6 +75,7 @@ import Foundation
             GeometryReader { geometry in
                 let presentationNotice = state.assistantReply.isEmpty ? activity.visibleNotice : nil
                 let diameter = min(geometry.size.width * 0.84, 360.0)
+                let layout = ConversationCaptionLayout(viewportHeight: geometry.size.height, faceDiameter: diameter)
                 ZStack {
                     ConversationCompanion(
                         state: state, reduceMotion: reduceMotion,
@@ -117,10 +118,6 @@ import Foundation
                         .position(x: geometry.size.width / 2, y: geometry.size.height * 0.40)
 
                     Group {
-                        let layout = ConversationCaptionLayout(
-                            viewportHeight: geometry.size.height, faceDiameter: diameter,
-                            hasTranscript: !state.liveTranscript.isEmpty, finalized: state.transcriptFinalized,
-                            hasActivity: !activity.items.isEmpty)
                         FadingCaption(
                             text: state.liveTranscript, reduceMotion: reduceMotion, color: .cyan,
                             finalized: state.transcriptFinalized, generation: state.token
@@ -140,12 +137,14 @@ import Foundation
                         )
                         .frame(width: min(geometry.size.width - 56, 440), height: layout.captionHeight)
                         .position(x: geometry.size.width / 2, y: layout.captionCenterY)
-                        .animation(
-                            reduceMotion ? nil : .spring(response: 0.55, dampingFraction: 0.9),
-                            value: state.transcriptFinalized)
+                        .accessibilityIdentifier("conversation.userCaption")
                     }
 
                     VStack(spacing: 20) {
+                        if state.queuedInputs + state.classifyingInputs > 0 {
+                            Text("排队 \(state.queuedInputs) · 决策中 \(state.classifyingInputs)")
+                                .font(.caption).foregroundStyle(.white.opacity(0.6))
+                        }
                         if let message = state.graphicsMessage {
                             Text(message).font(.caption).foregroundStyle(.white.opacity(0.6))
                         }
@@ -181,12 +180,12 @@ import Foundation
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
-                    .frame(width: min(geometry.size.width - 56, 440), height: min(120, geometry.size.height * 0.20))
+                    .frame(width: min(geometry.size.width - 56, 440), height: layout.replyHeight)
                     .position(
                         x: geometry.size.width / 2,
-                        y: geometry.size.height - (activity.items.isEmpty ? 120 : 240)
+                        y: layout.replyCenterY
                     )
-                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: state.voicePhase)
+                    .accessibilityIdentifier("conversation.assistantCaption")
                     .opacity(ConversationCaptionVisibility.reply(hasNotice: presentationNotice != nil) ? 1 : 0)
                     .accessibilityHidden(presentationNotice != nil)
 
@@ -205,7 +204,7 @@ import Foundation
                             .allowsHitTesting(false)
                             .position(
                                 x: geometry.size.width / 2,
-                                y: geometry.size.height - (activity.items.isEmpty ? 120 : 240)
+                                y: layout.replyCenterY
                             )
                             .transition(.opacity)
 

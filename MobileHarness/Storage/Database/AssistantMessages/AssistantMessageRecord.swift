@@ -1,6 +1,6 @@
 import Foundation
 
-/// Minimal identity metadata; body/evidence are committed only at the producer's completion boundary.
+/// Request input is durable on admission; response body/evidence follows the producer completion boundary.
 public struct AssistantMessageIdentity: Sendable {
     public let clientID: String
     public let inputID: String
@@ -80,6 +80,7 @@ public struct AssistantToolPreview: Sendable {
     }
 }
 public struct AssistantMessagePreview: Sendable {
+    public var coordination: AssistantInputCoordination? = nil
     public var toolCalls: [AssistantToolPreview] = []
     public var metadata: [String: String] = [:]
     public var ordinal: Int = 0

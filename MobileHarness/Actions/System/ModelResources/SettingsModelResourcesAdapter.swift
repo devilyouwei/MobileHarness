@@ -12,7 +12,8 @@ public enum SettingsModelResourcesAdapter {
             let source = try ModelDownloadSource(endpoint: draft.endpoint, allowsCellular: true)
             return ModelResourcePreferences(
                 endpoint: source.endpoint, allowsCellular: source.allowsCellular,
-                useCustomRecognition: draft.useCustomRecognition, useCustomSynthesis: draft.useCustomSynthesis)
+                useCustomRecognition: draft.useCustomRecognition, useCustomSynthesis: draft.useCustomSynthesis,
+                useLocalDecision: draft.useLocalDecision)
         } catch { throw ModelResourcePreferenceError.invalidSource }
     }
     public static func items(_ raw: String) throws -> ModelResourceViewSnapshot {

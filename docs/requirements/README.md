@@ -76,4 +76,6 @@
 
 [语音打断后的聆听恢复](Listening-Interruption-Recovery-Plan.md)：修复取消期间回复空闲事实被拦截造成的重新启听卡死；真机复验独立记录。
 
-[Assistant 多源输入协调](Assistant-MultiSource-Input-Coordination.md)：输入分类、回复触发边界和语义合并的分析提案；尚未实施，不改变现有正式输入 FIFO 契约。
+[Assistant 多源输入协调](Assistant-MultiSource-Input-Coordination.md)：既有整 Q、Decision 云端/本地与全双工链路已接入；最新“仅用户快决策、统一语义 Q、用户身份/时间 envelope 与选择性回复”已接入调度、提示词及自动回归，准备失败保留批次且不建行。Decision 独立选择云端 Provider/模型已接入保存、恢复与运行时，旧配置缺少选择时明确未配置；真实模型/UI/音频验收独立跟踪。
+
+[全双工回声与字幕](Assistant-MultiSource-Input-Coordination.md)：已接入系统回声消除输入/语音处理 AEC 的实际状态确认及降级；双方字幕固定分区。真实扬声器回录、插话和原生页面效果仍需设备验收。

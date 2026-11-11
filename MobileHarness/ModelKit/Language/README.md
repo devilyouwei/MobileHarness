@@ -17,10 +17,10 @@ The diagram shows runtime calls and data flow, not compilation dependencies.
 ```mermaid
 flowchart LR
  Consumer[Capability consumer] --> Chat[ChatCapability]
- Consumer --> Judge[JudgeCapability]
+ Consumer --> Decision[DecisionCapability]
  Chat --> Adapters[Gemma or Responses adapter]
  Adapters -->|Events and errors| Consumer
- Judge -->|Selected candidate or abstention| Consumer
+ Decision -->|Selected candidate or abstention| Consumer
 ```
 
 ## Interfaces
@@ -44,3 +44,5 @@ Conversation and judgment contracts are implemented.
 ✅ 本地Gemma在ModelKit内按后端有效窗口适配，当前iOS缓存安全限制比4096更小；接口及算法见 [Gemma4](LLM/Gemma4/README.md)。
 
 ✅ 按用户要求，本地Gemma排查版本移除所有system，仅保留有界对话输入；云端及通用请求不变，详见Gemma4目录契约。
+
+D3Decision 的生产实现由 ModelKitD3 独立目标编译，详细格式及取消语义见 [JEV](JEV/README.md)。LLM 的 required tool choice 用于受限候选选择，路由政策仍归调用者。

@@ -69,7 +69,7 @@ BasicSkill读取agents.applicationcontrol、agents.writer、ui.navigation、全�
 6. **完成、取消与异常**：明确可确认的完成条件、需要的清理和摘要。Skill 释放不等于设备清理；清理通过已实现的 Action 和任务屏障完成。
 7. **例子（必要时）**：以“当前条件/用户输入 → 本轮精确输出 → 真实反馈后的下一轮”组织。可执行回复单独放在 `xml` 代码块中，不把条件、步骤编号、引号或解释拼进模型输出；参数来自 canonical 元数据。示例反馈须标明为假设数据，mediaID 等标识仅用于该示例，运行时使用真实返回值。
 
-提示词可以使用项目约定语言，但术语、别名和流程必须一致。措辞用明确条件与动作，避免同一规则多处重复、与依赖 Skill 冲突或无上限重试。指令是静态教学，不接受用户内容作为可信规则。不要新增 `{{variable}}` 期待自动替换：当前 Skill Instructions.md 是原文加载，没有模板渲染契约。
+提示词可以使用项目约定语言，术语、别名和流程须一致。用明确条件与动作，避免重复规则、与依赖 Skill 冲突或无上限重试。Skill Instructions.md 是静态教学，经共享提示词加载器以空变量集渲染。业务请求和状态由运行时作为数据装配。
 
 摄影流程应读取相机事实、按需打开或切换、拍摄并使用返回的 previewID；询问保存或重拍时保留任务，保存或关闭清空后按已确认结果结束。重拍直接拍摄，旧图在会话缓存内继续可读。普通相机控制请求可在效果确认后完成。摄影对话由 Assistant 维护，不 send 给 Photographer 来回对话。
 
@@ -147,6 +147,8 @@ BasicSkill Instructions.md先检查CURRENT STATE：已有足够事实直接回�
 Photography 的匹配摄影 Task 在保存或视频处置结果确认后可以结束，Camera 窗口独立保留。只有用户明确关闭或丢弃照片时才执行 closeCamera，收到 operation=close、enabled=false 后确认关闭并完成匹配目标。Task 取消/替换、打开新窗口不授权关窗。关闭直接清空未保存照片；待处置视频需先明确保存或忽略。关闭失败或取消时保留 Task 和已提交的保存结果。Capture 关闭不关闭背景视觉。独立拍照／保存操作不创建 Task；重拍保留原 Task、窗口及先前缓存照片。
 
 BasicSkill 要求以 AGENT CONTEXT task 和匹配目标判断关闭：无 Task 单步完成只回复，不生成 task.end/task.cancel。明确目标切换可释放无关非基础近期 Skill；不确定是否放弃旧目标时先问是否继续实际 Task，保持等待状态。明确替换或正常目标完成不重复询问。continueDecision 只继续同一输入剩余新目标；释放 Skill 不代表相机/照片清理。Photography 与 HistoryQuery 的完成示例遵循同一规则。
+
+Assistant 全双工中，`task.end` 成功即提交前台终态和历史摘要；明确结束当前目标时需实际调用，单独回复确认会保留任务。Control 与语音、显示等 channel 各自调度。
 
 历史查询只复制 list 返回的完整 dialog_number；notFound 允许一次重新 list 和一次基于实际 ID 的修正 read，不猜测 ID 或无限重试。业务参数与 media_N 等引用来自真实反馈。语法、Channel/wait 和资源冲突由 Core/Gateway 契约决定，Skill 不重复定义。
 
@@ -234,3 +236,5 @@ Photography teaches actual numeric preview_N references and system-State attachm
 Photography describes the20-image FIFO window session, stable local preview_N labels, retained pending/saved entries, reload and close expiry. A single load appends a selection. A batch load sets up to five explicit photos, with the latest photo filling a free slot. saveAllPhotos saves all pending photos, and closing clears temporary previews without a photo prompt.
 
 BasicSkill 的 Lifetime and completion 独占通用窗口生命周期教学：窗口独立于 Task/Skill，操作一个窗口不隐式关闭其他窗口，关闭/丢弃需要明确意图。Assistant 身份不承载窗口流程；Photography、ApplicationControl、WebBrowsing 只说明各自操作与完成语义，不复制通用规则或嵌入跨业务场景。资源 revision 随教学更新。
+
+BasicSkill 教授前台 Task、委派、补充输入、取消、Skill 生命周期、聆听控制和执行反馈。通用 XML、Channel 和 wait 规则见 [System 输出协议](../Agents/System/OutputProtocol.md)，语音与字幕呈现见 [Assistant 角色指令](../Agents/Assistant/Instructions.md)。

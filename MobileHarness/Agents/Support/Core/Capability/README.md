@@ -32,7 +32,7 @@ Agents uses the frozen capability catalog before submission to Gateway. Gateway 
 | [ToolRegistration.swift](ToolRegistration.swift) | native Tool 定义、参数和代码私有 InternalTool 声明 |
 | [CapabilityRegistry.swift](CapabilityRegistry.swift) | 不可变可见目录、内部权限、别名解析与调用许可 |
 | [CapabilityDocumentation.swift](CapabilityDocumentation.swift) | 函数及参数文档值 |
-| [CapabilityContextBuilder.swift](CapabilityContextBuilder.swift) | 按有效目录渲染协议、Channel 和 Action 教学 |
+| [CapabilityContextBuilder.swift](CapabilityContextBuilder.swift) | 读取固定输出协议，按有效目录渲染 Channel 和 Action |
 
 ## 内部结构与数据流
 
@@ -74,7 +74,7 @@ InternalAction/InternalTool 参与 permits，不参与模型 resolve，也不生
 
 CapabilityContextBuilder 从当前不可变目录渲染 Channel、Action 别名、doc、参数类型／必填性／约束，不显示内部授权。目录上限 65536 UTF-8 字节；相同 description/constraints 只显示一次。CapabilityDocumentation 只保留 doc/parameters；配置中的 examples 只在导入时验证，不进入实时目录。
 
-无可见 Tool 使用 Action-only protocol/boundary；存在 Tool 使用双协议教学，native 定义另交请求。模板读取／渲染失败明确传播。角色身份、业务示例与 Skill 步骤由上层提供。
+CapabilityContextBuilder 接收 Agents 加载的输出协议与 Action 目录模板。`protocolRules()` 读取固定 Markdown 正文中的 XML 及调度规则。`catalog(_:)` 按当前 Registry 的 Channel 对 Action 和参数分组。`catalogSection(_:)` 使用同一资源中的章节模板加入标题。原生 Tool 定义随模型请求单独传入。模板读取和渲染失败显式传播。角色身份、业务示例和 Skill 步骤由上层提供。
 
 restrictingCommunication 仅保留原声明中允许的 contract，对新不可变配置重新验证，不新增 source/target/grant，不改缓存资源。Core 不认识诊断场景或具体角色。
 

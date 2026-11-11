@@ -32,7 +32,11 @@ extension SystemActions {
         invocation: any FunctionInput, using preferences: any ModelResourcePreferencesCapability
     ) async throws -> String {
         let args = ActionArguments(invocation.call.parameters)
-        try args.validateAllowedKeys(["endpoint", "allowsCellular", "recognition", "synthesis"])
+        try args.validateAllowedKeys(["endpoint", "allowsCellular", "recognition", "synthesis", "decision"])
+        let decision = invocation.call.parameters["decision"] ?? "false"
+        guard ["true", "false"].contains(decision) else {
+            throw ActionArguments.ValidationError.invalidValue("decision")
+        }
         let endpoint = try args.requiredString("endpoint", maximumUTF8Bytes: 1024)
         let flags = try ["allowsCellular", "recognition", "synthesis"].map {
             try args.requiredString($0, maximumUTF8Bytes: 5)
@@ -44,7 +48,8 @@ extension SystemActions {
         return try await preferences.saveSource(
             .init(
                 endpoint: endpoint, allowsCellular: flags[0] == "true",
-                useCustomRecognition: flags[1] == "true", useCustomSynthesis: flags[2] == "true")
+                useCustomRecognition: flags[1] == "true", useCustomSynthesis: flags[2] == "true",
+                useLocalDecision: decision == "true")
         ).encoded()
     }
 

@@ -99,6 +99,7 @@ import StorageFiles
         let resources: ResourceCoordinator
 
         static func prepare(
+            makeInputDecision: @escaping @MainActor (AgentBusinessBindings) -> AssistantInputDecision,
             maintenance: AgentMaintenancePorts,
             containerFailures: ContainerFailureChannel, home: UIHomeContainer,
             assistantContainer: AssistantContainer, applicationControlContainer: ApplicationControlContainer,
@@ -254,6 +255,7 @@ import StorageFiles
                         activity: activity, photographerAgent: photographerAgent,
                         applicationControlAgent: applicationControlAgent, historyAgent: historyAgent,
                         stateContext: stateContext, cameraControl: cameraControl, chatProvider: chatProvider,
+                        inputDecision: makeInputDecision(business), inputQueueStatus: business.inputQueueStatus,
                         modelName: modelName, assistantContainer: assistantContainer,
                         applicationControlContainer: applicationControlContainer, memoryContainer: memoryContainer,
                         photographerContainer: photographerContainer, writerContainer: writerContainer)
@@ -269,6 +271,8 @@ import StorageFiles
             applicationControlAgent: ApplicationControlAgent, historyAgent: MemoryAgent,
             stateContext: AgentStateContext, cameraControl: any AgentCameraAccess,
             chatProvider: @escaping @Sendable () async throws -> any ChatCapability,
+            inputDecision: AssistantInputDecision? = nil,
+            inputQueueStatus: @escaping @MainActor @Sendable (Int, Int) -> Void = { _, _ in },
             modelName: @escaping @Sendable () async throws -> String, assistantContainer: AssistantContainer,
             applicationControlContainer: ApplicationControlContainer, memoryContainer: MemoryContainer,
             photographerContainer: PhotographerContainer, writerContainer: WriterContainer
@@ -330,7 +334,8 @@ import StorageFiles
                 }, reset: { scope in await cameraControl.resetPreviewSelection(scope: scope) })
             let speechOutput = AssistantSpeechOutput()
             let main = try AssistantAgent(
-                stateContext: stateContext, speechOutput: speechOutput,
+                stateContext: stateContext, speechOutput: speechOutput, inputDecision: inputDecision, fullDuplex: true,
+                inputQueueStatus: { ready, deciding in await inputQueueStatus(ready, deciding) },
                 uiHome: home, uiSessionID: applicationControlSessionID,
                 reportsReplyActivity: true, chatProvider: chatProvider, conversations: conversations,
                 communications: communications,

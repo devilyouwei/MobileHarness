@@ -220,7 +220,7 @@ let package = Package(
                 "Output/README.md",
                 "README.md",
                 "Runtime/README.md",
-            ], resources: [.process("Generation/FunctionTokenPrompts.json")]),
+            ]),
         .target(
             name: "FunctionContracts", dependencies: [], path: "MobileHarness/Actions/Support/Contracts",
             exclude: ["README.md"]),
@@ -384,6 +384,7 @@ let package = Package(
             name: "ModelKit", dependencies: [], path: "MobileHarness/ModelKit",
             exclude: [
                 "README.md", "ModelContainer.swift", "Language/README.md", "Language/JEV/README.md",
+                "Language/JEV/D3Decision.swift",
                 "Speech/README.md", "Speech/ASR/README.md", "Speech/TTS/README.md", "Speech/VAD/README.md",
                 "Language/LLM/Gemma4", "Language/LLM/OpenAI", "Language/LLM/README.md", "Support/Backends",
                 "Support/README.md", "Support/Speech",
@@ -392,6 +393,11 @@ let package = Package(
                 "Speech/TTS/MossNano",
                 "Speech/ASR/Nemotron", "Speech/VAD/Silero", "Speech/VAD/Energy", "Vision/YOLO", "Vision/README.md",
             ]),
+        .target(
+            name: "ModelKitD3",
+            dependencies: ["ModelKit", "ModelKitCoreAI", .product(name: "Tokenizers", package: "swift-transformers")],
+            path: "MobileHarness/ModelKit/Language/JEV",
+            exclude: ["README.md", "DecisionCapability.swift"], sources: ["D3Decision.swift"]),
         .target(
             name: "ModelKitOpenAI", dependencies: ["ModelKit"],
             path: "MobileHarness/ModelKit/Language/LLM/OpenAI", exclude: ["README.md"]),
@@ -403,7 +409,7 @@ let package = Package(
             dependencies: [
                 "ModelKit", "ModelKitRuntime", "ModelKitNemotron", "ModelKitSilero",
                 "ModelKitMossNano", "ModelKitYOLOPose", "ModelKitOpenAI", "ModelKitAppleSpeech",
-                "ModelKitEnergy",
+                "ModelKitEnergy", "ModelKitD3",
             ] + localChatDependencies,
             path: "MobileHarness/ModelKit",
             exclude: [

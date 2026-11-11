@@ -84,29 +84,18 @@ import Testing
     #expect(camera.skeleton == nil && camera.message == nil && !camera.needsSettings)
 }
 
-@Test(arguments: [CGFloat(568), 667, 852, 1024])
-func homeCaptionKeepsItsSpaceAfterTaskMovesToIsland(viewportHeight: CGFloat) {
+@Test(arguments: [CGFloat(320), 568, 667, 852, 1024])
+func homeCaptionsKeepFixedDisjointRoleRegions(viewportHeight: CGFloat) {
     let diameter = min(CGFloat(390) * 0.84, 360)
-    let waiting = ConversationCaptionLayout(
-        viewportHeight: viewportHeight, faceDiameter: diameter,
-        hasTranscript: false, finalized: false, hasActivity: false)
-    for finalized in [false, true] {
-        for hasActivity in [false, true] {
-            let layout = ConversationCaptionLayout(
-                viewportHeight: viewportHeight, faceDiameter: diameter,
-                hasTranscript: true, finalized: finalized, hasActivity: hasActivity)
-            #expect(layout.captionCenterY - layout.captionHeight / 2 >= 72)
-            if finalized {
-                #expect(layout.captionCenterY == waiting.captionCenterY)
-            } else {
-                #expect(layout.captionCenterY == viewportHeight - (hasActivity ? 240 : 120))
-            }
-        }
-    }
-    let noTask = ConversationCaptionLayout(
-        viewportHeight: viewportHeight, faceDiameter: diameter,
-        hasTranscript: true, finalized: false, hasActivity: false)
-    #expect(noTask.captionCenterY == viewportHeight - 120)
+    let layout = ConversationCaptionLayout(viewportHeight: viewportHeight, faceDiameter: diameter)
+    let userTop = layout.captionCenterY - layout.captionHeight / 2
+    let userBottom = layout.captionCenterY + layout.captionHeight / 2
+    let replyTop = layout.replyCenterY - layout.replyHeight / 2
+    #expect(userTop >= 72)
+    #expect(replyTop >= userBottom + 24)
+    #expect(layout.replyCenterY + layout.replyHeight / 2 <= viewportHeight)
+    // Neither finalization nor channel activity is a layout input.
+    #expect(layout.captionCenterY < layout.replyCenterY)
 }
 
 @Test @MainActor func homeEyesFollowEnabledSessionAcrossRecognitionAndReplyPauses() {

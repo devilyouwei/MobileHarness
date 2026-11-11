@@ -22,6 +22,7 @@ extension SpeechPerceptionAgent {
         nativeInputEpoch = epoch
         do {
             let capture = try await microphoneInput.subscribeCapture()
+            setCaptureDuplex(capture.supportsFullDuplex)
             try Task.checkCancellation()
             guard nativeInputEpoch == epoch else { throw CancellationError() }
             _ = try admitsMicrophone(sessionID: sessionID)

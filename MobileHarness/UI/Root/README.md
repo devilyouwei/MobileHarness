@@ -35,3 +35,9 @@ artifact窗口将WindowPresentation.subtitle注入WebPageView工具栏；Root只
 Camera photoAspect updates use zero reserved controls height: the camera content renders live video beneath its translucent controls overlay. Root still only forwards window sizing metadata.
 
 ApplicationRootView 在正常启动准备完成后通过 SettingsControlling.restore 恢复设置，仅 needsWelcome 为真时展示 WelcomeProviderView。诊断入口不展示。恢复失败提供重试/稍后，不把失败当作空配置。跳过只影响当前根视图；成功保存后关闭弹窗并导航到智能体大脑选择模型。根只负责弹窗与导航，不读写凭据。
+
+Assistant、Writer 和 Decision 配置都进入 Settings → Agent Brains → 对应子页。原有 AppDestination.decision 保持路由身份并映射到同一子页。
+
+Root 在常驻导航容器外层渲染通用 transientToast，首页与设置/历史页均可见，不受助手字幕抑制；提示内容、单槽替换及到期归 Conversation/HomeEffects，Root 不判断业务输入。
+
+Root 向 Agent Brains 和子页注入共享 Settings 与模型资源接口。总页 Provider 草稿随 Agent Brains 路径保留，离开该路径清理；子页草稿由各自页面持有。根只组合接口和导航。

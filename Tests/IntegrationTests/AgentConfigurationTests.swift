@@ -261,9 +261,10 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     try skills.initialize(fixed: maximum, baseSkills: try AgentConfigurations.baseSkills(named: "Assistant"))
     let registry = try skills.registry(fixed: maximum)
     let prompt = try AssistantAgent.systemPrompt(capabilities: registry)
-    #expect(prompt.contains("Available Channels: Control, Display, ListeningControl, Speech\n"))
+    #expect(!prompt.contains("Available Channels:"))
+    #expect(prompt.contains("Channel Control\nAction "))
     #expect(prompt.contains("Action express:"))
-    #expect(prompt.contains("Each Action uses its registered Channel."))
+    #expect(prompt.contains("Each Action uses its registered Channel, shown in the current Action catalog."))
     #expect(!prompt.contains("Action dance:"))
     #expect(!prompt.contains("Action takePhoto:"))
     #expect(prompt.contains("# BasicSkill"))
@@ -312,7 +313,8 @@ private func nativeTool() -> [String: Any] {
     #expect(
         !registry.permits(
             ToolCall(id: UUID().uuidString, toolPath: "Memory.Query.lookup", arguments: ["query": "three"])))
-    #expect(!((try CapabilityContextBuilder.build(registry)).contains("lookup")))
+    let output = try AgentPrompts.capabilityContext()
+    #expect(!(try output.build(registry)).contains("lookup"))
 }
 
 @Test(
@@ -403,7 +405,8 @@ func malformedNativeToolsFailExplicitly(_ mutation: String) throws {
 @Test(.actionCatalog) func agentCoreContextContainsNoAutomaticSpeechPolicy() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     let effective = try AgentSkillLoader.registry(["expression-interaction"], fixed: config.capabilities)
-    let generic = try CapabilityContextBuilder.build(effective)
+    let output = try AgentPrompts.capabilityContext()
+    let generic = try output.build(effective)
     #expect(generic.contains("SCHEDULING: CHANNEL, EXECUTION CONSTRAINTS, WAIT"))
     #expect(generic.contains("Action express:"))
     #expect(!generic.contains("becomes audio on independent Speech"))

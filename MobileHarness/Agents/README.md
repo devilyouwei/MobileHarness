@@ -121,7 +121,7 @@ Photography与ApplicationControl共享Island.setPresentation和ui.island，Basic
 
 Agent task presentation belongs to the executing role: Writer publishes its creative lifecycle and AssistantExecutionSession publishes its own foreground Skill task. Both use registered Gateway Island tools with code-owned permissions, outside model-visible catalogs. Terminal state ends only the owner's activity; passive task logs are history rather than UI authority. Shared latest-value transport is described in [Support](Support/README.md); UI arbitrates all producers without interpreting role identities. Writer titles/operation subtitles similarly reach Actions-owned presentation through producer-bound Gateway direct calls.
 
-SpeechPerception owns recognition-caption onset; Assistant independently handles the speaking control fact and clears only its own reply without inference. Final ASR text retains the formal FIFO. A failed perception round emits the existing empty-phase fact and joins presentation cleanup; Assistant releases that recognition binding. Restoration follows capture/consent/reply occupancy, preserving the original recognition error. Caption lifetime is not inferred by UI from playback completion. See [SpeechPerception](SpeechPerception/README.md) and [Assistant](Assistant/README.md#输入开始与自有回复字幕).
+SpeechPerception owns recognition-caption onset. Full-duplex Assistant preserves its reply caption until a real new reply begins; final ASR alone enters Decision. Perception consent/capture lifecycle remains independent of LLM generation and output execution.
 
 各角色均通过自己绑定的 Gateway consumer 调用内部灵动岛工具：SpeechPerception 拥有聆听/识别，Assistant 的语音子能力拥有合成/真实播放，Photographer 沿既有相机输入处理摄影，ApplicationControl 沿连接输入处理蓝牙提示；Assistant 同时管理自身任务、推理等待和语音输出。Actions 不设集中 UI 状态观察器代发。内部调用结果（含异常）由所属执行者处理，只有显式 LLM 调用反馈能触发 ReACT；共享机制见 [Support/Chat](Support/Chat/README.md)。
 
@@ -137,8 +137,14 @@ Assistant 的 start 与 delegate 是按所有者选择的平级入口，Writer �
 
 ## Prompt ownership and discovery
 
-Each role owns its public description in Resources/Agents/<Role>/Agent.json and its private model instructions in its own resource directory. Support validates resource schema v10 and projects the v8 compiled contract. Assistant combines its own identity with generic Core/Skill rules and a public peer directory filtered by the actual instance communication policy and the shared executable delegation adapter. Public descriptions create no permissions and expose no private instructions. Writer owns its content-format templates; deterministic roles do not require artificial model prompts. See [resource contracts](../Resources/Agents/README.md).
+Each role owns its public description in Resources/Agents/<Role>/Agent.json and its private model instructions in its own resource directory. Support validates resource schema v10 and projects the v8 compiled contract. Assistant assembles System protocols, its own identity, Skill instructions and a public peer directory filtered by the actual instance communication policy and the shared executable delegation adapter. AgentCore renders the supplied output templates. Writer owns its content-format templates. See [resource contracts](../Resources/Agents/README.md).
 
 Writer 运行以委托入口为身份，workspace 是可选编辑目标；前序与 workspace 消息保持同一请求链，界面分别查询。
 
 Generation resolves Action and text-mapped output to registration-owned Channels. Camera UI inputs expose capture, saving and window controls; closing releases the photo session.
+
+Assistant 的用户 final/input 采用短上下文 Decision→统一 Q；已认证同伴及 Action 业务返回值/异常直接进 Q，成功 Void 不产生输入。空闲时冻结整 Q，通过带身份/来源/时间的统一 envelope 请求模型，生成与执行独立结算。ModelKit 只提供候选能力，Actions 适配云端设置与 UI 事实，Gateway 负责会话内跨轮同 Channel 顺序；其他 Agent 的独立任务生命周期不随回复打断。
+
+Assistant/Writer 的排队与请求准备不创建 message；模型实际开始时提交请求，真实失败保留。Assistant 会话为已丢弃及已完成打断发布限时灵动岛详情，Writer 委托生命周期由独立执行仓库保存。
+
+Decision 使用独立于 Assistant 和 Writer 的已提交配置。每次分类从注入的配置读取本地模式及可选云端工厂，在同一次分类内使用该快照。Actions 负责按 Decision 绑定创建固定模型句柄。未配置或失败时保守入队，详情见 [Assistant](Assistant/README.md)。

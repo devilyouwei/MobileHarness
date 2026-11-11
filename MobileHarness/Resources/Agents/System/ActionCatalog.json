@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "templates": {
+    "section": "# EFFECTIVE ACTION CATALOG\n{{entries}}",
+    "channel": "Channel {{name}}",
+    "action": "Action {{alias}}:",
+    "parameter": "  {{name}}: {{type}}, {{presence}}. {{description}} {{constraints}}"
+  }
+}

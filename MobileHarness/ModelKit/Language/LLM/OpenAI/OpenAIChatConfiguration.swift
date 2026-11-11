@@ -174,7 +174,15 @@ public struct OpenAIChatConfiguration: Sendable, Equatable, CustomStringConverti
                 function["strict"] = false
                 return function
             }
-            body["tool_choice"] = "auto"
+            switch chat.toolChoice {
+            case .automatic: body["tool_choice"] = "auto"
+            case .required(let name):
+                guard let encoded = names.first(where: { $0.value == name })?.key else {
+                    throw CapabilityError.invalidRequest("Required tool is not declared")
+                }
+                body["tool_choice"] = ["type": "function", "name": encoded]
+                body["parallel_tool_calls"] = false
+            }
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         return request

@@ -26,7 +26,7 @@
     /// Synchronous configuration shared by native callers, on each caller's existing executor.
     func configureNativeAudioSession() throws {
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
+        try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetoothHFP])
         try session.setAllowHapticsAndSystemSoundsDuringRecording(true)
         try session.setActive(true)
     }
@@ -37,6 +37,8 @@
         private lazy var player = AVAudioPlayerNode()
         private var installed = false
         private var rate: Int?
+        private var capturing = false
+        private var echoCancellation = AudioCaptureContext.EchoCancellation.unavailable
         private var token: String?
         private let telemetry: PlaybackTelemetry
         init(telemetry: PlaybackTelemetry) { self.telemetry = telemetry }
@@ -76,17 +78,150 @@
             guard !pcm.samples.isEmpty, pcm.samples.count <= 262_144, pcm.samples.allSatisfy(\.isFinite),
                 (8000...192000).contains(pcm.sampleRate)
             else { throw AudioIOError.invalidFormat }
-            let format = try connect(pcm.sampleRate)
-            guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(pcm.samples.count)),
+            if capturing { try validateEchoCancellation() }
+            let format = try connect(capturing ? 24000 : pcm.sampleRate)
+            guard
+                let sourceFormat = AVAudioFormat(
+                    commonFormat: .pcmFormatFloat32, sampleRate: Double(pcm.sampleRate), channels: 1, interleaved: false
+                ),
+                let buffer = AVAudioPCMBuffer(
+                    pcmFormat: sourceFormat, frameCapacity: AVAudioFrameCount(pcm.samples.count)),
                 let destination = buffer.floatChannelData?[0]
             else { throw AudioIOError.invalidFormat }
             buffer.frameLength = AVAudioFrameCount(pcm.samples.count)
             pcm.samples.withUnsafeBufferPointer { source in
                 if let base = source.baseAddress { destination.update(from: base, count: source.count) }
             }
+            let rendered: AVAudioPCMBuffer
+            if sourceFormat.sampleRate != format.sampleRate {
+                guard let converter = AVAudioConverter(from: sourceFormat, to: format),
+                    let converted = AVAudioPCMBuffer(
+                        pcmFormat: format,
+                        frameCapacity: AVAudioFrameCount(
+                            ceil(Double(buffer.frameLength) * format.sampleRate / sourceFormat.sampleRate)) + 16)
+                else { throw AudioIOError.invalidFormat }
+                var supplied = false
+                var failure: NSError?
+                let status = converter.convert(to: converted, error: &failure) { _, state in
+                    if supplied {
+                        state.pointee = .endOfStream
+                        return nil
+                    }
+                    supplied = true
+                    state.pointee = .haveData
+                    return buffer
+                }
+                if let failure { throw failure }
+                guard status != .error, converted.frameLength > 0 else { throw AudioIOError.invalidFormat }
+                rendered = converted
+            } else {
+                rendered = buffer
+            }
             if !engine.isRunning { try engine.start() }
-            player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { @Sendable _ in completed() }
+            player.scheduleBuffer(rendered, completionCallbackType: .dataPlayedBack) { @Sendable _ in completed() }
             if !player.isPlaying { player.play() }
+        }
+        func prepareCapture(admission: PlatformAdmission?) -> AudioCaptureContext.EchoCancellation {
+            engine.stop()
+            // Configure I/O before attaching the mixer tap so no pre-processing format is retained.
+            echoCancellation = AudioEchoCancellationSelection.select(
+                systemInput: {
+                    let session = AVAudioSession.sharedInstance()
+                    try session.setCategory(
+                        .playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
+                    guard session.isEchoCancelledInputAvailable else { return false }
+                    try session.setPrefersEchoCancelledInput(true)
+                    try session.setAllowHapticsAndSystemSoundsDuringRecording(true)
+                    try session.setActive(true)
+                    if session.isEchoCancelledInputEnabled { return true }
+                    try session.setPrefersEchoCancelledInput(false)
+                    return false
+                },
+                voiceProcessing: {
+                    try configureNativeAudioSession()
+                    try engine.inputNode.setVoiceProcessingEnabled(true)
+                    engine.inputNode.isVoiceProcessingBypassed = false
+                    return engine.inputNode.isVoiceProcessingEnabled
+                        && engine.outputNode.isVoiceProcessingEnabled
+                        && !engine.inputNode.isVoiceProcessingBypassed
+                },
+                report: { admission?.report("audio.capture", "echoCancellation", $0) })
+            return echoCancellation
+        }
+        func isEchoCancellationActive() -> Bool {
+            switch echoCancellation {
+            case .systemInput:
+                let session = AVAudioSession.sharedInstance()
+                return session.category == .playAndRecord && session.mode == .default
+                    && session.isEchoCancelledInputEnabled
+            case .voiceProcessing:
+                let session = AVAudioSession.sharedInstance()
+                return session.category == .playAndRecord && session.mode == .voiceChat
+                    && engine.inputNode.isVoiceProcessingEnabled && engine.outputNode.isVoiceProcessingEnabled
+                    && !engine.inputNode.isVoiceProcessingBypassed
+            case .unknown, .unavailable: return false
+            }
+        }
+        private func validateEchoCancellation() throws {
+            if echoCancellation != .unavailable && !isEchoCancellationActive() { throw AudioIOError.interrupted }
+        }
+        func startCapture(source: MicrophoneCapture, readiness: AudioCaptureReadiness, admission: PlatformAdmission?)
+            async throws
+        {
+            guard !capturing else { throw AudioIOError.busy }
+            engine.stop()
+            install()
+            _ = try connect(24000)
+            let node = engine.inputNode
+            let format = node.outputFormat(forBus: 0)
+            guard format.channelCount > 0, format.sampleRate >= 8000 else { throw AudioIOError.invalidFormat }
+            let counter = Mutex<UInt64>(0)
+            node.installTap(onBus: 0, bufferSize: 1024, format: format) { @Sendable buffer, when in
+                guard source.isActive else { return }
+                guard let samplesPointer = buffer.floatChannelData?[0], buffer.frameLength > 0,
+                    buffer.frameLength <= 8192
+                else {
+                    admission?.report("audio.capture", "callback", AudioIOError.invalidFormat)
+                    readiness.resolve(.failure(AudioIOError.invalidFormat))
+                    source.finish(throwing: AudioIOError.invalidFormat)
+                    return
+                }
+                let stride = buffer.format.isInterleaved ? Int(buffer.format.channelCount) : 1
+                let samples = (0..<Int(buffer.frameLength)).map { samplesPointer[$0 * stride] }
+                let number = counter.withLock { value in
+                    defer { value += 1 }
+                    return value
+                }
+                let frame = MicrophoneFrame(
+                    samples: samples, sampleRate: Int(buffer.format.sampleRate), sequence: number,
+                    timestamp: when.isHostTimeValid
+                        ? AVAudioTime.seconds(forHostTime: when.hostTime)
+                        : ProcessInfo.processInfo.systemUptime,
+                    capturedAt: .now)
+                do {
+                    if try source.send(frame) { readiness.resolve(.success(())) }
+                } catch {
+                    admission?.report("audio.capture", "callback", error)
+                    readiness.resolve(.failure(error))
+                    source.finish(throwing: error)
+                }
+            }
+            capturing = true
+            do {
+                engine.prepare()
+                try engine.start()
+                try validateEchoCancellation()
+                try await readiness.wait()
+                try validateEchoCancellation()
+            } catch {
+                stopCapture()
+                throw error
+            }
+        }
+        func stopCapture() {
+            if capturing { engine.inputNode.removeTap(onBus: 0) }
+            capturing = false
+            if token == nil { engine.stop() }
         }
         func finish(_ id: String) { if token == id { token = nil } }
         func stop(_ id: String?) {
@@ -94,13 +229,14 @@
             token = nil
             if installed {
                 player.stop()
-                engine.stop()
+                if !capturing { engine.stop() }
             }
-            rate = nil
+            if !capturing { rate = nil }
         }
 
         func reset() {
             guard token == nil else { return }
+            stopCapture()
             if installed {
                 player.stop()
                 engine.stop()
@@ -110,6 +246,7 @@
             player = AVAudioPlayerNode()
             installed = false
             rate = nil
+            echoCancellation = .unavailable
         }
 
     }
@@ -178,6 +315,12 @@
                             (value.userInfo?[AVAudioSessionRouteChangePreviousRouteKey]
                             as? AVAudioSessionRouteDescription).map { Self.routeIdentity($0) }
                         let current = Self.routeIdentity(AVAudioSession.sharedInstance().currentRoute)
+                        if self.captureToken != nil, self.captureContext.supportsFullDuplex,
+                            !(await self.playback.isEchoCancellationActive())
+                        {
+                            events.send(.routeChanged)
+                            continue
+                        }
                         if let event = AudioSessionEventPolicy.routeChange(
                             applicationChange: reason == .categoryChange || reason == .override,
                             unavailable: reason == .noSuitableRouteForCategory, previous: previous, current: current)
@@ -219,7 +362,6 @@
             }
         }
         private let admitAvailability: @MainActor () throws -> Void
-        private var captureEngine = AVAudioEngine()
         private let playback: NativePlaybackGraph
         private var playbackCleanup: Task<Void, Never>?
         private var stopOperation: Task<Void, Never>?
@@ -228,7 +370,6 @@
         private var captureReadiness: AudioCaptureReadiness?
         private var spatialCapture: SpatialAudioCapture?
         private let log = Logger(subsystem: "dev.mobileharness", category: "AudioCapture")
-        private var hasTap = false
         private var playbackWaiter: CheckedContinuation<Void, Error>?
         private var playbackToken: String?
         private var spaceWaiter: CheckedContinuation<Void, Error>?
@@ -342,57 +483,18 @@
                     captureContext = AudioCaptureContext(
                         input: captureInput(audio), spatialSupport: spatialSupport, fallback: fallback)
                     captureSource?.finish()
-                    let source = MicrophoneCapture()
+                    let echo = await playback.prepareCapture(admission: platformAdmission)
+                    let duplex = echo == .systemInput || echo == .voiceProcessing
+                    let source = MicrophoneCapture(supportsFullDuplex: duplex)
                     captureSource = source
-                    let node = captureEngine.inputNode
-                    let format = node.outputFormat(forBus: 0)
-                    guard format.channelCount > 0, format.sampleRate >= 8000 else { throw AudioIOError.invalidFormat }
-                    let counter = Mutex<UInt64>(0)
                     let readiness = AudioCaptureReadiness()
                     captureReadiness = readiness
-                    let admission = platformAdmission
-                    node.installTap(onBus: 0, bufferSize: 1024, format: format) { @Sendable buffer, when in
-                        guard source.isActive else { return }
-                        guard let samplesPointer = buffer.floatChannelData?[0], buffer.frameLength > 0,
-                            buffer.frameLength <= 8192
-                        else {
-                            admission?.report("audio.capture", "callback", AudioIOError.invalidFormat)
-                            readiness.resolve(.failure(AudioIOError.invalidFormat))
-                            source.finish(throwing: AudioIOError.invalidFormat)
-                            return
-                        }
-                        let stride = buffer.format.isInterleaved ? Int(buffer.format.channelCount) : 1
-                        let samples = (0..<Int(buffer.frameLength)).map { samplesPointer[$0 * stride] }
-                        let number = counter.withLock { value in
-                            defer { value += 1 }
-                            return value
-                        }
-                        let frame = MicrophoneFrame(
-                            samples: samples, sampleRate: Int(buffer.format.sampleRate), sequence: number,
-                            timestamp: when.isHostTimeValid
-                                ? AVAudioTime.seconds(forHostTime: when.hostTime)
-                                : ProcessInfo.processInfo.systemUptime,
-                            capturedAt: .now)
-                        do {
-                            if try source.send(frame) { readiness.resolve(.success(())) }
-                        } catch {
-                            admission?.report("audio.capture", "callback", error)
-                            readiness.resolve(.failure(error))
-                            source.finish(throwing: error)
-                        }
-                    }
-                    hasTap = true
-                    do {
-                        captureEngine.prepare()
-                        try captureEngine.start()
-                        try await readiness.wait()
-                        guard captureToken == token, !Task.isCancelled else { throw CancellationError() }
-                        captureContext = AudioCaptureContext(
-                            input: captureInput(audio), spatialSupport: spatialSupport, fallback: fallback)
-                    } catch {
-                        if captureToken == token { await stop() }
-                        throw error
-                    }
+                    try await playback.startCapture(source: source, readiness: readiness, admission: platformAdmission)
+                    guard captureToken == token, !Task.isCancelled else { throw CancellationError() }
+                    captureContext = AudioCaptureContext(
+                        input: captureInput(audio), spatialSupport: spatialSupport,
+                        fallback: fallback, supportsFullDuplex: duplex, echoCancellation: echo)
+                    log.info("Capture echo cancellation: \(echo.rawValue, privacy: .public)")
                     watchEvents()
                     return
                 } catch {
@@ -603,11 +705,7 @@
             let backend = spatialCapture
             spatialCapture = nil
             await backend?.stop()
-            if hasTap {
-                captureEngine.inputNode.removeTap(onBus: 0)
-                hasTap = false
-            }
-            captureEngine.stop()
+            await playback.stopCapture()
         }
         public func stop() async {
             if let stopOperation { return await stopOperation.value }
@@ -634,7 +732,6 @@
             await playbackCleanup?.value
             playbackCleanup = nil
             await playback.reset()
-            captureEngine = AVAudioEngine()
             if owned {
                 do { try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation) } catch
                 {

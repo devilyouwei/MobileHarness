@@ -153,7 +153,7 @@ public actor WriterHistory {
                 delegationGoal: String(goal.prefix(1000)), execution: "background")
             metadata.delegateID = delegateID
             let historyID = try await store.readCurrent().current.id
-            let number = try await store.requestCount(historyID)
+            let number = try await store.requestCount(historyID) + 1
             progressValues[id] = .init(inputID: id, number: number, phase: phase, attempt: attempt, path: path)
             var record = WriterModelRequest(
                 id: UUID().uuidString, input: label, requestJSON: json, decisionMetadata: metadata)
@@ -171,7 +171,7 @@ public actor WriterHistory {
             ]
             record.producerMetadata?["path"] = path
             record.producerMetadata?["controlDomain"] = domain
-            try await store.beginModelRequest(record, for: id)
+            try await store.beginModelRequest(record, for: id, awaitingDispatch: true)
             try await store.checkpoint(inputID: id)
             return id
         } catch {
@@ -183,7 +183,9 @@ public actor WriterHistory {
         }
     }
     public func progress(_ id: String) -> WriterRequestProgress? { progressValues.removeValue(forKey: id) }
+    public func dispatched(_ id: String) async throws { try await store.markModelRequestDispatched(id) }
     public func event(_ event: ChatEvent, id: String) async throws {
+        try await dispatched(id)
         switch event {
         case .text(let text): try await store.append(text, to: id)
         case .toolCall(let call):

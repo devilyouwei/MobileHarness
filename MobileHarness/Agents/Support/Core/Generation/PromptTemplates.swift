@@ -6,11 +6,13 @@ public enum PromptTemplateError: Error, Equatable, Sendable {
     case missingTemplate(String)
     case invalidVariables(String)
     case outputTooLarge
-    case resourceMissing(String)
+    case unsupportedFormat(String)
 }
 
 /// Immutable, bounded templates. Inserted values are never parsed as template source.
 public struct PromptTemplates: Sendable {
+    public enum Format: Sendable { case json, text }
+
     private enum Segment: Sendable {
         case literal(String)
         case variable(String)
@@ -42,18 +44,31 @@ public struct PromptTemplates: Sendable {
         }
     }
 
-    public init(data: Data) throws {
+    public init(data: Data, format: Format = .json) throws {
         guard data.count <= 65_536 else { throw PromptTemplateError.invalidDocument }
-        let document: Document
-        do { document = try JSONDecoder().decode(Document.self, from: data) } catch {
-            throw PromptTemplateError.invalidDocument
-        }
-        guard document.version == 1, (1...64).contains(document.templates.count) else {
-            throw PromptTemplateError.invalidDocument
+        let source: [String: String]
+        let maximumTemplateBytes: Int
+        switch format {
+        case .json:
+            let document: Document
+            do { document = try JSONDecoder().decode(Document.self, from: data) } catch {
+                throw PromptTemplateError.invalidDocument
+            }
+            guard document.version == 1, (1...64).contains(document.templates.count) else {
+                throw PromptTemplateError.invalidDocument
+            }
+            source = document.templates
+            maximumTemplateBytes = 16_384
+        case .text:
+            guard let text = String(data: data, encoding: .utf8) else {
+                throw PromptTemplateError.invalidDocument
+            }
+            source = ["body": text]
+            maximumTemplateBytes = 65_536
         }
         var compiled: [String: Template] = [:]
-        for (name, body) in document.templates {
-            guard Self.validName(name), body.utf8.count <= 16_384 else {
+        for (name, body) in source {
+            guard Self.validName(name), body.utf8.count <= maximumTemplateBytes else {
                 throw PromptTemplateError.invalidTemplate(name)
             }
             var segments: [Segment] = []
@@ -78,7 +93,7 @@ public struct PromptTemplates: Sendable {
         templates = compiled
     }
 
-    public func render(_ name: String, variables: [String: String] = [:]) throws -> String {
+    public func render(_ name: String = "body", variables: [String: String] = [:]) throws -> String {
         guard let template = templates[name] else { throw PromptTemplateError.missingTemplate(name) }
         guard Set(variables.keys) == template.variables else { throw PromptTemplateError.invalidVariables(name) }
         var output = ""
@@ -99,15 +114,6 @@ public struct PromptTemplates: Sendable {
         return output
     }
 
-    public static func load(named name: String, bundle: Bundle) throws -> Self {
-        guard validName(name), let url = bundle.url(forResource: name, withExtension: "json") else {
-            throw PromptTemplateError.resourceMissing(name)
-        }
-        let file = try FileHandle(forReadingFrom: url)
-        defer { try? file.close() }
-        return try Self(data: file.read(upToCount: 65_537) ?? Data())
-    }
-
     private static func validName(_ value: String) -> Bool {
         !value.isEmpty && value.utf8.count <= 64
             && value.utf8.allSatisfy {
@@ -115,10 +121,4 @@ public struct PromptTemplates: Sendable {
                     || $0 == 95 || $0 == 46
             }
     }
-}
-
-/// Generic protocol guidance is owned by AgentCore, independently of role resources.
-public enum FunctionTokenPrompts {
-    private static let stored = Result { try PromptTemplates.load(named: "FunctionTokenPrompts", bundle: .module) }
-    public static func load() throws -> PromptTemplates { try stored.get() }
 }

@@ -61,6 +61,8 @@ public actor Gemma4Chat: ChatCapability {
             let task = Task {
                 defer { control.finish() }
                 do {
+                    try Task.checkCancellation()
+                    try await request.onDispatch?()
                     request.timing?.start()
                     let generation = try await lease.model.generate(
                         tokens: tokens, maximumTokens: maximumTokens, temperature: request.temperature,

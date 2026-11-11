@@ -204,3 +204,9 @@ ModelPreparationRequirement and ModelPreparationStep expose generic language/rec
 ModelLanguageProviding.chatModel(configuration:) 返回固定配置的轻量 ChatModel（能力句柄与可选模型名称），不占推理槽位，不要求调用方关闭或重开。ModelLanguageContainer.chat(request, using:) 直接指定配置，nil 为本地；普通 chat(request) 捕获当前默认配置。默认配置改变不替换在途实例。云端按不可变配置通过同根 ModelManager 复用客户端，沿用注册资源容量而不设置两个请求槽位；同客户端请求并行，各自取消/完成。根停止统一加入客户端与资源。
 
 本地 Chat 共用根下 SerialChat：一项运行，默认最多八项等待，ModelContainer 的 maximumPendingLocalChats 初始化参数可配置非负容量；满时明确 inputBusy。接纳返回 queued session，获得执行占用后为 running；等待取消释放名额，运行取消加入 Provider 原生清理后才推进 FIFO。暂停/关闭取消并加入等待和运行。结束后保留的句柄不占队列。其他后端保持各自默认互斥资源策略。模型、并发和资源回收归 SDK，Agent 不管理模型租约。
+
+## Decision 能力
+
+language.decision 是稳定子端口，使用独立 D3 资源，不占用主 Chat 的串行队列。ModelKitD3 依赖基础契约、CoreAI 图执行和 Tokenizers，默认注册 d3-edge；模型管理只提供选择结果及资源生命周期。云端分类由调用方通过不可变 ChatModel 请求，ChatToolChoice.required 只约束一次命名工具选择，不执行工具。
+
+Chat 的可选 onDispatch 回调报告实际 HTTP/本地推理开始边界，供上层原子持久化请求；详见 [LLM](Language/LLM/README.md)。

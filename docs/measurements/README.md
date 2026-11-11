@@ -4,6 +4,9 @@ Purpose: retain bounded raw model/device measurements independently of productio
 
 提示词回归的合成场景与真实云模型调用证据也保存在本目录，明确区分真实模型输出与设备执行替身。测试方法与结论由 validation 报告维护，原始结果不包含凭据或用户设备数据。
 
+- [Mac 本地 Decision 模型对照](decision-model-mac-2026-11-11.csv)保留 D3、Laya 和 UniMC 的 456 次逐条判定、分数和时延，方法见[验证报告](../validation/Decision-Model-Mac-Comparison.md)。
+- [D3 提示词与句向量对照](decision-request-embedding-2026-11-11.json)保留输入、定义、代表例和 957 次判定，方法见[追加验证](../validation/Decision-Model-Mac-Comparison.md#d3-请求格式与句向量追加对照)。
+
 - [BasicSkill 控制教学](basic-skill-control-2026-11-08.json)：revision 50 两轮 Qwen 回复、调用与失败；保留旧摄影夹具不适配及终轮两项模型失败，解释见[验证记录](../validation/BasicSkill-Control-Teaching.md)。
 
 - [通用 Skill 发现](skill-discovery-2026-11-08.json)：BasicSkill revision 48/49 的 Qwen 实际回复、调用、失败、请求 hash 与相关资源 hash 摘录；完整报告位置保留在数据中，解释见[验证记录](../validation/Skill-Discovery-Before-Denial.md)。

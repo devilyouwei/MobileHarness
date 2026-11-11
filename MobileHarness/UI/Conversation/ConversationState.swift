@@ -32,6 +32,8 @@ public final class ConversationState {
     @ObservationIgnored var presentationAdmission: UIPresentationAdmission?
     public var isPresentationAvailable: Bool { presentationAdmission.map { $0.started && !$0.stopped } ?? true }
 
+    public internal(set) var queuedInputs = 0
+    public internal(set) var classifyingInputs = 0
     public internal(set) var voicePhase: VoicePhase = .loading
     public internal(set) var liveTranscript = ""
     public internal(set) var transcriptFinalized = false
@@ -159,6 +161,9 @@ public final class ConversationState {
     }
     func apply(_ update: ConversationUpdate) {
         switch update {
+        case .inputQueue(let ready, let classifying):
+            queuedInputs = max(0, ready)
+            classifyingInputs = max(0, classifying)
         case .voicePhase(let value): voicePhase = value
         case .liveTranscript(let value): liveTranscript = value
         case .transcriptFinalized(let value): transcriptFinalized = value
@@ -177,24 +182,20 @@ public final class ConversationState {
     }
 }
 
-/// The pinned goal and movable ASR are independent, with reserved promoted-caption space.
+/// Fixed, disjoint role regions; recognition finalization never moves a caption.
 public struct ConversationCaptionLayout: Sendable {
     public let captionHeight: CGFloat
     public let captionCenterY: CGFloat
+    public let replyHeight: CGFloat
+    public let replyCenterY: CGFloat
 
-    public init(
-        viewportHeight: CGFloat, faceDiameter: CGFloat,
-        hasTranscript: Bool, finalized: Bool, hasActivity: Bool
-    ) {
+    public init(viewportHeight: CGFloat, faceDiameter: CGFloat) {
         captionHeight = min(100, viewportHeight * 0.16)
-        let promotedTop = max(72, viewportHeight * 0.40 - faceDiameter * 0.5 - 31 - captionHeight * 0.5)
-        let captionCenter: CGFloat
-        if finalized || !hasTranscript {
-            captionCenter = promotedTop + captionHeight * 0.5
-        } else {
-            captionCenter = viewportHeight - (hasActivity ? 240 : 120)
-        }
-        captionCenterY = captionCenter
+        let top = max(72, viewportHeight * 0.40 - faceDiameter * 0.5 - 31 - captionHeight * 0.5)
+        captionCenterY = top + captionHeight * 0.5
+        replyHeight = min(120, viewportHeight * 0.20)
+        // Reserve the same bottom area even while channels have no visible activity.
+        replyCenterY = max(top + captionHeight + 24 + replyHeight * 0.5, viewportHeight - 240)
     }
 }
 
@@ -378,6 +379,7 @@ public final class ConversationExpressionPresentation: ExpressionPresenting {
 }
 
 public enum ConversationUpdate {
+    case inputQueue(ready: Int, classifying: Int)
     case voicePhase(VoicePhase)
     case liveTranscript(String)
     case transcriptFinalized(Bool)

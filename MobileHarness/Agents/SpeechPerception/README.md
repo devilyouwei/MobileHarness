@@ -147,7 +147,7 @@ Publication is one-way. A subscriber rejection cannot stop inference; output pro
 
 同意只在本会话有效；撤销／暂停推进接纳 epoch，并在异步提交后重验 UI 代际，拒绝迟到启用。原生 owner 的 `stopListening(sessionID:)` 只撤销并发布内部策略，不能重新同意。公开启停 Action 通过 `setListening(enabled:sessionID:)` 更新同一许可：校验 resident/root 会话与运行态（paused 时仅允许关闭），推进 admission epoch 并返回单调 revision 的中立 ListeningPolicy；关闭同时清空 pendingFinal 并关闭新句接纳。此调用不发布第二个 Action，由原执行方直接应用返回策略并确认原生完成。回复占用只改变 paused；物理停止不依赖 UI 队列可用。
 
-最多四个 source/incarnation/revision 围栏的 replyActivity 快照及一个 pending final root 抑制新句接纳。最终识别先关接纳再发布，Assistant 匹配回复事实接管 occupancy；释放依赖真实终态／生命周期，没有占用定时器。半双工暂停保留逻辑同意，Actions 加入已确认语句、播放 drain 和音频清理后才恢复；用户撤销推进单调时间围栏，早于撤销开始的汇报不能重新启听。新的汇报在撤销后实际开始并成功播毕时可按汇报政策启听。
+最多四个来源的 replyActivity 仍保留身份/revision围栏和 pendingFinal 确认。fullDuplex 时这些占用事实不暂停新句；最终文本发布后重置识别器开始下一句。受限路由仍按原半双工策略等待完成，用户许可和原生代始终优先。
 
 startInput 只订阅当前已开启采集代。回复半双工暂停保留该订阅并丢弃未获准入的帧；设备关闭时取消空闲取帧、加入当前包，完整 close/stop 先取消识别，再加入原生任务、获取模型和发布者。恢复最多 32 个可取消当前包等待者，只等待已接纳工作，不承载 PCM。UI 回执确认策略接纳；原生停机和播放终态由执行服务单独确认。
 
@@ -184,7 +184,7 @@ ASR创建、输入或结果失败属于当前识别轮次终态：保留原始ag
 
 ReplyActivity以来源revision/incarnation验证占用及成功汇报事实，接纳时必须推进来源围栏并处理pendingFinal确认；只有已启听时合并paused改变，或成功汇报使enabled改变，才提交Speech.Listening.update。关闭聆听时单纯占用改变不提交关闭Action，避免反向取消主动播报。相同空闲、同态忙碌、另一个来源仍占用时的单方结束不会重复调用设备策略。此规则切断关闭→取消回复→空闲回执→再次关闭的反馈环；显式用户开关和原生采集结束仍走既有执行路径，不采用节流或日志过滤。
 
-场景隐藏不撤销根语音许可或取消识别。回复占用期间原生输入订阅继续排空帧，admitsMicrophone为false时直接丢弃，不调用VAD/ASR或生成输入；实际关闭/中断仍取消加入。此半双工准入与设备持续录音分离，避免把播放声音识别为下一句。
+场景隐藏不撤销根语音许可。全双工播放准入不置 awaitingReply、不等当前语句结束；同一原生订阅继续 VAD/ASR。受限路由在回复时丢弃未获准入帧。实际关闭/中断始终取消并加入原生、识别及发布者。
 
 
 汇报完成事实携带回复开始的进程单调时间；明确停止、原生采集结束、暂停及根关闭推进本地撤销围栏。来源incarnation/revision丢弃乱序快照，完成事实可独立于更早的占用快照接纳；较新停止之后的旧完成及重复完成不得重新启听。policy不直接操作设备，实际启动、权限和播放屏障继续归Actions；失败/取消回复没有成功完成事实。
@@ -200,3 +200,7 @@ SpeechListening日志只记录策略与生命周期检查点：enabled/paused、
 ## 自有灵动岛
 
 SpeechPerception在capture、聆听许可、识别phase和播放准入边界直接更新自有活动：可接纳输入时显示聆听/人声，ASR收尾显示识别；等待回复、关闭采集或停止撤下。连续聆听/人声保留elapsed起点，退出后重新计时，不依赖UI.voicePhase。容器绑定本角色consumer，复用共享有界发布，展示失败通过presentationFailure及容器runtime公开；停止在身份退休前加入最终end。不调用Assistant代发；字幕边界保持独立。
+
+原生输入不支持全双工时保留既有播放等待门控；订阅输入本身不清除此状态。支持全双工的采集可独立保持识别接纳。
+
+SpeechPerception 管理用户字幕、录音与识别灵动岛。定稿时先提交结束当句的录音/识别活动，再将非空 final 交给 Assistant。全双工可继续接收下一句，下一句录音状态与上一句的 Decision 详情独立。

@@ -80,6 +80,9 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
     public let artifactStreaming: (any ArtifactStreaming)?
     public let writerArtifacts: (any WriterArtifactsControlling)?
     public let writerModel: (@Sendable () async throws -> ChatModel)?
+    public let inputQueueStatus: @MainActor @Sendable (Int, Int) -> Void
+    public let decisionStatus: @MainActor @Sendable (String) -> Void
+    public let decisionConfiguration: (@Sendable () async throws -> (Bool, (@Sendable () async throws -> ChatModel)?))?
     public let executor: ActionsExecutionPort
     public let catalog: ActionCatalogSnapshot
     public let settings: any ProviderSettingsStaging
@@ -102,6 +105,9 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
         artifactStreaming: (any ArtifactStreaming)? = nil,
         writerArtifacts: (any WriterArtifactsControlling)? = nil,
         writerModel: (@Sendable () async throws -> ChatModel)? = nil,
+        decisionConfiguration: (@Sendable () async throws -> (Bool, (@Sendable () async throws -> ChatModel)?))? = nil,
+        decisionStatus: @escaping @MainActor @Sendable (String) -> Void = { _ in },
+        inputQueueStatus: @escaping @MainActor @Sendable (Int, Int) -> Void = { _, _ in },
         settings: any ProviderSettingsStaging, discovery: any ProviderDiscoveryStaging,
         providerPresentation: any ProviderPresentationRegistering, tasks: any TaskControlBinding,
         resources: [ResourceDefinition],
@@ -120,6 +126,9 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
         self.artifactStreaming = artifactStreaming
         self.writerArtifacts = writerArtifacts
         self.writerModel = writerModel
+        self.decisionConfiguration = decisionConfiguration
+        self.decisionStatus = decisionStatus
+        self.inputQueueStatus = inputQueueStatus
         self.executor = executor
         self.catalog = catalog
         self.settings = settings

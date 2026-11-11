@@ -8,7 +8,7 @@ extension OutputEnvelope {
         .init(
             source: source.rawValue, sessionID: sessionID, inputID: inputID, schedulingID: schedulingID,
             sequence: sequence, roundID: roundID, callID: callID, context: executionContext,
-            correlation: SignalCausality(envelope: self))
+            correlation: SignalCausality(envelope: self), orderingScope: source == .assistant ? "conversation" : nil)
     }
     public var actionObservation: ActionOutputObservation {
         let kind: ActionOutputObservation.Kind

@@ -4,6 +4,27 @@ import StorageChat
 import StorageCore
 
 extension SQLiteAssistantTaskRepository {
+    public func completeTask(_ completion: TaskCompressionRecord, dialog: String, endingRequest: String) throws {
+        guard completion.status == "completed", let summary = completion.summary,
+            !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, summary.utf8.count <= 4096
+        else { throw RecordStorageError.invalidRecord }
+        let task = try BusinessRecordID.number(completion.id, kind: .task)
+        let conversation = try BusinessRecordID.number(dialog, kind: .dialog)
+        try database.write { db in
+            let sources = try Self.taskSources(task, db: db).map(\.requestID)
+            guard sources == completion.sources, sources.contains(endingRequest) else {
+                throw RecordStorageError.conflict
+            }
+            try db.execute(
+                sql: """
+                    UPDATE assistant_tasks SET state='completed',end_reason='task.end',summary=?,ended_at=?,
+                      summary_revision=source_revision WHERE id=? AND conversation_id=? AND state='running'
+                    """,
+                arguments: [summary, completion.finishedAt.timeIntervalSince1970, task, conversation])
+            guard db.changesCount == 1 else { throw RecordStorageError.conflict }
+        }
+    }
+
     static func saveSummaries(_ summaries: [TaskCompressionRecord], conversation: Int64, db: Database) throws {
         for summary in summaries {
             let key = try BusinessRecordID.number(summary.id, kind: .task)
@@ -56,7 +77,8 @@ extension SQLiteAssistantTaskRepository {
                 let value = AssistantTaskCompression(
                     taskID: "task_\(key)", goal: row["description"], status: state, reportedSummary: row["summary"],
                     failure: failure, completedAt: Date(timeIntervalSince1970: ended),
-                    sources: sources.map { .init(inputID: $0.inputID, requestID: $0.requestID) })
+                    sources: sources.map { .init(inputID: $0.inputID, requestID: $0.requestID) },
+                    closedAtAction: (row["end_reason"] as String?) == "task.end" ? true : nil)
                 return try JSONEncoder().encode(value)
             }
         }
@@ -69,10 +91,16 @@ extension SQLiteAssistantTaskRepository {
     static let validSummary =
         "COALESCE(t.summary_revision=t.source_revision,0) AND COALESCE(t.summary,'')!='' AND t.state NOT IN ('running','finishing','closing','cleanup_failed')"
 
+    // An explicit close freezes membership; subsequent output and execution evidence still update those same rows.
+    private static let advanceSourceEvidence = """
+        summary_revision=CASE WHEN end_reason='task.end' AND summary_revision=source_revision
+          THEN source_revision+1 ELSE summary_revision END,source_revision=source_revision+1
+        """
+
     static func invalidateAssistantMessageSummary(_ message: Int64, db: Database) throws {
         try db.execute(
             sql:
-                "UPDATE assistant_tasks SET source_revision=source_revision+1 WHERE id=(SELECT task_id FROM assistant_messages WHERE id=?)",
+                "UPDATE assistant_tasks SET \(advanceSourceEvidence) WHERE id=(SELECT task_id FROM assistant_messages WHERE id=?)",
             arguments: [message])
     }
     static func invalidateAssistantResultSummary(conversation: Int64, invocation: String, result: String, db: Database)
@@ -80,13 +108,13 @@ extension SQLiteAssistantTaskRepository {
     {
         try db.execute(
             sql:
-                "UPDATE assistant_tasks SET source_revision=source_revision+1 WHERE id IN (SELECT task_id FROM assistant_messages WHERE conversation_id=? AND json_extract(assistant_response_json,'$.id')=? AND action_results_json!=?)",
+                "UPDATE assistant_tasks SET \(advanceSourceEvidence) WHERE id IN (SELECT task_id FROM assistant_messages WHERE conversation_id=? AND json_extract(assistant_response_json,'$.id')=? AND action_results_json!=?)",
             arguments: [conversation, invocation, result])
     }
     static func invalidateAssistantInputSummary(message: Int64, input: String, db: Database) throws {
         try db.execute(
             sql:
-                "UPDATE assistant_tasks SET source_revision=source_revision+1 WHERE id=(SELECT task_id FROM assistant_messages WHERE id=? AND user_input_json!=?)",
+                "UPDATE assistant_tasks SET \(advanceSourceEvidence) WHERE id=(SELECT task_id FROM assistant_messages WHERE id=? AND user_input_json!=?)",
             arguments: [message, input])
     }
 

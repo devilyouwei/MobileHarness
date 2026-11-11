@@ -184,7 +184,7 @@ private struct FixtureVAD: VoiceActivityCapability {
         }, defaults: [.chat])
     #expect(try await reply(using: manager.get(.chat)) == "default")
     #expect(try await reply(using: manager.get(id, as: .chat)) == "default")
-    await #expect(throws: ModelRegistrationError.missingDefault(.judge)) { _ = try await manager.get(.judge) }
+    await #expect(throws: ModelRegistrationError.missingDefault(.decision)) { _ = try await manager.get(.decision) }
     let other = ModelID("other")
     let registration = try ModelRegistration(id: other, capabilities: [.chat]) { _ in
         ProvidedCapabilities(chat: FixtureProvider(reply: "other"))

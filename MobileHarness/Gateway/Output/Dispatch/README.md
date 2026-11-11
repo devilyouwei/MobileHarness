@@ -13,3 +13,5 @@ ChannelScheduler owns scheduled ordering and uses the same neutral preparation/e
 ## Passive state observation
 
 The owning stateSnapshot entry point reads current local business/capability values and runtime admission/work facts in the owner's isolation domain. It performs no action, acquisition or device activation. The module root composes the explicitly selected fields; unknown diagnostic coverage is not healthy evidence. Domain-specific completion and failure contracts above remain authoritative.
+
+ExecutionEnvelope carries optional orderingScope; Gateway compares it with producer/session/channel for cross-round ordering without owning Assistant business policy. The default nil preserves independently scheduled producers.

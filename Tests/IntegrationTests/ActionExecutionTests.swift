@@ -417,7 +417,9 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     #expect(await log.values == ["first:start", "second:start", "second:end", "first:end"])
 }
 
-@Test(.actionCatalog, .timeLimit(.minutes(1))) func sameChannelInDifferentTasksRunsConcurrently() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func assistantSameChannelAcrossInputsWaitsForEarlierExecution()
+    async throws
+{
     let started = ActionTestGate()
     let release = ActionTestGate()
     let secondFinished = ActionTestGate()
@@ -441,11 +443,12 @@ private enum ActionTestFailure: Error, Equatable { case playback }
     try await scheduler.enqueue(invocation: actionInvocation("first", input: first, channel: "shared"))
     await started.wait()
     try await scheduler.enqueue(invocation: actionInvocation("second", input: second, channel: "shared"))
+    #expect(await log.values == ["first"])
+    await release.open()
     await secondFinished.wait()
+    try await scheduler.finish(inputID: first.id, source: .assistant)
     try await scheduler.finish(inputID: second.id, source: .assistant)
     #expect(await log.values == ["first", "second"])
-    await release.open()
-    try await scheduler.finish(inputID: first.id, source: .assistant)
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])

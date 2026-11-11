@@ -328,7 +328,17 @@ public struct HistoryToolCall: Codable, Sendable, Identifiable {
     }
 }
 
+public struct HistoryInputCoordination: Codable, Sendable {
+    public let source: String
+    public let capturedAt: String
+    public let decision: String?
+    public let route: String?
+    public let batchID: String?
+    public let memberIDs: [String]?
+}
+
 public struct HistoryTurn: Codable, Sendable, Identifiable {
+    public var coordination: HistoryInputCoordination? = nil
     public var requestParametersJSON: String? = nil
     public var responseEventsJSON: String? = nil
     public var logsCleared: Bool? = nil

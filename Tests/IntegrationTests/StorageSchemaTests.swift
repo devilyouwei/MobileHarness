@@ -80,7 +80,7 @@ import UI
             tables == [
                 "agent_messages", "assistant_conversations", "assistant_messages", "assistant_tasks", "devices",
                 "media_files",
-                "model_request_log", "workspace_files", "writer_messages", "writer_workspaces",
+                "model_request_log", "workspace_files", "writer_executions", "writer_messages", "writer_workspaces",
             ])
         #expect(try schemaRows(url, "SELECT COUNT(*) FROM assistant_messages") == [["2"]])
         #expect(try schemaRows(url, "SELECT COUNT(*) FROM assistant_messages") == [["2"]])
@@ -235,7 +235,7 @@ import UI
         #expect(try await database.logs.requestPayload(writerID, agent: "writer") == nil)
         #expect(try await assistantRecords.message(assistantID).turns.first?.modelRequests?.first?.response == "done")
         #expect(try await writerRecords.message(writerID).turns.first?.modelRequests?.first?.response == "done")
-        #expect(try database.storageStatistics().messages == 3)
+        #expect(try database.storageStatistics().messages == 2)
         #expect(try database.storageStatistics().requests == 2)
         try await database.shutdown()
     }
@@ -678,3 +678,110 @@ func storageSyntheticWriterUIFixture() async throws {
     await workflow.shutdown()
     try await reopened.shutdown()
 }
+
+#if canImport(SQLite3)
+    @Test func assistantFullRoleTextSurvivesCheckpointReopenAndLogDeletion() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".sqlite")
+        defer { for suffix in ["", "-wal", "-shm"] { try? FileManager.default.removeItem(atPath: url.path + suffix) } }
+        let database = try SQLiteRepositories(url: url)
+        let records = try AssistantRecordStore(
+            repository: database.assistantMessages, tasks: database.assistantTasks,
+            conversations: database.assistantConversations, logs: database.logs)
+        let history = AssistantHistoryStore(records: records)
+        let batch =
+            #"{"inputs":[{"id":"a","source":"speech","time":1,"text":"介绍北京"},{"id":"b","source":"writer","time":2,"text":""#
+            + String(repeating: "补充内容", count: 1000) + #""}]}"#
+        let response = String(repeating: "这是完整回复，不应被截断。", count: 1000)
+        _ = try await history.admitUserInput(id: "a", user: "介绍北京", model: "fixture")
+        _ = try await history.admitUserInput(id: "b", user: "补充内容", model: "fixture")
+        var evidence = AssistantInputCoordination(source: "speech", capturedAt: "1")
+        evidence.batchID = "a"
+        evidence.memberIDs = ["a", "b"]
+        try await history.recordCoordination(evidence, for: "a")
+        let snapshot = try await history.readCurrent()
+        _ = try await history.begin(id: "a", user: "介绍北京", request: [], expecting: snapshot.token, model: "fixture")
+        try await history.beginModelRequest(.init(id: "first", input: batch, requestJSON: "[]"), for: "a")
+        #expect(
+            try schemaRows(
+                url, "SELECT json_extract(user_input_json,'$.requestText') FROM assistant_messages WHERE input_key='a'")
+                == [[batch]])
+        try await history.append(response, to: "a")
+        try await history.finishModelRequest("a", reason: "stop")
+        try await history.beginModelRequest(.init(id: "react", input: "完整执行观察", requestJSON: "[]"), for: "a")
+        try await history.append("观察后的回复", to: "a")
+        try await history.finishModelRequest("a", reason: "stop")
+        try await history.finish("a", state: .completed)
+        try await history.finish("b", state: .completed)
+        try await history.checkpoint()
+        #expect(
+            try schemaRows(
+                url, "SELECT json_extract(user_input_json,'$.text') FROM assistant_messages WHERE input_key='a'") == [
+                    ["介绍北京"]
+                ])
+        let selected = try #require(try database.assistantMessages.previews(dialog: snapshot.current.id).first?.id)
+        try await database.shutdown()
+        let reopened = try SQLiteRepositories(url: url)
+        let restored = try AssistantRecordStore(
+            repository: reopened.assistantMessages, tasks: reopened.assistantTasks,
+            conversations: reopened.assistantConversations, logs: reopened.logs)
+        try await restored.clearRequestLogs(requestID: nil)
+        let detail = try await restored.message(selected)
+        let view = try await HistoryPresentationAdapter.conversation(detail)
+        let turn = try #require(ConversationHistoryPresentation.turns(view).first)
+        #expect(turn.displayInput == batch && turn.raw == response)
+        #expect(try await restored.read(snapshot.current.id).turns.first?.modelRequests?.first?.input == batch)
+        #expect(
+            try await restored.window(snapshot.current.id).turns.first(where: { $0.id == "a" })?.modelRequests?.first?
+                .input == batch)
+        #expect(try await restored.input("a")?.turns.first?.modelRequests?.map(\.input) == [batch, "完整执行观察"])
+        #expect(detail.turns.first?.user == "介绍北京")
+        try await reopened.shutdown()
+    }
+
+    @Test(arguments: ["messages", "responses", "mismatch", "cleared"])
+    func assistantLegacyBatchDetailRecoversOnlyMatchingRecordedInput(format: String) async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".sqlite")
+        defer { for suffix in ["", "-wal", "-shm"] { try? FileManager.default.removeItem(atPath: url.path + suffix) } }
+        let database = try SQLiteRepositories(url: url)
+        let records = try AssistantRecordStore(
+            repository: database.assistantMessages, tasks: database.assistantTasks,
+            conversations: database.assistantConversations, logs: database.logs)
+        let history = AssistantHistoryStore(records: records)
+        let snapshot = try await history.readCurrent()
+        _ = try await history.begin(id: "a", user: "原始主输入", request: [], expecting: snapshot.token, model: "fixture")
+        var evidence = AssistantInputCoordination(source: "speech", capturedAt: "1")
+        evidence.memberIDs = ["a", "b"]
+        evidence.batchID = "a"
+        try await history.recordCoordination(evidence, for: "a")
+        try await history.beginModelRequest(.init(id: "request", input: "原始主输入", requestJSON: "[]"), for: "a")
+        let batch =
+            format == "mismatch"
+            ? #"{"inputs":[{"id":"a"},{"id":"wrong"}]}"#
+            : #"{"inputs":[{"id":"a","text":"原始主输入"},{"id":"b","text":"第二条输入"}]}"#
+        let payload: [String: Any] =
+            format == "responses"
+            ? ["input": [["role": "user", "content": [["type": "input_text", "text": batch]]]]]
+            : ["messages": [["role": "user", "content": batch]]]
+        try await history.recordModelExchange(
+            requestJSON: String(decoding: JSONSerialization.data(withJSONObject: payload), as: UTF8.self),
+            response: "[]", for: "a", initial: true)
+        try await history.append("完整回复", to: "a")
+        try await history.finishModelRequest("a", reason: "stop")
+        try await history.finish("a", state: .completed)
+        var connection: OpaquePointer?
+        try #require(sqlite3_open(url.path, &connection) == SQLITE_OK)
+        #expect(
+            sqlite3_exec(
+                connection,
+                "UPDATE assistant_messages SET user_input_json=json_remove(user_input_json,'$.requestText')", nil, nil,
+                nil) == SQLITE_OK)
+        sqlite3_close(connection)
+        if format == "cleared" { try await records.clearRequestLogs(requestID: nil) }
+        let id = try #require(try database.assistantMessages.previews(dialog: snapshot.current.id).first?.id)
+        let detail = try await records.message(id)
+        #expect(
+            detail.turns.first?.modelRequests?.first?.input
+                == (["mismatch", "cleared"].contains(format) ? "原始主输入" : batch))
+        try await database.shutdown()
+    }
+#endif

@@ -518,6 +518,22 @@ public actor ChannelScheduler {
                 continue
             }
             let channel = job.invocation.channel
+            if let scope = job.invocation.envelope.orderingScope {
+                let blocked = inputs.values.contains { other in
+                    other.phases.contains { phase in
+                        guard let lane = phase.lanes[channel] else { return false }
+                        let sameScope: (Job) -> Bool = {
+                            $0.invocation.envelope.orderingScope == scope
+                                && $0.invocation.owner?.incarnation == job.invocation.owner?.incarnation
+                                && $0.invocation.envelope.source == job.invocation.envelope.source
+                                && $0.invocation.envelope.sessionID == job.invocation.envelope.sessionID
+                        }
+                        return lane.running.map { sameScope($0.job) } == true
+                            || lane.queued.contains { $0.sequence < job.sequence && sameScope($0) }
+                    }
+                }
+                if blocked { continue }
+            }
             state.phases[job.phase].lanes[channel]?.queued.removeFirst()
             let task = Task {
                 var outcome: Outcome

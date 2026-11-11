@@ -80,3 +80,5 @@ Gateway State queue depths, endpoint/delivery counts, scheduling/direct work, re
 ResourceCoordinator exposes current-context execution, coordinated lease acquisition and atomic settlement queries. App adapters consume these operations rather than interpret holdings or resolve leases.
 
 Agent-provided Action calls use their registration Channel; Gateway schedules these resolved calls and ordered wait events. Model text cannot override routing.
+
+Assistant supplies an opaque conversation ordering scope so same-Channel outputs remain FIFO across model rounds. Gateway owns ordering and joined cancellation only; classification and batch formation remain in Agents. See [Scheduling](Output/Scheduling/README.md).

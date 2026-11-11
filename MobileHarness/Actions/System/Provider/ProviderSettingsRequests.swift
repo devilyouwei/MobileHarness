@@ -34,7 +34,12 @@ public final class ProviderSettingsRequests: ProviderSettingsCapability, Provide
         guard value.url.utf8.count <= 2048, value.key.utf8.count <= 4096, value.model.utf8.count <= 512 else {
             throw ProviderSettingsError.invalidConfiguration
         }
-        guard value.writerModel.utf8.count <= 512,
+        guard value.decisionModel.utf8.count <= 512,
+            value.decisionProviderID == nil
+                ? value.decisionModel.isEmpty
+                : (value.providers.contains { $0.id == value.decisionProviderID }
+                    && !value.decisionModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty),
+            value.writerModel.utf8.count <= 512,
             value.writerProviderID == nil
                 || (value.providers.contains { $0.id == value.writerProviderID } && !value.writerModel.isEmpty),
             Set(value.providers.map(\.id)).count == value.providers.count,

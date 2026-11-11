@@ -23,13 +23,14 @@
             /// trigger for a Core AI placement defect that returns silently wrong numerics on some
             /// graphs (filed with Apple; see `knowledge/pocket-tts-port.md`). Parity and gate runs
             /// should use `cpuOnly`, never `cpu`.
-            case neuralEngine, gpu, cpu, cpuOnly
+            case automatic, neuralEngine, gpu, cpu, cpuOnly
 
             /// The Core AI options this choice lowers to. Exposed so callers that hold a raw
             /// `AIModel` — the graphs whose shape `GraphModel`/`StatefulGraphModel` cannot
             /// accept — specialize identically instead of re-deriving the mapping.
             public var specializationOptions: SpecializationOptions {
                 switch self {
+                case .automatic: return .default
                 case .neuralEngine: return SpecializationOptions(preferredComputeUnitKind: .neuralEngine)
                 case .gpu: return SpecializationOptions(preferredComputeUnitKind: .gpu)
                 case .cpu: return SpecializationOptions(preferredComputeUnitKind: .cpu)

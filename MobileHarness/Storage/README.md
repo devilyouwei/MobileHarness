@@ -43,7 +43,7 @@ becomes memory-only success. Recovery records interrupted facts and never replay
 
 ## Persistence contracts
 
-[Database](Database/README.md) owns ten domain tables. Assistant conversations, foreground tasks and complete messages are independent of Writer workspaces and delegation/message records; only communication and request logging are shared. Raw rounds survive task summary projection. Full HTTP request/response bytes (including SSE and images), parameters and generation metadata live in deletable logs. Clearing logs preserves business messages and results; lists/context do not load Base64. Old formats are erased and initialized without migration; current versions reopen normally and future versions are rejected. Credentials and models are outside this database.
+[Database](Database/README.md) owns eleven domain tables. Assistant conversations, foreground tasks and complete messages are independent of Writer workspaces and delegation/message records; only communication and request logging are shared. Raw rounds survive task summary projection. Full HTTP request/response bytes (including SSE and images), parameters and generation metadata live in deletable logs. Clearing logs preserves business messages and results; lists/context do not load Base64. Schema 20261110/20261111 migrates transactionally to the request-only message schema with independent Writer execution records; the previously approved clean reset applies only to older formats. Current versions reopen normally and future versions are rejected. Credentials and models are outside this database.
 
 [Workspaces](Database/WriterWorkspaces/README.md) coordinates current filesystem source and SQL metadata. Writer-owned selection atomically binds a delegation to one workspace without moving existing messages; Storage validates persistence constraints without choosing the work from natural language.
 No source body or historical file version is stored in SQLite. [Files](Files/README.md) owns generic
@@ -67,3 +67,9 @@ Database root owns core connection/lifecycle/schema assembly. Shared owns neutra
 [Database](Database/README.md) 的十表分为 Assistant 私有对话/前台任务/完整消息、Writer 委托入口与子消息/workspace/文件索引，以及通用通信、HTTP logs、相册和设备。Database 根目录拥有核心机制与装配，Shared 拥有共用业务；各业务表目录拥有自身 schema、record、repo、恢复和业务操作。旧格式清空初始化，无兼容表或迁移；当前版本正常重开保留数据。
 
 WriterMessages 同时拥有委托入口与子消息，WriterWorkspaces 仅拥有文件与 workspace 元数据。开发格式重置在数据库发布前清理 App 显式传入的 Writer 文件根，失败阻止启动；当前版本重开不清理。
+
+Assistant input coordination is additive message evidence; input source, classification and batch membership are persisted separately from the single generated response. Current schema upgrade preserves existing data. See [Assistant messages](Database/AssistantMessages/README.md).
+
+AssistantMessages 将每次请求的完整业务输入与原始输入分开保存在同一消息行；完整回复与请求文本不依赖可清理的模型日志。字段与兼容读取见 [AssistantMessages](Database/AssistantMessages/README.md)。
+
+Assistant/Writer message 表只持有实际发起的模型请求；准备阶段不建行，Writer 委托由独立 writer_executions 表拥有。来源和已采用的协调决策随请求保存，discard 不持久化。

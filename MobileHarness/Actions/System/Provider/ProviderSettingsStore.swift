@@ -16,6 +16,9 @@ public struct UserSettingsDocument: Codable, Sendable {
     var writerProviderID: String? = nil
     var writerModel: String = ""
     var writerThinking: Bool? = nil
+    var decisionProviderID: String? = nil
+    var decisionModel: String? = nil
+    var decisionUsesLocal: Bool? = nil
 
     struct CloudRecord: Codable, Sendable {
         var name: String
@@ -67,7 +70,10 @@ public actor ProviderSettingsStore: ProviderSettingsPersistence {
                         enabled: $0.enabled, url: $0.url, key: $0.key, model: $0.model,
                         providers: others, name: $0.name, id: $0.id,
                         writerProviderID: snapshot.value.writerProviderID, writerModel: snapshot.value.writerModel,
-                        writerThinking: snapshot.value.writerThinking ?? false
+                        writerThinking: snapshot.value.writerThinking ?? false,
+                        decisionProviderID: snapshot.value.decisionProviderID,
+                        decisionModel: snapshot.value.decisionModel ?? "",
+                        decisionUsesLocal: snapshot.value.decisionUsesLocal
                     )
                 }
                 loaded = true
@@ -110,6 +116,9 @@ public actor ProviderSettingsStore: ProviderSettingsPersistence {
             document.writerProviderID = value?.writerProviderID
             document.writerModel = value?.writerModel ?? ""
             document.writerThinking = value?.writerThinking
+            document.decisionProviderID = value?.decisionProviderID
+            document.decisionModel = value?.decisionModel ?? ""
+            document.decisionUsesLocal = value?.decisionUsesLocal
             snapshot = try await documents().save(document, expecting: snapshot?.revision)
         } catch {
             for id in inserted { try? credentials.removeKey(id: id) }

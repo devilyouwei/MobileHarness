@@ -27,11 +27,14 @@ enum ApplicationControlResourcePolicy {
         let allowsCellular: Bool
         let useCustomRecognition: Bool
         let useCustomSynthesis: Bool
+        let useLocalDecision: Bool?
     }
     static func preferenceValue(_ raw: String) throws -> PreferenceValue {
         guard raw.utf8.count <= 2048,
             let keys = try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any],
-            Set(keys.keys) == ["endpoint", "allowsCellular", "useCustomRecognition", "useCustomSynthesis"]
+            Set(keys.keys).isSubset(of: [
+                "endpoint", "allowsCellular", "useCustomRecognition", "useCustomSynthesis", "useLocalDecision",
+            ])
         else { throw CommunicationError.invalidPayload }
         let value = try JSONDecoder().decode(PreferenceValue.self, from: Data(raw.utf8))
         guard !value.endpoint.isEmpty, value.endpoint.utf8.count <= 1024 else {

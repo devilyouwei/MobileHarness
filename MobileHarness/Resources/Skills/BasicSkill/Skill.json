@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "basic-skill",
-  "revision": 52,
+  "revision": 53,
   "description": "Discover and load capabilities, manage foreground goals and Skill lifecycles, coordinate delegated work, and control listening using current context and execution feedback.",
   "dependencies": [],
   "useActions": [

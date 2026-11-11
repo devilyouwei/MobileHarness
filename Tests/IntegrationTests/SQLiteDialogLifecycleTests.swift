@@ -71,6 +71,7 @@ private actor DialogPublicationFixture {
             logs: db.logs))
     let initial = try await store.readCurrent()
     _ = try await store.begin(id: "old-input", user: "old", request: [], expecting: initial.token, model: "fixture")
+    try await store.beginModelRequest(.init(id: "started-old-input", input: "old", requestJSON: "[]"), for: "old-input")
     try await store.finish("old-input", state: .completed)
     let memory = DialogPublicationFixture(try await store.snapshot())
     try await store.attachContext(
@@ -99,6 +100,7 @@ private actor DialogPublicationFixture {
     #expect(try await db.assistantConversations.listDialogs().count == 1)
     _ = try await store.begin(
         id: "new-input", user: "new", request: [], expecting: recovered.token, model: "fixture")
+    try await store.beginModelRequest(.init(id: "new-request", input: "new", requestJSON: "[]"), for: "new-input")
     #expect(try db.assistantMessages.messages(dialog: durable.id).first?.body == "new")
     #expect(try db.assistantMessages.messages(dialog: initial.current.id).first?.body == "old")
 }
@@ -131,8 +133,8 @@ private actor DialogPublicationFixture {
     #expect(fresh.current.id != initial.current.id)
     let writes = db.committedWriteCount
     _ = try await store.begin(id: "fresh", user: "hello", request: [], expecting: fresh.token, model: "fixture")
-    #expect(db.committedWriteCount == writes + 1)
-    #expect(try db.assistantMessages.messages(dialog: fresh.current.id).first?.body == "hello")
+    #expect(db.committedWriteCount == writes)
+    #expect(try db.assistantMessages.messages(dialog: fresh.current.id).isEmpty)
 }
 
 @Test func sqliteDialogArchivedInsertIsRejectedButLateExistingUpdateRemainsValid() async throws {
@@ -172,6 +174,7 @@ private actor DialogPublicationFixture {
             logs: db.logs))
     let read = try await store.readCurrent()
     _ = try await store.begin(id: "active", user: "keep me", request: [], expecting: read.token, model: "fixture")
+    try await store.beginModelRequest(.init(id: "started-active", input: "keep me", requestJSON: "[]"), for: "active")
     let current = try db.assistantConversations.rotate(read.current.id)
     await #expect(throws: AssistantHistoryError.conflict) { _ = try await store.readCurrent() }
     await #expect(throws: AssistantHistoryError.conflict) {

@@ -15,6 +15,7 @@
         @State private var opensModelsAfterWelcome = false
         @State private var welcomeRestoreError: String?
         @State private var restoringWelcome = false
+        @State private var brainProviderDraft: [CloudSettingsDraft]?
         public var body: some View {
             Group {
                 PersistentHomeNavigation(
@@ -56,8 +57,23 @@
                         .navigationContext(destination.contextPage)
                         .id(assembly.navigation.generation)
                 }
+                .overlay(alignment: .top) {
+                    if let notice = container?.actionActivity.transientToast {
+                        Label(notice.text, systemImage: "info.circle.fill")
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                            .padding(.horizontal, 24)
+                            .padding(.top, 60)
+                            .accessibilityIdentifier("application.transientToast")
+                            .allowsHitTesting(false)
+                    }
+                }
                 .environment(\.navigationContext, assembly.navigation)
                 .onChange(of: assembly.navigation.path, initial: true) { _, path in
+                    if !path.contains(.language) { brainProviderDraft = nil }
                     assembly.cameraState.windows = assembly.windows
                     assembly.cameraState.faceVisible = path.isEmpty
                     assembly.navigationChanged()
@@ -152,7 +168,21 @@
                 LanguageModelSettingsView(
                     settings: assembly.settings, settingsControls: assembly.settingsControls,
                     modelResources: assembly.modelResources, modelResourceControls: assembly.modelResourceControls,
-                    save: saveSettings)
+                    providerDraft: $brainProviderDraft, save: saveSettings,
+                    navigate: { brain in
+                        switch brain {
+                        case .assistant: assembly.navigate(.assistantBrain)
+                        case .writer: assembly.navigate(.writerBrain)
+                        case .decision: assembly.navigate(.decision)
+                        }
+                    })
+            case .assistantBrain, .writerBrain, .decision:
+                if let brain = destination.agentBrain {
+                    AgentBrainSettingsView(
+                        brain: brain, settings: assembly.settings, controls: assembly.settingsControls,
+                        resources: assembly.modelResources, resourceControls: assembly.modelResourceControls,
+                        save: saveSettings)
+                }
             case .bluetooth: BluetoothSettingsView(state: assembly.bluetoothState, controls: assembly.bluetoothControls)
             case .album: AlbumView(album: assembly.album)
             case .assistantHistory, .writerHistory:
@@ -169,13 +199,14 @@
                 ModelResourcesView(
                     state: assembly.modelResources, controls: assembly.modelResourceControls,
                     group: destination == .recognition
-                        ? .recognition : (destination == .synthesis ? .synthesis : .vision),
+                        ? .recognition
+                        : (destination == .synthesis ? .synthesis : .vision),
                     audioDetection: destination == .recognition ? container?.audioDetectionState : nil,
                     audioDetectionRequests: destination == .recognition ? container?.audioDetectionRequests : nil)
             }
         }
-        private func saveSettings() async -> Bool {
-            let applied = await assembly.settingsControls.save()
+        private func saveSettings(_ change: BrainSettingsChange) async -> Bool {
+            let applied = await assembly.settingsControls.save(change)
             if applied, container == nil { assembly.retry() }
             return applied
         }

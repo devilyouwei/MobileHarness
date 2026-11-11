@@ -263,7 +263,9 @@ enum AgentTaskCommunication {
             .init("target", description: "Declared target Agent ID"),
             .init("kind", description: "Declared task message kind"),
             .init("content", description: "Public task content"),
-            .init("taskID", required: false, description: "Existing task identity"),
+            .init(
+                "taskID", required: false, description: "Existing task identity",
+                constraints: "Omit for request. Required for input, cancel, progress, and result."),
             .init("artifactID", required: false, description: "Authorized artifact reference"),
         ])
 

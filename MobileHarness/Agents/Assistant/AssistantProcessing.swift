@@ -67,13 +67,15 @@ public struct AssistantContextState: AgentChatContextState {
         let delegates =
             capabilities.actions.contains { $0.path.description == "Agent.Task.delegateTask" }
             ? try AgentConfigurations.delegationOverview(requester: agentID, communication: communication) : ""
+        let capabilityContext = try AgentPrompts.capabilityContext()
         let sections = [
-            try CapabilityContextBuilder.protocolRules(capabilities),
-            "# ASSISTANT ROLE", try AgentConfigurations.identityInstructions(named: configurationName),
-            "# AVAILABLE SKILLS", try AgentConfigurations.skillOverview(),
-            "# DELEGATABLE AGENTS", delegates,
+            try capabilityContext.protocolRules(),
+            try AgentPrompts.systemInput(),
+            try AgentConfigurations.identityInstructions(named: configurationName),
+            try AgentPrompts.skillCatalog().render("availableHeading"), try AgentConfigurations.skillOverview(),
+            try AgentPrompts.agentCatalog().render("heading"), delegates,
             skillInstructions,
-            "# EFFECTIVE ACTION CATALOG", try CapabilityContextBuilder.catalog(capabilities),
+            try capabilityContext.catalogSection(capabilities),
         ]
         let result = sections.joined(separator: "\n")
         guard result.utf8.count <= 65_536 else { throw PromptTemplateError.outputTooLarge }

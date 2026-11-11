@@ -9,6 +9,8 @@ public final class UIHomeContainer {
             business: [
                 "voicePhase": .text(conversation.voicePhase.rawValue), "voiceActive": .flag(conversation.isVoiceActive),
                 "replyActive": .flag(conversation.isReplyActive),
+                "queuedInputs": .count(conversation.queuedInputs),
+                "classifyingInputs": .count(conversation.classifyingInputs),
             ], runtime: ["available": .flag(admission.active), "ready": .flag(conversation.isReady)],
             children: [.init(path: "ui.home.expression")],
             stateValues: ["business.voicePhase": VoicePhase.allCases.map(\.rawValue)])
@@ -61,6 +63,8 @@ public final class UIHomeContainer {
         conversation.resetCaptions()
         conversation.isVoiceActive = false
         conversation.isReplyActive = false
+        conversation.queuedInputs = 0
+        conversation.classifyingInputs = 0
         conversation.listeningAnimationID = nil
         conversation.microphoneSpectrum = [Float](repeating: 0, count: 32)
         conversation.playbackSpectrum = [Float](repeating: 0, count: 32)

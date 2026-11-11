@@ -72,6 +72,32 @@ public actor AssistantRecordStore {
         request.state = try Self.state(row.state)
         return request
     }
+    /// Recover only an exact recorded batch, never synthesize a past request from current state.
+    private static func restoreLegacyBatchInput(_ request: inout AssistantModelRequest, turn: AssistantRecord) {
+        guard request.input == turn.user, let members = turn.coordination?.memberIDs, members.count > 1,
+            let payload = request.requestParametersJSON,
+            let root = try? JSONSerialization.jsonObject(with: Data(payload.utf8))
+        else { return }
+        let object = root as? [String: Any]
+        let messages =
+            (root as? [[String: Any]]) ?? object?["messages"] as? [[String: Any]]
+            ?? object?["input"] as? [[String: Any]] ?? []
+        for message in messages.reversed() where message["role"] as? String == "user" {
+            let texts =
+                (message["content"] as? String).map { [$0] }
+                ?? (message["content"] as? [[String: Any]])?.compactMap { $0["text"] as? String } ?? []
+            for text in texts {
+                let json = text.components(separatedBy: "\nInterrupted intentions").first ?? text
+                guard let batch = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any],
+                    let inputs = batch["inputs"] as? [[String: Any]],
+                    inputs.count == members.count,
+                    Set(inputs.compactMap { $0["id"] as? String }) == Set(members)
+                else { continue }
+                request.input = text
+                return
+            }
+        }
+    }
     private func metadata(_ row: AssistantConversationRecord) -> AssistantConversation {
         var result = AssistantConversation(id: row.id, createdAt: row.createdAt)
         result.archivedAt = row.archivedAt
@@ -89,12 +115,6 @@ public actor AssistantRecordStore {
     public func isCurrent(_ id: String) async throws -> Bool {
         try await conversations.current().id == id
     }
-    public func beginMessage(dialog id: String, identity: AssistantMessageIdentity) async throws -> String {
-        try await writeGate.withAccess { [self] in
-            _ = try await ownedDialog(id)
-            return try await repository.beginMessage(dialog: id, identity: identity)
-        }
-    }
     @discardableResult public func saveCurrent(_ snapshot: AssistantCheckpoint) async throws
         -> [AssistantMessageReference]
     {
@@ -107,7 +127,11 @@ public actor AssistantRecordStore {
         var messages: [AssistantMessageRecord] = []
         var changes: [String: Data] = [:]
         for turn in snapshot.conversation.turns where snapshot.changedInputs?.contains(turn.id) ?? true {
+            let dispatched = (turn.modelRequests ?? []).filter { $0.awaitingDispatch != true }
+            guard !dispatched.isEmpty else { continue }
             var input = turn
+            let dispatchedIDs = Set(dispatched.map(\.id))
+            input.generationRounds = input.generationRounds?.filter { dispatchedIDs.contains($0.id) }
             // The SQL primary key is published after INSERT and is not duplicated in evidence.
             input.messageID = nil
             input.request = []
@@ -121,13 +145,14 @@ public actor AssistantRecordStore {
                 messages.append(
                     AssistantMessageRecord(
                         clientID: turn.id, inputID: turn.id, role: "user", kind: "input",
-                        order: turn.historyOrder, date: turn.date, body: turn.user, state: "completed",
+                        order: dispatched[0].historyOrder, date: dispatched[0].date, body: turn.user,
+                        state: "completed",
                         detail: inputData, id: turn.messageID))
                 changes[inputKey] = inputFingerprint
             }
-            for request in turn.modelRequests ?? [] {
+            for request in dispatched {
                 // Observations are complete before the next invocation; assistant partials are not admitted here.
-                if request.id != turn.modelRequests?.first?.id {
+                if request.id != dispatched.first?.id {
                     let key = request.id + ":observation"
                     let data = try encoder.encode(request.input)
                     let fingerprint = ContentFingerprint.digest(data)
@@ -141,10 +166,8 @@ public actor AssistantRecordStore {
                         changes[key] = fingerprint
                     }
                 }
-                guard request.state != .generating || request.producerMetadata != nil else { continue }
                 var detail = request
                 detail.response = ""
-                detail.input = ""
                 guard var evidence = try JSONSerialization.jsonObject(with: encoder.encode(detail)) as? [String: Any]
                 else { throw RecordStorageError.invalidRecord }
                 evidence["model"] = turn.model
@@ -169,7 +192,7 @@ public actor AssistantRecordStore {
         }
         var summaries: [TaskCompressionRecord] = []
         var summaryChanges: [String: Data] = [:]
-        for compression in snapshot.conversation.taskCompressions {
+        for compression in snapshot.conversation.taskCompressions where compression.closedAtAction != true {
             var sources = Dictionary(
                 uniqueKeysWithValues: try await tasks.taskSources(compression.taskID).map { ($0.requestID, $0) })
             for turn in snapshot.conversation.turns {
@@ -197,6 +220,7 @@ public actor AssistantRecordStore {
                 summaryChanges[compression.taskID] = summaryFingerprint
             }
         }
+        guard !messages.isEmpty || !summaries.isEmpty else { return [] }
         let references = try await repository.save(
             dialog: snapshot.conversation.id, revision: snapshot.revision,
             messages: messages, summaries: summaries)
@@ -251,8 +275,12 @@ public actor AssistantRecordStore {
                 }
                 request.messageID = response.id
                 request.response = response.body
-                request.input =
-                    records.first { $0.clientID == response.clientID && $0.kind == "observation" }?.body ?? item.body
+                if response.detail.isEmpty {
+                    request.input =
+                        records.first { $0.clientID == response.clientID && $0.kind == "observation" }?.body
+                        ?? item.body
+                }
+                Self.restoreLegacyBatchInput(&request, turn: turn)
                 if turn.request.isEmpty,
                     let original = try? JSONDecoder().decode(
                         [ModelMessage].self, from: Data(request.requestJSON.utf8))
@@ -321,7 +349,14 @@ extension AssistantRecordStore {
         result.isWindow = true
         let previews = try await repository.previews(
             dialog: id, after: after, taskID: taskID, limit: limit, offset: offset)
-        for preview in previews {
+        for preview in previews where !preview.isInput {
+            var turn = AssistantRecord(
+                id: preview.inputID, date: preview.date, user: preview.input, request: [], model: "",
+                maximumOutputTokens: nil, temperature: 0.7)
+            turn.messageID = preview.id
+            turn.historyOrder = preview.position
+            turn.state = try Self.state(preview.state)
+            turn.coordination = preview.coordination
             var request = AssistantModelRequest(
                 id: preview.clientID, input: preview.input, requestJSON: "[]", historyTaskID: preview.taskID,
                 date: preview.date)
@@ -330,9 +365,6 @@ extension AssistantRecordStore {
             request.response = preview.response
             request.state = try Self.state(preview.state)
             request.isObservation = preview.isObservation
-            var turn = AssistantRecord(
-                id: preview.inputID, date: preview.date, user: preview.input, request: [], model: "",
-                maximumOutputTokens: nil, temperature: 0.7)
             turn.modelRequests = [request]
             turn.state = request.state
             result.turns.append(turn)
@@ -349,22 +381,7 @@ extension AssistantRecordStore {
         guard let user = rows.first(where: { $0.kind == "input" }),
             let selected = rows.first(where: { $0.id == id })
         else { throw AssistantHistoryError.missingTurn }
-        if selected.role == "user" {
-            var turn = try Self.decodeInput(user)
-            var request = AssistantModelRequest(
-                id: selected.clientID, input: selected.body,
-                requestJSON: selected.kind == "input"
-                    ? String(decoding: try JSONEncoder().encode(turn.request), as: UTF8.self) : "[]",
-                historyTaskID: selected.taskID, date: selected.date)
-            request.messageID = id
-            request.historyOrder = selected.order
-            request.state = try Self.state(selected.state)
-            request.isObservation = selected.kind == "observation"
-            turn.modelRequests = [request]
-            var result = AssistantConversation(id: "detail")
-            result.turns = [turn]
-            return result
-        }
+        guard selected.role == "assistant" else { throw AssistantHistoryError.missingTurn }
         let response = selected
         var turn = try Self.decodeInput(user)
         var request = try Self.decodeResponse(response)
@@ -379,7 +396,10 @@ extension AssistantRecordStore {
         request.messageID = response.id
         request.response = response.body
         request.isObservation = rows.contains { $0.kind == "observation" }
-        request.input = rows.first(where: { $0.kind == "observation" })?.body ?? user.body
+        if response.detail.isEmpty {
+            request.input = rows.first(where: { $0.kind == "observation" })?.body ?? user.body
+        }
+        Self.restoreLegacyBatchInput(&request, turn: turn)
         turn.modelRequests = [request]
         var result = AssistantConversation(id: "detail")
         result.turns = [turn]
@@ -405,7 +425,9 @@ extension AssistantRecordStore {
             var request = try Self.decodeResponse(response)
             request.messageID = response.id
             request.response = response.body
-            request.input = rows.first(where: { $0.kind == "observation" })?.body ?? input.body
+            if response.detail.isEmpty {
+                request.input = rows.first(where: { $0.kind == "observation" })?.body ?? input.body
+            }
             request.isObservation = rows.contains { $0.kind == "observation" }
             if turn.request.isEmpty,
                 let original = try? JSONDecoder().decode(
@@ -476,8 +498,10 @@ extension AssistantRecordStore {
             var request = try Self.decodeResponse(response)
             request.messageID = response.id
             request.response = response.body
-            request.input =
-                rows.first { $0.clientID == response.clientID && $0.kind == "observation" }?.body ?? user.body
+            if response.detail.isEmpty {
+                request.input =
+                    rows.first { $0.clientID == response.clientID && $0.kind == "observation" }?.body ?? user.body
+            }
             if turn.request.isEmpty,
                 let original = try? JSONDecoder().decode(
                     [ModelMessage].self, from: Data(request.requestJSON.utf8))

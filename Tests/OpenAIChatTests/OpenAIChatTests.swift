@@ -193,6 +193,28 @@ func liveProviderPreservesConsecutiveUsers() async throws {
     }
 }
 
+@Test func requiredDecisionToolDisablesParallelCalls() throws {
+    let tool = try ChatToolDefinition(
+        declaration: Data(
+            #"{"type":"function","function":{"name":"classify_input","parameters":{"type":"object","properties":{"action":{"type":"string"}},"required":["action"]}}}"#
+                .utf8))
+    let request = try ChatRequest(
+        messages: [.init(role: .user, content: "current input")], tools: [tool],
+        toolChoice: .required(name: "classify_input"))
+    let http = try config().request(request)
+    let data = try #require(http.httpBody)
+    let body = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let choice = try #require(body["tool_choice"] as? [String: String])
+    #expect(choice["type"] == "function")
+    let definitions = try #require(body["tools"] as? [[String: Any]])
+    #expect(choice["name"] == definitions[0]["name"] as? String)
+    #expect(body["parallel_tool_calls"] as? Bool == false)
+    #expect(throws: CapabilityError.self) {
+        try ChatRequest(
+            messages: [.init(role: .user, content: "x")], tools: [tool], toolChoice: .required(name: "undeclared"))
+    }
+}
+
 private func decode(_ text: String) throws -> [ChatEvent] {
     var decoder = ChatEventDecoder()
     var result: [ChatEvent] = []
@@ -255,12 +277,26 @@ private final class StubProtocol: URLProtocol, @unchecked Sendable {
     let timing = ChatTiming()
     request.timing = timing
     let captured = Mutex<[ChatTransportEvent]>([])
-    request.transportCapture = { event in captured.withLock { $0.append(event) } }
+    let dispatched = Mutex(0)
+    request.onDispatch = { dispatched.withLock { $0 += 1 } }
+    request.transportCapture = { event in
+        if case .request = event {
+            let previous = captured.withLock {
+                $0.filter {
+                    if case .request = $0 { return true }
+                    return false
+                }.count
+            }
+            #expect(dispatched.withLock { $0 } == previous + 1)
+        }
+        captured.withLock { $0.append(event) }
+    }
     let session = try await capability.chat(request)
     #expect(session.context == request.context)
     var events: [ChatEvent] = []
     for try await event in session.events { events.append(event) }
     #expect(events == [.text("Hello"), .finished(.stop)])
+    #expect(dispatched.withLock { $0 } == 1)
     let wire = captured.withLock { $0 }
     guard case .request(let method, let url, let headers, let body, _) = wire.first else {
         Issue.record("Missing HTTP request")
@@ -286,6 +322,7 @@ private final class StubProtocol: URLProtocol, @unchecked Sendable {
     try await manager.unload(.chat)
     let next = try await capability.chat(request)
     for try await _ in next.events {}
+    #expect(dispatched.withLock { $0 } == 2)
     await manager.shutdown()
     await #expect(throws: CapabilityError.sessionClosed) { try await capability.chat(request) }
 }
@@ -1679,4 +1716,40 @@ private final class HeartbeatStreamProtocol: URLProtocol, @unchecked Sendable {
     let json = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
     let input = try #require(json["input"] as? [[String: Any]])
     #expect(input.first?["arguments"] as? String == arguments)
+}
+
+private final class DispatchFailureProtocol: URLProtocol, @unchecked Sendable {
+    static let starts = Mutex(0)
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        Self.starts.withLock { $0 += 1 }
+        client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+    }
+    override func stopLoading() {}
+}
+
+@Test func dispatchBoundaryRetainsNetworkFailureButRejectsUnstartedRequests() async throws {
+    let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
+    let model = try OpenAIChat(
+        context: context, configuration: config(),
+        sessionConfiguration: {
+            let settings = URLSessionConfiguration.ephemeral
+            settings.protocolClasses = [DispatchFailureProtocol.self]
+            return settings
+        })
+    let started = Mutex(0)
+    var request = try ChatRequest(messages: [.init(role: .user, content: "hello")])
+    request.onDispatch = { started.withLock { $0 += 1 } }
+    let session = try await model.chat(request)
+    await #expect(throws: (any Error).self) { for try await _ in session.events {} }
+    await session.waitForCompletion()
+    #expect(started.withLock { $0 } == 1)
+    #expect(DispatchFailureProtocol.starts.withLock { $0 } == 1)
+    request.onDispatch = { throw CapabilityError.invalidRequest("record start rejected") }
+    let rejected = try await model.chat(request)
+    await #expect(throws: (any Error).self) { for try await _ in rejected.events {} }
+    await rejected.waitForCompletion()
+    #expect(DispatchFailureProtocol.starts.withLock { $0 } == 1)
+    try await context.unload()
 }

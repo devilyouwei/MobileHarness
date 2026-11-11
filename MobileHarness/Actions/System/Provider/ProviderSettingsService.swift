@@ -4,7 +4,7 @@ import StorageCore
 import StorageFiles
 
 public enum ProviderSettingsError: LocalizedError, Sendable, ActionExecutionFailureProviding {
-    case invalidSelection, invalidConfiguration, persistence, busy, application, cancelled
+    case invalidSelection, invalidConfiguration, persistence, busy, application, cancelled, decisionRequired
     case keychain(Int32)
     case rollback(primary: String, secondary: String)
     public var executionFailureCode: ActionExecutionFailureCode {
@@ -16,6 +16,7 @@ public enum ProviderSettingsError: LocalizedError, Sendable, ActionExecutionFail
         case .busy: value = "provider.busy"
         case .application: value = "provider.application"
         case .cancelled: value = "provider.cancelled"
+        case .decisionRequired: value = "provider.decisionRequired"
         case .keychain: value = "provider.keychain"
         case .rollback: value = "provider.rollback"
         }
@@ -60,6 +61,23 @@ public struct ProviderSettingsRuntime {
 /// Business transaction; native and lifecycle operations are injected, without UI types.
 @MainActor
 public final class ProviderSettingsService {
+    public func decisionConfiguration() async throws -> ProviderSettings {
+        let value = try await decisionSnapshot()
+        return try Self.decisionConfiguration(value)
+    }
+    public func decisionSnapshot() async throws -> ProviderSettings {
+        if restored { return resolved(saved) }
+        return try await restore()
+    }
+    public static func decisionConfiguration(_ value: ProviderSettings) throws -> ProviderSettings {
+        guard let selected = value.decisionProviderID,
+            let provider = value.providers.first(where: { $0.id == selected }),
+            !value.decisionModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else { throw ProviderSettingsError.invalidSelection }
+        return ProviderSettings(
+            enabled: true, url: provider.url, key: provider.key, model: value.decisionModel,
+            name: provider.name, id: provider.id)
+    }
     public func writerConfiguration() async throws -> ProviderSettings {
         let value = try await restore()
         guard let selected = value.writerProviderID else {
@@ -74,14 +92,23 @@ public final class ProviderSettingsService {
     }
     private let store: any ProviderSettingsPersistence
     private let runtime: ProviderSettingsRuntime
+    private let legacyDecision: @Sendable () async throws -> Bool
+    private let isDecisionInstalled: @Sendable () async throws -> Bool
+    private var inheritedDecision = false
     private var saved: ProviderSettings?
     private var restored = false
     private var changing = false
     private var restoration: Task<ProviderSettings, any Error>?
     private var waiters = 0
-    public init(store: any ProviderSettingsPersistence, runtime: ProviderSettingsRuntime) {
+    public init(
+        store: any ProviderSettingsPersistence, runtime: ProviderSettingsRuntime,
+        legacyDecision: @escaping @Sendable () async throws -> Bool = { false },
+        isDecisionInstalled: @escaping @Sendable () async throws -> Bool = { false }
+    ) {
         self.store = store
         self.runtime = runtime
+        self.legacyDecision = legacyDecision
+        self.isDecisionInstalled = isDecisionInstalled
     }
     public func summary() throws -> String {
         guard restored else { throw ProviderSettingsError.busy }
@@ -93,7 +120,7 @@ public final class ProviderSettingsService {
     }
     public func restore() async throws -> ProviderSettings {
         guard !changing, waiters < 32 else { throw ProviderSettingsError.busy }
-        if restored { return saved ?? runtime.initial }
+        if restored { return resolved(saved) }
         waiters += 1
         defer { waiters -= 1 }
         if let restoration { return try await restoration.value }
@@ -105,11 +132,17 @@ public final class ProviderSettingsService {
     private func restoreSaved() async throws -> ProviderSettings {
         do {
             let value = try await store.load()
+            if value?.decisionUsesLocal == nil { inheritedDecision = try await legacyDecision() }
             try await runtime.prepare(value)()
             saved = value
             restored = true
-            return value ?? runtime.initial
+            return resolved(value)
         } catch { throw ProviderSettingsError.safe(error) }
+    }
+    private func resolved(_ raw: ProviderSettings?) -> ProviderSettings {
+        var value = raw ?? runtime.initial
+        if value.decisionUsesLocal == nil { value.decisionUsesLocal = inheritedDecision }
+        return value
     }
     public func save(_ value: ProviderSettings) async throws -> ProviderSettings {
         guard !changing, restoration == nil else { throw ProviderSettingsError.busy }
@@ -117,9 +150,26 @@ public final class ProviderSettingsService {
         defer { changing = false }
         do {
             try Task.checkCancellation()
-            if value.enabled, value.model.isEmpty { throw ProviderSettingsError.invalidSelection }
-            let apply = try runtime.prepare(value)
             let previous = saved
+            let current = resolved(previous)
+            var value = value
+            value.decisionUsesLocal = value.decisionUsesLocal ?? current.decisionUsesLocal
+            if value.decisionUsesLocal == true, current.decisionUsesLocal != true,
+                try await !isDecisionInstalled()
+            {
+                throw ProviderSettingsError.decisionRequired
+            }
+            if value.enabled, value.model.isEmpty { throw ProviderSettingsError.invalidSelection }
+            let assistantChanged =
+                !restored || value.enabled != current.enabled
+                || (value.enabled
+                    && (value.url != current.url || value.key != current.key || value.model != current.model))
+            if !assistantChanged {
+                try await store.save(value)
+                saved = value
+                return value
+            }
+            let apply = try runtime.prepare(value)
             await runtime.beginChange()
             defer { runtime.endChange() }
             try await store.save(value)

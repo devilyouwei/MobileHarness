@@ -52,6 +52,12 @@ public struct SignalInbox: Sendable {
     public var isEmpty: Bool { entries.isEmpty }
     public var inputs: [AgentInput] { entries.map(\.input) }
     public mutating func removeAll() { entries.removeAll() }
+    public mutating func takeAll(sessionID: String, excluding: Set<String> = []) -> [Entry] {
+        let selected = entries.filter { $0.input.sessionID == sessionID && !excluding.contains($0.input.id) }
+        let ids = Set(selected.map(\.sequence))
+        entries.removeAll { ids.contains($0.sequence) }
+        return selected.sorted { $0.sequence < $1.sequence }
+    }
     public mutating func remove(id: String) { entries.removeAll { $0.input.id == id } }
     public mutating func takeBatch() -> [Entry] {
         guard let first = take() else { return [] }
@@ -94,9 +100,9 @@ public struct SignalInbox: Sendable {
         return sequence
     }
     /// Expiry is returned to the owner for an explicit terminal record, never silently discarded.
-    public mutating func take() -> Entry? {
+    public mutating func take(excluding: Set<String> = []) -> Entry? {
         guard
-            let index = entries.indices.max(by: {
+            let index = entries.indices.filter({ !excluding.contains(entries[$0].input.id) }).max(by: {
                 entries[$0].priority == entries[$1].priority
                     ? entries[$0].sequence > entries[$1].sequence : entries[$0].priority < entries[$1].priority
             })

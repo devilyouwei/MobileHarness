@@ -78,12 +78,6 @@ public actor WriterRecordStore {
     public func isCurrent(_ id: String) async throws -> Bool {
         try await repository.current().id == id
     }
-    public func beginMessage(ownerID id: String, identity: WriterMessageIdentity) async throws -> String {
-        try await writeGate.withAccess { [self] in
-            _ = try await historyOwner(id)
-            return try await repository.beginMessage(ownerID: id, identity: identity)
-        }
-    }
     @discardableResult public func saveCurrent(_ snapshot: WriterCheckpoint) async throws -> [WriterMessageReference] {
         try await writeGate.withAccess(honorCancellation: false) { [self] in try await saveCurrentLocked(snapshot) }
     }
@@ -94,7 +88,11 @@ public actor WriterRecordStore {
         var messages: [WriterMessageRecord] = []
         var changes: [String: Data] = [:]
         for turn in snapshot.conversation.turns where snapshot.changedInputs?.contains(turn.id) ?? true {
+            let dispatched = (turn.modelRequests ?? []).filter { $0.awaitingDispatch != true }
+            guard !dispatched.isEmpty else { continue }
             var input = turn
+            let dispatchedIDs = Set(dispatched.map(\.id))
+            input.generationRounds = input.generationRounds?.filter { dispatchedIDs.contains($0.id) }
             // The SQL primary key is published after INSERT and is not duplicated in evidence.
             input.messageID = nil
             input.request = []
@@ -108,13 +106,14 @@ public actor WriterRecordStore {
                 messages.append(
                     WriterMessageRecord(
                         clientID: turn.id, inputID: turn.id, role: "user", kind: "input",
-                        order: turn.historyOrder, date: turn.date, body: turn.user, state: "completed",
+                        order: dispatched[0].historyOrder, date: dispatched[0].date, body: turn.user,
+                        state: "completed",
                         detail: inputData, id: turn.messageID))
                 changes[inputKey] = inputFingerprint
             }
-            for request in turn.modelRequests ?? [] {
+            for request in dispatched {
                 // Observations are complete before the next invocation; assistant partials are not admitted here.
-                if request.id != turn.modelRequests?.first?.id {
+                if request.id != dispatched.first?.id {
                     let key = request.id + ":observation"
                     let data = try encoder.encode(request.input)
                     let fingerprint = ContentFingerprint.digest(data)
@@ -128,7 +127,6 @@ public actor WriterRecordStore {
                         changes[key] = fingerprint
                     }
                 }
-                guard request.state != .generating || request.producerMetadata != nil else { continue }
                 var detail = request
                 detail.response = ""
                 detail.input = ""
@@ -154,6 +152,7 @@ public actor WriterRecordStore {
                 }
             }
         }
+        guard !messages.isEmpty else { return [] }
         let references = try await repository.save(
             ownerID: snapshot.conversation.id, revision: snapshot.revision,
             messages: messages)

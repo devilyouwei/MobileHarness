@@ -21,25 +21,13 @@ struct WriterMessageRow: Codable, FetchableRecord, MutablePersistableRecord {
         tool_calls_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(tool_calls_json)),
         workspace_id INTEGER REFERENCES writer_workspaces(id) ON DELETE RESTRICT,
         request_message_id TEXT REFERENCES agent_messages(id) ON DELETE RESTRICT,
-        delegation_id INTEGER REFERENCES writer_messages(id) ON DELETE RESTRICT,
-        selected_workspace_id INTEGER REFERENCES writer_workspaces(id) ON DELETE RESTRICT,
-        run_state TEXT,
-        request_goal TEXT,
-        request_revision INTEGER NOT NULL DEFAULT 0,
-        pending_question_id TEXT REFERENCES agent_messages(id) ON DELETE RESTRICT,
-        pending_question_json TEXT CHECK(pending_question_json IS NULL OR json_valid(pending_question_json)),
-        failure_json TEXT,
-        terminal_state TEXT,
-        result_json TEXT CHECK(result_json IS NULL OR json_valid(result_json)),
+        delegation_id INTEGER NOT NULL REFERENCES writer_executions(id) ON DELETE RESTRICT,
         caused_by_message_id INTEGER REFERENCES writer_messages(id) ON DELETE SET NULL,
         phase TEXT,
         target_path TEXT,
         runtime_results_json TEXT NOT NULL DEFAULT '[]' ,
         CHECK(request_message_id IS NOT NULL),
-        CHECK((input_kind='delegation' AND delegation_id IS NULL AND workspace_id IS NULL AND run_state IS NOT NULL) OR (input_kind!='delegation' AND delegation_id IS NOT NULL AND run_state IS NULL)),
         UNIQUE(input_key));
-        CREATE UNIQUE INDEX writer_delegation_identity ON writer_messages(request_message_id) WHERE input_kind='delegation';
-        CREATE UNIQUE INDEX single_writer_execution ON writer_messages((1)) WHERE input_kind='delegation' AND run_state IN ('running','waiting_input','paused','closing','cleanup_failed');
         CREATE INDEX writer_message_delegation ON writer_messages(delegation_id,id);
         CREATE INDEX writer_message_order ON writer_messages(workspace_id,position,id);
         CREATE INDEX writer_message_request ON writer_messages(request_message_id,position,id);
@@ -63,15 +51,6 @@ struct WriterMessageRow: Codable, FetchableRecord, MutablePersistableRecord {
     var toolCallsJson: String = "[]"
     var workspaceID: Int64? = nil
     var delegationID: Int64? = nil
-    var selectedWorkspaceID: Int64? = nil
-    var runState: String? = nil
-    var requestGoal: String? = nil
-    var requestRevision: Int64 = 0
-    var pendingQuestionID: String? = nil
-    var pendingQuestionJson: String? = nil
-    var failureJson: String? = nil
-    var terminalState: String? = nil
-    var resultJson: String? = nil
     var requestMessageID: String? = nil
     var causedByMessageID: Int64? = nil
     var phase: String? = nil
@@ -94,15 +73,6 @@ struct WriterMessageRow: Codable, FetchableRecord, MutablePersistableRecord {
         case toolCallsJson = "tool_calls_json"
         case workspaceID = "workspace_id"
         case delegationID = "delegation_id"
-        case selectedWorkspaceID = "selected_workspace_id"
-        case runState = "run_state"
-        case requestGoal = "request_goal"
-        case requestRevision = "request_revision"
-        case pendingQuestionID = "pending_question_id"
-        case pendingQuestionJson = "pending_question_json"
-        case failureJson = "failure_json"
-        case terminalState = "terminal_state"
-        case resultJson = "result_json"
         case requestMessageID = "request_message_id"
         case causedByMessageID = "caused_by_message_id"
         case phase

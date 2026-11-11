@@ -28,7 +28,16 @@ public final class UINavigationContainer {
 }
 
 public enum AppDestination: String, Codable, Hashable, Sendable {
-    case settings, language, recognition, synthesis, vision, bluetooth, assistantHistory, writerHistory, album
+    case settings, language, recognition, synthesis, vision, decision, bluetooth, assistantHistory, writerHistory, album
+    case assistantBrain, writerBrain
+    var agentBrain: AgentBrain? {
+        switch self {
+        case .assistantBrain: .assistant
+        case .writerBrain: .writer
+        case .decision: .decision
+        default: nil
+        }
+    }
 }
 @MainActor
 @Observable
@@ -109,7 +118,11 @@ public final class NavigationState {
             path = []
             return
         }
-        path = destination == .settings ? [.settings] : [.settings, destination]
+        if destination.agentBrain != nil {
+            path = [.settings, .language, destination]
+        } else {
+            path = destination == .settings ? [.settings] : [.settings, destination]
+        }
     }
 
     @discardableResult

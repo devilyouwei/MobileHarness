@@ -7,6 +7,113 @@ import Testing
 
 @testable import StorageSQLite
 
+private let writerSchemaBeforeRequestBoundary = """
+    CREATE TABLE writer_messages(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    input_key TEXT NOT NULL,
+    root_input_key TEXT NOT NULL,
+    position INTEGER NOT NULL CHECK(position>=0),
+    input_kind TEXT NOT NULL DEFAULT 'user',
+    state TEXT NOT NULL DEFAULT 'generating',
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    completed_at REAL,
+    schema_version INTEGER NOT NULL DEFAULT 1,
+    user_input_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(user_input_json)),
+    assistant_response_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(assistant_response_json)),
+    tool_catalog_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(tool_catalog_json)),
+    tool_calls_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(tool_calls_json)),
+    workspace_id INTEGER REFERENCES writer_workspaces(id) ON DELETE RESTRICT,
+    request_message_id TEXT REFERENCES agent_messages(id) ON DELETE RESTRICT,
+    delegation_id INTEGER REFERENCES writer_messages(id) ON DELETE RESTRICT,
+    selected_workspace_id INTEGER REFERENCES writer_workspaces(id) ON DELETE RESTRICT,
+    run_state TEXT,
+    request_goal TEXT,
+    request_revision INTEGER NOT NULL DEFAULT 0,
+    pending_question_id TEXT REFERENCES agent_messages(id) ON DELETE RESTRICT,
+    pending_question_json TEXT CHECK(pending_question_json IS NULL OR json_valid(pending_question_json)),
+    failure_json TEXT,
+    terminal_state TEXT,
+    result_json TEXT CHECK(result_json IS NULL OR json_valid(result_json)),
+    caused_by_message_id INTEGER REFERENCES writer_messages(id) ON DELETE SET NULL,
+    phase TEXT,
+    target_path TEXT,
+    runtime_results_json TEXT NOT NULL DEFAULT '[]' ,
+    CHECK(request_message_id IS NOT NULL),
+    CHECK((input_kind='delegation' AND delegation_id IS NULL AND workspace_id IS NULL AND run_state IS NOT NULL) OR (input_kind!='delegation' AND delegation_id IS NOT NULL AND run_state IS NULL)),
+    UNIQUE(input_key));
+    CREATE UNIQUE INDEX writer_delegation_identity ON writer_messages(request_message_id) WHERE input_kind='delegation';
+    CREATE UNIQUE INDEX single_writer_execution ON writer_messages((1)) WHERE input_kind='delegation' AND run_state IN ('running','waiting_input','paused','closing','cleanup_failed');
+    CREATE INDEX writer_message_delegation ON writer_messages(delegation_id,id);
+    CREATE INDEX writer_message_order ON writer_messages(workspace_id,position,id);
+    CREATE INDEX writer_message_request ON writer_messages(request_message_id,position,id);
+    CREATE INDEX writer_message_root ON writer_messages(root_input_key);
+    CREATE INDEX writer_message_cause ON writer_messages(caused_by_message_id);
+    CREATE UNIQUE INDEX writer_message_invocation ON writer_messages(json_extract(assistant_response_json,'$.id')) WHERE json_extract(assistant_response_json,'$.id') IS NOT NULL;
+    """
+
+@Test(arguments: [20_261_110, 20_261_111])
+func requestBoundaryMigrationRetainsInvocationsAndMovesWriterExecutions(version: Int) async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".sqlite")
+    defer { for suffix in ["", "-wal", "-shm"] { try? FileManager.default.removeItem(atPath: url.path + suffix) } }
+    let pool = try DatabasePool(path: url.path)
+    try await pool.write { db in
+        for statement in SQLiteSchema.statements where statement != SQLiteWriterExecutionRepository.schemaSQL {
+            try db.execute(sql: statement == WriterMessageRow.schemaSQL ? writerSchemaBeforeRequestBoundary : statement)
+        }
+        try db.execute(sql: "INSERT INTO assistant_conversations(id,created_at) VALUES(1,1)")
+        try db.execute(
+            sql:
+                "INSERT INTO assistant_messages(id,input_key,root_input_key,position,conversation_id,created_at,updated_at) VALUES(1,'discard','discard',1,1,1,1)"
+        )
+        try db.execute(
+            sql:
+                #"INSERT INTO assistant_messages(id,input_key,root_input_key,position,conversation_id,created_at,updated_at,state,assistant_response_json) VALUES(2,'sent','sent',2,1,2,2,'failed','{"id":"http-attempt","text":""}')"#
+        )
+        try db.execute(
+            sql:
+                "INSERT INTO model_request_log(assistant_message_id,invocation_id,method,created_at,updated_at) VALUES(2,'http-attempt','POST',2,2)"
+        )
+        try db.execute(
+            sql:
+                "INSERT INTO agent_messages(id,sender_agent_id,receiver_agent_id,contract,payload_json,correlation_id,dedupe_key,created_at) VALUES('delegate','assistant','writer','task.request','{}','delegate','delegate',1)"
+        )
+        try db.execute(sql: "INSERT INTO writer_workspaces(id,description,created_at,updated_at) VALUES(1,'draft',1,1)")
+        try db.execute(
+            sql:
+                #"INSERT INTO writer_messages(id,input_key,root_input_key,position,input_kind,request_message_id,selected_workspace_id,request_goal,run_state,user_input_json,result_json,created_at,updated_at) VALUES(10,'delegate','delegate',10,'delegation','delegate',1,'goal','completed','{"text":"write","source_agent":"assistant"}','{"result":"kept"}',1,1)"#
+        )
+        try db.execute(
+            sql:
+                #"INSERT INTO writer_messages(id,input_key,root_input_key,position,delegation_id,workspace_id,request_message_id,assistant_response_json,created_at,updated_at) VALUES(11,'writer-input','writer-input',11,10,1,'delegate','{"id":"writer-http","text":"reply"}',2,2)"#
+        )
+        try db.execute(
+            sql:
+                "INSERT INTO writer_messages(id,input_key,root_input_key,position,delegation_id,request_message_id,created_at,updated_at) VALUES(12,'queued','queued',12,10,'delegate',3,3)"
+        )
+        try db.execute(
+            sql:
+                "INSERT INTO model_request_log(writer_message_id,invocation_id,method,created_at,updated_at) VALUES(11,'writer-http','POST',2,2)"
+        )
+        try db.execute(sql: "PRAGMA user_version=\(version)")
+    }
+    try SQLiteSchema.prepare(pool)
+    try await pool.read { db throws -> Void in
+        #expect(try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM assistant_messages") == 1)
+        #expect(try String.fetchOne(db, sql: "SELECT state FROM assistant_messages WHERE id=2") == "failed")
+        #expect(try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM writer_messages") == 1)
+        #expect(try Int.fetchOne(db, sql: "SELECT delegation_id FROM writer_messages WHERE id=11") == 10)
+        #expect(
+            try String.fetchOne(db, sql: "SELECT result_json FROM writer_executions WHERE id=10")
+                == #"{"result":"kept"}"#)
+        #expect(try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM model_request_log") == 2)
+        #expect(try Int.fetchOne(db, sql: "PRAGMA user_version") == SQLiteSchema.currentVersion)
+        #expect(try Row.fetchAll(db, sql: "PRAGMA foreign_key_check").isEmpty)
+    }
+    try SQLiteSchema.prepare(pool)
+    try pool.close()
+}
+
 @Test func independentAgentTablesAndForeignKeys() async throws {
     let repository = try SQLiteRepositories.temporary()
     try repository.database.write { db throws -> Void in
@@ -16,7 +123,7 @@ import Testing
         #expect(
             names == [
                 "assistant_conversations", "assistant_tasks", "assistant_messages", "writer_workspaces",
-                "writer_messages",
+                "writer_messages", "writer_executions",
                 "workspace_files", "agent_messages", "model_request_log", "media_files", "devices",
             ])
         var conversation = AssistantConversationRow(createdAt: 1)
@@ -385,7 +492,7 @@ import Testing
     #expect(
         try reopened.database.read {
             try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM writer_messages WHERE delegation_id IS NOT NULL")
-        } == 1)
+        } == 0)
     #expect(try await reopened.writerExecutions.delegationCount() == 2)
     try await reopened.shutdown()
 }
@@ -399,16 +506,16 @@ import Testing
     let scope = try records.writerMessages.current().id
     try records.database.write { db in
         try db.execute(sql: "UPDATE sqlite_sequence SET seq=9000000000 WHERE name='business_message'")
-        try db.execute(sql: "UPDATE writer_messages SET request_revision=7 WHERE input_kind='delegation'")
+        try db.execute(sql: "UPDATE writer_executions SET request_revision=7")
     }
     let first = try records.writerMessages.beginMessage(
         ownerID: scope,
-        identity: .init(clientID: "one", inputID: "one", role: "user", kind: "input", order: 1, date: Date()))
+        identity: .init(clientID: "one", inputID: "one", role: "assistant", kind: "response", order: 1, date: Date()))
     let second = try records.writerMessages.beginMessage(
         ownerID: scope,
-        identity: .init(clientID: "two", inputID: "two", role: "user", kind: "input", order: 1, date: Date()))
-    #expect(try BusinessRecordID.number(first, kind: .message) == 9_000_000_001)
-    #expect(try BusinessRecordID.number(second, kind: .message) == 9_000_000_002)
+        identity: .init(clientID: "two", inputID: "two", role: "assistant", kind: "response", order: 1, date: Date()))
+    #expect(try BusinessRecordID.number(first, kind: .request) == 9_000_000_001)
+    #expect(try BusinessRecordID.number(second, kind: .request) == 9_000_000_002)
     let rows = try records.writerMessages.previews(ownerID: fixture.workspaceID, after: 9_000_000_000, limit: 20)
     #expect(rows.map(\.position) == [9_000_000_001, 9_000_000_002])
     try await records.endSeedDelegation(fixture.delegateID, status: "completed")
@@ -423,4 +530,71 @@ import Testing
         try await records.workspaces.claim(id, expecting: nil, lease: UUID())
     }
     try await records.shutdown()
+}
+
+@Test func assistantMessagesStartAtDispatchAndDiscardNeverPersists() async throws {
+    let db = try SQLiteRepositories.temporary()
+    let records = try AssistantRecordStore(
+        repository: db.assistantMessages, tasks: db.assistantTasks, conversations: db.assistantConversations,
+        logs: db.logs)
+    let store = AssistantHistoryStore(records: records)
+    let current = try await store.readCurrent()
+    _ = try await store.admitUserInput(id: "discard", user: "ack", model: "not started")
+    var discarded = AssistantInputCoordination(source: "speech", capturedAt: "1")
+    discarded.decision = "discard"
+    try await store.recordCoordination(discarded, for: "discard")
+    try await store.finish("discard", state: .completed, reason: "decision.discard")
+    #expect(try db.database.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM assistant_messages") } == 0)
+    #expect(try db.database.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM model_request_log") } == 0)
+    _ = try await store.admitUserInput(id: "cancelled", user: "cancel before send", model: "cloud")
+    try await store.beginModelRequest(
+        .init(id: "never-started", input: "cancel before send", requestJSON: "[]"), for: "cancelled",
+        awaitingDispatch: true)
+    try await store.finish("cancelled", state: .cancelled)
+    await #expect(throws: (any Error).self) { try await store.markModelRequestDispatched("cancelled") }
+    #expect(try db.database.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM assistant_messages") } == 0)
+    _ = try await store.admitUserInput(id: "a", user: "one", model: "cloud")
+    _ = try await store.admitUserInput(id: "b", user: "two", model: "cloud")
+    try await store.beginModelRequest(
+        .init(id: "call", input: "one + two", requestJSON: "[]"), for: "a", awaitingDispatch: true)
+    try await store.checkpoint()
+    #expect(try db.database.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM assistant_messages") } == 0)
+    try await store.markModelRequestDispatched("a")
+    try await store.markModelRequestDispatched("a")
+    #expect(try db.database.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM assistant_messages") } == 1)
+    try await store.finishModelRequest("a", reason: "error", error: "network timeout")
+    try await store.finish("a", state: .failed, error: "network timeout")
+    try await store.finish("b", state: .failed, error: "batch request failed")
+    let rows = try await records.page(current.current.id)
+    #expect(rows.turns.count == 1 && rows.turns.first?.modelRequests?.first?.state == .failed)
+    #expect(rows.turns.first?.modelRequests?.first?.input == "one + two")
+    #expect(try db.database.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM assistant_messages") } == 1)
+    try await db.shutdown()
+}
+
+@Test func writerDelegationAndPreparationDoNotCreateMessagesUntilDispatch() async throws {
+    let db = try SQLiteRepositories.temporary()
+    _ = try await db.seedDelegation(
+        workspaceID: nil, goal: "create", input: "write", sourceDialog: nil, agent: "writer")
+    let records = try WriterRecordStore(repository: db.writerMessages, logs: db.logs)
+    let store = WriterHistoryStore(records: records)
+    let read = try await store.readCurrent()
+    _ = try await store.begin(id: "prepare", user: "write", request: [], expecting: read.token, model: "cloud")
+    try await store.beginModelRequest(
+        .init(id: "never-sent", input: "write", requestJSON: "[]"), for: "prepare", awaitingDispatch: true)
+    try await store.finish("prepare", state: .failed, error: "configuration rejected before HTTP")
+    await #expect(throws: (any Error).self) { try await store.markModelRequestDispatched("prepare") }
+    #expect(try db.database.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM writer_executions") } == 1)
+    #expect(try db.database.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM writer_messages") } == 0)
+    #expect(try db.database.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM model_request_log") } == 0)
+    _ = try await store.begin(
+        id: "sent", user: "write", request: [], expecting: store.readCurrent().token, model: "cloud")
+    try await store.beginModelRequest(
+        .init(id: "writer-http", input: "write", requestJSON: "[]"), for: "sent", awaitingDispatch: true)
+    try await store.markModelRequestDispatched("sent")
+    try await store.finish("sent", state: .failed, error: "connection reset")
+    #expect(try db.database.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM writer_messages") } == 1)
+    #expect(try db.database.read { try String.fetchOne($0, sql: "SELECT state FROM writer_messages") } == "failed")
+    #expect(try db.database.read { try Row.fetchAll($0, sql: "PRAGMA foreign_key_check") }.isEmpty)
+    try await db.shutdown()
 }

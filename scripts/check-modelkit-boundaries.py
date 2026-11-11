@@ -16,12 +16,14 @@ SYSTEM_MODULES = {
     'Accelerate', 'Vision', 'ImageIO', 'Compression', 'CryptoKit',
 }
 THIRD_PARTY_PRODUCTS = {
+    'ModelKitD3': {'Tokenizers': 'swift-transformers'},
     'ModelKitGemma4': {'CoreAILM': 'coreai-models', 'Tokenizers': 'swift-transformers'},
     'ModelKitNemotron': {'FluidAudio': 'fluidaudio'},
     'ModelKitKokoro': {'FluidAudio': 'fluidaudio'},
     'ModelKitHub': {'HuggingFace': 'swift-huggingface'},
 }
 THIRD_PARTY_IMPORTS = {
+    'ModelKitD3': {'Tokenizers'},
     'ModelKitGemma4': {'CoreAILanguageModels', 'Tokenizers'},
     'ModelKitNemotron': {'FluidAudio'}, 'ModelKitKokoro': {'FluidAudio'},
     'ModelKitHub': {'HuggingFace'},
@@ -123,9 +125,10 @@ for product in package['products']:
 expected_model_dependencies = {
     'ModelKit': set(), 'ModelKitRuntime': {'ModelKit'},
     'ModelKitDefaults': {'ModelKit', 'ModelKitRuntime', 'ModelKitNemotron', 'ModelKitSilero',
-        'ModelKitMossNano', 'ModelKitGemma4', 'ModelKitYOLOPose', 'ModelKitOpenAI', 'ModelKitAppleSpeech', 'ModelKitEnergy'},
+        'ModelKitMossNano', 'ModelKitGemma4', 'ModelKitYOLOPose', 'ModelKitOpenAI', 'ModelKitAppleSpeech', 'ModelKitEnergy', 'ModelKitD3'},
     'ModelKitHub': {'ModelKitRuntime'},
     'ModelKitCoreAI': set(), 'ModelKitCoreML': set(),
+    'ModelKitD3': {'ModelKit', 'ModelKitCoreAI'},
     'ModelKitAppleSpeech': {'ModelKit'}, 'ModelKitEnergy': {'ModelKit'},
     'ModelKitNemotron': {'ModelKit'}, 'ModelKitKokoro': {'ModelKit'}, 'ModelKitMossNano': {'ModelKit'},
     'ModelKitGemma4': {'ModelKit'}, 'ModelKitOpenAI': {'ModelKit'},
@@ -1216,7 +1219,7 @@ model_catalog = ROOT / 'MobileHarness/Resources/Models/model-catalog.json'
 if not model_catalog.is_file():
     raise SystemExit('Missing runtime model catalog')
 catalog = json.loads(model_catalog.read_text())
-if catalog.get('schemaVersion') != 2 or len(catalog.get('packages', [])) != 5:
+if catalog.get('schemaVersion') != 2 or {entry.get('id') for entry in catalog.get('packages', [])} != {'moss-tts-nano', 'silero', 'gemma4-e2b', 'yolo26n-pose', 'nemotron', 'd3-edge'}:
     raise SystemExit('Invalid production model catalog')
 for entry in catalog['packages']:
     source = entry['source']

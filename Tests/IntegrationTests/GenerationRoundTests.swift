@@ -233,7 +233,7 @@ private struct RoundHarness {
     }
 }
 private func roundHarness(
-    action: Bool, toolCount: Int,
+    action: Bool, toolCount: Int, fullDuplex: Bool = false, decision: AssistantInputDecision? = nil,
     deliverActionFeedback: Bool = true, photo: Bool = false, supportsImages: Bool = false, photoCommand: String? = nil,
     deviceStatus: Bool = false, playbackDelay: Duration = .zero, requestRounds: Int = 1, actionCount: Int = 1,
     photoObservation: (@Sendable (String, AgentInput) async throws -> ChatImage)? = nil,
@@ -252,7 +252,7 @@ private func roundHarness(
             AgentConfigurations.skill(deviceStatus ? "application-control" : "photography").useActions)
         let capabilities = try CapabilityRegistry(actions: declared.actions, channels: declared.channels)
         agent = try FixtureNativeAgent(
-            chat: model, conversations: store,
+            inputDecision: decision, fullDuplex: fullDuplex, chat: model, conversations: store,
             observations: { values, input, chat in
                 guard let photoObservation else { return [] }
                 if values.contains(where: { $0.path == "Camera.Capture.takePhoto" && !$0.result.isError }),
@@ -287,14 +287,14 @@ private func roundHarness(
         )
     } else if toolCount > 0 {
         agent = try FixtureNativeAgent(
-            chat: model, conversations: store,
+            inputDecision: decision, fullDuplex: fullDuplex, chat: model, conversations: store,
             context: try AgentContextRepository(
                 agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
         )
     } else {
         agent = try AssistantAgent(
             stateContext: try publicStateFixture(),
-            chat: model, conversations: store,
+            inputDecision: decision, fullDuplex: fullDuplex, chat: model, conversations: store,
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
         )
@@ -1787,4 +1787,434 @@ func actionFailureContinuesReActDespiteSpeechFailureAndAcceptsNextInput() async 
     let records = try await harness.store.snapshot().current.turns
     #expect(records.count == 2 && records.allSatisfy { $0.state == .completed })
     await harness.close()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func fullDuplexFreezesEveryQueuedInputInOneRequest() async throws {
+    let harness = try await roundHarness(action: false, toolCount: 0, fullDuplex: true, requestRounds: 0) { _ in
+        .completed
+    }
+    try await harness.agent.start()
+    try await harness.agent.pause()
+    let session = UUID().uuidString
+    let first = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("给我介绍北京"))
+    let second = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("还要明天出行的注意事项"))
+    try await harness.agent.receive(first)
+    try await harness.agent.receive(second)
+    let pump = Task {
+        try await AssistantGenerationTransport.consume(fixtureOutputs(harness.agent)) { output in
+            let result = try await harness.gateway.execute(output)
+            await harness.log.record(output, result: result)
+        }
+    }
+    try await harness.agent.resume()
+    for _ in 0..<1000 {
+        let turns = try await harness.store.snapshot().current.turns
+        if turns.count == 2 && turns.allSatisfy({ $0.state == .completed }) { break }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    let requests = await harness.model.requests
+    #expect(requests.count == 1)
+    let request = try #require(requests.first)
+    let body = request.messages.last(where: { $0.role == .user })?.content ?? ""
+    #expect(body.hasPrefix("给我介绍北京\nUser ｜ "))
+    #expect(!body.contains(first.id) && !body.contains(second.id))
+    #expect(body.contains("给我介绍北京") && body.contains("明天出行"))
+    let system = try #require(request.messages.first)
+    #expect(system.role == .system && system.content.hasPrefix("# OUTPUT FORMAT"))
+    #expect(system.content.contains(try AgentPrompts.systemInput()))
+    #expect(system.content.contains("respond selectively") && system.content.contains("speech is optional"))
+    #expect(!system.content.contains("# RESPONSE CHECK"))
+    let turns = try await harness.store.snapshot().current.turns
+    #expect(turns.count == 2 && turns.allSatisfy { $0.state == .completed })
+    #expect(turns.allSatisfy { $0.coordination?.batchID == first.id })
+    #expect(turns.filter { !($0.modelRequests ?? []).isEmpty }.count == 1)
+    await harness.close()
+    pump.cancel()
+    _ = await pump.result
+}
+
+private actor DuplexActionGate {
+    var entered = false
+    var count = 0
+    var released = false
+    var exited = false
+    func execute() async throws {
+        entered = true
+        count += 1
+        defer { exited = true }
+        while !released { try await Task.sleep(for: .milliseconds(10)) }
+    }
+    func release() { released = true }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func fullDuplexStartsNewRequestWhileOldActionIsExecuting() async throws {
+    let gate = DuplexActionGate()
+    let harness = try await roundHarness(action: true, toolCount: 0, fullDuplex: true, requestRounds: 2) { _ in
+        try await gate.execute()
+        return .completed
+    }
+    try await harness.agent.start()
+    let pump = Task {
+        try await AssistantGenerationTransport.consume(fixtureOutputs(harness.agent)) { output in
+            let result = try await harness.gateway.execute(output)
+            await harness.log.record(output, result: result)
+        }
+    }
+    let session = UUID().uuidString
+    try await harness.agent.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("执行第一个动作")))
+    for _ in 0..<1000 {
+        if await gate.entered { break }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(await gate.entered)
+    try await harness.agent.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("同时回答这个新问题")))
+    for _ in 0..<1000 {
+        if await harness.model.requests.count >= 2 { break }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(await harness.model.requests.count == 2)
+    #expect(await !gate.released)
+    #expect(await gate.count == 1)
+    await gate.release()
+    for _ in 0..<1000 {
+        if await gate.count == 2 { break }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(await gate.count == 2)
+    await harness.close()
+    pump.cancel()
+    _ = await pump.result
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func fullDuplexMergesReadyNativeResultsAndQueuedUserInput() async throws {
+    let gate = DuplexActionGate()
+    let harness = try await roundHarness(action: false, toolCount: 1, fullDuplex: true) { _ in
+        try await gate.execute()
+        return .value("original tool evidence")
+    }
+    let agent = try #require(harness.agent as? FixtureNativeAgent)
+    try await agent.start()
+    let pump = Task {
+        try await AssistantGenerationTransport.consume(fixtureOutputs(agent)) { output in
+            let result = try await harness.gateway.execute(output)
+            await harness.log.record(output, result: result)
+        }
+    }
+    let session = UUID().uuidString
+    let first = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("read the old result"))
+    try await agent.receive(first)
+    for _ in 0..<1000 {
+        if await gate.entered { break }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(await gate.entered)
+    await agent.setExecutionCancellationBarrier(true)
+    let second = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("also answer the new question"))
+    try await agent.receive(second)
+    await gate.release()
+    for _ in 0..<1000 {
+        if await harness.log.outputs.contains(where: { if case .roundFinished = $0.output { true } else { false } }) {
+            break
+        }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    await agent.setExecutionCancellationBarrier(false)
+    for _ in 0..<1000 {
+        if await harness.model.requests.count >= 2 { break }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    let requests = await harness.model.requests
+    let diagnostics =
+        "failures: \(await harness.log.failures); turns: \(try await harness.store.snapshot().current.turns)"
+    try #require(requests.count == 2, Comment(rawValue: diagnostics))
+    let messages = requests[1].messages
+    #expect(messages.contains { $0.content.contains("also answer the new question") })
+    #expect(messages.filter { $0.role == .tool && $0.toolCallID == "native-0" }.count == 1)
+    #expect(messages.flatMap(\.toolCalls).filter { $0.id == "native-0" }.count == 1)
+    #expect(messages.contains { $0.role == .tool && $0.content == "original tool evidence" })
+    let history = try await harness.store.snapshot()
+    let recorded = history.current.turns.flatMap { $0.modelRequests ?? [] }
+    #expect(
+        recorded.contains {
+            $0.input.contains("also answer the new question") && $0.input.contains("original tool evidence")
+        })
+    await harness.close()
+    pump.cancel()
+    _ = await pump.result
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func fullDuplexInterruptSettlesOldActionAndRetainsQueuedInput() async throws {
+    let gate = DuplexActionGate()
+    let classifier = DecisionCloudFixture(events: [
+        .toolCall(.init(id: "classification", name: "classify_input", argumentsJSON: #"{"action":"interrupt"}"#)),
+        .finished(.toolCalls),
+    ])
+    let decision = AssistantInputDecision(local: UnavailableDecision(), selection: { false }, cloud: { classifier })
+    let harness = try await roundHarness(action: true, toolCount: 0, fullDuplex: true, decision: decision) { _ in
+        try await gate.execute()
+        return .completed
+    }
+    let agent = try #require(harness.agent as? AssistantAgent)
+    try await agent.start()
+    let pump = Task {
+        try await AssistantGenerationTransport.consume(fixtureOutputs(agent)) { output in
+            do {
+                let result = try await harness.gateway.execute(output)
+                await harness.log.record(output, result: result)
+            } catch is CancellationError { try Task.checkCancellation() }
+        }
+    }
+    let session = UUID().uuidString
+    let first = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("old action"))
+    try await agent.receive(first)
+    for _ in 0..<1000 {
+        if await gate.entered { break }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(await gate.entered)
+    let next = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("stop and answer this"))
+    let feedback = DecisionFeedbackProbe()
+    await agent.bindInputDecisionFeedback { disposition, id in
+        #expect(disposition == .interrupt)
+        #expect(await gate.exited)
+        await feedback.receive(id)
+    }
+    await agent.bindInputInterruption { session in
+        await agent.setExecutionCancellationBarrier(true)
+        async let outputs: Void = harness.gateway.cancelCalls(for: agent, sessionID: session)
+        async let generation: Void = agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
+        _ = try await (outputs, generation)
+        try await agent.settleInterruptedExecution(sessionID: session)
+        await agent.setExecutionCancellationBarrier(false)
+    }
+    try await agent.receive(next)
+    for _ in 0..<1000 {
+        let turns = try await harness.store.snapshot().current.turns
+        if turns.first(where: { $0.id == next.id })?.state == .completed { break }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    let turns = try await harness.store.snapshot().current.turns
+    #expect(turns.first(where: { $0.id == first.id })?.state == .cancelled)
+    #expect(turns.first(where: { $0.id == next.id })?.state == .completed)
+    #expect(await harness.model.requests.count == 2)
+    #expect(await !gate.released)
+    #expect(await feedback.values == [next.id])
+    await harness.close()
+    pump.cancel()
+    _ = await pump.result
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func fullDuplexPauseCancelsParkedRoundWithoutReplayingOnResume() async throws {
+    let gate = DuplexActionGate()
+    let harness = try await roundHarness(action: true, toolCount: 0, fullDuplex: true) { _ in
+        try await gate.execute()
+        return .completed
+    }
+    let agent = try #require(harness.agent as? AssistantAgent)
+    try await agent.start()
+    let pump = Task {
+        try await AssistantGenerationTransport.consume(fixtureOutputs(agent)) { output in
+            do {
+                let result = try await harness.gateway.execute(output)
+                await harness.log.record(output, result: result)
+            } catch is CancellationError { try Task.checkCancellation() }
+        }
+    }
+    let session = UUID().uuidString
+    let first = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("old action"))
+    try await agent.receive(first)
+    for _ in 0..<1000 {
+        if await gate.entered { break }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(await gate.entered)
+    try await agent.pause()
+    try await harness.gateway.cancelCalls(for: agent, sessionID: session)
+    try await agent.resume()
+    let next = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("new request"))
+    try await agent.receive(next)
+    for _ in 0..<1000 {
+        if try await harness.store.snapshot().current.turns.first(where: { $0.id == next.id })?.state == .completed {
+            break
+        }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    let turns = try await harness.store.snapshot().current.turns
+    #expect(turns.first(where: { $0.id == first.id })?.state == .cancelled)
+    #expect(turns.first(where: { $0.id == next.id })?.state == .completed)
+    #expect(await harness.model.requests.count == 2)
+    #expect(await gate.count == 1)
+    await harness.close()
+    pump.cancel()
+    _ = await pump.result
+}
+
+@Test(.timeLimit(.minutes(1)))
+func duplexRoundTransportReportsSealFailureWithoutWaitingForMoreOutputs() async throws {
+    let outputs = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(4))
+    let input = AgentInput(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("fixture"))
+    outputs.continuation.yield(.init(source: .assistant, context: input.context, output: .roundFinished("failed")))
+    // Keep the producer open: the failed seal must wake the reader independently.
+    await #expect(throws: RoundFailure.self) {
+        try await AssistantGenerationTransport.consume(outputs.stream) { _ in throw RoundFailure.expected }
+    }
+    outputs.continuation.finish()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
+func duplexSemanticResultsShareQueueCapacityWhileSettlementKeepsReservedSlot(speech: Bool) async throws {
+    let gate = DuplexActionGate()
+    let harness = try await roundHarness(action: false, toolCount: 1, fullDuplex: true) { _ in
+        try await gate.execute()
+        return .value("result")
+    }
+    let agent = try #require(harness.agent as? FixtureNativeAgent)
+    try await agent.start()
+    let pump = Task {
+        try await AssistantGenerationTransport.consume(fixtureOutputs(agent)) { output in
+            let result = try await harness.gateway.execute(output)
+            await harness.log.record(output, result: result)
+        }
+    }
+    let session = UUID().uuidString
+    try await agent.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("tool")))
+    for _ in 0..<1000 {
+        if await gate.entered { break }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(await gate.entered)
+    await agent.setExecutionCancellationBarrier(true)
+    await gate.release()
+    for _ in 0..<1000 {
+        if await agent.status().queuedInputs == 2 { break }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(await agent.status().queuedInputs == 2)
+    for index in 0..<31 {
+        let id = UUID().uuidString
+        let payload: InputPayload =
+            speech ? .observation(.transcript("queued \(index)", final: true)) : .text("queued \(index)")
+        try await agent.receive(
+            .init(
+                id: id, sessionID: session, payload: payload,
+                metadata: .init(
+                    payload: payload, source: speech ? "speechPerception" : "user",
+                    origin: speech ? .agent : .local, rootID: id)))
+    }
+    #expect(await agent.status().queuedInputs == 33)
+    await #expect(throws: HarnessError.self) {
+        try await agent.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("overflow")))
+    }
+    await harness.close()
+    pump.cancel()
+    _ = await pump.result
+}
+
+private actor EarlyBusinessResult {
+    var count = 0
+    var released = false
+    func execute(fail: Bool) async throws -> ActionCompletion {
+        count += 1
+        if count == 1 {
+            if fail { throw RoundFailure.expected }
+            return .value("first business result")
+        }
+        while !released { try await Task.sleep(for: .milliseconds(5)) }
+        return .completed
+    }
+    func release() { released = true }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
+func multiSourceActionResultStartsRequestBeforeOtherActionCompletes(fail: Bool) async throws {
+    let gate = EarlyBusinessResult()
+    let classifier = DecisionCloudFixture(events: [
+        .toolCall(.init(id: "classify", name: "classify_input", argumentsJSON: #"{"action":"enqueue"}"#))
+    ])
+    let decision = AssistantInputDecision(local: UnavailableDecision(), selection: { false }, cloud: { classifier })
+    let harness = try await roundHarness(
+        action: true, toolCount: 0, fullDuplex: true, decision: decision, actionCount: 2
+    ) { _ in
+        try await gate.execute(fail: fail)
+    }
+    try await harness.agent.start()
+    let pump = Task {
+        try await AssistantGenerationTransport.consume(fixtureOutputs(harness.agent)) { output in
+            let result = try await harness.gateway.execute(output)
+            await harness.log.record(output, result: result)
+        }
+    }
+    try await harness.agent.receive(.init(id: "early-result", sessionID: "early", payload: .text("执行两个动作")))
+    for _ in 0..<1000 {
+        let actionsStarted = await gate.count
+        if await harness.model.requests.count >= 2, fail || actionsStarted == 2 { break }
+        try await Task.sleep(for: .milliseconds(5))
+    }
+    let requests = await harness.model.requests
+    #expect(requests.count == 2)
+    #expect(await !gate.released)
+    if !fail { #expect(await gate.count == 2) }
+    let body = try #require(requests.last?.messages.last(where: { $0.role == .user })?.content)
+    #expect(body.hasPrefix("UI.Expression.express {"))
+    #expect(body.contains("\nAction Result ｜ "))
+    #expect(body.contains(fail ? #""status":"failed""# : #""status":"succeeded""#))
+    #expect(!body.contains("call_id") && !body.contains("round_id") && !body.contains(#""call":"#))
+    #expect(!body.contains("执行两个动作"))
+    await gate.release()
+    for _ in 0..<1000 {
+        if try await harness.store.snapshot().current.turns.allSatisfy({ $0.state == .completed }) { break }
+        try await Task.sleep(for: .milliseconds(5))
+    }
+    #expect(await harness.model.requests.count == 2)
+    #expect(await classifier.requests.count == 1)
+    await decision.stop()
+    await harness.close()
+    pump.cancel()
+    _ = await pump.result
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func multiSourceReadyNativeGroupDoesNotWaitForUnrelatedAction() async throws {
+    let gate = DuplexActionGate()
+    let harness = try await roundHarness(action: true, toolCount: 2, fullDuplex: true) { invocation in
+        if invocation.call.actionPath.domain == "UI" {
+            try await gate.execute()
+            return .completed
+        }
+        return .value("ready tool result")
+    }
+    try await harness.agent.start()
+    let pump = Task {
+        try await AssistantGenerationTransport.consume(fixtureOutputs(harness.agent)) { output in
+            let result = try await harness.gateway.execute(output)
+            await harness.log.record(output, result: result)
+        }
+    }
+    try await harness.agent.receive(
+        .init(id: "native-ready", sessionID: "native", payload: .text("read while displaying")))
+    for _ in 0..<1000 {
+        if await harness.model.requests.count >= 2, await gate.entered { break }
+        try await Task.sleep(for: .milliseconds(5))
+    }
+    let requests = await harness.model.requests
+    #expect(requests.count == 2)
+    #expect(await gate.entered)
+    #expect(await !gate.released)
+    let request = try #require(requests.last)
+    #expect(request.messages.filter { $0.role == .tool }.count == 2)
+    #expect(Set(request.messages.flatMap(\.toolCalls).map(\.id)) == ["native-0", "native-1"])
+    await gate.release()
+    for _ in 0..<1000 {
+        if try await harness.store.snapshot().current.turns.allSatisfy({ $0.state == .completed }) { break }
+        try await Task.sleep(for: .milliseconds(5))
+    }
+    #expect(await harness.model.requests.count == 2)
+    await harness.close()
+    pump.cancel()
+    _ = await pump.result
 }

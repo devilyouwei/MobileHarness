@@ -12,10 +12,15 @@ public actor AssistantExecutionSession {
     let speech: AssistantSpeechOutput?
     private let island = AgentIslandPublication()
     private let waitingIsland = AgentIslandPublication()
+    private let decisionIsland = AgentIslandPublication()
+    private var decisionExpiry: Task<Void, Never>?
+    private var decisionRevision: UInt64 = 0
+    private var allowsDecisionPresentation = true
     public var presentationFailure: String? {
         get async {
             let failures = [
-                await island.lastFailure, await waitingIsland.lastFailure, await speech?.snapshot().presentationFailure,
+                await island.lastFailure, await waitingIsland.lastFailure, await decisionIsland.lastFailure,
+                await speech?.snapshot().presentationFailure,
             ]
             .compactMap { $0 }
             return failures.isEmpty ? nil : failures.joined(separator: "; ")
@@ -67,6 +72,9 @@ public actor AssistantExecutionSession {
                 try Task.checkCancellation()
                 try await manager.start(.assistant)
                 let consumer = try await output.consumer(for: agent)
+                await agent.bindInputInterruption { [weak self] session in
+                    try await self?.interruptConversation(sessionID: session)
+                }
                 await island.bind { operation, parameters, session in
                     let result = try await consumer.executeInternal(
                         .init(
@@ -87,13 +95,18 @@ public actor AssistantExecutionSession {
                 await island.start()
                 await waitingIsland.bind(consumer: consumer, source: .assistant)
                 await waitingIsland.start()
+                await decisionIsland.bind(consumer: consumer, source: .assistant)
+                await decisionIsland.start()
+                await agent.bindInputDecisionFeedback { [weak self] disposition, id in
+                    await self?.presentInputDecision(disposition, id: id)
+                }
                 await speech?.bindPresentation(consumer)
                 await agent.bindReplyWaiting { [waitingIsland] waiting in
                     await waitingIsland.submit(waiting ? Self.waitingContent : nil)
                 }
                 pump = Task {
                     do {
-                        try await IndependentOutputWorkflow.consumeGeneration(agent.outputs) { envelope in
+                        try await AssistantGenerationTransport.consume(agent.outputs) { envelope in
                             do {
                                 let outcome = try await consumer.execute(envelope)
                                 if outcome.isError {
@@ -120,6 +133,7 @@ public actor AssistantExecutionSession {
                 started = true
             } catch {
                 await speech?.stop()
+                await decisionIsland.stop()
                 await waitingIsland.stop()
                 await island.stop()
                 await removeRegistration()
@@ -146,6 +160,10 @@ public actor AssistantExecutionSession {
     /// Only the Assistant is affected; peer lifecycle belongs to the module root.
     public func setForeground(_ foreground: Bool) async throws {
         try await start()
+        allowsDecisionPresentation = foreground
+        if !foreground {
+            await clearInputDecision()
+        }
         let state = await agent.status().lifecycle
         if foreground, state == .paused { try await agent.resume() }
         if !foreground, state == .running { try await agent.pause() }
@@ -154,9 +172,17 @@ public actor AssistantExecutionSession {
     /// Stop accepted execution without ending the conversation or its public State scope.
     public func interruptConversation(sessionID: String) async throws {
         guard started, !closed else { return }
-        async let calls: Void = output.cancelCalls(for: agent, sessionID: sessionID)
-        async let model: Void = sendControl(.interruptSession, sessionID: sessionID)
-        _ = try await (model, calls)
+        await agent.setExecutionCancellationBarrier(true)
+        do {
+            async let calls: Void = output.cancelCalls(for: agent, sessionID: sessionID)
+            async let model: Void = sendControl(.interruptSession, sessionID: sessionID)
+            _ = try await (model, calls)
+            try await agent.settleInterruptedExecution(sessionID: sessionID)
+            await agent.setExecutionCancellationBarrier(false)
+        } catch {
+            await agent.setExecutionCancellationBarrier(false)
+            throw error
+        }
     }
 
     /// Receives the existing role-owned Skill snapshot; task logs are not a presentation authority.
@@ -184,6 +210,52 @@ public actor AssistantExecutionSession {
             detail: .init(text: String(task.goal.prefix(320))))
     }
 
+    private func presentInputDecision(_ disposition: InputDisposition, id: String) async {
+        guard started, !closed, allowsDecisionPresentation,
+            let content = Self.inputDecisionContent(disposition, id: id)
+        else { return }
+        decisionExpiry?.cancel()
+        decisionRevision &+= 1
+        let revision = decisionRevision
+        decisionExpiry = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(3)) } catch { return }
+            await self?.expireInputDecision(revision: revision)
+        }
+        await decisionIsland.submit(content)
+    }
+
+    static func inputDecisionContent(_ disposition: InputDisposition, id: String) -> IslandContent? {
+        let title: String
+        let symbol: String
+        switch disposition {
+        case .enqueue: return nil
+        case .discard:
+            title = "已丢弃本次输入"
+            symbol = "minus.circle"
+        case .interrupt:
+            title = "已打断当前回复"
+            symbol = "stop.circle"
+        }
+        return .init(
+            title: title, primary: .symbol(name: symbol), tone: .warning, priority: .attention,
+            liveActivity: false, expansionID: id, detail: .init(text: title))
+    }
+
+    private func expireInputDecision(revision: UInt64) async {
+        guard decisionRevision == revision else { return }
+        decisionExpiry = nil
+        await decisionIsland.submit(nil)
+    }
+
+    private func clearInputDecision() async {
+        decisionRevision &+= 1
+        let expiry = decisionExpiry
+        decisionExpiry = nil
+        expiry?.cancel()
+        await decisionIsland.submit(nil)
+        await expiry?.value
+    }
+
     static var waitingContent: IslandContent {
         .init(title: "正在思考", primary: .symbol(name: "sparkles"), priority: .low, secondary: .loading)
     }
@@ -209,6 +281,8 @@ public actor AssistantExecutionSession {
             starting?.cancel()
             _ = await starting?.result
             await speech?.stop()
+            await clearInputDecision()
+            await decisionIsland.stop()
             await waitingIsland.stop()
             await island.stop()
             await removeRegistration()

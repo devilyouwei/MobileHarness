@@ -50,3 +50,5 @@ Production declarations and explicit developer provisioning.
 ## 待实现
 
 - 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。
+
+Decision 使用固定 revision 的 hugging-mac/d3-edge-CoreAI 制品，安装目录 D3Edge。目录只随包分发声明与下载信息，不含权重。图、tokenizer、manifest、配置和许可证一并校验安装，下载不切换业务偏好。

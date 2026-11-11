@@ -197,6 +197,19 @@ public actor AssistantHistoryStore {
                     attachedIdentity = true
                 }
             }
+            for reference in references where reference.role == "assistant" {
+                for input in next.current.turns.indices {
+                    guard
+                        let request = next.current.turns[input].modelRequests?.firstIndex(where: {
+                            $0.id == reference.clientID
+                        })
+                    else { continue }
+                    next.current.turns[input].modelRequests?[request].messageID = reference.id
+                    let inputMessageID = next.current.turns[input].messageID
+                    next.current.turns[input].modelRequests?[request].inputMessageID = inputMessageID
+                    attachedIdentity = true
+                }
+            }
             if attachedIdentity { try await commit(next) }
             dirtyInputs.subtract(snapshot.changedInputs ?? [])
             savedID = snapshot.conversation.id
@@ -213,6 +226,59 @@ public actor AssistantHistoryStore {
         try await load()
         if let inputID { dirtyInputs.insert(inputID) }
         try await checkpointLocked()
+    }
+    public func completeForegroundTask(
+        _ taskID: String, goal: String, summary: String, finishedAt: Date, inputID: String, requestID: String,
+        publish: @Sendable (AssistantArchive, @escaping @Sendable () async throws -> Void) async throws -> Void
+    ) async throws {
+        try await acquireWrite()
+        defer { releaseWrite() }
+        try await load()
+        guard
+            let request = value.current.turns.first(where: { $0.id == inputID })?.modelRequests?.first(where: {
+                $0.id == requestID
+            }), request.historyTaskID == taskID, request.awaitingDispatch != true
+        else {
+            throw RecordStorageError.conflict
+        }
+        try await checkpointLocked()
+
+        let sources: [AssistantHistoryReference]
+        if let records {
+            sources = try await records.tasks.taskSources(taskID).map {
+                AssistantHistoryReference(inputID: $0.inputID, requestID: $0.requestID)
+            }
+        } else {
+            sources = value.current.turns.flatMap { turn in
+                (turn.modelRequests ?? []).filter { $0.historyTaskID == taskID && $0.awaitingDispatch != true }.map {
+                    ($0.historyOrder, AssistantHistoryReference(inputID: turn.id, requestID: $0.id))
+                }
+            }.sorted { $0.0 < $1.0 }.map(\.1)
+        }
+        guard sources.contains(where: { $0.requestID == requestID }) else { throw RecordStorageError.conflict }
+        let compression = AssistantTaskCompression(
+            taskID: taskID, goal: goal, status: .completed, reportedSummary: summary, failure: nil,
+            completedAt: finishedAt, sources: sources, closedAtAction: true)
+        var next = value
+        guard next.revision < UInt64.max else { throw AssistantHistoryError.capacityExceeded }
+        next.revision += 1
+        next.current.taskCompressions.append(compression)
+        try next.validate()
+        let completion = try TaskCompressionRecord(
+            id: taskID, goal: goal, status: "completed", summary: summary, failure: nil, finishedAt: finishedAt,
+            sources: sources.map(\.requestID), detail: JSONEncoder().encode(compression))
+        let dialog = next.current.id
+        let summaries = records?.tasks
+        let tasks = tasks
+        try await publish(next) {
+            if let summaries {
+                try await summaries.completeTask(completion, dialog: dialog, endingRequest: requestID)
+            } else {
+                try await tasks.endTask(taskID, status: "completed", failure: nil, finishedAt: finishedAt)
+            }
+        }
+        value = next
+        readToken = AssistantReadToken(value: UUID().uuidString)
     }
     public func listConversations() async throws -> [AssistantConversation] {
         try await acquireWrite()
@@ -344,7 +410,7 @@ public actor AssistantHistoryStore {
         id: String, user: String, request: [ModelMessage], model: String,
         maximumOutputTokens: Int?, temperature: Double, awaitingModel: Bool
     ) async throws -> AssistantRecord {
-        guard user.utf8.count <= 4096, model.utf8.count <= 512,
+        guard user.utf8.count <= 16_384, model.utf8.count <= 512,
             request.count <= 514,
             request.allSatisfy({ $0.content.utf8.count <= ($0.role == .system ? 65536 : 262144) }),
             temperature.isFinite, maximumOutputTokens.map({ $0 > 0 }) ?? true
@@ -418,7 +484,9 @@ public actor AssistantHistoryStore {
         }
     }
 
-    public func beginModelRequest(_ request: AssistantModelRequest, for id: String) async throws {
+    public func beginModelRequest(_ request: AssistantModelRequest, for id: String, awaitingDispatch: Bool = false)
+        async throws
+    {
         try await acquireWrite()
         defer { releaseWrite() }
         try await load()
@@ -439,27 +507,37 @@ public actor AssistantHistoryStore {
         let observation = !requests.isEmpty
         admitted.isObservation = observation
         admitted.inputMessageID = next.current.turns[index].messageID
-        if let records {
-            if observation {
-                admitted.inputMessageID = try await records.beginMessage(
-                    dialog: value.current.id,
-                    identity: .init(
-                        clientID: request.id, inputID: id, role: "user", kind: "observation",
-                        order: admitted.historyOrder, date: admitted.date, taskID: request.historyTaskID,
-                        replyTo: requests.last?.messageID))
-            }
-            admitted.messageID = try await records.beginMessage(
-                dialog: value.current.id,
-                identity: .init(
-                    clientID: request.id, inputID: id, role: "assistant", kind: "response",
-                    order: admitted.historyOrder, date: admitted.date, taskID: request.historyTaskID,
-                    replyTo: admitted.inputMessageID, detail: try JSONEncoder().encode(admitted)))
-        }
+        admitted.awaitingDispatch = awaitingDispatch
         requests.append(admitted)
         next.current.turns[index].modelRequests = requests
         dirtyInputs.insert(id)
         try await commit(next)
-        if observation { try await checkpointLocked() }
+        if !awaitingDispatch { try await checkpointLocked() }
+    }
+
+    public func markModelRequestDispatched(_ id: String) async throws {
+        try await acquireWrite()
+        defer { releaseWrite() }
+        try await load()
+        guard let input = value.current.turns.firstIndex(where: { $0.id == id }),
+            let request = value.current.turns[input].modelRequests?.indices.last
+        else { throw AssistantHistoryError.missingTurn }
+        guard value.current.turns[input].modelRequests?[request].awaitingDispatch == true else { return }
+        try Task.checkCancellation()
+        guard value.current.turns[input].state == .generating,
+            value.current.turns[input].modelRequests?[request].state == .generating
+        else { throw AssistantHistoryError.invalidRecord }
+        if let task = value.current.turns[input].modelRequests?[request].historyTaskID,
+            value.current.taskCompressions.contains(where: { $0.taskID == task && $0.closedAtAction == true })
+        {
+            throw RecordStorageError.conflict
+        }
+        var next = value
+        next.current.turns[input].modelRequests?[request].awaitingDispatch = false
+        next.current.turns[input].modelRequests?[request].date = Date()
+        dirtyInputs.insert(id)
+        try await commit(next)
+        try await checkpointLocked()
     }
 
     public func clearRequestLogs(requestID: String?) async throws {
@@ -468,6 +546,7 @@ public actor AssistantHistoryStore {
     }
 
     public func recordModelTransport(_ update: ModelRequestLogUpdate, for id: String) async throws {
+        if case .request = update { try await markModelRequestDispatched(id) }
         guard let records else { return }
         let snapshot = try await readCurrent()
         guard let request = snapshot.current.turns.first(where: { $0.id == id })?.modelRequests?.last else {
@@ -484,7 +563,10 @@ public actor AssistantHistoryStore {
             guard let request = snapshot.current.turns.first(where: { $0.id == id })?.modelRequests?.last else {
                 throw AssistantHistoryError.missingTurn
             }
-            try await records.writeRequestPayload(request.id, json: requestJSON, response: response, initial: initial)
+            if request.awaitingDispatch != true {
+                try await records.writeRequestPayload(
+                    request.id, json: requestJSON, response: response, initial: initial)
+            }
         }
         let retainedRequest = records == nil ? requestJSON : nil
         let retainedResponse = records == nil ? response : nil
@@ -621,6 +703,7 @@ public actor AssistantHistoryStore {
         else { throw AssistantHistoryError.missingTurn }
         var next = value
         var turn = next.current.turns[index]
+        let directProducer = turn.modelRequests?.isEmpty ?? true
         // Direct text producers start their message on its first content event. Managed models
         // use beginModelRequest before invoking the provider, so their deltas perform no writes.
         if turn.modelRequests?.isEmpty ?? true {
@@ -631,21 +714,29 @@ public actor AssistantHistoryStore {
             request.inputMessageID = turn.messageID
             request.toolCalls = turn.toolCalls ?? []
             request.tokenUsage = turn.tokenUsage
-            if let records {
-                request.messageID = try await records.beginMessage(
-                    dialog: value.current.id,
-                    identity: .init(
-                        clientID: request.id, inputID: id, role: "assistant", kind: "response",
-                        order: request.historyOrder, date: request.date, replyTo: turn.messageID,
-                        detail: try JSONEncoder().encode(request)))
-            }
             turn.modelRequests = [request]
+        }
+        if directProducer {
+            next.current.turns[index] = turn
+            dirtyInputs.insert(id)
+            try await commit(next)
+            try await checkpointLocked()
+            next = value
+            turn = next.current.turns[index]
         }
         turn.response += delta
         if let request = turn.modelRequests?.indices.last { turn.modelRequests?[request].response += delta }
         next.current.turns[index] = turn
         dirtyInputs.insert(id)
         try await commit(next)
+    }
+
+    public func recordCoordination(_ evidence: AssistantInputCoordination, for id: String) async throws {
+        try await updateTurn(id) {
+            $0.coordination = evidence
+            return true
+        }
+        try await checkpoint(inputID: id)
     }
 
     public func finish(
@@ -808,7 +899,10 @@ extension AssistantConversation {
             throw AssistantHistoryError.invalidRecord
         }
         for compression in taskCompressions {
-            let owned = requests.filter { $0.1.historyTaskID == compression.taskID }
+            let owned = requests.filter {
+                $0.1.historyTaskID == compression.taskID
+                    && (compression.closedAtAction != true || $0.1.awaitingDispatch != true)
+            }
             guard compression.status != .generating, !compression.sources.isEmpty,
                 compression.sources.count <= 8192,
                 compression.goal.utf8.count <= 4096,
@@ -817,7 +911,7 @@ extension AssistantConversation {
                 isWindow
                     ? Set(owned.map({ $0.0 })).isSubset(of: Set(compression.sources))
                     : owned.map({ $0.0 }) == compression.sources,
-                owned.allSatisfy({ $0.1.state != .generating })
+                compression.closedAtAction == true || owned.allSatisfy({ $0.1.state != .generating })
             else { throw AssistantHistoryError.invalidRecord }
         }
     }

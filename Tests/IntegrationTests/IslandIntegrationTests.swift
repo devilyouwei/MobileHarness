@@ -451,3 +451,34 @@ func photographerAndApplicationControlPublishOwnActivitiesWithoutAssistant() asy
     await output.shutdown()
     await ui.stop()
 }
+
+@Test @MainActor func assistantDecisionIslandExpandsLocallyAndRevealsPreviousDetailAfterEnding() async throws {
+    let state = IslandState()
+    state.setAvailable(true)
+    defer { state.setAvailable(false) }
+    let service = IslandPresentationService(state: state)
+    try state.publishSlot(
+        owner: "test.task",
+        content: .init(
+            title: "任务", primary: .symbol(name: "scope"), priority: .normal, detail: .init(text: "当前任务")))
+    let id = UUID().uuidString
+    #expect(AssistantExecutionSession.inputDecisionContent(.enqueue, id: "enqueue") == nil)
+    for (revision, decision, text) in [
+        (1, InputDisposition.discard, "已丢弃本次输入"),
+        (2, InputDisposition.interrupt, "已打断当前回复"),
+    ] {
+        let content = try #require(AssistantExecutionSession.inputDecisionContent(decision, id: String(revision)))
+        let payload = String(decoding: try JSONEncoder().encode(content), as: UTF8.self)
+        _ = try await IslandActions.present(
+            invocation: islandInput(
+                "present", parameters: ["activityID": id, "revision": String(revision), "content": payload],
+                source: "assistant"), using: service)
+        #expect(state.expanded && state.detail?.text == text)
+        #expect(state.selected?.owner == "test.task")
+        try state.setExpanded(false)
+    }
+    _ = try await IslandActions.end(
+        invocation: islandInput(
+            "end", parameters: ["activityID": id, "revision": "3"], source: "assistant"), using: service)
+    #expect(state.expanded && state.detail?.text == "当前任务")
+}

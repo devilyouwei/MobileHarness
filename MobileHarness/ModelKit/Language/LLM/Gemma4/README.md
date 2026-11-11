@@ -72,3 +72,5 @@ GemmaLanguageEngine.render emits one prompt turn for each caller message, includ
 ## 直连链路当前契约
 
 ✅ 显式模拟器构建变体不链接 CoreAI 后端，返回能力不可用；真机和 macOS 固定后端不变。
+
+上下文预算和资源准备完成后，在实际 generate 前调用 ChatRequest.onDispatch；准备阶段失败不报告推理开始。

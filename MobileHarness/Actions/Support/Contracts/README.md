@@ -78,3 +78,5 @@ MultimodalContextSnapshot.resourceBindings and ContextImage.resourceScope are pr
 CameraPhotoCommandReceipt represents a saved preview and optional feedback issues; CameraControlCapability exposes photo saving, with session expiry owned by Camera.
 
 ArtifactFilePath 统一 Writer 创建与 Artifacts 文件操作的路径校验。入口仅接受 HTML、Markdown 和纯文本文件路径。
+
+ProviderSettings 的 decisionUsesLocal、decisionProviderID 和 decisionModel 通过私有设置端口共同传输。Decision 云端绑定共享 Provider 稳定身份和凭据，nil ID 与空模型表示云端未配置。旧文档的 nil 模式在恢复时由 Provider 设置服务解析为有效模式。

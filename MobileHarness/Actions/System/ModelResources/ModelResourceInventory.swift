@@ -2,13 +2,14 @@ import Foundation
 import FunctionContracts
 
 public enum ResourceModelGroup: String, Codable, Sendable, CaseIterable {
-    case recognition, synthesis, language, vision
+    case recognition, synthesis, language, vision, decision
     public var requiredIDs: Set<String> {
         switch self {
         case .recognition: ["nemotron"]
         case .synthesis: ["moss-tts-nano"]
         case .language: ["gemma4-e2b"]
         case .vision: ["yolo26n-pose"]
+        case .decision: ["d3-edge"]
         }
     }
     public func isInstalled(in ids: Set<String>) -> Bool { requiredIDs.isSubset(of: ids) }

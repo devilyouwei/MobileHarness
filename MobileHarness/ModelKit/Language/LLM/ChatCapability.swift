@@ -215,8 +215,15 @@ public enum ChatTransportEvent: Sendable {
     case finished(at: Date, error: String?)
 }
 
+public enum ChatToolChoice: Sendable, Equatable {
+    case automatic
+    case required(name: String)
+}
+
 public struct ChatRequest: Sendable {
     public static let maximumImageCount = 5
+    /// Called after provider preparation, immediately before HTTP dispatch or native inference.
+    public var onDispatch: (@Sendable () async throws -> Void)?
     public var transportCapture: (@Sendable (ChatTransportEvent) async -> Void)?
     public var timing: ChatTiming?
     public let context: InferenceContext
@@ -224,10 +231,12 @@ public struct ChatRequest: Sendable {
     public let maximumOutputTokens: Int?
     public let temperature: Double
     public let tools: [ChatToolDefinition]
+    public let toolChoice: ChatToolChoice
 
     public init(
         messages: [ChatMessage], context: InferenceContext = InferenceContext(),
-        maximumOutputTokens: Int? = nil, temperature: Double = 0.7, tools: [ChatToolDefinition] = []
+        maximumOutputTokens: Int? = nil, temperature: Double = 0.7, tools: [ChatToolDefinition] = [],
+        toolChoice: ChatToolChoice = .automatic
     ) throws {
         guard !messages.isEmpty, maximumOutputTokens.map({ $0 > 0 }) ?? true, temperature.isFinite,
             (0...2).contains(temperature)
@@ -279,6 +288,10 @@ public struct ChatRequest: Sendable {
         guard tools.count <= 128, Set(tools.map(\.name)).count == tools.count,
             tools.reduce(0, { $0 + $1.declaration.count }) <= 65536
         else { throw CapabilityError.invalidRequest("Tool declarations exceed limits or contain duplicates") }
+        if case .required(let name) = toolChoice, !tools.contains(where: { $0.name == name }) {
+            throw CapabilityError.invalidRequest("Required tool is not declared")
+        }
+        self.toolChoice = toolChoice
         self.tools = tools
         self.context = context
         self.messages = messages

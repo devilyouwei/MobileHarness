@@ -6,7 +6,7 @@ public enum ModelResourceIntent: Codable, Sendable, Equatable {
     case refreshResources
     case refreshPresentation(generation: UInt64)
     case restoreSource
-    case saveSource(endpoint: String, allowsCellular: Bool, recognition: Bool, synthesis: Bool)
+    case saveSource(endpoint: String, allowsCellular: Bool, recognition: Bool, synthesis: Bool, decision: Bool = false)
     case configureSpeech(recognition: Bool, synthesis: Bool)
     case retire(String)
     case download(id: String, endpoint: String, allowsCellular: Bool)
@@ -20,7 +20,7 @@ public enum ModelResourceIntent: Codable, Sendable, Equatable {
         case .refreshPresentation(let generation):
             guard generation > 0 else { throw CommunicationError.invalidPayload }
             return
-        case .saveSource(let endpoint, _, _, _):
+        case .saveSource(let endpoint, _, _, _, _):
             guard !endpoint.isEmpty, endpoint.utf8.count <= 1024 else { throw CommunicationError.invalidPayload }
             return
         case .download(let value, let endpoint, _):

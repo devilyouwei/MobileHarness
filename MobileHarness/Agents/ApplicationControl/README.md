@@ -193,3 +193,5 @@ WindowState.requests is a typed UI source consumed with maximum concurrency4 plu
 ## 自有连接岛
 
 连接输入经角色自己的分类/接纳后调用UI.Island内部工具。状态变化先显示high优先级临时提示，角色持有一个可替换、可取消加入的3秒到期任务；到期连接状态降为background，断开撤下。展示不读取UI.bluetoothStatus，也不委托Assistant；窗口/诊断/设置的既有调用职责不变。presentationFailure在角色和容器runtime公开，停止在身份退休前加入最终end和计时器清理。
+
+Decision 的本地模式、云端 Provider ID 和模型通过 CloudSettingsDraft 与 ProviderSettings 的既有私有保存、恢复和呈现通道共同提交。ApplicationControl 原样传递角色选择和保存错误；模型发现沿用同一会话隔离请求链路。D3 下载通过独立的模型资源请求提交。

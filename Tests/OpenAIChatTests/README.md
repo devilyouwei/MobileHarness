@@ -49,3 +49,5 @@ Responses framing regressions cover deltas and repeated terminal output exceedin
 Shared-client concurrency uses twelve held URLProtocol requests against one actual OpenAIChat/resource context. It verifies per-session cancellation, continued occupancy by other requests and joined root shutdown; no real provider requests are issued.
 
 Large native-argument regression streams payloads beyond 4 KiB and 64 KiB, validates terminal identity/arguments and reserializes a paired transcript without truncation.
+
+发送边界测试核对 onDispatch 在首个 HTTP transportCapture 事件之前恰好执行一次；继续使用 URLProtocol 替身，不调用真实服务。

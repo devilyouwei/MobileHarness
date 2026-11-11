@@ -1,6 +1,230 @@
 # Assistant 多源输入的触发时机与合并
 
-## 范围与状态
+## 2026-11-10 最新收敛：仅用户快决策、统一语义 Q（代码核对与目标设计）
+
+本节记录最新用户要求，覆盖此前“Agent 文本也走 Decision”和按独立续轮消费业务结果的输入策略。本节调整于 2026-11-11 获准实施；下表保留改动前的核对基线，实施结果和验证在本节末及专项验证文档更新。Message 实际发起请求才建行的规则不变。
+
+### 改动前代码核对（历史基线）
+
+| 项目 | 改动前代码 | 本次目标 |
+| --- | --- | --- |
+| 用户 ASR final / 手工 input | `AgentChatWorker.receiveSignal` 把 `.text` 和 final transcript 交给 Decision | 用户最终文本必经 JEV/Decision；partial/onset 不触发语义请求。鉴别用户身份须依据已认证入口，不依据 `.text` 载荷类型或正文自称。 |
+| 其他 Agent | `admitPeerText` 将同伴输入转成 `.text`，再次进入同一分类分支 | 不再分类；保留 Agent 身份，直接进入 Q。 |
+| Action 返回值/异常 | `acceptPendingFeedback` 先进入 PendingRound，收到 round receipt 后以 priority=100 排入续轮；结果另外组成 execution observations/native tool 块 | 有业务返回值或执行异常的 Action 才成为 Q 项，不因同轮其他 Action 尚未完成而等待。成功且无返回值的 Action 只结束执行，不产生输入。 |
+| 冻结批次 | `drain` 只合并同会话可转换为文本的输入，并排除部分 PendingRound；单条发送裸文本，多条才发送 `inputs` JSON | 统一冻结同一 Assistant 会话中当时全部已就绪语义消息，单条也使用相同 envelope。 |
+| 来源/身份/时间 | 批次已有 id/source/time/text，但缺少 user 与 agent/action 的显式角色区分；capturedAt 默认是 systemUptime，排序以接纳 sequence 为主 | 显式 sender_role、channel、可读时间及顺序；ASR 多条均标为 user，各自保留时间和正文。不能把 uptime 当 Unix 时间。 |
+| 提示词 | Assistant Instructions 只描述协调与简短回答，未定义多来源 envelope 或选择性回答规则 | 加入本节提示词；不要求逐条复述/回复，不需要说话时允许仅表情。 |
+| 持久化 | awaitingDispatch 过滤准备态；onDispatch 创建请求，之后更新结果；Writer 使用相同门槛 | 保持，不恢复 Signal 接纳/丢弃时建 message 的行为。 |
+
+证据入口：
+- [输入接纳与批次](../../MobileHarness/Agents/Support/Chat/AgentChatWorker.swift)：receiveSignal、classifyPendingInputs、drain、acceptPendingFeedback、admitPeerText。
+- [输入事实](../../MobileHarness/Agents/Support/Core/AgentInput.swift)、[现有有界邮箱](../../MobileHarness/Agents/Support/Core/Runtime/SignalProcessing.swift)。
+- [Decision 校验](../../MobileHarness/Agents/Assistant/AssistantInputDecision.swift)：手工 local text 当前仍把 discard 强制转为 enqueue；这是需要统一说明/调整的既有保护，而非没有调用分类。
+- [Assistant 提示词](../../MobileHarness/Resources/Agents/Assistant/Instructions.md)、[请求发起回调](../../MobileHarness/ModelKit/Language/LLM/OpenAI/OpenAIChat.swift)、[历史写入门槛](../../MobileHarness/Storage/Database/AssistantMessages/AssistantHistoryStore.swift)。
+
+### 输入来源与边界
+
+这里的输入 channel 表示来源，不等于输出执行端的 Speech/Display/Camera 等 FIFO channel。
+
+| 输入 | sender_role / channel 示例 | 处理 |
+| --- | --- | --- |
+| SpeechPerception 最终 ASR | user / speechPerception | 每条 final 调用 Decision；来源仍是 speechPerception，语义作者是用户。 |
+| 显式文本输入 | user / input | 每次提交调用 Decision，不因载荷同为 text 与 Agent 混淆。 |
+| Action 业务返回值或执行异常 | action / action.camera | 验证 owner/session/round/call，业务返回值或异常去重后直接进 Q，不走 Decision；成功 Void 不进 Q。 |
+| 其他 Agent 进度、追问、完成、失败 | agent / agent.writer | 来源和委托校验后直接进 Q，不走 Decision。 |
+| 已订阅的其他语义事件 | event / 已注册来源 | 经现有权限及契约校验后直接进 Q，不代表接受未知任意事件。 |
+| ASR partial / onset | 字幕/语音状态 | 只更新运行状态，不进语义 Q，不调用 Decision。 |
+| 表情/播报完成、流结束、投递确认、token、状态刷新 | 内部控制与输出结算 | 只完成既有执行/更新状态，不是返回给 LLM 的业务值。表情成功返回 Void；内部完成通知不能包装成“表情已完成”再入 Q。执行异常才作为错误反馈。 |
+| 停止/权限失效/应用关闭 | 运行时控制 | 立即处理，不等待 LLM 空闲。 |
+
+仅用户输入接受 enqueue/discard/interrupt 快决策。Decision 仍使用当前用户文本、来源/时间和短现场，不带完整聊天或整个 Q；JEV 是能力模块，D3 是本地实现，云端继续复用 Assistant 配置并强制分类 tool。无法分类/超时保守 enqueue；“必经分类”不等于故障时阻塞或丢弃。可靠答案保护必须以语义/交互关系判断，不能因为同伴载荷被转成 text 就把它当用户。
+
+### Action 返回值规则（用户确认后的修正）
+
+按返回契约统一处理，不为表情另设“忽略反馈”黑名单：成功且无业务返回值 → 不产生语义输入；成功且有业务返回值 → 入 Q；执行异常 → 错误入 Q。用户主动取消仍是控制终态，不伪装成执行失败。
+
+核对现行实现，`UIActions.express` / `setExpression` 已是 `async throws -> Void`，没有需要删除的成功返回值。内部 `.completed` 是调度完成标记，`AgentActionCompletion.hasBusinessOutput` 对它返回 false；`ToolResult.requiresReasoning` 对成功 `.completed` 为 false，对真正失败为 true。`AgentChatWorker` 不为纯成功 Void 发起下一次推理。内部调度仍需知道演出已结束，以推进 FIFO、恢复表情及释放资源，但不把完成通知当成用户/模型输入。
+
+前文关于“表情完成导致循环”的说法混淆了内部执行完成与业务返回值，撤回对当前表情实现的这一推断。统一 Q 改造只需沿用上述返回契约；不能把所有完成事件包装成文本放入 Q。证据见 [表情函数](../../MobileHarness/Actions/UI/Expression/ExpressionActions.swift)、[完成契约](../../MobileHarness/Agents/Support/Core/Output/ActionResult.swift)、[推理判定](../../MobileHarness/Agents/Support/Core/Output/ToolResult.swift)。
+
+### 完整链路
+
+```mermaid
+flowchart TD
+    MIC[用户语音] --> SP[SpeechPerception: VAD / ASR]
+    SP --> PART[partial / onset: 只更新字幕和状态]
+    SP --> FINAL[ASR final: user / speechPerception]
+    TEXT[用户文本提交: user / input] --> AUTH
+    FINAL --> AUTH[校验来源、会话、去重；保留时间与身份]
+    ACTION[Action 业务返回值 / 执行异常] --> VALID[校验原 call / round / owner]
+    AGENT[其他 Agent 语义消息] --> PEER[校验来源与委托]
+    EVENT[已订阅的其他语义事件] --> PEER
+    AUTH --> DEC[JEV / Decision: 仅用户快决策]
+    DEC -->|discard| DROP[释放候选 + toast；不落库]
+    DEC -->|enqueue| Q[统一有界语义 Q；仅内存]
+    DEC -->|interrupt| INT[先保留进 Q，再取消当前 LLM 和旧输出执行]
+    INT --> Q
+    VALID --> Q
+    PEER --> Q
+    Q --> GATE{主 LLM 空闲且 Q 非空?}
+    GATE -->|否| WAIT[继续积累；在 LLM 结束/取消完成后重试]
+    WAIT --> GATE
+    GATE -->|是| FREEZE[原子冻结当前全部 Q 为一个 batch]
+    FREEZE --> BUILD[按时间/顺序编码；显式标出 user / action / agent]
+    BUILD --> CHECK[准备上下文、模型与协议配对；暂不建 message]
+    CHECK -->|准备失败| PREFAIL[保留待处理批次并显式报错；不建 message]
+    CHECK -->|准备成功| START[发起边界: 原子创建一条 message]
+    START --> HTTP[发起 HTTP / 本地推理]
+    HTTP --> LLM[主 LLM 综合批次，选择性回答/执行/仅表情]
+    LLM --> FIN[流结束、失败或取消: 更新同一 message；LLM 释放]
+    FIN --> GATE
+    LLM --> OUT[输出 Action 按各执行 channel FIFO 排队]
+    OUT --> RESULT{有业务返回值或执行异常?}
+    RESULT -->|是| ACTION
+    RESULT -->|否: 成功 Void| ACK[结束执行 / 释放 channel；不产生 Q 消息]
+    NEW[冻结后新到的信号] --> AUTH
+```
+
+冻结后的新信号仍按来源走上述入口：用户经 Decision，非用户直接 Q；图中 NEW→AUTH 仅示用户路径。Q 表示同一 Assistant 会话的全部**已完成准入**语义项，不包含正在分类的用户候选，也不包含未发生的 Action 结果。
+
+- 一个 Assistant 会话最多一个主 LLM 请求；LLM 空闲不等于所有输出 Action 已结束。旧 Action 运行时仍可发起下一批请求；新 Action 沿原 channel FIFO 等待。
+- interrupt 先保留新用户输入与原 Q。取消旧 LLM 并等待其实际终止，旧输出同时走所有者取消/清理；迟到结果不能再次触发旧请求，不把取消请求的提交当作取消已完成。执行资源的清理屏障不能被伪造为空闲或成功。
+- 原子冻结决定这一轮成员；冻结以后才进入 Q 的信号留到下一轮。用户分类未完成的候选不阻塞已就绪 Q。没有固定“等更多 ASR”的延迟；若每次到达时 LLM 都空闲，连续 ASR 仍可能分别发起请求。
+- Action 的业务返回值或异常逐条入 Q；成功 Void 没有消息可入队。原 call/round 用于关联、去重和执行结算，不再要求所有普通 Action 齐备才消费。内部 round 完成不是额外语义项。
+- 原生 function/tool 协议仍保留调用/结果配对。需要整组配对的结果由协议适配器暂存为未就绪组，配对齐备后才成为可消费项，不阻塞其他已就绪消息，也不为缺失结果伪造完成。HTTP messages 中保留必要的 assistant tool_calls / tool 消息；统一 user envelope 不能代替这些协议字段。
+- 排队不按主题逐条调用 LLM，不在应用层静默丢掉普通进度。沿用容量、字节上限和明确拒绝策略；不得建立无界 Q。整个批次过大先裁剪可省历史，仍超限保留批次并报告准备失败，不截断用户正文、不拆成偷偷发送的小批次。准备失败不立即无限重试。
+
+### user content 格式
+
+单条和多条使用同一种自然文本格式，放在一个 API user 消息中。整批按完整事件时间排序，时间相同按内部接纳顺序。每条先放原正文，下一行由可信入口生成来源及设备本地 24 小时制 `HH:mm:ss`，条目之间空一行。
+
+```text
+帮我拍一张照片。
+User (ASR) ｜ 13:06:35
+
+Camera.Capture.takePhoto {"status":"succeeded","value":{"previewID":"preview_23"}}
+Action Result ｜ 13:06:36
+
+等一下，先别保存。
+User (ASR) ｜ 13:06:36
+
+文稿初稿已完成。
+Writer ｜ 13:06:37
+```
+
+手输使用 `User`，语音定稿使用 `User (ASR)`，Writer 使用 `Writer`，其他已认证同伴使用其 Agent 名。Action 的函数名放进结果正文，保留真实结果与异常。可能与来源行或辅助上下文标题混淆的正文行缩进。完整时间、诊断标识和分类路径仍在内部；发起时的请求原文可回查。旧 JSON 回放使用同一格式，既有自然文本继续保留。历史回放通过来源行识别当前时间线；时间线内的旧 JSON 示例仍是原正文。
+
+### Assistant 提示词契约
+
+在 Assistant/Prompts.json 的 inputProtocol 加入正文在前的格式例子、来源含义和修正规则，在系统提示中紧邻通用 XML 输出协议。把角色 Instructions.md 中重复的选择性回应段落移到 inputProtocol，保留整合有用事实、按需回应、呈现可处理失败和待答问题，以及语音可选规则。ASR 的明显误识别可结合上下文理解；疑义影响意图、目标或动作时先问一个具体问题。
+
+输入处理按意图、证据、澄清和回应的顺序。先确定用户目标及限制，按条目顺序接受最新修正；把同伴消息、执行结果、状态和图像作为证据，按相关性、时效和是否证实判断。上下文足够时理解明显的转写错误；疑义会改变意图、目标或动作时，先问一个具体问题。回应优先给出答案、等待中的结果或阻塞，合并相关事实和需要处理的问题，省略重复、例行进度和无关细节。此调整修改 Assistant/Prompts.json 的 inputProtocol 及对应提示词回归，保留时间线格式和既有提示词预算。批次回归在投递同伴消息前固定 ASR 采集时间，使断言中的来源顺序不受异步投递耗时影响。
+
+实现由 AssistantInputBatch 渲染，Chat Worker 继续提供可信输入来源及事件时间。更新 Assistant、资源与持久化相关 README，回归覆盖多来源同批排序、同秒顺序、伪造来源行、旧历史回放、实际模型请求和提示词预算。
+
+表情只是一种可见输出，不等于没有模型请求；这轮实际请求仍记录输入及真实输出。提示词不决定要不要落库，落库只由请求发起边界决定。
+
+### 持久化不变
+
+1. Signal 到达、Decision、入 Q、冻结和模型准备都不新增 message。discard 使用瞬时灵动岛反馈，无独立 Signal 记录。
+2. 校验和上下文准备成功后，在 onDispatch 的 HTTP/本地推理发起边界前原子创建一条 message，保存此次完整正文与真实请求关联；持久化失败阻止发起。
+3. 发出后的回复、工具/Action 结果、失败、打断更新既有记录；结果结算可以更新原请求，但不能冒充一次新请求插入行。HTTP 发送失败仍保留已经发起的这次请求。
+4. 下一次从 Q 发起另一请求才新增另一行；原生续轮和真实重试也依此计数。Assistant/Writer 均保持这条规则，Writer 执行入口仍独立于消息表。
+
+### 2026-11-11 前台任务结束与历史折叠
+
+- Assistant 全双工的 `task.end(summary)` 在 Control channel 执行时提交任务终态、结束时间和摘要，使用当时已经发起并关联此任务的 Message 作为来源，包含发出结束调用的 Message。调用成功立即释放任务 Skill、清空前台任务并折叠历史。保留原始 Message 与 Action 结果，后续生成或执行证据只更新原行，来源成员固定。Control channel 保留同 channel FIFO 和显式 wait 语义。
+- Agent Chat Worker 验证调用与请求身份，通过 AssistantHistoryStore 的串行写入边界封存来源。SQLite AssistantTasks 在一笔事务内核对来源和结束调用并保存终态及摘要。成功持久化后 Agents 发布新 Context；失败传播给 Action 调用者。尚未发出的旧任务请求不能在结束后绑定新 Message。普通结束回执不触发额外模型请求，`continueDecision=true` 仍可为同一用户请求的另一个目标提供结果。Assistant Context 的输入绑定仅将等待用户的任务恢复为运行中。
+- 保留 Message 的独立写入阶段。请求发起前建行，模型生成完成写回复正文和生成终态，轮次执行结算更新原行的 Action 记录。回归在模型流和另一个 Action channel 分别阻塞时检查任务和摘要已落盘，释放后检查生成正文、Action 证据和折叠结果。实施后更新 Agents、Chat、Context、BasicSkill、Storage 和总体设计的拥有者文档。
+
+### 2026-11-11 实施细化
+
+- 在现有 Agents/Assistant 目录增加输入 envelope 值类型；共享 Chat Worker 持有有界消息元数据及附件，来源角色只能由用户入口、已认证同伴适配器和执行反馈适配器指定。准入时分配 seq，以本机 uptime/Date 锚点映射用户事件时间；同伴采用本机接收时间。
+- 普通 Action 单个业务结果/异常就绪即可入 Q；原 PendingRound 仍结算执行 journal，但不重发旧用户意图。成功 Void、内部调度完成及纯取消不产生语义项。原生 tool 组在配对完整后统一入 Q，保留 assistant tool_calls/tool 消息。Web 观察附件继续由原观察适配器生成，受请求图片和总字节上限约束。
+- 内部结算先完成，随后原子取同会话全部已就绪语义项；单条同样编码 envelope。输入时间排序不改变冻结成员、原执行身份或输出 FIFO。批次附件与 envelope 一起作为受保护当前输入，历史只能整体裁剪。
+- 准备失败的批次保留内存并标记阻塞，不自动循环请求。后续接纳的新用户输入可解除该会话阻塞并一起重试，显式停止/暂停/关闭清理批次；这一阶段不创建 message。已发出请求的失败仍按原规则终态结算，不自动重试。
+- 绕过 Decision 的语义消息入 Q，以及准备失败批次重新入队后，直接刷新既有 UI 排队事实回调，避免计数依赖分类消费者。
+- 修改拥有者：Assistant（envelope、Decision 校验、README）、Support/Chat（接纳、批次、结果适配、README）、Support/Core/Runtime（邮箱排除阻塞会话、README）、Resources/Agents（提示词及说明）；同步 Agents 与全局 README 的跨模块流，并将 Writer 回馈说明从直接播报改为全双工模式下交由统一 Q 综合决定呈现。Storage/ModelKit 的 dispatch 持久化接口不变。
+- 完整并发检查暴露 discard toast 回归测试的固定 700ms 等待不可靠；仅将测试改为有截止时间的可见状态等待，保留生产到期行为及失败提示断言。
+- 验证用户/同伴路由、单条/多条时间身份、普通结果提前入队、Void/取消不续轮、原生协议配对、准备失败不落库且保留、完整批次记录、原有打断/FIFO 回归；运行 check.sh 和 build-ios.sh，真实模型与设备交互另行标明。
+
+### 实施范围与验收
+
+- Agents/Support/Chat：基于可信来源决定是否用户输入；同伴直接入 Q；业务 Action 结果改为独立就绪项；统一 batch 编码、排序、冻结与一次性消费。保留工具协议适配和输出结果结算，不双重消费结果。
+- Agents/Assistant：收敛 Decision 调用范围和显式 input 的结果保护策略。来源事实在 Core/输入入口维护，用户业务角色映射由 Assistant 拥有，Storage/ModelKit 不承担分类或队列业务。
+- Resources/Agents/Assistant/Instructions.md：接入上述 batch 与选择性回复契约；检查 ExpressionInteraction/Core 教学无冲突。
+- Storage 无需为这次 envelope 新建表；requestText 保存完整当前批次，日志清除后仍能读取，新增行门槛不动。
+- 实施时同步 Assistant、Chat/Core、Resources/Agents 的 owning README 和总体数据流。当前源码 README 维护实际契约；真实模型/设备验收仍独立跟踪。
+- 验收：语音和 input 每次均调用 Decision；Agent/Action 零分类；忙时三类输入积累，空闲后一次提交全部；单条与多条同格式；多次 ASR 标 user 且时间/轮次有序；冻结竞态；Action 未全部结束不阻塞已完成结果；工具配对；表情成功 Void 不触发请求、失败才入 Q，所有无返回值 Action 同理；旧 Action 运行不挡新 LLM、输出 channel FIFO；准备失败/丢弃零 message；一个 batch 一行、真实失败留证；Prompt 构建包含新契约。实际模型选择性回复和无声表情须独立真机/云端验收，不能用字符串断言代替。
+
+
+### 2026-11-11 代码交付状态
+
+已实现用户专属 Decision、同伴直接 Q、普通 Action 独立结果 Q、native 完整组就绪后直接 Q（不等待无关 Action）、统一单条/多条 envelope、时间/身份、选择性回复提示词和准备失败保留。真实 Action/工具结算 journal 仍属于原请求，新语义批次不会重发旧意图。当前批次工具配对从历史去重，截图附件保留。发起边界和表结构不变。
+
+针对性自动回归覆盖上述行为；完整检查、构建及设备交付证据记录于 [专项验证](../validation/Assistant-Full-Duplex.md)。真实云端/D3 选择性回复准确率、持续语音和表情体验尚需真机交互验收，本需求暂不归档。
+
+
+## 2026-11-10 已批准的实施契约
+
+本节取代下文历史提案中的整轮等待执行完成、D3 默认影子评估及本地失败直接入队策略。代码已接入，自动验证及尚未完成的真实验收记录于 [验证报告](../validation/Assistant-Full-Duplex.md)；历史分析不代表当前已实现能力。
+
+- Assistant 拥有逐来源输入协调和三分类。enqueue 累积 Q；请求可接纳时冻结全部 Q，不按主题拆分；interrupt 先入 Q，再取消当前会话此前各轮遗留生成、播放与 Action；discard 只作用于尚未入 Q 的单个候选。
+- 模型请求、输出执行、采集/播放状态独立。单个会话只运行一个主模型请求；旧工具/Action 等待期间可以处理新 Q。结果保留原 call/round，齐备的原生工具组保持配对后续接；不运行过时续轮、不重放已完成效果。
+- 输出执行 channel 在 Assistant 实例/会话内跨轮 FIFO，其他 Agent 独立。取消加入实际原生清理；只阻挡冲突新执行，不阻挡不相关模型请求。独立后台任务不随回复打断取消。
+- Decision 默认云端，设置中手动选择本地；下载不切换。复用 Assistant 保存的云端配置，即使主对话当前选择本地。D3 缺失/加载或推理失败/超过512 token转云端，云端失败则保守入队；配置变更不改变在途快照。
+- Decision 只带当前输入及最小现场（来源/时间/生成/播放/执行状态/关联问题/回复片段），背景最多384字符，不带聊天全史或整Q。云端只允许一个 classify_input 工具，参数为三个合法动作；不执行业务工具。
+- 本地热调用预算250ms、从接管起总分类预算2秒；一个分类worker，本地/云端各最多一个在途。迟到结果不改变已提交决策。可靠事实与有效交互答案不得因 discard 消失。
+- pending/ready最多32条，后台最多16条，单条16KiB、总512KiB；活跃输入最多64，等待执行请求最多32；来源/状态键各32，状态总256KiB。内部控制与配对收集不争普通队列；就绪语义结果与用户/同伴共享普通队列容量（由上方最新契约取代旧独立续轮策略），容量满明确拒绝，不能静默丢弃。
+- 增量数据库迁移保留历史，输入原文、来源、批次、分类和终态可追溯，联合回复只保存一次；重启不自动重放设备效果。整Q超过窗口先压缩可省历史，仍超限明确失败且保留输入。
+- 全双工优先于空间定位，使用共享语音处理采播图；不可用明确显示受限模式。final确认只代表接管；onset/partial不清旧回复、不直接语义打断；首版保留端点参数并计入延迟。
+- UI复用模型资源管理增加Decision页和云端/本地模式，下载/续传/取消/删除/版本/许可/失败状态齐全；并行用户/助手字幕、实际fallback及有界排队事实由业务投影。
+
+### 实施所有者与文档
+
+Agents/Assistant、Support/Chat/Core 拥有输入批次、原调用续接和会话取消；Gateway/Output/Scheduling 增加跨轮顺序域。ModelKit/Language/JEV 保存Decision契约与隔离编译的D3实现，ModelKitDefaults注册/装配，现有Resources/Models目录登记固定制品。Actions/System/ModelResources、Provider与ApplicationControl负责偏好和操作，UI/Settings/Root只展示/导航。PlatformKit/Audio、Actions/Speech、SpeechPerception负责共享音频图、原生取消和连续识别。Storage/Database现有AssistantMessages与ModelRequestLog目录承载增量输入记录和证据，不新增目录。
+
+实施后同步以上所有者README和MobileHarness/README.md跨模块流；不把尚未实施部分写成当前技术契约。清除被替代Judge命名和半双工门控；保留文档中的历史证据。
+
+### 存储落地细化
+
+复用 assistant_messages.user_input_json 增加可选 coordination 字段，保存来源、采集时间、分类路径及批次成员；旧记录缺省为空，不另建重复消息表。schema 增量版本只增加批次查询索引，现有版本升级不得 erase。回复继续仅由主输入持有，成员保存批次关联及各自终态。
+
+### 生命周期收尾
+
+暂停接管分类 worker、已冻结批次与等待执行轮，记录取消并关闭对应轮；恢复不续跑旧批次。执行所有者完成取消清理后，缺失的原生工具回执按未知效果的取消状态落盘，不能伪造回滚。绑定模型失败同样结束整批成员，避免遗留处理中的输入。异步执行轮封口失败立即结束输出消费并加入清理，不等待下一条模型输出才上报。
+
+### 历史双方完整文本（2026-11-10）
+
+每次请求详情的 User Request 显示本次完整业务输入（包括合并 Q 的来源/时间/正文以及本次续轮观察），Assistant Response 显示完整模型正文；列表继续使用有界预览。AssistantMessages 在 user_input_json 增加 requestText，和原始 text/coordination 分开，首次请求及 ReACT 均在接纳时保存，并在后续 checkpoint 保留。无需重建表或清空数据；清理 model_request_log 不删除该业务文本。读取 message/window/input/read 不能再用主输入原文覆盖已保存的请求文本。
+
+Support/Chat 在合并续轮时把批次文本与本次观察一起留证。旧的多成员批次仅在完整日志存在且 inputs 成员身份全部吻合时恢复实际批次文本，不能凭当前队列重建旧请求；日志缺失时无法保证补回既往完整文本。涉及 Storage/Database/AssistantMessages、Agents/Support/Chat、Actions/History 和 UI/Settings 的契约与回归同步维护，验证真实 SQLite 重开、后续 checkpoint、清日志及完整详情投影。
+
+### 历史尝试：输入记录与模型请求详情区分（2026-11-10，已被下节替代）
+
+修复历史预览与详情将未产生模型调用的原始输入包装为虚构 AssistantModelRequest，导致空 Assistant Response、无上下文和伪 Request ID 的问题。保留所有输入及 enqueue/discard/interrupt 证据，不删除或过滤原始记录。AssistantMessages 的 page/message 返回真实输入或真实模型请求；预览透传有界 coordination，详情保留完整来源、时间、分类路径、批次身份和实际输入状态。UI/Settings 接收独立的协调证据值，列表与详情区分输入记录和模型请求：输入记录显示等待分类/已排队/丢弃/合并批次/失败取消等已记录事实，不展示不存在的回复和模型上下文；真实请求没有正文时明确区分生成中、失败、取消、仅工具调用及已结束但无输出，保留错误证据。原始输入仍可导出，批次身份可核对，不复制批次回复。Actions/History 保持事实转换，不推测模型是否执行。
+
+修改既有 AssistantMessages、UI/Settings 和测试文件，无新增目录或数据库表；同步 Storage、Actions/History、UI/Settings 及总体数据流文档。回归覆盖真实 SQLite 的输入-only 预览/详情、三类决策、批次成员、清日志、真实空回复及失败/中断，保证不虚构调用、无空白回复框、不隐藏真实请求。真机数据库只读核对截图输入的实际状态，副本不进入仓库。
+
+未调用模型的输入在恢复后以消息行终态为准，不能被恢复前 JSON 中的 generating 覆盖。既有 SQLite 测试中通过伪请求访问原始输入及硬编码 completed 的断言，改为验证真实输入身份、无模型请求及恢复后的 interrupted 状态。
+
+### Message 只记录实际模型请求（2026-11-10 最新约束）
+
+本节覆盖此前关于保存所有原始 Signal、discard 和批次成员独立行的约定。assistant_messages / writer_messages 每行必须对应一次实际发起的模型请求，包含本次输入、输出或请求失败。排队、分类和请求准备仅在有界内存中；discard 直接释放并由前端 toast 提示，不写 message、模型日志或其他持久化 Signal 记录。整个 Q 合并发起一次请求只产生一行，来源、时间、采用的 enqueue/interrupt 决策随实际批次输入留存。ReACT 和真实重试各自产生请求行；配置/准备失败、发起前取消不得制造空请求。
+
+Agents/Support/Chat 与 Writer 在准备阶段保留未发出的请求描述，HTTP 发送边界（本地模型为实际推理开始）才提交记录；传输错误和非成功状态仍有一行。Storage 两侧 checkpoint 跳过未发出的输入/请求，首次落盘原子保存身份、完整输入与请求快照，后续完成只更新该行。UI 历史只呈现真实请求；保留真实失败/取消/空正文状态说明，撤回输入-only 详情与伪 Request ID。
+
+Writer 的委托生命周期不等于模型请求：将当前混在 writer_messages 的 delegation 入口移至独立 writer_executions 表，继续由现有 WriterMessages 目录及 WriterExecutionRepository 拥有；Agent 通信沿用 agent_messages，补充输入不再复制为 message 行。无新增目录或上层模块。迁移保留工作区、委托结果、真实请求、工具结果和日志的身份及外键，清除没有 invocation 的旧输入行；不通过重置数据库实现。现存有 invocation 但日志已清理的记录不据此推定未请求，不删除真实失败记录。
+
+涉及 Storage/Database 的 schema、AssistantMessages、WriterMessages、WriterWorkspaces 关系；Agents/Support/Chat、Writer 请求生命周期；ModelKit 的中立开始通知；Actions/App 的瞬时丢弃提示装配及 UI/Conversation、Settings。同步各所属 README 和总体链路，测试零HTTP时零message、HTTP失败留证、整Q一行、ReACT/重试多行、discard提示且无持久化、Writer委托与请求分离及旧库迁移保留。真机安装前完成 scripts/check.sh、scripts/build-ios.sh 与签名构建，不以模拟器或替身测试代替真机交互验收。
+
+丢弃提示使用 HomeNotice 的中立 toast 呈现位置，由 UI/Root 在导航外层渲染，不能复用会被助手字幕遮蔽的 caption notice。UI/Conversation 继续拥有单槽替换、到期与根停止清理；Actions 只选择通用呈现值。Root 不解释 discard 业务，不写库。验证回复字幕存在时提示仍可见、字幕不被替换，以及历史页与首页共用根 toast。
+
+### 验收
+
+整Q与冻结竞态；旧Action运行时新请求；跨轮同channel FIFO；结果配对和联合续接；打断所有旧会话执行/迟到结果围栏；容量与恢复；Decision短上下文/非法tool/超时/fallback/配置变化；D3 tokenizer/512边界/真实推理；默认云端和下载不切换/删除维护；双字幕及外放回声/重叠讲话/蓝牙切换。运行scripts/check.sh及scripts/build-ios.sh；真实D3、云端调用、原生UI和真机音频分别报告，不能以编译或替身测试替代。
+
+## 历史范围与状态
 
 2026-11-06：根据当前代码分析并提出后续设计。本次只记录分析，不改变输入调度、FIFO 或合并规则。此前约定正式输入互不合并；下述整队列批次是需要单独实施和验收的策略变化，不是现有 `SignalBatch` 已有能力。
 
@@ -328,3 +552,49 @@ ModelKit 返回候选分布和推理失败信息，Assistant 决定是否采用�
 - 用户声音叠加助手扬声器、用户复述助手词句、耳机/蓝牙/扬声器路由变化、长时 LLM+ASR+TTS+D3 并行负载和内存压力。
 
 本次验证仅为现有源码/文档核对与设计一致性、链接、diff 格式检查。没有实施该方案，没有将 D3 已发布制品、编译检查或模拟数据当作全双工验收。
+
+## 2026-11-11 Decision 独立模型配置
+
+需求：Decision 独立选择本地 D3 或云端；云端从已经保存的 Provider 列表选择服务和模型，交互沿用 Agent Brains，不跟随 Assistant/Writer 的选择。
+
+实施范围与契约：
+- `UI/Settings` 的 Decision 页面保留下载与立即保存的本地/云端模式选择，增加独立 Provider/模型草稿和保存按钮；本地模式仍可配置云端备用。复用根拥有的 SettingsFormController 模型发现、取消、错误呈现及私有保存通道。Provider 管理仍在 Agent Brains，删除 Provider 清除 Decision 引用并显示未配置。
+- `Actions/Support/Contracts`、`Actions/System/Provider` 的私有设置增加 decisionProviderID/decisionModel，通过 `Agents/ApplicationControl` 暂存与呈现；凭据继续只存钥匙串，共用 Provider 稳定 ID，不复制业务凭据到公开 Signal。
+- 持久文档新增可选字段，旧文档缺字段读作未配置，保存后明确写入模型字段。未配置不隐式继承 Assistant；可在 Decision 页显式选择同一 Provider 或不同 Provider。Assistant 与 Writer 配置保持各自选择。
+- `ActionsBusinessAssembly` 从独立 decisionConfiguration 创建固定云端 ChatModel，保持最低思考与短上下文工具分类。`Agents/Assistant` 的本地失败回退只使用该云端配置，未配置、失效或推理失败沿用可见错误与保守入队。切换配置用于下一次分类，不改写已取得的模型句柄。输入 Q 与请求前才持久化 message 的规则不变。
+- 实现后同步总体设计、Actions/Agents/UI 模块及 Provider、Contracts、ApplicationControl、Assistant、Settings、Root、ModelResources 拥有目录 README；当前技术说明移除借用 Assistant 的旧描述。
+
+验证计划：独立 Provider/模型保存与重开、缺少新字段、无配置及悬空引用失败、同一 Provider 不同模型、删除/编辑 Provider、模型发现与表单私有传输回归。运行 scripts/check.sh 与 scripts/build-ios.sh；模拟与替身结果不等同于真实云端分类或原生 UI 验收。
+
+实现进展：独立配置、私有传输、运行时解析、共用模型选择器与删除清理已完成。针对性回归覆盖持久化重开、旧文档缺字段、无效引用、独立角色选择和实际 UI 请求/呈现链路；完整检查、构建及交付证据见 [验证记录](../validation/Assistant-Full-Duplex.md)。真实云端与原生页面交互验收另列，不以自动化替身结果替代。
+
+## 2026-11-11 回声消除与固定双方字幕
+
+问题：全双工时扬声器播报被 ASR 重复识别；用户未定稿字幕与助手回复占据相同下方位置，随后上飘导致重叠。
+
+实施计划：
+- PlatformKit/Audio 的 AppleAudioIO 保留同一采播图，优先尝试 iOS 18.2+ 受支持设备的 playAndRecord/default 回声消除输入，以激活后的 isEchoCancelledInputEnabled 确认；不支持或设置失败时显式回退 voiceChat + AVAudioEngine voice processing，关闭 bypass，检查输入/输出双节点，不同时叠加两种 AEC。原生错误保留报告，不再吞掉启用失败。
+- AudioCaptureContext 增加实际回声处理路径事实；仅确认 AEC 可用才标记 fullDuplex。引擎启动后、每次输出提交前重新校验，不把偏好或单节点配置当成实际能力。两路径不可用保持已有受限聆听策略；路由变化继续关闭旧代重建，不靠全文相似度误删用户插话。
+- Actions/Speech/Listening 展示真实 AEC 路径与受限状态；不改 Decision、Q、消息持久化边界。设备实际回声抑制效果必须由扬声器单讲及双方同时说话检验，开关状态不能证明抑制效果。
+- UI/Conversation 的 ConversationCaptionLayout 改为固定用户上方、助手下方的两个不相交区域，位置与 ASR 是否定稿及任务活动无关。移除 transcriptFinalized 引起的上飘动画；保留文字淡入，不移动角色位置。队列/提示保持下方区域内有界布局。
+- 更新 PlatformKit/Audio、PlatformKit、Actions/Speech/Listening、UI/Conversation、UI 与总体设计；调整布局和音频选择/失败回归，运行 check.sh、build-ios.sh，完成后覆盖安装真机，不清数据。
+
+依据：[Apple 回声消除输入](https://developer.apple.com/documentation/avfaudio/avaudiosession/setprefersechocancelledinput%28_%3A%29) 与 [AVAudioEngine 语音处理](https://developer.apple.com/videos/play/wwdc2019/510/)。回声输入仅适用于支持硬件及指定 session 配置，Voice Processor 已自带 AEC，两者不叠加。
+
+交付进展：回声处理路径确认与降级、固定双方字幕、回归和文档同步完成；完整检查脚本与四个 iOS 构建目标通过，已覆盖安装版本 2026111103。原生扬声器回录/用户插话和页面目视效果尚未验收；完整证据与步骤见 [全双工验证记录](../validation/Assistant-Full-Duplex.md)。
+
+## Decision 结果的灵动岛呈现
+
+SpeechPerception 继续维护录音、识别灵动岛及用户字幕。在发布语音 final 前，先提交结束当句录音/识别状态。Assistant 的对话工作器继续维护回复字幕，语音输出子能力维护播放灵动岛。Assistant 的输入工作器只在实际丢弃或同代打断成功后向角色会话发送瞬时反馈。角色会话使用独立的灵动岛活动槽，以高优先级详情展开显示约三秒，同槽新结果替换旧结果，后台暂停或退出清理。enqueue 和跨代未实际打断不发布反馈。显示仅限 App 内灵动岛，展开正文只显示本次结果。反馈不进入系统活动、执行队列或历史。移除 Actions 装配的 Decision toast 回调，基础 UI 保持通用呈现与仲裁。验证实际生效的决策、队列与持久化回归，以及真机录音结束到展开的呈现顺序。
+
+## 自然文本输入兼容
+
+当前时间线格式见 [user content 格式](#user-content-格式)。批次、消息、调用、轮次和内部任务 UUID、分类路径及内部序号留在协调证据中。保留业务载荷中有用的标识和原生工具的协议配对。打断上下文补充相关旧用户意图。协调 JSON 保留成员明细；发起时保存实际请求文本。旧 assistant.input_batch.v1 回放投影为当前自然文本，历史原始请求继续可回查。
+
+## 本地 D3 请求格式诊断
+
+针对真实语音指令误丢弃，核对 Assistant 到 ModelKit 的状态语义、候选定义、chat template 和候选读出。用已发布 Core AI 权重复跑原始提示词，分别替换状态格式和选项定义，保留误打断、误丢弃和漏打断。另用预先写好的中文指令和反例核对简短请求、否定、引用和上下文。历史采集时间继续用于入队证据，原话在推理前完整保留。
+
+只有经过对照支持的调整才用于本地路径。Assistant 拥有三类业务解释和候选结果映射，ModelKit 保持通用候选选择及 512 token 契约。云端工具协议继续由原路径负责。若有代码变更，核对本地请求、云端回退及候选映射，并同步所属 README 和验证记录。
+
+补充对照使用轻量中文句向量模型。每类分别使用一句定义、多条定义和多条带对话状态的代表例，比较余弦分数聚合对上述冻结集的影响。原型提前写定，采用同一组评估标签，不训练权重。此实验只产生本机验证证据。

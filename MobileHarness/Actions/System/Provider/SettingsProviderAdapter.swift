@@ -78,6 +78,7 @@ public enum SettingsProviderAdapter {
             case "provider.selection", "provider.keychain": return "无法保存配置，请检查模型选择或设备钥匙串访问"
             case "provider.application": return "模型配置应用失败，请检查配置后重试"
             case "provider.cancelled": return "操作已取消"
+            case "provider.decisionRequired": return "请先在 Agent Brains 下载 D3 Decision 模型，再选择本地"
             case "provider.capacity": return "模型查询请求过多，请稍后重试"
             case "provider.request", "provider.expired": return "模型查询请求已失效，请重新查询"
             default: break
@@ -149,12 +150,14 @@ public enum SettingsProviderAdapter {
                     providers: value.providers.map {
                         .init(enabled: false, url: $0.url, key: $0.key, model: $0.model, name: $0.name, id: $0.id)
                     }, writerProviderID: value.writerProviderID, writerModel: value.writerModel,
-                    writerThinking: value.writerThinking),
+                    writerThinking: value.writerThinking,
+                    decisionProviderID: value.decisionProviderID, decisionModel: value.decisionModel,
+                    decisionUsesLocal: value.decisionUsesLocal == true),
                 revision: entry.revision)
         case .save:
-            let value = try settings.result(id, sessionID: sessionID)
+            _ = try settings.result(id, sessionID: sessionID)
             try state.requirePresentation()
-            _ = state.presentNotice("已保存智能体大脑配置", revision: entry.revision)
+            _ = state.presentNotice("已保存模型配置", revision: entry.revision)
         }
     }
 }
