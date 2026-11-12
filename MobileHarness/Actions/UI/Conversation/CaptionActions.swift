@@ -17,28 +17,6 @@ extension UIActions {
         try Task.checkCancellation()
     }
 
-    /// Clear only the caller's reply caption at an accepted new user-input boundary.
-    @Action(
-        domain: "UI", module: "Caption", title: "clearReply",
-        parameters: [
-            .init("replyInputID", type: .string, required: false, description: "Runtime-owned reply request to retire.")
-        ], timeout: .seconds(5))
-    public static func clearReply(
-        invocation: any FunctionInput,
-        using present: @escaping @Sendable (any FunctionInput) async throws -> Void
-    ) async throws {
-        try Task.checkCancellation()
-        do {
-            let args = ActionArguments(invocation.call.parameters)
-            try args.validateAllowedKeys(["replyInputID"])
-            if invocation.call.parameters["replyInputID"] != nil {
-                _ = try args.requiredString("replyInputID", maximumUTF8Bytes: 256)
-            }
-        } catch { throw PresentationError.invalidCall }
-        try await present(invocation)
-        try Task.checkCancellation()
-    }
-
     /// Replace the recognition caption; unlike UI.print, empty text is an explicit clear.
     @Action(
         domain: "UI", module: "Caption", title: "setTranscript", timeout: .seconds(5))

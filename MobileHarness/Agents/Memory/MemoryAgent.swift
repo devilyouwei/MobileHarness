@@ -55,7 +55,7 @@ public actor MemoryAgent: Agent {
         guard configuration.agentID == .memory else { throw AgentConfigurationError.identityMismatch }
         descriptor = AgentDescriptor(
             category: configuration.category,
-            id: .memory, name: "Memory", inputs: Set(configuration.communication.inputs.map(\.kind)),
+            id: .memory, name: "Memory", inputs: configuration.communication.inputKinds,
             outputs: [.communication, .actionCall, .toolCall, .control, .scheduling],
             capabilities: try Self.runtimeCapabilities(configuration.capabilities))
         taskCoordinator = AgentFixedTaskCoordinator(context: self.contextRepository)

@@ -67,19 +67,6 @@
             state.presentReplyWaiting(enabled, requestID: requestID)
         }
 
-        public func clearReply(invocation: any FunctionInput) throws {
-            try Task.checkCancellation()
-            try state.requirePresentation()
-            guard state.accepts(token) else { throw CancellationError() }
-            guard state.isVoiceActive, acceptsSession(invocation.context.sessionID) else { throw CancellationError() }
-            guard
-                conversationPresentation.accept(
-                    invocation.context, update: .clearReply,
-                    retiringInputID: invocation.call.parameters["replyInputID"])
-            else { return }
-            effects.replyDidBegin()
-            state.clearReply()
-        }
         public func beginReplyTurn(invocation: any FunctionInput) throws {
             try Task.checkCancellation()
             try state.requirePresentation()

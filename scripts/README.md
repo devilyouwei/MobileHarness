@@ -170,3 +170,7 @@ Matrix source fingerprints also include WriterWorkspaces and WriterMessages Swif
 Writer record UI acceptance can select `WRITER_UI_ONLY_TEST=testDelegationWorkspaceSeparation`; its seed is the temporary SQLite/workspaces fixture exported by the real-storage integration test through `WRITER_SEPARATION_UI_SEED`. The fixture includes 27 delegations and 40 workspace messages. This route verifies newest-first display, automatic older pages and navigation without model credentials or a physical-device database.
 
 Agent 资源静态检查与运行时 schema 一致：Agent.json 使用 v10，category 必须为 perception 或 cognition；角色的实际归类由各自资源声明。
+
+提示词资源校验覆盖 cognition Agent 的 Shared 与角色模板；Actions 与 ModelKit 的内部文案不属于本次资源迁移。最终包验证核对合并后的 Assistant 资源、完整文件集合与源文件字节。
+
+Writer 评估运行前对 Writer 与 Shared 全部资源核对文件集合和源字节；新增业务模板也受旧 bundle 拒绝检查。源哈希继续覆盖全部 JSON/Markdown。

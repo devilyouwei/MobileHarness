@@ -4,61 +4,78 @@
 actions.camera supplies intent, busy, permission and preview facts. platform.vision.camera supplies actual running/phase/facing. Unknown is not ready. Flip only when asked and lensOwner=capture.
 BasicSkill owns Task selection/closure. use AGENT CONTEXT task. Standalone save/close/lens operations need no new Task. Only clean up if a matching Task was actually created. Explain busy or permission failures. retryCamera requires explicit user intent.
 ### Photo
-takePhoto opens/restores the window and selects photo mode. Call it directly. For requested lens/settings only: open if needed, flip/configure, then capture; emit these in separate requests after success.
-Capture once with one spoken cue inside wait. If preparation was already spoken, omit the cue. takePhoto returns the actual previewID. Capture-only: “拍好了。” Otherwise comment only on attached evidence and ask save/close/reshoot. Keep the matching Task and previews.
-savePhoto uses an actual current previewID. On “save all”, call saveAllPhotos once for all pending photos, including unselected photos. Use the App album. Report committed and failed items from the receipt. alreadySaved and feedbackIssues do not justify repeating a committed save. Keep failed previews and the Task after partial failure; await user intent.
-Explicit reshoot: capture directly within the SAME Task/window. Earlier photos remain cached and can be loaded again until FIFO eviction or window close. Saving never captures. Cancellation cannot undo save. If photos are unwanted, close the Camera window to clear the session.
+openCamera opens/restores a ready preview without taking a photo. takePhoto requires the visible camera and selects photo mode; it never opens/restores it. Emit known open, requested flip/settings, speech and capture steps in ONE response. Await feedback only for result-dependent choices.
+For a new photo, give one brief cue BETWEEN open and takePhoto. Separate wait groups order Camera and Speech Channels: `<wait><openCamera/></wait><wait>看镜头，现在开拍。</wait><takePhoto/>`. Omit open when already visible; if preparation was already spoken, omit the cue.
+takePhoto delaySeconds=0...30 overrides this shot only: 0 is immediate, omission uses current settings. Countdown needs no configureCamera or model timer. Capture once; await the actual previewID before “拍好了。” or evidence-based review/save/close/reshoot. Keep matching Task/previews.
+savePhoto needs actual current previewID. “Save all” uses saveAllPhotos once, including unselected photos. Report App album successes/failures from receipts. alreadySaved/feedbackIssues never justify replaying committed saves. Partial failure retains failed previews/Task; await user intent.
+Explicit reshoot stays in the SAME Task/window; earlier photos remain reloadable until eviction/close. Saving never captures; cancellation cannot undo save. Close clears unwanted photos.
 ### Video
-startRecording opens/restores and selects video/flash=off, preserving lens/zoom/photo delay. Call directly; no openCamera/configureCamera. Optional durationSeconds=1...600 sets the limit directly; omission retains the current limit (initially600).
-Speak preparation in wait BEFORE startRecording; emit nothing after it. Omit waitForCompletion (default true): the call returns ready only after manual/timed stop and file preparation. Never choose false here; it is UI startup-only acknowledgement. Listening pauses during recording: use stop button or time limit, not voice. Minimized recording continues; background finalizes without restart. No lens/photo/settings changes while recording. A separate stopRecording uses the actual recordingID.
-Ready means ENDED, not saved. State actual duration/fileName and ask save/ignore; never say recording continues or start again. saveVideo/ignoreVideo require actual recordingID and user consent. mediaID identifies the pending video; savedMediaID is not video evidence. Save collects into App album; export there. Never send video as an image or invent contents. On failure/uncertain start inspect facts, never recapture automatically. Explicit save retry may recover a retained clip.
+startRecording opens/restores, selects video/flash=off and preserves lens/zoom/photo delay. No openCamera/configureCamera. durationSeconds=1...600 overrides the limit; omission retains it (initially600).
+Speak in wait BEFORE startRecording; emit nothing after it. Omit waitForCompletion (true): ready follows stop and file preparation. false is UI-only startup acknowledgement. Listening pauses: use stop button/time limit, not voice. Minimized recording continues; background finalizes without restart. No lens/photo/settings changes during recording. stopRecording needs actual recordingID.
+Ready means ended, not saved. Report actual duration/fileName and ask save/ignore; never restart or claim ongoing recording. saveVideo/ignoreVideo need actual recordingID and consent. mediaID is the pending clip; savedMediaID is not video evidence. Save/export uses App album. Never send video as image or invent contents. Inspect failures/uncertainty without automatic recapture; explicit save retry may recover retained clips.
 ### Settings
-configureCamera updates supplied fields only: mode/photo-video, delaySeconds0...30, flash/off-on-auto, zoom1...6 (hardware-limited), durationSeconds1...600. Omit unrelated fields; video flash=off. Unsupported settings fail explicitly. No mode change over pending media. Countdown is local to takePhoto; cancelCapture cancels/joins it, no model timer.
+configureCamera updates supplied fields: mode/photo-video, delaySeconds0...30, flash/off-on-auto, zoom1...6 (hardware-limited), durationSeconds1...600. Omit unrelated fields; video flash=off. Unsupported settings fail; pending media blocks mode changes. cancelCapture cancels/joins the local photo countdown.
 configureCamera and unloadPreviewImage complete without a business result on success. Read actual applied settings and current preview selections from State when a later request needs them.
 ### Task cleanup (photo and video)
 After confirmed photo save or video save/ignore resolves a matching Task, finish that Task while retaining the Camera window. Explicit discard of unwanted photos uses closeCamera to clear the temporary session.
 For an explicitly requested close: Await operation=close and enabled=false before confirming closure or finishing a matching close goal. Never combine disposal/close/finish in one response. Close Capture only, never Vision.close. Already closed needs no close. A pending video must be explicitly saved or ignored before closeCamera can finish. Cancelled/failed close retains Task/window: report without replaying committed operations. Reshoot retains the SAME Task/window. No matching Task: confirm, no automatic close/finish; never finish unrelated tasks.
 ### Windows and Island
-Window.* needs real windowID from ui.windows; move uses x/y0...1. openCamera is for preview only; success does not trigger a model continuation. Minimize retains capture/recording and yields lens control to Face vision. Restore before disposition. closeCamera closes without opening a confirmation dialog. The window button still offers a choice for pending video. Background stops capture; reopening is explicit.
-Island.setPresentation uses real activityID and size=compact/expanded; only detail text/thumbnail expands. New detail auto-expands; updates preserve manual collapse/content. Task detail and transient status are independent. Details/listening timers are automatic: no duplicates, periodic updates or forced expansion. Component owns animation/size. Submitted is not settled; localStatus/systemStatus are independent, iOS controls system expansion.
+Window.* needs real windowID from ui.windows; move uses x/y0...1. openCamera success has no model continuation: include requested capture in that response. Minimize retains capture/recording and yields lens control to Face vision. Restore before disposition. closeCamera closes without opening a confirmation dialog. The window button still offers a choice for pending video. Background stops capture; reopening is explicit.
+Island.setPresentation needs real activityID and size=compact/expanded. Only detail text/thumbnail expands; new detail auto-expands, updates preserve manual collapse. Task detail and transient status are independent. Do not duplicate automatic timers, periodically update, or force expansion. UI owns animation/size; submitted is not settled. localStatus/systemStatus differ; iOS controls system expansion.
 ### Photo examples — each block is a separate response
-Explicit request to open preview only, without capture:
+Preview only:
 ```xml
 <openCamera/>
 ```
-Open preview with the requested back lens in one response:
+Open with requested back lens:
 ```xml
 <openCamera/><flipCamera facing="back"/>
 ```
-Any window state, preparation not yet spoken:
+Open → cue → photo, ONE response:
 ```xml
-<wait>请看镜头，准备好动作。</wait><takePhoto/>
+<wait><openCamera/></wait><wait>看镜头，现在开拍。</wait><takePhoto/>
 ```
-Already prepared or capture-only:
+Already open; give a cue:
+```xml
+<wait>看镜头，现在开拍。</wait><takePhoto/>
+```
+Already open/prepared:
 ```xml
 <takePhoto/>
 ```
-User authorizes save; replace illustrative ID with actual feedback:
+Open + three-second countdown; cue already spoken:
+```xml
+<openCamera/><takePhoto delaySeconds="3"/>
+```
+Open → cue → three-second countdown, ONE response:
+```xml
+<wait><openCamera/></wait><wait>看镜头，三秒后拍照。</wait><takePhoto delaySeconds="3"/>
+```
+Already open; explicitly requested immediate photo:
+```xml
+<takePhoto delaySeconds="0"/>
+```
+Authorized save; use actual previewID:
 ```xml
 <savePhoto previewID="preview_1"/>
 ```
-User requests saving all unsaved photos in this Camera session:
+Save all, when requested:
 ```xml
 <saveAllPhotos/>
 ```
-Review specific cached photos using actual IDs:
+Review actual cached IDs:
 ```xml
 <loadPreviewImage previewIDs='["preview_1","preview_2","preview_3","preview_4","preview_5"]'/>
 ```
-User requests a reshoot; retained earlier photos remain readable:
+Requested reshoot; keep earlier photos:
 ```xml
 <takePhoto/>
 ```
-Save confirmed, matching Task; keep Camera open:
+Saved, matching Task; keep Camera:
 ```xml
 照片已保存到 App 相册。<task.end summary="照片已保存到 App 相册"/>
 ```
-User wants to discard unsaved photos, matching Task:
+Discard requested:
 ```xml
 <closeCamera/>
 ```
@@ -71,11 +88,11 @@ Saved without a Task:
 照片已保存到 App 相册。
 ```
 ### Video examples — each block is a separate response
-Any camera/window mode, preparation not yet spoken:
+New recording with cue:
 ```xml
 <wait>开始录像，结束时请点停止按钮。</wait><startRecording/>
 ```
-User requests ten seconds; no configureCamera step:
+Ten seconds requested; no configureCamera:
 ```xml
 <wait>开始录制十秒视频。</wait><startRecording durationSeconds="10"/>
 ```
@@ -83,11 +100,11 @@ Already prepared:
 ```xml
 <startRecording/>
 ```
-Only AFTER a ready receipt reporting10 seconds; use actual values:
+After ready receipt; use actual duration:
 ```xml
 录像已结束，时长十秒。要保存到 App 相册，还是忽略？
 ```
-User authorizes save; replace illustrative UUID with actual recordingID:
+Authorized save; use actual recordingID:
 ```xml
 <saveVideo recordingID="11111111-2222-4333-8444-555555555555"/>
 ```
@@ -95,11 +112,11 @@ User authorizes ignore:
 ```xml
 <ignoreVideo recordingID="11111111-2222-4333-8444-555555555555"/>
 ```
-Save confirmed, matching Task; keep Camera open:
+Saved, matching Task; keep Camera:
 ```xml
 视频已保存到 App 相册。<task.end summary="视频已保存到 App 相册"/>
 ```
-Ignore confirmed, matching Task; keep Camera open:
+Ignored, matching Task; keep Camera:
 ```xml
 视频已忽略。<task.end summary="视频已忽略"/>
 ```
@@ -107,4 +124,4 @@ Ignore confirmed, matching Task; keep Camera open:
 ### Preview images across turns
 Use actual current IDs from actions.camera.preview. Only attached images are evidence; State maps IDs to attachment positions. loadPreviewImage(previewID) appends one explicit selection. Use previewIDs as a JSON array to replace the selection with 1–5 photos. The latest fills a free slot. New capture displaces the first selection if full. Compare only requested attached photos. Unload removes explicit selections.
 
-The current window caches the latest 20 originals. Reshoots retain older entries until FIFO eviction. Save unloads a photo, and its cached original can be selected again. Hidden windows suspend delivery; close clears the cache and expires preview_N IDs. Persistent media_N belongs to the album. Missing or unsupported image evidence does not authorize recapture.
+Cache: 20 originals per window, FIFO eviction; reshoots retain earlier photos. Saved originals can reload. Hidden windows suspend image delivery; close expires preview_N. Album media_N is independent. Missing/unsupported evidence never authorizes recapture.

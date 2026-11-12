@@ -152,3 +152,62 @@ Writer 的介绍由 Writer 资源注入独立的协作目录段。因此 Writer 
 - `Assistant/Instructions.md` 维护自身角色标题。`Assistant/Prompts.json` 维护 Writer 追问和近期事件在 Assistant system 中的呈现。Swift 使用共享模板加载器并提供动态值。资源索引、授权筛选、预算、快照选择、消息顺序及序列化仍由现有代码负责。
 - Writer 控制请求复用 `SkillCatalog.json` 的已加载教学标题，继续使用 Writer 自己的 Skill 与提示词。
 - 保持两条 system 消息的正文、顺序和边界，移除 Swift 中的重复标题和排版字符串。同步 Xcode 引用、应用包校验及所属技术 README。对比迁移前的首条 system 正文，并验证 Skill／委派目录、State、图片清单和 Writer 上下文进入实际请求。
+
+## 全量请求提示词资源化（2026-11-11）
+
+用户确认实施，并最终明确 Actions 完全不参与：Actions 的描述、参数说明、正常返回、异常、文件编辑上下文及诊断输入均维持代码定义；Actions 不依赖 Resources。撤回此前尝试的 Actions 模板、加载器、返回结构及打包配置，删除 Resources/Actions。此前目录授权不代表必须保留目录。
+
+### 归属与文件
+
+本次提示词 Resources 只供 cognition Agent 使用，Shared 也属于 cognition Agent 的共享资源。ModelKit 的适配器指令、Decision 默认问题与预热文本保持原有代码定义，不参与本次迁移。现有模型下载声明、权重和其他非提示词资源不受影响。
+
+- Resources/Agents/System 重命名 Shared，只保存无角色归属的通用输出协议、目录排版、运行时事实框架与 Agent 层的通信反馈。Assistant 专属 InputProtocol.md 归 Assistant。
+- Assistant 按输入时间线、会话上下文、输入分类与任务反馈分别维护文件；Writer 按控制上下文、内容请求、恢复和工作区反馈维护文件。Actions 返回值原样作为动态数据传入，Writer 保持既有 instruction/context 协议与文件格式识别。
+- Agent.json 的 perception/cognition 分类保持唯一来源；没有 LLM 请求的 perception 不新增提示词。完整固定指令使用 Markdown，动态插值和成组短模板使用 JSON；无业务细分时保留 Prompts.json。
+- 撤回 ModelPrompts 加载器、四份 Models 提示词文件、相关测试和打包变更。Actions 与 ModelKit 的源码及 target 配置均恢复原状。
+
+### 实现与失败契约
+
+cognition Agents 使用既有严格模板加载器。变量单次插入，资源缺失、无效及变量集合错误明确失败，源码不保留提示词兜底。原有执行、取消、容量、重试与历史证据语义保持。时间线防伪来源行使用同一模板定义并兼容历史格式。
+
+同步 Agents/Assistant、Writer、Support/Chat、Resources 与总体设计 README；撤回 Actions 与 ModelKit 文档变更。维持原 SwiftPM target 配置，同步 Xcode 与最终应用资源校验，清除过期路径和资源包。Xcode 只登记本次源码与文本资产，不登记本地下载权重文件。
+
+### 验证与评估
+
+验证实际请求、角色归属、全部 Agent 模板打包、变量缺失失败和字面模板内容；确认 Actions 和 ModelKit 源码与目标配置无本次变更。Writer 评估源哈希覆盖全部 JSON/Markdown，运行前 bundle 校验覆盖 Writer/Shared 完整资源集合。执行 scripts/check.sh 和 scripts/build-ios.sh，真实模型、原生 UI 与物理设备验收单列，未执行不宣称通过。
+
+### 本轮实施结果
+
+上述 cognition 范围的迁移、Actions/ModelKit 撤回、文档与打包检查已完成。四个 iOS 目标及资源字节校验通过；全量检查仍有一个 NexArm 用例失败，串行复跑通过，NativePresentationTests 缺少完整结束证据。具体日志、结果与真实模型/设备边界见[本轮验证](../../validation/Prompt-Ownership.md#2026-11-11-cognition-提示词资源归属)。
+
+### 真机交付与后续视觉 State 方向
+
+用户要求先安装当前版本。使用现有本地签名配置构建 MobileHarness Debug，命令行构建号 2026111109，覆盖安装到已配对 iPhone 17 Pro，并核对资源、签名、设备版本和启动结果；不卸载、不清空数据，不改仓库签名配置。
+
+用户指出相机视觉和网页截图均代表当前所见，应统一通过 State 向 cognition Agent 提供。此为后续改造方向，尚未实现；本次真机交付仍保留已存在的相机多模态 State 与网页回执专用观察链路。后续需分析图片来源、窗口/会话生命周期、有效性和清理规则，以及共享请求附件的选择与权限边界，避免重复注入图片或把过期截图当成当前状态。
+
+真机交付结果：2026111109 已构建、签名校验并覆盖安装成功，设备版本核对一致。启动验证因设备锁屏被系统拒绝；详见[安装证据](../../validation/Prompt-Ownership.md#2026-11-11-cognition-提示词版本真机安装)。视觉 State 统一仍为后续工作。
+
+用户已确认继续实现网页当前截图 State 统一，仅保留当前图；独立方案见 [Web-Screenshot-State](Web-Screenshot-State.md)。此变更不让 Actions 依赖提示词资源。
+
+2026-11-12：网页单槽 State 后续改造已实现；ConversationContext.json 仅保留任务历史模板，图片事实清单复用 Shared/RequestContext。此前安装记录仍描述当时的交付，最新实现与验证见上述独立方案及其验证记录。
+
+### Assistant 同业务资源合并
+
+2026-11-12 用户确认同一业务的内容可放在一个文件。完整单段文本用 Markdown，同一职责下的多个具名字段用 JSON，包括其中的固定规则正文。
+
+- 将 InputProtocol.md 的规则正文与 InputTimeline.json 的标签、排版、兼容旧格式合并为 InputProtocol.json。Assistant 主请求读取 `instructions`，输入批次、历史恢复和工具结果装配读取同文件的具名字段。
+- 将 InputDecision.md 的分类规则并入 InputDecision.json 的 `instructions`。本地和云端继续使用原规则及输入模板，云端工具描述仍在同文件。
+- 将 ConversationContext.json 唯一的 `taskHistory` 并入 Prompts.json，和已有的历史证据模板同归主对话请求。保留角色单段 Instructions.md、任务控制 TaskFeedback.json 和运行时 Agent.json。
+- 修改资源读取路径和 Xcode 文件引用，删除已并入的文件。更新 Agent 资源规范、Assistant、共享 Chat、总体设计及包校验。核对合并前后正文、换行、模板键及填值语义，复用现有请求、分类、历史恢复和打包测试，并执行仓库完整检查与 iOS 构建。
+
+合并已完成，模板内容、请求回归和打包结果见[验证记录](../../validation/Prompt-Ownership.md#2026-11-12-assistant-同业务资源合并)。
+
+### Assistant 信号权限核对
+
+2026-11-12 用户要求删除 Assistant/Agent.json 中生产链路用不到的信号配置。收窄 Assistant 的入站任务命令和定向发送声明，沿用 Agent 通信接口。
+
+- 删除入站 task.request、task.input、task.cancel。当前角色配置没有向 Assistant 定向发送这些命令的生产者，Assistant 发起 Writer 委派并接收反馈。运行时给请求者的终止反馈仍使用 task.result。
+- Assistant 的 task.request/input/cancel 只授权 Writer。当前公开委派适配只支持 Writer，各固定能力通过自己的入口执行，生产 Skill 没有低层通信 send 入口。
+- 保留 speech.final 和 speech.phase 的输入与订阅。识别开始绑定任务，最终文本进入 Decision，空转写清除绑定。保留 interaction.replyActivity 广播，SpeechPerception 消费回复占用和最终语音接纳确认。
+- 保留 tool.result、action.result、generation.round.result、communication.receipt、task.progress、task.result 和 writer.completion。更新 Assistant 的关系图和资源规范，在 CommunicationTests 验证打包配置能组装通信策略并路由语音双向信号与 Writer 权限。执行完整检查和 iOS 构建。

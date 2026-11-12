@@ -237,13 +237,10 @@ import StorageFiles
                         default: return ""
                         }
                     },
-                    observedContracts: ["speech.partial", "speech.final", "speech.phase"],
+                    observedContracts: [PerceptionMessage.asrFinalContract],
                     observeEvent: { input in
-                        guard let observation = input.payload.perception else { return }
-                        switch observation {
-                        case .transcript(let text, true): try await business.observeTranscript(text, input.sessionID)
-                        case .speechPhase(.empty): try await business.observeEmpty(input.sessionID)
-                        default: break
+                        if case .transcript(let text, true)? = input.payload.perception {
+                            try await business.observeTranscript(text, input.sessionID)
                         }
                     }, sink: { await business.output($0.actionObservation) })
                 return AgentExecutionBinding(configuration: configuration) { facilities in
@@ -332,28 +329,17 @@ import StorageFiles
                 read: { scope in
                     try await cameraControl.previewSnapshot(scope: scope)
                 }, reset: { scope in await cameraControl.resetPreviewSelection(scope: scope) })
+            try stateContext.registerMedia(
+                "actions.web.screenshot", read: business.readWebScreenshot, reset: { _ in })
             let speechOutput = AssistantSpeechOutput()
             let main = try AssistantAgent(
                 stateContext: stateContext, speechOutput: speechOutput, inputDecision: inputDecision, fullDuplex: true,
                 inputQueueStatus: { ready, deciding in await inputQueueStatus(ready, deciding) },
                 uiHome: home, uiSessionID: applicationControlSessionID,
-                reportsReplyActivity: true, chatProvider: chatProvider, conversations: conversations,
+                presentsReply: true, chatProvider: chatProvider, conversations: conversations,
                 communications: communications,
                 modelName: modelName,
-                observations: AssistantContextBuilder.webImageObservationHandler(
-                    read: { id, input in
-                        try await ChatImage(
-                            id: id,
-                            data: cameraControl.readPhoto(
-                                id, source: "assistant", sessionID: input.sessionID, inputID: input.id))
-                    },
-                    prepareJPEG: { data, policy in
-                        try await NativeImageCompression.jpeg(
-                            from: data,
-                            limits: .init(
-                                maximumDimension: policy.maximumDimension, maximumPixels: policy.maximumPixels,
-                                maximumBytes: policy.maximumBytes, quality: policy.quality))
-                    }), context: assistantContext)
+                context: assistantContext)
             business.tasks.handler = { operation, arguments, source, session, input, decision in
                 try await main.controlTask(
                     operation, arguments: arguments, source: source, sessionID: session, inputID: input,

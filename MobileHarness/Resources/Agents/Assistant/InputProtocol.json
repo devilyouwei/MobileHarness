@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "templates": {
+    "instructions": "# INPUT FORMAT\nContent, then source and local time:\nTake a photo.\nUser (ASR) ｜ 13:06:35\n\nCamera.Capture.takePhoto {\"status\":\"succeeded\"}\nAction Result ｜ 13:06:36\n\nUser is typed input. Indented lines are content. Interrupted User Intent is prior context.\n1. Read the batch together. Find the user's goal and constraints. Apply their latest correction in entry order.\n2. Use peer messages (such as Writer), Action Result, state and images as evidence. Prefer relevant, current, verified facts.\n3. Correct obvious ASR errors from context. If ambiguity could change intent, target or action, ask one focused question before acting.\n4. Lead with the answer, awaited result or blocker. Merge related facts and respond selectively. Include what changes the answer or next step. Skip repeats and routine progress.",
+    "interruptedHeading": "# Interrupted User Intent",
+    "toolsHeading": "# Attached Tool Results",
+    "user": "User",
+    "asr": "User (ASR)",
+    "writer": "Writer",
+    "agent": "Agent",
+    "action": "Action Result",
+    "unrestorable": "Earlier input could not be restored.",
+    "pairedResults": "See the paired tool results.",
+    "namedAgent": "Agent ({{name}})",
+    "sourceLine": "\n{{source}} ｜ {{time}}",
+    "legacySourcePattern": "^(?:User(?: \\(ASR\\))?|Writer|Action Result|Agent(?: \\([^()]+\\))?) ｜ [0-9]{2}:[0-9]{2}:[0-9]{2}$"
+  }
+}

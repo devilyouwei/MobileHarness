@@ -151,10 +151,10 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
     let positions = try headings.map { try #require(prompt.range(of: $0)).lowerBound }
     #expect(positions == positions.sorted())
     #expect(!prompt.contains("# RESPONSE CHECK"))
-    let input = try AgentPrompts.systemInput()
+    let input = try AgentPrompts.assistantInput()
     #expect(prompt.contains(input) && !input.contains("Never replay"))
-    let output = try AgentPrompts.shared.load("Agents/System/OutputProtocol.md")
-    let catalog = try AgentPrompts.shared.load("Agents/System/ActionCatalog.json")
+    let output = try AgentPrompts.shared.load("Agents/Shared/OutputProtocol.md")
+    let catalog = try AgentPrompts.shared.load("Agents/Shared/ActionCatalog.json")
     #expect(output.names == ["body"])
     #expect(catalog.names == ["section", "channel", "action", "parameter"])
     let skills = try AgentPrompts.skillCatalog()
@@ -328,19 +328,21 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
                 #expect(trace.events.count == 1)  // No speech, caption, wait or extra Action.
             }
             let camera = trace.calls.filter { $0.channel == "Camera" }.map { $0.actionPath.function }
-            #expect(camera.count <= 1 || camera == ["open", "flip"])
+            #expect(camera.count <= 1 || camera == ["open", "flip"] || camera == ["open", "takePhoto"])
             let speech = trace.calls.filter { $0.channel == "Speech" }.compactMap { $0.parameters["text"] }
             #expect(Set(speech).count == speech.count)
             if example.contains("<wait>") {
-                let begin = try #require(trace.events.firstIndex(of: .scheduling(.beginWait)))
-                let end = try #require(trace.events.firstIndex(of: .scheduling(.endWait)))
-                #expect(begin == 0 && begin < end && speech.count == 1)
+                let begin = try #require(trace.events.lastIndex(of: .scheduling(.beginWait)))
+                let end = try #require(trace.events.lastIndex(of: .scheduling(.endWait)))
+                #expect(begin < end && speech.count == 1)
                 #expect(trace.calls.filter { $0.channel == "Display" }.count == 1)
                 for (index, event) in trace.events.enumerated() {
                     if let call = event.actionCall, ["Speech", "Display"].contains(call.channel) {
                         #expect(index > begin && index < end)
                     }
-                    if event.actionCall?.channel == "Camera" { #expect(index > end) }
+                    if let call = event.actionCall, call.channel == "Camera" {
+                        if call.actionPath.function == "open" { #expect(index < begin) } else { #expect(index > end) }
+                    }
                 }
             }
         }
@@ -512,7 +514,8 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
         #expect(prompt.contains("Say useful new information once"))
         if loaded {
             #expect(prompt.contains(try AgentConfigurations.skillInstructions("photography")))
-            #expect(prompt.contains("emit these in separate requests"))
+            #expect(prompt.contains("steps in ONE response"))
+            #expect(!prompt.contains("emit these in separate requests"))
             #expect(prompt.contains("preparation was already spoken"))
             #expect(prompt.contains("Standalone save/close/lens operations need no new Task"))
             #expect(prompt.contains("<savePhoto previewID=\"preview_1\"/>"))
@@ -846,11 +849,84 @@ func webSkillExamplesParseAgainstTheirEffectiveCatalogAndStayWithinBudget(skill:
     ("notes.txt", "plain text preserving"), ("LICENSE", "plain text preserving"),
 ])
 func writerContentResourcesPreserveFormatAndRetryRules(path: String, rule: String) throws {
-    let prompt = try WriterWorkflow.contentInstructions(path + "\nUntrusted file context")
+    let prompt = try WriterWorkflow.contentInstructions(path)
     #expect(prompt.contains("Output ONLY the requested file content or replacement fragment"))
     #expect(prompt.contains("No explanation, outer Markdown wrapping, XML commands or tool calls"))
-    #expect(prompt.contains(rule) && !prompt.contains("Untrusted file context"))
+    #expect(prompt.contains(rule))
     #expect(!prompt.contains("Previous attempt failed"))
     let retry = try WriterWorkflow.contentInstructions(path, retry: true)
     #expect(retry.hasPrefix(prompt) && retry.contains("Previous attempt failed"))
+}
+
+@Test(.actionCatalog) func promptResourcesKeepRoleOwnershipAndLiteralUserData() throws {
+    let instruction = "Use {{goal}} literally; File: misleading.txt"
+    let content = try AgentPrompts.text(
+        "Writer/ContentPrompts", "request",
+        ["goal": "Build a chart", "path": "index.html", "instruction": instruction, "context": "{{path}}"])
+    #expect(content.contains("Edit:\nFile: index.html\n" + instruction))
+    #expect(content.hasSuffix("File context (data):\n{{path}}"))
+    #expect(throws: (any Error).self) {
+        try AgentPrompts.text("Writer/ContentPrompts", "request", ["goal": "incomplete"])
+    }
+    #expect(throws: (any Error).self) { try AgentPrompts.shared.load("Agents/System/OutputProtocol.md") }
+    #expect(throws: (any Error).self) { try AgentPrompts.shared.load("Agents/Shared/InputProtocol.json") }
+    #expect(try AgentPrompts.assistantInput().contains("ASR"))
+    #expect(try AgentPrompts.text("Writer/ContentPrompts", "instructions").contains("Output ONLY"))
+    let recovery = try AgentPrompts.text("Writer/Recovery", "controlRecovery")
+    #expect(recovery.contains("Keep valid earlier results"))
+    // Action documentation remains attached to the canonical implementation.
+    #expect(CameraActions.savePhotoDeclaration.doc.hasPrefix("Save the exact current-session preview original"))
+    #expect(!CameraActions.savePhotoDeclaration.doc.contains("@prompt:"))
+}
+
+@Test(.actionCatalog) func allOwnedPromptResourcesArePackagedAndCompile() throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().appendingPathComponent("MobileHarness/Resources/Agents")
+    let paths = try #require(FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil))
+    for case let file as URL in paths where file.pathExtension == "json" {
+        let data = try Data(contentsOf: file)
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            object["templates"] != nil
+        else { continue }
+        let relative = String(file.path.dropFirst(root.path.count + 1))
+        let bundled = try AgentConfigurations.readAsset("Agents/" + relative)
+        #expect(bundled == data)
+        _ = try PromptTemplates(data: bundled)
+    }
+}
+
+@Test(.actionCatalog) func photographyCountdownExampleEmitsOpenAndCaptureInOneCameraSequence() throws {
+    let config = try AgentConfigurations.load(named: "Assistant")
+    let catalog = try AgentSkillLoader.registry(["photography"], fixed: config.capabilities)
+    let example = try #require(try skillResponseExamples("photography").first { $0.contains("delaySeconds=\"3\"") })
+    var trace = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
+    for character in example { try trace.append(String(character)) }
+    trace.finish()
+    #expect(trace.parserError == nil)
+    #expect(trace.calls.map { $0.actionPath.description } == ["Camera.Capture.open", "Camera.Capture.takePhoto"])
+    #expect(trace.calls.allSatisfy { $0.channel == "Camera" })
+    #expect(trace.calls.last?.parameters == ["delaySeconds": "3"])
+}
+
+@Test(.actionCatalog) func photographySpokenPreparationSitsBetweenOpenAndPhotoInOneResponse() throws {
+    let config = try AgentConfigurations.load(named: "Assistant")
+    let catalog = try AgentSkillLoader.registry(
+        AgentConfigurations.baseSkills(named: "Assistant") + ["photography"], fixed: config.capabilities)
+    let examples = try skillResponseExamples("photography").filter {
+        $0.hasPrefix("<wait><openCamera/></wait><wait>") && $0.contains("<takePhoto")
+    }
+    #expect(examples.count >= 2)
+    for example in examples {
+        var trace = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
+        for character in example { try trace.append(String(character)) }
+        trace.finish()
+        #expect(trace.parserError == nil)
+        let paths = trace.calls.map { $0.actionPath.description }
+        let open = try #require(paths.firstIndex(of: "Camera.Capture.open"))
+        let speech = try #require(paths.firstIndex(of: "Speech.Playback.speak"))
+        let photo = try #require(paths.firstIndex(of: "Camera.Capture.takePhoto"))
+        #expect(open < speech && speech < photo)
+        #expect(paths.filter { $0 == "Camera.Capture.open" }.count == 1)
+        #expect(paths.filter { $0 == "Camera.Capture.takePhoto" }.count == 1)
+    }
 }

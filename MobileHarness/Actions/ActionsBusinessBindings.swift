@@ -17,7 +17,6 @@
         func pauseVisionForModelMaintenance() async
         func previewSnapshot(scope: String) async throws -> MultimodalContextSnapshot
         func resetPreviewSelection(scope: String) async
-        func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data
     }
     @MainActor public protocol ActionsDeviceAccess: AnyObject {
         func openPage()
@@ -111,6 +110,7 @@
         }
     }
     @MainActor public struct ActionsBusinessBindings {
+        public let readWebScreenshot: @Sendable (String) async throws -> MultimodalContextSnapshot
         public let artifactStreaming: (any ArtifactStreaming)?
         public let writerArtifacts: (any WriterArtifactsControlling)?
         public let writerModel: (@Sendable () async throws -> ChatModel)?
@@ -135,12 +135,12 @@
                 @escaping @Sendable (Set<ResourceID>, @escaping @Sendable () async throws -> Void) async throws -> Void
             ) -> Void
         public let observeTranscript: @MainActor @Sendable (String, String) throws -> Void
-        public let observeEmpty: @MainActor @Sendable (String) throws -> Void
         public let output: @Sendable (ActionOutputObservation) async -> Void
         public let decodeResources: @Sendable (String) throws -> ModelResourceViewSnapshot
         public let makeVoice: @MainActor (ActionsVoiceHost) throws -> ActionsVoiceExecution
         public init(
             executor: ActionsExecutionPort, catalog: ActionCatalogSnapshot,
+            readWebScreenshot: @escaping @Sendable (String) async throws -> MultimodalContextSnapshot,
             artifactStreaming: (any ArtifactStreaming)? = nil,
             writerArtifacts: (any WriterArtifactsControlling)? = nil,
             writerModel: (@Sendable () async throws -> ChatModel)? = nil,
@@ -163,11 +163,11 @@
                         Void
                 ) -> Void,
             observeTranscript: @escaping @MainActor @Sendable (String, String) throws -> Void,
-            observeEmpty: @escaping @MainActor @Sendable (String) throws -> Void,
             output: @escaping @Sendable (ActionOutputObservation) async -> Void,
             decodeResources: @escaping @Sendable (String) throws -> ModelResourceViewSnapshot,
             makeVoice: @escaping @MainActor (ActionsVoiceHost) throws -> ActionsVoiceExecution
         ) {
+            self.readWebScreenshot = readWebScreenshot
             self.artifactStreaming = artifactStreaming
             self.writerArtifacts = writerArtifacts
             self.writerModel = writerModel
@@ -187,7 +187,6 @@
             self.bindDeferredFailure = bindDeferredFailure
             self.bindResourceRun = bindResourceRun
             self.observeTranscript = observeTranscript
-            self.observeEmpty = observeEmpty
             self.output = output
             self.decodeResources = decodeResources
             self.makeVoice = makeVoice

@@ -3,11 +3,6 @@ import Foundation
 import StorageCore
 
 /// Runtime Task/Skill state; executable code is never loaded from assets.
-public enum RecognitionBinding: Codable, Sendable, Equatable {
-    case conversation
-    case task(String)
-}
-
 public struct AgentTaskSkillState: Codable, Sendable {
     public struct TaskRecord: Codable, Sendable, Identifiable {
         public let id: String
@@ -60,7 +55,6 @@ public struct AgentTaskSkillState: Codable, Sendable {
     public var activeTaskID: String?
     public var tasks: [TaskRecord] = []
     public var events: [Event] = []
-    public var recognitionBindings: [String: RecognitionBinding] = [:]
     public var inputBindings: [String: String] = [:]
     public init() {}
 
@@ -408,7 +402,6 @@ public struct AgentTaskSkillState: Codable, Sendable {
         }
         activeTaskID = nil
         loaded = []
-        recognitionBindings = [:]
         recentSkills = [:]
         taskSkillRoots = []
         decisions = [:]
@@ -422,7 +415,7 @@ public struct AgentTaskSkillState: Codable, Sendable {
             Set(recentSkills.keys).isDisjoint(with: taskSkillRoots),
             activeTaskID != nil || taskSkillRoots.isEmpty,
             decisions.values.allSatisfy({ $0.roots.count <= 16 }),
-            recognitionBindings.count <= 32, inputBindings.count <= 256,
+            inputBindings.count <= 256,
             Set(tasks.map(\.id)).count == tasks.count,
             tasks.allSatisfy({
                 $0.inputIDs.count <= 256 && Set($0.inputIDs).count == $0.inputIDs.count

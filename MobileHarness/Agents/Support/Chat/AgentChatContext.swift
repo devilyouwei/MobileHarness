@@ -11,7 +11,6 @@ public enum AgentChatSessionControl: Sendable, Equatable { case interrupt, close
 public protocol AgentChatContextState: AgentTaskContextState {
     static var supportsSkills: Bool { get }
     static func sessionControl(_ message: AgentMessage) throws -> AgentChatSessionControl?
-    static var tracksDelegatedReplies: Bool { get }
     static var agentID: AgentID { get }
     static var configurationName: String { get }
     static var acceptsDirectedUserInput: Bool { get }
@@ -72,10 +71,6 @@ public enum AgentChatHistoryContext {
                 skills.tasks.removeAll { ended.contains($0.id) }
                 skills.events.removeAll { $0.taskID.map(ended.contains) == true }
                 skills.inputBindings = skills.inputBindings.filter { !ended.contains($0.value) }
-                skills.recognitionBindings = skills.recognitionBindings.filter { entry in
-                    if case .task(let id) = entry.value { return !ended.contains(id) }
-                    return true
-                }
                 $0.state.skillState = skills
             }
             $0.state.history = history
@@ -120,7 +115,6 @@ extension AgentChatContextState {
             system: system, user: user, conversation: conversation,
             templates: AgentPrompts.load(named: configurationName))
     }
-    public static var tracksDelegatedReplies: Bool { false }
     public static var acceptsDirectedUserInput: Bool { false }
     public static var commitDependentTargets: Set<AgentID> { [] }
     public static func validateCommunication(_ signal: AgentTaskSignal, state: Self) throws {}

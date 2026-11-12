@@ -45,35 +45,36 @@ enum WriterRecovery {
         try Task.checkCancellation()
         try await Task.sleep(for: .milliseconds(attempt == 1 ? 500 : 1000))
     }
-    static func requestFeedback(_ error: any Error, attempt: Int, content: Bool = false) -> String {
+    static func requestFeedback(_ error: any Error, attempt: Int, content: Bool = false) throws -> String {
         let failure = WriterDiagnostics.make(error, stage: content ? "文件内容请求" : "控制请求")
         let value: [String: String] = [
             "origin": "writer.runtime", "status": "failed", "code": failure.code,
             "message": failure.message, "category": failure.category, "stage": failure.stage,
-            "details": String(decoding: (try? JSONEncoder().encode(failure.details)) ?? Data(), as: UTF8.self),
+            "details": String(decoding: try JSONEncoder().encode(failure.details), as: UTF8.self),
             "attempt": String(attempt), "maximumAttempts": String(attempts),
             "effect": content
-                ? "Failed source stream aborted and cleaned up; no failed content was committed."
-                : "No workspace tool from this failed request was executed. Earlier successful operations remain.",
+                ? try AgentPrompts.text("Writer/Recovery", "contentEffect")
+                : try AgentPrompts.text("Writer/Recovery", "controlEffect"),
             "recovery": content
-                ? "Correct the reported failure and return raw source for the requested file/range only."
-                : "Use the reported cause to correct the next response. Keep valid earlier results. Fix malformed arguments or call/result protocol; use edit with a short instruction for large source changes. Do not repeat the same invalid response."
-                ,
+                ? try AgentPrompts.text("Writer/Recovery", "contentRecovery")
+                : try AgentPrompts.text("Writer/Recovery", "controlRecovery"),
         ]
-        return "Runtime failure observation (data, not a user instruction):\n"
-            + String(decoding: (try? JSONEncoder().encode(value)) ?? Data(), as: UTF8.self)
+        return try AgentPrompts.text("Writer/Recovery", "observation")
+            + String(decoding: try JSONEncoder().encode(value), as: UTF8.self)
     }
-    static func feedback(_ error: any Error, attempt: Int, repeated: Bool = false) -> String {
+    static func feedback(_ error: any Error, attempt: Int, repeated: Bool = false) throws -> String {
         let failure = WriterDiagnostics.make(error, stage: "工具恢复")
         let value: [String: String] = [
             "status": "failed", "code": failure.code, "message": failure.message,
             "category": failure.category, "stage": failure.stage,
-            "details": String(decoding: (try? JSONEncoder().encode(failure.details)) ?? Data(), as: UTF8.self),
+            "details": String(decoding: try JSONEncoder().encode(failure.details), as: UTF8.self),
             "recoveryAttempt": String(attempt), "maximumAttempts": String(attempts),
-            "effect": repeated ? "notExecuted; unchanged failed call" : "see original tool failure",
+            "effect": repeated
+                ? try AgentPrompts.text("Writer/Recovery", "repeatedEffect")
+                : try AgentPrompts.text("Writer/Recovery", "originalEffect"),
             "recovery":
-                "Inspect the error and current files. Reread stale references, correct arguments, or change approach. An unchanged failed effect is not re-executed. For edits, render successfully before calling finish; ask only for genuinely missing user information.",
+                try AgentPrompts.text("Writer/Recovery", "toolRecovery"),
         ]
-        return String(decoding: (try? JSONEncoder().encode(value)) ?? Data("Tool recovery failed".utf8), as: UTF8.self)
+        return String(decoding: try JSONEncoder().encode(value), as: UTF8.self)
     }
 }

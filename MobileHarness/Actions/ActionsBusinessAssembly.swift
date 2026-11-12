@@ -53,6 +53,7 @@
             self.makeCameraRuntime = makeCameraRuntime
             self.connectVision = connectVision
         }
+        private var observedWeb: WebExecutionService?
         private var observedCamera: CameraCoordinator?
         lazy var camera: CameraCoordinator = {
             let owner = CameraCoordinator(
@@ -83,6 +84,15 @@
             }
             readers["actions.camera.preview"] = ActionsStateSnapshot.reader(of: self) {
                 try await $0.previewStateSnapshot()
+            }
+            readers["actions.web"] = ActionsStateSnapshot.reader(of: self) { owner in
+                let created = await owner.observedWeb != nil
+                return .init(
+                    path: "actions.web", runtime: ["created": .flag(created)],
+                    children: [.init(path: "actions.web.screenshot")])
+            }
+            readers["actions.web.screenshot"] = ActionsStateSnapshot.reader(of: self) { owner in
+                try await owner.observedWeb?.stateSnapshot() ?? .init(path: "actions.web.screenshot")
             }
             return readers
         }
@@ -182,13 +192,8 @@
                     try pages.createSession(windowID: id, reference: reference)
                 },
                 removePage: { [pages = ui.web] id in pages.removeSession(windowID: id) },
-                saveImage: { [photos] data, input in
-                    try await photos.save(
-                        data,
-                        owner: StorageOwner(
-                            namespace: "photos", source: input.context.source,
-                            session: input.context.sessionID, input: input.context.inputID))
-                })
+                prepareImage: WebScreenshotImage.prepare)
+            observedWeb = web
             let windowExecution = WindowExecutionService(
                 state: ui.windows,
                 lifecycles: [
@@ -251,6 +256,7 @@
                 })
             return ActionsBusinessBindings(
                 executor: actions.execution, catalog: try actions.catalog(),
+                readWebScreenshot: { scope in try await web.screenshotSnapshot(scope: scope) },
                 artifactStreaming: artifacts, writerArtifacts: exports,
                 writerModel: { [model] in
                     let selected = try await providerService.writerConfiguration()
@@ -293,7 +299,6 @@
                         try await run(requested, operation)
                     }
                 }, observeTranscript: { text, session in try presentation.observeTranscript(text, sessionID: session) },
-                observeEmpty: { session in try presentation.observeEmptyUtterance(sessionID: session) },
                 output: { await presentation.output($0) },
                 decodeResources: { try SettingsModelResourcesAdapter.items($0) },
                 makeVoice: { [self] in try makeVoice($0) })
@@ -364,9 +369,6 @@
             try camera.previewSnapshot(scope: scope)
         }
         func resetPreviewSelection(scope: String) async { camera.previews.reset(scope: scope) }
-        func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data {
-            try await camera.readPhoto(id, source: source, sessionID: sessionID, inputID: inputID)
-        }
     }
     @MainActor final class ActionsDeviceHost: ActionsDeviceAccess {
         let bluetooth: BluetoothWorkflow

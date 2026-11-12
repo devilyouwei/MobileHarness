@@ -9,7 +9,6 @@
 | 文件 | 职责 |
 | --- | --- |
 | [PerceptionMessage.swift](PerceptionMessage.swift) | 感知业务枚举，AgentMessage 工厂与类型化读取，按消息类型验证内容和字节上限 |
-| [SpeechValues.swift](SpeechValues.swift) | 语音阶段和完整回复占用快照 |
 | [PoseObservation.swift](PoseObservation.swift) | COCO-17 姿态、几何／置信度与观测新鲜度 |
 | [SoundSourceObservation.swift](SoundSourceObservation.swift) | 声源方向、质量、格式及有效状态 |
 | [AgentTasks.swift](AgentTasks.swift) | Task 内容／视图、用户回复、公开委派许可、固定任务准入和通信函数声明 |
@@ -28,9 +27,9 @@ flowchart LR
 
 ## 消息内容与约束
 
-PerceptionMessage 区分 speech.final、speech.partial、speech.phase、sound.source、vision.pose。AgentMessage 持有类型化内容及验证闭包；一般编码上限为 16 KiB，姿态为 256 KiB。最终转写非空且最多 4096 UTF-8 字节，预览最多 16300 字节。合成不是角色通信协议，文本校验与音频生产由 Assistant 拥有。
+PerceptionMessage 包含 user.input.asr.partial、user.input.asr.final、sound.source 和 vision.pose。语音片段与最终文本共用 user.input 主题，订阅按契约、主题和来源匹配。AgentMessage 持有类型化内容及验证闭包。编码上限通常为 16 KiB，姿态为 256 KiB；最终文本非空且最多 4096 UTF-8 字节，片段最多 16300 字节。
 
-ReplyActivity 是 revision 递增的完整占用快照，input/task 列表各最多 128 项且不能重复；它描述回复占用及最后一条已接纳语音的 root。姿态和声源的算法及发布节奏由 [VisionPerception](../../VisionPerception/README.md) 与 [SpeechPerception](../../SpeechPerception/README.md) 拥有。
+姿态、声源和识别阶段由对应角色拥有。见 [VisionPerception](../../VisionPerception/README.md) 与 [SpeechPerception](../../SpeechPerception/README.md)。
 
 AgentTaskContent 保存最多 4096 字节的业务文本与 running／waitingUser／completed 阶段；waitingUser 要求 interactionID。AgentTaskInputIntent 显式指向既有 taskID 与 interactionID，标识各最多 128 字节；运行时所有权由可信上下文提供。后台委派使用 AgentTaskSignal.request 携带目标及原始用户输入。固定能力继续用信封类型标记解释自己的载荷。
 

@@ -467,12 +467,7 @@ private func photographyAcceptance(
     let agent = try AssistantAgent(
         stateContext: publicContext,
         chat: model, conversations: store, communications: persistentRecords?.agentMessages,
-        observations: { values, input, chat in
-            try await AssistantContextBuilder.webImageObservations(
-                values, input: input, chat: chat,
-                read: { id, _ in try ChatImage(id: id, data: Data([1])) },
-                prepareJPEG: { data, _ in data })
-        }, context: context)
+        context: context)
     _ = try await bindSpeechRequests(agent)
     let manager = AgentManager()
     try await manager.register(agent)
@@ -949,7 +944,7 @@ private func photographyAcceptance(
     if let persistentRecords { try await persistentRecords.shutdown() }
 }
 
-@Test(.actionCatalog) func cancelledTaskRejectsLateASRInsteadOfCapturingNewTask() async throws {
+@Test(.actionCatalog) func completedASRBindsToTaskAtAdmission() async throws {
     let fixedCapabilities = try AssistantAgent.runtimeCapabilities(
         AgentConfigurations.load(named: "Assistant").capabilities)
     var initial = AssistantContextState()
@@ -968,10 +963,6 @@ private func photographyAcceptance(
     try await agent.start()
     let session = UUID().uuidString
     let turn = AgentTurn(id: UUID().uuidString, ordinal: 1)
-    try await agent.receive(
-        .init(
-            id: UUID().uuidString, sessionID: session, payload: .observation(.speechPhase(.speaking)),
-            turn: turn))
     try await context.update {
         var state = try #require($0.state.skillState)
         _ = try state.control(
@@ -985,14 +976,14 @@ private func photographyAcceptance(
         $0.state.skillState = state
     }
     let current = try await context.snapshot().state.skillState?.activeTaskID
-    await #expect(throws: CommunicationError.scopeClosed) {
-        try await agent.receive(
-            .init(
-                id: UUID().uuidString, sessionID: session,
-                payload: .observation(.transcript("保存", final: true)), turn: turn))
-    }
-    #expect(try await context.snapshot().state.skillState?.activeTaskID == current)
-    #expect(await model.requests.count == 0)
+    let payload = InputPayload.observation(.transcript("查询记录", final: true))
+    try await agent.receive(
+        .init(
+            id: "completed-asr", sessionID: session, payload: payload,
+            metadata: .init(
+                payload: payload, source: "speechPerception", origin: .agent, rootID: "completed-asr",
+                topic: PerceptionMessage.userInputTopic), turn: turn))
+    #expect(try await context.snapshot().state.skillState?.taskID(for: "completed-asr") == current)
     await agent.stop()
 }
 
@@ -2513,7 +2504,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
     let model = WriterNoticeModel(delegate: true, retryRejected: outcome == "rejectedRetry")
     let assistant = try AssistantAgent(
         stateContext: try publicStateFixture(),
-        reportsReplyActivity: true, chat: model, conversations: history, communications: database.agentMessages,
+        presentsReply: true, chat: model, conversations: history, communications: database.agentMessages,
         context: context)
     let child = ObservationRecorder(
         id: "writer", reject: outcome.hasPrefix("rejected"), executions: database.writerExecutions)

@@ -67,7 +67,8 @@ private func writerDefinitions() throws -> [ChatToolDefinition] {
         definitions: try writerDefinitions(),
         execute: { call in
             call.id == "edit"
-                ? .write(streamID: "runtime-owned", instruction: "Create HTML", context: "") : .finished("完成")
+                ? .write(.init(streamID: "runtime-owned", path: "index.html", instruction: "Create HTML"))
+                : .finished("完成")
         },
         append: { id, chunk in
             #expect(id == "runtime-owned")
@@ -98,7 +99,7 @@ private func writerDefinitions() throws -> [ChatToolDefinition] {
     let probe = WriterStreamProbe()
     let tools = WriterTools(
         definitions: try writerDefinitions(),
-        execute: { _ in .write(streamID: "s", instruction: "Text", context: "") },
+        execute: { _ in .write(.init(streamID: "s", path: "notes.txt", instruction: "Text")) },
         append: { _, text in await probe.append(text) }, complete: { _ in await probe.complete() },
         abort: { _ in await probe.abort() })
     await #expect(throws: WriterRecoveryFailure.self) {
@@ -247,7 +248,7 @@ private func writerDefinitions() throws -> [ChatToolDefinition] {
     let probe = WriterStreamProbe()
     let tools = WriterTools(
         definitions: try writerDefinitions(),
-        execute: { _ in .write(streamID: "s", instruction: "Write", context: "") },
+        execute: { _ in .write(.init(streamID: "s", path: "notes.txt", instruction: "Write")) },
         append: { _, _ in
             withUnsafeCurrentTask { $0?.cancel() }
             throw CancellationError()
@@ -271,12 +272,12 @@ private func writerDefinitions() throws -> [ChatToolDefinition] {
     #expect(html.content == "keep\n")
     #expect(html.startLine == 2)
     let css = try await editor.read(path: "style.css")
-    #expect(try await editor.relatedContext([css.reference]).contains(".diagram {color:red}"))
+    #expect(try await editor.relatedFiles([css.reference]).first?.text == ".diagram {color:red}")
     let stream = try await editor.begin(path: "index.html", reference: html.reference)
     try await editor.append("changed\n", to: stream)
     _ = try await editor.finish(stream)
-    #expect(try await editor.relatedContext([css.reference]).contains(".diagram"))
-    await #expect(throws: ArtifactWorkspaceError.readRequired) { try await editor.relatedContext([html.reference]) }
+    #expect(try await editor.relatedFiles([css.reference]).first?.text.contains(".diagram") == true)
+    await #expect(throws: ArtifactWorkspaceError.readRequired) { try await editor.relatedFiles([html.reference]) }
     #expect(await editor.snapshot().files["index.html"] == "<div class=diagram>🌍</div>\nchanged\nend")
 }
 
@@ -317,7 +318,13 @@ private func writerDefinitions() throws -> [ChatToolDefinition] {
         definitions: try writerDefinitions(),
         execute: { call in
             call.id == "edit"
-                ? .write(streamID: "s", instruction: "File: style.css\nUpdate style", context: "<div class=diagram>")
+                ? .write(
+                    .init(
+                        streamID: "s", path: "style.css", instruction: "File: misleading.md\nUpdate {{goal}}",
+                        selection: .init(start: 3, end: 8, before: "old", selected: "\ncss\n", after: "tail"),
+                        relatedFiles: [
+                            .init(path: "index.html", version: 2, start: 0, end: 19, text: "<div class=diagram>")
+                        ]))
                 : .finished("done")
         }, append: { _, text in await probe.append(text) }, complete: { _ in await probe.complete() },
         abort: { _ in await probe.abort() })
@@ -325,7 +332,12 @@ private func writerDefinitions() throws -> [ChatToolDefinition] {
     _ = try await WriterWorkflow(model: model).run(
         goal: "draw", scope: "task", tools: tools, revisions: { await updates.take() })
     let request = try #require(await model.requests.dropFirst().first)
-    #expect(request.messages.contains { $0.content.contains("Use red") && $0.content.contains("class=diagram") })
+    let user = try #require(request.messages.first { $0.role == .user }).content
+    #expect(user.contains("Use red"))
+    #expect(user.contains("File: style.css\nFile: misleading.md\nUpdate {{goal}}"))
+    #expect(user.contains("range 3..<8. Selected range begins with newline: true; ends with newline: true."))
+    #expect(user.contains("Before (data):\nold\nSelected (data):\n\ncss\n\nAfter (data):\ntail"))
+    #expect(user.contains("Related file index.html, version 2, range 0..<19 (data):\n<div class=diagram>"))
     #expect(request.messages.contains { $0.role == .system && $0.content.contains("WebKit") })
 }
 
@@ -358,7 +370,7 @@ private actor WriterFailureProbe {
         definitions: try writerDefinitions(),
         execute: { call in
             if ["first", "second"].contains(call.id) { return try await probe.render() }
-            if call.id == "edit" { return .write(streamID: "s", instruction: "Fix", context: "") }
+            if call.id == "edit" { return .write(.init(streamID: "s", path: "index.html", instruction: "Fix")) }
             return .finished("Done")
         }, append: { _, _ in }, complete: { _ in "Draft changed" }, abort: { _ in })
     if repair {
@@ -494,7 +506,7 @@ private actor WriterRetryEditor {
     func begin() async throws -> WriterToolOutcome {
         let id = try await editor.begin(path: "index.html")
         streams.append(id.uuidString)
-        return .write(streamID: id.uuidString, instruction: "File: index.html\nCreate demo", context: "New file")
+        return .write(.init(streamID: id.uuidString, path: "index.html", instruction: "Create demo"))
     }
     func append(_ id: String, _ text: String) async throws {
         try await editor.append(text, to: #require(UUID(uuidString: id)))
@@ -569,7 +581,7 @@ private actor WriterRetryEditor {
     let model = WriterScriptModel([writerControl("edit", "edit"), [.text("partial"), .finished(.lengthLimit)]])
     let tools = WriterTools(
         definitions: try writerDefinitions(),
-        execute: { _ in .write(streamID: "s", instruction: "Create demo", context: "") },
+        execute: { _ in .write(.init(streamID: "s", path: "index.html", instruction: "Create demo")) },
         append: { _, _ in }, complete: { _ in "not committed" }, abort: { _ in throw WriterToolFailure("abort failed") }
     )
     do {
@@ -584,7 +596,7 @@ private actor WriterRetryEditor {
 
 @Test(arguments: ["html", "css", "js", "svg", "json"])
 func writerRejectsSplitOuterCodeFencesBeforeCommit(format: String) throws {
-    var prefix = WriterContentPrefix(instruction: "File: demo.\(format)\nCreate source")
+    var prefix = WriterContentPrefix(path: "demo.\(format)")
     #expect(try prefix.consume(" \n`") == " \n")
     #expect(try prefix.consume("`") == "")
     #expect(throws: WriterContentFormatFailure.self) { try prefix.consume("`\(format)\nsource") }
@@ -594,11 +606,11 @@ func writerRejectsSplitOuterCodeFencesBeforeCommit(format: String) throws {
 }
 
 @Test func writerContentPrefixPreservesMarkdownAndLegitimateTemplateLiterals() throws {
-    var markdown = WriterContentPrefix(instruction: "File: document.md")
+    var markdown = WriterContentPrefix(path: "document.md")
     #expect(try markdown.consume("```js\nconsole.log('你好')\n```\n") == "```js\nconsole.log('你好')\n```\n")
-    var javascript = WriterContentPrefix(instruction: "File: app.js")
+    var javascript = WriterContentPrefix(path: "app.js")
     #expect(try javascript.consume("`hello 🌍`;") == "`hello 🌍`;")
-    var emptyTemplate = WriterContentPrefix(instruction: "File: app.js")
+    var emptyTemplate = WriterContentPrefix(path: "app.js")
     #expect(try emptyTemplate.consume("``") == "")
     #expect(emptyTemplate.finish() == "``")
 }
@@ -736,7 +748,7 @@ private actor WriterRoundBoundaryProbe {
         execute: { call in
             await probe.add(call.id)
             switch call.id {
-            case "edit": return .write(streamID: "stream", instruction: "File: index.html", context: "")
+            case "edit": return .write(.init(streamID: "stream", path: "index.html", instruction: "Create demo"))
             case "render": return .observation(#"{"status":"observed"}"#)
             default: return .finished("Done")
             }

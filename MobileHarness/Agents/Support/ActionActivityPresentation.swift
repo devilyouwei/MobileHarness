@@ -110,7 +110,7 @@ extension ActionActivityItem {
                 startedAt: execution.startedAt, endedAt: execution.endedAt),
             source: execution.source, inputID: execution.inputID,
             isInternal: [
-                "UI.Caption.print", "UI.Caption.beginReplyTurn", "UI.Caption.clearReply", "UI.Caption.setTranscript",
+                "UI.Caption.print", "UI.Caption.beginReplyTurn", "UI.Caption.setTranscript",
                 "UI.Caption.finishTranscript", "UI.Expression.setReplyWaiting", "UI.VoiceState.setVoiceState",
                 "Speech.Listening.update", "UI.Island.present", "UI.Island.update", "UI.Island.end",
                 "UI.Island.setPresentation",

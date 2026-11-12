@@ -83,7 +83,7 @@ public actor VisionPerceptionAgent: Agent {
         descriptor = AgentDescriptor(
             category: configuration.category,
             id: configuration.agentID, name: "VisionPerception",
-            inputs: Set(configuration.communication.inputs.map(\.kind)),
+            inputs: configuration.communication.inputKinds,
             outputs: [.communication, .toolCall, .control],
             capabilities: try Self.runtimeCapabilities(configuration.capabilities))
         self.cadence = FrameCadence(configuration: try sampling ?? FrameSamplingConfiguration())

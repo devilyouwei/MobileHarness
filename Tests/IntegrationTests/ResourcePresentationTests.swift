@@ -7,6 +7,7 @@ import Gateway
 import PlatformKit
 import StorageCore
 import Testing
+import UI
 
 @testable import Agents
 
@@ -357,4 +358,100 @@ private actor OperationFailurePresentation: ResourcePresentationCapability {
     #expect(
         ApplicationControlIntentFailure.execution("primary; presentation: secondary").localizedDescription
             == "primary; presentation: secondary")
+}
+
+@Test @MainActor func supersededResourcePresentationPreservesLatestStateAndRejectsForeignCalls() async throws {
+    let ui = UIContainer()
+    try ui.start()
+    let session = UUID().uuidString
+    let provider = ProviderPresentationAdapter(
+        state: ui.settings.presentation, sessionID: session,
+        settings: ProviderSettingsRequests(service: ResourceProviderPersistence().service()))
+    var acknowledgments = 0
+    let presentation = ResourcePresentationAdapter(
+        state: ui.modelResources.presentation, sessionID: session, provider: provider,
+        navigation: ui.navigation.presentation, acknowledge: { acknowledgments += 1 })
+    let state = ui.modelResources.state
+    let old = state.beginRefresh()
+    let current = state.beginRefresh()
+    let inventory = ModelResourceInventory(items: [
+        .init(id: "d3-edge", name: "Current model", bytes: 1, completedBytes: 1, phase: .installed)
+    ])
+    func invocation(_ owner: String) -> FunctionInvocation {
+        .init(
+            call: .init(actionPath: .init(domain: "UI", module: "ResourcePresentation", function: "showResources")),
+            context: .init(source: "applicationControl", sessionID: owner, inputID: UUID().uuidString),
+            executionID: UUID().uuidString, results: ActionReportStore())
+    }
+    let call = invocation(session)
+    try await presentation.presentResources(inventory, generation: current, invocation: call)
+    try await presentation.presentResourceFailure("current failure", generation: current, invocation: call)
+    try await presentation.presentResources(.init(items: []), generation: old, invocation: call)
+    try await presentation.presentResourceFailure("old failure", generation: old, invocation: call)
+    #expect(state.items.map(\.id) == ["d3-edge"] && state.error == "current failure")
+    #expect(acknowledgments == 1)
+    for generation in [UInt64(0), current + 1] {
+        await #expect(throws: ResourcePresentationError.self) {
+            try await presentation.presentResources(inventory, generation: generation, invocation: call)
+        }
+        await #expect(throws: ResourcePresentationError.self) {
+            try await presentation.presentResourceFailure("invalid", generation: generation, invocation: call)
+        }
+    }
+    for generation in [old, current] {
+        await #expect(throws: ResourcePresentationError.self) {
+            try await presentation.presentResources(
+                inventory, generation: generation, invocation: invocation("foreign"))
+        }
+        await #expect(throws: ResourcePresentationError.self) {
+            try await presentation.presentResourceFailure(
+                "foreign", generation: generation, invocation: invocation("foreign"))
+        }
+    }
+    try await presentation.presentResources(inventory, generation: current, invocation: call)
+    #expect(state.error == nil && acknowledgments == 2)
+    await ui.stop()
+    await #expect(throws: (any Error).self) {
+        try await presentation.presentResources(inventory, generation: old, invocation: call)
+    }
+}
+
+private actor SupersededInventoryGate: ModelResourceInventoryCapability {
+    let started = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let released = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    private(set) var reads = 0
+    func release() { released.continuation.finish() }
+    func snapshotResources() async throws -> [ModelResourceFact] {
+        reads += 1
+        if reads == 1 {
+            started.continuation.yield(())
+            for await _ in released.stream { break }
+            try Task.checkCancellation()
+        }
+        return [.init(id: "d3-edge", name: "Read result", bytes: 1, completedBytes: 1, phase: .installed)]
+    }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func supersededResourceRefreshFinishesThroughGatewayWithoutErrorPresentation() async throws {
+    let inventory = SupersededInventoryGate()
+    let runtime = try await resourceRuntime(UnusedModelResourceCapability(), inventory: inventory)
+    try await runtime.prepareForInteraction()
+    let state = runtime.resources.state
+    let old = state.beginRefresh()
+    let refresh = Task { try await runtime.presentInventory(generation: old) }
+    var starts = await inventory.started.stream.makeAsyncIterator()
+    await starts.next()
+    let current = state.beginRefresh()
+    #expect(state.applySnapshot(.init(items: [], installedGroups: []), generation: current))
+    // Simulate returning home while a previous resource refresh is still being read.
+    runtime.ui.navigation.presentation.show(nil)
+    await inventory.release()
+    _ = try await refresh.value
+    #expect(state.items.isEmpty && state.error == nil)
+    #expect(await runtime.agent.status().queuedInputs == 0)
+    _ = try await runtime.presentInventory(generation: current)
+    #expect(state.items.map(\.id) == ["d3-edge"] && state.error == nil)
+    #expect(await inventory.reads == 2)
+    await runtime.shutdown()
 }

@@ -46,3 +46,7 @@ loadLocal(preservingViewport:) 用于必须执行完整脚本的导航，保存�
 WebPageView可接收外部通用subtitle，优先用于顶部灰色栏；未提供时本地页沿用“本地作品”、远程页显示地址。subtitle不导航、不执行脚本，也不来自页面源码。isAvailable是根可用性的只读缓存，供业务呈现者决定是否延后渲染，读取不创建WKWebView。
 
 Window-backed sessions receive the owning WindowState readable reference at creation. ui.web publishes window_N or unknown, never native UUIDs; page/session lifecycle still uses private IDs.
+
+## 截图有效身份
+
+WebPagePresenting.snapshotIdentity 是已有原生表面的被动有效性标识，不创建视图、不执行 JS、不截图。只有已挂载、可用、非隐藏、加载/文档更新结束且有有效尺寸的页面才提供身份。身份包含页面代际、本地内容修订、原生尺寸与缩放；iOS 还包含内容坐标、内容尺寸和原生缩放，手势/惯性滚动期间不可用。显式 navigate 递增修订。调用方可在截图及后续只读投影时检查同一身份，拒绝页面变化后的旧像素；UI 不存储业务截图，也不观察远程网页所有异步 DOM 变化。

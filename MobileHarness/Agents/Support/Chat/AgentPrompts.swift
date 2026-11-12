@@ -39,26 +39,31 @@ public final class AgentPrompts: @unchecked Sendable {
         lock.withLock { cache[path] = nil }
     }
 
-    static func systemInput() throws -> String {
-        try shared.render("Agents/System/InputProtocol.md").trimmingCharacters(in: .newlines)
+    /// Role/concern paths preserve resource ownership without a global text catalog.
+    static func text(_ owner: String, _ key: String, _ variables: [String: String] = [:]) throws -> String {
+        try shared.render("Agents/" + owner + ".json", template: key, variables: variables)
+    }
+
+    static func assistantInput() throws -> String {
+        try text("Assistant/InputProtocol", "instructions")
     }
 
     static func capabilityContext() throws -> CapabilityContextBuilder {
-        let output = try shared.load("Agents/System/OutputProtocol.md")
-        let catalog = try shared.load("Agents/System/ActionCatalog.json")
+        let output = try shared.load("Agents/Shared/OutputProtocol.md")
+        let catalog = try shared.load("Agents/Shared/ActionCatalog.json")
         return CapabilityContextBuilder(outputProtocol: output, actionCatalog: catalog)
     }
 
     static func skillCatalog() throws -> PromptTemplates {
-        try shared.load("Agents/System/SkillCatalog.json")
+        try shared.load("Agents/Shared/SkillCatalog.json")
     }
 
     static func agentCatalog() throws -> PromptTemplates {
-        try shared.load("Agents/System/AgentCatalog.json")
+        try shared.load("Agents/Shared/AgentCatalog.json")
     }
 
     static func requestContext() throws -> PromptTemplates {
-        try shared.load("Agents/System/RequestContext.json")
+        try shared.load("Agents/Shared/RequestContext.json")
     }
 
     static func roleTemplates(named role: String) throws -> PromptTemplates {

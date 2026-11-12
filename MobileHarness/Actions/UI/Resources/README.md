@@ -19,3 +19,5 @@ showResources 返回本次呈现的资源快照。Provider 结果和错误展示
 [所属域设计](../README.md) · [Actions 模块](../../README.md)
 
 D3 下载沿用通用制品状态和失败呈现。选择本地 Decision 的安装错误经 Provider 设置呈现通道返回。
+
+showResources 返回本次实际读取的资源快照；同会话刷新已被新批次替代时不再覆盖 UI，正常结束不代表该批快照曾被显示。旧批次的 showResourceFailure 同样不覆盖最新错误。当前批次的真实查询/展示失败仍沿原失败链路返回，业务保存结果不因投影过期改变。

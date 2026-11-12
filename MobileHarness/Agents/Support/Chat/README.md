@@ -49,7 +49,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
- I["UI 文本／speech.final／固定控制"]:::agent
+ I["UI 文本／user.input.asr.final／固定控制"]:::agent
  B["AgentChatContextBuilder：完整历史／最新 State"]:::agent
  K["冻结 Skill／有效目录／提示词"]:::agent
  W["AgentChatWorker：Decision／轮次屏障"]:::agent
@@ -91,7 +91,7 @@ commitDependentTargets 声明需要父历史提交确认的目标；Worker 在�
 
 Worker 在选择 provider 前登记原始 Decision，内部 ReACT 复用该输入/使用集合。每次从角色仓库选择快照，按加载 Skill 组合不可变目录与 system；加载/释放仅影响下一请求。具体 system 章节由 [Assistant](../../Assistant/README.md#system-提示词结构与来源) 拥有，公共层不解释相机业务事实。
 
-[AgentPrompts](AgentPrompts.swift) 负责 Agents Bundle 提示词资源的 `load`、`render` 和 `unload`。加载按路径缓存最多 256 份成功编译的不可变模板，文件读取与缓存变更串行化。卸载移除指定路径的缓存，后续读取会重新加载，已取得的模板继续供当前请求使用。读取和编译失败显式传播。AgentConfigurations 按 Catalog 定位角色与 Skill 资产，AgentPrompts 提供 System 协议、Action 目录、角色指令和证据、Skill 教学及 Memory 标题模板。Assistant 的证据模板要求 executionObservations、historicalExecution 和 toolFailure。渲染规则见 [Generation](../Core/Generation/README.md#prompt-resources-and-rendering)。
+[AgentPrompts](AgentPrompts.swift) 负责 Agents Bundle 提示词资源的 `load`、`render` 和 `unload`。加载按路径缓存最多 256 份成功编译的不可变模板，文件读取与缓存变更串行化。卸载移除指定路径的缓存，后续读取会重新加载，已取得的模板继续供当前请求使用。读取和编译失败显式传播。AgentConfigurations 按 Catalog 定位角色与 Skill 资产，AgentPrompts 提供 共享协议、Action 目录、角色指令和证据、Skill 教学及 Memory 标题模板。Assistant 的证据模板要求 executionObservations、historicalExecution 和 toolFailure。渲染规则见 [Generation](../Core/Generation/README.md#prompt-resources-and-rendering)。
 
 Assistant 请求装配与 Skill 预算使用同一组已加载的 OutputProtocol 和 ActionCatalog 模板。SkillCatalog 和 AgentCatalog 提供目录标题和条目排版。RequestContext 渲染独立 system 消息的事实和图片清单，Assistant 的角色模板渲染 Writer 追问与事件。Swift 选择并序列化当前数据，维护容量和插入位置。AgentCommunicationAdapter 按本轮权限为已声明的低层 send 生成实际目标与消息种类配对。
 
@@ -147,7 +147,7 @@ The driver's secondary queues use synchronous checked yields. They do not suspen
 
 ## 生命周期、时序与错误
 
-worker 独立于 UI 页面；结果必须匹配 call/round/task/session/incarnation 与封闭屏障。pause／interrupt 取消并加入当前 Decision，保留 Task／Skill 与公开状态作用域，目标回到 waitingUser，被中断 Decision 不扣闲置次数；close 关闭匹配会话，stop 关闭全部。输出传输失败也必须清理。Reply occupancy 是有界完整 revision 快照，证据提交先于占用移交；终态事实释放占用，不使用租约定时器，聆听政策仍由SpeechPerception解释。
+worker 独立于 UI 页面。结果必须匹配 call、round、task、session、incarnation 与完成屏障。pause 和 interrupt 取消并等待当前 Decision 退出，保留 Task、Skill 与公开状态作用域，目标回到 waitingUser，被中断 Decision 保留原闲置次数。close 关闭匹配会话，stop 关闭全部。回复占用由 worker 为本地 Decision 管理，输入终态释放对应记录。输出传输失败也会清理。
 
 ChatTiming 由支持的 provider 在请求发出及首个非空文本或已校验身份的原生工具参数增量时取单调样本；取先到者，排除私有推理和工具执行时间。不支持计时或没有有效增量时不产生 TTFT；driver 沿用同一快照持久化链路。消费、ASR、TTS 与 UI 耗时不是模型首 token 时延。网络传输自身超时和实时感知 freshness 不作为整个决策时限。
 
@@ -208,11 +208,11 @@ Writer 的 started、draftUpdated、recovering 和 userInput 作为认证控制�
 
 Assistant 全双工模式下，Writer 与其他经过身份验证的语义通知进入 Decision；任务事实先提交，可靠终态和交互问题受保留保护。原 task/interaction 绑定用于后续补充校验。非全双工绑定保留原确定性播报适配。
 
-模型历史 read-token/begin 短事务与 Assistant 输入接纳共用 admission gate，避免并发接纳使请求历史令牌失效。模型生成和工具执行不占此锁。ReplyActivity 发送占用变化、会话变化和最新语音 root 确认。Writer 的实际播报复用短回复的占用信号和播放动作，监听许可仍由 SpeechPerception 拥有。
+模型历史 read-token/begin 短事务与 Assistant 输入接纳共用 admission gate。模型生成和工具执行在锁外。输入和回复占用是 Decision 的本地事实，播放由 Speech.Playback 处理。
 
 ChatDriver scopes request consumption with InferenceSession.withCleanup, joining the SDK request worker on normal/error/cancellation exits. It owns no model-instance lease and does not unload shared clients.
 
-Assistant 全双工模式的 speech.phase(speaking) 不清旧回复、不触发模型；final 才进入分类。非全双工角色继续使用原有输入开始字幕适配。
+Assistant 按完整语音文本接纳时的会话及任务上下文分类并归属。识别字幕和阶段展示由 SpeechPerception 管理。
 
 Background task.delegate persists a request in agent_messages without creating a target task. Assistant reconciles authenticated communication facts; Writer owns its private task and workspace. Task send/cancel resolve agent_id to the active communication, with pending-question matching for answers. No caller-supplied task/workspace selection is accepted.
 
@@ -220,18 +220,11 @@ Background task.delegate persists a request in agent_messages without creating a
 
 Agents 的 AgentModelRequestRecording 将 ModelKit 中立 HTTP 采集回调桥接到共享 model_request_log，记录实际请求、响应/SSE、图片和 generation meta。非 HTTP 调用标 local。业务输入、回复和工具结果分别在 assistant_messages / writer_messages；清日志不会删除业务消息，图片与生成信息随日志删除。后续采集仅 UPDATE，不重建已清除日志。
 
-Assistant reply-activity snapshots retain the latest admitted final-speech acknowledgment for the
-interaction session. Later text, task-feedback and terminal publications carry that same root;
-finishing an older input cannot replace it. SpeechPerception can therefore release its pending-final
-gate from the newest complete snapshot even when transport overtakes the original acknowledgment.
-Occupancy and explicit listening consent remain independent; no task waiting state forces a microphone
-restart or bypasses playback drain.
-
 内部执行与模型观察按每次调用的modelGenerated来源分开，不能根据internalActions/internalTools目录或路径推测。AgentGenerator将代码的自然文本展开标记为runtimeAction；显式模型Action、Tool及解析拒绝保持模型来源。字幕/播放/等待态可加入本轮执行屏障和历史留证，但内部值、失败、异常不进入ReACT观察，也不触发续轮；内部执行失败保留实际记录；同轮存在显式模型调用的可推理业务观察时继续交付该观察，不能被字幕/播放失败阻断；没有业务观察时由 worker 按运行失败处理。未关联的Tool反馈拒绝，不作为新输入启动推理。共享Chat提供等待事实回调，角色决定展示文案和调用。
 
 ## Request-only State images
 
-Each executeRound reads a fresh typed snapshot selected by effective Skills. AgentChatContextBuilder merges selected images into the original current user input, preserving its text and any existing attachments, including XML Action and native Tool continuations. No image-only user message is added. The system State image manifest maps one-based image positions in that input to ID/source/MIME/dimensions/byte count; image data remains untrusted. Unsupported delivery is explicit in that system manifest and adds no image bytes. Missing current input, ambiguous identities or an oversized current attachment set fail explicitly. Native call/result groups remain contiguous. Attachments do not enter the retained ReACT/history base, preventing accumulation. Current intent/results/images are protected during trimming. Driver records actual submitted images in the independent full log; retained conversation context stays lightweight. Web observations retain their independent behavior.
+Each executeRound reads a fresh typed snapshot selected by effective Skills. AgentChatContextBuilder merges selected images into the original current user input, preserving its text and any existing attachments, including XML Action and native Tool continuations. No image-only user message is added. The system State image manifest maps one-based image positions in that input to ID/source/MIME/dimensions/byte count; image data remains untrusted. Unsupported delivery is explicit in that system manifest and adds no image bytes. Missing current input, ambiguous identities or an oversized current attachment set fail explicitly. Native call/result groups remain contiguous. Attachments do not enter the retained ReACT/history base, preventing accumulation. Current intent/results/images are protected during trimming. Driver records actual submitted images in the independent full log; retained conversation context stays lightweight. WebBrowsing selects actions.web.screenshot through this same mechanism, without feedback image enrichment.
 
 The request-only system State message extends the protected suffix before context trimming, preserving the current complete Action/tool result group and the current user intent alongside selected images. If these protected values alone exceed the request budget, assembly fails explicitly.
 
@@ -242,7 +235,7 @@ Database 根目录拥有连接、schema 装配与生命周期；Shared 只保存
 
 ## 公开能力目录与实例权限
 
-AgentChatContextState 的 systemPrompt(capabilities,skills,communication) 接收当前实例 communicationPolicy；初始请求与 executeRound 每轮重建两处装配路径都显式传入。Assistant 通过该入口组合自己的身份、System 协议、Skill 目录/教学、有效函数及权限过滤后的 Agent 自有公开介绍。默认协议实现兼容不使用该目录的状态类型。两参数便利入口使用角色默认配置；真实请求不通过该入口绕过权限收窄。
+AgentChatContextState 的 systemPrompt(capabilities,skills,communication) 接收当前实例 communicationPolicy；初始请求与 executeRound 每轮重建两处装配路径都显式传入。Assistant 通过该入口组合自己的身份、共享协议、Skill 目录/教学、有效函数及权限过滤后的 Agent 自有公开介绍。默认协议实现兼容不使用该目录的状态类型。两参数便利入口使用角色默认配置；真实请求不通过该入口绕过权限收窄。
 
 ## 语音输出注入
 
@@ -266,8 +259,12 @@ interrupt 保留未处理 Q，取消已生成各轮及当前生成；执行 owne
 
 可信用户入口（本地 text、SpeechPerception final）才调用快决策。经过 task 身份校验的同伴消息由 private semantic adapter 标为 agent；执行反馈验证原 owner/session/round/call 后标为 action，两者绕过 Decision。不能凭载荷 text 或正文自称获得用户角色。用户的可靠回答保护不应用于其他来源。
 
-普通 Action 的 value/异常逐条创建独立语义项，原 PendingRound 继续结算 journal 和资源完成；forwarded 标记与 publishing 所有权防止异步观察构建、重复反馈或封口造成重复消费。新请求不会重发原意图作为当前输入。成功 Void/内部完成/纯取消不入 Q。原生组在全部 native 结果就绪后即可发布，不等待同轮无关 Action；原生调用保留完整 assistant tool_calls/tool 块，历史中相同调用组在拼接当前附件时去重。Web 图片观察仍经原适配器生成，待处理附件总上限 32 MiB，超限明确拒绝；请求仍受五张图片、64 条消息、64 KiB 文本约束。
+普通 Action 的 value/异常逐条创建独立语义项，原 PendingRound 继续结算 journal 和资源完成；forwarded 标记与 publishing 所有权防止异步观察构建、重复反馈或封口造成重复消费。新请求不会重发原意图作为当前输入。成功 Void/内部完成/纯取消不入 Q。原生组在全部 native 结果就绪后即可发布，不等待同轮无关 Action；原生调用保留完整 assistant tool_calls/tool 块，历史中相同调用组在拼接当前附件时去重。通用观察扩展的待处理附件总上限 32 MiB，超限明确拒绝；请求仍受五张图片、64 条消息、64 KiB 文本约束。
 
 元数据和图片由 Worker 持有，生命周期与队列/批次一致；排队容量计算展开准备失败保留批次，防止折叠成员绕过 32 条/512 KiB 上限。seq 在准入时分配，不受异步分类耗时影响。AssistantInputBatch 使用完整事件时间及 seq 排序，单条和整批均输出正文在前、来源和秒级本地时间在后的时间线。因果身份留在运行时和协调证据中。整批和协议附件一起受保护，可省历史整组裁剪。未 dispatch 的准备记录不投影为已发生对话历史。
 
 语义消息直接入 Q 与准备失败重入队都刷新既有 inputQueueStatus 回调，UI 队列计数不依赖是否调用 Decision。
+
+## 共享与角色文案
+
+AgentPrompts.text 以角色/职责路径和模板键加载资源；Shared 是没有具体角色所有权的协议、目录和通用反馈目录。Assistant 时间线与配对工具提示读取 InputProtocol.json，任务历史摘要前缀与执行证据读取 Prompts.json，任务控制回执读取 TaskFeedback.json。Writer 私有恢复从自身目录读取。模型请求组装使用严格、单次变量插入，不将插入内容再次作为模板解释。Action 描述保持 canonical 代码声明；Action 原始错误和结果仍由执行模块管理。

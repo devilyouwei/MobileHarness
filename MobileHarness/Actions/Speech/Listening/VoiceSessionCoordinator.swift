@@ -800,10 +800,6 @@ public enum VoiceReplyCancellation {
             guard accepts(session: sessionID) else { return }
             record("你（语音）：\(text)")
         }
-        public func observeEmptyUtterance(sessionID: String) {
-            guard accepts(session: sessionID), !listeningPaused, !hasPlaybackBarrier, !videoAudioHeld else { return }
-            handlingTurn = false
-        }
         private func traceListening(_ point: String) {
             let value =
                 "voice.\(point) revision=\(listeningRevision) paused=\(listeningPaused) playback=\(playbackCount) generation=\(voiceGeneration != nil) capture=\(captureEpoch != nil) handling=\(handlingTurn) video=\(videoAudioHeld)"
@@ -936,9 +932,6 @@ public enum VoiceReplyCancellation {
         }
         public func setReplyWaiting(_ enabled: Bool, requestID: String, invocation: any FunctionInput) throws {
             try projection.setReplyWaiting(enabled, requestID: requestID, invocation: invocation)
-        }
-        public func clearReply(invocation: any FunctionInput) throws {
-            try projection.clearReply(invocation: invocation)
         }
         public func beginReplyTurn(invocation: any FunctionInput) throws {
             try projection.beginReplyTurn(invocation: invocation)

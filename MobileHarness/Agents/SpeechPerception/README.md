@@ -52,8 +52,8 @@ flowchart LR
  subgraph Peers["其他 Agent：仅经 Gateway 通信"]
  AS["Assistant"]:::agent
  end
- AS -->|"interaction.replyActivity"| G
- G -->|"speech.final／speech.phase"| AS
+ A -->|"user.input.asr.partial／final · user.input"| G
+ G -->|"user.input.asr.final"| AS
 
  classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
  classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
@@ -67,7 +67,7 @@ flowchart LR
 
 角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。角色、Skill 与 Task 授权归 Agents；Actions 来源的协作接口由 App 以中立窄端口绑定，Agents 不导入 Actions、CallRuntime 或 ExecutionRuntime。
 
-`speech.partial`、`sound.source` 也被发布，目前静态配置没有订阅角色；不能把已声明可发布等同于已有消费者。
+SpeechPerception 在 user.input 主题发布 user.input.asr.partial 和 user.input.asr.final。Assistant 订阅最终文本，片段可由诊断或显式订阅者观察。声源诊断观察 sound.source。
 
 ## 内部结构与执行链
 
@@ -80,7 +80,7 @@ flowchart LR
  end
  subgraph Role["SpeechPerception"]
  V["VoiceInteractionSession：能力装配／语音与检测会话生命周期"]:::agent
- L["同意／epoch／reply occupancy"]:::agent
+ L["同意／采集代／播放准入"]:::agent
  N["Microphone 消费：一个长期任务"]:::agent
  R["声道选择／16kHz resampler"]:::agent
  B["VoiceActivitySegmenter／BoundaryPolicy"]:::agent
@@ -133,21 +133,20 @@ flowchart LR
 
 | Contract / function | Payload and semantics |
 | --- | --- |
-| speech.partial | Latest transcript preview ≤16 KiB encoded, two-second validity |
-| speech.final | Nonempty final text ≤4096 UTF-8 bytes; published once per nonempty turn, with lifecycle-owned completion |
-| speech.phase | Discrete listening/speaking/processing/empty transitions; lifecycle-owned completion |
+| user.input.asr.partial | Latest transcript preview ≤16 KiB encoded, two-second validity |
+| user.input.asr.final | Nonempty final text ≤4096 UTF-8 bytes; published once per nonempty turn, with lifecycle-owned completion |
 | sound.source | Native direction/quality/RMS and active/inactive/uncertain/unavailable; ≤10 Hz and 500 ms freshness |
 | UI.Caption.setTranscript / finishTranscript | Internal completion-only calls; final text precedes sealing, including explicit empty result |
 | UI.VoiceState.setVoiceState | Internal hearing/processing/listening display, no device control |
 | Speech.Listening.update | Internal policy Action for the actual resident producer/root session |
 
-Publication is one-way. A subscriber rejection cannot stop inference; output protocol/context failures remain local errors. Internal presentation completion is state acceptance, not screen rendering. Output capacity is 32 with oldest-buffer retention; normal output yield failure throws queueFull. Audio FIFO overflow rejects the new packet before advancing sequence/time. Evidence retains 256 summaries with counted eviction. Final/phase use the stable interaction scope; raw/partial recognition retains capture generation.
+Publication is one-way. Subscriber rejection is isolated from inference. Output protocol and context failures remain local errors. Internal presentation completion confirms state acceptance. The output buffer retains the oldest 32 items and throws queueFull on overflow. The audio FIFO rejects the new packet on overflow before advancing sequence or time. Evidence retains 256 summaries with counted eviction. Final text uses the interaction session. Audio and partial transcripts retain the capture session.
 
 ## 聆听、取消与完成
 
-同意只在本会话有效；撤销／暂停推进接纳 epoch，并在异步提交后重验 UI 代际，拒绝迟到启用。原生 owner 的 `stopListening(sessionID:)` 只撤销并发布内部策略，不能重新同意。公开启停 Action 通过 `setListening(enabled:sessionID:)` 更新同一许可：校验 resident/root 会话与运行态（paused 时仅允许关闭），推进 admission epoch 并返回单调 revision 的中立 ListeningPolicy；关闭同时清空 pendingFinal 并关闭新句接纳。此调用不发布第二个 Action，由原执行方直接应用返回策略并确认原生完成。回复占用只改变 paused；物理停止不依赖 UI 队列可用。
+同意只在本会话有效。撤销或暂停推进接纳 epoch，异步提交后重验 UI 代际。原生 stopListening(sessionID:) 撤销许可，公开启停 Action 用 setListening(enabled:sessionID:) 更新同一许可并返回单调 revision。执行方应用策略并加入原生完成。
 
-最多四个来源的 replyActivity 仍保留身份/revision围栏和 pendingFinal 确认。fullDuplex 时这些占用事实不暂停新句；最终文本发布后重置识别器开始下一句。受限路由仍按原半双工策略等待完成，用户许可和原生代始终优先。
+最终文本发布后，感知重置识别器并结束本轮。全双工路线可在播放期间接纳音频；受限路线由实际播放准入暂停识别，播放完成或取消后通过执行端恢复。重置校验采集会话和代际，新播放准入可阻止旧恢复开放识别。
 
 startInput 只订阅当前已开启采集代。回复半双工暂停保留该订阅并丢弃未获准入的帧；设备关闭时取消空闲取帧、加入当前包，完整 close/stop 先取消识别，再加入原生任务、获取模型和发布者。恢复最多 32 个可取消当前包等待者，只等待已接纳工作，不承载 PCM。UI 回执确认策略接纳；原生停机和播放终态由执行服务单独确认。
 
@@ -180,27 +179,16 @@ stateSnapshot projects local installation/closure and existing work or Agent lif
 
 SpeechPerceptionContainer.presentation returns one complete SpeechSessionPresentation for an installed interaction. It includes typed conversation/activity/detection state, request interfaces and diagnostics; App does not combine optional child fields. Identity remains stable for that interaction. Stop invalidates the debug validation entry and releases the projection after joining shutdown; stale validation requests fail explicitly.
 
-ASR创建、输入或结果失败属于当前识别轮次终态：保留原始agent.error，取消并加入该轮ASR/VAD，校验采集代/会话/运行态后重建下一轮。失败保留本轮已有字幕并finishTranscript封口，使用统一transition(.empty)写Context/listening、结束识别绑定，并在采集开启且聆听许可未撤销/未暂停时提交listening呈现；不能只改内部phase。processing是等待ASR收尾，不等于已提交LLM。恢复不发布speech.final、不重开麦克风、不改变用户同意；关闭/换代的迟到清理不复活旧会话。UI工具/通信失败继续报告，UI保持既有会话/序号/采集与回复占用围栏。
+ASR 创建、输入或结果失败时保留原始 agent.error，取消并加入该轮 ASR/VAD，校验采集代、会话与运行态后重建下一轮。失败字幕由 finishTranscript 封口，transition(.empty) 记录本地阶段，并在准入仍有效时呈现 listening。
 
-ReplyActivity以来源revision/incarnation验证占用及成功汇报事实，接纳时必须推进来源围栏并处理pendingFinal确认；只有已启听时合并paused改变，或成功汇报使enabled改变，才提交Speech.Listening.update。关闭聆听时单纯占用改变不提交关闭Action，避免反向取消主动播报。相同空闲、同态忙碌、另一个来源仍占用时的单方结束不会重复调用设备策略。此规则切断关闭→取消回复→空闲回执→再次关闭的反馈环；显式用户开关和原生采集结束仍走既有执行路径，不采用节流或日志过滤。
-
-场景隐藏不撤销根语音许可。全双工播放准入不置 awaitingReply、不等当前语句结束；同一原生订阅继续 VAD/ASR。受限路由在回复时丢弃未获准入帧。实际关闭/中断始终取消并加入原生、识别及发布者。
-
-
-汇报完成事实携带回复开始的进程单调时间；明确停止、原生采集结束、暂停及根关闭推进本地撤销围栏。来源incarnation/revision丢弃乱序快照，完成事实可独立于更早的占用快照接纳；较新停止之后的旧完成及重复完成不得重新启听。policy不直接操作设备，实际启动、权限和播放屏障继续归Actions；失败/取消回复没有成功完成事实。
+根语音许可跨场景可见性保留。全双工路线在播放时继续 VAD 和 ASR。受限路线等当前语句收尾后取得播放准入，播放期间暂停识别。实际关闭或中断会取消并等待原生采集、识别和发布工作退出。Actions 持有原生权限与播放屏障，感知在恢复时校验用户许可、会话和采集代。
 
 ## 新人声字幕生命周期
 
-processFrame在VAD确认新轮并创建AgentTurn后、发送语音阶段或ASR首段文本前，显式调用UI.Caption.setTranscript空文本开启本轮字幕。麦克风启用／恢复不创建这个字幕边界。speech.phase(speaking)同时是给Assistant的新输入开始控制事实；同一识别轮内的阶段变化不重复清转写。partial/final只更新自己的槽，finishTranscript封口但不清空；失败恢复只封口已有文本并恢复许可，不抹掉已有转写。下一轮确认人声才替换上轮字幕。最终非空speech.final仍是唯一进入Assistant正式输入FIFO的识别文本，开始事实不要求Assistant推理。
+processFrame 在 VAD 确认新轮并创建 AgentTurn 后先用 UI.Caption.setTranscript 空文本打开本轮字幕。片段和最终文本更新本轮字幕，finishTranscript 封口。识别阶段保存在本地 Context 并驱动感知灵动岛和语音状态。
 
-SpeechListening日志只记录策略与生命周期检查点：enabled/paused、pending-final是否存在、占用来源
-数量、capture/awaiting/nativeProcessing与phase，以及恢复的join/reset边界。不记录原始语音、图片
-或模型正文。它与原有私有内容日志分开，用于区分策略未释放、恢复未到达和DSP重建停滞。
+SpeechListening 日志记录许可、采集开启、识别暂停、原生包处理、识别阶段及恢复时的等待和重置边界。日志内容限于状态和检查点。
 
 ## 自有灵动岛
 
-SpeechPerception在capture、聆听许可、识别phase和播放准入边界直接更新自有活动：可接纳输入时显示聆听/人声，ASR收尾显示识别；等待回复、关闭采集或停止撤下。连续聆听/人声保留elapsed起点，退出后重新计时，不依赖UI.voicePhase。容器绑定本角色consumer，复用共享有界发布，展示失败通过presentationFailure及容器runtime公开；停止在身份退休前加入最终end。不调用Assistant代发；字幕边界保持独立。
-
-原生输入不支持全双工时保留既有播放等待门控；订阅输入本身不清除此状态。支持全双工的采集可独立保持识别接纳。
-
-SpeechPerception 管理用户字幕、录音与识别灵动岛。定稿时先提交结束当句的录音/识别活动，再将非空 final 交给 Assistant。全双工可继续接收下一句，下一句录音状态与上一句的 Decision 详情独立。
+SpeechPerception 在采集、聆听许可、识别阶段和播放准入变化时更新自有活动。可接纳输入时显示聆听或人声，ASR 收尾显示识别，受限路线播放或关闭采集时撤下。连续聆听和人声共用计时起点。容器为感知绑定有界发布端，展示失败通过 presentationFailure 及容器状态公开，停止时先完成最终 end，再撤销身份。识别定稿后独立重置，下一句采集按本地准入处理。

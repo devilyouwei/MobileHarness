@@ -290,11 +290,11 @@ extension LiveRuntimeTests {
 
 struct NexArmAssistantUIModule: ActionModule {
     var definitions: [ActionBinding] {
-        ["express", "setExpression", "setReplyWaiting", "beginReplyTurn", "clearReply", "print"].map {
+        ["express", "setExpression", "setReplyWaiting", "beginReplyTurn", "print"].map {
             ActionBinding(
                 path: ActionPath(
                     domain: "UI",
-                    module: ["beginReplyTurn", "clearReply", "print"].contains($0) ? "Caption" : "Expression",
+                    module: ["beginReplyTurn", "print"].contains($0) ? "Caption" : "Expression",
                     function: $0), displayName: "测试动作",
                 kind: $0 == "express" ? .finite : .state,
                 completion: "Test presentation accepted.", handler: { _ in })

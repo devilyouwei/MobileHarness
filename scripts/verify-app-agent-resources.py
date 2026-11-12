@@ -26,10 +26,10 @@ if pathlib.Path(lookup).resolve() != (bundle / 'Catalog.json').resolve():
 expected = {pathlib.Path('Catalog.json'): source / 'Catalog.json'}
 for group in ('Agents', 'Skills'):
     expected.update({p.relative_to(source): p for p in (source / group).rglob('*') if p.is_file()})
-for name in ('InputProtocol.md', 'OutputProtocol.md', 'ActionCatalog.json', 'SkillCatalog.json', 'AgentCatalog.json', 'RequestContext.json'):
-    path = pathlib.Path('Agents/System') / name
+for name in ('OutputProtocol.md', 'ActionCatalog.json', 'SkillCatalog.json', 'AgentCatalog.json', 'RequestContext.json'):
+    path = pathlib.Path('Agents/Shared') / name
     if path not in expected:
-        raise SystemExit(f'Missing System prompt source: {path}')
+        raise SystemExit(f'Missing Shared prompt source: {path}')
 signature_metadata = {
     pathlib.Path('_CodeSignature') / name
     for name in ('CodeResources', 'CodeRequirements', 'CodeDirectory', 'CodeSignature')
@@ -43,8 +43,23 @@ if set(expected) != set(actual):
 for path, original in expected.items():
     if original.read_bytes() != actual[path].read_bytes():
         raise SystemExit(f'Stale Agent asset: {path}')
+for name in ('InputProtocol.json', 'InputDecision.json', 'Prompts.json', 'TaskFeedback.json', 'Instructions.md'):
+    if not (bundle / 'Agents/Assistant' / name).is_file():
+        raise SystemExit(f'Missing Assistant prompt resource: {name}')
+writer = bundle / 'Agents/Writer'
+for name in ('Instructions.md', 'Prompts.json', 'ContentPrompts.json', 'Recovery.json', 'WorkspaceFeedback.json'):
+    if not (writer / name).is_file():
+        raise SystemExit(f'Missing Writer prompt resource: {name}')
+for name in ('ControlContext.json', 'ContentContext.json', 'ContentInstructions.md'):
+    if (writer / name).exists():
+        raise SystemExit(f'Retired Writer prompt remains packaged: {name}')
+if (bundle / 'Agents/System').exists():
+    raise SystemExit('Retired System prompt directory remains packaged')
+for owner in ('Actions', 'ModelKit'):
+    if (app / f'HarnessKit_{owner}.bundle').exists():
+        raise SystemExit(f'Retired {owner} prompt bundle remains packaged')
 if list(app.rglob('FunctionTokenPrompts.json')):
     raise SystemExit('Retired Core protocol resource remains packaged')
 if list(app.rglob('FunctionMetadata.json')):
     raise SystemExit('Retired centralized function metadata remains packaged')
-print(f'Final app Agent/Skill resources verified: {len(expected)} assets, including System protocols and Action catalog templates.')
+print(f'Final app Agent/Skill resources verified: {len(expected)} assets, including Shared protocols, role contexts.')

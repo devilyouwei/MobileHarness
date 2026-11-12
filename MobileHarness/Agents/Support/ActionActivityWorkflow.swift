@@ -144,7 +144,7 @@ public final class ActionActivityWorkflow: ExecutionFailureReporting {
                     let retained = Set(snapshot.records.map(\.id))
                     projected = projected.filter { retained.contains($0.key) }
                     for record in snapshot.records {
-                        guard let signal = record.task, signal.businessContract != "runtime.replyFinished" else {
+                        guard let signal = record.task else {
                             continue
                         }
                         let key = record.phase.rawValue

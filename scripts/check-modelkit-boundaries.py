@@ -1259,9 +1259,12 @@ for source in (ROOT / 'MobileHarness/Agents/Support/Core/Input').rglob('*.swift'
     declared = set(re.findall(r'\b(?:struct|enum|protocol|typealias)\s+(\w+)', source.read_text()))
     if declared & domain_names:
         raise SystemExit(f'Agent-domain value in generic input contracts: {source.relative_to(ROOT)}')
-for name, filename in [('SpeechPhase', 'SpeechValues.swift'), ('PoseObservation', 'PoseObservation.swift')]:
-    source = ROOT / 'MobileHarness/Agents/Support/Communication' / filename
-    if not source.is_file() or not re.search(r'public (?:struct|enum) ' + name + r'\b', source.read_text()):
+for name, path in [
+    ('SpeechPhase', 'SpeechPerception/SpeechPerceptionProcessing.swift'),
+    ('PoseObservation', 'Support/Communication/PoseObservation.swift'),
+]:
+    source = ROOT / 'MobileHarness/Agents' / path
+    if not source.is_file() or not re.search(r'\b(?:struct|enum) ' + name + r'\b', source.read_text()):
         raise SystemExit(f'Missing Agent-owned domain value: {name}')
 if re.search(r'\b(?:outOfOrder|wrongSession)\b', (ROOT / 'MobileHarness/Agents/Support/Core/Input/ImageInput.swift').read_text()):
     raise SystemExit('Image transport values must not own receiver ordering/session policy')

@@ -1,5 +1,7 @@
 # 技术需求
 
+- [拍照倒计时与显式打开相机](Photo-Countdown-And-Explicit-Open.md)：单次倒计时、独立打开、同轮多 Action 与验证。
+
 已完成：[删除 Channel 覆盖与照片忽略](../../completed/Remove-Channel-Override-And-Photo-Ignore.md)，包括配置、教学、UI和专用音效清理，以及固定路由、重拍保留与完整检查。
 
 - [BasicSkill 控制教学](BasicSkill-Control-Teaching.md)：Task / Skill 概念、上下文、动作效果、生效时机和失败语义的通用教学重组。
@@ -26,6 +28,7 @@
 
 - [Direct container inputs](Direct-Container-Input-Plan.md): implementation and automated/build validation; native/device and comparable performance acceptance remain tracked.
 
+- [语音完成文本的 Agent 输入](ASR-User-Input-Plan.md) 规划 ASR 订阅、感知内部收尾和播放控制。
 - [Agent containers](Agent-Containers-Plan.md): root, seven roles and unified lifecycle implemented; validation and native acceptance tracked separately.
 
 - [Container 状态与模型上下文](Container-State-Context.md)：替代共享Storage State，迁移到容器快照和Skill v3；验收见专项记录。
@@ -65,6 +68,7 @@ Completed scope: [可读预览编号与合并图片输入](../../completed/Reada
 - [提示词所有权与 Agent 自描述](Prompt-Ownership-Plan.md)：Agent 自描述、实际权限目录和 Writer 私有模板已实现；真实模型/手机验收另行记录。
 
 - [Writer 提示词优化](Writer-Prompt-Optimization-Plan.md)：两模型、JSON 场景、真实工作区与窗口状态证据；只调整 Writer 提示词，Swift 评估适配改动已先告知。
+- [Writer 提示词与续写上下文整理](Writer-Resource-Organization.md) 记录资源归属、内部续写事实与消息通行核对。
 
 已完成并归档：[Writer 请求与作品选择内聚](../../completed/Writer-Execution-Cohesion.md)，包含同请求作品选择、无文件完成、发布恢复及验证。
 

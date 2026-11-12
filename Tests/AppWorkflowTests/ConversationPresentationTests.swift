@@ -32,20 +32,19 @@ import Testing
     #expect(!presentation.acceptsPlayback(child, activeSessions: [UUID().uuidString]))
 }
 
-@Test @MainActor func captionOwnersClearOnlyTheirOwnSlotsAtNewHumanInput() {
+@Test @MainActor func recognitionAndReplyBeginClearOnlyTheirOwnSlots() {
     let state = ConversationState()
     var presentation = ConversationPresentation()
-    func accept(
-        _ context: ActionExecutionContext, update: ConversationPresentation.Update, retiringInputID: String? = nil
-    ) -> Bool {
-        presentation.accept(context, update: update, retiringInputID: retiringInputID)
+    func accept(_ context: ActionExecutionContext, update: ConversationPresentation.Update) -> Bool {
+        presentation.accept(context, update: update)
     }
     let session = UUID().uuidString
-    func context(_ ordinal: UInt64, _ sequence: UInt64, source: String, input: String = "old") -> ActionExecutionContext
+    func context(_ ordinal: UInt64, _ sequence: UInt64, source: String, decision: String? = nil)
+        -> ActionExecutionContext
     {
         .init(
-            source: source, sessionID: session, inputID: input, sequence: sequence,
-            correlationID: "turn-" + String(ordinal), ordinal: ordinal)
+            source: source, sessionID: session, inputID: "input", sequence: sequence,
+            correlationID: "turn-" + String(ordinal), ordinal: ordinal, decisionID: decision)
     }
     #expect(accept(context(1, 1, source: "speechPerception"), update: .transcript))
     state.presentTranscript("old user")
@@ -58,47 +57,18 @@ import Testing
     #expect(accept(context(2, 3, source: "speechPerception"), update: .transcript))
     state.presentTranscript("")
     #expect(state.liveTranscript.isEmpty && !state.transcriptFinalized && state.assistantReply == "old reply")
-    #expect(
-        accept(
-            context(2, 2, source: "assistant", input: "onset"), update: .clearReply, retiringInputID: "old"))
-    state.clearReply()
-    #expect(state.assistantReply.isEmpty && state.liveTranscript.isEmpty)
     #expect(!accept(context(1, 99, source: "speechPerception"), update: .finishTranscript))
-    #expect(!accept(context(2, 2, source: "assistant", input: "onset"), update: .clearReply))
-    #expect(!accept(context(1, 100, source: "assistant"), update: .beginReply))
-    #expect(!accept(context(1, 101, source: "assistant"), update: .reply))
-    // A fresh request for an older queued input is allowed; turn ordering does not merge the two owners.
-    #expect(accept(context(1, 102, source: "assistant", input: "queued-report"), update: .beginReply))
-    state.appendReply("new report")
     #expect(accept(context(2, 4, source: "speechPerception"), update: .transcript))
     state.presentTranscript("new user")
+    #expect(state.liveTranscript == "new user" && state.assistantReply == "old reply")
+    // A queued reply can still begin after recognition has advanced to a later turn.
+    #expect(accept(context(1, 2, source: "assistant", decision: "queued-report"), update: .beginReply))
+    state.clearReply()
+    #expect(state.liveTranscript == "new user" && state.assistantReply.isEmpty)
+    #expect(!accept(context(1, 3, source: "assistant"), update: .reply))
+    #expect(accept(context(1, 3, source: "assistant", decision: "queued-report"), update: .reply))
+    state.appendReply("new report")
     #expect(state.liveTranscript == "new user" && state.assistantReply == "new report")
-}
-
-@Test @MainActor func delayedCaptionClearRetiresOldContinuationButPreservesNewRequest() {
-    var presentation = ConversationPresentation()
-    func accept(
-        _ context: ActionExecutionContext, update: ConversationPresentation.Update, retiringInputID: String? = nil
-    ) -> Bool {
-        presentation.accept(context, update: update, retiringInputID: retiringInputID)
-    }
-    func context(_ sequence: UInt64, input: String, ordinal: UInt64 = 1, decision: String? = nil)
-        -> ActionExecutionContext
-    {
-        .init(
-            source: "assistant", sessionID: "session", inputID: input, sequence: sequence,
-            correlationID: "turn-" + String(ordinal), ordinal: ordinal, decisionID: decision)
-    }
-    #expect(accept(context(1, input: "old"), update: .beginReply))
-    // Old request continuation reaches the UI before its earlier clear; it must still be retired.
-    #expect(accept(context(5, input: "old", decision: "continuation"), update: .beginReply))
-    #expect(accept(context(3, input: "onset", ordinal: 2), update: .clearReply, retiringInputID: "old"))
-    #expect(!accept(context(8, input: "old"), update: .beginReply))
-    #expect(accept(context(9, input: "fresh"), update: .beginReply))
-    // A later actual request is not erased by a delayed clear of the old request.
-    #expect(
-        !accept(context(7, input: "onset-next", ordinal: 3), update: .clearReply, retiringInputID: "old"))
-    #expect(presentation.isCurrent(context(10, input: "fresh")))
 }
 
 @Test func userOffRejectsLateReplyCaptionAndPlaybackUntilFreshRecognition() {

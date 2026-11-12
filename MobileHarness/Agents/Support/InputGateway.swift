@@ -390,26 +390,6 @@ public actor InputGateway {
                 owner: event.recipient)
         } catch { return .closed }
     }
-    /// Runtime completion fact after the child's output/playback barrier; no publisher acknowledgment.
-    func deliverReplyCompletion(_ scope: AgentTaskScope) async throws {
-        let inputID = UUID().uuidString
-        do {
-            let signal = try AgentTaskSignal(
-                kind: .progress, scope: scope,
-                businessContract: "runtime.replyFinished", data: Data())
-            let payload = InputPayload.observation(try signal.message())
-            let owner = ExecutionOwner(
-                agent: scope.requester,
-                incarnation: try await manager.identity(scope.requester), sessionID: scope.sessionID)
-            _ = await deliverRuntime(
-                AgentInput(
-                    id: inputID,
-                    sessionID: scope.sessionID, payload: payload,
-                    metadata: InputMetadata(payload: payload, source: "runtime", origin: .runtime, rootID: scope.id)),
-                owner: owner)
-        } catch {}
-    }
-
     func deliverCommunicationReceipt(_ result: CommunicationReceipt) async throws {
         let outcome = await deliverFeedback(
             .communicationReceipt(result), owner: result.owner, causality: result.causality)
@@ -509,8 +489,12 @@ public actor InputGateway {
                 group.addTask { [manager, policy, admission, signals] in
                     do {
                         try Task.checkCancellation()
-                        if let policy, !policy.accepts(input, target: target) {
-                            throw CommunicationError.unsupportedContract
+                        if let policy {
+                            let accepted =
+                                publication
+                                ? policy.acceptsPublication(input, target: target)
+                                : policy.accepts(input, target: target)
+                            guard accepted else { throw CommunicationError.unsupportedContract }
                         }
                         if input.metadata.incarnation != nil, policy == nil {
                             throw CommunicationError.unsupportedContract

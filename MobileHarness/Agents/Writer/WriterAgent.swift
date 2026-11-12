@@ -103,7 +103,7 @@ public actor WriterAgent: Agent {
         let config = try AgentConfigurations.load(named: "Writer")
         descriptor = AgentDescriptor(
             category: config.category,
-            id: .writer, name: "Writer", inputs: Set(config.communication.inputs.map(\.kind)),
+            id: .writer, name: "Writer", inputs: config.communication.inputKinds,
             outputs: [.toolCall, .communication, .control], capabilities: try Self.capabilities())
         let pair = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(16))
         outputs = pair.stream
@@ -143,7 +143,7 @@ public actor WriterAgent: Agent {
         reportWorker?.cancel()
         await reportWorker?.value
         await notifications.pause()
-        for (id, request) in requests {
+        for (id, _) in requests {
             await island.update(delegateID: id, phase: .paused)
             if requests[id] != nil {
                 try await executions.updateRequestPhase(requestID: id, phase: "paused")
@@ -153,7 +153,7 @@ public actor WriterAgent: Agent {
     public func resume() async throws {
         guard lifecycle == .paused else { return }
         lifecycle = .running
-        for (id, request) in requests {
+        for (id, _) in requests {
             await island.update(delegateID: id, phase: waiting[id] == nil ? .running : .waitingUser)
             if requests[id] != nil {
                 try await executions.updateRequestPhase(
@@ -284,7 +284,8 @@ public actor WriterAgent: Agent {
                 guard content.interactionID == interaction, var request = requests[id], let original = inputs[id] else {
                     throw CommunicationError.invalidPayload
                 }
-                request.request += "\nAdditional user input:\n" + content.text
+                request.request +=
+                    "\n" + (try AgentPrompts.text("Writer/Prompts", "clarification", ["text": content.text]))
                 guard request.request.utf8.count <= 12_000 else { throw WriterFailure.capacity }
                 guard
                     try await executions.acceptWriterInput(
@@ -399,7 +400,7 @@ public actor WriterAgent: Agent {
     }
     private func run(_ request: Request, input: AgentInput, scope: AgentTaskScope, userInitiated: Bool = false) async {
         let background = userInitiated ? await beginBackground(for: scope.id) : nil
-        var request = request
+        let request = request
         var failure: (any Error)?
         var result = ""
         let preview = WriterPreview(
@@ -412,7 +413,9 @@ public actor WriterAgent: Agent {
         var selectedModel: String?
         do {
             try Task.checkCancellation()
-            let goal = (request.goal.map { "Goal: " + $0 + "\nUser input: " } ?? "") + request.request
+            let goal =
+                (try request.goal.map { try AgentPrompts.text("Writer/Prompts", "goal", ["goal": $0]) } ?? "")
+                + request.request
             if eventSequences[scope.id] == nil {
                 try await report("已接收任务，正在处理。", scope: scope, input: input, kind: .started)
             }
@@ -461,7 +464,7 @@ public actor WriterAgent: Agent {
                 goal: goal,
                 scope: scope.id, tools: tools,
                 progress: { text in await self.updateProgress(text, input: input) },
-                revisions: { await self.takeUpdates(scope.id) }, workspace: workspaceContexts[scope.id])
+                revisions: { try await self.takeUpdates(scope.id) }, workspace: workspaceContexts[scope.id])
         } catch { failure = error }
         backgroundRuns.removeValue(forKey: scope.id)
         let backgroundExpired = expiredBackgroundRuns.remove(scope.id) != nil
@@ -605,9 +608,12 @@ public actor WriterAgent: Agent {
         suspending.remove(id)
         cancelling.remove(id)
     }
-    private func takeUpdates(_ id: String) -> [String] {
+    private func takeUpdates(_ id: String) throws -> [String] {
         let value = updates[id] ?? []
-        for text in value { requests[id]?.request += "\nAdditional user requirement:\n" + text }
+        for text in value {
+            requests[id]?.request +=
+                "\n" + (try AgentPrompts.text("Writer/Prompts", "additionalRequirement", ["text": text]))
+        }
         updates[id] = []
         return value
     }
@@ -627,7 +633,7 @@ public actor WriterAgent: Agent {
                     resolved = try (inLibrary ? library : editing).resolveTool(call.name, arguments: args)
                 } catch {
                     throw WriterToolFailure(
-                        "Invalid tool or parameters for the current phase. Follow the active tool schema.",
+                        try AgentPrompts.text("Writer/WorkspaceFeedback", "invalidParameters"),
                         context: ["command": call.name, "validationCode": "invalidParameters", "executed": "false"])
                 }
                 let operation = String(resolved.toolPath.split(separator: ".").last ?? "")
@@ -664,17 +670,13 @@ public actor WriterAgent: Agent {
                     await preview.changed()
                 }
                 if operation == "edit" {
-                    let value = try JSONDecoder().decode([String: String].self, from: Data(response.utf8))
-                    guard let id = value["streamID"], let instruction = value["instruction"],
-                        let context = value["context"]
-                    else { throw WriterFailure.invalidOutput }
-                    return .write(streamID: id, instruction: instruction, context: context)
+                    return .write(try JSONDecoder().decode(ArtifactEditPreparation.self, from: Data(response.utf8)))
                 }
                 if operation == "render" {
                     if let bytes = try await self.streaming.snapshot(delegateID: delegateID) {
                         return .visual(response, try ChatImage(id: UUID().uuidString, data: bytes))
                     }
-                    return .observation(response + "\nScreenshot unavailable; do not claim visual verification.")
+                    return .observation(response + (try AgentPrompts.text("Writer/WorkspaceFeedback", "noScreenshot")))
                 }
                 if operation == "finish" { return .finished(response) }
                 return .observation(response)
@@ -715,16 +717,16 @@ public actor WriterAgent: Agent {
         }
         guard let workspaceID = args["workspaceID"], WorkspaceID(rawValue: workspaceID) != nil else {
             throw WriterToolFailure(
-                "Supply an exact workspace ID such as workspace_3. If the ID is unknown, use workspace.search.")
+                try AgentPrompts.text("Writer/WorkspaceFeedback", "workspaceID"))
         }
         if command == "delete" {
             guard searchMatches[id]?.contains(workspaceID) == true else {
                 throw WriterToolFailure(
-                    "To delete a work, use its ID from this delegation's workspace.search results.",
+                    try AgentPrompts.text("Writer/WorkspaceFeedback", "searchBeforeDelete"),
                     context: ["condition": "workspaceSearchRequired"])
             }
             if workspaceContexts[id] != nil, request.workspaceID == workspaceID {
-                throw WriterToolFailure("Switch to a different workspace before deleting the active work.")
+                throw WriterToolFailure(try AgentPrompts.text("Writer/WorkspaceFeedback", "activeDelete"))
             }
         } else {
             let allocation: WriterWorkspaceRecord?
@@ -733,7 +735,7 @@ public actor WriterAgent: Agent {
             } catch RecordStorageError.missingRecord { allocation = nil }
             guard let allocation, allocation.workspaceReady else {
                 throw WriterToolFailure(
-                    "Workspace \(workspaceID) is unavailable. Use workspace.search to locate an existing work.",
+                    try AgentPrompts.text("Writer/WorkspaceFeedback", "unavailable", ["workspaceID": workspaceID]),
                     context: ["command": command, "condition": "workspaceUnavailable", "workspaceID": workspaceID])
             }
             if command == "enter" {
@@ -752,13 +754,13 @@ public actor WriterAgent: Agent {
     ) async throws -> WriterToolOutcome {
         guard let id = input.taskScope?.id else { throw CommunicationError.unauthorized }
         guard let title = args["title"]?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty else {
-            throw WriterToolFailure("Supply a nonempty display title.")
+            throw WriterToolFailure(try AgentPrompts.text("Writer/WorkspaceFeedback", "emptyTitle"))
         }
         guard let entry = args["entry"]?.trimmingCharacters(in: .whitespacesAndNewlines),
             ArtifactFilePath.isEntry(entry)
         else {
             throw WriterToolFailure(
-                "entry must be a workspace-relative file path such as flowchart.html or docs/flowchart.md. Use edit to write the file content.",
+                try AgentPrompts.text("Writer/WorkspaceFeedback", "invalidEntry"),
                 context: ["condition": "invalidEntry"])
         }
         let key = CreationKey(title: title, entry: entry)
@@ -766,10 +768,11 @@ public actor WriterAgent: Agent {
         if let reservation, reservation.entered {
             let next =
                 request.workspaceID == reservation.workspaceID
-                ? "Use edit on the active workspace to create or change its entry file."
-                : "Use workspace.enter with that workspace ID to return to it."
+                ? try AgentPrompts.text("Writer/WorkspaceFeedback", "editExisting")
+                : try AgentPrompts.text("Writer/WorkspaceFeedback", "enterExisting")
             throw WriterToolFailure(
-                "This delegation already created \(reservation.workspaceID) for this title and entry. " + next,
+                try AgentPrompts.text(
+                    "Writer/WorkspaceFeedback", "alreadyCreated", ["workspaceID": reservation.workspaceID]) + next,
                 context: [
                     "condition": "workspaceAlreadyCreated", "workspaceID": reservation.workspaceID, "entry": entry,
                 ])
@@ -798,7 +801,7 @@ public actor WriterAgent: Agent {
     private func finalize(_ summary: String, input: AgentInput, outcome: String = "artifact") async throws -> String {
         guard let id = input.taskScope?.id else { throw CommunicationError.unauthorized }
         guard (updates[id] ?? []).isEmpty else {
-            throw WriterToolFailure("Newly accepted requirements must be processed before publication.")
+            throw WriterToolFailure(try AgentPrompts.text("Writer/WorkspaceFeedback", "pendingRequirements"))
         }
         guard ["artifact", "explanation", "declined"].contains(outcome),
             !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -813,7 +816,7 @@ public actor WriterAgent: Agent {
         }
         if outcome == "explanation" {
             guard !preparedWorkspaces.contains(id) else {
-                throw WriterToolFailure("Editing has begun; an explanation cannot bypass render and publication.")
+                throw WriterToolFailure(try AgentPrompts.text("Writer/WorkspaceFeedback", "editedExplanation"))
             }
             return String(
                 decoding: try JSONEncoder().encode([
@@ -834,7 +837,8 @@ public actor WriterAgent: Agent {
         {
             if error.description.contains("renderRequired") { throw error }
             throw WriterCleanupFailure(
-                primary: error, cleanup: WriterToolFailure("Publication outcome uncertain; never replay."))
+                primary: error,
+                cleanup: WriterToolFailure(try AgentPrompts.text("Writer/WorkspaceFeedback", "uncertainPublication")))
         }
     }
 
@@ -848,7 +852,7 @@ public actor WriterAgent: Agent {
         }
         if previous.workspaceID == target.workspaceID {
             return .observation(
-                "This workspace is already active. Existing read references and savepoints still apply.")
+                try AgentPrompts.text("Writer/WorkspaceFeedback", "alreadyActive"))
         }
         let priorAllocation = try await executions.workspace(previousWorkspaceID, agent: "writer")
         await preview.resetForWorkspace()
@@ -866,7 +870,7 @@ public actor WriterAgent: Agent {
                 throw WriterCleanupFailure(primary: primary, cleanup: error)
             }
             throw WriterToolFailure(
-                "Switch failed. Previous workspace restored; reread files for fresh references. "
+                try AgentPrompts.text("Writer/WorkspaceFeedback", "switchRestored")
                     + String(describing: primary),
                 context: ["command": "enter"])
         }
@@ -908,7 +912,7 @@ public actor WriterAgent: Agent {
             var details = data
             details["previousWorkspaceID"] = previous
             details["previousWorkspace"] =
-                "Previous draft retained. Its read references and savepoints are no longer active."
+                try AgentPrompts.text("Writer/WorkspaceFeedback", "previousWorkspace")
             result = String(decoding: try JSONEncoder().encode(details), as: UTF8.self)
         }
         let bind: @Sendable () async throws -> Void = { [executions] in
@@ -967,7 +971,7 @@ public actor WriterAgent: Agent {
             {
                 details["condition"] = "workspaceEntryMissing"
                 throw WriterToolFailure(
-                    "missingFile: The active workspace exists. Call edit(path: \(entry), instruction: …) without a read reference to create its entry file.",
+                    try AgentPrompts.text("Writer/WorkspaceFeedback", "missingEntry", ["entry": entry]),
                     context: details)
             }
             throw WriterToolFailure(failure, context: details)

@@ -148,10 +148,6 @@ public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapabi
         guard let voice else { throw ActionHostError.scopeClosed }
         try voice.setReplyWaiting(enabled, requestID: requestID, invocation: invocation)
     }
-    public func clearReply(invocation: any FunctionInput) async throws {
-        guard let voice else { throw ActionHostError.scopeClosed }
-        try voice.clearReply(invocation: invocation)
-    }
     public func beginReplyTurn(invocation: any FunctionInput) async throws {
         guard let voice else { throw ActionHostError.scopeClosed }
         try voice.beginReplyTurn(invocation: invocation)
@@ -189,10 +185,6 @@ public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapabi
     public func observeTranscript(_ text: String, sessionID: String) throws {
         guard let voice else { throw ActionHostError.scopeClosed }
         voice.observeTranscript(text, sessionID: sessionID)
-    }
-    public func observeEmptyUtterance(sessionID: String) throws {
-        guard let voice else { throw ActionHostError.scopeClosed }
-        voice.observeEmptyUtterance(sessionID: sessionID)
     }
     public func output(_ envelope: ActionOutputObservation) async {
         await voice?.show(envelope)

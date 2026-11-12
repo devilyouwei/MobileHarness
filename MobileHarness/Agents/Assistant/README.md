@@ -18,7 +18,7 @@ Assistant 是 `AgentChatWorker<AssistantContextState>` 的角色绑定，负责�
 | ChatCapability／chatProvider | ModelKit.language：按请求选择并使用模型 |
 | AgentStateContext | 读取 Skill.useStates 指定容器事实；Task从私有上下文生成 |
 | AssistantHistoryStore／AssistantTaskRepository／AgentMessageRepository | Storage 数据库领域接口；会话、消息与任务提交 |
-| 照片读取、prepareJPEG 回调 | 装配时注入 Actions.Camera 的只读 readPhoto 闭包与 PlatformKit JPEG 准备能力；角色制定预算，不持有相机控制器 |
+| 当前图像 State | Camera/Web 分别拥有图片与有效期；通过 AgentStateContext 按 Skill 选择，共享 Chat 组装，角色不读取媒体或压缩图片 |
 | AgentContextRepository／配置与目录 | Agents 私有 Context、Skill 状态与 AgentCore 不可变执行声明 |
 
 ## 文件与职责
@@ -55,12 +55,11 @@ flowchart LR
  A -.-> X
  subgraph Peers["其他 Agent：仅经 Gateway 通信"]
  SP["SpeechPerception"]:::agent
- Fixed["Photographer／Memory／ApplicationControl"]:::agent
+ W["Writer"]:::agent
  end
- SP -->|"speech.final／speech.phase"| G
- G -->|"interaction.replyActivity"| SP
- G -->|"task.request／input／cancel"| Fixed
- Fixed -->|"task.progress／result"| G
+ SP -->|"user.input.asr.final · user.input"| G
+ G -->|"task.request／input／cancel"| W
+ W -->|"task.progress／writer.completion"| G
 
  classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
  classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
@@ -74,6 +73,8 @@ flowchart LR
 
 角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。角色、Skill 与 Task 授权归 Agents；Actions 来源的协作接口由 App 以中立窄端口绑定，Agents 不导入 Actions、CallRuntime 或 ExecutionRuntime。
 
+Assistant 的跨角色任务命令定向送达 Writer，Writer 回报进度和完成结果。运行时送达工具、动作、轮次和通信回执，并使用 task.result 投递执行方终止反馈。语音入口订阅 SpeechPerception 在 user.input 主题发布的 user.input.asr.final。识别片段另有契约，按精确订阅分发。
+
 ## 内部结构与执行链
 
 ```mermaid
@@ -82,8 +83,7 @@ flowchart LR
  U["UI.home.requests"]:::ui
  M["ModelKit.language.ChatCapability"]:::model
  S["Storage · Chat / Task repositories"]:::storage
- P["PlatformKit：JPEG 准备"]:::platform
- RD["注入 readPhoto：读取已存储 Web 截图"]:::action
+ RD["AgentStateContext：Camera / Web 当前图像"]:::action
  end
  subgraph Owned["Assistant"]
  I["类型化文本／最终识别 → Decision"]:::agent
@@ -96,8 +96,7 @@ flowchart LR
  S <--> C
  K --> D
  D <--> M
- RD -->|"Web 截图读取"| C
- P -->|"受预算约束的 Web 图片"| C
+ RD -->|"Skill 选择的多模态 State"| C
  O --> G["Gateway：端点／租约／取消"]:::gateway
  G --> X["当前 Skill 绑定的可扩展 Actions"]:::action
  G --> PR["UI.Caption.beginReplyTurn<br/>UI.Caption.print<br/>UI.Expression.setReplyWaiting<br/>Speech.Playback.speak"]:::action
@@ -124,7 +123,7 @@ The private AgentContextRepository owns history, skillState and runtime task cor
 
 AgentChatWorker then samples the selected owner facts through AgentStateContext and combines them as CURRENT STATE in the same fresh system data message. It does not read a Storage.State mirror or route these reads through Gateway. The data message follows history and precedes the latest user input, or follows the complete native result group. Old system data is replaced on continuation. Ordinary background conversation and current Task evidence remain within the bounded history window; terminal Tasks can project summaries without altering source evidence. See [request assembly](../Support/Chat/README.md#request-state-assembly), [source mapping](../Support/Context/README.md#container-context-read-path) and the [overall context figure](../../README.md#model-context-composition).
 
-## System 提示词结构与来源
+## 共享提示词结构与来源
 
 实际拼接入口为 [AssistantContextState.systemPrompt](AssistantProcessing.swift)。下图左侧是来源与获取方式，右侧按首条 system 消息的章节顺序排列。蓝色表示同一 App 资源版本内固定的正文，橙色表示从资源或本轮快照组装的章节。
 
@@ -134,19 +133,19 @@ block-beta
 
     H1["来源 / 获取方式"] space H2["System 章节：从上到下"]
 
-    A["System/OutputProtocol.md<br/>读取通用输出规则"] space S1["① OUTPUT FORMAT<br/>XML Action、Channel、wait"]
+    A["Shared/OutputProtocol.md<br/>读取通用输出规则"] space S1["① OUTPUT FORMAT<br/>XML Action、Channel、wait"]
 
-    Input["System/InputProtocol.md<br/>读取时间线及理解规则"] space S2["② INPUT FORMAT<br/>来源、时间、多来源取舍与 ASR"]
+    Input["Assistant/InputProtocol.json<br/>读取时间线及理解规则"] space S2["② INPUT FORMAT<br/>来源、时间、多来源取舍与 ASR"]
 
     B["Assistant/Instructions.md<br/>读取完整正文"] space S3["③ ASSISTANT ROLE<br/>角色、回应风格、语音与字幕呈现"]
 
-    C["System/SkillCatalog.json<br/>填入已登记的共享 Skill 简介"] space S4["④ AVAILABLE SKILLS<br/>由已登记的共享 Skill 生成"]
+    C["Shared/SkillCatalog.json<br/>填入已登记的共享 Skill 简介"] space S4["④ AVAILABLE SKILLS<br/>由已登记的共享 Skill 生成"]
 
-    D["System/AgentCatalog.json<br/>填入按真实委派适配＋实例通信权限筛选的公开介绍"] space S5["⑤ DELEGATABLE AGENTS<br/>按当前授权和可用函数筛选"]
+    D["Shared/AgentCatalog.json<br/>填入按真实委派适配＋实例通信权限筛选的公开介绍"] space S5["⑤ DELEGATABLE AGENTS<br/>按当前授权和可用函数筛选"]
 
-    E["System/SkillCatalog.json<br/>加上基础及已加载 Skill 的 Instructions.md"] space S6["⑥ LOADED SKILL INSTRUCTIONS<br/>当前已加载 Skill 的完整教学"]
+    E["Shared/SkillCatalog.json<br/>加上基础及已加载 Skill 的 Instructions.md"] space S6["⑥ LOADED SKILL INSTRUCTIONS<br/>当前已加载 Skill 的完整教学"]
 
-    F["本轮 Registry＋真实 @Action 声明<br/>System/ActionCatalog.json 排版"] space S7["⑦ EFFECTIVE ACTION CATALOG<br/>当前 Action 的别名、描述、参数"]
+    F["本轮 Registry＋真实 @Action 声明<br/>Shared/ActionCatalog.json 排版"] space S7["⑦ EFFECTIVE ACTION CATALOG<br/>当前 Action 的别名、描述、参数"]
 
     A --> S1
     Input --> S2
@@ -172,9 +171,9 @@ block-beta
     class H1,H2 heading
 ```
 
-Assistant 先拼接 [OutputProtocol.md](../../Resources/Agents/System/OutputProtocol.md)、[InputProtocol.md](../../Resources/Agents/System/InputProtocol.md) 和自己的 [Instructions.md](../../Resources/Agents/Assistant/Instructions.md)，再组装四个目录与教学区。[AgentConfigurations](../Support/AgentConfigurations.swift) 根据 [Catalog.json](../../Resources/Catalog.json) 定位 Agent 与 Skill 资产，[AgentPrompts](../Support/Chat/AgentPrompts.swift) 加载并渲染提示词。可委派角色职责来自各自 Agent.json 的 description，经 AgentTaskDelegation 与实例通信权限筛选，总量最多 8192 UTF-8 字节。Skill 概览按 ID 拼接已登记的共享 Skill.json 的简介，总预算 4 KiB，必要时截短描述并保留 ID。带 owner 的 Writer 专属 Skill 由 Writer 的工作区域激活。
+Assistant 先拼接 [OutputProtocol.md](../../Resources/Agents/Shared/OutputProtocol.md)、[InputProtocol.json](../../Resources/Agents/Assistant/InputProtocol.json) 和自己的 [Instructions.md](../../Resources/Agents/Assistant/Instructions.md)，再组装四个目录与教学区。[AgentConfigurations](../Support/AgentConfigurations.swift) 根据 [Catalog.json](../../Resources/Catalog.json) 定位 Agent 与 Skill 资产，[AgentPrompts](../Support/Chat/AgentPrompts.swift) 加载并渲染提示词。可委派角色职责来自各自 Agent.json 的 description，经 AgentTaskDelegation 与实例通信权限筛选，总量最多 8192 UTF-8 字节。Skill 概览按 ID 拼接已登记的共享 Skill.json 的简介，总预算 4 KiB，必要时截短描述并保留 ID。带 owner 的 Writer 专属 Skill 由 Writer 的工作区域激活。
 
-基础列表来自 [Agent.json](../../Resources/Agents/Assistant/Agent.json) 的 baseSkills。[AgentSkillLoader](../Support/AgentSkillLoader.swift) 展开当前激活项的依赖并合并函数绑定。⑥拼接对应 Instructions.md，⑦通过 [CapabilityContextBuilder](../Support/Core/Capability/CapabilityContextBuilder.swift) 和 [ActionCatalog.json](../../Resources/Agents/System/ActionCatalog.json) 渲染当前 Action 目录。别名和 Channel 来自 Skill 绑定，描述、参数和约束来自实际 Action 声明。独立 system 数据消息使用 [RequestContext.json](../../Resources/Agents/System/RequestContext.json) 渲染 AGENT CONTEXT、CURRENT STATE 及图片清单，用 [Assistant/Prompts.json](../../Resources/Agents/Assistant/Prompts.json) 呈现 Writer 的追问与近期事件。
+基础列表来自 [Agent.json](../../Resources/Agents/Assistant/Agent.json) 的 baseSkills。[AgentSkillLoader](../Support/AgentSkillLoader.swift) 展开当前激活项的依赖并合并函数绑定。⑥拼接对应 Instructions.md，⑦通过 [CapabilityContextBuilder](../Support/Core/Capability/CapabilityContextBuilder.swift) 和 [ActionCatalog.json](../../Resources/Agents/Shared/ActionCatalog.json) 渲染当前 Action 目录。别名和 Channel 来自 Skill 绑定，描述、参数和约束来自实际 Action 声明。独立 system 数据消息使用 [RequestContext.json](../../Resources/Agents/Shared/RequestContext.json) 渲染 AGENT CONTEXT、CURRENT STATE 及图片清单，用 [Assistant/Prompts.json](../../Resources/Agents/Assistant/Prompts.json) 呈现 Writer 的追问与近期事件。
 
 [共享 Chat Worker](../Support/Chat/README.md) 在每次新输入及 ReACT 请求中按当前 Skill 快照重新组装 system/工具定义；已发出的请求与历史证据不重写。system 正文最多 64 KiB，超限明确失败。当前会话的 Task 目标/阶段及已加载 Skill ID 进入 AGENT CONTEXT；选定的相机/机械臂/UI 事实进入 CURRENT STATE，Skill 归属/剩余次数保持私有；历史与真实 ReACT 执行观察保留在各自消息中；Assistant 当前基础与可加载 Skills 均只声明 XML Action，request.tools 为空；Writer 的原生工具定义由其独立工作流提供。
 
@@ -228,9 +227,9 @@ Assistant 以原会话、输入、轮次和调用身份提交输出。Gateway �
 
 ## Image context ownership
 
-Camera previews come from Photography's actions.camera.preview State. Camera prepares bytes and owns latest/explicit selection; shared Chat rebuilds attachments on the original current user input on every request, including new user turns and Action continuations. The system State manifest supplies source/ID/size and attachment-order mapping. Assistant does not interpret takePhoto receipts or own a second photo cache. Ephemeral bytes are excluded from durable model-request logs.
+Camera previews come from Photography's actions.camera.preview State. Camera prepares bytes and owns latest/explicit selection; shared Chat rebuilds attachments on the original current user input on every request, including new user turns and Action continuations. The system State manifest supplies source/ID/size and attachment-order mapping. Assistant does not interpret takePhoto receipts or own a second photo cache. Retained conversation attachments exclude these bytes; independent full model-request logs preserve actual submitted images.
 
-AssistantWebImagePolicy and its observation callback remain for Web.Page browse/snapshot/navigate only, enforcing1568px/1MP/1MiB JPEG preparation and unsupported-model reporting. They never load Camera previews or album images.
+Web screenshots use the same State projection through WebBrowsing’s actions.web.screenshot. Actions.Web prepares and retains only the current image; Assistant has no Web feedback image hook, media lookup or compression policy. Unsupported delivery is reported by the common system image manifest.
 
 ## Container 上下文
 
@@ -254,11 +253,11 @@ Photography loads capture/video Actions and settings/recording fields from actio
 
 ui.island投影包含活动身份、标题、系统选择及提交状态；前台目标展开与localStatus可读，系统实际几何未知，不携带频谱或设备权威状态。Island.setPresentation设置前台compact/expanded，expanded要求已提供的detail；系统可见性/时长仍由iOS决定；实际摄影/录像仍调用Camera声明。
 
-## Web image observations
+## Web screenshot State
 
-The scoped web observation hook recognizes successful Web.Page browse/snapshot/navigate receipts. It resolves their mediaID through the same scope-bound image read and image preparation port. The user image message labels the payload as untrusted data. Unsupported image models receive an explicit unavailable observation and can use the bounded page text in the Action result. Generated code and the Writer transcript never enter the Assistant parser or history.
+Web.Page browse/snapshot/navigate update one scope-bound current screenshot in Actions.Web. Action feedback contains text and screenshotID; every real model request reads the selected State again and attaches only the currently valid image. There is no screenshot history selection or extra feedback image message. Images remain untrusted data; models without image support can use bounded page text. Generated code and Writer transcripts never enter Assistant parsing.
 
-WebBrowsing 从 ui.web.sessions 读取逐窗口的页面类型和有界远程 URL，从 ui.windows 读取窗口身份与焦点。统一resolver按Skill声明读取这两个来源；本地文件路径与WebKit运行指标不进入Assistant上下文。
+WebBrowsing 从 ui.web.sessions 读取逐窗口的页面类型和有界远程 URL，从 ui.windows 读取窗口身份与焦点。统一resolver按Skill声明读取这两个事实来源和 actions.web.screenshot；本地文件路径与WebKit运行指标不进入Assistant上下文。
 
 默认BasicSkill观察全局ui.windows，包含Writer窗口。Assistant按可用Skill说明加载页面观察或窗口控制能力，不能将未加载目录解释为看不到所有窗口；窗口摘要与实际截图/正文证据区分。Writer 自有灵动岛直接展示进度、追问和结果。
 
@@ -268,11 +267,10 @@ AssistantExecutionSession管理两条独立活动：消费本角色Skill状态�
 
 ## 输入开始与自有回复字幕
 
-SpeechPerception 的 speech.phase(speaking) 是识别与交互绑定事实，不触发主模型或语义打断。全双工 Assistant 保留当前助手字幕，用户转写独立更新；final 才进入 Decision。真正回复开始使用原有 beginReplyTurn 身份围栏。
+完整转写与键入文本进入同一用户输入流程，按接纳时的会话和任务确定归属。识别字幕由 SpeechPerception 呈现，回复字幕使用 beginReplyTurn 校验实际回复身份。
 
 前台Task灵动岛通过GatewayOutputConsumer.executeInternal调用已声明的UI.Island内部工具，
-其结果只由AssistantExecutionSession的呈现worker消费。独立呈现会话不生成Assistant输入或
-回复占用；任务/模型会话与呈现会话保持独立。内部字幕/等待态的执行回执不触发模型ReACT。
+其结果由 AssistantExecutionSession 的呈现 worker 消费。任务、模型与呈现会话各有独立身份。字幕和等待态回执由内部呈现路径处理。
 
 ## 前台与 Writer 入口选择
 
@@ -282,7 +280,7 @@ task.start 保留 Assistant 自己执行的前台目标；task.delegate 将目�
 
 ## 提示词所有权
 
-Assistant/Instructions.md 只维护自身用户对话、协调、输出和事实汇报责任，Prompts.json 只维护证据模板。AssistantContextState 组合 System 协议、Skill 教学和目录、有效 Action 目录，以及各 Agent 自己的公开 description；DELEGATABLE AGENTS 根据实际实例权限和已实现适配过滤，不包含其他角色私有提示词。start/delegate 平级教学归 BasicSkill，Writer 业务用途和委派条件归 Writer/Agent.json。
+Assistant/Instructions.md 只维护自身用户对话、协调、输出和事实汇报责任，Prompts.json 只维护证据模板。AssistantContextState 组合 共享协议、Skill 教学和目录、有效 Action 目录，以及各 Agent 自己的公开 description；DELEGATABLE AGENTS 根据实际实例权限和已实现适配过滤，不包含其他角色私有提示词。start/delegate 平级教学归 BasicSkill，Writer 业务用途和委派条件归 Writer/Agent.json。
 
 ## 语音生产与播放
 
@@ -310,8 +308,14 @@ prepare 校验非空、至多 2000 UTF-8 字节的文本，生成唯一 audioID�
 
 [AssistantInputBatch.swift](AssistantInputBatch.swift) 将单条或多条输入渲染为同一条时间线。正文后接 `User (ASR) ｜ HH:mm:ss` 等可信来源和设备本地时间。手输为 User，Writer 使用角色名，其他同伴使用 Agent 名。Action Result 的正文含函数名和结果；原生工具保留独立调用/结果配对。排序使用完整事件时间，同一事件时间按接纳顺序。用户可信 uptime 映射到本机日期，同伴用接收时间，Action 用完成时间。形似来源行或辅助标题的正文行缩进。打断仅补充相关旧用户意图。旧 JSON 请求在模型历史回放时重新投影，已发送请求的原始证据可回查。
 
-System 的 InputProtocol 紧邻 XML 输出协议装配。它引导模型按最新用户修正确定目标，用同伴消息、执行结果、状态和图像核对事实，结合上下文处理明显转写错误，并澄清会改变动作的疑义。回复优先给出答案、等待中的结果或阻塞。角色 Instructions 允许在无需说话时仅用当前目录允许的表情。表情函数成功返回 Void，内部完成通知用于推进 FIFO，异常成为错误输入。
+Assistant 自有的 InputProtocol 在 system 消息中紧邻共享 XML 输出协议装配。它引导模型按最新用户修正确定目标，用同伴消息、执行结果、状态和图像核对事实，结合上下文处理明显转写错误，并澄清会改变动作的疑义。回复优先给出答案、等待中的结果或阻塞。角色 Instructions 允许在无需说话时仅用当前目录允许的表情。表情函数成功返回 Void，内部完成通知用于推进 FIFO，异常成为错误输入。
 
 请求配置/上下文准备失败时，批次保留内存并阻塞该会话，显式报告错误；接纳新用户输入时一起重试，不自动循环。暂停、关闭或停止清理未发批次。已发请求失败不走此准备重试路径，仍结算原 message。所有持久化继续由 onDispatch 边界控制。
 
 AssistantExecutionSession 为 Decision 维护独立、可替换的灵动岛活动。确认 discard 或实际完成同代 interrupt 后，发布约三秒的本地展开详情，正文仅包含结果。新反馈替换旧内容及计时，后台暂停或退出取消计时并结束活动。通用灵动岛负责详情仲裁及渲染。
+
+## 请求文字的资源归属
+
+Prompts.json 维护主对话的执行证据、任务历史摘要前缀和 Writer 协作事实。InputProtocol.json 同时维护主模型的输入规则与代码使用的来源标签、时间线排版和旧格式识别。InputDecision.json 维护独立分类请求的规则、输入模板及工具说明。TaskFeedback.json 维护任务控制与委派回执。图片清单由 Shared/RequestContext.json 提供。
+
+来源行识别从当前资源标签和排版生成，同时识别历史格式；形似来源行与辅助标题的用户正文仍缩进。模板缺失或渲染失败显式传播，不用硬编码正文补位。

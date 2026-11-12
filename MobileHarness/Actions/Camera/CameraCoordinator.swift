@@ -133,6 +133,7 @@
                 guard self.worker == nil else { throw CameraControlError.busy }
                 guard self.state.isEnabled else { throw CameraControlError.disabled }
                 guard self.state.isVisible, self.captureLease != nil else { throw CameraControlError.unavailable }
+                guard self.state.lensOwner == .capture else { throw CameraControlError.lensNotOwned }
             })
 
         public init(
@@ -223,10 +224,6 @@
                 health: failed ? .fault : .unknown,
                 issues: failed ? [.init(code: "cameraFailed", impact: "cameraExecutionUnavailable")] : [])
         }
-        public func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data {
-            try await photos.read(
-                id, owner: .init(namespace: "photos", source: source, session: sessionID, input: inputID))
-        }
         public func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
             try validatePreview(invocation)
             return try await photoSession.savePhoto(id, invocation: invocation)
@@ -235,18 +232,23 @@
             try validatePreview(invocation)
             return try await photoSession.saveAllPhotos(invocation: invocation)
         }
-        public func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt {
+        public func takePhoto(delaySeconds: Int?, invocation: any FunctionInput) async throws -> CameraPhotoReceipt {
+            if let delaySeconds, !(0...30).contains(delaySeconds) {
+                throw ActionArguments.ValidationError.invalidValue("delaySeconds")
+            }
+            guard foreground else { throw CameraControlError.notForeground }
+            guard state.isEnabled, state.isVisible else { throw CameraControlError.disabled }
+            guard state.lensOwner == .capture else { throw CameraControlError.lensNotOwned }
             guard !changingDemand, !windowTransition, worker == nil else { throw CameraControlError.busy }
             guard !recordingSession.busy, !recordingSession.hasClip else { throw CameraControlError.busy }
             changingDemand = true
             defer { changingDemand = false }
             if state.settings.mode != "photo" {
-                guard foreground, state.isEnabled, state.isVisible else { throw CameraControlError.disabled }
-                guard state.lensOwner == .capture else { throw CameraControlError.lensNotOwned }
                 try await CameraCaptureConfiguration.preparePhoto(camera: camera, presentation: presentation)
             }
             try Task.checkCancellation()
-            return try await photoSession.takePhoto(delaySeconds: state.settings.delaySeconds, invocation: invocation)
+            return try await photoSession.takePhoto(
+                delaySeconds: delaySeconds ?? state.settings.delaySeconds, invocation: invocation)
         }
 
         public func configureCapture(_ update: CameraCaptureSettings.Update, invocation: any FunctionInput) async throws

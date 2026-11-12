@@ -9,15 +9,17 @@ public enum CommunicationError: Error, Equatable, Sendable {
 public struct CommunicationContract: Sendable {
     public let name: String
     public let kind: InputKind
+    public let topic: String
     public let maximumBytes: Int
     public let startsNewWork: Bool
     fileprivate let validateMessage: (@Sendable (AgentMessage) throws -> Void)?
     public init(
-        name: String, kind: InputKind, maximumBytes: Int = 16_384,
+        name: String, kind: InputKind, topic: String? = nil, maximumBytes: Int = 16_384,
         startsNewWork: Bool = false, validateMessage: (@Sendable (AgentMessage) throws -> Void)? = nil
     ) {
         self.name = name
         self.kind = kind
+        self.topic = topic ?? name
         self.maximumBytes = maximumBytes
         self.startsNewWork = startsNewWork
         self.validateMessage = validateMessage
@@ -45,6 +47,10 @@ public struct CommunicationContracts: Sendable {
         for contract in additional {
             guard !contract.name.isEmpty, contract.name.utf8.count <= 64,
                 contract.name.split(separator: ".", omittingEmptySubsequences: false).allSatisfy({
+                    CapabilityRegistry.validName(String($0))
+                }),
+                !contract.topic.isEmpty, contract.topic.utf8.count <= 64,
+                contract.topic.split(separator: ".", omittingEmptySubsequences: false).allSatisfy({
                     CapabilityRegistry.validName(String($0))
                 }),
                 (1...262_144).contains(contract.maximumBytes),
@@ -88,6 +94,12 @@ public struct CommunicationDeclaration: Codable, Sendable {
     public let sends: [SendPermission]
     public static let empty = CommunicationDeclaration(inputs: [], subscriptions: [], publications: [], sends: [])
 
+    public var inputKinds: Set<InputKind> {
+        var kinds = Set(inputs.map(\.kind))
+        if !subscriptions.isEmpty { kinds.insert(.observation) }
+        return kinds
+    }
+
     public func validate(contracts: CommunicationContracts = .standard) throws {
         guard inputs.count <= 32, subscriptions.count <= 16, publications.count <= 64, sends.count <= 64,
             Set(inputs).count == inputs.count, Set(subscriptions).count == subscriptions.count,
@@ -95,7 +107,7 @@ public struct CommunicationDeclaration: Codable, Sendable {
             inputs.allSatisfy({ $0.version == 1 && contracts[$0.contract]?.kind == $0.kind }),
             publications.allSatisfy({ contracts[$0]?.kind == .observation }),
             subscriptions.allSatisfy({ sub in
-                inputs.contains { $0.contract == sub.contract } && sub.topic == sub.contract
+                contracts[sub.contract]?.kind == .observation && contracts[sub.contract]?.topic == sub.topic
                     && CapabilityRegistry.validName(sub.source)
             }),
             sends.allSatisfy({ contracts[$0.contract]?.kind == .observation && CapabilityRegistry.validName($0.target) }
@@ -120,7 +132,7 @@ public struct CommunicationPolicy: Sendable {
         var subscribers: [String: Int] = [:]
         for declaration in agents.values {
             try declaration.validate(contracts: contracts)
-            topics.formUnion(declaration.publications)
+            topics.formUnion(declaration.publications.compactMap { contracts[$0]?.topic })
             for sub in declaration.subscriptions {
                 topics.insert(sub.topic)
                 subscribers[sub.topic, default: 0] += 1
@@ -142,12 +154,16 @@ public struct CommunicationPolicy: Sendable {
         }
     }
     public func destinations(for input: AgentInput) -> [AgentID] {
-        agents.compactMap { id, declaration in
-            declaration.subscriptions.contains {
-                $0.contract == input.metadata.contract && $0.topic == input.metadata.topic
-                    && $0.source == input.metadata.source
-            } ? id : nil
-        }.sorted { $0.rawValue < $1.rawValue }
+        agents.keys.filter { acceptsPublication(input, target: $0) }.sorted { $0.rawValue < $1.rawValue }
+    }
+    public func acceptsPublication(_ input: AgentInput, target: AgentID) -> Bool {
+        guard let contract = contracts[input.metadata.contract], contract.kind == .observation,
+            contract.kind == input.payload.kind, input.metadata.version == 1, contract.topic == input.metadata.topic
+        else { return false }
+        return agents[target]?.subscriptions.contains {
+            $0.contract == input.metadata.contract && $0.topic == input.metadata.topic
+                && $0.source == input.metadata.source
+        } == true
     }
     public func accepts(_ input: AgentInput, target: AgentID) -> Bool {
         agents[target]?.inputs.contains {

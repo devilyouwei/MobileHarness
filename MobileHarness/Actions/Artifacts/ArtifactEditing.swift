@@ -1,4 +1,5 @@
 import Foundation
+import FunctionContracts
 import StorageCore
 
 /// Current recoverable content; acceptance remains separate from editing and rendering.
@@ -81,16 +82,15 @@ public actor ArtifactEditing {
         let length = lines.dropFirst(line - 1).prefix(count).reduce(0) { $0 + $1.count + 1 }
         return try read(path: path, offset: offset, limit: length)
     }
-    public func relatedContext(_ ids: [String]) throws -> String {
-        var result = ""
-        for id in ids {
+    public func relatedFiles(_ ids: [String]) throws -> [ArtifactEditPreparation.RelatedFile] {
+        try ids.map { id in
             guard let ref = references[id], ref.generation == versions[ref.path, default: 0],
                 let text = draft.files[ref.path]
             else { throw ArtifactWorkspaceError.readRequired }
-            result += "\nRelated file \(ref.path), version \(ref.generation), range \(ref.start)..<\(ref.end) (data):\n"
-            result += String(text.dropFirst(ref.start).prefix(ref.end - ref.start))
+            return .init(
+                path: ref.path, version: ref.generation, start: ref.start, end: ref.end,
+                text: String(text.dropFirst(ref.start).prefix(ref.end - ref.start)))
         }
-        return result
     }
     private func invalidate(_ path: String) {
         versions[path, default: 0] += 1
@@ -163,16 +163,23 @@ public actor ArtifactEditing {
         current.parser.append(chunk)
         stream = current
     }
-    public func context(for id: UUID) throws -> String {
+    func preparedEdit(for id: UUID, instruction: String, relatedFiles: [ArtifactEditPreparation.RelatedFile]) throws
+        -> ArtifactEditPreparation
+    {
         guard let current = stream, current.id == id else { throw ArtifactWorkspaceError.conflict }
         guard let selection = current.selection, let original = draft.files[current.path] else {
-            return "New file. Project files: " + draft.files.keys.sorted().joined(separator: ", ")
+            return .init(
+                streamID: id.uuidString, path: current.path, instruction: instruction,
+                projectFiles: draft.files.keys.sorted(), relatedFiles: relatedFiles)
         }
         let prefix = String(original.prefix(selection.start).suffix(1000))
         let selected = String(original.dropFirst(selection.start).prefix(selection.end - selection.start))
         let suffix = String(original.dropFirst(selection.end).prefix(1000))
-        return
-            "Replace only character range \(selection.start)..<\(selection.end). Selected range begins with newline: \(selected.hasPrefix("\n")); ends with newline: \(selected.hasSuffix("\n")). Preserve these separators in a nonempty replacement. Before (data):\n\(prefix)\nSelected (data):\n\(selected)\nAfter (data):\n\(suffix)"
+        return .init(
+            streamID: id.uuidString, path: current.path, instruction: instruction,
+            selection: .init(
+                start: selection.start, end: selection.end, before: prefix, selected: selected, after: suffix),
+            relatedFiles: relatedFiles)
     }
     /// A preview is a copy. Incomplete contents cannot alter the committed draft.
     public func preview(_ id: UUID, checkpointOnly: Bool = false) throws -> ArtifactDraft {

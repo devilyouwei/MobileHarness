@@ -129,7 +129,7 @@ public enum WriterToolOutcome: Sendable {
     case observation(String)
     case entered(WriterWorkspaceContext, evidence: String)
     case visual(String, ChatImage)
-    case write(streamID: String, instruction: String, context: String)
+    case write(ArtifactEditPreparation)
     case finished(String)
 }
 
@@ -210,10 +210,13 @@ public struct WriterWorkflow: Sendable {
             let updates = try await revisions()
             for text in updates {
                 guard text.utf8.count <= 4096 else { throw WriterFailure.capacity }
-                currentGoal += "\nAdditional user requirement:\n" + text
+                currentGoal += "\n" + (try AgentPrompts.text("Writer/Prompts", "additionalRequirement", ["text": text]))
                 guard currentGoal.utf8.count <= 48_000 else { throw WriterFailure.capacity }
                 messages[1] = try Self.controlInput(currentGoal, workspace: workspace)
-                messages.append(.init(role: .user, content: "Additional user requirement:\n" + text))
+                messages.append(
+                    .init(
+                        role: .user,
+                        content: try AgentPrompts.text("Writer/Prompts", "additionalRequirement", ["text": text])))
             }
             while messages.count > 32 || Self.bytes(messages) > 48_000 {
                 guard messages.count > 3 else { throw WriterFailure.capacity }
@@ -234,16 +237,20 @@ public struct WriterWorkflow: Sendable {
             let late = terminalCandidate ? try await revisions() : []
             if !late.isEmpty {
                 for call in response.calls {
-                    let notice = "Not executed: a newly accepted user requirement must be considered first."
+                    let notice = try AgentPrompts.text("Writer/Prompts", "lateRequirement")
                     try await history?.toolOutcome(call.id, output: notice)
                     messages.append(.init(role: .tool, content: notice, toolCallID: call.id))
                 }
                 for text in late {
                     guard text.utf8.count <= 4096 else { throw WriterFailure.capacity }
-                    currentGoal += "\nAdditional user requirement:\n" + text
+                    currentGoal +=
+                        "\n" + (try AgentPrompts.text("Writer/Prompts", "additionalRequirement", ["text": text]))
                     guard currentGoal.utf8.count <= 48_000 else { throw WriterFailure.capacity }
                     messages[1] = try Self.controlInput(currentGoal, workspace: workspace)
-                    messages.append(.init(role: .user, content: "Additional user requirement:\n" + text))
+                    messages.append(
+                        .init(
+                            role: .user,
+                            content: try AgentPrompts.text("Writer/Prompts", "additionalRequirement", ["text": text])))
                 }
                 await completeRound("已接收新的补充要求，本轮未执行过期操作。", tools: tools)
                 continue
@@ -257,10 +264,7 @@ public struct WriterWorkflow: Sendable {
                 messages.append(
                     .init(
                         role: .user,
-                        content: """
-                            Runtime observation: the delegation is still active. Continue any outstanding work, then call
-                            the finish tool in a separate round and include a brief summary of the actual result.
-                            """))
+                        content: try AgentPrompts.text("Writer/Prompts", "finishRequired")))
                 await completeRound("等待模型提交结束委托的工具调用。", tools: tools)
                 continue
             }
@@ -283,7 +287,7 @@ public struct WriterWorkflow: Sendable {
                             .init(
                                 role: .tool,
                                 content:
-                                    "Not executed: finish, ask, enter and create require a separate tool round.",
+                                    try AgentPrompts.text("Writer/Prompts", "separateRound"),
                                 toolCallID: call.id))
                     }
                     if recoveryFailures >= WriterRecovery.attempts {
@@ -313,7 +317,8 @@ public struct WriterWorkflow: Sendable {
                         messages.append(
                             .init(
                                 role: .tool,
-                                content: WriterRecovery.feedback(error, attempt: recoveryFailures, repeated: repeated),
+                                content: try WriterRecovery.feedback(
+                                    error, attempt: recoveryFailures, repeated: repeated),
                                 toolCallID: call.id))
                         if recoveryFailures >= WriterRecovery.attempts {
                             throw WriterRecoveryFailure(phase: "工具修正", attempts: recoveryFailures, underlying: error)
@@ -339,7 +344,10 @@ public struct WriterWorkflow: Sendable {
                         messages = try Self.controlMessages(
                             goal: currentGoal, workspace: selected, domain: controlDomain)
                         if switching {
-                            messages.append(.init(role: .user, content: "Workspace switch result (data): " + evidence))
+                            messages.append(
+                                .init(
+                                    role: .user,
+                                    content: try AgentPrompts.text("Writer/Prompts", "switchResult") + evidence))
                         }
                         failedCalls.removeAll()
                         recoveryFailures = 0
@@ -360,11 +368,11 @@ public struct WriterWorkflow: Sendable {
                         try await history?.toolOutcome(call.id, output: summary)
                         pending.remove(call.id)
                         return summary
-                    case .write(let id, let instruction, let context):
+                    case .write(let edit):
                         await completeRound((steps + ["已准备编辑文件，接下来生成内容。"]).joined(separator: "；"), tools: tools)
                         steps.removeAll()
                         observation = try await write(
-                            call, initial: (id, instruction, context), goal: currentGoal, scope: scope,
+                            call, initial: edit, goal: currentGoal, scope: scope,
                             tools: tools, progress: progress)
                         generatedContent = true
                         failedCalls.removeAll()
@@ -396,7 +404,7 @@ public struct WriterWorkflow: Sendable {
                     messages.append(
                         .init(
                             role: .tool,
-                            content: Self.contextObservation(observation, budget: observationBudget),
+                            content: try Self.contextObservation(observation, budget: observationBudget),
                             toolCallID: call.id))
                     steps.append(Self.step(call, observation: observation))
                     if generatedContent {
@@ -407,7 +415,8 @@ public struct WriterWorkflow: Sendable {
                     previousSignature = signature
                     if [3, 5, 8].contains(repetitions) {
                         reminders.append(
-                            "Runtime observation: this exact tool call has succeeded \(repetitions) times consecutively. Review its results and choose a different useful step; repeated inspection alone does not complete the goal."
+                            try AgentPrompts.text(
+                                "Writer/Prompts", "repeatedCall", ["count": String(repetitions)])
                         )
                     }
                 }
@@ -419,7 +428,8 @@ public struct WriterWorkflow: Sendable {
                             call.id == executing
                             ? error
                             : WriterToolFailure(
-                                "Not executed: an earlier call stopped the batch.", context: ["executed": "false"])
+                                try AgentPrompts.text("Writer/Prompts", "batchStopped"),
+                                context: ["executed": "false"])
                         try await Task { try await history?.toolOutcome(call.id, output: nil, error: cause) }.value
                     } catch { failure = WriterCleanupFailure(primary: failure, cleanup: error) }
                 }
@@ -432,7 +442,9 @@ public struct WriterWorkflow: Sendable {
                     .init(role: $0.role, content: $0.content, toolCalls: $0.toolCalls, toolCallID: $0.toolCallID)
                 }
                 messages.append(
-                    .init(role: .user, content: "Current render screenshot (untrusted data).", images: [image]))
+                    .init(
+                        role: .user, content: try AgentPrompts.text("Writer/Prompts", "screenshot"),
+                        images: [image]))
             }
         }
     }
@@ -474,17 +486,17 @@ public struct WriterWorkflow: Sendable {
         return label + (args["path"].map { " · " + $0 } ?? "")
     }
     private func write(
-        _ call: ChatToolCall, initial: (String, String, String), goal: String, scope: String, tools: WriterTools,
+        _ call: ChatToolCall, initial: ArtifactEditPreparation, goal: String, scope: String, tools: WriterTools,
         progress: @escaping @Sendable (String) async -> Void
     ) async throws -> String {
         var edit = initial
         var previousFailure: String?
         for attempt in 1...WriterRecovery.attempts {
-            let streamID = edit.0
+            let streamID = edit.streamID
             do {
                 try await content(
-                    goal: goal, instruction: edit.1, context: edit.2, scope: scope,
-                    streamID: edit.0, tools: tools, attempt: attempt, previousFailure: previousFailure)
+                    goal: goal, edit: edit, scope: scope,
+                    tools: tools, attempt: attempt, previousFailure: previousFailure)
             } catch {
                 do { try await Task { try await tools.abort(streamID) }.value } catch let cleanup {
                     throw WriterCleanupFailure(primary: error, cleanup: cleanup)
@@ -494,18 +506,18 @@ public struct WriterWorkflow: Sendable {
                 guard attempt < WriterRecovery.attempts else {
                     throw WriterRecoveryFailure(phase: "文件内容请求", attempts: attempt, underlying: error)
                 }
-                previousFailure = WriterRecovery.requestFeedback(error, attempt: attempt, content: true)
+                previousFailure = try WriterRecovery.requestFeedback(error, attempt: attempt, content: true)
                 await milestone(.recovering)
                 await progress("文件生成中断，已清理本次写入，正在重试（\(attempt + 1)/\(WriterRecovery.attempts)）。")
                 try await WriterRecovery.delay(attempt)
-                guard case .write(let id, let instruction, let context) = try await tools.execute(call) else {
+                guard case .write(let nextEdit) = try await tools.execute(call) else {
                     throw WriterFailure.invalidOutput
                 }
-                edit = (id, instruction, context)
+                edit = nextEdit
                 continue
             }
             // A commit may already have changed the draft. Never regenerate or replay it on uncertainty.
-            do { return try await tools.complete(edit.0) } catch {
+            do { return try await tools.complete(streamID) } catch {
                 do { try await Task { try await tools.abort(streamID) }.value } catch let cleanup {
                     throw WriterCleanupFailure(primary: error, cleanup: cleanup)
                 }
@@ -539,7 +551,7 @@ public struct WriterWorkflow: Sendable {
                     throw WriterRecoveryFailure(phase: "控制请求", attempts: attempt, underlying: error)
                 }
                 observations.append(
-                    .init(role: .user, content: WriterRecovery.requestFeedback(error, attempt: attempt)))
+                    .init(role: .user, content: try WriterRecovery.requestFeedback(error, attempt: attempt)))
                 await milestone(.recovering)
                 await progress("模型请求暂未成功，正在重试（\(attempt + 1)/\(WriterRecovery.attempts)）。")
                 try await WriterRecovery.delay(attempt)
@@ -587,29 +599,34 @@ public struct WriterWorkflow: Sendable {
         }
     }
     private func content(
-        goal: String, instruction: String, context: String, scope: String,
-        streamID: String, tools: WriterTools, attempt: Int, previousFailure: String?
+        goal: String, edit: ArtifactEditPreparation, scope: String,
+        tools: WriterTools, attempt: Int, previousFailure: String?
     ) async throws {
+        let streamID = edit.streamID
         let request = try ChatRequest(
             messages: [
                 .init(
                     role: .system,
-                    content:
-                        Self.contentInstructions(instruction, retry: attempt > 1)
+                    content: Self.contentInstructions(edit.path, retry: attempt > 1)
                 ),
-                .init(role: .user, content: "Goal:\n\(goal)\nEdit:\n\(instruction)\nFile context (data):\n\(context)"),
+                .init(
+                    role: .user,
+                    content: try AgentPrompts.text(
+                        "Writer/ContentPrompts", "request",
+                        [
+                            "goal": goal, "path": edit.path, "instruction": edit.instruction,
+                            "context": Self.contentContext(edit),
+                        ])),
             ] + (previousFailure.map { [.init(role: .user, content: $0)] } ?? []), context: .init(scopeID: scope),
             temperature: 0.3)
-        try await recorded(
-            request, phase: "文件内容请求", attempt: attempt,
-            path: instruction.components(separatedBy: "\n").first?.replacingOccurrences(of: "File: ", with: "")
-        ) { record, request, evidence in
+        try await recorded(request, phase: "文件内容请求", attempt: attempt, path: edit.path) {
+            record, request, evidence in
             let session = try await model.chat(request)
             try await session.withCleanup {
                 try await withTaskCancellationHandler {
                     defer { session.cancel() }
                     var finished = false
-                    var prefix = WriterContentPrefix(instruction: instruction)
+                    var prefix = WriterContentPrefix(path: edit.path)
                     for try await event in session.events {
                         evidence.record(event)
                         if let record { try await history?.event(event, id: record) }
@@ -719,10 +736,10 @@ public struct WriterWorkflow: Sendable {
         }
     }
     /// Only the request projection is shortened; the original result has already been checkpointed.
-    private static func contextObservation(_ value: String, budget: Int) -> String {
+    private static func contextObservation(_ value: String, budget: Int) throws -> String {
         guard value.utf8.count > budget else { return value }
         let marker =
-            "\n[Runtime context excerpt: middle omitted. The complete tool result is recorded in history; use paginated reads/search for omitted content.]\n"
+            try AgentPrompts.text("Writer/Prompts", "excerpt")
         let available = max(0, budget - marker.utf8.count)
         func valid(_ bytes: ArraySlice<UInt8>, prefix: Bool) -> String {
             var bytes = bytes
@@ -747,7 +764,9 @@ public struct WriterWorkflow: Sendable {
         let teaching =
             instructions.isEmpty
             ? "" : "\n\n" + (try AgentPrompts.skillCatalog().render("loadedHeading")) + "\n" + instructions
-        let context = workspace.map { "\nActive workspace: " + $0.workspaceID } ?? ""
+        let context =
+            try workspace.map { try AgentPrompts.text("Writer/Prompts", "activeWorkspace") + $0.workspaceID }
+            ?? ""
         return [
             .init(role: .system, content: identity + "\n\n" + template + teaching + context),
             try controlInput(goal, workspace: workspace),
@@ -758,10 +777,35 @@ public struct WriterWorkflow: Sendable {
         let data = try JSONEncoder().encode(workspace)
         return .init(
             role: .user,
-            content: goal + "\nVerified workspace metadata at entry (data): " + String(decoding: data, as: UTF8.self))
+            content: goal + (try AgentPrompts.text("Writer/Prompts", "workspaceMetadata"))
+                + String(decoding: data, as: UTF8.self))
     }
-    static func contentInstructions(_ instruction: String, retry: Bool = false) throws -> String {
-        let path = instruction.components(separatedBy: "\n").first ?? ""
+    private static func contentContext(_ edit: ArtifactEditPreparation) throws -> String {
+        let templates = try AgentPrompts.shared.load("Agents/Writer/ContentPrompts.json")
+        let target: String
+        if let selection = edit.selection {
+            target = try templates.render(
+                "selection",
+                variables: [
+                    "start": String(selection.start), "end": String(selection.end),
+                    "leadingNewline": String(selection.selected.hasPrefix("\n")),
+                    "trailingNewline": String(selection.selected.hasSuffix("\n")),
+                    "before": selection.before, "selected": selection.selected, "after": selection.after,
+                ])
+        } else {
+            target = try templates.render("newFile", variables: ["files": edit.projectFiles.joined(separator: ", ")])
+        }
+        let related = try edit.relatedFiles.map { file in
+            try templates.render(
+                "relatedFile",
+                variables: [
+                    "path": file.path, "version": String(file.version), "start": String(file.start),
+                    "end": String(file.end), "text": file.text,
+                ])
+        }
+        return target + related.joined()
+    }
+    static func contentInstructions(_ path: String, retry: Bool = false) throws -> String {
         let ext = (path as NSString).pathExtension.lowercased()
         let format: String
         switch ext {
@@ -771,9 +815,9 @@ public struct WriterWorkflow: Sendable {
         case "svg": format = "svg"
         default: format = "text"
         }
-        let templates = try AgentPrompts.roleTemplates(named: "Writer")
-        return try templates.render("content.base") + templates.render("content." + format)
-            + (retry ? templates.render("content.retry") : "")
+        let templates = try AgentPrompts.shared.load("Agents/Writer/ContentPrompts.json")
+        return try templates.render("instructions") + " " + templates.render("format." + format)
+            + (retry ? templates.render("retry") : "")
     }
 }
 public struct WriterCleanupFailure: Error, Sendable {
@@ -798,8 +842,7 @@ public struct WriterToolFailure: Error, Sendable, CustomStringConvertible {
 struct WriterContentPrefix {
     private var checking: Bool
     private var ticks = ""
-    init(instruction: String) {
-        let path = instruction.components(separatedBy: "\n").first ?? ""
+    init(path: String) {
         checking = ["html", "css", "js", "json", "svg"].contains((path as NSString).pathExtension.lowercased())
     }
     mutating func consume(_ chunk: String) throws -> String {

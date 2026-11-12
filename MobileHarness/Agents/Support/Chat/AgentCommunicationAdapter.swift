@@ -28,7 +28,8 @@ public enum AgentCommunicationAdapter {
                     documentation: try JSONDecoder().decode(
                         CapabilityDocumentation.self,
                         from: JSONSerialization.data(withJSONObject: [
-                            "doc": (registration.documentation?.doc ?? "") + "\nAllowed target/kind pairs: "
+                            "doc": (registration.documentation?.doc ?? "")
+                                + (try AgentPrompts.text("Shared/CommunicationContext", "allowedPairs"))
                                 + grants.joined(separator: ", ") + ".",
                             "parameters": (registration.documentation?.parameters ?? []).map {
                                 [

@@ -11,16 +11,6 @@
         "kind": "toolResult"
       },
       {
-        "contract": "speech.final",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
-        "contract": "speech.phase",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
         "contract": "action.result",
         "version": 1,
         "kind": "actionResult"
@@ -36,27 +26,12 @@
         "kind": "communicationReceipt"
       },
       {
-        "contract": "task.request",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
-        "contract": "task.input",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
         "contract": "task.progress",
         "version": 1,
         "kind": "observation"
       },
       {
         "contract": "task.result",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
-        "contract": "task.cancel",
         "version": 1,
         "kind": "observation"
       },
@@ -68,56 +43,13 @@
     ],
     "subscriptions": [
       {
-        "contract": "speech.final",
+        "contract": "user.input.asr.final",
         "source": "speechPerception",
-        "topic": "speech.final"
-      },
-      {
-        "contract": "speech.phase",
-        "source": "speechPerception",
-        "topic": "speech.phase"
+        "topic": "user.input"
       }
     ],
-    "publications": [
-      "interaction.replyActivity"
-    ],
+    "publications": [],
     "sends": [
-      {
-        "contract": "task.request",
-        "target": "photographer"
-      },
-      {
-        "contract": "task.input",
-        "target": "photographer"
-      },
-      {
-        "contract": "task.cancel",
-        "target": "photographer"
-      },
-      {
-        "contract": "task.request",
-        "target": "memory"
-      },
-      {
-        "contract": "task.input",
-        "target": "memory"
-      },
-      {
-        "contract": "task.cancel",
-        "target": "memory"
-      },
-      {
-        "contract": "task.request",
-        "target": "applicationControl"
-      },
-      {
-        "contract": "task.input",
-        "target": "applicationControl"
-      },
-      {
-        "contract": "task.cancel",
-        "target": "applicationControl"
-      },
       {
         "contract": "task.request",
         "target": "writer"

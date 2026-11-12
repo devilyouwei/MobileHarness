@@ -22,6 +22,7 @@ public struct WebPageObservation: Sendable {
     func loadRemote(_ url: URL) async throws -> WebPageObservation
     func loadLocal(_ entry: URL) async throws -> WebPageObservation
     func observe() async throws -> WebPageObservation
+    var snapshotIdentity: String? { get }
     func snapshot() async throws -> Data
     func navigate(_ command: String) async throws -> WebPageObservation
     func close()
@@ -563,6 +564,20 @@ public enum WebPagePolicy {
                 text: String(decoding: (object["text"] ?? "").utf8.prefix(8000), as: UTF8.self),
                 diagnostics: String(decoding: (object["errors"] ?? "").utf8.prefix(2048), as: UTF8.self))
         }
+        /// Native identity/viewport facts only; reading does not render or run JavaScript.
+        public var snapshotIdentity: String? {
+            guard available, !loading, !preparing, !documentUpdating, failure == nil,
+                let view = nativeView, view.window != nil, !view.isHidden,
+                view.bounds.width > 1, view.bounds.height > 1
+            else { return nil }
+            var value = "\(generation):\(previewRevision):\(view.bounds):\(view.pageZoom)"
+            #if os(iOS)
+                let scroll = view.scrollView
+                guard !scroll.isDragging, !scroll.isDecelerating, !scroll.isZooming else { return nil }
+                value += ":\(scroll.contentOffset):\(scroll.zoomScale):\(scroll.contentSize)"
+            #endif
+            return value
+        }
         public func snapshot() async throws -> Data {
             guard !documentUpdating else { throw WebPageError.busy }
             guard available, !loading, failure == nil else { throw WebPageError.unavailable }
@@ -604,6 +619,7 @@ public enum WebPagePolicy {
             return data
         }
         public func navigate(_ command: String) async throws -> WebPageObservation {
+            previewRevision += 1
             guard !documentUpdating else { throw WebPageError.busy }
             if command == "reload", let localEntry, let localRoot {
                 return try await loadLocal(

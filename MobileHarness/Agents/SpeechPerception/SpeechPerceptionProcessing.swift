@@ -28,7 +28,7 @@ public struct SpeechPerceptionSignalPreprocessor: SignalPreprocessor {
         switch input.payload {
         case .actionResult: return .feedback
         case .observation(let message)
-        where [ListeningIntent.contract, ReplyActivity.contract, SpeechCaptureEnded.contract].contains(message.contract):
+        where [ListeningIntent.contract, SpeechCaptureEnded.contract].contains(message.contract):
             return .control
         default: throw HarnessError.unsupportedInput
         }
@@ -52,29 +52,11 @@ public struct SpeechPerceptionContextBuilder: ContextBuilder {
 
 // MARK: - Listening policy
 
-/// Domain-owned consent and lifecycle-owned reply facts; unrelated streaming busy never closes listening.
+enum SpeechPhase: String, Codable, Sendable { case listening, speaking, processing, empty }
+
+/// Capture consent and the current native route capability.
 struct SpeechListeningPolicy {
-    struct Activity {
-        var revision: UInt64
-        var incarnation: String
-        var occupied: Bool
-    }
     var enabled = false
     var revision: UInt64 = 0
-    var activities: [String: Activity] = [:]
     var fullDuplex = false
-    var pendingFinal: String?
-    var paused: Bool { !fullDuplex && (pendingFinal != nil || activities.values.contains { $0.occupied }) }
-    mutating func accept(_ value: ReplyActivity, source: String, incarnation: String) throws -> Bool {
-        try value.validate()
-        guard ["assistant", "photographer", "memory", "applicationControl"].contains(source) else {
-            throw CommunicationError.unauthorized
-        }
-        guard activities[source]?.incarnation != incarnation || value.revision > (activities[source]?.revision ?? 0)
-        else { return false }
-        activities[source] = Activity(
-            revision: value.revision, incarnation: incarnation, occupied: !value.inputs.isEmpty || !value.tasks.isEmpty)
-        if source == "assistant", pendingFinal == value.acknowledgedRoot { pendingFinal = nil }
-        return true
-    }
 }

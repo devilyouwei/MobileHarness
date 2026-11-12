@@ -127,7 +127,7 @@ WebWorkspaceTests exercises read-before-edit, unique replacements, path/byte lim
 
 WriterWorkflowTests 使用脚本模型验证原生控制/原始内容流分离、逐字符传递与截断不提交；WebWorkspaceTests 验证通用作品兼容、MD 入口、草稿/发布隔离和过期编辑引用。替身不证明真实模型遵循。
 
-Writer 文件回归还覆盖关联片段与 Unicode 行读取、按文件引用隔离、目录移动的整批校验/恢复、历史版本原生读取，以及追加用户要求和格式规则传入内容请求。
+Writer 文件回归覆盖关联片段与 Unicode 行读取、按文件引用隔离、目录移动的整批校验与恢复、历史版本原生读取。内容请求回归核对追加用户要求、选区换行、相邻文本、关联片段和从实际文件路径选出的格式规则，指令中形似路径或模板变量的文本按字面保留。
 
 ArtifactArchive 的 ZIP 输出通过独立系统 unzip 校验目录结构/CRC；仅测试进程调用桌面校验工具，手机生产代码不执行 Shell。
 
@@ -172,3 +172,5 @@ HomeEffects 回归覆盖独立 toast 与保留字幕、错误 notice 共存，�
 丢弃 toast 回归按有界截止时间等待可见状态消失，随后断言真实错误提示和对话字幕独立保留；不假定并发测试负载下 MainActor 定时任务会在固定额外 200ms 内获得调度。
 
 SettingsInteractionTests 覆盖 Decision 选择、保存、恢复、独立模型保留、Provider 删除清理及共享发现缓存；页面原生布局需另行验收。
+
+WebWorkspaceTests 覆盖网页单槽截图的替换、scope 隔离、被动读取、窗口生命周期、准备失败、忙拒绝、取消加入和页面变化后的迟到结果；通过真实 AgentStateContext 与 ChatRequest 投影验证 Skill 选择、跨输入替换、无图片模型及完整请求日志留证。页面用替身，不代表真实 WebKit 截图验收。

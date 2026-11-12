@@ -89,7 +89,7 @@ App creates one AgentContainer and starts it after Gateway. Stable role subconta
 
 Each direct input source has a long-lived owning consumer rather than per-frame forwarding tasks. ProcessingContext carries request/session/generation/turn and causality, without granting authority. UI request/reply generations and native stream generations remain distinct. Roles own their decision, subscriptions and model producers; Actions owns actual voice/camera/device execution and interaction facades. Passive activity projection interprets Agent/Task evidence here and never executes callable effects.
 
-Stop closes cognitive admission, cancels and joins role work, and retains original terminal/cleanup ports while Gateway and Actions drain. App releases bindings only afterward. Role shutdown does not globally stop borrowed scheduler/transport roots. Primary and cleanup failures remain explicit; a failed cleanup prevents replacing native owners. Conversation interruption can retain Task/Skill, while session closure releases them; neither automatically replays effects. Reply occupancy facts remain deliverable during execution cancellation, including in-flight publication; producer/session authorization and receiver revision fences still apply, so perception can release retired reply barriers without renewing revoked listening consent.
+Stop closes cognitive admission, cancels and joins role work, and retains original terminal/cleanup ports while Gateway and Actions drain. App releases bindings afterward. Borrowed scheduler and transport roots retain their own lifecycles. A failed cleanup prevents replacing native owners, and both primary and cleanup failures remain explicit. Conversation interruption can retain Task and Skill, while session closure releases them. SpeechPerception owns recognition lifecycle and consent. Actions restores restricted-route recognition after actual playback cleanup, subject to consent and capture identity.
 
 Public containers expose UI-owned state/control interfaces and narrow role capabilities, without exposing mutable registries, raw handlers or private role state. Capacity, algorithms and failure contracts live in the linked role and [Support](Support/README.md) READMEs.
 
@@ -148,3 +148,5 @@ Assistant 的用户 final/input 采用短上下文 Decision→统一 Q；已认�
 Assistant/Writer 的排队与请求准备不创建 message；模型实际开始时提交请求，真实失败保留。Assistant 会话为已丢弃及已完成打断发布限时灵动岛详情，Writer 委托生命周期由独立执行仓库保存。
 
 Decision 使用独立于 Assistant 和 Writer 的已提交配置。每次分类从注入的配置读取本地模式及可选云端工厂，在同一次分类内使用该快照。Actions 负责按 Decision 绑定创建固定模型句柄。未配置或失败时保守入队，详情见 [Assistant](Assistant/README.md)。
+
+AgentRuntime 通过 AgentBusinessBindings.readWebScreenshot 将 Actions 的当前网页图片注册为 actions.web.screenshot；WebBrowsing 选择后进入共享多模态 State。Agents 不拥有网页截图缓存、压缩或媒体回查，Assistant 不再从 Web feedback 附图。

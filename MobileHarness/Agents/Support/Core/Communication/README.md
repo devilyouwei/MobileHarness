@@ -60,7 +60,7 @@ flowchart LR
 
 ## 授权与身份
 
-配置精确列 contract/source/topic/target；支持输入不等于订阅。发布者必须是声明的 Agent，无 wildcard、默认 Agent 回落或外部来源表。schema catalog 128，policy 至多 64 个 Agent/topics、16 个订阅／接收者。消息校验类型、内容、字节和可否启动工作；runtime 来源不能由外部文本伪造。
+注册契约定义载荷类型和主题，默认主题为契约名。广播订阅精确匹配 contract、source、topic 和 v1 载荷，定向与运行时反馈通过 inputs 接纳。发布者必须有对应 publications，发送权限对应目标 inputs。全局至多 64 个主题，每个主题至多 16 个订阅声明。
 
 因果值保留 incarnation/root/parent/session/turn，最多八跳。Signal 无默认 TTL；显式感知 freshness 由生产者和接收者校验。容器／运行故障由上层直接观察，不在通信注册表发布。
 

@@ -47,7 +47,7 @@ ExecutionIssue 保留分类、短提示、最多2048字符详情及轮次关联�
 
 Toast 为最多三行的黄色图标／文字，不拦截触摸，无回复时占用状态区。事实异常优先于装饰 Notice；装饰光不改变聆听同意或设备状态。
 
-HomeEffectsWorkflow只拥有独立、可替换、按身份围栏的Notice／光效到期任务，stopAndWait加入这些任务。回复字幕没有到期任务；ConversationState.clearReply只清回复槽，presentTranscript只更新转写槽，二者的业务调用时机归各自Agent。Toast到期由根拥有，不依赖页面存活。
+HomeEffectsWorkflow 拥有独立、可替换且按身份隔离的 Notice 和光效到期任务，stopAndWait 等待这些任务退出。回复字幕保留至新回复开始或会话清理。ConversationState.clearReply 由回复开始调用，presentTranscript 由识别轮次更新。Toast 到期由根拥有。
 
 ## 生命周期与约束
 

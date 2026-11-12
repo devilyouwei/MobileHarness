@@ -5,6 +5,7 @@ import Gateway
 import ModelKit
 import StorageChat
 import StorageCore
+import Synchronization
 import Testing
 
 @testable import Agents
@@ -883,9 +884,11 @@ private actor ReplyWaitingChat: ChatCapability {
 func assistantReplyWaitingEndsOnFirstOutputAndAllRequestTerminations(outcome: String) async throws {
     let model = ReplyWaitingChat(failsOpening: outcome == "openFailure")
     let agent = try AssistantAgent(
-        stateContext: try publicStateFixture(), reportsReplyActivity: true, chat: model,
+        stateContext: try publicStateFixture(), presentsReply: true, chat: model,
         context: try AgentContextRepository(
             agent: .assistant, scope: UUID().uuidString, state: AssistantContextState()))
+    let waiting = Mutex([Bool]())
+    await agent.bindReplyWaiting { value in waiting.withLock { $0.append(value) } }
     try await agent.start()
     var outputs = agent.outputs.makeAsyncIterator()
     try await agent.receive(
@@ -909,11 +912,6 @@ func assistantReplyWaitingEndsOnFirstOutputAndAllRequestTerminations(outcome: St
     }
     var ended = false
     while let envelope = await outputs.next() {
-        if outcome == "cancel", case .communication(let message) = envelope.output,
-            let activity = message.message.content(as: ReplyActivity.self), activity.inputs.isEmpty
-        {
-            ended = true
-        }
         if case .actionCall(let call) = envelope.output,
             call.actionPath.description == "UI.Expression.setReplyWaiting"
         {
@@ -922,14 +920,15 @@ func assistantReplyWaitingEndsOnFirstOutputAndAllRequestTerminations(outcome: St
             break
         }
     }
-    #expect(ended)
+    #expect(ended || outcome == "cancel")
+    #expect(waiting.withLock { $0 } == [true, false])
     await agent.stop()
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func assistantReplyWaitingEmitsOneExitForAStreamingAnswer() async throws
 {
     let agent = try AssistantAgent(
-        stateContext: try publicStateFixture(), reportsReplyActivity: true, chat: ChatFixture(),
+        stateContext: try publicStateFixture(), presentsReply: true, chat: ChatFixture(),
         context: try AgentContextRepository(
             agent: .assistant, scope: UUID().uuidString, state: AssistantContextState()))
     _ = try await bindSpeechRequests(agent)
@@ -941,7 +940,6 @@ func assistantReplyWaitingEndsOnFirstOutputAndAllRequestTerminations(outcome: St
     try await agent.receive(input)
     var answer: [OutputEnvelope] = []
     while let envelope = try await outputs.next() {
-        // Reply occupancy facts have their own finished control; they are not this request's terminal.
         guard envelope.inputID == input.id else { continue }
         answer.append(envelope)
         if case .control(let value) = envelope.output,

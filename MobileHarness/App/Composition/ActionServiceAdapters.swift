@@ -14,9 +14,6 @@ final class AppCameraAccess: AgentCameraAccess {
     }
     func resetPreviewSelection(scope: String) async { await value.resetPreviewSelection(scope: scope) }
     func pauseVisionForModelMaintenance() async { await value.pauseVisionForModelMaintenance() }
-    func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data {
-        try await value.readPhoto(id, source: source, sessionID: sessionID, inputID: inputID)
-    }
 }
 @MainActor final class AppDeviceAccess: AgentDeviceAccess {
     let value: any ActionsDeviceAccess

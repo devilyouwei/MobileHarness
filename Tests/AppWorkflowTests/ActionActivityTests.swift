@@ -207,7 +207,7 @@ extension ActionActivityState {
 }
 
 @Test(arguments: [
-    "UI.Caption.print", "UI.Caption.clearReply", "UI.Caption.beginReplyTurn", "UI.Caption.setTranscript",
+    "UI.Caption.print", "UI.Caption.beginReplyTurn", "UI.Caption.setTranscript",
     "UI.Caption.finishTranscript", "UI.Expression.setReplyWaiting", "UI.VoiceState.setVoiceState",
     "Speech.Listening.update", "UI.Island.present", "UI.Island.update", "UI.Island.end", "UI.Island.setPresentation",
 ]) @MainActor func executionLogInternalFilteringMatchesHomeAndPreservesFailures(
@@ -266,15 +266,12 @@ extension ActionActivityState {
     pair.continuation.yield(.init(revision: 2, records: [accepted, question]))
     while state.tasks.first?.phase != .waitingUser && ContinuousClock.now < end { await Task.yield() }
     #expect(state.tasks.first?.phase == .waitingUser)
-    let playback = try record(.progress, businessContract: "runtime.replyFinished")
-    pair.continuation.yield(.init(revision: 3, records: [accepted, question, playback]))
-    #expect(state.tasks.first?.phase == .waitingUser)
     let result = try record(.result, status: .succeeded)
-    pair.continuation.yield(.init(revision: 4, records: [accepted, question, playback, result]))
+    pair.continuation.yield(.init(revision: 3, records: [accepted, question, result]))
     while state.tasks.first?.phase != .succeeded && ContinuousClock.now < end { await Task.yield() }
     #expect(state.tasks.first?.phase == .succeeded)
     let progress = try record(.progress)
-    pair.continuation.yield(.init(revision: 5, records: [accepted, question, playback, result, progress]))
+    pair.continuation.yield(.init(revision: 4, records: [accepted, question, result, progress]))
     while state.tasks.first?.events.count != 4 && ContinuousClock.now < end { await Task.yield() }
     #expect(state.tasks.first?.phase == .succeeded)
     #expect(state.tasks.first?.events.count == 4)

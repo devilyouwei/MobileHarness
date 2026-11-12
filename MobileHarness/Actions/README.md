@@ -113,7 +113,7 @@ Camera与Web在创建UI窗口时显式提供各自图标。Actions只选择显�
 
 UI.Island工具执行生产者自己决定的语义内容。Writer与Assistant管理自身任务，Assistant另管理推理等待；SpeechPerception管理聆听/识别，Assistant的语音子能力管理合成/真实播放，Photographer和ApplicationControl管理摄影与连接展示。Actions不从UI状态或任务日志推断角色展示。
 
-Writer workspace commands, including preview/describe, enter through Gateway direct tools. The admitted edit returns a stream identity; source append/complete/abort use the host-bound ArtifactStreaming continuation with delegate/stream validation and caller backpressure. Revoke closes ordinary continuation admission; release joins actual work before retiring the editor, and Actions root shutdown provides final cleanup. Tool completion, file completion and Writer task completion are separate boundaries. Source intake only checkpoints the draft; independently scheduled safe previews do not block it. Explicit render joins pending previews and executes complete scripts; finish requires a current successful render and publishes once. Detailed bounds and failure semantics belong to [Artifacts](Artifacts/README.md#执行与续写生命周期); the UI/Storage modules do not own creative-loop or progress policies.
+Writer workspace commands, including preview/describe, enter through Gateway direct tools. The admitted edit returns a stream identity and structured file facts for Writer's content request. Source append/complete/abort use the host-bound ArtifactStreaming continuation with delegate/stream validation and caller backpressure. Revoke closes ordinary continuation admission. Release joins actual work before retiring the editor, and Actions root shutdown provides final cleanup. Tool completion, file completion and Writer task completion are separate boundaries. Source intake checkpoints the draft independently of safe previews. Explicit render joins pending previews and executes complete scripts. Finish requires current render evidence and publishes once. See [Artifacts](Artifacts/README.md#执行与续写生命周期).
 
 Web页面读取/截图/导航可按windowID选择既有Writer会话，仍经业务执行与原生验证；作品编辑授权保持Writer域。装配只注入UI根会话查询。
 
@@ -121,7 +121,7 @@ Writer新模型选择读取独立writerThinking，默认minimum；显式开启�
 
 Island business execution has one typed entry, IslandActions.execute. Each role calls registered internal tools through its own Gateway identity. The shared execution service validates commands and returns actual receipts; it owns no business-phase observer. Playback spectra and UI gestures/layout/lifecycle retain their specialized interfaces. See [Runtime](UI/Runtime/README.md).
 
-Caption execution keeps recognition and reply ownership separate: setTranscript/finishTranscript affect only recognition, while code-owned clearReply retires a caller's old reply request without starting a new reply. Presentation guards reject stale continuations and delayed clears; the Agent decides the boundary, and UI retains text through playback/listening transitions. See [Conversation execution](UI/Conversation/README.md).
+Caption execution gives recognition and replies independent slots. SpeechPerception opens and closes the recognition slot with setTranscript/finishTranscript. A reply owner replaces the reply slot at beginReplyTurn. Presentation guards reject stale updates, and UI retains text through playback and listening transitions. See [Conversation execution](UI/Conversation/README.md).
 
 Artifacts拥有作品窗口的简洁标题/操作副标题、每项目最新快照和场景恢复。Writer通过Gateway提交命名/步骤；Actions内部直接更新UI，不重新通信。场景隐藏时保留文件与业务执行，渲染返回deferred；恢复不重开用户关闭或最小化的窗口。详见[Artifacts](Artifacts/README.md)。
 
@@ -129,7 +129,7 @@ Artifacts receives the shared SQLite WorkspaceRepository through ActionsDependen
 
 Artifacts consumes the neutral StorageDatabase.Workspaces contracts/coordinator and StorageFiles primitives. It never imports SQLite/GRDB; formats, rendering and acceptance remain Actions responsibilities.
 
-Camera owns memory-only photo capture, automatic latest and explicit image selections, and saving by previewID. Its scoped State reader supplies immutable image attachments; ordinary inspection remains metadata-only. Storage owns bytes/persistence, Agents owns Skill selection, and App binds the interfaces.
+Camera owns memory-only photo capture, automatic latest and explicit image selections, and saving by previewID. Opening the camera and taking a photo are independent Actions ordered by Gateway on the Camera Channel; takePhoto accepts a single-shot countdown without changing capture preferences. Its scoped State reader supplies immutable image attachments; ordinary inspection remains metadata-only. Storage owns bytes/persistence, Agents owns Skill selection, and App binds the interfaces.
 
 History validates recorded attachment identity and reads logged request bytes only. Clearing logs removes their images and generation metadata. No history read loads State or triggers model feedback.
 
@@ -146,3 +146,5 @@ Task Actions expose foreground task.start/end and independent task.delegate; age
 ActionsBusinessBindings 为每次 Decision 分类提供一份已提交的配置，包含本地模式与可选云端工厂。工厂通过该快照中的 Decision Provider ID、模型和共享凭据构建模型句柄。只读事实适配将分类路径和队列数量投影到 UI，输入分类与取消政策由 Agents 持有。
 
 Decision 瞬时反馈由 Assistant 通过已有 UI.Island 工具发布。Actions 只执行通用活动发布及结束。
+
+WebExecutionService 拥有单槽当前网页截图，经 ActionsBusinessBindings.readWebScreenshot 对外提供 scope 隔离的多模态快照。App 透传至 Agents；Actions 不依赖 Agent 或 Resources。截图不写入 MediaStore，Actions 树中的 actions.web.screenshot 只投影元数据，详细生命周期见 [Web](Web/README.md)。

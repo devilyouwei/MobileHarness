@@ -16,7 +16,6 @@ import UI
     func pauseVisionForModelMaintenance() async
     func previewSnapshot(scope: String) async throws -> MultimodalContextSnapshot
     func resetPreviewSelection(scope: String) async
-    func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data
 }
 @MainActor public protocol AgentDeviceAccess: AnyObject, Sendable {
     func openPage()
@@ -77,6 +76,7 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
     any ExecutionFailureReporting, any ModelArtifactsManaging, AssistantConversation
 >
 @MainActor public struct AgentBusinessBindings {
+    public let readWebScreenshot: @Sendable (String) async throws -> MultimodalContextSnapshot
     public let artifactStreaming: (any ArtifactStreaming)?
     public let writerArtifacts: (any WriterArtifactsControlling)?
     public let writerModel: (@Sendable () async throws -> ChatModel)?
@@ -96,12 +96,12 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
     public let bindDeferredFailure: @MainActor (@escaping @Sendable (DeferredActionFailure) async -> Bool) -> Void
     public let bindResources: @MainActor (ResourceCoordinator, ChannelScheduler) -> Void
     public let observeTranscript: @MainActor @Sendable (String, String) throws -> Void
-    public let observeEmpty: @MainActor @Sendable (String) throws -> Void
     public let output: @Sendable (ActionOutputObservation) async -> Void
     public let decodeResources: @Sendable (String) throws -> ModelResourceViewSnapshot
     public let makeVoice: @MainActor (AgentVoiceHost) throws -> AgentVoiceExecution
     public init(
         executor: ActionsExecutionPort, catalog: ActionCatalogSnapshot,
+        readWebScreenshot: @escaping @Sendable (String) async throws -> MultimodalContextSnapshot,
         artifactStreaming: (any ArtifactStreaming)? = nil,
         writerArtifacts: (any WriterArtifactsControlling)? = nil,
         writerModel: (@Sendable () async throws -> ChatModel)? = nil,
@@ -118,11 +118,11 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
         bindDeferredFailure: @escaping @MainActor (@escaping @Sendable (DeferredActionFailure) async -> Bool) -> Void,
         bindResources: @escaping @MainActor (ResourceCoordinator, ChannelScheduler) -> Void,
         observeTranscript: @escaping @MainActor @Sendable (String, String) throws -> Void,
-        observeEmpty: @escaping @MainActor @Sendable (String) throws -> Void,
         output: @escaping @Sendable (ActionOutputObservation) async -> Void,
         decodeResources: @escaping @Sendable (String) throws -> ModelResourceViewSnapshot,
         makeVoice: @escaping @MainActor (AgentVoiceHost) throws -> AgentVoiceExecution
     ) {
+        self.readWebScreenshot = readWebScreenshot
         self.artifactStreaming = artifactStreaming
         self.writerArtifacts = writerArtifacts
         self.writerModel = writerModel
@@ -142,7 +142,6 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
         self.bindDeferredFailure = bindDeferredFailure
         self.bindResources = bindResources
         self.observeTranscript = observeTranscript
-        self.observeEmpty = observeEmpty
         self.output = output
         self.decodeResources = decodeResources
         self.makeVoice = makeVoice

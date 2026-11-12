@@ -171,3 +171,5 @@ AgentStateContext registers scope-aware multimodal readers/reset callbacks along
 The shared Chat projection combines snapshot images with the current input's user message. Source/image metadata and the one-based attachment mapping live in system State; the source snapshot still owns selection and bytes, with no role-specific image-message generation.
 
 Multimodal snapshots retain source-owned private resourceScope bindings and image scopes outside facts JSON. Camera withholds facts/attachments when its window is not visible, but retains its cache until actual closure. Registry aggregation preserves private bindings without interpreting them.
+
+actions.web.screenshot 通过同一多模态注册表读取 Actions.Web 的单槽当前图片；WebBrowsing 显式选择它。来源按调用会话隔离、检查窗口/页面有效性，不提供历史选择；dialog reset 无显式图片选择可清理，来源自行处理窗口和根生命周期。

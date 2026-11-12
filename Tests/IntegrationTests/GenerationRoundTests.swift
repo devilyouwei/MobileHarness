@@ -166,7 +166,10 @@ private actor RoundModel: ChatCapability {
         }
         if requests.count <= requestRounds {
             if speakBeforeAction { try text("<wait>正在处理。</wait>") }
-            if photo, requests.count == 1 { try text("<takePhoto/>") }
+            if photo, requests.count == 1 {
+                try text(
+                    "<wait><openCamera/></wait><wait>看镜头，现在开拍。</wait><takePhoto delaySeconds=\"3\"/>")
+            }
             if let photoCommand { try text("<" + photoCommand + "/>") }
             if action {
                 for _ in 0..<actionCount { try text("<wait><express emotion=\"happy\"/></wait>") }
@@ -268,12 +271,11 @@ private func roundHarness(
                         throw CommunicationError.invalidPayload
                     }
                     let image = try await photoObservation(id, input)
-                    let policy = AssistantWebImagePolicy.analysis
                     let prepared = try await NativeImageCompression.jpeg(
                         from: image.data,
                         limits: .init(
-                            maximumDimension: policy.maximumDimension, maximumPixels: policy.maximumPixels,
-                            maximumBytes: policy.maximumBytes, quality: policy.quality))
+                            maximumDimension: 1568, maximumPixels: 1_048_576,
+                            maximumBytes: 1_048_576, quality: 0.82))
                     messages.append(
                         .init(
                             role: .user, content: "Fixture image observation",
@@ -305,7 +307,7 @@ private func roundHarness(
     let input = InputGateway(manager: manager)
     let paths = [
         "UI.Expression.express", "UI.Caption.print", "UI.Caption.beginReplyTurn", "Speech.Playback.speak",
-        "Camera.Capture.takePhoto", "Camera.Capture.savePhoto",
+        "Camera.Capture.open", "Camera.Capture.takePhoto", "Camera.Capture.savePhoto",
         "System.Device.readStatus",
     ]
     var definitions = paths.map { path -> ActionBinding in
@@ -315,6 +317,7 @@ private func roundHarness(
             displayName: path, kind: .finite, completion: "Actual fixture completion.",
             completing: { invocation in
                 if path == "Speech.Playback.speak" { try await Task.sleep(for: playbackDelay) }
+                if path == "Camera.Capture.open" { return .completed }
                 if path == "UI.Expression.express" || path.hasPrefix("Camera.Capture.")
                     || path == "System.Device.readStatus"
                 {
@@ -732,18 +735,31 @@ func photographerPhotoFailuresDoNotFabricateVisionOrRepeatCapture(
 
 private actor PhotoFunctionEndpoint: CameraControlCapability {
     private let preview: (any CameraPresenting)?
-    init(preview: (any CameraPresenting)? = nil) { self.preview = preview }
+    private let denyOpen: Bool
+    init(preview: (any CameraPresenting)? = nil, denyOpen: Bool = false) {
+        self.preview = preview
+        self.denyOpen = denyOpen
+    }
+    let opening = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     private(set) var opens = 0
     let id = "media_1"
     private(set) var captures = 0
-    func takePhoto(invocation: any FunctionInput) throws -> CameraPhotoReceipt {
+    private(set) var delays: [Int?] = []
+    private(set) var trace: [String] = []
+    func takePhoto(delaySeconds: Int?, invocation: any FunctionInput) throws -> CameraPhotoReceipt {
+        if denyOpen { throw CameraControlError.disabled }
         captures += 1
+        delays.append(delaySeconds)
+        trace.append("photo")
         return try CameraPhotoReceipt(previewID: id, width: 640, height: 480)
     }
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
         if enabled {
             opens += 1
+            opening.continuation.yield(())
+            if denyOpen { throw CameraControlError.permissionDenied }
             if let preview { _ = try await preview.waitForPhotoCaptureRotation() }
+            trace.append("openReady")
         }
     }
     func flip(_ facing: CameraActions.Facing, invocation: any FunctionInput) {}
@@ -775,6 +791,7 @@ private actor PhotoFunctionEndpoint: CameraControlCapability {
     let receipt = try JSONDecoder().decode(CameraPhotoReceipt.self, from: Data(valid.value.utf8))
     #expect(receipt.previewID == endpoint.id)
     #expect(await endpoint.captures == 1)
+    #expect(await endpoint.opens == 0)
 }
 
 @Test(.actionCatalog, arguments: ["savePhoto"], [false, true])
@@ -1651,8 +1668,8 @@ func cameraFirstFramePendingDoesNotCaptureOrStartReact() async throws {
         action: false, toolCount: 0, photo: true, camera: camera, handler: { _ in .completed })
     let pump = try await harness.start(
         .init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("拍照")))
-    let deadline = ContinuousClock.now + .seconds(2)
-    while await camera.opens == 0, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(5)) }
+    var opening = camera.opening.stream.makeAsyncIterator()
+    await opening.next()
     #expect(await camera.opens == 1)
     #expect(await camera.captures == 0)
     #expect(await harness.model.requests.count == 1)
@@ -1663,6 +1680,11 @@ func cameraFirstFramePendingDoesNotCaptureOrStartReact() async throws {
         })
     try await pump.value
     #expect(await camera.captures == 1)
+    #expect(await camera.delays == [3])
+    #expect(await camera.trace == ["openReady", "photo"])
+    let records = await harness.scheduler.executionSnapshot().records
+    #expect(records.filter { $0.path.description == "Camera.Capture.open" }.count == 1)
+    #expect(records.filter { $0.path.description == "Camera.Capture.takePhoto" }.count == 1)
     #expect(await harness.model.requests.count == 2)
     await harness.close()
     await ui.stop()
@@ -1822,7 +1844,7 @@ func fullDuplexFreezesEveryQueuedInputInOneRequest() async throws {
     #expect(body.contains("给我介绍北京") && body.contains("明天出行"))
     let system = try #require(request.messages.first)
     #expect(system.role == .system && system.content.hasPrefix("# OUTPUT FORMAT"))
-    #expect(system.content.contains(try AgentPrompts.systemInput()))
+    #expect(system.content.contains(try AgentPrompts.assistantInput()))
     #expect(system.content.contains("respond selectively") && system.content.contains("speech is optional"))
     #expect(!system.content.contains("# RESPONSE CHECK"))
     let turns = try await harness.store.snapshot().current.turns
@@ -2217,4 +2239,28 @@ func multiSourceReadyNativeGroupDoesNotWaitForUnrelatedAction() async throws {
     await harness.close()
     pump.cancel()
     _ = await pump.result
+}
+
+private actor ModelPhotoReadCounter {
+    private(set) var count = 0
+    func read() { count += 1 }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func sameRoundCameraOpenFailureReportsReadinessFailureWithoutCapturingOrRetrying() async throws {
+    let camera = PhotoFunctionEndpoint(denyOpen: true)
+    let harness = try await roundHarness(
+        action: false, toolCount: 0, photo: true, camera: camera, handler: { _ in .completed })
+    let pump = try await harness.start(
+        .init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("打开相机，倒计时三秒拍照")))
+    try await pump.value
+    #expect(await camera.opens == 1)
+    #expect(await camera.captures == 0)
+    #expect(await harness.model.requests.count == 2)
+    let records = await harness.scheduler.executionSnapshot().records.filter { $0.path.domain == "Camera" }
+    #expect(records.count == 2 && records.allSatisfy { $0.phase == .failed })
+    let requests = await harness.model.requests
+    let observations = try #require(requests.last).messages.map(\.content).joined()
+    #expect(observations.contains("permissionDenied") && observations.contains("disabled"))
+    await harness.close()
 }

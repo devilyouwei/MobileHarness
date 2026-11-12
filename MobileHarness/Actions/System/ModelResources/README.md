@@ -45,3 +45,5 @@ ModelResourcesClient and ModelResourceInteractionWorkflow are Actions-owned UI f
 D3 Decision 和 Gemma 在 Agent Brains 共用下载源，分别由模型资源事务管理下载、取消、删除、校验、版本与许可。D3 删除前 quiesce 加入本地调用并卸载。
 
 下载设置保留旧 useLocalDecision 字段供 [Provider 设置](../Provider/README.md) 在升级时读取，保存下载设置时保持旧值。当前 Decision 主来源及备用由 Provider 设置拥有。删除或缺少 D3 时按已提交备用配置处理。
+
+ResourcePresentationAdapter 在校验根接纳与会话后，将小于当前 refreshGeneration 的有效刷新/错误呈现视为已被替代并正常结束；不写 UI、不 acknowledge，不触发二次失败。当前序号仍应用实际快照或错误；无效/未来序号、外来会话和根关闭继续拒绝。Provider 保存事务不受页面刷新替代影响。

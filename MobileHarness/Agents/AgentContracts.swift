@@ -27,26 +27,18 @@ public enum AgentContracts {
                             }
                             try value.validate()
                         }),
-                    CommunicationContract(
-                        name: ReplyActivity.contract, kind: .observation, maximumBytes: 16384,
-                        startsNewWork: true,
-                        validateMessage: { message in
-                            guard let value = message.content(as: ReplyActivity.self) else {
-                                throw CommunicationError.invalidPayload
-                            }
-                            try value.validate()
-                        }),
-                    contract("speech.final"), contract("speech.partial"), contract("speech.phase"),
+                    contract(PerceptionMessage.asrPartialContract, topic: PerceptionMessage.userInputTopic),
+                    contract(PerceptionMessage.asrFinalContract, topic: PerceptionMessage.userInputTopic),
                     contract("sound.source"),
                     contract("vision.pose", maximumBytes: 262_144),
                 ])
         }
     }
     private static func contract(
-        _ name: String, maximumBytes: Int = 16_384, startsNewWork: Bool = false
+        _ name: String, topic: String? = nil, maximumBytes: Int = 16_384, startsNewWork: Bool = false
     ) -> CommunicationContract {
         CommunicationContract(
-            name: name, kind: .observation, maximumBytes: maximumBytes,
+            name: name, kind: .observation, topic: topic, maximumBytes: maximumBytes,
             startsNewWork: startsNewWork,
             validateMessage: { message in
                 guard let value = message.perception, value.contract == name else {

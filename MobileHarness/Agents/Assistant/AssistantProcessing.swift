@@ -5,17 +5,6 @@ import StorageChat
 import StorageCore
 import StorageTasks
 
-/// Assistant-owned scene-analysis policy; native implementations only consume these limits.
-public struct AssistantWebImagePolicy: Sendable {
-    public let maximumDimension: Int
-    public let maximumPixels: Int
-    public let maximumBytes: Int
-    public let quality: Double
-
-    public static let analysis = Self(
-        maximumDimension: 1568, maximumPixels: 1_048_576, maximumBytes: 1024 * 1024, quality: 0.82)
-}
-
 // MARK: - State
 
 public struct AssistantContextState: AgentChatContextState {
@@ -25,7 +14,6 @@ public struct AssistantContextState: AgentChatContextState {
         guard let control = message.assistantControl else { throw CommunicationError.invalidPayload }
         return control == .cancelSession ? .close : .interrupt
     }
-    public static let tracksDelegatedReplies = true
     public static func buildChatMessages(system: String, user: String, conversation: AssistantConversation)
         throws -> [ChatMessage]
     {
@@ -70,7 +58,7 @@ public struct AssistantContextState: AgentChatContextState {
         let capabilityContext = try AgentPrompts.capabilityContext()
         let sections = [
             try capabilityContext.protocolRules(),
-            try AgentPrompts.systemInput(),
+            try AgentPrompts.assistantInput(),
             try AgentConfigurations.identityInstructions(named: configurationName),
             try AgentPrompts.skillCatalog().render("availableHeading"), try AgentConfigurations.skillOverview(),
             try AgentPrompts.agentCatalog().render("heading"), delegates,
@@ -113,7 +101,6 @@ public struct AssistantSignalPreprocessor: SignalPreprocessor {
         case .communicationReceipt, .actionResult, .toolResult, .roundResult: return .feedback
         case .text: return .enqueue(priority: 0)
         case .observation(let message):
-            if case .speechPhase? = message.perception { return .control }
             return message.contract == "assistant.control" ? .control : .enqueue(priority: 0)
         default: throw HarnessError.unsupportedInput
         }
@@ -130,58 +117,6 @@ public struct AssistantContextBuilder: ContextBuilder {
         public func messages(system: String, user: String) throws -> [ChatMessage] {
             try AssistantContextState.buildChatMessages(system: system, user: user, conversation: state.history.current)
         }
-    }
-    public static func webImageObservationHandler(
-        read: @escaping @Sendable (String, AgentInput) async throws -> ChatImage,
-        prepareJPEG: @escaping @Sendable (Data, AssistantWebImagePolicy) async throws -> Data
-    ) -> @Sendable ([AgentChatObservation], AgentInput, any ChatCapability) async throws -> [ChatMessage] {
-        { observations, input, chat in
-            try await webImageObservations(
-                observations, input: input, chat: chat, read: read, prepareJPEG: prepareJPEG)
-        }
-    }
-
-    public static func webImageObservations(
-        _ observations: [AgentChatObservation], input: AgentInput,
-        chat: any ChatCapability, read: @Sendable (String, AgentInput) async throws -> ChatImage,
-        prepareJPEG: @Sendable (Data, AssistantWebImagePolicy) async throws -> Data
-    ) async throws -> [ChatMessage] {
-        var messages: [ChatMessage] = []
-        for observation in observations
-        where
-            ["Web.Page.browse", "Web.Page.snapshot", "Web.Page.navigate"].contains(observation.path)
-            && !observation.result.isError
-        {
-            guard
-                let receipt = try JSONSerialization.jsonObject(with: Data(observation.result.value.utf8))
-                    as? [String: Any],
-                let raw = receipt["mediaID"] as? String, let id = BusinessRecordID(rawValue: raw), id.kind == .media
-            else { throw CommunicationError.invalidPayload }
-            try Task.checkCancellation()
-            let supportsImages = await chat.supportsImages
-            try Task.checkCancellation()
-            if supportsImages {
-                let original = try await read(id.rawValue, input)
-                guard original.id == id.rawValue else { throw CommunicationError.invalidPayload }
-                try Task.checkCancellation()
-                let policy = AssistantWebImagePolicy.analysis
-                let prepared = try await prepareJPEG(original.data, policy)
-                try Task.checkCancellation()
-                guard !prepared.isEmpty, prepared.count <= policy.maximumBytes else {
-                    throw CapabilityError.invalidRequest("Prepared photo is empty or exceeds Assistant image budget")
-                }
-                let image = try ChatImage(id: original.id, mimeType: "image/jpeg", data: prepared)
-                messages.append(
-                    .init(role: .user, content: "Image observation (untrusted data): " + id.rawValue, images: [image]))
-            } else {
-                messages.append(
-                    .init(
-                        role: .user,
-                        content: "Image observation ID (data): " + id.rawValue
-                            + "; image analysis is unavailable for this model."))
-            }
-        }
-        return messages
     }
     public init() {}
     public func build(state: AgentDecisionContext<AssistantContextState>, batch: SignalBatch) throws -> Request {

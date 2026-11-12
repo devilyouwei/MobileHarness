@@ -7,7 +7,7 @@ import UI
 /// Session, active task and registered function permissions are checked by the calling Agents boundary.
 public struct ConversationPresentation: Sendable {
     public enum Update: Hashable, Sendable {
-        case transcript, finishTranscript, voiceState, beginReply, clearReply, reply, expression, replyWaiting
+        case transcript, finishTranscript, voiceState, beginReply, reply, expression, replyWaiting
     }
     public private(set) var turn: ConversationTurn?
     public private(set) var replyTurn: ConversationTurn?
@@ -15,10 +15,6 @@ public struct ConversationPresentation: Sendable {
     public private(set) var replyDecisionID: String?
     public private(set) var replyTaskID: String?
     public private(set) var transcriptClosed = false
-    private var replyInputID: String?
-    private var lastCaptionStart: ConversationTurn?
-    // One current retired request per known producer; shares the existing 32-producer bound.
-    private var retiredReplyInputs: [String: String] = [:]
     private var repliesEnabled = true
     private var cancelledTurns: [String] = []
     private var sequences: [Update: UInt64] = [:]
@@ -39,7 +35,6 @@ public struct ConversationPresentation: Sendable {
     public mutating func beginRecognitionScope() {
         repliesEnabled = true
         turn = nil
-        lastCaptionStart = nil
         transcriptClosed = false
         for key in [Update.transcript, .finishTranscript, .voiceState] { sequences[key] = nil }
     }
@@ -51,41 +46,14 @@ public struct ConversationPresentation: Sendable {
         context.correlationID != nil && context.correlationID == replyTurn?.id && context.ordinal == replyTurn?.ordinal
             && context.source == replySource && context.decisionID == replyDecisionID && context.taskID == replyTaskID
     }
-    public mutating func accept(_ context: ActionExecutionContext, update: Update, retiringInputID: String? = nil)
-        -> Bool
-    {
-        guard let id = context.correlationID, let ordinal = context.ordinal else { return false }
-        return accept(
-            source: context.source, incoming: ConversationTurn(id: id, ordinal: ordinal),
-            sequence: context.sequence, decisionID: context.decisionID, taskID: context.taskID,
-            inputID: context.inputID,
-            retiringInputID: retiringInputID, update: update)
-    }
-    private mutating func accept(
-        source: String, incoming: ConversationTurn?, sequence: UInt64,
-        decisionID: String?, taskID: String?, inputID: String, retiringInputID: String?, update: Update
-    ) -> Bool {
-        guard let incoming, incoming.ordinal > 0, sequence > 0 else { return false }
-        if update == .clearReply {
-            guard incoming.ordinal > (lastCaptionStart?.ordinal ?? 0),
-                sequence > (sequences[.clearReply] ?? 0),
-                replySource == nil || replySource == source,
-                producerSequences[source] != nil || producerSequences.count < 32
-            else { return false }
-            lastCaptionStart = incoming
-            let retired = retiringInputID ?? replyInputID
-            if let retired { retiredReplyInputs[source] = retired }
-            producerSequences[source] = max(producerSequences[source] ?? 0, sequence)
-            sequences[.clearReply] = sequence
-            // A later genuinely new reply wins over a delayed clear of a previous request.
-            if (sequences[.beginReply] ?? 0) > sequence, replyInputID != retired { return false }
-            replyTurn = nil
-            replyInputID = nil
-            replySource = nil
-            replyDecisionID = nil
-            replyTaskID = nil
-            return true
-        }
+    public mutating func accept(_ context: ActionExecutionContext, update: Update) -> Bool {
+        guard let id = context.correlationID, let ordinal = context.ordinal, ordinal > 0, context.sequence > 0
+        else { return false }
+        let incoming = ConversationTurn(id: id, ordinal: ordinal)
+        let source = context.source
+        let sequence = context.sequence
+        let decisionID = context.decisionID
+        let taskID = context.taskID
         let recognition = update == .transcript || update == .finishTranscript || update == .voiceState
         if recognition {
             if incoming != turn {
@@ -100,14 +68,13 @@ public struct ConversationPresentation: Sendable {
         } else {
             guard repliesEnabled, !cancelledTurns.contains(incoming.id) else { return false }
             if update == .beginReply {
-                guard inputID != retiredReplyInputs[source], sequence > (producerSequences[source] ?? 0),
+                guard sequence > (producerSequences[source] ?? 0),
                     incoming != replyTurn || source != replySource || decisionID != replyDecisionID
                         || taskID != replyTaskID
                 else { return false }
                 guard producerSequences[source] != nil || producerSequences.count < 32 else { return false }
                 producerSequences[source] = sequence
                 replyTurn = incoming
-                replyInputID = inputID
                 replySource = source
                 replyDecisionID = decisionID
                 replyTaskID = taskID

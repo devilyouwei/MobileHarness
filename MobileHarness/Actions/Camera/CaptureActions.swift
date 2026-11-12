@@ -50,18 +50,23 @@ extension CameraActions {
     @Action(
         domain: "Camera", module: "Capture", title: "takePhoto",
         doc:
-            "Open or restore the Camera window, prepare photo mode and capture once; return previewID/image evidence. No separate openCamera needed. Keeps the original in temporary memory; does not save to an album.",
-        parameters: [], timeout: .seconds(110))
+            "Capture once from the already open, visible Camera window, preparing photo mode; return previewID/image evidence. If needed, emit openCamera before takePhoto in the same response. Optional delaySeconds sets this shot's countdown without configureCamera. Keeps the original in temporary memory; does not save to an album.",
+        parameters: [
+            .init(
+                "delaySeconds", type: .integer, required: false,
+                description: "Countdown for this photo only; omitted uses the current setting, 0 captures immediately.",
+                constraints: "0...30 seconds")
+        ], timeout: .seconds(50))
     public static func takePhoto(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws
         -> String
     {
-        try ActionArguments(invocation.call.parameters).validateAllowedKeys([])
+        let arguments = ActionArguments(invocation.call.parameters)
+        try arguments.validateAllowedKeys(["delaySeconds"])
+        let delaySeconds =
+            invocation.call.parameters["delaySeconds"] == nil
+            ? nil : try arguments.requiredInt("delaySeconds", range: 0...30)
         try Task.checkCancellation()
-        let receipt = try await CameraCaptureWorkflow.run(
-            invocation: invocation, camera: camera, capture: "takePhoto", timeout: .seconds(50)
-        ) {
-            try await camera.takePhoto(invocation: invocation)
-        }
+        let receipt = try await camera.takePhoto(delaySeconds: delaySeconds, invocation: invocation)
         return String(decoding: try JSONEncoder().encode(receipt), as: UTF8.self)
     }
 
@@ -78,7 +83,7 @@ extension CameraActions {
     @Action(
         domain: "Camera", module: "Capture", title: "open",
         doc:
-            "Present the Camera window and start capture after permission. Wait for the first ready preview. On failure the window remains available for retry.",
+            "Open or restore the Camera preview window after permission, without taking a photo. Wait for the first ready preview; a requested takePhoto can follow in the same response. On failure the window remains available for retry.",
         parameters: [], timeout: .seconds(60))
     public static func open(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws {
         try Task.checkCancellation()

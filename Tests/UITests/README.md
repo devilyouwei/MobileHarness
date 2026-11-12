@@ -229,3 +229,5 @@ WriterRecordPages 值测试覆盖已加载两页后的首次成功标志、末�
 `testDelegationWorkspaceSeparation` opens the delegation list/detail, enters the workspace flow, exhausts its pages, traces a message back to its delegation, and verifies loaded rows remain after returning. Run it with `WRITER_UI_ONLY_TEST=testDelegationWorkspaceSeparation` and the synthetic fixture exported by `writerDelegationAndWorkspaceMessagesHaveImmutableScopes`.
 
 ExecutionLogTests 验证上下角色字幕在不同屏幕高度下保留间隔、范围有界；字幕位置不接受定稿或任务活动输入。
+
+WebPageTests 的原生 WebKit 截图用例同时验证 snapshotIdentity：未挂载时无身份、被动重复读取稳定、显式导航/缩放改变身份、不可用时失效。macOS 原生结果不代替 iOS 触控或真机验收。

@@ -4,7 +4,7 @@ extension WebActions {
     @Action(
         domain: "Web", module: "Page", title: "browse",
         doc:
-            "Open an HTTP/HTTPS URL in a new Web window or navigate an existing Web window. Returns its windowID and untrusted page evidence.",
+            "Open an HTTP/HTTPS URL in a new Web window or navigate an existing Web window. Returns its windowID and untrusted page evidence; a visible capture replaces actions.web.screenshot.",
         parameters: [
             .init("url", type: .string, required: true, description: "Remote HTTP/HTTPS URL."),
             .init(
@@ -15,7 +15,8 @@ extension WebActions {
     }
     @Action(
         domain: "Web", module: "Page", title: "snapshot",
-        doc: "Capture the specified visible Web/Writer window viewport for image analysis.",
+        doc:
+            "Capture the specified visible Web/Writer viewport as the current actions.web.screenshot, replacing the previous image.",
         parameters: [
             .init(
                 "windowID", type: .string, required: false,
@@ -40,7 +41,7 @@ extension WebActions {
     @Action(
         domain: "Web", module: "Page", title: "navigate",
         doc:
-            "Navigate or scroll the specified Web/Writer page (most recent Web window when omitted); return screenshot.",
+            "Navigate or scroll the specified Web/Writer page (most recent Web window when omitted); replace the current actions.web.screenshot.",
         parameters: [
             .init(
                 "windowID", type: .string, required: false,

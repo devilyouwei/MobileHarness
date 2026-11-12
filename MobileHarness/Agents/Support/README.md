@@ -59,12 +59,11 @@ Skill 文档必须显式给出 useInstructions；任务 scope 的 execution 是�
 
 IndependentOutputWorkflow.swift also owns AgentIslandPublication, the shared transport mechanism used by role-owned presentation adapters. It accepts neutral IslandContent or an end intent, retains one immutable in-flight command and one replaceable latest pending command, and uses a stable activity/session identity with monotonically increasing revisions. Gateway execution remains producer-bound; model-visible tools and prompts are unchanged. Failed publication retains bounded evidence and retries the latest state every500ms independently of creative work and peer reporting. Stop closes admission, cancels and joins the worker, then joins one final registered end call before producer retirement; Gateway supplies the call deadline and cleanup failure remains observable. Roles own business phases and terminal fencing; UI owns selection, layout and animation.
 
-ReplyActivity 是独立于回复执行取消的生命周期事实。OutputGateway 在 cancelCalls 的 producer/scope 取消围栏期间仍接纳类型化占用快照，并保留已经进入直接投递的快照；普通 Action、Tool 与其他通信仍按原执行取消规则处理。事实照常经过 producer/incarnation/session、通信契约及接收者权限校验，SpeechPerception 用来源 revision/incarnation 合并占用。此例外不跨越网关关闭或根生命周期准入，也不跳过真实播放清理；用户关闭许可与其他角色占用仍由感知策略保留。
+InputGateway 按投递方式分别校验。广播要求精确订阅，定向消息和运行时反馈要求 inputs。OutputGateway 使用契约注册的主题构造广播元数据。
 
 InputGateway accepts complete Action/Tool value completions without an observation-byte quota; trusted source/session identity, task permissions and result status consistency remain mandatory. Per-agent model context selection is separate from result delivery.
 
-执行记录的内部呈现路径投影包含UI.Caption.clearReply，与print/beginReplyTurn等统一交给UI的
-内部动作过滤器；真实失败仍可见。该分类不改变Action权限、调度或实际执行。
+执行记录将 UI.Caption.print、UI.Caption.beginReplyTurn 等呈现路径归入 UI 内部动作过滤器，真实失败仍可见。权限、调度和实际执行由各自入口校验。
 
 GatewayOutputConsumer区分模型/Agent协议反馈与内部完成结果。executeInternal只接受本注册角色
 声明的internalTools且roundID为空；调用仍经过Gateway的权限、资源和执行验证，真实完成或
@@ -87,3 +86,5 @@ AgentConfigurations 校验 Catalog 索引的 v10 Agent 资源（category、descr
 AgentSkillLoader 共享依赖展开、函数绑定和教学读取。Skill 可声明 owner 限定运行时 Agent ID。共享发现仅列出无 owner 的 Skill，共享 Task/Skill 加载按同一规则校验根 Skill 和依赖。Agent 基础目录按可信配置身份解析；Writer 以自己的身份组合各控制域的 Skill。共享目录也解析 Writer 专属的 Agent.Writer 工具声明，校验 Skill 所有者并为其生成同样的模型参数。Gateway 覆盖检查只要求外部执行入口，本地工具由 Writer 消费。
 
 角色类别从资源进入 AgentConfiguration，再由各角色构造 AgentDescriptor；OutputGateway 复制轮次有效能力时保留 category。只编译函数的 registry 临时配置显式携带 perception 以满足 schema，不注册角色，也不生成分类策略。
+
+AgentBusinessBindings.readWebScreenshot 提供按 scope 读取当前网页图像的中立窄端口。共享 Context/Chat 负责按 Skill 选择与逐请求附件投影，生产者负责单槽图片生命周期；不从 Action 回执回查媒体。

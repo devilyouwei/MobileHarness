@@ -8,6 +8,8 @@ ArtifactsModule 从 WorkspaceActions 的声明表注册独立的 Artifacts.Works
 
 Gateway 的 edit 工具完成表示已创建编辑流，不表示文件已写完或委托已完成。工具入口同时校验原始 sessionID 与 delegateID，续写校验 delegateID/streamID；恢复经 start/resume 创建新会话和新的流身份。Writer 拥有模型与委托生命周期，Actions 拥有实际效果和编辑资源，内容分片无需重复提交 Gateway。
 
+edit 接纳返回 ArtifactEditPreparation。编辑器从同一事务取实际路径、原始指令、项目文件列表或选区与相邻文本，并校验关联文件的版本和范围。Writer 使用这些事实组装内容请求，Actions 管理编辑校验、数据与业务结果。
+
 ArtifactService 跟踪全部工具、追加、完成、中止和截图操作：全局最多八项、零等待队列；每委托最多一个变更操作和一个预览/截图操作，竞争显式 busy。追加由调用者逐次等待形成背压。预览独立于变更通道，返回时只更新仍匹配编辑代次的预览字段，不用旧会话副本覆盖新的写入或完成状态。取消请求会传播到实际任务并等待其退出；非协作依赖仍需真实返回，不能宣称已停。
 
 revoke 立即关闭该委托普通准入并取消在途普通操作，已开始的 abort 只等待、不再次取消。release 合并并发调用，先围栏并加入在途工作，再保存中断草稿、关闭 editor 和释放项目锁。abort 的检查点失败仍尝试关闭流，原始错误和清理错误保留。release 清理失败后服务关闭准入，后续 release/shutdown 继续返回失败。Actions 根调用 shutdown 关闭全部准入、取消/加入普通工作并清理剩余会话，先于依赖的窗口服务关闭。已发生的文件效果不回滚；被取消的工具不得把已落盘内容描述为从未发生。

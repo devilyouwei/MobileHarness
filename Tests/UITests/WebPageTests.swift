@@ -44,6 +44,7 @@ import UI
             let state = try await page.stateSnapshot()
             #expect(state.business["content"] == .text("local"))
             #expect(state.business["url"] == .unknown)
+            #expect(page.snapshotIdentity == nil)
             await #expect(throws: WebPageError.notVisible) { try await page.snapshot() }
             let window = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 480, height: 320),
@@ -57,7 +58,15 @@ import UI
             }
             let bytes = try await page.snapshot()
             #expect(NSImage(data: bytes) != nil)
+            let identity = try #require(page.snapshotIdentity)
+            #expect(page.snapshotIdentity == identity)
+            _ = try await page.navigate("top")
+            #expect(page.snapshotIdentity != nil && page.snapshotIdentity != identity)
+            let navigated = page.snapshotIdentity
+            page.webView.pageZoom = 1.25
+            #expect(page.snapshotIdentity != navigated)
             page.setAvailable(false)
+            #expect(page.snapshotIdentity == nil)
             await #expect(throws: WebPageError.unavailable) { try await page.snapshot() }
             page.close()
             let closed = try await page.stateSnapshot()

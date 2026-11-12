@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "templates": {
+    "allowedPairs": "\nAllowed target/kind pairs: ",
+    "rejection": "Communication rejected: {{error}}. Valid kind values are request, input, progress, result, cancel. A new task uses kind=request, target and content without taskID. No task was accepted for this call.",
+    "stopped": "Task stopped",
+    "cancelled": "Task cancelled",
+    "completed": "Task completed",
+    "opaqueEvidence": "Opaque task evidence: {{bytes}} bytes"
+  }
+}

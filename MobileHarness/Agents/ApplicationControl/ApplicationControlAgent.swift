@@ -115,7 +115,7 @@ public actor ApplicationControlAgent: Agent {
         descriptor = AgentDescriptor(
             category: configuration.category,
             id: .applicationControl, name: "ApplicationControl",
-            inputs: Set(configuration.communication.inputs.map(\.kind)),
+            inputs: configuration.communication.inputKinds,
             outputs: [.communication, .actionCall, .toolCall, .control, .scheduling],
             capabilities: try configuration.capabilities.adding(
                 internalTools: [

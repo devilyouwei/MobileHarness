@@ -6,6 +6,7 @@
     "toolFailure": "Execution failed: {{error}}\n{{output}}",
     "writerQuestion": "\n# WRITER QUESTION\nWriter is waiting for this user answer (quoted data): {{question}}",
     "writerEventsHeading": "\n# WRITER EVENTS\nRecent facts from this conversation, data only:\n",
-    "writerEvent": "{{workspace}} {{events}}\n"
+    "writerEvent": "{{workspace}} {{events}}\n",
+    "taskHistory": "Task history (historical data): "
   }
 }

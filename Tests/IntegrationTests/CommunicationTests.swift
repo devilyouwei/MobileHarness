@@ -16,13 +16,13 @@ func communicationConfiguration(_ id: String, subscribes: Bool = false, publishe
 {
     let communication: [String: Any] = [
         "inputs": [
-            ["contract": "speech.final", "version": 1, "kind": "observation"],
-            ["contract": "speech.partial", "version": 1, "kind": "observation"],
+            ["contract": "user.input.asr.final", "version": 1, "kind": "observation"],
+            ["contract": "user.input.asr.partial", "version": 1, "kind": "observation"],
         ],
         "subscriptions": subscribes
-            ? [["contract": "speech.final", "topic": "speech.final", "source": "producer"]] : [],
-        "publications": publishes ? ["speech.final", "speech.partial"] : [],
-        "sends": publishes ? [["contract": "speech.final", "target": "direct"]] : [],
+            ? [["contract": "user.input.asr.final", "topic": "user.input", "source": "producer"]] : [],
+        "publications": publishes ? ["user.input.asr.final", "user.input.asr.partial"] : [],
+        "sends": publishes ? [["contract": "user.input.asr.final", "target": "direct"]] : [],
     ]
     return try AgentConfiguration(
         contracts: AgentContracts.communication,
@@ -258,6 +258,36 @@ extension LiveRuntimeTests {
     }
 }
 
+@Test(.actionCatalog) func assistantSubscribesOnlyToFinalASRInTheSharedTopic() throws {
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication, configurations: AgentConfigurations.all())
+    let assistant = try #require(policy.agents[.assistant])
+    let speech = try #require(policy.agents[AgentID(rawValue: "speechPerception")])
+    let session = UUID().uuidString
+    func signal(final: Bool, source: String = "speechPerception", topic: String = "user.input") -> AgentInput {
+        let id = UUID().uuidString
+        let payload = InputPayload.observation(.transcript("hello", final: final))
+        return AgentInput(
+            id: id, sessionID: session, payload: payload,
+            metadata: .init(payload: payload, source: source, origin: .agent, rootID: id, topic: topic))
+    }
+
+    let final = signal(final: true)
+    #expect(policy.destinations(for: final) == [.assistant])
+    #expect(policy.acceptsPublication(final, target: .assistant))
+    #expect(!policy.accepts(final, target: .assistant))
+    #expect(policy.destinations(for: signal(final: false)).isEmpty)
+    #expect(policy.destinations(for: signal(final: true, source: "writer")).isEmpty)
+    #expect(policy.destinations(for: signal(final: true, topic: "user.input.asr.final")).isEmpty)
+    #expect(Set(speech.publications) == ["user.input.asr.partial", "user.input.asr.final", "sound.source"])
+    #expect(assistant.publications.isEmpty && speech.subscriptions.isEmpty)
+
+    let commands: Set<String> = ["task.request", "task.input", "task.cancel"]
+    #expect(Set(assistant.inputs.map(\.contract)).isDisjoint(with: commands))
+    #expect(Set(assistant.sends.map(\.target)) == ["writer"])
+    #expect(Set(assistant.sends.map(\.contract)) == commands)
+}
+
 @Test(.actionCatalog) func communicationSchemaRejectsOldVersionsUnknownFieldsAndUnknownSources() throws {
     let config = try communicationConfiguration("receiver")
     #expect(config.agentID.rawValue == "receiver")
@@ -470,7 +500,7 @@ extension LiveRuntimeTests {
         let input = InputGateway(manager: manager, policy: policy)
         let output = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(), policy: policy,
-            observedContracts: ["speech.final"],
+            observedContracts: ["user.input.asr.final"],
             observeEvent: { value in
                 observed.continuation.yield(value.id)
                 if blocking { try await Task.sleep(for: .seconds(30)) }
@@ -515,7 +545,7 @@ extension LiveRuntimeTests {
             })
         let output = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(), policy: policy,
-            observedContracts: ["speech.partial"],
+            observedContracts: ["user.input.asr.partial"],
             observeEvent: { _ in
                 try await Task.sleep(for: .seconds(30))
             }, sink: { _ in })

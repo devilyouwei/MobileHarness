@@ -655,6 +655,7 @@ private func bundledStateSkillIDs() throws -> [String] {
                 "actions": { @Sendable in ActionsStateSnapshot(path: "actions") },
                 "actions.camera": { @Sendable in ActionsStateSnapshot(path: "actions.camera") },
                 "actions.camera.preview": { @Sendable in ActionsStateSnapshot(path: "actions.camera.preview") },
+                "actions.web.screenshot": { @Sendable in ActionsStateSnapshot(path: "actions.web.screenshot") },
                 "actions.robot": { @Sendable in ActionsStateSnapshot(path: "actions.robot") },
                 "actions.robot.motion": { @Sendable in ActionsStateSnapshot(path: "actions.robot.motion") },
             ]

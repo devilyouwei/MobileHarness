@@ -1,3 +1,4 @@
+import Actions
 import AgentCore
 import CoreGraphics
 import Foundation
@@ -199,157 +200,13 @@ func nativeImageCompressionPreservesCompositionAndBounds(size: (Int, Int)) async
     }
 }
 
-actor ModelPhotoReadCounter {
-    private(set) var count = 0
-    func read() { count += 1 }
-}
-
-private struct CompressedPhotoModel: ChatCapability {
-    let availability: CapabilityAvailability = .available
-    var supportsImages = true
-    func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> { throw CancellationError() }
-}
-
-private enum PhotoPreparationTestFailure: Error { case expected }
-
-@Test func assistantWebScreenshotResultsBecomeScopedUntrustedImages() async throws {
-    let input = AgentInput(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("web"))
-    let bytes = try compressionFixture(width: 80, height: 40)
-    for path in ["browse", "snapshot", "navigate"] {
-        let messages = try await AssistantContextBuilder.webImageObservations(
-            [
-                .init(
-                    path: "Web.Page." + path,
-                    result: .init(callID: UUID().uuidString, value: #"{"mediaID":"media_1"}"#))
-            ],
-            input: input, chat: CompressedPhotoModel(),
-            read: { id, received in
-                #expect(received.id == input.id && received.sessionID == input.sessionID)
-                return try ChatImage(id: id, data: bytes)
-            }, prepareJPEG: { data, _ in data })
-        #expect(messages.count == 1)
-        #expect(messages.first?.images?.first?.id == "media_1")
-        #expect(messages.first?.content.contains("untrusted data") == true)
-    }
-}
-
-@Test func assistantWebImagePreparationRejectsErrorsInvalidOutputAndForeignIdentity() async throws {
-    let id = "media_1"
-    let input = AgentInput(
-        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("photo"))
-    let observation = AgentChatObservation(
-        path: "Web.Page.snapshot",
-        result: ToolResult(callID: UUID().uuidString, value: "{\"mediaID\":\"\(id)\"}"))
-    let original = try compressionFixture(width: 80, height: 40)
-    let read: @Sendable (String, AgentInput) async throws -> ChatImage = { id, _ in
-        try ChatImage(id: id, data: original)
-    }
-    await #expect(throws: PhotoPreparationTestFailure.expected) {
-        try await AssistantContextBuilder.webImageObservations(
-            [observation], input: input, chat: CompressedPhotoModel(), read: read,
-            prepareJPEG: { _, _ in throw PhotoPreparationTestFailure.expected })
-    }
-    for output in [Data(), Data(repeating: 1, count: 1024 * 1024 + 1)] {
-        await #expect(throws: CapabilityError.self) {
-            try await AssistantContextBuilder.webImageObservations(
-                [observation], input: input, chat: CompressedPhotoModel(), read: read,
-                prepareJPEG: { _, _ in output })
-        }
-    }
-    await #expect(throws: CommunicationError.invalidPayload) {
-        try await AssistantContextBuilder.webImageObservations(
-            [observation], input: input, chat: CompressedPhotoModel(),
-            read: { _, _ in try ChatImage(id: UUID().uuidString, data: original) },
-            prepareJPEG: { _, _ in
-                Issue.record("A foreign photo must not reach preparation")
-                return original
-            })
-    }
-    let cancelled = Task {
-        try await AssistantContextBuilder.webImageObservations(
-            [observation], input: input, chat: CompressedPhotoModel(), read: read,
-            prepareJPEG: { data, _ in
-                withUnsafeCurrentTask { $0?.cancel() }
-                return data
-            })
-    }
-    await #expect(throws: CancellationError.self) { try await cancelled.value }
-}
-
-@Test func assistantWebImagePreparationSkipsUnsupportedModelsAndNonPhotoResults() async throws {
-    let id = "media_1"
-    let input = AgentInput(
-        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("photo"))
-    let observation = AgentChatObservation(
-        path: "Web.Page.snapshot",
-        result: ToolResult(callID: UUID().uuidString, value: "{\"mediaID\":\"\(id)\"}"))
-    let read: @Sendable (String, AgentInput) async throws -> ChatImage = { _, _ in
-        Issue.record("Skipped observations must not read a photo")
-        throw PhotoPreparationTestFailure.expected
-    }
-    let prepare: @Sendable (Data, AssistantWebImagePolicy) async throws -> Data = { _, _ in
-        Issue.record("Skipped observations must not prepare a photo")
-        throw PhotoPreparationTestFailure.expected
-    }
-    let unavailable = try await AssistantContextBuilder.webImageObservations(
-        [observation], input: input, chat: CompressedPhotoModel(supportsImages: false), read: read,
-        prepareJPEG: prepare)
-    #expect(unavailable.count == 1 && unavailable.first?.images == nil)
-    #expect(unavailable.first?.content.contains("image analysis is unavailable") == true)
-    let ignored = try await AssistantContextBuilder.webImageObservations(
-        [
-            .init(path: "Camera.Capture.savePhoto", result: observation.result),
-            .init(
-                path: "Web.Page.snapshot",
-                result: .init(callID: observation.result.callID, value: "failed", isError: true)),
-        ], input: input, chat: CompressedPhotoModel(), read: read, prepareJPEG: prepare)
-    #expect(ignored.isEmpty)
-}
-
-@Test func modelPhotoUploadUsesReducedBytesWhileStoredOriginalSurvivesReopen() async throws {
-    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: directory) }
-    let input = AgentInput(
-        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("photo"))
-    let owner = StorageOwner(namespace: "photos", source: "assistant", session: input.sessionID, input: input.id)
+@Test func webScreenshotPreparationUsesBoundedAnalysisJPEG() async throws {
     let original = try compressionFixture(width: 4000, height: 3000)
-    let store = try fixtureMediaStore(root: directory)
-    let id = try await store.save(original, owner: owner)
-    let observation = AgentChatObservation(
-        path: "Web.Page.snapshot",
-        result: ToolResult(callID: UUID().uuidString, value: "{\"mediaID\":\"\(id)\"}"))
-    let handler = AssistantContextBuilder.webImageObservationHandler(
-        read: { id, _ in
-            try await ChatImage(id: id, data: store.read(id, owner: owner))
-        },
-        prepareJPEG: { data, policy in
-            #expect(data == original)
-            #expect(policy.maximumDimension == 1568 && policy.maximumPixels == 1_048_576)
-            #expect(policy.maximumBytes == 1024 * 1024 && policy.quality == 0.82)
-            return try await NativeImageCompression.jpeg(
-                from: data,
-                limits: .init(
-                    maximumDimension: policy.maximumDimension, maximumPixels: policy.maximumPixels,
-                    maximumBytes: policy.maximumBytes, quality: policy.quality))
-        })
-    let messages = try await handler([observation], input, CompressedPhotoModel())
-    let attachment = try #require(messages.first?.images?.first)
-    #expect(attachment.id == id && attachment.mimeType == "image/jpeg" && attachment.data != original)
-    let decoded = try preparedImage(attachment.data)
-    #expect(decoded.width * decoded.height <= 1_048_576)
-    let configuration = try OpenAIChatConfiguration(
-        baseURL: try #require(URL(string: "https://example.com/v1")), apiKey: "", model: "gpt-4o")
-    let request = try ChatRequest(
-        messages: messages, context: InferenceContext(requestID: input.id, scopeID: input.sessionID))
-    let http = try configuration.request(request)
-    let body = try #require(http.httpBody)
-    let object = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
-    let wireMessages = try #require(object["input"] as? [[String: Any]])
-    let content = try #require(wireMessages.first?["content"] as? [[String: Any]])
-    let wireImage = try #require(content.first { $0["type"] as? String == "input_image" })
-    let url = try #require(wireImage["image_url"] as? String)
-    #expect(url == "data:image/jpeg;base64," + attachment.data.base64EncodedString())
-    #expect(wireImage["detail"] as? String == "auto")
-    let reopened = try fixtureMediaStore(root: directory)
-    #expect(try await reopened.read(id, owner: owner) == original)
+    let image = try await WebScreenshotImage.prepare(original)
+    #expect(image.data != original && image.data.count <= 1_048_576)
+    #expect(image.width <= 1568 && image.height <= 1568)
+    #expect(image.width * image.height <= 1_048_576)
+    let decoded = try preparedImage(image.data)
+    #expect(decoded.width == image.width && decoded.height == image.height)
+    await #expect(throws: (any Error).self) { try await WebScreenshotImage.prepare(Data()) }
 }

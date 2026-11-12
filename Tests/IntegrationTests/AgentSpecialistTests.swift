@@ -156,51 +156,6 @@ private actor SpecialistPendingModel: ChatCapability {
     await failing.stop()
 }
 
-private actor ReplyActivityProbe {
-    var values: [ReplyActivity] = []
-    var listeningCalls = 0
-    func record(_ output: AgentOutput) {
-        if case .communication(let action) = output,
-            let activity = action.message.content(as: ReplyActivity.self)
-        {
-            values.append(activity)
-        }
-        if case .actionCall(let call) = output, call.actionPath.description == "Speech.Listening.update" {
-            listeningCalls += 1
-        }
-    }
-}
-
-@Test(.actionCatalog, .timeLimit(.minutes(1)))
-func assistantReportsReplyActivityWithoutOwningListening() async throws {
-    let session = UUID().uuidString
-    let root = try AssistantAgent(
-        stateContext: try publicStateFixture(),
-        reportsReplyActivity: true, chat: FixedTextChat(text: ""),
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
-    )
-    try await root.start()
-    let probe = ReplyActivityProbe()
-    let pump = Task {
-        var outputs = FixtureGenerationOutputs(agent: root, observer: { await probe.record($0.output) })
-            .makeAsyncIterator()
-        while try await outputs.next() != nil {}
-    }
-    await #expect(throws: (any Error).self) { try await root.receive(ListeningIntent().input(sessionID: session)) }
-    try await root.receive(AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("hello")))
-    try await specialistEventually {
-        let values = await probe.values
-        return values.contains { !$0.inputs.isEmpty } && values.last?.inputs.isEmpty == true
-    }
-    let values = await probe.values
-    #expect(values.contains { !$0.inputs.isEmpty })
-    #expect(values.last?.inputs.isEmpty == true)
-    #expect(await probe.listeningCalls == 0)
-    await root.stop()
-    try await pump.value
-}
-
 private actor SpecialistRobotModel: ChatCapability {
     nonisolated let availability: CapabilityAvailability = .available
     var requests: [ChatRequest] = []
@@ -485,53 +440,10 @@ private actor ReplyOccupancyBlockedModel: ChatCapability {
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
-func assistantCoalescesQueuedTextOccupancyButAcknowledgesEveryFinalSpeechRoot() async throws {
-    let session = UUID().uuidString
-    let agent = try AssistantAgent(
-        stateContext: try publicStateFixture(), reportsReplyActivity: true, chat: ReplyOccupancyBlockedModel(),
-        context: try AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: AssistantContextState())
-    )
-    try await agent.start()
-    let probe = ReplyActivityProbe()
-    let pump = Task { for await output in agent.outputs { await probe.record(output.output) } }
-    try await agent.receive(.init(id: "first", sessionID: session, payload: .text("Keep first reply occupied")))
-    for index in 0..<8 {
-        try await agent.receive(.init(id: "text-\(index)", sessionID: session, payload: .text("Queued text")))
-    }
-    for root in ["final-one", "final-two"] {
-        let payload = InputPayload.observation(.transcript("Final speech", final: true))
-        try await agent.receive(
-            .init(
-                id: root, sessionID: session, payload: payload,
-                metadata: InputMetadata(
-                    payload: payload, source: "speechPerception", incarnation: "speech-fixture", origin: .agent,
-                    rootID: root)))
-    }
-    // A later non-speech input must not erase the final-speech acknowledgment carried
-    // by newer complete snapshots; the receiver may see only the newest revision.
-    try await agent.receive(.init(id: "later-text", sessionID: session, payload: .text("Queued after speech")))
-    await agent.stop()
-    await pump.value
-    let values = await probe.values
-    let busy = values.filter { !$0.inputs.isEmpty || !$0.tasks.isEmpty }
-    #expect(busy.count == 3)
-    #expect(busy.map(\.acknowledgedRoot) == ["first", "final-one", "final-two"])
-    #expect(values.last?.inputs.isEmpty == true && values.last?.tasks.isEmpty == true)
-    let latest = try #require(values.last)
-    #expect(latest.acknowledgedRoot == "final-two")
-    var listening = SpeechListeningPolicy()
-    listening.enabled = true
-    listening.pendingFinal = "final-two"
-    _ = try listening.accept(latest, source: "assistant", incarnation: "assistant-fixture")
-    #expect(listening.pendingFinal == nil && !listening.paused)
-
-}
-
-@Test(.actionCatalog, .timeLimit(.minutes(1)))
 func directIslandResultMustNotBecomeAssistantInputDuringAReply() async throws {
     let session = UUID().uuidString
     let agent = try AssistantAgent(
-        stateContext: publicStateFixture(), reportsReplyActivity: true, chat: ReplyOccupancyBlockedModel(),
+        stateContext: publicStateFixture(), presentsReply: true, chat: ReplyOccupancyBlockedModel(),
         context: AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: AssistantContextState()))
     let manager = AgentManager()
     try await manager.register(agent)

@@ -56,14 +56,16 @@ CameraControlCapability distinguishes photo setEnabled/flip from setPerceptionEn
 
 ## Capture configuration and movie receipts
 
-CameraCaptureSettings is a complete validated settings value (photo/video mode, countdown, flash, zoom, duration). CameraCaptureSettings.Update carries only provided fields. CameraControlCapability includes partial configure/cancel and typed recording start/wait/stop/save/ignore. Start accepts an optional validated duration override; its domain owner prepares video mode and otherwise preserves current capture preferences. CameraVideoReceipt separates recording, ready, saved and ignored, carrying recordingID, optional mediaID/duration/stopReason/fileName (a display basename, never a file URL). These values contain no native device or UI implementation. Defaults on capability test adapters reject unavailable operations rather than fabricating a recording.
+CameraCaptureSettings is a complete validated settings value (photo/video mode, countdown, flash, zoom, duration). CameraCaptureSettings.Update carries only provided fields. CameraControlCapability includes partial configure/cancel, takePhoto(delaySeconds:invocation:) with an optional per-shot 0…30-second override (nil preserves the configured countdown), and typed recording start/wait/stop/save/ignore. Photo capture does not open the window or persist the override; setEnabled owns opening independently. Start accepts an optional validated duration override; its domain owner prepares video mode and otherwise preserves current capture preferences. CameraVideoReceipt separates recording, ready, saved and ignored, carrying recordingID, optional mediaID/duration/stopReason/fileName (a display basename, never a file URL). These values contain no native device or UI implementation. Defaults on capability test adapters reject unavailable operations rather than fabricating a recording.
 
 
 ArtifactStreaming 是已接纳编辑的宿主续写端口，streamID 与 delegateID 必须匹配；追加施加背压，complete 结束单次写入，snapshot 返回实际渲染图片。revoke 关闭普通准入并请求取消，不等待清理；已开始的 abort 不被它再次取消。abort 保存中断草稿并关闭流，release 是合并并发调用的会话清理屏障：加入在途操作后释放编辑资源，失败保留。恢复必须经工具重新接纳，旧流身份无效。它不包含模型或角色实现；服务容量和根关闭契约见 [Artifacts](../../Artifacts/README.md#执行与续写生命周期)。
 
+ArtifactEditPreparation 是 edit 接纳回执的 Codable 值，包含续写流身份、路径、原始指令、选区与相邻文本或项目文件列表，以及带版本和范围的关联片段。Writer 按自身请求格式呈现这些事实。
+
 ProviderSettings.writerThinking为私有布尔配置，默认false，跨暂存/呈现端口传递，不携带模型枚举或凭据序列化。生产Writer租约策略由Actions业务装配选择。
 
-VoicePresentationHandling的clearReply是独立回复槽操作，由可信调用上下文及可选replyInputID限定；与setTranscript/finishTranscript分离，不把输入开始伪装成回复开始。
+VoicePresentationHandling 分别接收语音转写和回复呈现。setTranscript/finishTranscript 更新转写槽，beginReplyTurn 以可信调用上下文开启回复槽。
 
 ToolResponse preserves complete value results without a generic payload-length rejection. Source/round identity, return policy and completion/report validity remain independent checks.
 
@@ -80,3 +82,5 @@ CameraPhotoCommandReceipt represents a saved preview and optional feedback issue
 ArtifactFilePath 统一 Writer 创建与 Artifacts 文件操作的路径校验。入口仅接受 HTML、Markdown 和纯文本文件路径。
 
 ProviderSettings 的 decisionUsesLocal、decisionProviderID 和 decisionModel 通过私有设置端口共同传输。Decision 云端绑定共享 Provider 稳定身份和凭据，nil ID 与空模型表示云端未配置。旧文档的 nil 模式在恢复时由 Provider 设置服务解析为有效模式。
+
+CameraControlCapability 不承担网页图片读取；Actions.Web 通过同一 MultimodalContextSnapshot 契约提供当前截图，不暴露历史媒体加载接口。

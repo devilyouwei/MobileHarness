@@ -142,8 +142,7 @@ public protocol CameraControlCapability: Sendable {
     func flipPerception(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws
     func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt
     func saveAllPhotos(invocation: any FunctionInput) async throws -> CameraPhotoBatchReceipt
-    func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt
-    func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data
+    func takePhoto(delaySeconds: Int?, invocation: any FunctionInput) async throws -> CameraPhotoReceipt
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws
     func retry(invocation: any FunctionInput) async throws
     func flip(_ facing: CameraActions.Facing, invocation: any FunctionInput) async throws
@@ -215,10 +214,7 @@ extension CameraControlCapability {
     public func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
         throw CameraControlError.unavailable
     }
-    public func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt {
-        throw CameraControlError.unavailable
-    }
-    public func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data {
+    public func takePhoto(delaySeconds: Int?, invocation: any FunctionInput) async throws -> CameraPhotoReceipt {
         throw CameraControlError.unavailable
     }
     public func retry(invocation: any FunctionInput) async throws { try await setEnabled(true, invocation: invocation) }

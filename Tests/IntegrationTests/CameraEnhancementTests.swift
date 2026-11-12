@@ -547,9 +547,10 @@ func recordingConfigurationFailureOrCancellationRollsBackWithoutAudioOrCapture(_
     try await records.shutdown()
 }
 
-/// Deterministic device/window boundary; exercises the real CameraModule and composition, not AVFoundation.
+/// Deterministic device/window boundary; exercises real CameraModule dispatch, not AVFoundation.
 private actor AutomaticCaptureProbe: CameraControlCapability {
     var trace: [String] = []
+    var photoDelays: [Int?] = []
     let denyOpen: Bool
     let failCapture: Bool
     init(denyOpen: Bool = false, failCapture: Bool = false) {
@@ -564,8 +565,9 @@ private actor AutomaticCaptureProbe: CameraControlCapability {
         if denyOpen { throw CameraControlError.permissionDenied }
     }
     func flip(_ facing: CameraActions.Facing, invocation: any FunctionInput) {}
-    func takePhoto(invocation: any FunctionInput) throws -> CameraPhotoReceipt {
+    func takePhoto(delaySeconds: Int?, invocation: any FunctionInput) throws -> CameraPhotoReceipt {
         trace.append("photo")
+        photoDelays.append(delaySeconds)
         if failCapture { throw CameraControlError.busy }
         return try .init(previewID: "media_151", width: 640, height: 480)
     }
@@ -616,16 +618,15 @@ func openingCameraReturnsOnlyCompletionAndPreservesPermissionFailure(_ deny: Boo
     await ui.stop()
 }
 
-@Test(.actionCatalog, arguments: ["photo", "video", "interactiveVideo"], ["success", "openFailure", "captureFailure"])
-func cameraCompositeReturnsOnlyCaptureResultAndStopsOnPreparationFailure(_ kind: String, _ outcome: String) async throws
+@Test(.actionCatalog, arguments: ["video", "interactiveVideo"], ["success", "openFailure", "captureFailure"])
+func recordingCompositeReturnsOnlyCaptureResultAndStopsOnPreparationFailure(_ kind: String, _ outcome: String)
+    async throws
 {
     let camera = AutomaticCaptureProbe(denyOpen: outcome == "openFailure", failCapture: outcome == "captureFailure")
-    let function = kind == "photo" ? "takePhoto" : "startRecording"
-    let parameters =
-        kind == "photo" ? [:] : ["durationSeconds": "10", "waitForCompletion": kind == "video" ? "true" : "false"]
+    let parameters = ["durationSeconds": "10", "waitForCompletion": kind == "video" ? "true" : "false"]
     let input = FunctionInvocation(
         call: .init(
-            actionPath: .init(domain: "Camera", module: kind == "photo" ? "Capture" : "Video", function: function),
+            actionPath: .init(domain: "Camera", module: "Video", function: "startRecording"),
             parameters: parameters),
         context: captureInput().context, executionID: UUID().uuidString, results: ActionReportStore())
     let definition = try #require(CameraModule(camera: camera).definitions.first { $0.path == input.call.actionPath })
@@ -637,14 +638,9 @@ func cameraCompositeReturnsOnlyCaptureResultAndStopsOnPreparationFailure(_ kind:
             Issue.record("Receipt was replaced by child report")
             return
         }
-        if kind == "photo" {
-            #expect(try JSONDecoder().decode(CameraPhotoReceipt.self, from: Data(value.utf8)).previewID == "media_151")
-            #expect(trace == ["open", "photo"])
-        } else {
-            let receipt = try JSONDecoder().decode(CameraVideoReceipt.self, from: Data(value.utf8))
-            #expect(receipt.state == (kind == "video" ? "ready" : "recording"))
-            #expect(trace == (kind == "video" ? ["open", "video:10", "ready"] : ["open", "video:10"]))
-        }
+        let receipt = try JSONDecoder().decode(CameraVideoReceipt.self, from: Data(value.utf8))
+        #expect(receipt.state == (kind == "video" ? "ready" : "recording"))
+        #expect(trace == (kind == "video" ? ["open", "video:10", "ready"] : ["open", "video:10"]))
     } else {
         guard case .report(let report) = completion else {
             Issue.record("Expected step failure report")
@@ -677,4 +673,42 @@ func automaticPhotoModePreservesSettingsAndAvoidsRedundantConfiguration(_ mode: 
     #expect(after.delaySeconds == 3 && after.durationSeconds == 10)
     #expect(await camera.trace == (mode == "video" ? ["video:false", "settings:off:2.0"] : []))
     await ui.stop()
+}
+
+@Test(.actionCatalog, arguments: [nil, 0, 3, 30] as [Int?])
+func photoCountdownForwardsSingleShotOverrideWithoutOpeningOrConfiguring(_ delay: Int?) async throws {
+    let camera = AutomaticCaptureProbe(denyOpen: true)
+    let endpoint = await CameraExecutionEndpoint(
+        camera: camera, rootSessionID: "recording-session", validateSession: { _ in })
+    let definition = try #require(CameraModule(camera: endpoint).definitions.first { $0.path.function == "takePhoto" })
+    let input = captureInput(
+        "takePhoto", parameters: delay.map { ["delaySeconds": String($0)] } ?? [:], module: "Capture")
+    let completion = try await FunctionExecutor.perform(input, definition: definition)
+    guard case .value(let value) = completion else {
+        Issue.record("Missing photo receipt")
+        return
+    }
+    #expect(try JSONDecoder().decode(CameraPhotoReceipt.self, from: Data(value.utf8)).previewID == "media_151")
+    #expect(await camera.trace == ["photo"])
+    #expect(await camera.photoDelays == [delay])
+    #expect(try definition.executionBudget(for: input.call).timeout == .seconds(50))
+}
+
+@Test(.actionCatalog, arguments: ["-1", "31", "1.5", "abc", "", "999999999999999999999999"])
+func photoCountdownRejectsInvalidValuesBeforeAnyEffect(_ delay: String) async throws {
+    let camera = AutomaticCaptureProbe()
+    let definition = try #require(CameraModule(camera: camera).definitions.first { $0.path.function == "takePhoto" })
+    let input = captureInput("takePhoto", parameters: ["delaySeconds": delay], module: "Capture")
+    #expect(throws: (any Error).self) { try definition.validateInput(input) }
+    await #expect(throws: (any Error).self) { _ = try await FunctionExecutor.perform(input, definition: definition) }
+    #expect(await camera.trace.isEmpty)
+}
+
+@Test(.actionCatalog) func photoFailureDoesNotRetryOrImplicitlyOpen() async throws {
+    let camera = AutomaticCaptureProbe(failCapture: true)
+    let definition = try #require(CameraModule(camera: camera).definitions.first { $0.path.function == "takePhoto" })
+    await #expect(throws: CameraControlError.busy) {
+        _ = try await FunctionExecutor.perform(captureInput("takePhoto", module: "Capture"), definition: definition)
+    }
+    #expect(await camera.trace == ["photo"])
 }

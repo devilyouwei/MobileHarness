@@ -4,6 +4,14 @@
 
 ## 当前验收入口
 
+[Writer 提示词与续写上下文](Writer-Resource-Organization.md) 记录模型请求、续写接纳、定向通信与资源打包的验证。
+
+[ASR 用户输入通行](ASR-User-Input.md) 记录片段和最终文本路由、语音本地生命周期及验证范围。
+
+[拍照倒计时与显式打开](Photo-Countdown-And-Explicit-Open.md)：单轮打开/话术/拍照、单次倒计时、参数校验及构建/设备验收边界。
+
+[网页当前截图 State](Web-Screenshot-State.md)：单槽替换、scope、生命周期、共享请求附件、完整检查与原生/真机验收边界。
+
 [Assistant 全双工与 Decision](Assistant-Full-Duplex.md)：整批输入、跨轮执行、分类回退、真实 D3 与音频/UI 验收边界。
 
 [Assistant 内聚语音合成](Assistant-Owned-Speech.md)：内部 FIFO、会话隔离、停止清理、角色资源移除及构建/真机验收边界。
@@ -176,3 +184,5 @@ refactor, Agent-only model recording, current-file recovery and automated/build/
 
 - [D3 Edge Core AI](D3-Edge-CoreAI.md)：本机 Core AI/PyTorch/Swift 对照、全双工文本三分类、性能与实验性发布证据。
 - [Mac 本地 Decision 模型对照](Decision-Model-Mac-Comparison.md)记录 D3、Laya 和 UniMC 在同一组全双工样例上的分类错误与热调用时延。
+
+[资源刷新过期误报](Resource-Refresh-Supersession.md)：保存成功快速离页后的迟到刷新、二次错误提示、失败保留和设备交付证据。

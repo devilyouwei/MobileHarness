@@ -45,3 +45,42 @@
 - `./scripts/check.sh` 退出 1。静态边界、Swift 格式、7 项 Python 测试、plist、188 项 AppWorkflowTests 和 229 项 LiveRuntimeTests 通过。集成阶段的 1151 项中，既有 `task.end` 跨 Channel 用例超时，拍照任务 SQLite 用例报 `.expired`。NativePresentationTests 缺少套件结束记录。日志 `/tmp/mobileharness-system-templates-check.log`。
 - 串行定向复跑 6 项全部通过，覆盖协议与目录、委派权限、Writer 上下文、状态图片和 `task.end` 跨 Channel。日志 `/tmp/mobileharness-system-templates-focused.log`。
 - iPhone 17 Pro 真机签名构建、深层严格签名、39 项 Agent／Skill 资源和 Live Activity 校验通过。覆盖安装后设备清单确认为 `0.1.0 (2026111108)`，安装序号 6688，系统返回启动成功。本次真机验证覆盖安装和启动。日志 `/tmp/mobileharness-device-prompt-2026111108-{build,install,app,launch}.log`。
+
+## 2026-11-11 cognition 提示词资源归属
+
+### 最终范围
+
+提示词资源只供 cognition Agent 使用。System 重命名 Shared，Assistant 输入协议归自身，Assistant/Writer 业务模板按职责拆分；完整固定分类/内容指令使用 Markdown。四个 perception 角色均无提示词文件。Actions 与 ModelKit 的源码、文档及 Package.swift 与本轮修改前一致；Resources/Actions、临时 ModelKit 提示词与两个加载器已撤回，Action 返回协议未改变。现有 Models 非提示词资产不变。
+
+共享协议、目录模板与迁移前源字节一致；Writer Markdown 固定指令在请求组合后保持原文本。模板变量严格校验、用户内容单次插入、时间线来源防伪与角色归属回归通过。Xcode 资源分组与文件目录一致，没有加入本地下载模型文件引用。
+
+### 验证结果
+
+- `./scripts/check.sh` 退出 1。静态架构/资源边界、严格 Swift 格式、7 项 Python 测试及 plist 校验通过。1153 项集成测试仅 `slowTrackingDispatchExecutesOnlyTheNewestPendingTarget` 的第二个目标角度断言失败；该用例及 Photographer/NexArm 实现未在本轮修改。188 项 AppWorkflowTests 与 229 项 LiveRuntimeTests 通过。NativePresentationTests 有启动及部分单项记录，缺少套件结束证据，不能宣称整套通过。日志：`/tmp/mh-cognition-prompts-check.log`。
+- 不改测试期望值，串行定向复跑上述 NexArm 用例、资源归属与字面变量、全部 Agent JSON 打包编译、Writer 格式与重试规则，4 项全部通过。此结果表明失败在本次串行运行未复现，不代替全量检查成功，也不确定其根因。日志：`/tmp/mh-cognition-prompts-focused.log`。
+- `./scripts/build-ios.sh` 首轮主应用编译成功，字节校验检测到构建期间更新的 Skills/README.md 仍为旧副本。复跑后四个目标全部构建成功，最终应用包 52 项 Agent/Skill 资源逐字节校验通过；旧 System 目录及 Actions/ModelKit 提示词 bundle 均不存在，Island 校验通过。最终日志：`/tmp/mh-cognition-prompts-ios-final.log`。
+- Writer 评估脚本的 Writer/Shared 完整资源预检通过；Python 语法、变更文档链接与 `git diff --check` 通过。预检只执行资源检查，没有读取凭据或调用供应商。
+
+### 验收边界
+
+本轮没有真实模型、完整原生 UI、安装或物理设备验收。自动测试使用替身与合成输入；编译和包校验不证明真实模型行为或设备效果。全量测试的 NexArm 失败与 NativePresentationTests 完成证据缺口仍保留，未用定向通过覆盖失败记录。
+
+## 2026-11-11 cognition 提示词版本真机安装
+
+按用户要求，使用现有本地签名配置构建 MobileHarness Debug `0.1.0 (2026111109)` 成功。严格深层签名、52 项 Agent/Skill 资源逐字节校验和 Live Activity 校验通过。覆盖安装到已配对 iPhone 17 Pro 成功，安装序号 6696；设备应用清单读回同一版本。没有卸载或清空应用数据，也未修改仓库签名配置。
+
+自动启动失败：CoreDevice 10002，底层 FBSOpenApplicationErrorDomain 7 / Locked，系统明确表示手机未解锁。此次确认安装和版本，不宣称成功启动、原生交互或真实模型验收。日志 `/tmp/mh-cognition-device-{build,signature,install,launch}.log`，设备回执 `/tmp/mh-cognition-device-{before,install,launch,version}.json`。
+
+该安装包含本轮 cognition 提示词资源迁移；网页截图仍走原有回执观察链路，统一视觉 State 尚未实现，方向记录在需求计划中。
+
+## 2026-11-12 Assistant 同业务资源合并
+
+- Assistant 的提示词文件从 8 个合并为 5 个。核对了迁移字段与原值，主请求输入规则保留原有首尾换行处理后的 809 字节，分类规则保留原有 268 字节及末尾换行。内容核对见 `/tmp/mh-assistant-prompt-merge-content.log`。
+- `./scripts/check.sh` 退出码为 0。IntegrationTests 1,158 项、AppWorkflowTests 194 项、LiveRuntimeTests 229 项均通过，包含模板加载、输入分类、时间线排版、旧历史回放和任务摘要。NativePresentationTests 日志缺少整组结束记录。日志见 `/tmp/mh-assistant-prompt-merge-check.log`。
+- `./scripts/build-ios.sh` 四个目标构建成功。最终包的 49 项 Agent 和 Skill 资源与源码逐字节一致，文件集合校验确认已合并的文件从包中移除，Live Activity 校验通过。日志见 `/tmp/mh-assistant-prompt-merge-ios.log`。
+
+## 2026-11-12 Assistant 信号权限核对
+
+- Assistant 入站删除三项无生产发送方的任务命令，定向任务权限从四个角色收窄为 Writer。生产声明的语音路由测试和跨 Gateway 语音占用测试通过，日志见 `/tmp/mh-assistant-communication-focused.log`。后续单向 ASR 方案另见 [语音完成文本契约](../requirements/technical/ASR-User-Input-Plan.md)。
+- 四个 iOS 构建成功，最终包 49 项资源与源码一致，日志见 `/tmp/mh-assistant-communication-ios.log`。
+- 完整检查退出码 1。IntegrationTests 的 `multiSourceActionResultStartsRequestBeforeOtherActionCompletes` 两个参数组合在并发运行时分类请求计数断言失败，随后串行复跑均通过。AppWorkflowTests 194 项与 LiveRuntimeTests 229 项通过，NativePresentationTests 日志缺少全组结束记录。完整检查和串行日志分别为 `/tmp/mh-assistant-communication-check.log` 和 `/tmp/mh-assistant-communication-serial.log`。

@@ -112,3 +112,5 @@ ApplicationActionAssembly 不再向 Actions 注入 Memory 的历史执行预览�
 ApplicationActionAssembly 传递 Decision 配置读取、分类状态与队列投影闭包。配置快照包含本地模式和可选云端工厂，由 Actions 提供。业务分类在 Agents，原生模型在 ModelKit。
 
 Assistant 会话使用角色自身的 UI.Island 权限发布 Decision 反馈。App 继续装配通用 Gateway 与 UI 渲染端口。
+
+ApplicationActionAssembly 将 ActionsBusinessBindings.readWebScreenshot 直接透传给 AgentBusinessBindings。Actions.Web 拥有当前截图，AgentRuntime 注册 actions.web.screenshot，App 不存储、压缩或解读图片；原 Camera readPhoto 网页桥接已删除。

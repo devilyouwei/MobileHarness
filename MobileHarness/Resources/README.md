@@ -44,7 +44,7 @@ Pinned schema-v2 catalog, metadata/notices staging, privacy declaration and app-
 
 Runtime/server/device acceptance belongs in [validation history](../../docs/validation/Validation-History.md).
 
-Agents packages Agents/, Skills/ and Catalog.json, including the [System input and output protocols and Action catalog templates](Agents/README.md#提示词与模板字段). Models and app assets are independently packaged. The final app resource verifier checks exact source bytes and missing or stale resources in the Agents bundle.
+Agents packages Agents/, Skills/ and Catalog.json, including the [Assistant input protocol, shared output protocol and Action catalog templates](Agents/README.md#提示词与模板字段). Models and app assets are independently packaged. The final app resource verifier checks exact source bytes and missing or stale resources in the Agents bundle.
 
 ## Related design
 
@@ -52,7 +52,7 @@ Agents packages Agents/, Skills/ and Catalog.json, including the [System input a
 
 ## 职责与组织
 
-随 App 打包的 Agent 与 Skill 配置由 Catalog.json 显式索引。Agents 保存 v10 身份、静态类别、角色自有公开 description、私有角色指令、通信契约和 baseSkills。System 协议由 Agents 按固定资源路径读取。Skills 保存 v3 配置、revision、可选的角色归属、流程说明和函数引用。Task 目标作为运行时数据。
+随 App 打包的 Agent 与 Skill 配置由 Catalog.json 显式索引。Agents 保存 v10 身份、静态类别、角色自有公开 description、私有角色指令、通信契约和 baseSkills。共享协议由 Agents 按固定资源路径读取。Skills 保存 v3 配置、revision、可选的角色归属、流程说明和函数引用。Task 目标作为运行时数据。
 
 Actions 独立提供函数实现，FunctionContracts 提供中立元数据。Catalog 是 Agent 与 Skill 定义的唯一索引。
 
@@ -126,3 +126,9 @@ Assistant 的技术诊断输入声明属于 Agents 资源契约；container.fail
 BasicSkill selects eight passive native platform.* State sources alongside UI navigation. Source schemas and native lifetime remain owned by [PlatformKit](../PlatformKit/README.md#native-state-port); [Skill declarations](Skills/README.md#basic-native-state-selection) select reads without starting hardware or granting execution authority.
 
 Assistant 身份只介绍自身。BasicSkill 拥有 start/delegate 平级选择的通用教学；各 Agent.json.description 维护各自用途，加载器按真实适配与实例通信权限生成公开目录。Catalog 不包含 writing；作品查找、打开与创作由 Writer 原生工具拥有。详见 [Skill 契约](Skills/README.md) 与 [角色配置](Agents/README.md)。
+
+## 提示词目录归属
+
+Agents/Shared 保存 cognition Agent 共享协议与目录模板；Agents/<Role> 保存角色身份和按业务拆分的请求模板。完整固定指令用 Markdown，动态插值与具名短模板用 JSON；未细分业务的模板名为 Prompts.json。perception 角色不配置提示词。
+
+本次提示词资源只供 cognition Agent 使用；Shared 是这些 Agent 的共享目录。Actions 的描述、返回值、异常及编辑上下文继续在代码内管理，ModelKit 的适配和预热文本也由内部管理，两者均不依赖提示词资源。现有 Models 下载声明等非提示词资源保持独立职责。资源代码负责读取、校验与排版，权限、排序、选择和执行逻辑留在原模块。

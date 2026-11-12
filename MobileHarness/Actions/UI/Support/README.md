@@ -15,4 +15,4 @@
 
 [所属域设计](../README.md) · [公共契约](../../Support/Contracts/README.md)
 
-UIPresentationCapabilities包含clearReply窄端口；它只转交经过会话验证的回复字幕清理，不执行ASR／播报策略或清除用户转写。
+UIPresentationCapabilities 将转写和回复呈现分别交给对应端口。beginReplyTurn 由会话呈现控制器验证并更新回复字幕槽。

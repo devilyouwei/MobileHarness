@@ -225,7 +225,7 @@ public enum AgentChatContextBuilder {
         value["sourceRequestCount"] = String(compression.sources.count)
         return .init(
             role: .user,
-            content: "Task history (historical data): "
+            content: try AgentPrompts.text("Assistant/Prompts", "taskHistory")
                 + String(
                     decoding: try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]), as: UTF8.self))
     }
@@ -233,7 +233,7 @@ public enum AgentChatContextBuilder {
     public static func messages(
         for invocation: AssistantModelRequest, nativeHistory: Bool = true, templates: PromptTemplates
     ) throws -> [ChatMessage] {
-        let input = AssistantInputBatch.historyText(invocation.input)
+        let input = try AssistantInputBatch.historyText(invocation.input)
         if !nativeHistory {
             let evidence = try invocation.toolCalls.map { call in
                 try templates.render(

@@ -37,9 +37,9 @@ stopListening 先撤销感知许可，再同步停止原生播放、失效采集
 
 beginVideoAudio retains the existing voice generation, blocks listening start/resume and new speech/cue playback, joins microphone.setEnabled(false), then joins full AudioInputOutput.stop and checks cleanupFailure before allowing native recording. Stopping input samples alone does not release the shared native voice owner. The handoff does not cancel the current reply, so a voice-originated recording Action cannot wait for itself. A cancelled pause still joins native cleanup; cleanup failure prevents recording admission. It does not erase user listening intent. endVideoAudio releases the hold and resumes only if the caller remains foreground, the same non-nil generation is current, readiness remains valid, settings are unchanged and reply/playback barriers allow it. User-off, shutdown or background cannot be undone by a late recording completion. A voice owner bound during an existing recording inherits a hold without inventing earlier listening intent. Full stop closes the old native event subscription; actual listening resume binds a new subscription after microphone admission. Cancelled event observers cannot stop the resumed generation. Native microphone ownership is independently enforced by PlatformKit.
 
-系统回声消除输入或共享语音处理图已确认可用时，回复等待/播放不暂停识别，final 回执仅代表接管。supportsFullDuplex 为 false 时保留原半双工暂停/恢复屏障，并显示受限聆听。用户关闭、录像交接、系统中断和根停止仍加入真实停机。
+全双工能力来自已确认启用的回声消除输入。受限路线在实际播放取得准入时暂停识别，末次播放结束或取消加入清理后恢复。恢复校验用户许可、语音代际、录像和播放屏障。感知结束语音识别后自行接纳下一轮。
 
-字幕呈现端口包含独立clearReply，调用ConversationPresentationController验证会话／身份后只清回复槽。正常播放完成及恢复聆听不清用户转写或回复字幕；新的识别轮次由SpeechPerception开启自己的槽，Assistant处理开口控制事实后清自己的槽。原生音频打断／采集与UI字幕生命周期分别完成。
+正常播放完成及恢复聆听保留转写和回复字幕。SpeechPerception 开启下一识别轮次时更新转写槽，回复所有者通过 beginReplyTurn 更新回复槽。ConversationPresentationController 分别校验会话和对应身份。原生音频打断、采集和 UI 字幕各自完成清理。
 
 SpeechListening日志记录策略收到/应用的revision和enabled/paused、播放计数、采集代是否存在、
 恢复调用/返回/提交及取消边界。只有状态与计数公开；既有内容日志仍保持private。日志不改变
@@ -57,6 +57,6 @@ VoiceNativeEffects在首个有效PCM和播放drain/失败清理边界加入activ
 
 VoiceCaptureRecovery 拥有单 worker 和一个合并的最新故障槽；重复事件合并，任一明确不允许重启的事件保留该限制。同一次明确开启最多自动重建一次：先取消并加入事件消费、麦克风、播放及完整原生停止，检查 cleanupFailure，再 openCapture 并经过现有回复/录像屏障恢复。原生恢复等待上限 10 秒，取消后仍加入原生清理；首帧接纳前不显示已恢复。新故障或恢复失败只退役并显示不可用，不能无限重试或自动重放拍照/保存等操作。系统 interruption/routeChanged 不自动重启；PCM interrupted 同样禁止恢复，后续 reset 不能在同一会话解除该限制。
 
-恢复期间暂停的回复或录像完成后才接纳新采集；故障不可用时普通 reply-activity 快照不能绕过 blocked。用户明确 startListening 可以重新建立恢复预算，关闭再开启也可建立新会话。用户关闭、设置切换、shutdown 同步失效恢复并加入 worker，迟到完成不得重新开麦。页面不拥有恢复生命周期。
+恢复等待实际播放或录像释放音频资源，并检查恢复状态。用户明确调用 startListening 可以重新建立恢复预算，关闭再开启也可建立新会话。用户关闭、设置切换和 shutdown 同步撤销恢复并等待 worker 退出。根会话拥有恢复生命周期。
 
 对话请求 preferSpatial=false；startInput 使用捕获代的实际 supportsFullDuplex，页面状态区分系统回声消除、语音回声消除和受限模式；不能只依据配置偏好宣称全双工。原生和端点延迟仍独立于 Decision，不以 UI 状态推定回声消除质量。

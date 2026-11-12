@@ -7,6 +7,8 @@ import StorageFiles
 import Testing
 import UI
 
+@testable import Agents
+
 @Test func webDraftRequiresReadAndUniqueMatchWithoutPartialMutation() throws {
     var draft = try ArtifactDraft(files: ["index.html": "<h1>old</h1>", "style.css": "a a"])
     #expect(throws: ArtifactWorkspaceError.readRequired) { try draft.replace("index.html", old: "old", new: "new") }
@@ -87,6 +89,8 @@ import UI
     var navigation: [String] = []
     var remote: URL?
     var closed = false
+    var identity: String? = UUID().uuidString
+    var snapshotIdentity: String? { closed ? nil : identity }
     init(_ text: String) { self.text = text }
     func loadRemote(_ url: URL) async throws -> WebPageObservation {
         remote = url
@@ -142,7 +146,7 @@ private func webWindowInput(_ command: String, windowID: String? = nil, extra: [
     let service = WebExecutionService(
         windows: windows, pageForWindow: { pages[$0] },
         createPage: { _, _ in throw WebPageError.unavailable }, removePage: { _ in },
-        saveImage: { _, _ in "media_1" })
+        prepareImage: { .init(data: $0, width: 10, height: 10) })
     let result = try await service.perform(
         "inspect", invocation: webWindowInput("inspect", windowID: try #require(windows.reference(for: first))))
     let values = try #require(JSONSerialization.jsonObject(with: Data(result.utf8)) as? [String: Any])
@@ -151,7 +155,7 @@ private func webWindowInput(_ command: String, windowID: String? = nil, extra: [
     #expect(values["url"] == nil)
     let screenshot = try await service.perform(
         "snapshot", invocation: webWindowInput("snapshot", windowID: try #require(windows.reference(for: second))))
-    #expect(screenshot.contains("media_1"))
+    #expect(screenshot.contains("screenshotID") && !screenshot.contains("mediaID"))
     #expect(a.reads == 1 && a.snapshots == 0 && b.snapshots == 1)
     #expect(windows.windows.count == 2)
     await #expect(throws: WindowError.self) {
@@ -184,7 +188,7 @@ private func webWindowInput(_ command: String, windowID: String? = nil, extra: [
         windows: windows, pageForWindow: { pages.pages[$0] },
         createPage: { id, _ in pages.page(id) },
         removePage: { pages.pages.removeValue(forKey: $0)?.close() },
-        saveImage: { _, _ in "media_1" })
+        prepareImage: { .init(data: $0, width: 10, height: 10) })
     func browse(_ url: String) async throws -> (id: UUID, reference: String) {
         let previous = Set(windows.windows.map(\.id))
         let task = Task {
@@ -221,5 +225,200 @@ private func webWindowInput(_ command: String, windowID: String? = nil, extra: [
     #expect(firstPage.closed && !secondPage.closed)
     await service.stop()
     #expect(secondPage.closed)
+    await windows.stop()
+}
+
+@MainActor private func currentWebScreenshotFixture(
+    prepare: @escaping @Sendable (Data) async throws -> WebScreenshotImage = {
+        .init(data: $0, width: 10, height: 10)
+    }
+) async throws -> (WindowState, WebWindowPageProbe, WebExecutionService, String) {
+    let windows = WindowState()
+    windows.layout(width: 390, height: 750)
+    windows.setAvailable(true)
+    let opening = Task { try await windows.present(content: .web, title: "Current screenshot") }
+    let deadline = ContinuousClock.now + .seconds(20)
+    while windows.windows.isEmpty {
+        guard ContinuousClock.now < deadline else { throw WindowError.unavailable }
+        await Task.yield()
+    }
+    let item = try #require(windows.windows.first)
+    windows.complete(item.id, revision: item.revision, generation: windows.generation, success: true)
+    let id = try await opening.value
+    let page = WebWindowPageProbe("Current pixels")
+    let service = WebExecutionService(
+        windows: windows, pageForWindow: { $0 == id ? page : nil },
+        createPage: { _, _ in throw WebPageError.unavailable }, removePage: { _ in page.close() },
+        prepareImage: prepare)
+    return (windows, page, service, try #require(windows.reference(for: id)))
+}
+
+@Test @MainActor func webScreenshotStateKeepsOnlyCurrentImageAndScopesReads() async throws {
+    let (windows, page, service, window) = try await currentWebScreenshotFixture()
+    let firstReceipt = try await service.perform("snapshot", invocation: webWindowInput("snapshot", windowID: window))
+    let first = try service.screenshotSnapshot(scope: "fixture")
+    let firstID = try #require(first.images.first?.id)
+    #expect(first.images.count == 1 && firstReceipt.contains(firstID) && !firstReceipt.contains("mediaID"))
+    #expect(try service.screenshotSnapshot(scope: "foreign").images.isEmpty)
+    #expect(try service.screenshotSnapshot(scope: "fixture").images.first?.id == firstID)
+    #expect(page.snapshots == 1)
+    _ = try await service.perform("inspect", invocation: webWindowInput("inspect", windowID: window))
+    #expect(try service.screenshotSnapshot(scope: "fixture").images.first?.id == firstID)
+    _ = try await service.perform("snapshot", invocation: webWindowInput("snapshot", windowID: window))
+    let second = try service.screenshotSnapshot(scope: "fixture")
+    #expect(second.images.count == 1 && second.images.first?.id != firstID)
+    #expect(!String(decoding: second.facts, as: UTF8.self).contains(firstID))
+    let priorIdentity = page.identity
+    page.identity = UUID().uuidString
+    #expect(try service.screenshotSnapshot(scope: "fixture").images.isEmpty)
+    page.identity = priorIdentity
+    #expect(try service.screenshotSnapshot(scope: "fixture").images.isEmpty)
+    await service.stop()
+    await windows.stop()
+}
+
+@Test @MainActor func webScreenshotStateClearsForWindowLifecycleAndUnavailablePage() async throws {
+    let (windows, page, service, window) = try await currentWebScreenshotFixture()
+    func capture() async throws {
+        _ = try await service.perform("snapshot", invocation: webWindowInput("snapshot", windowID: window))
+        #expect(try service.screenshotSnapshot(scope: "fixture").images.count == 1)
+    }
+    try await capture()
+    try await service.pauseWindow(invocation: webWindowInput("pause", windowID: window))
+    #expect(try service.screenshotSnapshot(scope: "fixture").images.isEmpty)
+    try await capture()
+    page.identity = nil
+    #expect(try service.screenshotSnapshot(scope: "fixture").images.isEmpty)
+    page.identity = UUID().uuidString
+    try await capture()
+    try await service.closeWindow(invocation: webWindowInput("close", windowID: window))
+    #expect(try service.screenshotSnapshot(scope: "fixture").images.isEmpty && page.closed)
+    await service.stop()
+    await windows.stop()
+}
+
+@MainActor private final class WebPreparationProbe {
+    var invalid = false
+    var preparing = false
+    func begin() { preparing = true }
+}
+
+@Test @MainActor func webScreenshotPreparationFailureDropsOldImage() async throws {
+    let probe = WebPreparationProbe()
+    let (windows, _, service, window) = try await currentWebScreenshotFixture { data in
+        .init(data: await probe.invalid ? Data() : data, width: 10, height: 10)
+    }
+    _ = try await service.perform("snapshot", invocation: webWindowInput("snapshot", windowID: window))
+    probe.invalid = true
+    await #expect(throws: WebPageError.snapshotFailed) {
+        try await service.perform("snapshot", invocation: webWindowInput("snapshot", windowID: window))
+    }
+    #expect(try service.screenshotSnapshot(scope: "fixture").images.isEmpty)
+    await service.stop()
+    await windows.stop()
+}
+
+@Test @MainActor func webScreenshotStopJoinsPreparationAndRejectsLateImage() async throws {
+    let probe = WebPreparationProbe()
+    let release = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let (windows, _, service, window) = try await currentWebScreenshotFixture { data in
+        await probe.begin()
+        for await _ in release.stream { break }
+        return .init(data: data, width: 10, height: 10)
+    }
+    let capture = Task {
+        try await service.perform("snapshot", invocation: webWindowInput("snapshot", windowID: window))
+    }
+    let deadline = ContinuousClock.now + .seconds(20)
+    while !probe.preparing {
+        guard ContinuousClock.now < deadline else {
+            capture.cancel()
+            throw WebPageError.timedOut
+        }
+        await Task.yield()
+    }
+    #expect(try service.screenshotSnapshot(scope: "fixture").images.isEmpty)
+    await #expect(throws: WebPageError.busy) {
+        try await service.perform("snapshot", invocation: webWindowInput("snapshot", windowID: window))
+    }
+    await service.stop()
+    release.continuation.finish()
+    await #expect(throws: CancellationError.self) { try await capture.value }
+    #expect(try service.screenshotSnapshot(scope: "fixture").images.isEmpty)
+    await #expect(throws: WebPageError.unavailable) {
+        try await service.perform("snapshot", invocation: webWindowInput("snapshot", windowID: window))
+    }
+    await windows.stop()
+}
+
+@Test @MainActor func webScreenshotStateProjectsOnlyCurrentPixelsAcrossRequests() async throws {
+    let (windows, page, service, window) = try await currentWebScreenshotFixture()
+    let state = AgentStateContext()
+    try state.open(session: "fixture")
+    try state.registerMedia(
+        "actions.web.screenshot", read: { try await service.screenshotSnapshot(scope: $0) }, reset: { _ in })
+    let selected = try AgentConfigurations.skill("web-browsing").useStates
+    #expect(selected.contains("actions.web.screenshot"))
+    // Other UI facts are deliberately unregistered: choose the selected image source only.
+    let sources = selected.filter { $0 == "actions.web.screenshot" }
+    var priorID: String?
+    for turn in 1...2 {
+        _ = try await service.perform("snapshot", invocation: webWindowInput("snapshot", windowID: window))
+        await state.synchronize(session: "fixture", dialog: "dialog_1")
+        let snapshot = try await state.multimodalSnapshot(session: "fixture", names: sources)
+        let id = try #require(snapshot.images.first?.id)
+        #expect(id != priorID && snapshot.images.count == 1)
+        let base = [ChatMessage(role: .user, content: "current page \(turn)")]
+        for supported in [true, false] {
+            let projection = try AgentChatContextBuilder.applyingStateImages(
+                snapshot.images, to: base, user: base[0].content, supportsImages: supported)
+            let request = try ChatRequest(messages: projection.messages)
+            #expect(request.messages.count == 1 && request.messages[0].content == base[0].content)
+            #expect(request.messages.flatMap { $0.images ?? [] }.map(\.id) == (supported ? [id] : []))
+            #expect(projection.manifest?.contains("actions.web.screenshot") == true)
+            #expect(projection.manifest?.contains(supported ? "attached" : "unsupported") == true)
+            if let priorID { #expect(projection.manifest?.contains(priorID) == false) }
+            if supported {
+                let audit = try AgentModelRequestRecording(request).snapshot().requestJSON
+                #expect(audit.contains(id))
+                #expect(audit.contains(snapshot.images[0].data.base64EncodedString()))
+            }
+        }
+        #expect(base[0].images == nil)
+        #expect(try await state.multimodalSnapshot(session: "fixture", names: []).images.isEmpty)
+        #expect(try await state.multimodalSnapshot(session: "fixture", names: sources).images.first?.id == id)
+        priorID = id
+    }
+    #expect(page.snapshots == 2)
+    try await service.pauseWindow(invocation: webWindowInput("pause", windowID: window))
+    #expect(try await state.multimodalSnapshot(session: "fixture", names: sources).images.isEmpty)
+    await service.stop()
+    await windows.stop()
+}
+
+@Test @MainActor func webScreenshotChangedPageRejectsLatePreparedPixels() async throws {
+    let probe = WebPreparationProbe()
+    let release = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let (windows, page, service, window) = try await currentWebScreenshotFixture { data in
+        await probe.begin()
+        for await _ in release.stream { break }
+        return .init(data: data, width: 10, height: 10)
+    }
+    let capture = Task {
+        try await service.perform("snapshot", invocation: webWindowInput("snapshot", windowID: window))
+    }
+    let deadline = ContinuousClock.now + .seconds(20)
+    while !probe.preparing {
+        guard ContinuousClock.now < deadline else {
+            capture.cancel()
+            throw WebPageError.timedOut
+        }
+        await Task.yield()
+    }
+    page.identity = UUID().uuidString
+    release.continuation.finish()
+    await #expect(throws: WebPageError.unavailable) { try await capture.value }
+    #expect(try service.screenshotSnapshot(scope: "fixture").images.isEmpty)
+    await service.stop()
     await windows.stop()
 }

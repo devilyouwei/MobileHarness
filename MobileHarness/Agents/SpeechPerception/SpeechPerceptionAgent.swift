@@ -49,7 +49,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     private func refreshIsland() async {
         let visible =
             lifecycle == .running && mode == .speechAndSoundSource && captureOpen
-            && (!residentListening || listeningPolicy.enabled) && (!awaitingReply || phase == .processing)
+            && (!residentListening || listeningPolicy.enabled) && (!recognitionSuspended || phase == .processing)
         let content: IslandContent?
         if !visible {
             islandListeningStart = nil
@@ -86,7 +86,8 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     private var lastSequence: UInt64?
     private var lastTimestamp: TimeInterval?
     private var processed = 0
-    private var awaitingReply = false
+    private var recognitionSuspended = false
+    private var playbackAdmission = UUID()
     private var activeInput: AgentInput?
     private var currentTurn: AgentTurn?
     private var turnOrdinal: UInt64 = 0
@@ -134,7 +135,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         descriptor = AgentDescriptor(
             category: configuration.category,
             id: configuration.agentID, name: "Speech Perception",
-            inputs: Set(configuration.communication.inputs.map(\.kind)),
+            inputs: configuration.communication.inputKinds,
             outputs: mode == .speechAndSoundSource
                 ? [.communication, .actionCall, .toolCall, .control] : [.communication, .control],
             capabilities: try mode == .speechAndSoundSource
@@ -202,7 +203,8 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     public func acquirePlaybackAdmission() async -> Bool {
         if listeningPolicy.fullDuplex { return lifecycle == .running }
         guard lifecycle == .running, !isUtteranceActive() else { return false }
-        awaitingReply = true
+        playbackAdmission = UUID()
+        recognitionSuspended = true
         await refreshIsland()
         traceListening("playback.acquired")
         return true
@@ -212,21 +214,23 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     }
     private func traceListening(_ point: String) {
         let value =
-            "perception.\(point) enabled=\(listeningPolicy.enabled) paused=\(listeningPolicy.paused) pendingFinal=\(listeningPolicy.pendingFinal != nil) occupiedSources=\(listeningPolicy.activities.values.filter(\.occupied).count) capture=\(captureOpen) awaiting=\(awaitingReply) nativeProcessing=\(nativeProcessing) phase=\(phase.rawValue)"
+            "perception.\(point) enabled=\(listeningPolicy.enabled) capture=\(captureOpen) awaiting=\(recognitionSuspended) nativeProcessing=\(nativeProcessing) phase=\(phase.rawValue)"
         Logger(subsystem: "dev.mobileharness", category: "SpeechListening").notice("\(value, privacy: .public)")
     }
     public func resumeListening() async throws {
         traceListening("resume.begin")
         defer { traceListening("resume.end") }
-        guard lifecycle == .running, awaitingReply else { return }
-        guard !residentListening || (captureOpen && listeningPolicy.enabled && !listeningPolicy.paused) else { return }
-        // Wait for final publication to finish before resetting its ASR/VAD state.
+        guard lifecycle == .running, recognitionSuspended else { return }
+        guard !residentListening || (captureOpen && listeningPolicy.enabled) else { return }
+        let admission = playbackAdmission
+        // Wait for the current native packet before resetting its ASR/VAD state.
         try await joinNativePacket()
         traceListening("resume.joined")
+        guard admission == playbackAdmission else { return }
         guard lifecycle == .running else { throw HarnessError.notRunning }
-        guard !residentListening || (captureOpen && listeningPolicy.enabled && !listeningPolicy.paused) else { return }
+        guard !residentListening || (captureOpen && listeningPolicy.enabled) else { return }
         guard let activeInput else {
-            awaitingReply = false
+            recognitionSuspended = false
             phase = .listening
             await refreshIsland()
             return
@@ -234,8 +238,8 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         traceListening("resume.reset.begin")
         try await resetListening(after: activeInput)
         traceListening("resume.reset.end")
-        guard !awaitingReply else { return }
-        try await transition(to: .listening, input: activeInput, publish: false)
+        guard !recognitionSuspended else { return }
+        try await transition(to: .listening, input: activeInput)
     }
     public func stop() async {
         listeningAdmissionEpoch = UUID()
@@ -260,9 +264,9 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     func setCaptureDuplex(_ enabled: Bool) {
         listeningPolicy.fullDuplex = enabled
         if enabled {
-            awaitingReply = false
+            recognitionSuspended = false
         } else if residentListening {
-            awaitingReply = !captureOpen || !listeningPolicy.enabled || listeningPolicy.paused
+            recognitionSuspended = !captureOpen || !listeningPolicy.enabled
         }
     }
     public func openCapture(sessionID: String) async throws {
@@ -273,7 +277,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         guard lifecycle == .running, listeningPolicy.enabled else { throw HarnessError.notRunning }
         self.sessionID = sessionID
         captureOpen = true
-        awaitingReply = listeningPolicy.paused
+        recognitionSuspended = false
         phase = .listening
         await refreshIsland()
         prepareRecognitionTurn()
@@ -313,9 +317,6 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
                 generation == nil || generation == input.metadata.generation
             else { throw CommunicationError.scopeClosed }
             listeningPolicy.enabled = intent.enabled ?? !listeningPolicy.enabled
-            if !listeningPolicy.enabled {
-                listeningPolicy.pendingFinal = nil
-            }
         } else if message.contract == SpeechCaptureEnded.contract {
             guard input.metadata.origin == .local, input.metadata.source == "phone.microphone",
                 let ended = message.content(as: SpeechCaptureEnded.self)
@@ -323,25 +324,8 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             try await prepareSignal(input)
             guard ended.revision == listeningPolicy.revision, listeningPolicy.enabled else { return }
             listeningPolicy.enabled = false
-            listeningPolicy.pendingFinal = nil
         } else {
-            guard input.metadata.origin == .agent, let incarnation = input.metadata.incarnation,
-                let activity = message.content(as: ReplyActivity.self),
-                ["assistant", "photographer", "memory", "applicationControl"].contains(input.metadata.source)
-            else { throw CommunicationError.unauthorized }
-            try activity.validate()
-            try await prepareSignal(input)
-            let wasPaused = listeningPolicy.paused
-            let wasEnabled = listeningPolicy.enabled
-            guard try listeningPolicy.accept(activity, source: input.metadata.source, incarnation: incarnation) else {
-                return
-            }
-            traceListening("policy.received")
-            // A newer occupancy receipt advances its source fence, not necessarily device policy.
-            // In particular, off -> cancel reply -> idle receipt must not enqueue another off.
-            // Occupancy alone must never turn an off microphone into a cancel-reply command.
-            guard wasEnabled || listeningPolicy.enabled else { return }
-            guard listeningPolicy.paused != wasPaused || listeningPolicy.enabled != wasEnabled else { return }
+            throw CommunicationError.unsupportedContract
         }
         traceListening("policy.accept")
         try await applyListeningPolicy(parent: input)
@@ -357,13 +341,13 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
                 payload: payload, source: "speechPerception", origin: .agent,
                 rootID: parent.metadata.rootID, parentID: parent.id, generation: parent.metadata.generation))
         // Close the Agent gate synchronously when no confirmed utterance must finish first.
-        if !listeningPolicy.enabled || listeningPolicy.paused, !isUtteranceActive() {
-            awaitingReply = true
+        if !listeningPolicy.enabled, !isUtteranceActive() {
+            recognitionSuspended = true
         }
         try emit(
             .actionCall(
                 Self.listeningAction.call([
-                    "enabled": String(listeningPolicy.enabled), "paused": String(listeningPolicy.paused),
+                    "enabled": String(listeningPolicy.enabled), "paused": "false",
                     "revision": String(listeningPolicy.revision),
                 ])), input: command)
         try emit(.control("agent.finished"), input: command)
@@ -380,12 +364,11 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         listeningAdmissionEpoch = UUID()
         listeningPolicy.enabled = enabled
         if !enabled {
-            listeningPolicy.pendingFinal = nil
-            awaitingReply = true
+            recognitionSuspended = true
         }
         listeningPolicy.revision += 1
         let policy = SpeechActions.ListeningPolicy(
-            enabled: listeningPolicy.enabled, paused: listeningPolicy.paused, revision: listeningPolicy.revision)
+            enabled: listeningPolicy.enabled, paused: false, revision: listeningPolicy.revision)
         await refreshIsland()
         return policy
     }
@@ -398,7 +381,6 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         listeningAdmissionEpoch = UUID()
         let wasEnabled = listeningPolicy.enabled
         listeningPolicy.enabled = false
-        listeningPolicy.pendingFinal = nil
         guard wasEnabled else { return }
         let context = ProcessingContext(sessionID: sessionID, source: "runtime")
         try await applyListeningPolicy(parent: context.input(.event("listening.revoked")))
@@ -433,7 +415,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
 
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
         if case .observation(let message) = input.payload,
-            [ListeningIntent.contract, ReplyActivity.contract, SpeechCaptureEnded.contract].contains(message.contract)
+            [ListeningIntent.contract, SpeechCaptureEnded.contract].contains(message.contract)
         {
             guard !input.metadata.expired else { throw CommunicationError.expired }
             try await receiveListening(input, message: message)
@@ -465,13 +447,12 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         guard case .audio(let audio) = input.payload else { throw HarnessError.unsupportedInput }
         guard
             !residentListening
-                || (captureOpen && input.sessionID == sessionID && listeningPolicy.enabled
-                    && (!listeningPolicy.paused || isUtteranceActive()))
+                || (captureOpen && input.sessionID == sessionID && listeningPolicy.enabled)
         else {
             throw CapabilityError.inputBusy
         }
         // The domain policy gates new capture independently of native playback barriers.
-        guard !awaitingReply else { throw CapabilityError.inputBusy }
+        guard !recognitionSuspended else { throw CapabilityError.inputBusy }
         guard lastSequence.map({ audio.sequence > $0 }) ?? true,
             lastTimestamp.map({ audio.timestamp >= $0 }) ?? true
         else { throw CommunicationError.outOfOrder }
@@ -527,9 +508,9 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     func admitsMicrophone(sessionID: String) throws -> Bool {
         guard lifecycle == .running else { throw HarnessError.notRunning }
         guard sessionID == self.sessionID else { throw CommunicationError.scopeClosed }
-        return !awaitingReply
+        return !recognitionSuspended
             && (!residentListening
-                || (captureOpen && listeningPolicy.enabled && (!listeningPolicy.paused || isUtteranceActive())))
+                || (captureOpen && listeningPolicy.enabled))
     }
     func bindMicrophoneGeneration(_ generation: String?) {
         nativeCaptureGeneration = generation
@@ -557,8 +538,8 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         guard lifecycle == .running || lifecycle == .paused, let parent = activeInput else {
             throw CancellationError()
         }
-        try await communicate(.transcript(text, final: false), parent: parent)
         try presentTranscript(text, input: parent)
+        try await communicate(.transcript(text, final: false), parent: parent)
     }
     private func presentTranscript(_ text: String, input: AgentInput) throws {
         try Task.checkCancellation()
@@ -575,32 +556,39 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         try emit(.toolCall(call), input: input)
         try emit(.control("agent.finished"), input: input)
     }
-    /// Owns phase state, presentation and optional observation as one explicit transition.
+    /// Owns recognition phase and its local presentation.
     private func transition(
-        to next: SpeechPhase, input: AgentInput, publish: Bool = true, present: Bool = true
+        to next: SpeechPhase, input: AgentInput, present: Bool = true
     ) async throws {
-        // Empty is a published outcome, not a persistent capture mode.
+        // Empty ends the current turn and returns capture to listening.
         let storedPhase = next == .empty ? SpeechPhase.listening : next
         try await contextRepository.update {
             $0.state.phase = storedPhase.rawValue
             if next == .speaking { $0.state.utteranceCount += 1 }
             try $0.append(
-                .init(taskID: input.turn?.id, kind: "speech.phase", data: Data(next.rawValue.utf8)),
+                .init(taskID: input.turn?.id, kind: "recognition.phase", data: Data(next.rawValue.utf8)),
                 retainingLast: SpeechPerceptionSignalPreprocessor.evidenceCapacity)
         }
         phase = storedPhase
         await refreshIsland()
         if present { try presentPhase(next, input: input) }
-        if publish { try await communicate(.speechPhase(next), parent: input) }
     }
     private func resetListening(after input: AgentInput) async throws {
+        let captureSession = sessionID
+        let captureGeneration = nativeCaptureGeneration
+        let admission = playbackAdmission
         soundEstimator.reset()
         soundLayout = nil
         soundRate = nil
         await resampler.reset()
         try await segmenter?.reset()
+        try Task.checkCancellation()
+        guard lifecycle == .running, sessionID == captureSession, nativeCaptureGeneration == captureGeneration else {
+            throw CancellationError()
+        }
         prepareRecognitionTurn()
-        awaitingReply = residentListening && (!captureOpen || !listeningPolicy.enabled || listeningPolicy.paused)
+        recognitionSuspended =
+            admission != playbackAdmission || (residentListening && (!captureOpen || !listeningPolicy.enabled))
         activeInput = input
     }
     // MARK: - Inline native packet processing
@@ -661,7 +649,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
                     samples: Array(mono[offset..<min(offset + 8192, mono.count)]),
                     sampleRate: audio.sampleRate, sequence: audio.sequence))
             for packet in packets {
-                guard !awaitingReply else { break }
+                guard !recognitionSuspended else { break }
                 let frame = try AudioFrame(
                     data: packet.samples.withUnsafeBytes { Data($0) },
                     format: AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32),
@@ -722,35 +710,26 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     private func finishUtterance(
         input: AgentInput, recognitionTurn: SpeechRecognitionTurn
     ) async throws {
-        awaitingReply = true
+        recognitionSuspended = true
+        phase = .processing
         soundEstimator.reset()
         if soundLayout == .firstOrderAmbisonicsACNSN3D, case .audio(let audio) = input.payload {
             enqueueSound(
                 .init(state: .inactive, timestamp: audio.timestamp, duration: 0), parent: input,
                 capturedAt: audio.capturedAt)
         }
-        // Buffered post-endpoint audio belongs to the explicitly suppressed reply interval.
+        // Keep the current turn closed while the recognizer seals its final text.
         try await transition(to: .processing, input: input)
         let text = try await recognitionTurn.finish()
         try Task.checkCancellation()
         try emit(.toolCall(Self.transcript.call(["text": String(text.suffix(320))])), input: input)
         try emit(.toolCall(Self.finishTranscript.call([:])), input: input)
         try emit(.control("agent.finished"), input: input)
-        if text.isEmpty {
-            try await resetListening(after: input)
-            try await transition(to: .empty, input: input)
-            return
+        if !text.isEmpty {
+            try await communicate(.transcript(text, final: true), parent: input)
         }
-        phase = .listening
-        await refreshIsland()
-        if residentListening {
-            listeningPolicy.pendingFinal = input.metadata.rootID
-            traceListening("final.pending")
-            try await applyListeningPolicy(parent: input)
-        }
-        try await communicate(.transcript(text, final: true), parent: input)
-        if listeningPolicy.fullDuplex { try await resetListening(after: input) }
-        // The reply producer reports occupancy; no subscriber receipt is expected.
+        try await resetListening(after: input)
+        try await transition(to: text.isEmpty ? .empty : .listening, input: input, present: !recognitionSuspended)
     }
     private func reportError(_ error: any Error, input: AgentInput) {
         outputSequence += 1
@@ -768,15 +747,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         let failedGeneration = nativeCaptureGeneration
         let failedRecognition = recognitionTurn
         let failedSegmenter = segmenter
-        if let activeInput = failedInput {
-            reportError(error, input: activeInput)
-            if listeningPolicy.pendingFinal == activeInput.metadata.rootID {
-                listeningPolicy.pendingFinal = nil
-                do { try await applyListeningPolicy(parent: activeInput) } catch {
-                    reportError(error, input: activeInput)
-                }
-            }
-        }
+        if let failedInput { reportError(error, input: failedInput) }
         await failedRecognition?.cancel()
         await failedSegmenter?.cancel()
         guard lifecycle == .running, sessionID == failedSession, nativeCaptureGeneration == failedGeneration else {
@@ -788,7 +759,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             return
         }
         soundEstimator.reset()
-        awaitingReply = residentListening && (!captureOpen || !listeningPolicy.enabled || listeningPolicy.paused)
+        recognitionSuspended = residentListening && (!captureOpen || !listeningPolicy.enabled)
         phase = .listening
         await refreshIsland()
         prepareRecognitionTurn()
@@ -799,9 +770,8 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             try emit(.control("agent.finished"), input: failedInput)
         } catch { reportError(error, input: failedInput) }
         do {
-            // Complete the failed recognition binding as well as its visible processing state.
-            // Revoked consent or reply occupancy must never be presented as active listening.
-            try await transition(to: .empty, input: failedInput, present: !awaitingReply)
+            // Close the failed recognition and publish its local presentation state.
+            try await transition(to: .empty, input: failedInput, present: !recognitionSuspended)
         } catch { reportError(error, input: failedInput) }
     }
 
@@ -869,7 +839,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
 
     private func communicate(_ message: AgentMessage, parent: AgentInput) async throws {
         var parent = parent
-        if let interactionSessionID, ["speech.final", "speech.phase"].contains(message.contract) {
+        if let interactionSessionID, message.contract == PerceptionMessage.asrFinalContract {
             parent = AgentInput(
                 id: parent.id, sessionID: interactionSessionID, payload: parent.payload,
                 metadata: parent.metadata, turn: parent.turn, taskScope: parent.taskScope)

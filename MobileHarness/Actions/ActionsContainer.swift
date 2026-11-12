@@ -14,7 +14,7 @@ import Foundation
         var children: [ActionsStateSnapshot.Reference] = []
         #if os(iOS)
             if #available(iOS 27, *), businessOwner is ActionsBusinessAssembly {
-                children = [.init(path: "actions.camera"), .init(path: "actions.robot")]
+                children = [.init(path: "actions.camera"), .init(path: "actions.robot"), .init(path: "actions.web")]
             }
         #endif
         return ActionsStateSnapshot(

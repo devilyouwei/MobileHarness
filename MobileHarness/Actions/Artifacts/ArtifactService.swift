@@ -303,7 +303,7 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
             let rawRefs = (args["contextReferences"] ?? "").split(separator: ",").map {
                 $0.trimmingCharacters(in: .whitespaces)
             }
-            let related = try await session.editor.relatedContext(rawRefs)
+            let related = try await session.editor.relatedFiles(rawRefs)
             let lower = try optionalInteger(args, "start")
             let upper = try optionalInteger(args, "end")
             let base = await session.editor.snapshot()
@@ -321,11 +321,8 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
             session.rendered = false
             sessions[delegateID] = session
             if let title = args["title"] { try await describe(session.id, title, nil) }
-            let context = try await session.editor.context(for: id) + related
-            return try encode([
-                "streamID": id.uuidString, "instruction": "File: \(path)\n\(instruction)",
-                "context": context,
-            ])
+            return try await encode(
+                session.editor.preparedEdit(for: id, instruction: instruction, relatedFiles: related))
         case "replace":
             guard let path = args["path"], let raw = args["reference"], let reference = Optional(raw),
                 let old = args["oldText"], let new = args["newText"]

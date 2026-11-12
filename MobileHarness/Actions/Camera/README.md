@@ -39,7 +39,7 @@ CameraCoordinator owns native demand/leases; CameraPhotoSession joins capture an
 | close | 无 | 直接清理临时照片并关闭窗口后返回 operation/enabled；60 秒 |
 | flip | facing=front/back | 注入镜头切换完成后返回 operation/facing；默认 30 秒 |
 | retry | 无 | 等待端点重试完成，Void/completed；默认 30 秒 |
-| takePhoto | none | JSON: previewID, width, height, mimeType; 110 seconds including open/countdown/capture |
+| takePhoto | optional delaySeconds 0…30 | JSON: previewID, width, height, mimeType; 50 seconds including countdown/capture |
 | savePhoto | previewID | JSON: saved, previewID, mediaID, alreadySaved, optional feedbackIssues; 60 seconds |
 | saveAllPhotos | 无 | JSON: saved, failures, optional feedbackIssues；120 秒 |
 | configure | mode、delaySeconds、flash、zoom、durationSeconds | 仅应用传入字段，保留其余当前设置；成功为 Void/completed；默认 30 秒 |
@@ -49,13 +49,13 @@ CameraCoordinator owns native demand/leases; CameraPhotoSession joins capture an
 All entries reject unknown parameters. Single-photo disposition requires an exact previewID, at most 64 bytes. Native work owns cancellation/cleanup; committed saves are not undone by presentation failure.
 
 ## 数据流与失败边界
-函数等待真实端点结果后编码回执，不推断模型就绪或物理效果。close 的 enabled 来自已完成的目标操作，flip 的 facing 来自已完成的目标选择；这些不是额外原生状态查询。预览像素通过类型化 State 附件传输；选择绑定可信调用 session，不接受模型提供 scope。Web 截图的持久媒体读取仍验证 source/session/input，不作为普通字符串参数传输。
+函数等待真实端点结果后编码回执，不推断模型就绪或物理效果。close 的 enabled 来自已完成的目标操作，flip 的 facing 来自已完成的目标选择；这些不是额外原生状态查询。预览像素通过类型化 State 附件传输；选择绑定可信调用 session，不接受模型提供 scope。网页截图由 Actions.Web 自行维护单张当前 State，相机不提供网页媒体读取端口。
 
 cancelCapture 加入倒计时取消后返回 Void。倒计时状态由相机状态提供，异常走原执行结果链。
 
 Disposition works by cached preview identity, including non-displayed images. Save returns a durable mediaID and optional feedback issues; repeated committed saves return alreadySaved. Batch save snapshots all pending entries in the current session and holds the same single disposition slot across the operation. Per-photo errors leave pending originals and return alongside successful media IDs. Retrying the batch writes only remaining pending photos. One feedback cue follows a batch that committed at least one photo.
 
-takePhoto/startRecording 在同一父调用内复用 canonical open 子Action：窗口关闭时打开、最小化时恢复、已打开时聚焦并复用原生采集；确认后才进入拍摄。前置失败后将拍摄标记notStarted，不自动重试或丢弃媒体；成功子报告不能覆盖最终照片／录像JSON。open仍可单独使用以只预览。子步骤不重新进入Gateway，不产生中间ReAct。takePhoto在需要时切photo并保留已有zoom/flash/delay/duration，配置失败加入回滚。
+open 独立负责打开、恢复、聚焦窗口并等待预览就绪，不拍照。takePhoto 只使用已经打开、可见且具备采集权限的相机，不隐式打开或恢复；入口和倒计时后的采集检查要求 lensOwner=capture，最小化或遮挡时拒绝拍照；需要时切 photo 并保留已有 zoom/flash/delay/duration，配置失败加入回滚。可选 delaySeconds 0…30 仅覆盖本次倒计时，省略使用当前设置，0 立即拍摄，不调用 configure 或改写偏好。模型可以同轮输出 openCamera、takePhoto，二者按 Camera Channel FIFO 执行，open 的完成回执不要求中间 ReAct；takePhoto 返回最终照片 JSON。调度器仍在单个 Action 失败后推进队列，拍照重新检查相机前置条件并显式失败，不自动重试。startRecording 保留 canonical open 子 Action 的内部组合，前置失败后将录像标记 notStarted，成功子报告不能覆盖最终录像 JSON。
 
 Action 函数本身没有请求队列或缓存；CameraCoordinator 拥有唯一采集/租约工作者。配置更新在 CameraCoordinator 独占段内读取并补齐当前设置，再进入原生配置及失败回滚事务。空更新不写入硬件。权限拒绝、忙、未启用、后台或照片不可用通过类型化错误传播；是否已经发生部分效果以端点的实际状态和回执为准。
 
@@ -126,7 +126,7 @@ Photo capture freezes presentation.snapshot.photoCaptureRotation after countdown
 
 Photographer沿其既有相机事实输入管理倒计时、照片处理、录像和待处置灵动岛，以自身身份调用Gateway内部展示工具。Camera仍拥有原生事务和窗口/音效执行；系统岛不控制设备或释放相机，点击唤回App当前页面。取消倒计时、停止录像和保存继续经UICameraContainer→Photographer→Gateway→Camera Action，停止请求绑定recordingID。
 
-Opening and native session running are not interchangeable with capture geometry readiness. The automatic open step awaits fresh preview geometry before completing. PhotoSession rechecks after the countdown; RecordingSession rechecks after mode configuration and microphone handoff. Both revalidate foreground/cancellation after the wait before calling Foundation. Missing initial frames wait for admission rather than immediately returning unavailable; a bounded timeout or root invalidation fails the current Action and never fabricates a capture result. The UI owns frame waiting only; Actions retains device/lifecycle authority.
+Opening and native session running are not interchangeable with capture geometry readiness. The explicit open Action (also used internally by startRecording) awaits fresh preview geometry before completing. PhotoSession rechecks after the countdown; RecordingSession rechecks after mode configuration and microphone handoff. Both revalidate foreground/cancellation after the wait before calling Foundation. Missing initial frames wait for admission rather than immediately returning unavailable; a bounded timeout or root invalidation fails the current Action and never fabricates a capture result. The UI owns frame waiting only; Actions retains device/lifecycle authority.
 
 CameraCoordinator创建相机Window时提供UI.WindowIcon.emoji("📷")；图标属于显示元数据，图标资源校验和卡片尺寸由UI Window组件拥有，不参与设备权限或采集生命周期。
 

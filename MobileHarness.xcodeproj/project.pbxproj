@@ -5,6 +5,20 @@
 	"objectVersion" = "60";
 	"archiveVersion" = "1";
 	"objects" = {
+		"2617BD3A6BC40BC98C05D830" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Resources/Agents/Shared/CommunicationContext.json"; "sourceTree" = "SOURCE_ROOT"; };
+		"283C39956B73E04A5E833F36" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Resources/Agents/Shared/ExecutionFeedback.json"; "sourceTree" = "SOURCE_ROOT"; };
+		"FBF1F2B6548BBF5829D87159" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/Resources/Agents/Shared/README.md"; "sourceTree" = "SOURCE_ROOT"; };
+		"8D6FA9F05C56F7EBDFAE1183" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Resources/Agents/Assistant/InputDecision.json"; "sourceTree" = "SOURCE_ROOT"; };
+		"C1570F19F40EF0CB3879EEDB" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Resources/Agents/Assistant/InputProtocol.json"; "sourceTree" = "SOURCE_ROOT"; };
+		"1F09D4A98557E8831D0FECCB" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Resources/Agents/Assistant/TaskFeedback.json"; "sourceTree" = "SOURCE_ROOT"; };
+		"7EB2BF700ACD054EEC84D4A8" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Resources/Agents/Writer/Agent.json"; "sourceTree" = "SOURCE_ROOT"; };
+		"2A3DC617426092FF03322486" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Resources/Agents/Writer/ContentPrompts.json"; "sourceTree" = "SOURCE_ROOT"; };
+		"F1336E480ABF24F9CF75AD16" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/Resources/Agents/Writer/Instructions.md"; "sourceTree" = "SOURCE_ROOT"; };
+		"083F9CB9FA3114ABA8C91F5A" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Resources/Agents/Writer/Prompts.json"; "sourceTree" = "SOURCE_ROOT"; };
+		"02264FD4B042E8D0E52049FD" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Resources/Agents/Writer/Recovery.json"; "sourceTree" = "SOURCE_ROOT"; };
+		"84A8721E284CB2CFA6F4B727" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Resources/Agents/Writer/WorkspaceFeedback.json"; "sourceTree" = "SOURCE_ROOT"; };
+		"0974C65AC68413510A224097" = { "isa" = "PBXGroup"; "name" = "Writer"; "children" = ("7EB2BF700ACD054EEC84D4A8", "2A3DC617426092FF03322486", "F1336E480ABF24F9CF75AD16", "083F9CB9FA3114ABA8C91F5A", "02264FD4B042E8D0E52049FD", "84A8721E284CB2CFA6F4B727"); "sourceTree" = "<group>"; };
+
 		"30C2B5A7A1F14E4C8E3BF999" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Agents/Assistant/AssistantInputBatch.swift"; "sourceTree" = "SOURCE_ROOT"; };
 		"28A42F0E4DAD2653C05F5E5F" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Agents/Assistant/AssistantGenerationTransport.swift"; "sourceTree" = "SOURCE_ROOT"; };
 		"108EA0410652EAC3804B4996" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Agents/Assistant/AssistantInputDecision.swift"; "sourceTree" = "SOURCE_ROOT"; };
@@ -198,8 +212,7 @@
 		"41F39965304D96B0FBEFA698" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Agents/Support/Communication/PoseObservation.swift"; "sourceTree" = "SOURCE_ROOT"; };
 		"C93C3F76B99AB85EA609A70F" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/Agents/Support/Communication/README.md"; "sourceTree" = "SOURCE_ROOT"; };
 		"F5D5C6D562FB7C3148CAEDF9" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Agents/Support/Communication/SoundSourceObservation.swift"; "sourceTree" = "SOURCE_ROOT"; };
-		"4D2F34D8F84072FD4C117E5C" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Agents/Support/Communication/SpeechValues.swift"; "sourceTree" = "SOURCE_ROOT"; };
-		"1E99636FAA4645AF4189C1D7" = { "isa" = "PBXGroup"; "name" = "Communication"; "children" = ("0F843ADC9EFC1EF71CF80700", "4AA74FB9D6E39393B58815D7", "41F39965304D96B0FBEFA698", "C93C3F76B99AB85EA609A70F", "F5D5C6D562FB7C3148CAEDF9", "4D2F34D8F84072FD4C117E5C"); "sourceTree" = "<group>"; };
+		"1E99636FAA4645AF4189C1D7" = { "isa" = "PBXGroup"; "name" = "Communication"; "children" = ("0F843ADC9EFC1EF71CF80700", "4AA74FB9D6E39393B58815D7", "41F39965304D96B0FBEFA698", "C93C3F76B99AB85EA609A70F", "F5D5C6D562FB7C3148CAEDF9"); "sourceTree" = "<group>"; };
 		"669E72068C9055FC8D2DE6CB" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Agents/Support/Context/AgentContextRepository.swift"; "sourceTree" = "SOURCE_ROOT"; };
 		"B22F8D9C021DAC48E285F407" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Agents/Support/Context/AgentFixedTaskCoordinator.swift"; "sourceTree" = "SOURCE_ROOT"; };
 		"2CFC5702120108203BE26341" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/Agents/Support/Context/AgentStateContext.swift"; "sourceTree" = "SOURCE_ROOT"; };
@@ -682,14 +695,13 @@
 		"9321D8791201973E5F3359CE" = { "isa" = "PBXGroup"; "name" = "SpeechPerception"; "children" = ("686506DB6C601AC8D86B3DAC"); "sourceTree" = "<group>"; };
 		"96A75B161B9D9B7761AEA7EB" = { "isa" = "PBXGroup"; "name" = "RobotInteraction"; "children" = ("A5777816CE74EB73DB186A4B", "CA27BDB083BDEEEAD9B6CCC3"); "sourceTree" = "<group>"; };
 		"9B3799D75F0CF56AFD7E7501" = { "isa" = "PBXGroup"; "name" = "Photographer"; "children" = ("824FD443B38B68159701E9A6"); "sourceTree" = "<group>"; };
-		"3A146359416F415EAA7C1898" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/Resources/Agents/System/InputProtocol.md"; "sourceTree" = "SOURCE_ROOT"; };
-		"E6C824E20E6C9D2BD1776CD0" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/Resources/Agents/System/OutputProtocol.md"; "sourceTree" = "SOURCE_ROOT"; };
-		"8F0FB54FF75D445984AEBD6D" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Resources/Agents/System/ActionCatalog.json"; "sourceTree" = "SOURCE_ROOT"; };
-		"3797DCB7E5634A7DA9A774FC" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Resources/Agents/System/SkillCatalog.json"; "sourceTree" = "SOURCE_ROOT"; };
-		"7BD1AFD338C5427F8FF32C95" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Resources/Agents/System/AgentCatalog.json"; "sourceTree" = "SOURCE_ROOT"; };
-		"553229D85A24487B8F56918B" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Resources/Agents/System/RequestContext.json"; "sourceTree" = "SOURCE_ROOT"; };
-		"85DCB31D26884B48A2EB65F6" = { "isa" = "PBXGroup"; "name" = "System"; "children" = ("3A146359416F415EAA7C1898", "E6C824E20E6C9D2BD1776CD0", "8F0FB54FF75D445984AEBD6D", "3797DCB7E5634A7DA9A774FC", "7BD1AFD338C5427F8FF32C95", "553229D85A24487B8F56918B"); "sourceTree" = "<group>"; };
-		"9E5032DF2219D60DC0A3BE2D" = { "isa" = "PBXGroup"; "name" = "Agents"; "children" = ("85DCB31D26884B48A2EB65F6", "635BCDA8B463F3036A44BF9C", "E1E0B173993DA919C5E9ACF6", "EB69EAD4A32A6D160979E6B1", "9B3799D75F0CF56AFD7E7501", "9321D8791201973E5F3359CE", "3E7581D3AE927E5A9F7FFACF", "EAF117F0B4DDEDB1529ED819"); "sourceTree" = "<group>"; };
+		"E6C824E20E6C9D2BD1776CD0" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/Resources/Agents/Shared/OutputProtocol.md"; "sourceTree" = "SOURCE_ROOT"; };
+		"8F0FB54FF75D445984AEBD6D" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Resources/Agents/Shared/ActionCatalog.json"; "sourceTree" = "SOURCE_ROOT"; };
+		"3797DCB7E5634A7DA9A774FC" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Resources/Agents/Shared/SkillCatalog.json"; "sourceTree" = "SOURCE_ROOT"; };
+		"7BD1AFD338C5427F8FF32C95" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Resources/Agents/Shared/AgentCatalog.json"; "sourceTree" = "SOURCE_ROOT"; };
+		"553229D85A24487B8F56918B" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Resources/Agents/Shared/RequestContext.json"; "sourceTree" = "SOURCE_ROOT"; };
+		"85DCB31D26884B48A2EB65F6" = { "isa" = "PBXGroup"; "name" = "Shared"; "children" = ("E6C824E20E6C9D2BD1776CD0", "8F0FB54FF75D445984AEBD6D", "3797DCB7E5634A7DA9A774FC", "7BD1AFD338C5427F8FF32C95", "553229D85A24487B8F56918B", "2617BD3A6BC40BC98C05D830", "283C39956B73E04A5E833F36", "FBF1F2B6548BBF5829D87159"); "sourceTree" = "<group>"; };
+		"9E5032DF2219D60DC0A3BE2D" = { "isa" = "PBXGroup"; "name" = "Agents"; "children" = ("85DCB31D26884B48A2EB65F6", "635BCDA8B463F3036A44BF9C", "E1E0B173993DA919C5E9ACF6", "EB69EAD4A32A6D160979E6B1", "9B3799D75F0CF56AFD7E7501", "9321D8791201973E5F3359CE", "3E7581D3AE927E5A9F7FFACF", "EAF117F0B4DDEDB1529ED819", "0974C65AC68413510A224097"); "sourceTree" = "<group>"; };
 		"A5777816CE74EB73DB186A4B" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "net.daringfireball.markdown"; "path" = "MobileHarness/Resources/Skills/RobotInteraction/Instructions.md"; "sourceTree" = "SOURCE_ROOT"; };
 		"ABC5AD6149D1B7F0DDD78230" = { "isa" = "PBXGroup"; "name" = "BasicInteraction"; "children" = ("6155D5FA28C6BA427D74B196", "FC12868991D557E6B8BA1DD0"); "sourceTree" = "<group>"; };
 
@@ -697,7 +709,7 @@
 
 		"CA27BDB083BDEEEAD9B6CCC3" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Resources/Skills/RobotInteraction/Skill.json"; "sourceTree" = "SOURCE_ROOT"; };
 		"D4B8DBF4436AC3C01CA2D935" = { "isa" = "PBXGroup"; "name" = "ApplicationControl"; "children" = ("2E2A818170AE4DF3F524231C", "E482FC0FEAA3CF5DC0DD676D"); "sourceTree" = "<group>"; };
-		"E1E0B173993DA919C5E9ACF6" = { "isa" = "PBXGroup"; "name" = "Assistant"; "children" = ("6254115BBE0C8811CC904A71", "1DB944477FA700CFC751F497", "3243C6CE3D047B5D026E6D9B"); "sourceTree" = "<group>"; };
+		"E1E0B173993DA919C5E9ACF6" = { "isa" = "PBXGroup"; "name" = "Assistant"; "children" = ("6254115BBE0C8811CC904A71", "1DB944477FA700CFC751F497", "3243C6CE3D047B5D026E6D9B", "8D6FA9F05C56F7EBDFAE1183", "C1570F19F40EF0CB3879EEDB", "1F09D4A98557E8831D0FECCB"); "sourceTree" = "<group>"; };
 		"E482FC0FEAA3CF5DC0DD676D" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json"; "path" = "MobileHarness/Resources/Skills/ApplicationControl/Skill.json"; "sourceTree" = "SOURCE_ROOT"; };
 
 		"E86476AE5767A0D78E1A2F46" = { "isa" = "PBXGroup"; "name" = "Photography"; "children" = ("4BE786AFECACEDA8ADE5158A", "4DEB5F7CD35749EF2DCD7179"); "sourceTree" = "<group>"; };

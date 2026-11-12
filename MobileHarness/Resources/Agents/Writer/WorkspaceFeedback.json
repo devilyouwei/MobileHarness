@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "templates": {
+    "invalidParameters": "Invalid tool or parameters for the current phase. Follow the active tool schema.",
+    "noScreenshot": "\nScreenshot unavailable; do not claim visual verification.",
+    "workspaceID": "Supply an exact workspace ID such as workspace_3. If the ID is unknown, use workspace.search.",
+    "searchBeforeDelete": "To delete a work, use its ID from this delegation's workspace.search results.",
+    "activeDelete": "Switch to a different workspace before deleting the active work.",
+    "emptyTitle": "Supply a nonempty display title.",
+    "invalidEntry": "entry must be a workspace-relative file path such as flowchart.html or docs/flowchart.md. Use edit to write the file content.",
+    "editExisting": "Use edit on the active workspace to create or change its entry file.",
+    "enterExisting": "Use workspace.enter with that workspace ID to return to it.",
+    "pendingRequirements": "Newly accepted requirements must be processed before publication.",
+    "editedExplanation": "Editing has begun; an explanation cannot bypass render and publication.",
+    "uncertainPublication": "Publication outcome uncertain; never replay.",
+    "alreadyActive": "This workspace is already active. Existing read references and savepoints still apply.",
+    "switchRestored": "Switch failed. Previous workspace restored; reread files for fresh references. ",
+    "previousWorkspace": "Previous draft retained. Its read references and savepoints are no longer active.",
+    "unavailable": "Workspace {{workspaceID}} is unavailable. Use workspace.search to locate an existing work.",
+    "alreadyCreated": "This delegation already created {{workspaceID}} for this title and entry. ",
+    "missingEntry": "missingFile: The active workspace exists. Call edit(path: {{entry}}, instruction: …) without a read reference to create its entry file."
+  }
+}

@@ -163,9 +163,10 @@ public enum SettingsModelResourcesAdapter {
     ) async throws {
         try Task.checkCancellation()
         try state.requirePresentation()
-        guard invocation.context.sessionID == sessionID, generation == state.refreshGeneration else {
-            throw ResourcePresentationError.staleGeneration
-        }
+        guard invocation.context.sessionID == sessionID else { throw ResourcePresentationError.staleGeneration }
+        // A newer refresh already owns the UI; completing this read must not overwrite it or report a failure.
+        if generation > 0, generation < state.refreshGeneration { return }
+        guard generation == state.refreshGeneration else { throw ResourcePresentationError.staleGeneration }
         let value = try SettingsModelResourcesAdapter.items(inventory.encoded())
         guard state.applySnapshot(value, generation: generation) else {
             throw ResourcePresentationError.staleGeneration
@@ -197,8 +198,10 @@ public enum SettingsModelResourcesAdapter {
     {
         try Task.checkCancellation()
         try state.requirePresentation()
-        guard invocation.context.sessionID == sessionID, state.applyRefreshFailure(message, generation: generation)
-        else {
+        guard invocation.context.sessionID == sessionID else { throw ResourcePresentationError.staleGeneration }
+        // Failure presentation follows the same replacement boundary as successful snapshots.
+        if generation > 0, generation < state.refreshGeneration { return }
+        guard state.applyRefreshFailure(message, generation: generation) else {
             throw ResourcePresentationError.staleGeneration
         }
     }

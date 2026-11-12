@@ -242,7 +242,7 @@ Skill状态回归覆盖任意新路径无需Assistant登记、生产者完整Bus
 
 WriterAgentTests 通过真实 AgentManager/通信与 Gateway DirectExecutionDispatcher 连接脚本模型和实际作品存储，验证后台接纳、流式编辑、发布与终态回报；呈现是明确 fixture。
 
-Writer 分域回归检查作品库、编辑、只读呈现的 Skill 教学与 native 工具 schema，以及追问后编辑域恢复和无工具内容请求。配置回归检查 Writer 专属 Skill 的原生绑定与共享目录隔离。
+Writer 分域回归检查作品库、编辑、只读呈现的 Skill 教学与 native 工具 schema，以及追问后编辑域恢复和无工具内容请求。追问测试核对回答文本进入后续模型请求。工作区回归检查 edit 回执的结构化事实及关联文件，配置回归检查 Writer 专属 Skill 的原生绑定与共享目录隔离。
 
 Writer 续写生命周期回归使用真实 ArtifactService/SQLite、可控非协作呈现与检查点阻塞：跨 session、撤销后及恢复后的旧流被拒绝；取消的 complete 不接纳；变更竞争显式 busy，预览不阻塞追加；release/Actions 根关闭等待在途效果并拒绝迟到操作；已开始的 abort 不被撤销再次取消。文件系统失败夹具检查清理失败持续可见及关闭准入。测试区分工具接纳、文件写入和委托终态，不证明真实模型或原生 WebKit 行为。
 
@@ -259,9 +259,7 @@ Writer 委托故障回归通过真实 Assistant XML、Gateway/Scheduler 和 SQLi
 Writer失败回归覆盖先list成功后第二次模型请求timeout，实际Gateway记录modelTransport分类并向Assistant传送完整诊断；SQLite重开及通用UI DTO还原诊断，模型/阶段/输入ID/耗时和独立清理原因均保留。模型为替身，不代表真实Qwen请求成功。
 
 
-Writer自主任务回归覆盖：汇报接收端暂不可用时创作/发布仍完成、同事件重投、暂停恢复、Assistant close不取消Writer、跨对话阶段汇报及共享FIFO。受控播放Action验证Writer输入等待排空；原生ReplyActivity完成事实只在成功边界出现。VoiceTests验证非聆听不提交反向取消Action、成功汇报后启听、失败/暂停/明确停止及重复/乱序完成不误开。模型、播放和peer占用事实为明确替身，不能替代真机语音验收。
-
-占用发布回归保留32项满队列场景，确认同态busy合并不会使通信消费者queueFull；单独验证首项输入与两个不同最终语音root都得到完整快照确认，排队文本不重复发布busy。
+Writer 自主任务回归覆盖接收端暂不可用时仍完成创作和发布、同事件重投、暂停恢复、Assistant 关闭后 Writer 继续执行、跨对话阶段汇报及共享 FIFO。语音回归使用受控识别与播放能力，验证连续转写、播放准入、恢复以及明确停止后的采集拒绝。
 
 Writer independence regressions use real Gateway/SQLite with scripted models: rejected user notifications do not retain the creative slot, execution retirement supports successive delegations beyond the live-grant bound, and database reopen redelivers immutable events without another model lease or file creation. Assistant fixtures cover canonical-state reconciliation before new/resumed delegations and stale terminal messages after a new run.
 
@@ -295,7 +293,7 @@ Island Action integration also covers registered/raw and container-local typed e
 
 VoiceTests 的语音打断回归使用真实生产者绑定、OutputGateway/InputGateway 和 SpeechPerception，受控播放清理及投递屏障固定取消与空闲事实重叠，覆盖取消前已在途和取消中才提交两种顺序。验证取消仍拒绝普通播放、空闲事实释放半双工占用、关闭许可保持关闭、旧 revision 不复活占用，以及连续五次显式启停可重开感知采集。模型与播放为替身，不代表真机麦克风、光效或灵动岛验收。
 
-Voice regressions verify SpeechPerception emits an empty caption at confirmed onset before ASR text; Assistant routes the existing speaking control event into its own clearReply Action exactly once without inference or formal FIFO work. Caption completion, empty/failure recovery and session fencing remain separate from speech playback.
+Voice regressions verify SpeechPerception emits an empty recognition caption at confirmed onset before ASR text, then completes or recovers locally. Assistant receives completed ASR text. Caption completion, empty/failure recovery and session fencing remain independent of speech playback.
 
 WriterAgentTests 在 LiveRuntimeTests 的真实 WebKit 阶段验证 ArtifactPresentation 的嵌套入口、双槽唯一版本资源、稳定原生文档及回收旧文件后的 reload；窗口完成回执由测试注入，不宣称真实窗口动画验收。
 
@@ -366,3 +364,13 @@ ProviderSettingsTests 覆盖 Decision 独立 Provider/模型持久化重开、�
 AudioCaptureReadinessTests 覆盖 AEC 实际启用结果的选择、失败保留、未支持回退及避免重复处理；配置替身不证明设备回声抑制效果。
 
 Assistant 前台结束回归使用 SQLite、模型流替身和实际 ChannelScheduler。模型流与 Display Action 同时阻塞时验证 Control Action 持久化任务终态及折叠来源；分别放行后验证原消息的回复、Action journal 与任务折叠。
+
+PromptTemplateTests 验证 Shared／角色资源归属、Assistant 输入协议隔离、全部 Agent JSON 模板的打包与编译、变量缺失失败，以及用户内容中的模板符号原样保留。Action 描述继续从代码声明投影。
+
+AppWorkflowTests 的网页当前截图通过共享多模态 State 投影验证 Skill 选择、替换、无图模型与新输入附件；原 Assistant Web mediaID 回查测试已删除。原生压缩测试检查分析 JPEG 边界。单槽、窗口生命周期与取消围栏由 AppWorkflowTests/WebWorkspaceTests 覆盖，替身不代表真实 WebKit 或真机验收。
+
+ResourcePresentationTests 覆盖同会话过期刷新/错误呈现不覆盖当前状态，当前错误可见、未来批次/外来会话/根关闭继续拒绝；使用可控在途查询经真实 ApplicationControl/Gateway 验证旧刷新正常结束和后续刷新可用。
+
+Photo countdown regression coverage validates the optional 0…30-second Action parameter before effects, typed endpoint forwarding, no implicit open/configure/retry, and unchanged recording composition. The scripted GenerationRound model emits openCamera, a spoken cue and takePhoto in one response using separate wait groups; a held preview demonstrates ordered execution without an intermediate request. Photography examples parse into two Camera Channel Actions with the countdown attached to takePhoto; spoken examples retain open → speech → capture order and paired waits. Failed opening and unavailable capture report both failures without retries or shutter effects. Native countdown timing/cancellation tests use injected clocks; these are not real-model or physical-camera acceptance.
+
+语音路由回归覆盖同主题的 ASR 片段与最终契约隔离、最终文本接纳时的任务归属、连续识别及受限路线播放准入。语音感知测试验证本地识别字幕与失败恢复，实际原生音频验收单列。

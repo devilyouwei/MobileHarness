@@ -151,11 +151,6 @@ public actor OutputGateway {
         else { return false }
         return task.kind == .cancel || task.kind == .result
     }
-    /// Occupancy snapshots describe execution lifetime; cancelling effects must not cancel their retirement facts.
-    private static func isReplyActivity(_ output: AgentOutput) -> Bool {
-        guard case .communication(let call) = output else { return false }
-        return call.message.contract == ReplyActivity.contract && call.message.content(as: ReplyActivity.self) != nil
-    }
     private static func isInterruption(_ envelope: OutputEnvelope) -> Bool {
         guard envelope.inputMetadata.origin == .local, envelope.inputMetadata.source == "runtime",
 
@@ -176,8 +171,7 @@ public actor OutputGateway {
             }
             directExecutions[id] = .init(
                 scope: OutputScope(envelope),
-                interruption: Self.isInterruption(envelope) || Self.isCleanupCommunication(envelope.output)
-                    || Self.isReplyActivity(envelope.output), task: task)
+                interruption: Self.isInterruption(envelope) || Self.isCleanupCommunication(envelope.output), task: task)
             defer { directExecutions[id] = nil }
             return try await withTaskCancellationHandler {
                 try await task.value
@@ -373,7 +367,7 @@ public actor OutputGateway {
                     payload: payload, source: source.rawValue, incarnation: incarnation, origin: .agent,
                     capturedAt: metadata.capturedAt, sequence: sequences[source]!, rootID: metadata.rootID,
                     parentID: inputID, hops: metadata.hops + 1,
-                    deadline: generatedCommand ? nil : metadata.deadline),
+                    deadline: generatedCommand ? nil : metadata.deadline, topic: contract.topic),
                 turn: turn,
                 taskScope: task.flatMap {
                     ($0.kind == .request || $0.kind == .input || $0.kind == .cancel) ? $0.scope : nil
@@ -708,7 +702,7 @@ public actor OutputGateway {
         }
         do {
             if !terminal {
-                guard !isCancelled(scope) || Self.isInterruption(envelope) || Self.isReplyActivity(envelope.output)
+                guard !isCancelled(scope) || Self.isInterruption(envelope)
                 else { throw CancellationError() }
                 if envelope.roundID != nil {
                     guard outputScopes.count < 128 || outputScopes.contains(scope) else { throw HarnessError.queueFull }
@@ -967,7 +961,6 @@ public actor OutputGateway {
         case .finish:
             do {
                 try await actions.finish(envelope)
-                if let scope = envelope.taskScope { try await requests.deliverReplyCompletion(scope) }
             } catch {
                 await actions.cancel(envelope)
                 throw error

@@ -37,7 +37,8 @@ final class ApplicationActionAssembly {
     func prepare(_ request: AgentBusinessRequest, actions: ActionsContainer) throws -> AgentBusinessBindings {
         let ports = try actions.configureBusiness(request: request)
         return AgentBusinessBindings(
-            executor: ports.executor, catalog: ports.catalog, artifactStreaming: ports.artifactStreaming,
+            executor: ports.executor, catalog: ports.catalog, readWebScreenshot: ports.readWebScreenshot,
+            artifactStreaming: ports.artifactStreaming,
             writerArtifacts: ports.writerArtifacts,
             writerModel: ports.writerModel, decisionConfiguration: ports.decisionConfiguration,
             decisionStatus: ports.decisionStatus,
@@ -51,7 +52,7 @@ final class ApplicationActionAssembly {
                 ports.bindResourceRun { requested, operation in
                     try await resources.runInCurrentContext(resources: requested, operation: operation)
                 }
-            }, observeTranscript: ports.observeTranscript, observeEmpty: ports.observeEmpty, output: ports.output,
+            }, observeTranscript: ports.observeTranscript, output: ports.output,
             decodeResources: ports.decodeResources,
             makeVoice: { host in
                 let voice = try ports.makeVoice(

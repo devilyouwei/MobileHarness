@@ -60,7 +60,7 @@ flowchart TD
 
 Writer 的 workspace 工具声明参数约束，文件编辑 Skill 教学操作顺序和失败修复。控制模型按需列出/查询文件、按行读取相关片段，用 contextReferences 将实际关联内容送入独立内容请求；新建/大段源码不进入工具参数，replace仅携带短精确旧/新文本。后续用户修订同时进入控制历史和内容请求目标。HTML/CSS/JS、Markdown、JSON、SVG 和纯文本的生成规则由 Writer 按目标扩展名选择。
 
-工作区内的文件操作使用独立控制提示和工具目录。进入后只携带原始目标、已接受补充、绑定的工作区身份与入口呈现状态。已有文件先读再改。新目录先创建声明的入口文件。最后一次修改后使用 render 检查再 finish 发布。内容模板由 content.base 与对应格式的模板组合。
+工作区内的文件操作使用独立控制提示和工具目录。进入后携带原始目标、已接受补充、绑定的工作区身份与入口呈现状态。已有文件先读再改。新目录先创建声明的入口文件。最后一次修改后使用 render 检查再 finish 发布。内容请求使用 ContentPrompts.json 的输出规则、格式字段和编辑上下文模板。
 
 WriterPreview拥有默认安全预览：源码追加或确定性修改只唤醒一个latest-value worker，经Gateway direct内部preview读取最新词法检查点，约750ms合并，一个在途加一个最新待呈现状态。页面重载不阻塞源码接收。相同快照跳过。显式关闭结束该窗口的预览。最小化期间更新最新快照，用户恢复窗口后继续渲染。Scene 隐藏加入并取消当前预览 worker，保留最新刷新意图。render/finalize/abort先取消并加入预览，根生命周期加入worker；run独立实例和加入屏障防止迟到帧。完整render执行脚本并提供诊断，截图缺失不宣称视觉验证。
 
@@ -92,7 +92,7 @@ Writer 经认证的 task.progress 发送接纳、追问及两类精选里程碑�
 
 Assistant 的 BasicSkill 通过调度的 XML task.delegate(agent_id=writer,description) 发送目标与实际用户输入，Writer 先获取模型判断操作；模型显式创建或进入时通过工作区 start/resume 准备窗口和草稿，单纯作品库操作不创建文件。agents.writer 公开 idle/starting/running/waitingUser/cancelling/paused、agentID、workspaceID、goal、step、waitingForInput。已有窗口不等于运行任务；单任务忙碌明确拒绝。task.send 由运行时绑定待答 interactionID，Writer验证其匹配；task.cancel(agent_id,reason) 转换为可信 cancel 信号并立即接纳，由根拥有的 worker 加入清理并回报。
 
-AgentTaskContent.writerEvent 携带版本 3、UUID eventID、递增 sequence 和可选工作区/窗口身份。事件包括 started、draftUpdated、recovering、userInput、completed、declined、failed 和 cancelled。运行阶段由内存 reportWorker 投递 task.progress。实际接纳由 CommunicationReceipt 决定，拒收每 500 ms 重试，创作可继续。
+AgentTaskContent.writerEvent 携带版本 3、UUID eventID、递增 sequence 和可选工作区及窗口身份。运行阶段由 reportWorker 投递 started、draftUpdated、recovering 和 userInput，经 task.progress 发送并读取 sendResult 返回的 DeliveryReport。拒收每 500 ms 重试，创作可继续。completed、declined、failed 和 cancelled 经持久 writer.completion 独立投递。
 
 Database 根目录拥有连接、schema 装配与生命周期；Shared 只保存编码、ID 与分页机制。Assistant 和 Writer 分别拥有消息/任务接口、历史 DTO、窗口及 SQL 实现。日志和 Agent 通信通过独立共享端口注入，不经统一 Chat/Task 门面。详见 [Database](../../Storage/Database/README.md)。
 
@@ -210,4 +210,10 @@ workspace.create(title,entry) 直接处理明确新建请求。入口路径在�
 
 ## 私有指令与公开介绍
 
-Resources/Agents/Writer/Agent.json.description 提供公开用途。Instructions.md 保存私有共用身份，Prompts.json 的 control.library 和 control.workspace 分别管理作品库和编辑两个控制域。控制请求的已加载 Skill 教学标题由共用 [SkillCatalog.json](../../Resources/Agents/System/SkillCatalog.json) 提供。每个控制请求持久化域标识，恢复只加载当前域的调用/结果配对。无工具内容请求继续使用 content.base、格式模板和 content.retry。
+Resources/Agents/Writer/Agent.json.description 提供公开用途。Instructions.md 保存私有控制身份及通用追问和完成规则。Prompts.json 的 control.library 和 control.workspace 管理作品库和编辑两个控制域。已加载 Skill 的教学标题由共用 [SkillCatalog.json](../../Resources/Agents/Shared/SkillCatalog.json) 提供。每个控制请求持久化域标识，恢复加载当前域的调用与结果配对。
+
+## 请求与恢复模板
+
+Prompts.json 包含控制请求的目标、追问回答、追加要求、状态标签和轮次提示。ContentPrompts.json 管理无工具内容请求的系统规则、格式、重试和输入包装。Recovery.json 保存失败恢复和历史回放指引。WorkspaceFeedback.json 保存工作区操作反馈。Writer 本地工具描述与 ActionDeclaration 一起维护。
+
+Actions 的 edit 接纳回执返回 ArtifactEditPreparation，包含流身份、原始指令、已验证路径、选区或项目文件以及关联文件片段。Writer 从路径选择格式、检查外层代码围栏并记录请求路径，再用 ContentPrompts.json 呈现选区和上下文。模型失败后先清理旧流，重试从重新接纳的流获取准备值。资源读取错误直接传播，恢复、取消、清理和提交由 Writer 工作流管理。

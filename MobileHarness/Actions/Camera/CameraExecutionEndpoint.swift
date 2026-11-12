@@ -74,12 +74,9 @@ import FunctionContracts
         try validate(invocation)
         try await camera.unloadPreviewImage(id, invocation: invocation)
     }
-    public func takePhoto(invocation: any FunctionInput) async throws -> CameraPhotoReceipt {
+    public func takePhoto(delaySeconds: Int?, invocation: any FunctionInput) async throws -> CameraPhotoReceipt {
         try validate(invocation)
-        return try await camera.takePhoto(invocation: invocation)
-    }
-    public func readPhoto(_ id: String, source: String, sessionID: String, inputID: String) async throws -> Data {
-        try await camera.readPhoto(id, source: source, sessionID: sessionID, inputID: inputID)
+        return try await camera.takePhoto(delaySeconds: delaySeconds, invocation: invocation)
     }
     public func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
         try validate(invocation)

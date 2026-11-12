@@ -631,7 +631,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     }
     let edit = try await service.perform(
         invocation: invocation("one", ["command": "edit", "path": "index.html", "instruction": "Create"]))
-    let stream = try #require(JSONDecoder().decode([String: String].self, from: Data(edit.utf8))["streamID"])
+    let stream = try JSONDecoder().decode(ArtifactEditPreparation.self, from: Data(edit.utf8)).streamID
     await #expect(throws: ArtifactWorkspaceError.conflict) {
         try await service.append(streamID: stream, delegateID: "two", text: "wrong owner")
     }
@@ -696,8 +696,10 @@ private func writerLifetimeInvocation(_ parameters: [String: String], session: S
     await #expect(throws: ArtifactWorkspaceError.invalidInstruction) {
         try await call(["command": "edit", "path": path, "instruction": ""])
     }
-    let edit = try await decode(call(["command": "edit", "path": path, "instruction": "Create document"]))
-    let stream = try #require(edit["streamID"])
+    let edit = try await call(["command": "edit", "path": path, "instruction": "Create document"])
+    let prepared = try JSONDecoder().decode(ArtifactEditPreparation.self, from: Data(edit.utf8))
+    let stream = prepared.streamID
+    #expect(prepared.path == path && prepared.instruction == "Create document")
     let query = String(repeating: "文本", count: 200)
     let source = query + "\n" + String(repeating: "A long line of text for the read fixture.\n", count: 640)
     try await service.append(streamID: stream, delegateID: "delegate", text: source)
@@ -720,13 +722,15 @@ private func writerLifetimeInvocation(_ parameters: [String: String], session: S
         let read = try await read(["offset": "0", "limit": "1"])
         references.append(read.reference)
     }
-    let related = try await decode(
-        call([
-            "command": "edit", "path": "notes.txt", "instruction": "Write notes",
-            "contextReferences": references.prefix(9).joined(separator: ","),
-        ]))
-    #expect(related["context"]?.contains(source) == true)
-    try await service.abort(streamID: #require(related["streamID"]), delegateID: "delegate")
+    let related = try await call([
+        "command": "edit", "path": "notes.txt", "instruction": "Write notes",
+        "contextReferences": references.prefix(9).joined(separator: ","),
+    ])
+    let relatedEdit = try JSONDecoder().decode(ArtifactEditPreparation.self, from: Data(related.utf8))
+    #expect(relatedEdit.relatedFiles.count == 9)
+    #expect(relatedEdit.relatedFiles.first?.text == source)
+    #expect(relatedEdit.selection == nil && relatedEdit.projectFiles == [path])
+    try await service.abort(streamID: relatedEdit.streamID, delegateID: "delegate")
 
     struct SearchOutput: Decodable {
         let matches: [[String: String]]
@@ -758,7 +762,7 @@ private func writerLifetimeInvocation(_ parameters: [String: String], session: S
     }
     let response = try await service.perform(
         invocation: writerLifetimeInvocation(["command": "edit", "path": "index.html", "instruction": "Create"]))
-    let stream = try #require(JSONDecoder().decode([String: String].self, from: Data(response.utf8))["streamID"])
+    let stream = try JSONDecoder().decode(ArtifactEditPreparation.self, from: Data(response.utf8)).streamID
     try await service.append(streamID: stream, delegateID: "delegate", text: "<p>preserved</p>")
     let cancelledCompletion = Task {
         withUnsafeCurrentTask { $0?.cancel() }
@@ -828,7 +832,7 @@ private func writerLifetimeInvocation(_ parameters: [String: String], session: S
     _ = try await service.perform(invocation: writerLifetimeInvocation(["command": "start"]))
     let response = try await service.perform(
         invocation: writerLifetimeInvocation(["command": "edit", "path": "index.html", "instruction": "Create"]))
-    let stream = try #require(JSONDecoder().decode([String: String].self, from: Data(response.utf8))["streamID"])
+    let stream = try JSONDecoder().decode(ArtifactEditPreparation.self, from: Data(response.utf8)).streamID
     try await service.append(streamID: stream, delegateID: "delegate", text: "<p>first</p>")
     let preview = Task { try await service.perform(invocation: writerLifetimeInvocation(["command": "preview"])) }
     await entered.wait()
@@ -909,7 +913,7 @@ private func writerLifetimeInvocation(_ parameters: [String: String], session: S
     _ = try await service.perform(invocation: writerLifetimeInvocation(["command": "start"]))
     let response = try await service.perform(
         invocation: writerLifetimeInvocation(["command": "edit", "path": "index.html", "instruction": "Create"]))
-    let stream = try #require(JSONDecoder().decode([String: String].self, from: Data(response.utf8))["streamID"])
+    let stream = try JSONDecoder().decode(ArtifactEditPreparation.self, from: Data(response.utf8)).streamID
     try await service.append(streamID: stream, delegateID: "delegate", text: "<p>draft</p>")
     // Explicit filesystem failure fixture: checkpoint cannot create files beneath a regular file.
     let directory = root.appendingPathComponent("writer/workspace_1")
@@ -995,7 +999,7 @@ func writerCheckpointRevocationDistinguishesCommitFromCleanup(aborting: Bool) as
     _ = try await service.perform(invocation: writerLifetimeInvocation(["command": "start"]))
     let response = try await service.perform(
         invocation: writerLifetimeInvocation(["command": "edit", "path": "index.html", "instruction": "Create"]))
-    let stream = try #require(JSONDecoder().decode([String: String].self, from: Data(response.utf8))["streamID"])
+    let stream = try JSONDecoder().decode(ArtifactEditPreparation.self, from: Data(response.utf8)).streamID
     try await service.append(streamID: stream, delegateID: "delegate", text: "<p>checkpoint</p>")
     await probe.arm()
     let write = Task {
@@ -1072,9 +1076,12 @@ private actor WriterRenderProbe {
     #expect(try await workspace.checkpoint(for: namingProject)?.draft.files == ["index.html": ""])
     #expect(try await workspace.published(namingProject) == nil)
     #expect(await probe.prepared == 1)
-    let first = try strings(
-        await call(["command": "edit", "path": "index.html", "instruction": "Create", "title": "Simple flowchart"]))
-    let stream = try #require(first["streamID"])
+    let first = try await call([
+        "command": "edit", "path": "index.html", "instruction": "Create", "title": "Simple flowchart",
+    ])
+    let initial = try JSONDecoder().decode(ArtifactEditPreparation.self, from: Data(first.utf8))
+    let stream = initial.streamID
+    #expect(initial.selection?.start == 0 && initial.selection?.end == 0 && initial.selection?.selected == "")
     try await Task.sleep(for: .milliseconds(210))
     try await service.append(streamID: stream, delegateID: "t", text: "<h1 class=diagram>Hello</h1>")
     _ = try await service.complete(streamID: stream, delegateID: "t")
@@ -1091,12 +1098,12 @@ private actor WriterRenderProbe {
         try await call(["command": "move", "path": "index.html", "destination": "entry.css"])
     }
 
-    let edit = try strings(
-        await call([
-            "command": "edit", "path": "styles/a.css", "instruction": "Use selector", "contextReferences": reference,
-        ]))
-    #expect(edit["context"]?.contains("class=diagram") == true)
-    let live = try #require(edit["streamID"])
+    let edit = try await call([
+        "command": "edit", "path": "styles/a.css", "instruction": "Use selector", "contextReferences": reference,
+    ])
+    let prepared = try JSONDecoder().decode(ArtifactEditPreparation.self, from: Data(edit.utf8))
+    #expect(prepared.relatedFiles.first?.text.contains("class=diagram") == true)
+    let live = prepared.streamID
     let css = (0..<40).map { ".diagram { --value: \($0); }" }.joined(separator: "\n")
     try await service.append(streamID: live, delegateID: "t", text: css)
     _ = try await service.complete(streamID: live, delegateID: "t")
@@ -1105,8 +1112,8 @@ private actor WriterRenderProbe {
     #expect(await probe.frames.last?.1 == true)
     // Opt-in belongs to one edit, not the next one or another project.
     let count = await probe.frames.count
-    let next = try strings(await call(["command": "edit", "path": "note.txt", "instruction": "Write"]))
-    let nextID = try #require(next["streamID"])
+    let next = try await call(["command": "edit", "path": "note.txt", "instruction": "Write"])
+    let nextID = try JSONDecoder().decode(ArtifactEditPreparation.self, from: Data(next.utf8)).streamID
     try await service.append(streamID: nextID, delegateID: "t", text: "note")
     _ = try await service.complete(streamID: nextID, delegateID: "t")
     #expect(await probe.frames.count == count)
@@ -1786,7 +1793,7 @@ private actor WriterBatchEffectProbe {
     var aborted = false
     func execute(_ call: ChatToolCall) -> WriterToolOutcome {
         calls.append(call.id)
-        return .write(streamID: "stream", instruction: "File: index.html", context: "New file")
+        return .write(.init(streamID: "stream", path: "index.html", instruction: "Create demo"))
     }
     func abort() { aborted = true }
 }
@@ -2445,6 +2452,12 @@ private actor WriterCohesionModel: ChatCapability {
                 let tools = request.messages.flatMap(\.toolCalls)
                 #expect(!tools.contains { $0.name == "workspace.search" })
                 #expect(tools.contains { $0.name == "ask" })
+            }
+            if ["clarify-enter", "clarify-workspace"].contains(mode), commands.last == "ask" {
+                #expect(
+                    request.messages.contains {
+                        $0.role == .user && $0.content.contains("Additional user input:\n选择 " + target)
+                    })
             }
             if mode == "switch-after-edit", commands.last == "workspace.open" {
                 #expect(request.messages.first?.content.contains("Active workspace: workspace_2") == true)

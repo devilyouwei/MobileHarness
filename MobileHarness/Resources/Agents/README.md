@@ -13,14 +13,20 @@ Assistant 是唯一面向用户的对话 Agent；摄影、历史查询、应用�
 | 文件 | 作用与要求 |
 | --- | --- |
 | `../Catalog.json` | 唯一显式资源索引。`version` 为 1；`agents` 的键为代码使用的配置名，如 `Assistant`，值为相对 Resources 的 `Agents/Assistant/Agent.json`；`skills` 由 [Skill 规范](../Skills/README.md) 定义。不得靠目录扫描或第二套配置生效。 |
-| `System/InputProtocol.md`、`System/OutputProtocol.md` | 模型输入时间线与通用输出协议。 |
-| `System/SkillCatalog.json`、`System/AgentCatalog.json`、`System/ActionCatalog.json` | 目录标题及条目排版。Swift 填入公开 Skill、获准委派的 Agent 和本轮有效 Action。 |
-| `System/RequestContext.json` | Task／Skill／State 快照和图片清单在独立 system 消息中的事实框架。 |
+| `Assistant/InputProtocol.json` | Assistant 主模型的输入规则、时间线标签和排版、历史格式识别。 |
+| `Shared/OutputProtocol.md` | 跨角色通用输出协议。 |
+| `Shared/SkillCatalog.json`、`Shared/AgentCatalog.json`、`Shared/ActionCatalog.json` | 目录标题及条目排版。Swift 填入公开 Skill、获准委派的 Agent 和本轮有效 Action。 |
+| `Shared/RequestContext.json` | Task／Skill／State 快照和图片清单在独立 system 消息中的事实框架。 |
 | `<AgentName>/Agent.json` | 必需。v10 身份、角色自有公开 description、通信权限和基础 Skill。 |
-| `Assistant/Instructions.md` | Assistant 自身的身份、用户沟通和如实汇报责任。业务流程归 Skill，共用协议提示词归 `System/`。 |
-| `Assistant/Prompts.json` | Assistant 请求与历史适配使用的命名模板，包含执行证据和 Writer 协作事实的呈现。 |
+| `Assistant/Instructions.md` | Assistant 自身的身份、用户沟通和如实汇报责任。业务流程归 Skill，共用协议提示词归 `Shared/`。 |
+| `Assistant/Prompts.json` | Assistant 主请求的执行证据、任务历史摘要及 Writer 协作事实模板。 |
+| `Assistant/InputDecision.json` | 独立输入分类的规则、动态输入格式和云端分类工具描述。 |
+| `Assistant/TaskFeedback.json` | 前台任务控制与委派回执。 |
 | `Writer/Instructions.md` | Writer 私有共用身份，仅供自己的控制请求。 |
-| `Writer/Prompts.json` | Writer 作品库、工作区编辑、查看和格式化内容输出的私有模板。 |
+| `Writer/Prompts.json` | Writer 作品库及编辑控制请求、补充输入和轮次模板。 |
+| `Writer/ContentPrompts.json` | 无工具内容请求的输出规则、文件格式、编辑上下文与重试模板。 |
+| `Writer/Recovery.json` | 失败修正、工具恢复与历史回放模板。 |
+| `Writer/WorkspaceFeedback.json` | 工作区操作的模型反馈模板。 |
 | `Memory/TitlePrompts.json` | 标题生成事务的专用模板，不生成普通历史记录。其他确定性 Agent 不添加普通对话模板。 |
 
 目录和固定资源文件采用 UpperCamelCase；配置名与 Swift 角色一致，运行时 `id` 使用既有 lowerCamelCase。重命名目录不能顺带修改身份、历史键或通信源。资源路径必须相对 Resources，不得含绝对路径、反斜杠或 `.` / `..` 路径段。加载器以 Bundle 中的 `Catalog.json` 定位资源根，不再次追加 Resources。
@@ -42,16 +48,18 @@ Assistant 是唯一面向用户的对话 Agent；摄影、历史查询、应用�
 
 | 字段 / 条目字段 | 作用与校验 |
 | --- | --- |
-| `inputs` | 可接纳的 Signal 协议集合，最多 32 项；接纳能力不等于广播订阅。 |
+| `inputs` | 可接纳的定向消息和运行时反馈，最多 32 项。 |
 | `inputs[].contract` | 已在通信契约注册表中存在的协议名，如 `camera.state`。新增业务协议必须同时实现 Schema 和验证器。 |
 | `inputs[].version` | 当前为 1，指 Signal 协议版本，不是 Agent 配置版本。 |
 | `inputs[].kind` | 必须与契约注册的 InputKind 一致，如 `text`、`observation`、`audio`、`actionResult`、`toolResult`、`roundResult`、`communicationReceipt`。不得仅为通过校验而随意改 kind。 |
-| `subscriptions` | 广播订阅，最多 16 项。每项必须有对应 inputs。 |
+| `subscriptions` | 独立授权广播接纳，最多 16 项。 |
 | `subscriptions[].contract` | 订阅的协议。 |
 | `subscriptions[].source` | 真实发布者的运行时 Agent ID 或已授权外部来源，如 `speechPerception`、`phone.camera`。不是配置名 `SpeechPerception`。 |
-| `subscriptions[].topic` | 当前必须等于该项 contract；不能自定义不同的路由主题。 |
+| `subscriptions[].topic` | 必须匹配契约注册表定义的主题。 |
 | `publications` | 可发布的 observation 协议名数组，最多 64 项。 |
 | `sends` | 定向发送权限，最多 64 项。每项为 `contract` 和 `target`，目标用运行时 Agent ID；协议必须是 observation，且目标声明相应 input。 |
+
+Assistant 订阅 SpeechPerception 在 user.input 主题发布的 user.input.asr.final。SpeechPerception 还在同主题发布 user.input.asr.partial。Assistant 向 Writer 定向发送 task.request、task.input 和 task.cancel，并接收任务反馈与运行时回执。
 
 各数组不得有重复条目。来源如果是 Agent，必须由该 Agent 声明相应 publication；外部来源必须在运行时外部来源集合中授权。全局最多 64 个主题，每个主题最多 16 个订阅者。
 
@@ -67,9 +75,9 @@ Skill.json 声明 path、callType、alias，以及 Action 的 channel。具体�
 
 ## 提示词与模板字段
 
-`Instructions.md` 是 UTF-8 的可信静态指令，说明自身身份、职责与交互约束。其他角色用途读取各自的 Agent.json.description。用户目标、历史任务、设备状态和执行结果由 Context Builder 作为数据组装。共用协议和业务流程分别引用 System 与 Skill 的指令。
+`Instructions.md` 是 UTF-8 的可信静态指令，说明自身身份、职责与交互约束。其他角色用途读取各自的 Agent.json.description。用户目标、历史任务、设备状态和执行结果由 Context Builder 作为数据组装。共用协议和业务流程分别引用 Shared 与 Skill 的指令。
 
-`System/OutputProtocol.md` 固定描述 XML Action、Channel／wait 调度和 Skill 加载后的目录更新时机。`System/ActionCatalog.json` 定义有效目录中的具体 Channel 标题、Action 别名和参数行排版。`System/InputProtocol.md` 提供 Assistant 时间线格式、多来源取舍、ASR 澄清和回应优先级。System 提示词随 Agents Bundle 分发。Agents 加载资源，AgentCore 读取输出协议并渲染当前 Action 目录。`Assistant/Instructions.md` 维护角色职责、回应风格与语音、字幕、表情呈现。Task、Skill、聆听控制和执行反馈由 BasicSkill 教学维护。Photography 维护自己的业务流程与分轮示例。
+`Shared/OutputProtocol.md` 固定描述 XML Action、Channel／wait 调度和 Skill 加载后的目录更新时机。`Shared/ActionCatalog.json` 定义有效目录中的具体 Channel 标题、Action 别名和参数行排版。`Assistant/InputProtocol.json` 将模型读取规则与时间线的标签、排版及历史格式识别放在同一资源中。共享提示词随 Agents Bundle 分发。Agents 加载资源，AgentCore 读取输出协议并渲染当前 Action 目录。`Assistant/Instructions.md` 维护角色职责、回应风格与语音、字幕、表情呈现。Task、Skill、聆听控制和执行反馈由 BasicSkill 教学维护。Photography 维护自己的业务流程与分轮示例。
 
 单段提示词使用 UTF-8 Markdown 或 TXT，加载为 `body`。多个具名模板共用一个 JSON 文件，包含 `version` 和 `templates`，版本为 1，最多 64 项，每项最多 16 KiB。三种格式都使用 `{{name}}` 插入变量，变量集合须与该模板完全一致。插入值按字面输出。资源、单段正文、单次渲染和 Assistant system 输出均最多 64 KiB。加载与卸载见 [AgentPrompts](../../Agents/Support/Chat/README.md#请求提示词与快照)。
 
@@ -80,8 +88,9 @@ Assistant 当前模板契约：
 | `executionObservations` | 当前执行观察数据 | `data` |
 | `historicalExecution` | 历史动作证据 | `name`、`state`、`arguments`、`result`、`error` |
 | `toolFailure` | 真实执行错误及输出 | `error`、`output` |
+| `taskHistory` | 已结算任务摘要的历史数据前缀 | 无 |
 
-Assistant 先拼接 System 的输出和输入协议，再读取带角色标题的 `Instructions.md`。三个目录模板提供标题与排版。Swift 从索引、当前授权及本轮 Skill 快照取值，并按本轮有效 Action 生成目录。独立 system 消息由 `RequestContext.json` 提供事实框架，`Assistant/Prompts.json` 提供 Writer 追问、近期事件与请求中的执行证据模板。Memory 模板 `title.system`、`title.excerpt` 和 `title.user` 供标题事务读取。
+Assistant 先拼接 Shared 的输出协议和 Assistant 的输入协议，再读取带角色标题的 `Instructions.md`。三个目录模板提供标题与排版。Swift 从索引、当前授权及本轮 Skill 快照取值，并按本轮有效 Action 生成目录。独立 system 消息由 `RequestContext.json` 提供事实框架，`Assistant/Prompts.json` 提供 Writer 追问、近期事件与请求中的执行证据模板。Memory 模板 `title.system`、`title.excerpt` 和 `title.user` 供标题事务读取。
 
 ## 新增与修改 Agent 的开发标准
 
@@ -159,8 +168,16 @@ AgentConfigurations 按 Catalog 读取 v10 资源并校验必填字段、身份�
 
 Assistant 的实际请求传入实例 communicationPolicy；目录与 task.delegate 执行共用 AgentTaskDelegation 适配查询。当前只有 assistant→writer 适配，且必须有 task.request 发送权限和接收端声明。有效函数目录没有 delegateTask 时不展示目标。其他角色虽维护公开介绍，注册和描述本身不会创建委派入口。实时 busy、暂停和结果保持在 State/证据数据中。
 
-Writer 控制请求组合 Instructions.md 与 control.library 或 control.workspace。内容请求读取 content.base、content.web/markdown/json/svg/text 和可选 content.retry 模板。扩展名选择、请求顺序、工具参数 Schema、恢复和校验仍由 Writer 代码拥有。公开目录不读取这些私有文件；确定性角色没有为形式统一增加 Instructions。
+Writer 控制请求组合 Instructions.md 与 Prompts.json 的 control.library 或 control.workspace。内容请求读取 ContentPrompts.json 的 instructions、format 字段、编辑事实模板和可选 retry。Writer 根据实际文件路径选格式，并拥有请求顺序、工具参数 Schema、恢复和校验。公开目录读取 Agent.json 的自描述。
 
 语音合成属于 Assistant 的内部能力，没有独立角色资源或 speech.synthesize/speech.cancel 通信授权。Assistant 的实际播放与呈现继续使用其运行时内部 Action/Tool 声明。
 
 BasicSkill 的 Lifetime and completion 独占通用窗口生命周期教学：窗口独立于 Task/Skill，操作一个窗口不隐式关闭其他窗口，关闭/丢弃需要明确意图。Assistant 身份不承载窗口流程；Photography、ApplicationControl、WebBrowsing 只说明各自操作与完成语义，不复制通用规则或嵌入跨业务场景。资源 revision 随教学更新。
+
+## 目录与格式的所有权
+
+`Shared/` 保存跨角色协议、目录排版和通用执行/通信框架，不能放入 Assistant 或 Writer 的业务政策。每个 cognition 角色目录拥有自己的模型请求内容。Agent.json.category 仍是 perception/cognition 分类唯一来源；perception 不配置提示词，cognition 按实际模型事务配置，分类本身不强制每个 cognition 角色运行 LLM。
+
+独立的单段固定指令使用 `.md`。同一职责的多个具名字段放在一个 `.json` 中，固定规则正文也可作为其中一个字段，动态字段使用 `{{variable}}`。角色通用模板使用 `Prompts.json`，细分业务按职责命名，如 InputProtocol、InputDecision、TaskFeedback 和 ContentPrompts。角色标识、工具 Schema、执行限制和动态事实由各自运行时契约定义。
+
+提示词资源只供 cognition Agent 使用。Actions 的描述、参数、正常返回、异常与文件上下文完全由内部管理，不依赖 Resources；ModelKit 内部文本同样不参与本次迁移。

@@ -173,7 +173,8 @@ public struct InputMetadata: Sendable {
     public init(
         payload: InputPayload, source: String? = nil, incarnation: String? = nil, origin: SignalOrigin = .local,
         capturedAt: TimeInterval? = nil, sequence: UInt64 = 0, rootID: String,
-        parentID: String? = nil, hops: Int = 0, deadline: ContinuousClock.Instant? = nil, generation: String? = nil
+        parentID: String? = nil, hops: Int = 0, deadline: ContinuousClock.Instant? = nil, generation: String? = nil,
+        topic: String? = nil
     ) {
         let contract: String
         var defaultSource = "runtime"
@@ -200,7 +201,7 @@ public struct InputMetadata: Sendable {
         self.origin = origin
         self.contract = contract
         version = 1
-        topic = contract
+        self.topic = topic ?? contract
         self.source = source ?? defaultSource
         self.incarnation = incarnation
         self.capturedAt = capturedAt ?? ProcessInfo.processInfo.systemUptime

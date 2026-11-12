@@ -92,9 +92,15 @@ def main():
     bundle = binary.parents[3] / "HarnessKit_Agents.bundle" / "Contents/Resources/Agents/Writer"
     if not bundle.is_dir():
         bundle = binary.parents[3] / "HarnessKit_Agents.bundle/Agents/Writer"
-    for name in ("Agent.json", "Instructions.md", "Prompts.json"):
-        if not (bundle / name).is_file() or (bundle / name).read_bytes() != (ROOT / "MobileHarness/Resources/Agents/Writer" / name).read_bytes():
-            raise ValueError("Rebuild required: bundled Writer resource is stale")
+    for owner in ("Writer", "Shared"):
+        source = ROOT / "MobileHarness/Resources/Agents" / owner
+        packaged = bundle.parent / owner
+        expected = {path.relative_to(source): path for path in source.rglob("*") if path.is_file()}
+        actual = {path.relative_to(packaged): path for path in packaged.rglob("*") if path.is_file()}
+        if set(expected) != set(actual) or any(
+            expected[path].read_bytes() != actual[path].read_bytes() for path in expected
+        ):
+            raise ValueError(f"Rebuild required: bundled {owner} resources are stale")
     preflight = subprocess.run([str(helper), "--test-bundle-path", str(binary), "--filter", "writerEvaluationWebKitReloadsLocalResourcesAndChecksClick|writerPromptHostUsesProductionWindowAndRenderingOwners", str(binary), "--testing-library", "swift-testing"], cwd=ROOT, env=dict(env, MH_WRITER_RENDER_EVAL="1"), timeout=60)
     if preflight.returncode:
         return preflight.returncode

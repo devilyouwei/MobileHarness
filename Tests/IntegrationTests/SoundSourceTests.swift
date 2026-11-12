@@ -186,18 +186,17 @@ extension LiveRuntimeTests {
         async throws
     {
         let original = try AgentConfigurations.load(named: "SpeechPerception")
-        #expect(throws: CommunicationError.unauthorized) {
-            try CommunicationPolicy(
-                contracts: AgentContracts.communication,
-                configurations: [original])
-        }
         let configuration = try original.restrictingCommunication(
             to: ["media.audio", "sound.source"], contracts: AgentContracts.communication)
         #expect(configuration.communication.inputs.isEmpty)
         #expect(configuration.communication.subscriptions.isEmpty)
         #expect(configuration.communication.publications == ["sound.source"])
         #expect(configuration.communication.sends.isEmpty)
-        #expect(original.communication.subscriptions.contains { $0.source == "assistant" })
+        #expect(original.communication.subscriptions.isEmpty)
+        #expect(
+            original.communication.publications == [
+                PerceptionMessage.asrPartialContract, PerceptionMessage.asrFinalContract, "sound.source",
+            ])
         #expect(configuration.agentID == original.agentID && configuration.version == original.version)
         let policy = try CommunicationPolicy(
             contracts: AgentContracts.communication, configurations: [configuration])

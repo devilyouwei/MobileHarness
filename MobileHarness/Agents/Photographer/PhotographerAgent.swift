@@ -77,7 +77,7 @@ public actor PhotographerAgent: Agent {
         descriptor = AgentDescriptor(
             category: configuration.category,
             id: configuration.agentID, name: "Photographer",
-            inputs: Set(configuration.communication.inputs.map(\.kind)),
+            inputs: configuration.communication.inputKinds,
             outputs: [.communication, .actionCall, .toolCall, .control, .scheduling],
             capabilities: try Self.runtimeCapabilities(configuration.capabilities))
         taskCoordinator = AgentFixedTaskCoordinator(context: self.contextRepository)
