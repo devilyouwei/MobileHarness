@@ -157,6 +157,10 @@ Click any preview to view it at full size.
   </tr>
   <tr>
     <td align="center" valign="top" width="25%">
+      <strong>Drawing in progress</strong><br><br>
+      <a href="docs/imgs/writer-drawing-demo.gif"><img src="docs/imgs/writer-drawing-demo.gif" height="200" alt="A drawing taking shape in the Writer preview"></a>
+    </td>
+    <td align="center" valign="top" width="25%">
       <strong>NexArm control</strong><br><br>
       <a href="docs/imgs/nexarm-control-demo.gif"><img src="docs/imgs/nexarm-control-demo.gif" height="200" alt="Animated demonstration of a phone mounted on a NexArm robotic arm"></a>
     </td>
