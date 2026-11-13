@@ -143,7 +143,7 @@ Writer 运行以委托入口为身份，workspace 是可选编辑目标；前序
 
 Generation resolves Action and text-mapped output to registration-owned Channels. Camera UI inputs expose capture, saving and window controls; closing releases the photo session.
 
-Assistant 的用户 final/input 采用短上下文 Decision→统一 Q；已认证同伴及 Action 业务返回值/异常直接进 Q，成功 Void 不产生输入。空闲时冻结整 Q，通过带身份/来源/时间的统一 envelope 请求模型，生成与执行独立结算。ModelKit 只提供候选能力，Actions 适配云端设置与 UI 事实，Gateway 负责会话内跨轮同 Channel 顺序；其他 Agent 的独立任务生命周期不随回复打断。
+Assistant 的用户 final/input 采用短上下文 Decision→统一 Q。已认证同伴及 Action 业务返回值或异常直接进 Q。模型生成结束后继续缓冲。Gateway 结算本轮所有 Channel 和结果投递后，Assistant 冻结同会话待处理输入，通过带身份、来源和时间的 envelope 请求模型。Gateway 负责会话内的 Channel 顺序，其他 Agent 管理独立任务生命周期。
 
 Assistant/Writer 的排队与请求准备不创建 message；模型实际开始时提交请求，真实失败保留。Assistant 会话为已丢弃及已完成打断发布限时灵动岛详情，Writer 委托生命周期由独立执行仓库保存。
 

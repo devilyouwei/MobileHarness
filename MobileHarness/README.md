@@ -993,7 +993,7 @@ sequenceDiagram
     end
 ```
 
-Agents submits a frozen request to ModelKit, resolves streamed output against its catalog, and submits authorized calls through Gateway. A round seal joins related calls and feedback for execution settlement. The full-duplex Assistant can admit the next input batch while an earlier round settles. See [Assistant full-duplex interaction](#assistant-full-duplex-interaction).
+Agents submits a frozen request to ModelKit, resolves streamed output against its catalog, and submits authorized calls through Gateway. A round seal joins related calls and feedback for execution settlement. The full-duplex Assistant buffers incoming signals during settlement and dispatches the next batch after that boundary. See [Assistant full-duplex interaction](#assistant-full-duplex-interaction).
 
 Call completion, delivery, round closure and the next inference are separate boundaries. Results retain endpoint/incarnation/session/input/round/execution identity and opaque cognitive correlation; Agents interprets turn/Task semantics. Late results cannot target the latest chat or awaken a replacement owner. Reply barriers also join synthesis and playback before continuation.
 
@@ -1134,7 +1134,7 @@ flowchart TB
 
 PlatformKit reports the active capture route capability. SpeechPerception publishes partial and final ASR on user.input and owns recognition presentation. Assistant subscribes to the final contract and classifies it alongside typed input. The voice coordinator gates recognition on restricted routes during actual playback and restores it after playback cleanup. See [audio routing](PlatformKit/Audio/README.md) and [Assistant input handling](Agents/Assistant/README.md#多源全双工输入与-decision).
 
-Model generation and Action settlement have separate completion boundaries. Assistant can start the next batch while Actions from earlier rounds settle. Gateway preserves session-scoped ordering within each Channel and coordinates resource use across Channels. A confirmed interruption joins cancellation of the Assistant's unfinished work before the next generation. Storage records dispatched requests, replies, Action results and Task commits at their respective boundaries. See [Assistant multi-Channel output](Agents/Assistant/README.md#多-channel-输出与跨轮结算), [Gateway scheduling](Gateway/Output/Scheduling/README.md) and [history and restart](#18-history-business-records-and-restart-behavior).
+Model generation closes the set of calls. Gateway preserves ordering within each Channel and coordinates resource use across Channels. Assistant buffers user inputs and execution feedback until the round's Channels and native calls settle, then dispatches the accumulated batch. A confirmed interruption joins cancellation and cleanup before the next generation. Storage records dispatched requests, replies, Action results and Task commits at their respective boundaries. See [Assistant multi-Channel output](Agents/Assistant/README.md#多-channel-输出与跨轮结算), [Gateway scheduling](Gateway/Output/Scheduling/README.md) and [history and restart](#18-history-business-records-and-restart-behavior).
 
 ### 13. Camera preview, vision and tracking
 

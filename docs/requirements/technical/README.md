@@ -29,6 +29,7 @@
 - [Direct container inputs](Direct-Container-Input-Plan.md): implementation and automated/build validation; native/device and comparable performance acceptance remain tracked.
 
 - [语音完成文本的 Agent 输入](ASR-User-Input-Plan.md) 规划 ASR 订阅、感知内部收尾和播放控制。
+- [Assistant 按执行轮次结算](Assistant-Channel-Settlement.md) 记录下一批推理的结算条件及用户输入缓冲。
 - [Agent containers](Agent-Containers-Plan.md): root, seven roles and unified lifecycle implemented; validation and native acceptance tracked separately.
 
 - [Container 状态与模型上下文](Container-State-Context.md)：替代共享Storage State，迁移到容器快照和Skill v3；验收见专项记录。

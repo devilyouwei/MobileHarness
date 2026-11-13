@@ -349,7 +349,7 @@ ProviderDiscovery 取消回归通过有界信号等待底层取消处理器被�
 
 GenerationRoundTests 验证业务 Action 抛出原生风格错误且同轮语音输出失败时，仍交付业务观察、继续 ReACT 并接纳下一输入。PromptTemplateTests 验证常驻多窗口规则、摄影保存完成与显式窗口关闭的独立性；提示词契约测试不等同真实模型遵从验收。
 
-Full-duplex fixtures verify whole-Q freezing, independent generation/execution, ready native-result pairing, interrupt settlement, short forced-tool Decision and conservative fallback, consent policy, and additive SQLite migration. These synthetic tests do not establish cloud accuracy or physical audio echo quality.
+Full-duplex fixtures verify buffering until Channel settlement, one request for queued user input and multiple terminal Action results, native-result pairing, interrupt settlement, short forced-tool Decision and conservative fallback, consent policy, and additive SQLite migration. Model and audio-route fixtures use controlled capabilities.
 
 历史完整文本回归覆盖首次批次、ReACT、后续checkpoint、SQLite重开、日志清理、详情/窗口/输入读取与UI双角色完整投影；旧批次仅从身份匹配的记录日志恢复。
 

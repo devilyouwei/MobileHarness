@@ -221,7 +221,7 @@ Assistant 按每轮冻结的 Action 目录解析模型流，保留调用所属 C
 
 会话的 [AssistantGenerationTransport](AssistantGenerationTransport.swift) 通过单一输出读取器按顺序接纳 Action 和 `wait` 边界。原生 Tool 使用四个独立执行槽，最多保留 128 条工具工作记录。各轮封口独立等待本轮原生 Tool，封口任务最多 32 个。容量耗尽时明确拒绝，封口失败通过独立通知唤醒输出泵并加入取消清理。
 
-Assistant 以原会话、输入、轮次和调用身份提交输出。Gateway 适配层为 Assistant 附加会话级顺序域，同一 Channel 在跨轮执行时保持 FIFO。各 Channel 在资源许可和 `wait` 约束下可并行。模型生成结束后，Assistant 可以接纳下一批输入，并保留旧轮目录和关联身份，供旧轮的权限校验与结果结算使用。调度算法、等待作用域和资源仲裁见 [Gateway Channel 调度](../../Gateway/Output/Scheduling/README.md)，挂起轮次和容量见 [Chat 全双工调度](../Support/Chat/README.md#assistant-全双工调度)。
+Assistant 以原会话、输入、轮次和调用身份提交输出。Gateway 适配层为 Assistant 附加会话级顺序域，同一 Channel 保持 FIFO。各 Channel 在资源许可和 `wait` 约束下并行。模型生成结束后保留原轮目录和身份，并缓冲新用户输入与执行结果。所有 Channel 和本轮原生 Tool 结算后才提交下一批模型请求。调度算法见 [Gateway Channel 调度](../../Gateway/Output/Scheduling/README.md)，批次与容量见 [Chat 全双工调度](../Support/Chat/README.md#assistant-全双工调度)。
 
 普通 Action 的业务值或真实异常到达后可逐条进入下一批输入，原轮继续结算执行记录。成功 Void 和纯取消只结算原调用。原生 Tool 结果在组内配对齐备后进入下一批。确认打断时，Assistant 保留已接纳的新输入，取消当前生成和本会话此前未结束的输出，加入实际清理后再开放新执行。独立后台 Agent 持续运行。跨模块流向见 [总体技术设计](../../README.md#assistant-full-duplex-interaction)。
 

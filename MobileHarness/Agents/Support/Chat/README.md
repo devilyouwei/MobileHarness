@@ -247,7 +247,7 @@ Worker 从注入或加载的 AgentConfiguration 复制 category 到 Descriptor�
 
 fullDuplex 为角色装配选择；其他 Chat Worker 可继续使用同步轮次协议。Assistant 的生成任务结束后将目录、原始请求、调用/结果、预算和媒体绑定保存在最多32个 PendingRound 中，反馈校验原 input/round/session/root/turn。effectiveCapabilities 在挂起期间仍提供原目录；已取消轮次不再授权新效果。控制操作还验证原任务快照未失效。
 
-待处理输入至多32、后台候选至多16、单条16 KiB、待处理文本512 KiB、来源32、活跃输入64；执行结算另有32个保留槽。满载明确拒绝。drain 先结算已齐备原轮次，再原子冻结同会话全部已就绪语义输入；联合请求保留每个 native call/result 块一次。新到输入留下一批；没有固定聚合延时。请求窗口压缩只移除可省历史，不能拆批或截断当前输入，仍超限则明确报告准备失败并保留内存批次，不创建 message。
+待处理输入至多32、后台候选至多16、单条16 KiB、待处理文本512 KiB、来源32、活跃输入64。执行结算另有保留槽。满载明确拒绝。模型流封口后，drain 只取已收到 Gateway 终态回执的原轮次结算入口。等待期间语义输入持续入队。结算开始时冻结同会话已在接纳和分类的身份，这批身份处理完后再原子取同会话已就绪输入。联合请求保留每个 native call/result 块一次。批次窗口压缩只移除可省历史，超限明确报告准备失败并保留内存批次。
 
 interrupt 保留未处理 Q，取消已生成各轮及当前生成；执行 owner join 后补记未确认结果为取消/效果未知，不能重放。各批次成员在完成、取消、失败时一并结算。AssistantInputCoordination 在内存保存分类路径、来源与主批次关联，仅随实际发起请求落盘；批次成员不单独建行。discard 释放输入后回报已确认决定，同代 interrupt 完成旧执行结算后回报打断。角色会话消费这两个回调，enqueue 不发布。根停止加入分类/模型任务，关闭挂起上下文。
 
@@ -259,7 +259,7 @@ interrupt 保留未处理 Q，取消已生成各轮及当前生成；执行 owne
 
 可信用户入口（本地 text、SpeechPerception final）才调用快决策。经过 task 身份校验的同伴消息由 private semantic adapter 标为 agent；执行反馈验证原 owner/session/round/call 后标为 action，两者绕过 Decision。不能凭载荷 text 或正文自称获得用户角色。用户的可靠回答保护不应用于其他来源。
 
-普通 Action 的 value/异常逐条创建独立语义项，原 PendingRound 继续结算 journal 和资源完成；forwarded 标记与 publishing 所有权防止异步观察构建、重复反馈或封口造成重复消费。新请求不会重发原意图作为当前输入。成功 Void/内部完成/纯取消不入 Q。原生组在全部 native 结果就绪后即可发布，不等待同轮无关 Action；原生调用保留完整 assistant tool_calls/tool 块，历史中相同调用组在拼接当前附件时去重。通用观察扩展的待处理附件总上限 32 MiB，超限明确拒绝；请求仍受五张图片、64 条消息、64 KiB 文本约束。
+普通 Action 的业务值或异常逐条创建语义项，forwarded 与 publishing 防止重复入队。原生组在配对齐备后进入等待队列，保留完整的 assistant tool_calls/tool 块。Gateway 等待所有 Channel 的完成、失败或取消及可靠结果投递。Assistant 结算原轮 journal 后，将待处理 Action、原生工具结果和已接纳用户输入纳入同一请求。成功 Void、内部完成和纯取消只结算原轮。通用观察扩展的待处理附件总上限 32 MiB，请求仍受五张图片、64 条消息和 64 KiB 文本约束，超限明确拒绝。
 
 元数据和图片由 Worker 持有，生命周期与队列/批次一致；排队容量计算展开准备失败保留批次，防止折叠成员绕过 32 条/512 KiB 上限。seq 在准入时分配，不受异步分类耗时影响。AssistantInputBatch 使用完整事件时间及 seq 排序，单条和整批均输出正文在前、来源和秒级本地时间在后的时间线。因果身份留在运行时和协调证据中。整批和协议附件一起受保护，可省历史整组裁剪。未 dispatch 的准备记录不投影为已发生对话历史。
 

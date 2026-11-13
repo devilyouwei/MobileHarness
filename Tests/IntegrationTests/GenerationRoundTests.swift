@@ -1871,7 +1871,7 @@ private actor DuplexActionGate {
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
-func fullDuplexStartsNewRequestWhileOldActionIsExecuting() async throws {
+func fullDuplexBuffersUserInputUntilOldActionSettles() async throws {
     let gate = DuplexActionGate()
     let harness = try await roundHarness(action: true, toolCount: 0, fullDuplex: true, requestRounds: 2) { _ in
         try await gate.execute()
@@ -1892,12 +1892,8 @@ func fullDuplexStartsNewRequestWhileOldActionIsExecuting() async throws {
     }
     #expect(await gate.entered)
     try await harness.agent.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("同时回答这个新问题")))
-    for _ in 0..<1000 {
-        if await harness.model.requests.count >= 2 { break }
-        try await Task.sleep(for: .milliseconds(10))
-    }
-    #expect(await harness.model.requests.count == 2)
-    #expect(await !gate.released)
+    try await Task.sleep(for: .milliseconds(150))
+    #expect(await harness.model.requests.count == 1)
     #expect(await gate.count == 1)
     await gate.release()
     for _ in 0..<1000 {
@@ -1905,6 +1901,7 @@ func fullDuplexStartsNewRequestWhileOldActionIsExecuting() async throws {
         try await Task.sleep(for: .milliseconds(10))
     }
     #expect(await gate.count == 2)
+    #expect(await harness.model.requests.count == 2)
     await harness.close()
     pump.cancel()
     _ = await pump.result
@@ -1933,17 +1930,11 @@ func fullDuplexMergesReadyNativeResultsAndQueuedUserInput() async throws {
         try await Task.sleep(for: .milliseconds(10))
     }
     #expect(await gate.entered)
-    await agent.setExecutionCancellationBarrier(true)
     let second = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("also answer the new question"))
     try await agent.receive(second)
+    try await Task.sleep(for: .milliseconds(150))
+    #expect(await harness.model.requests.count == 1)
     await gate.release()
-    for _ in 0..<1000 {
-        if await harness.log.outputs.contains(where: { if case .roundFinished = $0.output { true } else { false } }) {
-            break
-        }
-        try await Task.sleep(for: .milliseconds(10))
-    }
-    await agent.setExecutionCancellationBarrier(false)
     for _ in 0..<1000 {
         if await harness.model.requests.count >= 2 { break }
         try await Task.sleep(for: .milliseconds(10))
@@ -2137,7 +2128,7 @@ func duplexSemanticResultsShareQueueCapacityWhileSettlementKeepsReservedSlot(spe
     _ = await pump.result
 }
 
-private actor EarlyBusinessResult {
+private actor StaggeredBusinessResults {
     var count = 0
     var released = false
     func execute(fail: Bool) async throws -> ActionCompletion {
@@ -2147,14 +2138,14 @@ private actor EarlyBusinessResult {
             return .value("first business result")
         }
         while !released { try await Task.sleep(for: .milliseconds(5)) }
-        return .completed
+        return .value("second business result")
     }
     func release() { released = true }
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
-func multiSourceActionResultStartsRequestBeforeOtherActionCompletes(fail: Bool) async throws {
-    let gate = EarlyBusinessResult()
+func multiSourceActionResultsAndUserInputShareOneRequestAfterSettlement(fail: Bool) async throws {
+    let gate = StaggeredBusinessResults()
     let classifier = DecisionCloudFixture(events: [
         .toolCall(.init(id: "classify", name: "classify_input", argumentsJSON: #"{"action":"enqueue"}"#))
     ])
@@ -2171,29 +2162,35 @@ func multiSourceActionResultStartsRequestBeforeOtherActionCompletes(fail: Bool) 
             await harness.log.record(output, result: result)
         }
     }
-    try await harness.agent.receive(.init(id: "early-result", sessionID: "early", payload: .text("执行两个动作")))
+    try await harness.agent.receive(.init(id: "first-input", sessionID: "settlement", payload: .text("执行两个动作")))
     for _ in 0..<1000 {
-        let actionsStarted = await gate.count
-        if await harness.model.requests.count >= 2, fail || actionsStarted == 2 { break }
+        if await gate.count == 2, await harness.agent.status().queuedInputs >= 1 { break }
+        try await Task.sleep(for: .milliseconds(5))
+    }
+    try #require(await gate.count == 2)
+    try await harness.agent.receive(.init(id: "follow-up", sessionID: "settlement", payload: .text("补充要求")))
+    try await Task.sleep(for: .milliseconds(150))
+    #expect(await harness.model.requests.count == 1)
+    await gate.release()
+    for _ in 0..<1000 {
+        if await harness.model.requests.count >= 2 { break }
         try await Task.sleep(for: .milliseconds(5))
     }
     let requests = await harness.model.requests
     #expect(requests.count == 2)
-    #expect(await !gate.released)
-    if !fail { #expect(await gate.count == 2) }
     let body = try #require(requests.last?.messages.last(where: { $0.role == .user })?.content)
     #expect(body.hasPrefix("UI.Expression.express {"))
-    #expect(body.contains("\nAction Result ｜ "))
+    #expect(body.components(separatedBy: "\nAction Result ｜ ").count == 3)
     #expect(body.contains(fail ? #""status":"failed""# : #""status":"succeeded""#))
+    #expect(body.contains("second business result") && body.contains("补充要求"))
     #expect(!body.contains("call_id") && !body.contains("round_id") && !body.contains(#""call":"#))
     #expect(!body.contains("执行两个动作"))
-    await gate.release()
     for _ in 0..<1000 {
         if try await harness.store.snapshot().current.turns.allSatisfy({ $0.state == .completed }) { break }
         try await Task.sleep(for: .milliseconds(5))
     }
     #expect(await harness.model.requests.count == 2)
-    #expect(await classifier.requests.count == 1)
+    #expect(await classifier.requests.count == 2)
     await decision.stop()
     await harness.close()
     pump.cancel()
@@ -2201,7 +2198,7 @@ func multiSourceActionResultStartsRequestBeforeOtherActionCompletes(fail: Bool) 
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
-func multiSourceReadyNativeGroupDoesNotWaitForUnrelatedAction() async throws {
+func multiSourceReadyNativeGroupWaitsForAllChannels() async throws {
     let gate = DuplexActionGate()
     let harness = try await roundHarness(action: true, toolCount: 2, fullDuplex: true) { invocation in
         if invocation.call.actionPath.domain == "UI" {
@@ -2220,17 +2217,21 @@ func multiSourceReadyNativeGroupDoesNotWaitForUnrelatedAction() async throws {
     try await harness.agent.receive(
         .init(id: "native-ready", sessionID: "native", payload: .text("read while displaying")))
     for _ in 0..<1000 {
-        if await harness.model.requests.count >= 2, await gate.entered { break }
+        if await gate.entered, await harness.agent.status().queuedInputs >= 1 { break }
+        try await Task.sleep(for: .milliseconds(5))
+    }
+    #expect(await gate.entered)
+    #expect(await harness.model.requests.count == 1)
+    await gate.release()
+    for _ in 0..<1000 {
+        if await harness.model.requests.count >= 2 { break }
         try await Task.sleep(for: .milliseconds(5))
     }
     let requests = await harness.model.requests
     #expect(requests.count == 2)
-    #expect(await gate.entered)
-    #expect(await !gate.released)
     let request = try #require(requests.last)
     #expect(request.messages.filter { $0.role == .tool }.count == 2)
     #expect(Set(request.messages.flatMap(\.toolCalls).map(\.id)) == ["native-0", "native-1"])
-    await gate.release()
     for _ in 0..<1000 {
         if try await harness.store.snapshot().current.turns.allSatisfy({ $0.state == .completed }) { break }
         try await Task.sleep(for: .milliseconds(5))

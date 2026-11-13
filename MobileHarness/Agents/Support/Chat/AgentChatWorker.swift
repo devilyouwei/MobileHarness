@@ -164,6 +164,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                             await inputDecisionFeedback?(.discard, input.id)
                         }
                         await publishInputQueue()
+                        if settlementAdmissions.contains(input.id) { drain() }
                         continue
                     }
                     try queue.admit(input, disposition: .enqueue(priority: 0))
@@ -194,6 +195,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                     semanticAttachments[input.id] = nil
                     replyInputs.remove(input.id)
                     emit(.control("agent.error: input decision failed: \(error)"), for: input)
+                    if settlementAdmissions.contains(input.id) { drain() }
                 }
             }
         }
@@ -286,6 +288,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         var publishing = false
     }
     private var pendingRounds: [String: PendingRound] = [:]
+    private var settlementAdmissions: Set<String> = []
     private var batchMembers: [String: [AgentInput]] = [:]
     private var batchTexts: [String: String] = [:]
     private var roundID: String?
@@ -534,6 +537,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             }
         decisionPending.removeAll()
         pendingRounds.removeAll()
+        settlementAdmissions.removeAll()
         batchMembers.removeAll()
         batchTexts.removeAll()
         mergedResults.removeAll()
@@ -600,6 +604,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             (queue.inputs + classifying + pendingRounds.values.map(\.input) + batchMembers.values.flatMap { $0 }).filter
         { seen.insert($0.id).inserted && $0.id != activeInput?.id }
         pendingRounds.removeAll()
+        settlementAdmissions.removeAll()
         batchMembers.removeAll()
         batchTexts.removeAll()
         mergedResults.removeAll()
@@ -1008,6 +1013,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             admitting -= 1
             admittingInputs[input.id] = nil
             cancelledAdmissions.remove(input.id)
+            if settlementAdmissions.contains(input.id) { drain() }
         }
         do { try await prepareSignal(input) } catch {
             inputInteractions[input.id] = nil
@@ -1217,24 +1223,30 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         }
     }
     private func drain() {
-        guard worker == nil, !hostCancellationInProgress, !executionCancellationBarrier,
-            pendingRounds.count < 32
-                || queue.inputs.contains(where: { input in
-                    pendingRounds.values.contains { $0.input.id == input.id && $0.queued }
-                })
+        guard worker == nil, lifecycle == .running, !hostCancellationInProgress, !executionCancellationBarrier
         else { return }
+        let waitingForSettlement = !pendingRounds.isEmpty
+        let settlements = Set(pendingRounds.values.filter(\.queued).map { $0.input.id })
+        guard !waitingForSettlement || !settlements.isEmpty else { return }
+        if !settlementAdmissions.isEmpty {
+            settlementAdmissions.formIntersection(Set(admittingInputs.keys).union(decisionPending.map { $0.input.id }))
+            guard waitingForSettlement || settlementAdmissions.isEmpty else { return }
+        }
         while lifecycle == .running && !queue.isEmpty {
-            let excludedBlocked = Set(
+            let excluded = Set(
                 queue.inputs.filter { queued in
-                    blockedSessions.contains(queued.sessionID)
-                        && !pendingRounds.values.contains(where: { $0.input.id == queued.id && $0.queued })
+                    !settlements.contains(queued.id)
+                        && (waitingForSettlement || blockedSessions.contains(queued.sessionID))
                 }.map(\.id))
-            guard let entry = queue.take(excluding: excludedBlocked) else { return }
+            guard let entry = queue.take(excluding: excluded) else { return }
             let input = entry.input
             processed += 1
-            if fullDuplex, !pendingRounds.values.contains(where: { $0.input.id == input.id }),
-                Self.inputText(input) != nil
-            {
+            if settlements.contains(input.id) {
+                // Wait for the inputs already being admitted for this batch, including classification.
+                settlementAdmissions.formUnion(admittingInputs.filter { $0.value == input.sessionID }.keys)
+                settlementAdmissions.formUnion(
+                    decisionPending.filter { $0.input.sessionID == input.sessionID }.map { $0.input.id })
+            } else if fullDuplex, Self.inputText(input) != nil {
                 let excluded = Set(pendingRounds.values.map { $0.input.id })
                     .union(queue.inputs.filter { Self.inputText($0) == nil }.map(\.id))
                 let entries = [input] + queue.takeAll(sessionID: input.sessionID, excluding: excluded).map(\.input)

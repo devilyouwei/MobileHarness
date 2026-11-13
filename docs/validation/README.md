@@ -4,6 +4,8 @@
 
 ## 当前验收入口
 
+[Assistant 执行轮次结算](Assistant-Channel-Settlement.md) 记录相机 ReACT 拆批证据和缓冲回归。
+
 [Writer 提示词与续写上下文](Writer-Resource-Organization.md) 记录模型请求、续写接纳、定向通信与资源打包的验证。
 
 [ASR 用户输入通行](ASR-User-Input.md) 记录片段和最终文本路由、语音本地生命周期及验证范围。
