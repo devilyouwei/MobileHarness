@@ -1,0 +1,3351 @@
+{
+  "device": "Apple M5 / macOS 27.2.1 (26B131)",
+  "model": "vllm-sr/d3-edge",
+  "threshold_ms": 100,
+  "limit_tokens": 512,
+  "warmups": 3,
+  "new_fixtures": [
+    {
+      "id": "syn-stop-zh-0",
+      "expected": "interrupt",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"你念一下这里。\"\nAssistant: \"我现在开始念第二段。\"\nLatest user transcript: \"停下\""
+    },
+    {
+      "id": "syn-stop-zh-1",
+      "expected": "enqueue",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"你念一下这里。\"\nAssistant: \"我现在开始念第二段。\"\nLatest user transcript: \"我只是重复“停下”这两个字。\""
+    },
+    {
+      "id": "syn-stop-en-0",
+      "expected": "interrupt",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"Read this aloud.\"\nAssistant: \"I am reading the second passage.\"\nLatest user transcript: \"Stop right there.\""
+    },
+    {
+      "id": "syn-stop-en-1",
+      "expected": "enqueue",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"Read this aloud.\"\nAssistant: \"I am reading the second passage.\"\nLatest user transcript: \"I was only quoting “stop right there”.\""
+    },
+    {
+      "id": "syn-speech-zh-0",
+      "expected": "interrupt",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"你念一下这里。\"\nAssistant: \"我现在开始念第二段。\"\nLatest user transcript: \"别说了。\""
+    },
+    {
+      "id": "syn-speech-zh-1",
+      "expected": "enqueue",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"你念一下这里。\"\nAssistant: \"我现在开始念第二段。\"\nLatest user transcript: \"不用停，继续说。\""
+    },
+    {
+      "id": "syn-speech-en-0",
+      "expected": "interrupt",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"Read this aloud.\"\nAssistant: \"I am reading the second passage.\"\nLatest user transcript: \"Enough talking.\""
+    },
+    {
+      "id": "syn-speech-en-1",
+      "expected": "enqueue",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"Read this aloud.\"\nAssistant: \"I am reading the second passage.\"\nLatest user transcript: \"Keep talking. You don’t have to stop.\""
+    },
+    {
+      "id": "syn-wait-zh-0",
+      "expected": "interrupt",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"你念一下这里。\"\nAssistant: \"我现在开始念第二段。\"\nLatest user transcript: \"等下。\""
+    },
+    {
+      "id": "syn-wait-zh-1",
+      "expected": "enqueue",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"你念一下这里。\"\nAssistant: \"我现在开始念第二段。\"\nLatest user transcript: \"这段讲完，等下再说下一段。\""
+    },
+    {
+      "id": "syn-wait-en-0",
+      "expected": "interrupt",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"Read this aloud.\"\nAssistant: \"I am reading the second passage.\"\nLatest user transcript: \"Hold on a second.\""
+    },
+    {
+      "id": "syn-wait-en-1",
+      "expected": "enqueue",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"Read this aloud.\"\nAssistant: \"I am reading the second passage.\"\nLatest user transcript: \"Finish this part, then we can talk about the next one.\""
+    },
+    {
+      "id": "syn-pause-zh-0",
+      "expected": "interrupt",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"你念一下这里。\"\nAssistant: \"我现在开始念第二段。\"\nLatest user transcript: \"先暂停一下。\""
+    },
+    {
+      "id": "syn-pause-zh-1",
+      "expected": "enqueue",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"你念一下这里。\"\nAssistant: \"我现在开始念第二段。\"\nLatest user transcript: \"先继续，等我回来再暂停。\""
+    },
+    {
+      "id": "syn-pause-en-0",
+      "expected": "interrupt",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"Read this aloud.\"\nAssistant: \"I am reading the second passage.\"\nLatest user transcript: \"Pause for a second.\""
+    },
+    {
+      "id": "syn-pause-en-1",
+      "expected": "enqueue",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"Read this aloud.\"\nAssistant: \"I am reading the second passage.\"\nLatest user transcript: \"Carry on for now. Pause when I get back.\""
+    },
+    {
+      "id": "syn-change-zh-0",
+      "expected": "interrupt",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"你念一下这里。\"\nAssistant: \"我现在开始念第二段。\"\nLatest user transcript: \"现在就换下一段。\""
+    },
+    {
+      "id": "syn-change-zh-1",
+      "expected": "enqueue",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"你念一下这里。\"\nAssistant: \"我现在开始念第二段。\"\nLatest user transcript: \"等这一段结束，再换到下一段。\""
+    },
+    {
+      "id": "syn-change-en-0",
+      "expected": "interrupt",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"Read this aloud.\"\nAssistant: \"I am reading the second passage.\"\nLatest user transcript: \"Skip to the next passage now.\""
+    },
+    {
+      "id": "syn-change-en-1",
+      "expected": "enqueue",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"Read this aloud.\"\nAssistant: \"I am reading the second passage.\"\nLatest user transcript: \"Move on once this passage ends.\""
+    },
+    {
+      "id": "syn-cancel-zh-0",
+      "expected": "interrupt",
+      "input": "Playing=no Running=yes Awaiting answer=unknown\nHistory:\nUser: \"帮我定好五点前的提醒并通知对方。\"\nAssistant: \"正在准备定时发送。\"\nLatest user transcript: \"先别发。\""
+    },
+    {
+      "id": "syn-cancel-zh-1",
+      "expected": "enqueue",
+      "input": "Playing=no Running=yes Awaiting answer=unknown\nHistory:\nUser: \"帮我定好五点前的提醒并通知对方。\"\nAssistant: \"正在准备定时发送。\"\nLatest user transcript: \"照常发，下一封再改。\""
+    },
+    {
+      "id": "syn-cancel-en-0",
+      "expected": "interrupt",
+      "input": "Playing=no Running=yes Awaiting answer=unknown\nHistory:\nUser: \"Set the reminder and notify them.\"\nAssistant: \"I am preparing the scheduled message.\"\nLatest user transcript: \"Don’t send it yet.\""
+    },
+    {
+      "id": "syn-cancel-en-1",
+      "expected": "enqueue",
+      "input": "Playing=no Running=yes Awaiting answer=unknown\nHistory:\nUser: \"Set the reminder and notify them.\"\nAssistant: \"I am preparing the scheduled message.\"\nLatest user transcript: \"Send this one as planned. Change the next one.\""
+    },
+    {
+      "id": "syn-correct-zh-0",
+      "expected": "interrupt",
+      "input": "Playing=no Running=yes Awaiting answer=unknown\nHistory:\nUser: \"帮我定好五点前的提醒并通知对方。\"\nAssistant: \"正在准备定时发送。\"\nLatest user transcript: \"不对，改到五点。\""
+    },
+    {
+      "id": "syn-correct-zh-1",
+      "expected": "enqueue",
+      "input": "Playing=no Running=yes Awaiting answer=unknown\nHistory:\nUser: \"帮我定好五点前的提醒并通知对方。\"\nAssistant: \"正在准备定时发送。\"\nLatest user transcript: \"这次照旧，下次改到五点。\""
+    },
+    {
+      "id": "syn-correct-en-0",
+      "expected": "interrupt",
+      "input": "Playing=no Running=yes Awaiting answer=unknown\nHistory:\nUser: \"Set the reminder and notify them.\"\nAssistant: \"I am preparing the scheduled message.\"\nLatest user transcript: \"No, make that five o’clock.\""
+    },
+    {
+      "id": "syn-correct-en-1",
+      "expected": "enqueue",
+      "input": "Playing=no Running=yes Awaiting answer=unknown\nHistory:\nUser: \"Set the reminder and notify them.\"\nAssistant: \"I am preparing the scheduled message.\"\nLatest user transcript: \"Keep this one as it is. Make the next one five.\""
+    },
+    {
+      "id": "syn-target-zh-0",
+      "expected": "enqueue",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"你念一下这里。\"\nAssistant: \"我现在开始念第二段。\"\nLatest user transcript: \"别说了，小陈。\""
+    },
+    {
+      "id": "syn-target-zh-1",
+      "expected": "interrupt",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"你念一下这里。\"\nAssistant: \"我现在开始念第二段。\"\nLatest user transcript: \"你先别说，我有个问题。\""
+    },
+    {
+      "id": "syn-target-en-0",
+      "expected": "enqueue",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"Read this aloud.\"\nAssistant: \"I am reading the second passage.\"\nLatest user transcript: \"Jo, stop talking.\""
+    },
+    {
+      "id": "syn-target-en-1",
+      "expected": "interrupt",
+      "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"Read this aloud.\"\nAssistant: \"I am reading the second passage.\"\nLatest user transcript: \"Stop speaking for a second. I have a question.\""
+    },
+    {
+      "id": "syn-idle-zh",
+      "expected": "enqueue",
+      "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"读上面那一段。\"\nAssistant: \"已经读完了。\"\nLatest user transcript: \"等下。\""
+    },
+    {
+      "id": "syn-idle-en",
+      "expected": "enqueue",
+      "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"Read the paragraph above.\"\nAssistant: \"I have finished reading it.\"\nLatest user transcript: \"Hold on.\""
+    }
+  ],
+  "previous_fixture_files": [
+    "duplex-decision-prompt-examples-2026-11-13.json",
+    "duplex-d3-bilingual-examples-2026-11-13.json",
+    "duplex-d3-discard-protection-2026-11-14.json"
+  ],
+  "columns": [
+    "suite",
+    "id",
+    "expected",
+    "model_result",
+    "adopted_by_policy_replay",
+    "tokens",
+    "ms"
+  ],
+  "variants": {
+    "baseline": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. \"现在停\" / \"Stop now\" during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 304,
+      "full_history_tokens": {
+        "short": 459,
+        "zh-100": 508,
+        "en-100": 475
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 20,
+            "false_discard": 0,
+            "false_interrupt": 3,
+            "missed_interrupt": 11
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 39,
+            "false_discard": 0,
+            "false_interrupt": 5,
+            "missed_interrupt": 10
+          }
+        },
+        "model_false_discard": 1,
+        "p95_ms": 46.592,
+        "maximum_ms": 47.604,
+        "token_range": [
+          313,
+          345
+        ]
+      },
+      "rows": [
+        ["new", "syn-stop-zh-0", "interrupt", "interrupt", "interrupt", 326, 46.303],
+        ["new", "syn-stop-zh-1", "enqueue", "enqueue", "enqueue", 333, 46.091],
+        ["new", "syn-stop-en-0", "interrupt", "interrupt", "interrupt", 327, 46.253],
+        ["new", "syn-stop-en-1", "enqueue", "enqueue", "enqueue", 333, 46.372],
+        ["new", "syn-speech-zh-0", "interrupt", "enqueue", "enqueue", 328, 46.338],
+        ["new", "syn-speech-zh-1", "enqueue", "enqueue", "enqueue", 331, 46.301],
+        ["new", "syn-speech-en-0", "interrupt", "enqueue", "enqueue", 326, 46.267],
+        ["new", "syn-speech-en-1", "enqueue", "enqueue", "enqueue", 333, 46.265],
+        ["new", "syn-wait-zh-0", "interrupt", "enqueue", "enqueue", 328, 46.304],
+        ["new", "syn-wait-zh-1", "enqueue", "enqueue", "enqueue", 335, 46.4],
+        ["new", "syn-wait-en-0", "interrupt", "enqueue", "enqueue", 328, 46.46],
+        ["new", "syn-wait-en-1", "enqueue", "enqueue", "enqueue", 336, 46.341],
+        ["new", "syn-pause-zh-0", "interrupt", "interrupt", "interrupt", 329, 46.12],
+        ["new", "syn-pause-zh-1", "enqueue", "enqueue", "enqueue", 333, 46.173],
+        ["new", "syn-pause-en-0", "interrupt", "interrupt", "interrupt", 328, 46.218],
+        ["new", "syn-pause-en-1", "enqueue", "interrupt", "interrupt", 335, 46.194],
+        ["new", "syn-change-zh-0", "interrupt", "enqueue", "enqueue", 330, 46.479],
+        ["new", "syn-change-zh-1", "enqueue", "enqueue", "enqueue", 335, 46.422],
+        ["new", "syn-change-en-0", "interrupt", "enqueue", "enqueue", 330, 46.291],
+        ["new", "syn-change-en-1", "enqueue", "interrupt", "interrupt", 330, 46.648],
+        ["new", "syn-cancel-zh-0", "interrupt", "enqueue", "enqueue", 334, 46.592],
+        ["new", "syn-cancel-zh-1", "enqueue", "enqueue", "enqueue", 338, 46.292],
+        ["new", "syn-cancel-en-0", "interrupt", "enqueue", "enqueue", 332, 46.408],
+        ["new", "syn-cancel-en-1", "enqueue", "enqueue", "enqueue", 337, 46.347],
+        ["new", "syn-correct-zh-0", "interrupt", "enqueue", "enqueue", 336, 46.348],
+        ["new", "syn-correct-zh-1", "enqueue", "enqueue", "enqueue", 339, 47.047],
+        ["new", "syn-correct-en-0", "interrupt", "enqueue", "enqueue", 335, 46.682],
+        ["new", "syn-correct-en-1", "enqueue", "enqueue", "enqueue", 339, 47.604],
+        ["new", "syn-target-zh-0", "enqueue", "enqueue", "enqueue", 331, 46.501],
+        ["new", "syn-target-zh-1", "interrupt", "enqueue", "enqueue", 332, 46.083],
+        ["new", "syn-target-en-0", "enqueue", "interrupt", "interrupt", 328, 46.244],
+        ["new", "syn-target-en-1", "interrupt", "interrupt", "interrupt", 334, 46.389],
+        ["new", "syn-idle-zh", "enqueue", "enqueue", "enqueue", 327, 46.407],
+        ["new", "syn-idle-en", "enqueue", "enqueue", "enqueue", 326, 46.283],
+        ["additional", "guard-01", "discard", "enqueue", "enqueue", 327, 46.841],
+        ["additional", "guard-02", "discard", "enqueue", "enqueue", 326, 46.318],
+        ["additional", "guard-03", "discard", "discard", "discard", 324, 46.453],
+        ["additional", "guard-04", "discard", "enqueue", "discard", 326, 46.41],
+        ["additional", "guard-05", "discard", "enqueue", "discard", 324, 46.319],
+        ["additional", "guard-06", "enqueue", "enqueue", "enqueue", 327, 46.386],
+        ["additional", "guard-07", "enqueue", "enqueue", "enqueue", 328, 46.156],
+        ["additional", "guard-08", "enqueue", "enqueue", "enqueue", 326, 46.258],
+        ["additional", "guard-09", "enqueue", "enqueue", "enqueue", 326, 46.308],
+        ["additional", "guard-10", "enqueue", "discard", "enqueue", 324, 46.113],
+        ["additional", "guard-11", "enqueue", "enqueue", "enqueue", 325, 46.247],
+        ["additional", "guard-12", "enqueue", "enqueue", "enqueue", 325, 46.254],
+        ["additional", "guard-13", "enqueue", "enqueue", "enqueue", 327, 46.385],
+        ["additional", "guard-14", "enqueue", "enqueue", "enqueue", 328, 46.365],
+        ["additional", "guard-15", "enqueue", "enqueue", "enqueue", 329, 46.436],
+        ["additional", "guard-16", "enqueue", "enqueue", "enqueue", 325, 46.321],
+        ["additional", "guard-17", "enqueue", "enqueue", "enqueue", 325, 46.487],
+        ["additional", "guard-18", "enqueue", "enqueue", "enqueue", 329, 46.381],
+        ["additional", "answer-01", "enqueue", "enqueue", "enqueue", 333, 46.265],
+        ["additional", "answer-02", "enqueue", "enqueue", "enqueue", 333, 46.4],
+        ["previous", "ack-0", "enqueue", "enqueue", "enqueue", 331, 46.416],
+        ["previous", "ack-1", "discard", "enqueue", "enqueue", 332, 46.408],
+        ["previous", "cancel-0", "interrupt", "interrupt", "interrupt", 326, 46.337],
+        ["previous", "cancel-1", "enqueue", "enqueue", "enqueue", 336, 46.347],
+        ["previous", "no-0", "enqueue", "enqueue", "enqueue", 337, 46.241],
+        ["previous", "no-1", "discard", "enqueue", "enqueue", 333, 46.501],
+        ["previous", "now-0", "interrupt", "interrupt", "interrupt", 337, 46.444],
+        ["previous", "now-1", "discard", "enqueue", "enqueue", 336, 46.429],
+        ["previous", "same-0", "enqueue", "enqueue", "enqueue", 335, 46.402],
+        ["previous", "same-1", "discard", "discard", "enqueue", 336, 46.288],
+        ["previous", "stop-0", "interrupt", "interrupt", "interrupt", 330, 46.373],
+        ["previous", "stop-1", "enqueue", "interrupt", "interrupt", 342, 46.382],
+        ["previous", "tomorrow-0", "interrupt", "interrupt", "interrupt", 329, 46.349],
+        ["previous", "tomorrow-1", "enqueue", "enqueue", "enqueue", 340, 46.231],
+        ["previous", "ok-0", "enqueue", "enqueue", "enqueue", 336, 46.192],
+        ["previous", "ok-1", "discard", "enqueue", "enqueue", 329, 46.484],
+        ["previous", "wait-0", "interrupt", "enqueue", "enqueue", 332, 46.244],
+        ["previous", "wait-1", "enqueue", "enqueue", "enqueue", 340, 46.164],
+        ["previous", "yes-0", "enqueue", "enqueue", "enqueue", 325, 46.209],
+        ["previous", "yes-1", "discard", "enqueue", "enqueue", 335, 46.295],
+        ["previous", "pronoun-0", "interrupt", "interrupt", "interrupt", 334, 46.342],
+        ["previous", "pronoun-1", "discard", "interrupt", "interrupt", 336, 46.4],
+        ["previous", "defer-0", "enqueue", "enqueue", "enqueue", 340, 46.11],
+        ["previous", "defer-1", "enqueue", "interrupt", "interrupt", 338, 46.14],
+        ["previous", "older-chinese-0", "interrupt", "interrupt", "interrupt", 327, 46.092],
+        ["previous", "older-chinese-1", "discard", "interrupt", "interrupt", 327, 46.6],
+        ["previous", "older-english-0", "enqueue", "enqueue", "enqueue", 329, 46.394],
+        ["previous", "older-english-1", "discard", "enqueue", "enqueue", 329, 46.423],
+        ["previous", "fresh-1", "interrupt", "enqueue", "enqueue", 333, 46.362],
+        ["previous", "fresh-2", "enqueue", "enqueue", "enqueue", 335, 46.297],
+        ["previous", "fresh-3", "discard", "enqueue", "enqueue", 333, 46.346],
+        ["previous", "fresh-4", "enqueue", "enqueue", "enqueue", 338, 46.296],
+        ["previous", "fresh-5", "discard", "enqueue", "enqueue", 326, 46.248],
+        ["previous", "fresh-6", "interrupt", "enqueue", "enqueue", 329, 46.153],
+        ["previous", "fresh-7", "enqueue", "interrupt", "interrupt", 327, 46.276],
+        ["previous", "fresh-8", "interrupt", "enqueue", "enqueue", 333, 46.215],
+        ["previous", "fresh-9", "enqueue", "enqueue", "enqueue", 336, 46.462],
+        ["previous", "fresh-10", "discard", "enqueue", "enqueue", 333, 46.179],
+        ["previous", "fresh-11", "enqueue", "enqueue", "enqueue", 331, 46.472],
+        ["previous", "fresh-12", "discard", "enqueue", "enqueue", 325, 46.224],
+        ["previous", "fresh-13", "interrupt", "enqueue", "enqueue", 328, 46.324],
+        ["previous", "fresh-14", "enqueue", "interrupt", "enqueue", 329, 46.309],
+        ["previous", "fresh-15", "enqueue", "enqueue", "enqueue", 334, 46.145],
+        ["previous", "fresh-16", "enqueue", "enqueue", "enqueue", 331, 46.286],
+        ["previous", "fresh-17", "enqueue", "enqueue", "enqueue", 327, 46.33],
+        ["previous", "fresh-18", "discard", "enqueue", "enqueue", 330, 46.417],
+        ["previous", "zh-01", "interrupt", "enqueue", "enqueue", 340, 46.344],
+        ["previous", "zh-02", "enqueue", "enqueue", "enqueue", 342, 46.321],
+        ["previous", "zh-03", "discard", "discard", "enqueue", 337, 46.432],
+        ["previous", "zh-04", "interrupt", "enqueue", "enqueue", 334, 46.089],
+        ["previous", "zh-05", "enqueue", "enqueue", "enqueue", 336, 46.096],
+        ["previous", "zh-06", "enqueue", "enqueue", "enqueue", 333, 46.34],
+        ["previous", "zh-07", "enqueue", "enqueue", "enqueue", 341, 46.353],
+        ["previous", "zh-08", "discard", "enqueue", "enqueue", 328, 46.353],
+        ["previous", "zh-09", "enqueue", "enqueue", "enqueue", 332, 46.343],
+        ["previous", "zh-10", "enqueue", "enqueue", "enqueue", 330, 46.291],
+        ["previous", "zh-11", "interrupt", "enqueue", "enqueue", 338, 46.239],
+        ["previous", "zh-12", "enqueue", "enqueue", "enqueue", 313, 46.303],
+        ["previous", "en-01", "interrupt", "enqueue", "enqueue", 335, 46.504],
+        ["previous", "en-02", "enqueue", "enqueue", "enqueue", 335, 46.372],
+        ["previous", "en-03", "discard", "enqueue", "enqueue", 334, 46.386],
+        ["previous", "en-04", "interrupt", "enqueue", "enqueue", 335, 46.356],
+        ["previous", "en-05", "enqueue", "enqueue", "enqueue", 333, 46.305],
+        ["previous", "en-06", "enqueue", "enqueue", "enqueue", 335, 46.314],
+        ["previous", "en-07", "enqueue", "enqueue", "enqueue", 345, 46.369],
+        ["previous", "en-08", "discard", "enqueue", "enqueue", 333, 46.437],
+        ["previous", "en-09", "enqueue", "enqueue", "enqueue", 336, 46.236],
+        ["previous", "en-10", "enqueue", "enqueue", "enqueue", 333, 46.232],
+        ["previous", "en-11", "interrupt", "interrupt", "interrupt", 338, 46.371],
+        ["previous", "en-12", "enqueue", "enqueue", "enqueue", 314, 46.325]
+      ]
+    },
+    "stop-pause-interrupt": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. \"现在停\" / \"Stop now\" during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change. Now: 停下 / stop, 别说了 / stop talking, 等下 / hold on, 暂停 / pause.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 330,
+      "full_history_tokens": {
+        "short": 485,
+        "zh-100": 534,
+        "en-100": 501
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 22,
+            "false_discard": 0,
+            "false_interrupt": 2,
+            "missed_interrupt": 10
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 38,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 13
+          }
+        },
+        "model_false_discard": 4,
+        "p95_ms": 46.531,
+        "maximum_ms": 46.743,
+        "token_range": [
+          339,
+          371
+        ]
+      }
+    },
+    "stop-pause-both": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. \"现在停\" / \"Stop now\" during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change. Now: 停下 / stop, 别说了 / stop talking, 等下 / hold on, 暂停 / pause.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input. Examples: 继续 / keep going, 读完再换 / change after this, 确认 / confirm."
+        }
+      },
+      "empty_prompt_tokens": 352,
+      "full_history_tokens": {
+        "short": 507,
+        "zh-100": 556,
+        "en-100": 523
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 23,
+            "false_discard": 0,
+            "false_interrupt": 5,
+            "missed_interrupt": 6
+          },
+          "additional": {
+            "correct": 20,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 39,
+            "false_discard": 0,
+            "false_interrupt": 8,
+            "missed_interrupt": 9
+          }
+        },
+        "model_false_discard": 29,
+        "p95_ms": 47.022,
+        "maximum_ms": 50.718,
+        "token_range": [
+          361,
+          393
+        ]
+      }
+    },
+    "stop-pause-compact": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change. Now: 停下 / stop, 别说了 / stop talking, 等下 / hold on, 暂停 / pause.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 316,
+      "full_history_tokens": {
+        "short": 471,
+        "zh-100": 520,
+        "en-100": 487
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 22,
+            "false_discard": 0,
+            "false_interrupt": 1,
+            "missed_interrupt": 11
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 38,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 13
+          }
+        },
+        "model_false_discard": 1,
+        "p95_ms": 46.683,
+        "maximum_ms": 47.165,
+        "token_range": [
+          325,
+          357
+        ]
+      }
+    },
+    "stop-pause-correct-interrupt": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. \"现在停\" / \"Stop now\" during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change. Now: 停下 / stop, 别说了 / stop talking, 等下 / hold on, 先别 / wait, 改成 / change it.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 337,
+      "full_history_tokens": {
+        "short": 492,
+        "zh-100": 541,
+        "en-100": 508
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 22,
+            "false_discard": 0,
+            "false_interrupt": 2,
+            "missed_interrupt": 10
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 38,
+            "false_discard": 0,
+            "false_interrupt": 5,
+            "missed_interrupt": 12
+          }
+        },
+        "model_false_discard": 4,
+        "p95_ms": 46.694,
+        "maximum_ms": 46.772,
+        "token_range": [
+          346,
+          378
+        ]
+      }
+    },
+    "stop-pause-correct-both": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. \"现在停\" / \"Stop now\" during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change. Now: 停下 / stop, 别说了 / stop talking, 等下 / hold on, 先别 / wait, 改成 / change it.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input. Examples: 继续 / keep going, 读完再换 / change after this, 确认 / confirm."
+        }
+      },
+      "empty_prompt_tokens": 359,
+      "full_history_tokens": {
+        "short": 514,
+        "zh-100": 563,
+        "en-100": 530
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 24,
+            "false_discard": 0,
+            "false_interrupt": 5,
+            "missed_interrupt": 5
+          },
+          "additional": {
+            "correct": 20,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 42,
+            "false_discard": 0,
+            "false_interrupt": 8,
+            "missed_interrupt": 6
+          }
+        },
+        "model_false_discard": 22,
+        "p95_ms": 46.67,
+        "maximum_ms": 47.097,
+        "token_range": [
+          368,
+          400
+        ]
+      },
+      "rows": [
+        ["new", "syn-stop-zh-0", "interrupt", "interrupt", "interrupt", 381, 46.616],
+        ["new", "syn-stop-zh-1", "enqueue", "discard", "enqueue", 388, 46.528],
+        ["new", "syn-stop-en-0", "interrupt", "interrupt", "interrupt", 382, 46.482],
+        ["new", "syn-stop-en-1", "enqueue", "interrupt", "interrupt", 388, 46.465],
+        ["new", "syn-speech-zh-0", "interrupt", "interrupt", "interrupt", 383, 46.538],
+        ["new", "syn-speech-zh-1", "enqueue", "enqueue", "enqueue", 386, 46.466],
+        ["new", "syn-speech-en-0", "interrupt", "interrupt", "interrupt", 381, 46.418],
+        ["new", "syn-speech-en-1", "enqueue", "interrupt", "interrupt", 388, 46.557],
+        ["new", "syn-wait-zh-0", "interrupt", "interrupt", "interrupt", 383, 46.436],
+        ["new", "syn-wait-zh-1", "enqueue", "enqueue", "enqueue", 390, 46.544],
+        ["new", "syn-wait-en-0", "interrupt", "interrupt", "interrupt", 383, 46.515],
+        ["new", "syn-wait-en-1", "enqueue", "enqueue", "enqueue", 391, 46.626],
+        ["new", "syn-pause-zh-0", "interrupt", "interrupt", "interrupt", 384, 46.472],
+        ["new", "syn-pause-zh-1", "enqueue", "enqueue", "enqueue", 388, 46.562],
+        ["new", "syn-pause-en-0", "interrupt", "interrupt", "interrupt", 383, 46.573],
+        ["new", "syn-pause-en-1", "enqueue", "interrupt", "interrupt", 390, 46.502],
+        ["new", "syn-change-zh-0", "interrupt", "enqueue", "enqueue", 385, 46.379],
+        ["new", "syn-change-zh-1", "enqueue", "enqueue", "enqueue", 390, 46.454],
+        ["new", "syn-change-en-0", "interrupt", "interrupt", "interrupt", 385, 46.486],
+        ["new", "syn-change-en-1", "enqueue", "interrupt", "interrupt", 385, 46.476],
+        ["new", "syn-cancel-zh-0", "interrupt", "enqueue", "enqueue", 389, 46.312],
+        ["new", "syn-cancel-zh-1", "enqueue", "enqueue", "enqueue", 393, 46.483],
+        ["new", "syn-cancel-en-0", "interrupt", "interrupt", "interrupt", 387, 46.515],
+        ["new", "syn-cancel-en-1", "enqueue", "enqueue", "enqueue", 392, 46.58],
+        ["new", "syn-correct-zh-0", "interrupt", "enqueue", "enqueue", 391, 46.688],
+        ["new", "syn-correct-zh-1", "enqueue", "enqueue", "enqueue", 394, 46.492],
+        ["new", "syn-correct-en-0", "interrupt", "enqueue", "enqueue", 390, 46.578],
+        ["new", "syn-correct-en-1", "enqueue", "enqueue", "enqueue", 394, 46.601],
+        ["new", "syn-target-zh-0", "enqueue", "discard", "enqueue", 386, 46.463],
+        ["new", "syn-target-zh-1", "interrupt", "enqueue", "enqueue", 387, 46.711],
+        ["new", "syn-target-en-0", "enqueue", "interrupt", "interrupt", 383, 46.574],
+        ["new", "syn-target-en-1", "interrupt", "interrupt", "interrupt", 389, 46.543],
+        ["new", "syn-idle-zh", "enqueue", "discard", "enqueue", 382, 46.459],
+        ["new", "syn-idle-en", "enqueue", "interrupt", "enqueue", 381, 46.63],
+        ["additional", "guard-01", "discard", "discard", "discard", 382, 46.513],
+        ["additional", "guard-02", "discard", "discard", "discard", 381, 46.515],
+        ["additional", "guard-03", "discard", "discard", "discard", 379, 46.496],
+        ["additional", "guard-04", "discard", "discard", "discard", 381, 46.434],
+        ["additional", "guard-05", "discard", "discard", "discard", 379, 46.365],
+        ["additional", "guard-06", "enqueue", "discard", "enqueue", 382, 46.47],
+        ["additional", "guard-07", "enqueue", "discard", "enqueue", 383, 46.318],
+        ["additional", "guard-08", "enqueue", "enqueue", "enqueue", 381, 46.407],
+        ["additional", "guard-09", "enqueue", "enqueue", "enqueue", 381, 46.516],
+        ["additional", "guard-10", "enqueue", "discard", "enqueue", 379, 46.45],
+        ["additional", "guard-11", "enqueue", "discard", "enqueue", 380, 46.49],
+        ["additional", "guard-12", "enqueue", "discard", "enqueue", 380, 46.654],
+        ["additional", "guard-13", "enqueue", "discard", "enqueue", 382, 46.556],
+        ["additional", "guard-14", "enqueue", "discard", "enqueue", 383, 46.446],
+        ["additional", "guard-15", "enqueue", "discard", "enqueue", 384, 46.532],
+        ["additional", "guard-16", "enqueue", "enqueue", "enqueue", 380, 46.419],
+        ["additional", "guard-17", "enqueue", "discard", "enqueue", 380, 46.625],
+        ["additional", "guard-18", "enqueue", "enqueue", "enqueue", 384, 46.472],
+        ["additional", "answer-01", "enqueue", "enqueue", "enqueue", 388, 46.578],
+        ["additional", "answer-02", "enqueue", "discard", "enqueue", 388, 46.562],
+        ["previous", "ack-0", "enqueue", "discard", "enqueue", 386, 46.478],
+        ["previous", "ack-1", "discard", "discard", "discard", 387, 46.442],
+        ["previous", "cancel-0", "interrupt", "interrupt", "interrupt", 381, 46.408],
+        ["previous", "cancel-1", "enqueue", "interrupt", "interrupt", 391, 46.486],
+        ["previous", "no-0", "enqueue", "discard", "enqueue", 392, 46.728],
+        ["previous", "no-1", "discard", "enqueue", "enqueue", 388, 46.435],
+        ["previous", "now-0", "interrupt", "interrupt", "interrupt", 392, 46.578],
+        ["previous", "now-1", "discard", "interrupt", "interrupt", 391, 46.347],
+        ["previous", "same-0", "enqueue", "enqueue", "enqueue", 390, 46.458],
+        ["previous", "same-1", "discard", "discard", "enqueue", 391, 46.515],
+        ["previous", "stop-0", "interrupt", "interrupt", "interrupt", 385, 46.455],
+        ["previous", "stop-1", "enqueue", "interrupt", "interrupt", 397, 46.398],
+        ["previous", "tomorrow-0", "interrupt", "interrupt", "interrupt", 384, 46.451],
+        ["previous", "tomorrow-1", "enqueue", "enqueue", "enqueue", 395, 46.507],
+        ["previous", "ok-0", "enqueue", "enqueue", "enqueue", 391, 46.506],
+        ["previous", "ok-1", "discard", "enqueue", "enqueue", 384, 46.432],
+        ["previous", "wait-0", "interrupt", "enqueue", "enqueue", 387, 46.749],
+        ["previous", "wait-1", "enqueue", "enqueue", "enqueue", 395, 46.486],
+        ["previous", "yes-0", "enqueue", "enqueue", "enqueue", 380, 46.442],
+        ["previous", "yes-1", "discard", "interrupt", "enqueue", 390, 46.584],
+        ["previous", "pronoun-0", "interrupt", "interrupt", "interrupt", 389, 46.462],
+        ["previous", "pronoun-1", "discard", "interrupt", "interrupt", 391, 46.477],
+        ["previous", "defer-0", "enqueue", "enqueue", "enqueue", 395, 46.5],
+        ["previous", "defer-1", "enqueue", "interrupt", "interrupt", 393, 46.55],
+        ["previous", "older-chinese-0", "interrupt", "interrupt", "interrupt", 382, 46.657],
+        ["previous", "older-chinese-1", "discard", "interrupt", "interrupt", 382, 46.624],
+        ["previous", "older-english-0", "enqueue", "discard", "enqueue", 384, 46.593],
+        ["previous", "older-english-1", "discard", "discard", "enqueue", 384, 46.589],
+        ["previous", "fresh-1", "interrupt", "discard", "enqueue", 388, 46.561],
+        ["previous", "fresh-2", "enqueue", "enqueue", "enqueue", 390, 46.389],
+        ["previous", "fresh-3", "discard", "discard", "enqueue", 388, 46.548],
+        ["previous", "fresh-4", "enqueue", "enqueue", "enqueue", 393, 46.54],
+        ["previous", "fresh-5", "discard", "enqueue", "enqueue", 381, 46.416],
+        ["previous", "fresh-6", "interrupt", "enqueue", "enqueue", 384, 46.475],
+        ["previous", "fresh-7", "enqueue", "interrupt", "interrupt", 382, 46.31],
+        ["previous", "fresh-8", "interrupt", "enqueue", "enqueue", 388, 46.577],
+        ["previous", "fresh-9", "enqueue", "enqueue", "enqueue", 391, 46.421],
+        ["previous", "fresh-10", "discard", "discard", "enqueue", 388, 46.591],
+        ["previous", "fresh-11", "enqueue", "enqueue", "enqueue", 386, 46.523],
+        ["previous", "fresh-12", "discard", "enqueue", "enqueue", 380, 46.559],
+        ["previous", "fresh-13", "interrupt", "interrupt", "interrupt", 383, 46.373],
+        ["previous", "fresh-14", "enqueue", "interrupt", "enqueue", 384, 46.67],
+        ["previous", "fresh-15", "enqueue", "discard", "enqueue", 389, 46.652],
+        ["previous", "fresh-16", "enqueue", "enqueue", "enqueue", 386, 46.429],
+        ["previous", "fresh-17", "enqueue", "enqueue", "enqueue", 382, 46.522],
+        ["previous", "fresh-18", "discard", "discard", "enqueue", 385, 46.556],
+        ["previous", "zh-01", "interrupt", "enqueue", "enqueue", 395, 46.636],
+        ["previous", "zh-02", "enqueue", "enqueue", "enqueue", 397, 46.568],
+        ["previous", "zh-03", "discard", "discard", "enqueue", 392, 46.53],
+        ["previous", "zh-04", "interrupt", "interrupt", "interrupt", 389, 46.578],
+        ["previous", "zh-05", "enqueue", "enqueue", "enqueue", 391, 46.464],
+        ["previous", "zh-06", "enqueue", "interrupt", "enqueue", 388, 46.567],
+        ["previous", "zh-07", "enqueue", "enqueue", "enqueue", 396, 46.561],
+        ["previous", "zh-08", "discard", "discard", "enqueue", 383, 46.465],
+        ["previous", "zh-09", "enqueue", "enqueue", "enqueue", 387, 46.449],
+        ["previous", "zh-10", "enqueue", "enqueue", "enqueue", 385, 47.097],
+        ["previous", "zh-11", "interrupt", "interrupt", "interrupt", 393, 46.661],
+        ["previous", "zh-12", "enqueue", "discard", "enqueue", 368, 46.65],
+        ["previous", "en-01", "interrupt", "interrupt", "interrupt", 390, 46.67],
+        ["previous", "en-02", "enqueue", "interrupt", "interrupt", 390, 46.602],
+        ["previous", "en-03", "discard", "discard", "enqueue", 389, 46.523],
+        ["previous", "en-04", "interrupt", "discard", "enqueue", 390, 46.489],
+        ["previous", "en-05", "enqueue", "enqueue", "enqueue", 388, 46.514],
+        ["previous", "en-06", "enqueue", "discard", "enqueue", 390, 46.666],
+        ["previous", "en-07", "enqueue", "enqueue", "enqueue", 400, 46.576],
+        ["previous", "en-08", "discard", "discard", "enqueue", 388, 46.507],
+        ["previous", "en-09", "enqueue", "enqueue", "enqueue", 391, 46.612],
+        ["previous", "en-10", "enqueue", "enqueue", "enqueue", 388, 46.592],
+        ["previous", "en-11", "interrupt", "interrupt", "interrupt", 393, 46.589],
+        ["previous", "en-12", "enqueue", "discard", "enqueue", 369, 46.458]
+      ]
+    },
+    "stop-pause-correct-compact": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change. Now: 停下 / stop, 别说了 / stop talking, 等下 / hold on, 先别 / wait, 改成 / change it.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 323,
+      "full_history_tokens": {
+        "short": 478,
+        "zh-100": 527,
+        "en-100": 494
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 22,
+            "false_discard": 0,
+            "false_interrupt": 1,
+            "missed_interrupt": 11
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 38,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 13
+          }
+        },
+        "model_false_discard": 1,
+        "p95_ms": 46.637,
+        "maximum_ms": 46.726,
+        "token_range": [
+          332,
+          364
+        ]
+      }
+    },
+    "stop-pause-guard-interrupt": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. \"现在停\" / \"Stop now\" during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change. Now: 停下 / stop, 别说了 / stop talking, 等下 / hold on. Later: 等下再说 / later.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 334,
+      "full_history_tokens": {
+        "short": 489,
+        "zh-100": 538,
+        "en-100": 505
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 22,
+            "false_discard": 0,
+            "false_interrupt": 1,
+            "missed_interrupt": 11
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 38,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 13
+          }
+        },
+        "model_false_discard": 4,
+        "p95_ms": 46.706,
+        "maximum_ms": 47.526,
+        "token_range": [
+          343,
+          375
+        ]
+      }
+    },
+    "stop-pause-guard-both": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. \"现在停\" / \"Stop now\" during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change. Now: 停下 / stop, 别说了 / stop talking, 等下 / hold on. Later: 等下再说 / later.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input. Examples: 继续 / keep going, 读完再换 / change after this, 确认 / confirm."
+        }
+      },
+      "empty_prompt_tokens": 356,
+      "full_history_tokens": {
+        "short": 511,
+        "zh-100": 560,
+        "en-100": 527
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 23,
+            "false_discard": 0,
+            "false_interrupt": 5,
+            "missed_interrupt": 6
+          },
+          "additional": {
+            "correct": 20,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 39,
+            "false_discard": 0,
+            "false_interrupt": 8,
+            "missed_interrupt": 9
+          }
+        },
+        "model_false_discard": 22,
+        "p95_ms": 46.758,
+        "maximum_ms": 47.922,
+        "token_range": [
+          365,
+          397
+        ]
+      }
+    },
+    "stop-pause-guard-compact": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change. Now: 停下 / stop, 别说了 / stop talking, 等下 / hold on. Later: 等下再说 / later.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 320,
+      "full_history_tokens": {
+        "short": 475,
+        "zh-100": 524,
+        "en-100": 491
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 21,
+            "false_discard": 0,
+            "false_interrupt": 1,
+            "missed_interrupt": 12
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 37,
+            "false_discard": 0,
+            "false_interrupt": 3,
+            "missed_interrupt": 14
+          }
+        },
+        "model_false_discard": 1,
+        "p95_ms": 46.69,
+        "maximum_ms": 46.785,
+        "token_range": [
+          329,
+          361
+        ]
+      }
+    },
+    "stop-pause-min-interrupt": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. \"现在停\" / \"Stop now\" during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change. 停下、别说了、等下 / stop, stop talking, hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 321,
+      "full_history_tokens": {
+        "short": 476,
+        "zh-100": 525,
+        "en-100": 492
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 22,
+            "false_discard": 0,
+            "false_interrupt": 2,
+            "missed_interrupt": 10
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 38,
+            "false_discard": 0,
+            "false_interrupt": 5,
+            "missed_interrupt": 12
+          }
+        },
+        "model_false_discard": 0,
+        "p95_ms": 46.693,
+        "maximum_ms": 46.784,
+        "token_range": [
+          330,
+          362
+        ]
+      },
+      "rows": [
+        ["new", "syn-stop-zh-0", "interrupt", "interrupt", "interrupt", 343, 46.548],
+        ["new", "syn-stop-zh-1", "enqueue", "enqueue", "enqueue", 350, 46.497],
+        ["new", "syn-stop-en-0", "interrupt", "interrupt", "interrupt", 344, 46.464],
+        ["new", "syn-stop-en-1", "enqueue", "enqueue", "enqueue", 350, 46.364],
+        ["new", "syn-speech-zh-0", "interrupt", "enqueue", "enqueue", 345, 46.495],
+        ["new", "syn-speech-zh-1", "enqueue", "enqueue", "enqueue", 348, 46.437],
+        ["new", "syn-speech-en-0", "interrupt", "interrupt", "interrupt", 343, 46.527],
+        ["new", "syn-speech-en-1", "enqueue", "enqueue", "enqueue", 350, 46.65],
+        ["new", "syn-wait-zh-0", "interrupt", "enqueue", "enqueue", 345, 46.547],
+        ["new", "syn-wait-zh-1", "enqueue", "enqueue", "enqueue", 352, 46.424],
+        ["new", "syn-wait-en-0", "interrupt", "enqueue", "enqueue", 345, 46.472],
+        ["new", "syn-wait-en-1", "enqueue", "enqueue", "enqueue", 353, 46.574],
+        ["new", "syn-pause-zh-0", "interrupt", "interrupt", "interrupt", 346, 46.618],
+        ["new", "syn-pause-zh-1", "enqueue", "enqueue", "enqueue", 350, 46.579],
+        ["new", "syn-pause-en-0", "interrupt", "interrupt", "interrupt", 345, 46.489],
+        ["new", "syn-pause-en-1", "enqueue", "interrupt", "interrupt", 352, 46.437],
+        ["new", "syn-change-zh-0", "interrupt", "enqueue", "enqueue", 347, 46.483],
+        ["new", "syn-change-zh-1", "enqueue", "enqueue", "enqueue", 352, 46.784],
+        ["new", "syn-change-en-0", "interrupt", "enqueue", "enqueue", 347, 46.532],
+        ["new", "syn-change-en-1", "enqueue", "enqueue", "enqueue", 347, 46.462],
+        ["new", "syn-cancel-zh-0", "interrupt", "enqueue", "enqueue", 351, 46.641],
+        ["new", "syn-cancel-zh-1", "enqueue", "enqueue", "enqueue", 355, 46.338],
+        ["new", "syn-cancel-en-0", "interrupt", "enqueue", "enqueue", 349, 46.551],
+        ["new", "syn-cancel-en-1", "enqueue", "enqueue", "enqueue", 354, 46.416],
+        ["new", "syn-correct-zh-0", "interrupt", "enqueue", "enqueue", 353, 46.594],
+        ["new", "syn-correct-zh-1", "enqueue", "enqueue", "enqueue", 356, 46.454],
+        ["new", "syn-correct-en-0", "interrupt", "enqueue", "enqueue", 352, 46.487],
+        ["new", "syn-correct-en-1", "enqueue", "enqueue", "enqueue", 356, 46.453],
+        ["new", "syn-target-zh-0", "enqueue", "enqueue", "enqueue", 348, 46.56],
+        ["new", "syn-target-zh-1", "interrupt", "enqueue", "enqueue", 349, 46.569],
+        ["new", "syn-target-en-0", "enqueue", "interrupt", "interrupt", 345, 46.648],
+        ["new", "syn-target-en-1", "interrupt", "interrupt", "interrupt", 351, 46.413],
+        ["new", "syn-idle-zh", "enqueue", "enqueue", "enqueue", 344, 46.373],
+        ["new", "syn-idle-en", "enqueue", "enqueue", "enqueue", 343, 46.572],
+        ["additional", "guard-01", "discard", "enqueue", "enqueue", 344, 46.766],
+        ["additional", "guard-02", "discard", "enqueue", "enqueue", 343, 46.525],
+        ["additional", "guard-03", "discard", "discard", "discard", 341, 46.538],
+        ["additional", "guard-04", "discard", "enqueue", "discard", 343, 46.618],
+        ["additional", "guard-05", "discard", "enqueue", "discard", 341, 46.649],
+        ["additional", "guard-06", "enqueue", "enqueue", "enqueue", 344, 46.586],
+        ["additional", "guard-07", "enqueue", "enqueue", "enqueue", 345, 46.531],
+        ["additional", "guard-08", "enqueue", "enqueue", "enqueue", 343, 46.503],
+        ["additional", "guard-09", "enqueue", "enqueue", "enqueue", 343, 46.469],
+        ["additional", "guard-10", "enqueue", "enqueue", "enqueue", 341, 46.521],
+        ["additional", "guard-11", "enqueue", "enqueue", "enqueue", 342, 46.448],
+        ["additional", "guard-12", "enqueue", "enqueue", "enqueue", 342, 46.4],
+        ["additional", "guard-13", "enqueue", "enqueue", "enqueue", 344, 46.53],
+        ["additional", "guard-14", "enqueue", "enqueue", "enqueue", 345, 46.535],
+        ["additional", "guard-15", "enqueue", "enqueue", "enqueue", 346, 46.512],
+        ["additional", "guard-16", "enqueue", "enqueue", "enqueue", 342, 46.531],
+        ["additional", "guard-17", "enqueue", "enqueue", "enqueue", 342, 46.449],
+        ["additional", "guard-18", "enqueue", "enqueue", "enqueue", 346, 46.361],
+        ["additional", "answer-01", "enqueue", "enqueue", "enqueue", 350, 46.491],
+        ["additional", "answer-02", "enqueue", "enqueue", "enqueue", 350, 46.49],
+        ["previous", "ack-0", "enqueue", "enqueue", "enqueue", 348, 46.397],
+        ["previous", "ack-1", "discard", "enqueue", "enqueue", 349, 46.488],
+        ["previous", "cancel-0", "interrupt", "interrupt", "interrupt", 343, 46.514],
+        ["previous", "cancel-1", "enqueue", "enqueue", "enqueue", 353, 46.508],
+        ["previous", "no-0", "enqueue", "enqueue", "enqueue", 354, 46.522],
+        ["previous", "no-1", "discard", "enqueue", "enqueue", 350, 46.619],
+        ["previous", "now-0", "interrupt", "enqueue", "enqueue", 354, 46.488],
+        ["previous", "now-1", "discard", "interrupt", "interrupt", 353, 46.535],
+        ["previous", "same-0", "enqueue", "enqueue", "enqueue", 352, 46.597],
+        ["previous", "same-1", "discard", "discard", "enqueue", 353, 46.579],
+        ["previous", "stop-0", "interrupt", "interrupt", "interrupt", 347, 46.447],
+        ["previous", "stop-1", "enqueue", "interrupt", "interrupt", 359, 46.598],
+        ["previous", "tomorrow-0", "interrupt", "enqueue", "enqueue", 346, 46.347],
+        ["previous", "tomorrow-1", "enqueue", "enqueue", "enqueue", 357, 46.512],
+        ["previous", "ok-0", "enqueue", "enqueue", "enqueue", 353, 46.401],
+        ["previous", "ok-1", "discard", "enqueue", "enqueue", 346, 46.716],
+        ["previous", "wait-0", "interrupt", "enqueue", "enqueue", 349, 46.593],
+        ["previous", "wait-1", "enqueue", "enqueue", "enqueue", 357, 46.504],
+        ["previous", "yes-0", "enqueue", "enqueue", "enqueue", 342, 46.488],
+        ["previous", "yes-1", "discard", "enqueue", "enqueue", 352, 46.641],
+        ["previous", "pronoun-0", "interrupt", "interrupt", "interrupt", 351, 46.431],
+        ["previous", "pronoun-1", "discard", "interrupt", "interrupt", 353, 46.562],
+        ["previous", "defer-0", "enqueue", "enqueue", "enqueue", 357, 46.568],
+        ["previous", "defer-1", "enqueue", "interrupt", "interrupt", 355, 46.49],
+        ["previous", "older-chinese-0", "interrupt", "interrupt", "interrupt", 344, 46.442],
+        ["previous", "older-chinese-1", "discard", "interrupt", "interrupt", 344, 46.516],
+        ["previous", "older-english-0", "enqueue", "enqueue", "enqueue", 346, 46.454],
+        ["previous", "older-english-1", "discard", "enqueue", "enqueue", 346, 46.469],
+        ["previous", "fresh-1", "interrupt", "enqueue", "enqueue", 350, 46.584],
+        ["previous", "fresh-2", "enqueue", "enqueue", "enqueue", 352, 46.496],
+        ["previous", "fresh-3", "discard", "enqueue", "enqueue", 350, 46.683],
+        ["previous", "fresh-4", "enqueue", "enqueue", "enqueue", 355, 46.544],
+        ["previous", "fresh-5", "discard", "enqueue", "enqueue", 343, 46.462],
+        ["previous", "fresh-6", "interrupt", "enqueue", "enqueue", 346, 46.446],
+        ["previous", "fresh-7", "enqueue", "enqueue", "enqueue", 344, 46.593],
+        ["previous", "fresh-8", "interrupt", "enqueue", "enqueue", 350, 46.587],
+        ["previous", "fresh-9", "enqueue", "enqueue", "enqueue", 353, 46.644],
+        ["previous", "fresh-10", "discard", "enqueue", "enqueue", 350, 46.573],
+        ["previous", "fresh-11", "enqueue", "enqueue", "enqueue", 348, 46.52],
+        ["previous", "fresh-12", "discard", "enqueue", "enqueue", 342, 46.615],
+        ["previous", "fresh-13", "interrupt", "enqueue", "enqueue", 345, 46.531],
+        ["previous", "fresh-14", "enqueue", "enqueue", "enqueue", 346, 46.456],
+        ["previous", "fresh-15", "enqueue", "enqueue", "enqueue", 351, 46.6],
+        ["previous", "fresh-16", "enqueue", "enqueue", "enqueue", 348, 46.436],
+        ["previous", "fresh-17", "enqueue", "enqueue", "enqueue", 344, 46.541],
+        ["previous", "fresh-18", "discard", "enqueue", "enqueue", 347, 46.496],
+        ["previous", "zh-01", "interrupt", "enqueue", "enqueue", 357, 46.407],
+        ["previous", "zh-02", "enqueue", "enqueue", "enqueue", 359, 46.536],
+        ["previous", "zh-03", "discard", "discard", "enqueue", 354, 46.693],
+        ["previous", "zh-04", "interrupt", "enqueue", "enqueue", 351, 46.351],
+        ["previous", "zh-05", "enqueue", "enqueue", "enqueue", 353, 46.636],
+        ["previous", "zh-06", "enqueue", "enqueue", "enqueue", 350, 46.524],
+        ["previous", "zh-07", "enqueue", "enqueue", "enqueue", 358, 46.443],
+        ["previous", "zh-08", "discard", "enqueue", "enqueue", 345, 46.393],
+        ["previous", "zh-09", "enqueue", "enqueue", "enqueue", 349, 46.415],
+        ["previous", "zh-10", "enqueue", "enqueue", "enqueue", 347, 46.36],
+        ["previous", "zh-11", "interrupt", "enqueue", "enqueue", 355, 46.546],
+        ["previous", "zh-12", "enqueue", "enqueue", "enqueue", 330, 46.37],
+        ["previous", "en-01", "interrupt", "enqueue", "enqueue", 352, 46.367],
+        ["previous", "en-02", "enqueue", "enqueue", "enqueue", 352, 46.528],
+        ["previous", "en-03", "discard", "enqueue", "enqueue", 351, 46.566],
+        ["previous", "en-04", "interrupt", "enqueue", "enqueue", 352, 46.661],
+        ["previous", "en-05", "enqueue", "enqueue", "enqueue", 350, 46.566],
+        ["previous", "en-06", "enqueue", "enqueue", "enqueue", 352, 46.541],
+        ["previous", "en-07", "enqueue", "enqueue", "enqueue", 362, 46.563],
+        ["previous", "en-08", "discard", "enqueue", "enqueue", 350, 46.696],
+        ["previous", "en-09", "enqueue", "enqueue", "enqueue", 353, 46.63],
+        ["previous", "en-10", "enqueue", "enqueue", "enqueue", 350, 46.741],
+        ["previous", "en-11", "interrupt", "interrupt", "interrupt", 355, 46.726],
+        ["previous", "en-12", "enqueue", "enqueue", "enqueue", 331, 46.477]
+      ]
+    },
+    "stop-pause-min-both": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. \"现在停\" / \"Stop now\" during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change. 停下、别说了、等下 / stop, stop talking, hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input. Examples: 继续 / keep going, 读完再换 / change after this, 确认 / confirm."
+        }
+      },
+      "empty_prompt_tokens": 343,
+      "full_history_tokens": {
+        "short": 498,
+        "zh-100": 547,
+        "en-100": 514
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 23,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 7
+          },
+          "additional": {
+            "correct": 20,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 39,
+            "false_discard": 0,
+            "false_interrupt": 7,
+            "missed_interrupt": 10
+          }
+        },
+        "model_false_discard": 18,
+        "p95_ms": 46.861,
+        "maximum_ms": 47.135,
+        "token_range": [
+          352,
+          384
+        ]
+      }
+    },
+    "stop-pause-min-compact": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change. 停下、别说了、等下 / stop, stop talking, hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 307,
+      "full_history_tokens": {
+        "short": 462,
+        "zh-100": 511,
+        "en-100": 478
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 22,
+            "false_discard": 0,
+            "false_interrupt": 1,
+            "missed_interrupt": 11
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 38,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 13
+          }
+        },
+        "model_false_discard": 2,
+        "p95_ms": 46.861,
+        "maximum_ms": 47.159,
+        "token_range": [
+          316,
+          348
+        ]
+      }
+    },
+    "stop-pause-bare-interrupt": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. \"现在停\" / \"Stop now\" during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change. 停下 / stop. 别说了 / stop talking. 等下 / hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 323,
+      "full_history_tokens": {
+        "short": 478,
+        "zh-100": 527,
+        "en-100": 494
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 22,
+            "false_discard": 0,
+            "false_interrupt": 2,
+            "missed_interrupt": 10
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 37,
+            "false_discard": 0,
+            "false_interrupt": 3,
+            "missed_interrupt": 14
+          }
+        },
+        "model_false_discard": 1,
+        "p95_ms": 47.031,
+        "maximum_ms": 47.407,
+        "token_range": [
+          332,
+          364
+        ]
+      }
+    },
+    "stop-pause-bare-both": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. \"现在停\" / \"Stop now\" during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change. 停下 / stop. 别说了 / stop talking. 等下 / hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input. Examples: 继续 / keep going, 读完再换 / change after this, 确认 / confirm."
+        }
+      },
+      "empty_prompt_tokens": 345,
+      "full_history_tokens": {
+        "short": 500,
+        "zh-100": 549,
+        "en-100": 516
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 23,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 7
+          },
+          "additional": {
+            "correct": 20,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 39,
+            "false_discard": 0,
+            "false_interrupt": 6,
+            "missed_interrupt": 11
+          }
+        },
+        "model_false_discard": 21,
+        "p95_ms": 47.37,
+        "maximum_ms": 47.545,
+        "token_range": [
+          354,
+          386
+        ]
+      }
+    },
+    "stop-pause-bare-compact": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change. 停下 / stop. 别说了 / stop talking. 等下 / hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 309,
+      "full_history_tokens": {
+        "short": 464,
+        "zh-100": 513,
+        "en-100": 480
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 22,
+            "false_discard": 0,
+            "false_interrupt": 1,
+            "missed_interrupt": 11
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 38,
+            "false_discard": 0,
+            "false_interrupt": 3,
+            "missed_interrupt": 13
+          }
+        },
+        "model_false_discard": 2,
+        "p95_ms": 47.308,
+        "maximum_ms": 47.397,
+        "token_range": [
+          318,
+          350
+        ]
+      }
+    },
+    "stop-pause-targeted-interrupt": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. \"现在停\" / \"Stop now\" during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change. The assistant is active and addressed now: 停下 / stop, 别说了 / stop talking, 等下 / hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 331,
+      "full_history_tokens": {
+        "short": 486,
+        "zh-100": 535,
+        "en-100": 502
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 22,
+            "false_discard": 0,
+            "false_interrupt": 1,
+            "missed_interrupt": 11
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 39,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 12
+          }
+        },
+        "model_false_discard": 5,
+        "p95_ms": 47.905,
+        "maximum_ms": 51.622,
+        "token_range": [
+          340,
+          372
+        ]
+      }
+    },
+    "stop-pause-targeted-both": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. \"现在停\" / \"Stop now\" during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change. The assistant is active and addressed now: 停下 / stop, 别说了 / stop talking, 等下 / hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input. Examples: 继续 / keep going, 读完再换 / change after this, 确认 / confirm."
+        }
+      },
+      "empty_prompt_tokens": 353,
+      "full_history_tokens": {
+        "short": 508,
+        "zh-100": 557,
+        "en-100": 524
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 23,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 7
+          },
+          "additional": {
+            "correct": 20,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 39,
+            "false_discard": 0,
+            "false_interrupt": 6,
+            "missed_interrupt": 11
+          }
+        },
+        "model_false_discard": 28,
+        "p95_ms": 47.834,
+        "maximum_ms": 48.895,
+        "token_range": [
+          362,
+          394
+        ]
+      }
+    },
+    "stop-pause-targeted-compact": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change. The assistant is active and addressed now: 停下 / stop, 别说了 / stop talking, 等下 / hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 317,
+      "full_history_tokens": {
+        "short": 472,
+        "zh-100": 521,
+        "en-100": 488
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 22,
+            "false_discard": 0,
+            "false_interrupt": 1,
+            "missed_interrupt": 11
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 39,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 12
+          }
+        },
+        "model_false_discard": 1,
+        "p95_ms": 47.833,
+        "maximum_ms": 49.496,
+        "token_range": [
+          326,
+          358
+        ]
+      }
+    },
+    "brief-0-0": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance in context. Keep clear requests, questions, answers and unclear fragments. Only interrupt ongoing speech or work if the user addresses the assistant and wants a change now. Quoted, negated and deferred stops do not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard.",
+        "criteria": {
+          "interrupt": "Immediate stop or change directed at the active assistant: 停下、别说了、等下 / stop, stop talking, hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 277,
+      "full_history_tokens": {
+        "short": 432,
+        "zh-100": 481,
+        "en-100": 448
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 20,
+            "false_discard": 0,
+            "false_interrupt": 2,
+            "missed_interrupt": 12
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 38,
+            "false_discard": 0,
+            "false_interrupt": 3,
+            "missed_interrupt": 14
+          }
+        },
+        "model_false_discard": 9,
+        "p95_ms": 50.505,
+        "maximum_ms": 56.66,
+        "token_range": [
+          286,
+          318
+        ]
+      }
+    },
+    "brief-0-1": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance in context. Keep clear requests, questions, answers and unclear fragments. Only interrupt ongoing speech or work if the user addresses the assistant and wants a change now. Quoted, negated and deferred stops do not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard.",
+        "criteria": {
+          "interrupt": "While speaking or working: 停下、别说了、等下 / stop, stop talking, hold on. Immediate change only.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 276,
+      "full_history_tokens": {
+        "short": 431,
+        "zh-100": 480,
+        "en-100": 447
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 20,
+            "false_discard": 0,
+            "false_interrupt": 1,
+            "missed_interrupt": 13
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 37,
+            "false_discard": 0,
+            "false_interrupt": 3,
+            "missed_interrupt": 14
+          }
+        },
+        "model_false_discard": 8,
+        "p95_ms": 49.901,
+        "maximum_ms": 50.042,
+        "token_range": [
+          285,
+          317
+        ]
+      }
+    },
+    "brief-0-2": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance in context. Keep clear requests, questions, answers and unclear fragments. Only interrupt ongoing speech or work if the user addresses the assistant and wants a change now. Quoted, negated and deferred stops do not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard.",
+        "criteria": {
+          "interrupt": "Interrupt active speech or work now: 停下、别说了、等下 / stop, stop talking, hold on. Later requests wait.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 278,
+      "full_history_tokens": {
+        "short": 433,
+        "zh-100": 482,
+        "en-100": 449
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 21,
+            "false_discard": 0,
+            "false_interrupt": 1,
+            "missed_interrupt": 12
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 37,
+            "false_discard": 0,
+            "false_interrupt": 3,
+            "missed_interrupt": 14
+          }
+        },
+        "model_false_discard": 6,
+        "p95_ms": 50.707,
+        "maximum_ms": 50.908,
+        "token_range": [
+          287,
+          319
+        ]
+      }
+    },
+    "brief-0-3": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance in context. Keep clear requests, questions, answers and unclear fragments. Only interrupt ongoing speech or work if the user addresses the assistant and wants a change now. Quoted, negated and deferred stops do not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard.",
+        "criteria": {
+          "interrupt": "While active, stop, pause or change now: 停下、别说了、等下 / stop, stop talking, hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 277,
+      "full_history_tokens": {
+        "short": 432,
+        "zh-100": 481,
+        "en-100": 448
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 20,
+            "false_discard": 0,
+            "false_interrupt": 2,
+            "missed_interrupt": 12
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 38,
+            "false_discard": 0,
+            "false_interrupt": 3,
+            "missed_interrupt": 14
+          }
+        },
+        "model_false_discard": 11,
+        "p95_ms": 52.161,
+        "maximum_ms": 52.339,
+        "token_range": [
+          286,
+          318
+        ]
+      }
+    },
+    "brief-1-0": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep usable instructions and short answers. A filler at the end does not erase a request. When uncertain, enqueue. Quotes, negations and requests for later do not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard.",
+        "criteria": {
+          "interrupt": "Immediate stop or change directed at the active assistant: 停下、别说了、等下 / stop, stop talking, hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 275,
+      "full_history_tokens": {
+        "short": 430,
+        "zh-100": 479,
+        "en-100": 446
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 1,
+            "missed_interrupt": 15
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 37,
+            "false_discard": 0,
+            "false_interrupt": 3,
+            "missed_interrupt": 14
+          }
+        },
+        "model_false_discard": 7,
+        "p95_ms": 54.607,
+        "maximum_ms": 55.152,
+        "token_range": [
+          284,
+          316
+        ]
+      }
+    },
+    "brief-1-1": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep usable instructions and short answers. A filler at the end does not erase a request. When uncertain, enqueue. Quotes, negations and requests for later do not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard.",
+        "criteria": {
+          "interrupt": "While speaking or working: 停下、别说了、等下 / stop, stop talking, hold on. Immediate change only.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 274,
+      "full_history_tokens": {
+        "short": 429,
+        "zh-100": 478,
+        "en-100": 445
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 1,
+            "missed_interrupt": 15
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 37,
+            "false_discard": 0,
+            "false_interrupt": 3,
+            "missed_interrupt": 14
+          }
+        },
+        "model_false_discard": 4,
+        "p95_ms": 55.057,
+        "maximum_ms": 55.374,
+        "token_range": [
+          283,
+          315
+        ]
+      }
+    },
+    "brief-1-2": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep usable instructions and short answers. A filler at the end does not erase a request. When uncertain, enqueue. Quotes, negations and requests for later do not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard.",
+        "criteria": {
+          "interrupt": "Interrupt active speech or work now: 停下、别说了、等下 / stop, stop talking, hold on. Later requests wait.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 276,
+      "full_history_tokens": {
+        "short": 431,
+        "zh-100": 480,
+        "en-100": 447
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 1,
+            "missed_interrupt": 15
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 37,
+            "false_discard": 0,
+            "false_interrupt": 3,
+            "missed_interrupt": 14
+          }
+        },
+        "model_false_discard": 0,
+        "p95_ms": 56.1,
+        "maximum_ms": 56.264,
+        "token_range": [
+          285,
+          317
+        ]
+      }
+    },
+    "brief-1-3": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep usable instructions and short answers. A filler at the end does not erase a request. When uncertain, enqueue. Quotes, negations and requests for later do not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard.",
+        "criteria": {
+          "interrupt": "While active, stop, pause or change now: 停下、别说了、等下 / stop, stop talking, hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 275,
+      "full_history_tokens": {
+        "short": 430,
+        "zh-100": 479,
+        "en-100": 446
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 1,
+            "missed_interrupt": 15
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 37,
+            "false_discard": 0,
+            "false_interrupt": 2,
+            "missed_interrupt": 14
+          }
+        },
+        "model_false_discard": 7,
+        "p95_ms": 57.419,
+        "maximum_ms": 57.868,
+        "token_range": [
+          284,
+          316
+        ]
+      }
+    },
+    "brief-2-0": {
+      "question": {
+        "type": "choice",
+        "instructions": "Use live state and recent context. An immediate stop, pause, correction or change to ongoing playback or work is interrupt. An idle request or a request for later is enqueue. Keep all usable speech and uncertain fragments. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard.",
+        "criteria": {
+          "interrupt": "Immediate stop or change directed at the active assistant: 停下、别说了、等下 / stop, stop talking, hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 270,
+      "full_history_tokens": {
+        "short": 425,
+        "zh-100": 474,
+        "en-100": 441
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 19,
+            "false_discard": 0,
+            "false_interrupt": 2,
+            "missed_interrupt": 13
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 36,
+            "false_discard": 0,
+            "false_interrupt": 2,
+            "missed_interrupt": 15
+          }
+        },
+        "model_false_discard": 11,
+        "p95_ms": 60.276,
+        "maximum_ms": 60.998,
+        "token_range": [
+          279,
+          311
+        ]
+      }
+    },
+    "brief-2-1": {
+      "question": {
+        "type": "choice",
+        "instructions": "Use live state and recent context. An immediate stop, pause, correction or change to ongoing playback or work is interrupt. An idle request or a request for later is enqueue. Keep all usable speech and uncertain fragments. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard.",
+        "criteria": {
+          "interrupt": "While speaking or working: 停下、别说了、等下 / stop, stop talking, hold on. Immediate change only.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 269,
+      "full_history_tokens": {
+        "short": 424,
+        "zh-100": 473,
+        "en-100": 440
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 19,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 15
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 35,
+            "false_discard": 0,
+            "false_interrupt": 1,
+            "missed_interrupt": 16
+          }
+        },
+        "model_false_discard": 7,
+        "p95_ms": 59.446,
+        "maximum_ms": 59.923,
+        "token_range": [
+          278,
+          310
+        ]
+      }
+    },
+    "brief-2-2": {
+      "question": {
+        "type": "choice",
+        "instructions": "Use live state and recent context. An immediate stop, pause, correction or change to ongoing playback or work is interrupt. An idle request or a request for later is enqueue. Keep all usable speech and uncertain fragments. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard.",
+        "criteria": {
+          "interrupt": "Interrupt active speech or work now: 停下、别说了、等下 / stop, stop talking, hold on. Later requests wait.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 271,
+      "full_history_tokens": {
+        "short": 426,
+        "zh-100": 475,
+        "en-100": 442
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 21,
+            "false_discard": 0,
+            "false_interrupt": 2,
+            "missed_interrupt": 11
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 37,
+            "false_discard": 0,
+            "false_interrupt": 3,
+            "missed_interrupt": 14
+          }
+        },
+        "model_false_discard": 3,
+        "p95_ms": 60.632,
+        "maximum_ms": 64.686,
+        "token_range": [
+          280,
+          312
+        ]
+      }
+    },
+    "brief-2-3": {
+      "question": {
+        "type": "choice",
+        "instructions": "Use live state and recent context. An immediate stop, pause, correction or change to ongoing playback or work is interrupt. An idle request or a request for later is enqueue. Keep all usable speech and uncertain fragments. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard.",
+        "criteria": {
+          "interrupt": "While active, stop, pause or change now: 停下、别说了、等下 / stop, stop talking, hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 270,
+      "full_history_tokens": {
+        "short": 425,
+        "zh-100": 474,
+        "en-100": 441
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 1,
+            "missed_interrupt": 15
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 35,
+            "false_discard": 0,
+            "false_interrupt": 1,
+            "missed_interrupt": 16
+          }
+        },
+        "model_false_discard": 10,
+        "p95_ms": 60.906,
+        "maximum_ms": 61.227,
+        "token_range": [
+          279,
+          311
+        ]
+      }
+    },
+    "fit-minimal-0": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" after a question -> enqueue. \"呃\" / \"Uh\" alone -> discard.",
+        "criteria": {
+          "interrupt": "Stop or change ongoing speech or work now: 停下、别说了、等下 / stop, stop talking, hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 290,
+      "full_history_tokens": {
+        "short": 445,
+        "zh-100": 494,
+        "en-100": 461
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 21,
+            "false_discard": 0,
+            "false_interrupt": 2,
+            "missed_interrupt": 11
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 38,
+            "false_discard": 0,
+            "false_interrupt": 3,
+            "missed_interrupt": 14
+          }
+        },
+        "model_false_discard": 8,
+        "p95_ms": 67.84,
+        "maximum_ms": 68.557,
+        "token_range": [
+          299,
+          331
+        ]
+      }
+    },
+    "fit-minimal-1": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" after a question -> enqueue. \"呃\" / \"Uh\" alone -> discard.",
+        "criteria": {
+          "interrupt": "Stop or change ongoing speech or work now: 停下、别说了、等下 / stop, stop talking, hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep usable speech: continue, wait until done, confirm, or clarify; 继续、讲完再说、确认."
+        }
+      },
+      "empty_prompt_tokens": 296,
+      "full_history_tokens": {
+        "short": 451,
+        "zh-100": 500,
+        "en-100": 467
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 22,
+            "false_discard": 0,
+            "false_interrupt": 2,
+            "missed_interrupt": 10
+          },
+          "additional": {
+            "correct": 20,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 40,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 12
+          }
+        },
+        "model_false_discard": 78,
+        "p95_ms": 64.8,
+        "maximum_ms": 65.027,
+        "token_range": [
+          305,
+          337
+        ]
+      }
+    },
+    "fit-minimal-2": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" after a question -> enqueue. \"呃\" / \"Uh\" alone -> discard.",
+        "criteria": {
+          "interrupt": "While speaking or working: 停下 / stop, 别说了 / stop talking, 等下 / hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep usable or uncertain input: 继续 / continue, 稍后 / later, 确认 / confirm."
+        }
+      },
+      "empty_prompt_tokens": 292,
+      "full_history_tokens": {
+        "short": 447,
+        "zh-100": 496,
+        "en-100": 463
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 22,
+            "false_discard": 0,
+            "false_interrupt": 1,
+            "missed_interrupt": 11
+          },
+          "additional": {
+            "correct": 20,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 40,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 12
+          }
+        },
+        "model_false_discard": 70,
+        "p95_ms": 62.497,
+        "maximum_ms": 62.825,
+        "token_range": [
+          301,
+          333
+        ]
+      }
+    },
+    "fit-contrast-0": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"念完再停\" / \"Stop after this\" -> enqueue. \"嗯\" / \"Mm-hm\" after a question -> enqueue. \"呃\" / \"Uh\" alone -> discard.",
+        "criteria": {
+          "interrupt": "Stop or change ongoing speech or work now: 停下、别说了、等下 / stop, stop talking, hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 289,
+      "full_history_tokens": {
+        "short": 444,
+        "zh-100": 493,
+        "en-100": 460
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 19,
+            "false_discard": 0,
+            "false_interrupt": 2,
+            "missed_interrupt": 13
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 37,
+            "false_discard": 0,
+            "false_interrupt": 3,
+            "missed_interrupt": 14
+          }
+        },
+        "model_false_discard": 6,
+        "p95_ms": 62.88,
+        "maximum_ms": 63.112,
+        "token_range": [
+          298,
+          330
+        ]
+      }
+    },
+    "fit-contrast-1": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"念完再停\" / \"Stop after this\" -> enqueue. \"嗯\" / \"Mm-hm\" after a question -> enqueue. \"呃\" / \"Uh\" alone -> discard.",
+        "criteria": {
+          "interrupt": "Stop or change ongoing speech or work now: 停下、别说了、等下 / stop, stop talking, hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep usable speech: continue, wait until done, confirm, or clarify; 继续、讲完再说、确认."
+        }
+      },
+      "empty_prompt_tokens": 295,
+      "full_history_tokens": {
+        "short": 450,
+        "zh-100": 499,
+        "en-100": 466
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 23,
+            "false_discard": 0,
+            "false_interrupt": 2,
+            "missed_interrupt": 9
+          },
+          "additional": {
+            "correct": 20,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 40,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 12
+          }
+        },
+        "model_false_discard": 76,
+        "p95_ms": 62.424,
+        "maximum_ms": 62.743,
+        "token_range": [
+          304,
+          336
+        ]
+      }
+    },
+    "fit-contrast-2": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"念完再停\" / \"Stop after this\" -> enqueue. \"嗯\" / \"Mm-hm\" after a question -> enqueue. \"呃\" / \"Uh\" alone -> discard.",
+        "criteria": {
+          "interrupt": "While speaking or working: 停下 / stop, 别说了 / stop talking, 等下 / hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep usable or uncertain input: 继续 / continue, 稍后 / later, 确认 / confirm."
+        }
+      },
+      "empty_prompt_tokens": 291,
+      "full_history_tokens": {
+        "short": 446,
+        "zh-100": 495,
+        "en-100": 462
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 21,
+            "false_discard": 0,
+            "false_interrupt": 1,
+            "missed_interrupt": 12
+          },
+          "additional": {
+            "correct": 20,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 39,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 13
+          }
+        },
+        "model_false_discard": 55,
+        "p95_ms": 62.27,
+        "maximum_ms": 62.412,
+        "token_range": [
+          300,
+          332
+        ]
+      }
+    },
+    "fit-three-0": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard.",
+        "criteria": {
+          "interrupt": "Stop or change ongoing speech or work now: 停下、别说了、等下 / stop, stop talking, hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 299,
+      "full_history_tokens": {
+        "short": 454,
+        "zh-100": 503,
+        "en-100": 470
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 21,
+            "false_discard": 0,
+            "false_interrupt": 2,
+            "missed_interrupt": 11
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 37,
+            "false_discard": 0,
+            "false_interrupt": 3,
+            "missed_interrupt": 14
+          }
+        },
+        "model_false_discard": 5,
+        "p95_ms": 62.408,
+        "maximum_ms": 62.503,
+        "token_range": [
+          308,
+          340
+        ]
+      }
+    },
+    "fit-three-1": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard.",
+        "criteria": {
+          "interrupt": "Stop or change ongoing speech or work now: 停下、别说了、等下 / stop, stop talking, hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep usable speech: continue, wait until done, confirm, or clarify; 继续、讲完再说、确认."
+        }
+      },
+      "empty_prompt_tokens": 305,
+      "full_history_tokens": {
+        "short": 460,
+        "zh-100": 509,
+        "en-100": 476
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 22,
+            "false_discard": 0,
+            "false_interrupt": 2,
+            "missed_interrupt": 10
+          },
+          "additional": {
+            "correct": 20,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 40,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 12
+          }
+        },
+        "model_false_discard": 78,
+        "p95_ms": 62.613,
+        "maximum_ms": 63.017,
+        "token_range": [
+          314,
+          346
+        ]
+      }
+    },
+    "fit-three-2": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard.",
+        "criteria": {
+          "interrupt": "While speaking or working: 停下 / stop, 别说了 / stop talking, 等下 / hold on.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep usable or uncertain input: 继续 / continue, 稍后 / later, 确认 / confirm."
+        }
+      },
+      "empty_prompt_tokens": 301,
+      "full_history_tokens": {
+        "short": 456,
+        "zh-100": 505,
+        "en-100": 472
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 22,
+            "false_discard": 0,
+            "false_interrupt": 1,
+            "missed_interrupt": 11
+          },
+          "additional": {
+            "correct": 20,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 40,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 12
+          }
+        },
+        "model_false_discard": 72,
+        "p95_ms": 62.492,
+        "maximum_ms": 62.643,
+        "token_range": [
+          310,
+          342
+        ]
+      }
+    },
+    "paired-example": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. \"停下\" / \"Stop\", \"别说了\" / \"Stop talking\", \"等下\" / \"Hold on\" during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 320,
+      "full_history_tokens": {
+        "short": 475,
+        "zh-100": 524,
+        "en-100": 491
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 23,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 7
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 38,
+            "false_discard": 0,
+            "false_interrupt": 9,
+            "missed_interrupt": 8
+          }
+        },
+        "model_false_discard": 0,
+        "p95_ms": 77.326,
+        "maximum_ms": 79.296,
+        "token_range": [
+          329,
+          361
+        ]
+      }
+    },
+    "paired-example-cut": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. \"停下\" / \"Stop\", \"别说了\" / \"Stop talking\", \"等下\" / \"Hold on\" during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 306,
+      "full_history_tokens": {
+        "short": 461,
+        "zh-100": 510,
+        "en-100": 477
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 21,
+            "false_discard": 0,
+            "false_interrupt": 3,
+            "missed_interrupt": 10
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 40,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 11
+          }
+        },
+        "model_false_discard": 1,
+        "p95_ms": 67.279,
+        "maximum_ms": 70.492,
+        "token_range": [
+          315,
+          347
+        ]
+      }
+    },
+    "chinese-first-example": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. \"停下\", \"别说了\", \"等下\" / \"Stop\", \"Stop talking\", \"Hold on\" during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 318,
+      "full_history_tokens": {
+        "short": 473,
+        "zh-100": 522,
+        "en-100": 489
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 24,
+            "false_discard": 0,
+            "false_interrupt": 3,
+            "missed_interrupt": 7
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 36,
+            "false_discard": 0,
+            "false_interrupt": 9,
+            "missed_interrupt": 10
+          }
+        },
+        "model_false_discard": 1,
+        "p95_ms": 64.474,
+        "maximum_ms": 65.404,
+        "token_range": [
+          327,
+          359
+        ]
+      }
+    },
+    "chinese-first-example-cut": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. \"停下\", \"别说了\", \"等下\" / \"Stop\", \"Stop talking\", \"Hold on\" during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 304,
+      "full_history_tokens": {
+        "short": 459,
+        "zh-100": 508,
+        "en-100": 475
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 22,
+            "false_discard": 0,
+            "false_interrupt": 2,
+            "missed_interrupt": 10
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 40,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 11
+          }
+        },
+        "model_false_discard": 1,
+        "p95_ms": 63.693,
+        "maximum_ms": 64.128,
+        "token_range": [
+          313,
+          345
+        ]
+      },
+      "rows": [
+        ["new", "syn-stop-zh-0", "interrupt", "interrupt", "interrupt", 326, 62.043],
+        ["new", "syn-stop-zh-1", "enqueue", "enqueue", "enqueue", 333, 61.726],
+        ["new", "syn-stop-en-0", "interrupt", "interrupt", "interrupt", 327, 62.224],
+        ["new", "syn-stop-en-1", "enqueue", "enqueue", "enqueue", 333, 61.995],
+        ["new", "syn-speech-zh-0", "interrupt", "enqueue", "enqueue", 328, 61.81],
+        ["new", "syn-speech-zh-1", "enqueue", "enqueue", "enqueue", 331, 61.777],
+        ["new", "syn-speech-en-0", "interrupt", "interrupt", "interrupt", 326, 62.117],
+        ["new", "syn-speech-en-1", "enqueue", "enqueue", "enqueue", 333, 61.485],
+        ["new", "syn-wait-zh-0", "interrupt", "enqueue", "enqueue", 328, 61.751],
+        ["new", "syn-wait-zh-1", "enqueue", "enqueue", "enqueue", 335, 61.915],
+        ["new", "syn-wait-en-0", "interrupt", "enqueue", "enqueue", 328, 62.037],
+        ["new", "syn-wait-en-1", "enqueue", "enqueue", "enqueue", 336, 62.155],
+        ["new", "syn-pause-zh-0", "interrupt", "interrupt", "interrupt", 329, 62.138],
+        ["new", "syn-pause-zh-1", "enqueue", "enqueue", "enqueue", 333, 62.499],
+        ["new", "syn-pause-en-0", "interrupt", "interrupt", "interrupt", 328, 62.432],
+        ["new", "syn-pause-en-1", "enqueue", "interrupt", "interrupt", 335, 62.935],
+        ["new", "syn-change-zh-0", "interrupt", "enqueue", "enqueue", 330, 62.634],
+        ["new", "syn-change-zh-1", "enqueue", "enqueue", "enqueue", 335, 62.69],
+        ["new", "syn-change-en-0", "interrupt", "enqueue", "enqueue", 330, 62.87],
+        ["new", "syn-change-en-1", "enqueue", "enqueue", "enqueue", 330, 62.803],
+        ["new", "syn-cancel-zh-0", "interrupt", "enqueue", "enqueue", 334, 62.82],
+        ["new", "syn-cancel-zh-1", "enqueue", "enqueue", "enqueue", 338, 62.692],
+        ["new", "syn-cancel-en-0", "interrupt", "enqueue", "enqueue", 332, 62.876],
+        ["new", "syn-cancel-en-1", "enqueue", "enqueue", "enqueue", 337, 63.115],
+        ["new", "syn-correct-zh-0", "interrupt", "enqueue", "enqueue", 336, 63.031],
+        ["new", "syn-correct-zh-1", "enqueue", "enqueue", "enqueue", 339, 62.547],
+        ["new", "syn-correct-en-0", "interrupt", "enqueue", "enqueue", 335, 62.981],
+        ["new", "syn-correct-en-1", "enqueue", "enqueue", "enqueue", 339, 62.958],
+        ["new", "syn-target-zh-0", "enqueue", "enqueue", "enqueue", 331, 62.822],
+        ["new", "syn-target-zh-1", "interrupt", "enqueue", "enqueue", 332, 62.471],
+        ["new", "syn-target-en-0", "enqueue", "interrupt", "interrupt", 328, 62.93],
+        ["new", "syn-target-en-1", "interrupt", "interrupt", "interrupt", 334, 63.106],
+        ["new", "syn-idle-zh", "enqueue", "enqueue", "enqueue", 327, 62.924],
+        ["new", "syn-idle-en", "enqueue", "enqueue", "enqueue", 326, 62.878],
+        ["additional", "guard-01", "discard", "enqueue", "enqueue", 327, 62.436],
+        ["additional", "guard-02", "discard", "enqueue", "enqueue", 326, 63.429],
+        ["additional", "guard-03", "discard", "discard", "discard", 324, 63.056],
+        ["additional", "guard-04", "discard", "enqueue", "discard", 326, 63.258],
+        ["additional", "guard-05", "discard", "enqueue", "discard", 324, 62.816],
+        ["additional", "guard-06", "enqueue", "enqueue", "enqueue", 327, 62.646],
+        ["additional", "guard-07", "enqueue", "enqueue", "enqueue", 328, 63.171],
+        ["additional", "guard-08", "enqueue", "enqueue", "enqueue", 326, 63.037],
+        ["additional", "guard-09", "enqueue", "enqueue", "enqueue", 326, 63.259],
+        ["additional", "guard-10", "enqueue", "discard", "enqueue", 324, 63.151],
+        ["additional", "guard-11", "enqueue", "enqueue", "enqueue", 325, 63.495],
+        ["additional", "guard-12", "enqueue", "enqueue", "enqueue", 325, 63.192],
+        ["additional", "guard-13", "enqueue", "enqueue", "enqueue", 327, 63.381],
+        ["additional", "guard-14", "enqueue", "enqueue", "enqueue", 328, 63.393],
+        ["additional", "guard-15", "enqueue", "enqueue", "enqueue", 329, 62.815],
+        ["additional", "guard-16", "enqueue", "enqueue", "enqueue", 325, 63.238],
+        ["additional", "guard-17", "enqueue", "enqueue", "enqueue", 325, 63.125],
+        ["additional", "guard-18", "enqueue", "enqueue", "enqueue", 329, 63.13],
+        ["additional", "answer-01", "enqueue", "enqueue", "enqueue", 333, 62.862],
+        ["additional", "answer-02", "enqueue", "enqueue", "enqueue", 333, 63.126],
+        ["previous", "ack-0", "enqueue", "enqueue", "enqueue", 331, 63.088],
+        ["previous", "ack-1", "discard", "enqueue", "enqueue", 332, 63.053],
+        ["previous", "cancel-0", "interrupt", "interrupt", "interrupt", 326, 63.072],
+        ["previous", "cancel-1", "enqueue", "enqueue", "enqueue", 336, 62.81],
+        ["previous", "no-0", "enqueue", "enqueue", "enqueue", 337, 63.111],
+        ["previous", "no-1", "discard", "enqueue", "enqueue", 333, 62.887],
+        ["previous", "now-0", "interrupt", "interrupt", "interrupt", 337, 63.164],
+        ["previous", "now-1", "discard", "interrupt", "interrupt", 336, 63.212],
+        ["previous", "same-0", "enqueue", "enqueue", "enqueue", 335, 62.833],
+        ["previous", "same-1", "discard", "discard", "enqueue", 336, 63.195],
+        ["previous", "stop-0", "interrupt", "interrupt", "interrupt", 330, 63.041],
+        ["previous", "stop-1", "enqueue", "interrupt", "interrupt", 342, 63.232],
+        ["previous", "tomorrow-0", "interrupt", "enqueue", "enqueue", 329, 62.708],
+        ["previous", "tomorrow-1", "enqueue", "enqueue", "enqueue", 340, 62.171],
+        ["previous", "ok-0", "enqueue", "enqueue", "enqueue", 336, 62.321],
+        ["previous", "ok-1", "discard", "enqueue", "enqueue", 329, 62.665],
+        ["previous", "wait-0", "interrupt", "enqueue", "enqueue", 332, 63.042],
+        ["previous", "wait-1", "enqueue", "enqueue", "enqueue", 340, 63.12],
+        ["previous", "yes-0", "enqueue", "enqueue", "enqueue", 325, 63.522],
+        ["previous", "yes-1", "discard", "enqueue", "enqueue", 335, 63.06],
+        ["previous", "pronoun-0", "interrupt", "interrupt", "interrupt", 334, 63.485],
+        ["previous", "pronoun-1", "discard", "interrupt", "interrupt", 336, 63.189],
+        ["previous", "defer-0", "enqueue", "enqueue", "enqueue", 340, 63.282],
+        ["previous", "defer-1", "enqueue", "enqueue", "enqueue", 338, 63.251],
+        ["previous", "older-chinese-0", "interrupt", "interrupt", "interrupt", 327, 63.068],
+        ["previous", "older-chinese-1", "discard", "interrupt", "interrupt", 327, 63.534],
+        ["previous", "older-english-0", "enqueue", "enqueue", "enqueue", 329, 62.988],
+        ["previous", "older-english-1", "discard", "enqueue", "enqueue", 329, 63.334],
+        ["previous", "fresh-1", "interrupt", "enqueue", "enqueue", 333, 63.333],
+        ["previous", "fresh-2", "enqueue", "enqueue", "enqueue", 335, 63.483],
+        ["previous", "fresh-3", "discard", "enqueue", "enqueue", 333, 63.302],
+        ["previous", "fresh-4", "enqueue", "enqueue", "enqueue", 338, 62.939],
+        ["previous", "fresh-5", "discard", "enqueue", "enqueue", 326, 63.269],
+        ["previous", "fresh-6", "interrupt", "enqueue", "enqueue", 329, 63.5],
+        ["previous", "fresh-7", "enqueue", "enqueue", "enqueue", 327, 62.819],
+        ["previous", "fresh-8", "interrupt", "enqueue", "enqueue", 333, 62.67],
+        ["previous", "fresh-9", "enqueue", "enqueue", "enqueue", 336, 63.089],
+        ["previous", "fresh-10", "discard", "enqueue", "enqueue", 333, 63.512],
+        ["previous", "fresh-11", "enqueue", "enqueue", "enqueue", 331, 63.556],
+        ["previous", "fresh-12", "discard", "enqueue", "enqueue", 325, 63.565],
+        ["previous", "fresh-13", "interrupt", "enqueue", "enqueue", 328, 63.303],
+        ["previous", "fresh-14", "enqueue", "enqueue", "enqueue", 329, 63.371],
+        ["previous", "fresh-15", "enqueue", "enqueue", "enqueue", 334, 63.47],
+        ["previous", "fresh-16", "enqueue", "enqueue", "enqueue", 331, 63.625],
+        ["previous", "fresh-17", "enqueue", "enqueue", "enqueue", 327, 63.298],
+        ["previous", "fresh-18", "discard", "enqueue", "enqueue", 330, 63.535],
+        ["previous", "zh-01", "interrupt", "enqueue", "enqueue", 340, 62.943],
+        ["previous", "zh-02", "enqueue", "enqueue", "enqueue", 342, 63.461],
+        ["previous", "zh-03", "discard", "enqueue", "enqueue", 337, 63.382],
+        ["previous", "zh-04", "interrupt", "enqueue", "enqueue", 334, 61.975],
+        ["previous", "zh-05", "enqueue", "enqueue", "enqueue", 336, 63.121],
+        ["previous", "zh-06", "enqueue", "enqueue", "enqueue", 333, 63.273],
+        ["previous", "zh-07", "enqueue", "enqueue", "enqueue", 341, 63.528],
+        ["previous", "zh-08", "discard", "enqueue", "enqueue", 328, 63.351],
+        ["previous", "zh-09", "enqueue", "enqueue", "enqueue", 332, 63.148],
+        ["previous", "zh-10", "enqueue", "enqueue", "enqueue", 330, 63.169],
+        ["previous", "zh-11", "interrupt", "enqueue", "enqueue", 338, 63.258],
+        ["previous", "zh-12", "enqueue", "enqueue", "enqueue", 313, 63.517],
+        ["previous", "en-01", "interrupt", "enqueue", "enqueue", 335, 63.181],
+        ["previous", "en-02", "enqueue", "enqueue", "enqueue", 335, 62.54],
+        ["previous", "en-03", "discard", "enqueue", "enqueue", 334, 61.962],
+        ["previous", "en-04", "interrupt", "enqueue", "enqueue", 335, 63.577],
+        ["previous", "en-05", "enqueue", "enqueue", "enqueue", 333, 64.128],
+        ["previous", "en-06", "enqueue", "enqueue", "enqueue", 335, 63.793],
+        ["previous", "en-07", "enqueue", "enqueue", "enqueue", 345, 63.837],
+        ["previous", "en-08", "discard", "enqueue", "enqueue", 333, 63.693],
+        ["previous", "en-09", "enqueue", "enqueue", "enqueue", 336, 63.606],
+        ["previous", "en-10", "enqueue", "enqueue", "enqueue", 333, 63.884],
+        ["previous", "en-11", "interrupt", "interrupt", "interrupt", 338, 63.874],
+        ["previous", "en-12", "enqueue", "enqueue", "enqueue", 314, 63.824]
+      ]
+    },
+    "english-first-example": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. \"Stop\", \"Stop talking\", \"Hold on\" / \"停下\", \"别说了\", \"等下\" during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 318,
+      "full_history_tokens": {
+        "short": 473,
+        "zh-100": 522,
+        "en-100": 489
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 23,
+            "false_discard": 0,
+            "false_interrupt": 5,
+            "missed_interrupt": 6
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 37,
+            "false_discard": 0,
+            "false_interrupt": 11,
+            "missed_interrupt": 8
+          }
+        },
+        "model_false_discard": 1,
+        "p95_ms": 66.824,
+        "maximum_ms": 68.091,
+        "token_range": [
+          327,
+          359
+        ]
+      }
+    },
+    "english-first-example-cut": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. \"Stop\", \"Stop talking\", \"Hold on\" / \"停下\", \"别说了\", \"等下\" during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 304,
+      "full_history_tokens": {
+        "short": 459,
+        "zh-100": 508,
+        "en-100": 475
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 20,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 10
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 39,
+            "false_discard": 0,
+            "false_interrupt": 5,
+            "missed_interrupt": 11
+          }
+        },
+        "model_false_discard": 1,
+        "p95_ms": 63.926,
+        "maximum_ms": 64.059,
+        "token_range": [
+          313,
+          345
+        ]
+      }
+    },
+    "terse-example": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. 停下、别说了、等下 / stop, stop talking, hold on during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 311,
+      "full_history_tokens": {
+        "short": 466,
+        "zh-100": 515,
+        "en-100": 482
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 24,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 6
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 40,
+            "false_discard": 0,
+            "false_interrupt": 7,
+            "missed_interrupt": 8
+          }
+        },
+        "model_false_discard": 0,
+        "p95_ms": 67.134,
+        "maximum_ms": 70.632,
+        "token_range": [
+          320,
+          352
+        ]
+      },
+      "rows": [
+        ["new", "syn-stop-zh-0", "interrupt", "interrupt", "interrupt", 333, 62.73],
+        ["new", "syn-stop-zh-1", "enqueue", "interrupt", "interrupt", 340, 62.562],
+        ["new", "syn-stop-en-0", "interrupt", "interrupt", "interrupt", 334, 62.336],
+        ["new", "syn-stop-en-1", "enqueue", "enqueue", "enqueue", 340, 62.277],
+        ["new", "syn-speech-zh-0", "interrupt", "enqueue", "enqueue", 335, 62.469],
+        ["new", "syn-speech-zh-1", "enqueue", "enqueue", "enqueue", 338, 62.296],
+        ["new", "syn-speech-en-0", "interrupt", "interrupt", "interrupt", 333, 62.841],
+        ["new", "syn-speech-en-1", "enqueue", "enqueue", "enqueue", 340, 62.703],
+        ["new", "syn-wait-zh-0", "interrupt", "interrupt", "interrupt", 335, 63.137],
+        ["new", "syn-wait-zh-1", "enqueue", "enqueue", "enqueue", 342, 63.037],
+        ["new", "syn-wait-en-0", "interrupt", "interrupt", "interrupt", 335, 63.164],
+        ["new", "syn-wait-en-1", "enqueue", "enqueue", "enqueue", 343, 62.712],
+        ["new", "syn-pause-zh-0", "interrupt", "interrupt", "interrupt", 336, 63.473],
+        ["new", "syn-pause-zh-1", "enqueue", "enqueue", "enqueue", 340, 63.68],
+        ["new", "syn-pause-en-0", "interrupt", "interrupt", "interrupt", 335, 63.419],
+        ["new", "syn-pause-en-1", "enqueue", "interrupt", "interrupt", 342, 63.495],
+        ["new", "syn-change-zh-0", "interrupt", "interrupt", "interrupt", 337, 63.337],
+        ["new", "syn-change-zh-1", "enqueue", "enqueue", "enqueue", 342, 63.641],
+        ["new", "syn-change-en-0", "interrupt", "interrupt", "interrupt", 337, 63.66],
+        ["new", "syn-change-en-1", "enqueue", "interrupt", "interrupt", 337, 63.967],
+        ["new", "syn-cancel-zh-0", "interrupt", "enqueue", "enqueue", 341, 64.004],
+        ["new", "syn-cancel-zh-1", "enqueue", "enqueue", "enqueue", 345, 63.58],
+        ["new", "syn-cancel-en-0", "interrupt", "enqueue", "enqueue", 339, 63.517],
+        ["new", "syn-cancel-en-1", "enqueue", "enqueue", "enqueue", 344, 63.734],
+        ["new", "syn-correct-zh-0", "interrupt", "enqueue", "enqueue", 343, 63.771],
+        ["new", "syn-correct-zh-1", "enqueue", "enqueue", "enqueue", 346, 63.92],
+        ["new", "syn-correct-en-0", "interrupt", "enqueue", "enqueue", 342, 64.257],
+        ["new", "syn-correct-en-1", "enqueue", "enqueue", "enqueue", 346, 63.888],
+        ["new", "syn-target-zh-0", "enqueue", "enqueue", "enqueue", 338, 63.365],
+        ["new", "syn-target-zh-1", "interrupt", "enqueue", "enqueue", 339, 64.027],
+        ["new", "syn-target-en-0", "enqueue", "interrupt", "interrupt", 335, 64.028],
+        ["new", "syn-target-en-1", "interrupt", "interrupt", "interrupt", 341, 64.487],
+        ["new", "syn-idle-zh", "enqueue", "enqueue", "enqueue", 334, 63.511],
+        ["new", "syn-idle-en", "enqueue", "enqueue", "enqueue", 333, 63.421],
+        ["additional", "guard-01", "discard", "enqueue", "enqueue", 334, 63.043],
+        ["additional", "guard-02", "discard", "enqueue", "enqueue", 333, 63.45],
+        ["additional", "guard-03", "discard", "discard", "discard", 331, 63.757],
+        ["additional", "guard-04", "discard", "enqueue", "discard", 333, 63.522],
+        ["additional", "guard-05", "discard", "enqueue", "discard", 331, 63.629],
+        ["additional", "guard-06", "enqueue", "enqueue", "enqueue", 334, 63.011],
+        ["additional", "guard-07", "enqueue", "enqueue", "enqueue", 335, 63.745],
+        ["additional", "guard-08", "enqueue", "enqueue", "enqueue", 333, 64.755],
+        ["additional", "guard-09", "enqueue", "enqueue", "enqueue", 333, 64.886],
+        ["additional", "guard-10", "enqueue", "enqueue", "enqueue", 331, 64.532],
+        ["additional", "guard-11", "enqueue", "enqueue", "enqueue", 332, 64.616],
+        ["additional", "guard-12", "enqueue", "enqueue", "enqueue", 332, 64.701],
+        ["additional", "guard-13", "enqueue", "enqueue", "enqueue", 334, 64.176],
+        ["additional", "guard-14", "enqueue", "enqueue", "enqueue", 335, 64.317],
+        ["additional", "guard-15", "enqueue", "enqueue", "enqueue", 336, 64.108],
+        ["additional", "guard-16", "enqueue", "enqueue", "enqueue", 332, 64.305],
+        ["additional", "guard-17", "enqueue", "enqueue", "enqueue", 332, 64.362],
+        ["additional", "guard-18", "enqueue", "enqueue", "enqueue", 336, 64.549],
+        ["additional", "answer-01", "enqueue", "enqueue", "enqueue", 340, 64.238],
+        ["additional", "answer-02", "enqueue", "enqueue", "enqueue", 340, 63.837],
+        ["previous", "ack-0", "enqueue", "enqueue", "enqueue", 338, 64.018],
+        ["previous", "ack-1", "discard", "enqueue", "enqueue", 339, 64.233],
+        ["previous", "cancel-0", "interrupt", "interrupt", "interrupt", 333, 63.915],
+        ["previous", "cancel-1", "enqueue", "interrupt", "interrupt", 343, 63.684],
+        ["previous", "no-0", "enqueue", "enqueue", "enqueue", 344, 63.878],
+        ["previous", "no-1", "discard", "enqueue", "enqueue", 340, 63.437],
+        ["previous", "now-0", "interrupt", "interrupt", "interrupt", 344, 63.516],
+        ["previous", "now-1", "discard", "interrupt", "interrupt", 343, 63.82],
+        ["previous", "same-0", "enqueue", "enqueue", "enqueue", 342, 63.589],
+        ["previous", "same-1", "discard", "discard", "enqueue", 343, 64.016],
+        ["previous", "stop-0", "interrupt", "interrupt", "interrupt", 337, 63.318],
+        ["previous", "stop-1", "enqueue", "interrupt", "interrupt", 349, 63.227],
+        ["previous", "tomorrow-0", "interrupt", "interrupt", "interrupt", 336, 63.394],
+        ["previous", "tomorrow-1", "enqueue", "enqueue", "enqueue", 347, 63.663],
+        ["previous", "ok-0", "enqueue", "enqueue", "enqueue", 343, 63.551],
+        ["previous", "ok-1", "discard", "enqueue", "enqueue", 336, 63.548],
+        ["previous", "wait-0", "interrupt", "enqueue", "enqueue", 339, 63.061],
+        ["previous", "wait-1", "enqueue", "enqueue", "enqueue", 347, 63.759],
+        ["previous", "yes-0", "enqueue", "enqueue", "enqueue", 332, 63.713],
+        ["previous", "yes-1", "discard", "enqueue", "enqueue", 342, 63.681],
+        ["previous", "pronoun-0", "interrupt", "interrupt", "interrupt", 341, 63.762],
+        ["previous", "pronoun-1", "discard", "interrupt", "interrupt", 343, 63.653],
+        ["previous", "defer-0", "enqueue", "enqueue", "enqueue", 347, 63.275],
+        ["previous", "defer-1", "enqueue", "interrupt", "interrupt", 345, 63.99],
+        ["previous", "older-chinese-0", "interrupt", "interrupt", "interrupt", 334, 63.768],
+        ["previous", "older-chinese-1", "discard", "interrupt", "interrupt", 334, 63.918],
+        ["previous", "older-english-0", "enqueue", "enqueue", "enqueue", 336, 63.623],
+        ["previous", "older-english-1", "discard", "enqueue", "enqueue", 336, 63.253],
+        ["previous", "fresh-1", "interrupt", "enqueue", "enqueue", 340, 63.563],
+        ["previous", "fresh-2", "enqueue", "enqueue", "enqueue", 342, 63.734],
+        ["previous", "fresh-3", "discard", "enqueue", "enqueue", 340, 63.678],
+        ["previous", "fresh-4", "enqueue", "enqueue", "enqueue", 345, 63.766],
+        ["previous", "fresh-5", "discard", "enqueue", "enqueue", 333, 63.701],
+        ["previous", "fresh-6", "interrupt", "enqueue", "enqueue", 336, 63.468],
+        ["previous", "fresh-7", "enqueue", "interrupt", "interrupt", 334, 63.833],
+        ["previous", "fresh-8", "interrupt", "enqueue", "enqueue", 340, 63.997],
+        ["previous", "fresh-9", "enqueue", "enqueue", "enqueue", 343, 63.86],
+        ["previous", "fresh-10", "discard", "enqueue", "enqueue", 340, 63.918],
+        ["previous", "fresh-11", "enqueue", "enqueue", "enqueue", 338, 63.687],
+        ["previous", "fresh-12", "discard", "enqueue", "enqueue", 332, 63.539],
+        ["previous", "fresh-13", "interrupt", "interrupt", "interrupt", 335, 64.167],
+        ["previous", "fresh-14", "enqueue", "interrupt", "enqueue", 336, 64.075],
+        ["previous", "fresh-15", "enqueue", "enqueue", "enqueue", 341, 63.777],
+        ["previous", "fresh-16", "enqueue", "enqueue", "enqueue", 338, 60.846],
+        ["previous", "fresh-17", "enqueue", "enqueue", "enqueue", 334, 61.467],
+        ["previous", "fresh-18", "discard", "enqueue", "enqueue", 337, 68.358],
+        ["previous", "zh-01", "interrupt", "enqueue", "enqueue", 347, 70.632],
+        ["previous", "zh-02", "enqueue", "enqueue", "enqueue", 349, 67.607],
+        ["previous", "zh-03", "discard", "enqueue", "enqueue", 344, 67.084],
+        ["previous", "zh-04", "interrupt", "interrupt", "interrupt", 341, 67.39],
+        ["previous", "zh-05", "enqueue", "enqueue", "enqueue", 343, 67.134],
+        ["previous", "zh-06", "enqueue", "interrupt", "enqueue", 340, 67.275],
+        ["previous", "zh-07", "enqueue", "enqueue", "enqueue", 348, 67.17],
+        ["previous", "zh-08", "discard", "enqueue", "enqueue", 335, 66.741],
+        ["previous", "zh-09", "enqueue", "enqueue", "enqueue", 339, 67.038],
+        ["previous", "zh-10", "enqueue", "enqueue", "enqueue", 337, 66.757],
+        ["previous", "zh-11", "interrupt", "enqueue", "enqueue", 345, 66.689],
+        ["previous", "zh-12", "enqueue", "enqueue", "enqueue", 320, 66.204],
+        ["previous", "en-01", "interrupt", "enqueue", "enqueue", 342, 65.858],
+        ["previous", "en-02", "enqueue", "enqueue", "enqueue", 342, 65.741],
+        ["previous", "en-03", "discard", "enqueue", "enqueue", 341, 65.345],
+        ["previous", "en-04", "interrupt", "enqueue", "enqueue", 342, 65.356],
+        ["previous", "en-05", "enqueue", "enqueue", "enqueue", 340, 65.201],
+        ["previous", "en-06", "enqueue", "enqueue", "enqueue", 342, 64.994],
+        ["previous", "en-07", "enqueue", "enqueue", "enqueue", 352, 65.125],
+        ["previous", "en-08", "discard", "enqueue", "enqueue", 340, 64.687],
+        ["previous", "en-09", "enqueue", "enqueue", "enqueue", 343, 64.532],
+        ["previous", "en-10", "enqueue", "enqueue", "enqueue", 340, 64.199],
+        ["previous", "en-11", "interrupt", "interrupt", "interrupt", 345, 64.14],
+        ["previous", "en-12", "enqueue", "enqueue", "enqueue", 321, 62.883]
+      ]
+    },
+    "terse-example-cut": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. 停下、别说了、等下 / stop, stop talking, hold on during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 297,
+      "full_history_tokens": {
+        "short": 452,
+        "zh-100": 501,
+        "en-100": 468
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 21,
+            "false_discard": 0,
+            "false_interrupt": 3,
+            "missed_interrupt": 10
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 41,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 10
+          }
+        },
+        "model_false_discard": 0,
+        "p95_ms": 64.935,
+        "maximum_ms": 65.577,
+        "token_range": [
+          306,
+          338
+        ]
+      },
+      "rows": [
+        ["new", "syn-stop-zh-0", "interrupt", "interrupt", "interrupt", 319, 59.508],
+        ["new", "syn-stop-zh-1", "enqueue", "enqueue", "enqueue", 326, 59.867],
+        ["new", "syn-stop-en-0", "interrupt", "interrupt", "interrupt", 320, 60.018],
+        ["new", "syn-stop-en-1", "enqueue", "enqueue", "enqueue", 326, 60.617],
+        ["new", "syn-speech-zh-0", "interrupt", "enqueue", "enqueue", 321, 60.301],
+        ["new", "syn-speech-zh-1", "enqueue", "enqueue", "enqueue", 324, 60.514],
+        ["new", "syn-speech-en-0", "interrupt", "interrupt", "interrupt", 319, 61.385],
+        ["new", "syn-speech-en-1", "enqueue", "enqueue", "enqueue", 326, 61.422],
+        ["new", "syn-wait-zh-0", "interrupt", "enqueue", "enqueue", 321, 61.556],
+        ["new", "syn-wait-zh-1", "enqueue", "enqueue", "enqueue", 328, 62.377],
+        ["new", "syn-wait-en-0", "interrupt", "enqueue", "enqueue", 321, 61.925],
+        ["new", "syn-wait-en-1", "enqueue", "enqueue", "enqueue", 329, 62.525],
+        ["new", "syn-pause-zh-0", "interrupt", "interrupt", "interrupt", 322, 62.298],
+        ["new", "syn-pause-zh-1", "enqueue", "enqueue", "enqueue", 326, 63.016],
+        ["new", "syn-pause-en-0", "interrupt", "interrupt", "interrupt", 321, 63.035],
+        ["new", "syn-pause-en-1", "enqueue", "interrupt", "interrupt", 328, 63.59],
+        ["new", "syn-change-zh-0", "interrupt", "enqueue", "enqueue", 323, 63.428],
+        ["new", "syn-change-zh-1", "enqueue", "enqueue", "enqueue", 328, 63.297],
+        ["new", "syn-change-en-0", "interrupt", "enqueue", "enqueue", 323, 63.598],
+        ["new", "syn-change-en-1", "enqueue", "interrupt", "interrupt", 323, 63.276],
+        ["new", "syn-cancel-zh-0", "interrupt", "enqueue", "enqueue", 327, 63.986],
+        ["new", "syn-cancel-zh-1", "enqueue", "enqueue", "enqueue", 331, 64.18],
+        ["new", "syn-cancel-en-0", "interrupt", "enqueue", "enqueue", 325, 63.68],
+        ["new", "syn-cancel-en-1", "enqueue", "enqueue", "enqueue", 330, 64.185],
+        ["new", "syn-correct-zh-0", "interrupt", "enqueue", "enqueue", 329, 64.409],
+        ["new", "syn-correct-zh-1", "enqueue", "enqueue", "enqueue", 332, 64.587],
+        ["new", "syn-correct-en-0", "interrupt", "enqueue", "enqueue", 328, 64.637],
+        ["new", "syn-correct-en-1", "enqueue", "enqueue", "enqueue", 332, 63.989],
+        ["new", "syn-target-zh-0", "enqueue", "enqueue", "enqueue", 324, 63.536],
+        ["new", "syn-target-zh-1", "interrupt", "enqueue", "enqueue", 325, 64.387],
+        ["new", "syn-target-en-0", "enqueue", "interrupt", "interrupt", 321, 64.299],
+        ["new", "syn-target-en-1", "interrupt", "interrupt", "interrupt", 327, 64.421],
+        ["new", "syn-idle-zh", "enqueue", "enqueue", "enqueue", 320, 64.795],
+        ["new", "syn-idle-en", "enqueue", "enqueue", "enqueue", 319, 64.823],
+        ["additional", "guard-01", "discard", "enqueue", "enqueue", 320, 64.894],
+        ["additional", "guard-02", "discard", "enqueue", "enqueue", 319, 64.661],
+        ["additional", "guard-03", "discard", "discard", "discard", 317, 64.279],
+        ["additional", "guard-04", "discard", "enqueue", "discard", 319, 63.951],
+        ["additional", "guard-05", "discard", "enqueue", "discard", 317, 64.405],
+        ["additional", "guard-06", "enqueue", "enqueue", "enqueue", 320, 63.847],
+        ["additional", "guard-07", "enqueue", "enqueue", "enqueue", 321, 64.378],
+        ["additional", "guard-08", "enqueue", "enqueue", "enqueue", 319, 64.153],
+        ["additional", "guard-09", "enqueue", "enqueue", "enqueue", 319, 64.374],
+        ["additional", "guard-10", "enqueue", "enqueue", "enqueue", 317, 63.869],
+        ["additional", "guard-11", "enqueue", "enqueue", "enqueue", 318, 63.076],
+        ["additional", "guard-12", "enqueue", "enqueue", "enqueue", 318, 63.448],
+        ["additional", "guard-13", "enqueue", "enqueue", "enqueue", 320, 63.937],
+        ["additional", "guard-14", "enqueue", "enqueue", "enqueue", 321, 63.737],
+        ["additional", "guard-15", "enqueue", "enqueue", "enqueue", 322, 63.647],
+        ["additional", "guard-16", "enqueue", "enqueue", "enqueue", 318, 63.491],
+        ["additional", "guard-17", "enqueue", "enqueue", "enqueue", 318, 64.154],
+        ["additional", "guard-18", "enqueue", "enqueue", "enqueue", 322, 64.785],
+        ["additional", "answer-01", "enqueue", "enqueue", "enqueue", 326, 64.899],
+        ["additional", "answer-02", "enqueue", "enqueue", "enqueue", 326, 65.247],
+        ["previous", "ack-0", "enqueue", "enqueue", "enqueue", 324, 65.577],
+        ["previous", "ack-1", "discard", "enqueue", "enqueue", 325, 65.51],
+        ["previous", "cancel-0", "interrupt", "interrupt", "interrupt", 319, 65.313],
+        ["previous", "cancel-1", "enqueue", "enqueue", "enqueue", 329, 65.265],
+        ["previous", "no-0", "enqueue", "enqueue", "enqueue", 330, 64.653],
+        ["previous", "no-1", "discard", "enqueue", "enqueue", 326, 64.935],
+        ["previous", "now-0", "interrupt", "interrupt", "interrupt", 330, 64.706],
+        ["previous", "now-1", "discard", "interrupt", "interrupt", 329, 65.172],
+        ["previous", "same-0", "enqueue", "enqueue", "enqueue", 328, 64.703],
+        ["previous", "same-1", "discard", "enqueue", "enqueue", 329, 64.795],
+        ["previous", "stop-0", "interrupt", "interrupt", "interrupt", 323, 64.432],
+        ["previous", "stop-1", "enqueue", "interrupt", "interrupt", 335, 64.673],
+        ["previous", "tomorrow-0", "interrupt", "interrupt", "interrupt", 322, 64.176],
+        ["previous", "tomorrow-1", "enqueue", "enqueue", "enqueue", 333, 64.13],
+        ["previous", "ok-0", "enqueue", "enqueue", "enqueue", 329, 64.241],
+        ["previous", "ok-1", "discard", "enqueue", "enqueue", 322, 64.224],
+        ["previous", "wait-0", "interrupt", "enqueue", "enqueue", 325, 64.208],
+        ["previous", "wait-1", "enqueue", "enqueue", "enqueue", 333, 64.101],
+        ["previous", "yes-0", "enqueue", "enqueue", "enqueue", 318, 63.319],
+        ["previous", "yes-1", "discard", "enqueue", "enqueue", 328, 63.285],
+        ["previous", "pronoun-0", "interrupt", "interrupt", "interrupt", 327, 63.837],
+        ["previous", "pronoun-1", "discard", "interrupt", "interrupt", 329, 62.09],
+        ["previous", "defer-0", "enqueue", "enqueue", "enqueue", 333, 64.208],
+        ["previous", "defer-1", "enqueue", "enqueue", "enqueue", 331, 64.148],
+        ["previous", "older-chinese-0", "interrupt", "interrupt", "interrupt", 320, 63.782],
+        ["previous", "older-chinese-1", "discard", "interrupt", "interrupt", 320, 63.356],
+        ["previous", "older-english-0", "enqueue", "enqueue", "enqueue", 322, 64.081],
+        ["previous", "older-english-1", "discard", "enqueue", "enqueue", 322, 63.936],
+        ["previous", "fresh-1", "interrupt", "enqueue", "enqueue", 326, 63.741],
+        ["previous", "fresh-2", "enqueue", "enqueue", "enqueue", 328, 63.578],
+        ["previous", "fresh-3", "discard", "enqueue", "enqueue", 326, 63.381],
+        ["previous", "fresh-4", "enqueue", "enqueue", "enqueue", 331, 63.554],
+        ["previous", "fresh-5", "discard", "enqueue", "enqueue", 319, 63.822],
+        ["previous", "fresh-6", "interrupt", "enqueue", "enqueue", 322, 63.851],
+        ["previous", "fresh-7", "enqueue", "enqueue", "enqueue", 320, 63.783],
+        ["previous", "fresh-8", "interrupt", "enqueue", "enqueue", 326, 63.482],
+        ["previous", "fresh-9", "enqueue", "enqueue", "enqueue", 329, 63.212],
+        ["previous", "fresh-10", "discard", "enqueue", "enqueue", 326, 63.886],
+        ["previous", "fresh-11", "enqueue", "enqueue", "enqueue", 324, 63.894],
+        ["previous", "fresh-12", "discard", "enqueue", "enqueue", 318, 63.491],
+        ["previous", "fresh-13", "interrupt", "enqueue", "enqueue", 321, 63.54],
+        ["previous", "fresh-14", "enqueue", "enqueue", "enqueue", 322, 63.28],
+        ["previous", "fresh-15", "enqueue", "enqueue", "enqueue", 327, 63.448],
+        ["previous", "fresh-16", "enqueue", "enqueue", "enqueue", 324, 63.126],
+        ["previous", "fresh-17", "enqueue", "enqueue", "enqueue", 320, 63.57],
+        ["previous", "fresh-18", "discard", "enqueue", "enqueue", 323, 63.569],
+        ["previous", "zh-01", "interrupt", "enqueue", "enqueue", 333, 62.928],
+        ["previous", "zh-02", "enqueue", "enqueue", "enqueue", 335, 63.601],
+        ["previous", "zh-03", "discard", "enqueue", "enqueue", 330, 63.412],
+        ["previous", "zh-04", "interrupt", "enqueue", "enqueue", 327, 63.697],
+        ["previous", "zh-05", "enqueue", "enqueue", "enqueue", 329, 63.698],
+        ["previous", "zh-06", "enqueue", "enqueue", "enqueue", 326, 63.42],
+        ["previous", "zh-07", "enqueue", "enqueue", "enqueue", 334, 63.441],
+        ["previous", "zh-08", "discard", "enqueue", "enqueue", 321, 63.71],
+        ["previous", "zh-09", "enqueue", "enqueue", "enqueue", 325, 63.781],
+        ["previous", "zh-10", "enqueue", "enqueue", "enqueue", 323, 63.624],
+        ["previous", "zh-11", "interrupt", "enqueue", "enqueue", 331, 63.917],
+        ["previous", "zh-12", "enqueue", "enqueue", "enqueue", 306, 63.41],
+        ["previous", "en-01", "interrupt", "enqueue", "enqueue", 328, 63.537],
+        ["previous", "en-02", "enqueue", "enqueue", "enqueue", 328, 63.601],
+        ["previous", "en-03", "discard", "enqueue", "enqueue", 327, 63.894],
+        ["previous", "en-04", "interrupt", "enqueue", "enqueue", 328, 63.8],
+        ["previous", "en-05", "enqueue", "enqueue", "enqueue", 326, 63.83],
+        ["previous", "en-06", "enqueue", "enqueue", "enqueue", 328, 63.352],
+        ["previous", "en-07", "enqueue", "enqueue", "enqueue", 338, 63.752],
+        ["previous", "en-08", "discard", "enqueue", "enqueue", 326, 63.728],
+        ["previous", "en-09", "enqueue", "enqueue", "enqueue", 329, 63.699],
+        ["previous", "en-10", "enqueue", "enqueue", "enqueue", 326, 63.994],
+        ["previous", "en-11", "interrupt", "interrupt", "interrupt", 331, 63.353],
+        ["previous", "en-12", "enqueue", "enqueue", "enqueue", 307, 63.576]
+      ]
+    },
+    "correct-example": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. 停下、别说了、等下、改成 / stop, stop talking, hold on, make it during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 316,
+      "full_history_tokens": {
+        "short": 471,
+        "zh-100": 520,
+        "en-100": 487
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 23,
+            "false_discard": 0,
+            "false_interrupt": 3,
+            "missed_interrupt": 8
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 39,
+            "false_discard": 0,
+            "false_interrupt": 8,
+            "missed_interrupt": 8
+          }
+        },
+        "model_false_discard": 1,
+        "p95_ms": 65.849,
+        "maximum_ms": 66.324,
+        "token_range": [
+          325,
+          357
+        ]
+      }
+    },
+    "correct-example-cut": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. 停下、别说了、等下、改成 / stop, stop talking, hold on, make it during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 302,
+      "full_history_tokens": {
+        "short": 457,
+        "zh-100": 506,
+        "en-100": 473
+      },
+      "summary": {
+        "completed": 124,
+        "attempted": 124,
+        "adopted_metrics": {
+          "new": {
+            "correct": 21,
+            "false_discard": 0,
+            "false_interrupt": 3,
+            "missed_interrupt": 10
+          },
+          "additional": {
+            "correct": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 0
+          },
+          "previous": {
+            "correct": 39,
+            "false_discard": 0,
+            "false_interrupt": 4,
+            "missed_interrupt": 11
+          }
+        },
+        "model_false_discard": 0,
+        "p95_ms": 65.879,
+        "maximum_ms": 66.198,
+        "token_range": [
+          311,
+          343
+        ]
+      }
+    }
+  }
+}

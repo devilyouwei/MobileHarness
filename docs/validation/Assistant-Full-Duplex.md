@@ -254,3 +254,22 @@ Decision 页面独立选择本地 D3/云端，云端 Provider/模型沿用共享
 ### 真机覆盖安装
 
 - Mobile Harness 0.1.0（2026111304）签名构建通过，校验 46 项 Agent 与 Skill 资源及 Live Activity。已覆盖安装至 Youwei’s iPhone 17 Pro（安装回执 6860），设备清单确认构建号，系统启动成功。覆盖安装保留应用数据。真实模型及真机交互未在本次安装中验收。
+
+## 2026-11-13 Decision 动作定义与示例
+
+- Mac 本地 D3 Edge 在 46 条合成输入上由 27 条正确增至 28 条。误打断由 8 降至 3，误丢弃由 1 降至 0，漏打断由 4 增至 6。新版最长 61.62 ms。 [对照与逐条标签](Decision-Model-Mac-Comparison.md#三种动作定义与对照示例)
+- 四个 iOS Simulator scheme 构建和应用资源校验通过。`./scripts/check.sh` 退出 1，D3 超时后重试与云台最新目标两个用例在全量集成阶段失败，随后两项和提示词请求、打包断言共 11 项专项复跑通过。228 项 LiveRuntimeTests 通过，相机 Metal 用例记录通过。日志位于 `/tmp/mh-decision-examples-{ios,check,focused}.log`。
+- 真机签名构建和严格签名校验通过，包内 `InputDecision.json` 与源码逐字节一致。iPhone 17 Pro 已覆盖安装并启动 `0.1.0 (2026111305)`，设备清单确认构建号，安装序号 6884。本次包含三种动作定义与四个英文对照例。证据见 `/tmp/mh-d3-prompt-device-{build.log,install.json,after.json,launch.json}`。
+
+## 2026-11-14 Decision 防止误丢弃
+
+- 真机应用数据目录可读。Decision 明细由 UI 根在内存中保留，已丢弃语音不写对话数据库，未能从设备文件回查用户反馈中的具体原句。
+- M5 Mac 本地 D3 的 90 条合成样例及离线采纳规则回放中，误丢弃从 2 降至 0，误打断从 3 增至 5，漏打断从 11 降至 10。新版最长模型调用 51.84 ms。 [模型结果及逐条数据](Decision-Model-Mac-Comparison.md#保留明确指令和可能有效的转写)
+- `./scripts/check.sh` 首轮集成阶段因现有 D3 超时重试夹具在并发下超出测试预算退出 1。扩大该夹具的测试期限后，最终 1,152 项集成测试及 11 项 Decision 专项通过。脚本的 228 项 LiveRuntimeTests 通过，相机 Metal 用例只有启动记录。四个 iOS 模拟器目标构建通过。日志位于 `/tmp/mh-d3-discard-{check,integration-final,focused-final,ios}.log`。
+- 真机签名构建和严格签名校验通过，包内 `InputDecision.json` 与源码逐字节一致。iPhone 17 Pro 已覆盖安装并启动 `0.1.0 (2026111401)`，安装序号 6892。证据见 `/tmp/mh-d3-discard-device-{build.log,install.json,after.json,launch.json}`。真机交互和并发语音时延尚未验收。
+
+## 2026-11-14 Decision 中英文打断近义词
+
+- 124 条 Mac 本地模型探测及采纳回放对照中，接入版的误丢弃维持 0，误打断从 8 降为 7，漏打断从 21 降为 20。 [实验方法与逐项结果](Decision-Model-Mac-Comparison.md#中英文打断近义词)
+- `./scripts/check.sh` 退出 0，1,152 项集成测试、228 项 LiveRuntimeTests 通过。相机 Metal 用例只有启动记录。四个 iOS 模拟器目标构建通过，应用包内提示词与源码逐字节一致。日志位于 `/tmp/mh-d3-synonyms-{check,ios}.log`。
+- 真机签名及资源校验通过。iPhone 17 Pro 已覆盖安装并启动 `0.1.0 (2026111402)`，设备清单核对构建号，安装序号 6900。真机包内 `InputDecision.json` 与源码逐字节一致，含中英文打断近义词。证据见 `/tmp/mh-d3-synonyms-device-{build.log,install.json,after.json,launch.json}`。

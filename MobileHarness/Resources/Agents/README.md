@@ -20,7 +20,7 @@ Assistant 是唯一面向用户的对话 Agent；摄影、历史查询、应用�
 | `<AgentName>/Agent.json` | 必需。v10 身份、角色自有公开 description、通信权限和基础 Skill。 |
 | `Assistant/Instructions.md` | Assistant 自身的身份、用户沟通和如实汇报责任。业务流程归 Skill，共用协议提示词归 `Shared/`。 |
 | `Assistant/Prompts.json` | Assistant 主请求的执行证据、任务历史摘要及 Writer 协作事实模板。 |
-| `Assistant/InputDecision.json` | 英文输入分类规则、三种动作描述、现场与最近一来一回的输入格式、云端分类工具描述。对话内容沿用原文。 |
+| `Assistant/InputDecision.json` | 英文输入分类规则、三种动作定义和中英文示例、现场与最近一来一回的输入格式、云端分类工具描述。明确保留有效请求和可能有用的转写。对话内容沿用原文。 |
 | `Writer/Instructions.md` | Writer 私有共用身份，仅供自己的控制请求。 |
 | `Writer/Prompts.json` | Writer 作品库及编辑控制请求、补充输入和轮次模板。 |
 | `Writer/ContentPrompts.json` | 无工具内容请求的输出规则、文件格式、编辑上下文与重试模板。 |

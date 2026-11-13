@@ -9,6 +9,10 @@ Purpose: retain bounded raw model/device measurements independently of productio
 - [全双工小模型 Core AI 对照](duplex-llm-coreai-2026-11-13.json)保留逐条候选分数、时延、制品版本和复现脚本，方法见[验证记录](../validation/Decision-Model-Mac-Comparison.md#小参数生成模型的-core-ai-对照)。
 - [全双工对话历史窗口 Core AI 对照](duplex-history-coreai-2026-11-13.json)保留同句异义样例、四款制品在各窗口的原始分数、超时和复现脚本，方法见[验证记录](../validation/Decision-Model-Mac-Comparison.md#对话历史窗口对照)。
 - [2、4、8、10 条历史窗口续测](duplex-history-windows-coreai-2026-11-13.json)保留 9 款 Core AI 制品的历史窗口对照、超限终止和复现脚本，方法见[验证记录](../validation/Decision-Model-Mac-Comparison.md#24810-条历史的续测)。
+- [Decision 动作定义与示例](duplex-decision-prompt-examples-2026-11-13.json)保留两版英文提示词、46 条合成输入、逐条标签及延迟汇总。 [验证记录](../validation/Decision-Model-Mac-Comparison.md#三种动作定义与对照示例)
+- [D3 输入边界与双语示例](duplex-d3-bilingual-examples-2026-11-13.json)保留 512 token 边界、17 个双语变体、24 条新增探测及逐条预测和延迟。 [验证记录](../validation/Decision-Model-Mac-Comparison.md#d3-输入边界与双语示例)
+- [D3 防止误丢弃](duplex-d3-discard-protection-2026-11-14.json)保留两版提示词、20 条新增样例、原始模型输出和采纳规则离线回放。 [验证记录](../validation/Decision-Model-Mac-Comparison.md#保留明确指令和可能有效的转写)
+- [D3 中英文打断近义词](duplex-d3-interrupt-synonyms-2026-11-14.json)保留 50 个配置的汇总、34 条新增探测及代表配置的逐条测量。 [验证记录](../validation/Decision-Model-Mac-Comparison.md#中英文打断近义词)
 
 - [BasicSkill 控制教学](basic-skill-control-2026-11-08.json)：revision 50 两轮 Qwen 回复、调用与失败；保留旧摄影夹具不适配及终轮两项模型失败，解释见[验证记录](../validation/BasicSkill-Control-Teaching.md)。
 

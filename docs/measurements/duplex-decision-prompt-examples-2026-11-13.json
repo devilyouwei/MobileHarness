@@ -1,0 +1,436 @@
+{
+  "device": "Apple M5 / macOS 27.2.1 (26B131)",
+  "threshold_ms": 100,
+  "warmup_calls_per_prompt": 3,
+  "model": "D3 Edge local Apple Core AI, same fixed 512-token artifact as the two-message window study",
+  "prior_fixtures": "duplex-history-windows-coreai-2026-11-13.json",
+  "candidate_order": [
+    "interrupt",
+    "discard",
+    "enqueue"
+  ],
+  "fixtures": {
+    "previous": [
+      {
+        "id": "ack-0",
+        "expected": "enqueue",
+        "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"给我设个提醒，时间还没决定。\"\nAssistant: \"明早八点可以吗？\"\nLatest user transcript: \"嗯。\""
+      },
+      {
+        "id": "ack-1",
+        "expected": "discard",
+        "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"读一下已经确定的提醒。\"\nAssistant: \"明早八点的提醒已经设好了。\"\nLatest user transcript: \"嗯。\""
+      },
+      {
+        "id": "cancel-0",
+        "expected": "interrupt",
+        "input": "Playing=no Running=yes Awaiting answer=unknown\nHistory:\nUser: \"开始发送这个附件。\"\nAssistant: \"我正在发送附件。\"\nLatest user transcript: \"取消。\""
+      },
+      {
+        "id": "cancel-1",
+        "expected": "enqueue",
+        "input": "Playing=no Running=yes Awaiting answer=unknown\nHistory:\nUser: \"发送附件的同时，告诉我按钮上的动词怎么说。\"\nAssistant: \"这个按钮叫什么？请念出标签。\"\nLatest user transcript: \"取消。\""
+      },
+      {
+        "id": "no-0",
+        "expected": "enqueue",
+        "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"介绍完之后先别发文件，问我一声。\"\nAssistant: \"关于这个附件，你还需要我发送吗？\"\nLatest user transcript: \"不用。\""
+      },
+      {
+        "id": "no-1",
+        "expected": "discard",
+        "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"接着讲。我只是在确认你能听见。\"\nAssistant: \"好，我继续讲下一步。\"\nLatest user transcript: \"不用。\""
+      },
+      {
+        "id": "now-0",
+        "expected": "interrupt",
+        "input": "Playing=yes Running=yes Awaiting answer=no\nHistory:\nUser: \"你先按目前的方案继续，如果我说换，就立刻切换。\"\nAssistant: \"我正在用旧方案运行。\"\nLatest user transcript: \"现在就换。\""
+      },
+      {
+        "id": "now-1",
+        "expected": "discard",
+        "input": "Playing=yes Running=yes Awaiting answer=no\nHistory:\nUser: \"我在和小李说话。小李，等下你来换电池。\"\nAssistant: \"我继续读我的清单。\"\nLatest user transcript: \"现在就换。\""
+      },
+      {
+        "id": "same-0",
+        "expected": "enqueue",
+        "input": "Playing=no Running=no Awaiting answer=yes\nHistory:\nUser: \"帮我订去杭州的票。上次是高铁。\"\nAssistant: \"这次选高铁还是飞机？\"\nLatest user transcript: \"还是上次那个。\""
+      },
+      {
+        "id": "same-1",
+        "expected": "discard",
+        "input": "Playing=no Running=no Awaiting answer=yes\nHistory:\nUser: \"我先跟同事说一声，等一下才回答你。\"\nAssistant: \"文件要导出成什么格式？\"\nLatest user transcript: \"还是上次那个。\""
+      },
+      {
+        "id": "stop-0",
+        "expected": "interrupt",
+        "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"Read the next section aloud.\"\nAssistant: \"First, check the wiring and the power switch.\"\nLatest user transcript: \"Stop.\""
+      },
+      {
+        "id": "stop-1",
+        "expected": "enqueue",
+        "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"Keep reading. When you ask for a word I will say the word printed on my card.\"\nAssistant: \"What's the English word on the card?\"\nLatest user transcript: \"Stop.\""
+      },
+      {
+        "id": "tomorrow-0",
+        "expected": "interrupt",
+        "input": "Playing=yes Running=yes Awaiting answer=unknown\nHistory:\nUser: \"现在开始发今天的通知。\"\nAssistant: \"我在执行今天的发送计划。\"\nLatest user transcript: \"改成明天。\""
+      },
+      {
+        "id": "tomorrow-1",
+        "expected": "enqueue",
+        "input": "Playing=yes Running=yes Awaiting answer=unknown\nHistory:\nUser: \"你继续准备材料。发通知之前先问我用哪一天。\"\nAssistant: \"你想把发送日期设在哪天？\"\nLatest user transcript: \"改成明天。\""
+      },
+      {
+        "id": "ok-0",
+        "expected": "enqueue",
+        "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"要拍照片，先问我是否同意使用闪光灯。\"\nAssistant: \"要打开 flash 吗？\"\nLatest user transcript: \"OK 好。\""
+      },
+      {
+        "id": "ok-1",
+        "expected": "discard",
+        "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"帮我确认上传是否完成。\"\nAssistant: \"Upload 完成了。\"\nLatest user transcript: \"OK 好。\""
+      },
+      {
+        "id": "wait-0",
+        "expected": "interrupt",
+        "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"继续念，我跟不上时会说等一下。\"\nAssistant: \"我继续念下一条说明。\"\nLatest user transcript: \"等一下。\""
+      },
+      {
+        "id": "wait-1",
+        "expected": "enqueue",
+        "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"我们在做字幕听写。你问台词，我照原文念。\"\nAssistant: \"角色在门口说的那句是什么？\"\nLatest user transcript: \"等一下。\""
+      },
+      {
+        "id": "yes-0",
+        "expected": "enqueue",
+        "input": "Playing=no Running=no Awaiting answer=yes\nHistory:\nUser: \"Please ask before saving this draft.\"\nAssistant: \"Should I save it?\"\nLatest user transcript: \"Yes.\""
+      },
+      {
+        "id": "yes-1",
+        "expected": "discard",
+        "input": "Playing=no Running=no Awaiting answer=yes\nHistory:\nUser: \"I am answering my colleague now. Give me a moment before I reply to you.\"\nAssistant: \"Should I save it?\"\nLatest user transcript: \"Yes.\""
+      },
+      {
+        "id": "pronoun-0",
+        "expected": "interrupt",
+        "input": "Playing=yes Running=yes Awaiting answer=no\nHistory:\nUser: \"我把正运行的下载叫作那个任务。\"\nAssistant: \"我继续介绍当前下载进度。\"\nLatest user transcript: \"先停那个。\""
+      },
+      {
+        "id": "pronoun-1",
+        "expected": "discard",
+        "input": "Playing=yes Running=yes Awaiting answer=no\nHistory:\nUser: \"我和同事说话时，那个是他手里的录音机。\"\nAssistant: \"我继续介绍当前下载进度。\"\nLatest user transcript: \"先停那个。\""
+      },
+      {
+        "id": "defer-0",
+        "expected": "enqueue",
+        "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"我会朗读一句示范台词，请照原句记下来。\"\nAssistant: \"你现在要我记哪句？\"\nLatest user transcript: \"等我说完再停。\""
+      },
+      {
+        "id": "defer-1",
+        "expected": "enqueue",
+        "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"我会在讲解时告诉你什么时候需要结束当前播报。\"\nAssistant: \"我继续介绍当前流程。\"\nLatest user transcript: \"等我说完再停。\""
+      },
+      {
+        "id": "older-chinese-0",
+        "expected": "interrupt",
+        "input": "Playing=yes Running=yes Awaiting answer=no\nHistory:\nUser: \"继续手头的事。\"\nAssistant: \"好，我继续。\"\nLatest user transcript: \"先停那个。\""
+      },
+      {
+        "id": "older-chinese-1",
+        "expected": "discard",
+        "input": "Playing=yes Running=yes Awaiting answer=no\nHistory:\nUser: \"继续手头的事。\"\nAssistant: \"好，我继续。\"\nLatest user transcript: \"先停那个。\""
+      },
+      {
+        "id": "older-english-0",
+        "expected": "enqueue",
+        "input": "Playing=no Running=no Awaiting answer=yes\nHistory:\nUser: \"回到导出文件。\"\nAssistant: \"这次要选哪种导出格式？\"\nLatest user transcript: \"Use the usual one.\""
+      },
+      {
+        "id": "older-english-1",
+        "expected": "discard",
+        "input": "Playing=no Running=no Awaiting answer=yes\nHistory:\nUser: \"回到导出文件。\"\nAssistant: \"这次要选哪种导出格式？\"\nLatest user transcript: \"Use the usual one.\""
+      }
+    ],
+    "fresh": [
+      {
+        "id": "fresh-1",
+        "expected": "interrupt",
+        "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"读一下那段开场白\"\nAssistant: \"各位来宾，晚上好。\"\nLatest user transcript: \"别念了，我自己来。\""
+      },
+      {
+        "id": "fresh-2",
+        "expected": "enqueue",
+        "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"读一下那段开场白\"\nAssistant: \"各位来宾，晚上好。\"\nLatest user transcript: \"你念完再帮我找一下结尾。\""
+      },
+      {
+        "id": "fresh-3",
+        "expected": "discard",
+        "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"读一下那段开场白\"\nAssistant: \"各位来宾，晚上好。\"\nLatest user transcript: \"小周，帮我开个窗。\""
+      },
+      {
+        "id": "fresh-4",
+        "expected": "enqueue",
+        "input": "Playing=no Running=no Awaiting answer=yes\nHistory:\nUser: \"帮我查一下交通\"\nAssistant: \"你是要查地铁吗？\"\nPending question: \"你是要查地铁吗？\"\nLatest user transcript: \"对。\""
+      },
+      {
+        "id": "fresh-5",
+        "expected": "discard",
+        "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"帮我查一下交通\"\nAssistant: \"我先看一下地铁线路。\"\nLatest user transcript: \"对。\""
+      },
+      {
+        "id": "fresh-6",
+        "expected": "interrupt",
+        "input": "Playing=no Running=yes Awaiting answer=unknown\nHistory:\nUser: \"打开计时器\"\nAssistant: \"正在启动五分钟计时。\"\nLatest user transcript: \"等等，五分钟改成三分钟。\""
+      },
+      {
+        "id": "fresh-7",
+        "expected": "enqueue",
+        "input": "Playing=no Running=yes Awaiting answer=unknown\nHistory:\nUser: \"打开计时器\"\nAssistant: \"正在启动五分钟计时。\"\nLatest user transcript: \"下次改成三分钟。\""
+      },
+      {
+        "id": "fresh-8",
+        "expected": "interrupt",
+        "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"给我读一下新闻\"\nAssistant: \"接下来是第二条新闻。\"\nLatest user transcript: \"Enough, go back to the first story now.\""
+      },
+      {
+        "id": "fresh-9",
+        "expected": "enqueue",
+        "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"给我读一下新闻\"\nAssistant: \"接下来是第二条新闻。\"\nLatest user transcript: \"Let this one finish, then go back to the first story.\""
+      },
+      {
+        "id": "fresh-10",
+        "expected": "discard",
+        "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"Read me the news\"\nAssistant: \"The next story is about the museum.\"\nLatest user transcript: \"Hey Mia, your keys are here.\""
+      },
+      {
+        "id": "fresh-11",
+        "expected": "enqueue",
+        "input": "Playing=no Running=no Awaiting answer=yes\nHistory:\nUser: \"Book the museum visit\"\nAssistant: \"Is Saturday okay?\"\nPending question: \"Is Saturday okay?\"\nLatest user transcript: \"Sure.\""
+      },
+      {
+        "id": "fresh-12",
+        "expected": "discard",
+        "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"Read me the news\"\nAssistant: \"The museum is open Saturday.\"\nLatest user transcript: \"Sure.\""
+      },
+      {
+        "id": "fresh-13",
+        "expected": "interrupt",
+        "input": "Playing=no Running=yes Awaiting answer=unknown\nHistory:\nUser: \"Start a timer\"\nAssistant: \"Starting a ten minute timer.\"\nLatest user transcript: \"Make that two minutes now.\""
+      },
+      {
+        "id": "fresh-14",
+        "expected": "enqueue",
+        "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"Start a timer\"\nAssistant: \"The ten minute timer has ended.\"\nLatest user transcript: \"Make that two minutes now.\""
+      },
+      {
+        "id": "fresh-15",
+        "expected": "enqueue",
+        "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"读下这条消息\"\nAssistant: \"我准备读正文。\"\nLatest user transcript: \"我刚才说的是“别读了”这三个字。\""
+      },
+      {
+        "id": "fresh-16",
+        "expected": "enqueue",
+        "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"Read my notes\"\nAssistant: \"Here is the first paragraph.\"\nLatest user transcript: \"Actually, do not stop. Keep reading.\""
+      },
+      {
+        "id": "fresh-17",
+        "expected": "enqueue",
+        "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"你帮我看看这个词\"\nAssistant: \"我先介绍背景。\"\nLatest user transcript: \"那个，能不能……\""
+      },
+      {
+        "id": "fresh-18",
+        "expected": "discard",
+        "input": "Playing=yes Running=no Awaiting answer=unknown\nHistory:\nUser: \"说说下个步骤\"\nAssistant: \"第二步，打开应用。\"\nLatest user transcript: \"嘿，老王，我们先走吧。\""
+      }
+    ]
+  },
+  "configurations": {
+    "baseline": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify only the latest utterance. Consider the history and the current situation. Keep an answer to the current question. A quote, a denial, or a request to stop later should not interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change.",
+          "discard": "Speech not directed at the assistant, or an acknowledgment that needs no follow-up.",
+          "enqueue": "Keep any answer, request, correction or unclear utterance for the assistant."
+        }
+      },
+      "results": {
+        "previous": {
+          "metrics": {
+            "correct": 18,
+            "total": 28,
+            "false_discard": 0,
+            "false_interrupt": 5,
+            "missed_interrupt": 1,
+            "p95": 67.48,
+            "maximum": 68.68,
+            "token_range": [
+              214,
+              231
+            ]
+          },
+          "predictions": {
+            "ack-0": "enqueue",
+            "ack-1": "discard",
+            "cancel-0": "interrupt",
+            "cancel-1": "interrupt",
+            "no-0": "enqueue",
+            "no-1": "discard",
+            "now-0": "interrupt",
+            "now-1": "enqueue",
+            "same-0": "enqueue",
+            "same-1": "enqueue",
+            "stop-0": "interrupt",
+            "stop-1": "interrupt",
+            "tomorrow-0": "interrupt",
+            "tomorrow-1": "enqueue",
+            "ok-0": "enqueue",
+            "ok-1": "discard",
+            "wait-0": "enqueue",
+            "wait-1": "enqueue",
+            "yes-0": "enqueue",
+            "yes-1": "enqueue",
+            "pronoun-0": "interrupt",
+            "pronoun-1": "interrupt",
+            "defer-0": "enqueue",
+            "defer-1": "interrupt",
+            "older-chinese-0": "interrupt",
+            "older-chinese-1": "interrupt",
+            "older-english-0": "enqueue",
+            "older-english-1": "enqueue"
+          }
+        },
+        "fresh": {
+          "metrics": {
+            "correct": 9,
+            "total": 18,
+            "false_discard": 1,
+            "false_interrupt": 3,
+            "missed_interrupt": 3,
+            "p95": 67.84,
+            "maximum": 67.87,
+            "token_range": [
+              214,
+              227
+            ]
+          },
+          "predictions": {
+            "fresh-1": "enqueue",
+            "fresh-2": "enqueue",
+            "fresh-3": "interrupt",
+            "fresh-4": "enqueue",
+            "fresh-5": "enqueue",
+            "fresh-6": "enqueue",
+            "fresh-7": "interrupt",
+            "fresh-8": "enqueue",
+            "fresh-9": "enqueue",
+            "fresh-10": "enqueue",
+            "fresh-11": "discard",
+            "fresh-12": "discard",
+            "fresh-13": "interrupt",
+            "fresh-14": "interrupt",
+            "fresh-15": "enqueue",
+            "fresh-16": "enqueue",
+            "fresh-17": "enqueue",
+            "fresh-18": "discard"
+          }
+        }
+      }
+    },
+    "definitions": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify only the latest utterance. Consider the history and the current situation. Keep an answer to the current question. A quote, a denial, or a request to stop later should not interrupt. Interrupt stops the active reply or action. Discard drops the latest utterance. Enqueue keeps it for normal handling. Examples: while reading, \"Read the other paragraph now\" -> interrupt. \"Read the other paragraph after this\" -> enqueue. \"Sure\" to answer an open question -> enqueue. \"Sure\" as mere backchannel -> discard.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change.",
+          "discard": "Speech not directed at the assistant, or an acknowledgment that needs no follow-up.",
+          "enqueue": "Keep any answer, request, correction or unclear utterance for the assistant."
+        }
+      },
+      "results": {
+        "previous": {
+          "metrics": {
+            "correct": 18,
+            "total": 28,
+            "false_discard": 0,
+            "false_interrupt": 3,
+            "missed_interrupt": 2,
+            "p95": 60.82,
+            "maximum": 61.62,
+            "token_range": [
+              285,
+              302
+            ]
+          },
+          "predictions": {
+            "ack-0": "enqueue",
+            "ack-1": "enqueue",
+            "cancel-0": "interrupt",
+            "cancel-1": "enqueue",
+            "no-0": "enqueue",
+            "no-1": "discard",
+            "now-0": "interrupt",
+            "now-1": "enqueue",
+            "same-0": "enqueue",
+            "same-1": "discard",
+            "stop-0": "interrupt",
+            "stop-1": "interrupt",
+            "tomorrow-0": "enqueue",
+            "tomorrow-1": "enqueue",
+            "ok-0": "enqueue",
+            "ok-1": "enqueue",
+            "wait-0": "enqueue",
+            "wait-1": "enqueue",
+            "yes-0": "enqueue",
+            "yes-1": "enqueue",
+            "pronoun-0": "interrupt",
+            "pronoun-1": "interrupt",
+            "defer-0": "enqueue",
+            "defer-1": "enqueue",
+            "older-chinese-0": "interrupt",
+            "older-chinese-1": "interrupt",
+            "older-english-0": "enqueue",
+            "older-english-1": "enqueue"
+          }
+        },
+        "fresh": {
+          "metrics": {
+            "correct": 10,
+            "total": 18,
+            "false_discard": 0,
+            "false_interrupt": 0,
+            "missed_interrupt": 4,
+            "p95": 59.32,
+            "maximum": 59.6,
+            "token_range": [
+              285,
+              298
+            ]
+          },
+          "predictions": {
+            "fresh-1": "enqueue",
+            "fresh-2": "enqueue",
+            "fresh-3": "enqueue",
+            "fresh-4": "enqueue",
+            "fresh-5": "enqueue",
+            "fresh-6": "enqueue",
+            "fresh-7": "enqueue",
+            "fresh-8": "enqueue",
+            "fresh-9": "enqueue",
+            "fresh-10": "enqueue",
+            "fresh-11": "enqueue",
+            "fresh-12": "enqueue",
+            "fresh-13": "enqueue",
+            "fresh-14": "enqueue",
+            "fresh-15": "enqueue",
+            "fresh-16": "enqueue",
+            "fresh-17": "enqueue",
+            "fresh-18": "discard"
+          }
+        }
+      }
+    }
+  }
+}

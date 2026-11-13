@@ -235,6 +235,20 @@ Writer ｜ 13:06:37
 
 Agents/Assistant、Support/Chat/Core 拥有输入批次、原调用续接和会话取消；Gateway/Output/Scheduling 增加跨轮顺序域。ModelKit/Language/JEV 保存Decision契约与隔离编译的D3实现，ModelKitDefaults注册/装配，现有Resources/Models目录登记固定制品。Actions/System/ModelResources、Provider与ApplicationControl负责偏好和操作，UI/Settings/Root只展示/导航。PlatformKit/Audio、Actions/Speech、SpeechPerception负责共享音频图、原生取消和连续识别。Storage/Database现有AssistantMessages与ModelRequestLog目录承载增量输入记录和证据，不新增目录。
 
+### 2026-11-13 Decision 动作定义与示例
+
+在 `Assistant/InputDecision.json` 明确三个动作的触发条件及效果，并加入英文对照示例。打断要求用户指向正在播报或执行的工作并要求立刻改变。丢弃用于明确不需要回应的输入。入队保留回答、请求、补充、延后要求和歧义。示例覆盖短答与附和、立即停止与稍后处理，沿用现有候选顺序、最近一来一回和原文数据边界。更新 Assistant、资源说明及分类请求回归，并用 Mac 本地 D3 对照误判、输入 token 和 100 ms 上限。
+
+### 2026-11-14 Decision 防止误丢弃
+
+保留明确指令、问题、纠正、数字、专有名词及可能有用的残句。`Assistant/InputDecision.json` 将 discard 收窄为无可用语义的噪声、乱码和独立语气词，并加入中英文对照。`AssistantInputDecision.swift` 在本地和云端共用的结果采纳点校验 discard。手输和有效待答交互保留。非待答语音整句是已知噪声标记或无正文的标点／替换字符时，采纳为 discard；只有无问题上下文的纯语气词可以采纳模型的 discard。带问号的片段保留。无法确认的乱码和混乱转写保留。原模型建议与采用原因继续进入 Decision 日志。保持打断校验、窗口和超时路径，增加对明确短指令、语气尾词、噪声、待答短句及实际入队的回归。同步 Assistant 与资源说明，真机记录和本地模型结果分别留证。
+
+### 2026-11-14 Decision 中英文近义表达对照
+
+在 Mac 本地用固定 512 token 的 D3 Edge 比较短候选描述。在 `Assistant/InputDecision.json` 的 interrupt 候选中试放「停下」「别说了」「等下」等中英文常用表达，另测 enqueue 的继续、稍后处理与确认。保留 discard 定义及现有采纳保护。验收比较正在播报、正在执行、空闲、延后、否定、引用和对旁人说话，逐项记录漏打断、误打断、误丢弃、token 和热时延。若采用新描述，更新资源说明及请求回归。
+
+接入通过对照的简短版本时，将近义表达放在既有打断示例的位置，沿用候选中的立即停止或改变条件和指令中的否定、引用与延后边界。保留已有入队与丢弃示例和两个候选定义。
+
 实施后同步以上所有者README和MobileHarness/README.md跨模块流；不把尚未实施部分写成当前技术契约。清除被替代Judge命名和半双工门控；保留文档中的历史证据。
 
 ### 存储落地细化

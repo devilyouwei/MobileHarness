@@ -1,0 +1,340 @@
+{
+  "model": "vllm-sr/d3-edge",
+  "device": "Apple M5 / macOS 27.2.1 (26B131)",
+  "threshold_ms": 100,
+  "limit_tokens": 512,
+  "warmups": 3,
+  "previous_fixtures": "duplex-decision-prompt-examples-2026-11-13.json",
+  "bilingual_fixtures": "duplex-d3-bilingual-examples-2026-11-13.json",
+  "new_fixtures": [
+    {
+      "id": "guard-01",
+      "expected": "discard",
+      "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"告诉我现在是什么状态\"\nAssistant: \"相机当前关闭。\"\nLatest user transcript: \"嗯，呃……\""
+    },
+    {
+      "id": "guard-02",
+      "expected": "discard",
+      "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"告诉我现在是什么状态\"\nAssistant: \"相机当前关闭。\"\nLatest user transcript: \"Um, uh...\""
+    },
+    {
+      "id": "guard-03",
+      "expected": "discard",
+      "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"告诉我现在是什么状态\"\nAssistant: \"相机当前关闭。\"\nLatest user transcript: \"[Noise].\""
+    },
+    {
+      "id": "guard-04",
+      "expected": "discard",
+      "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"告诉我现在是什么状态\"\nAssistant: \"相机当前关闭。\"\nLatest user transcript: \"�… �\""
+    },
+    {
+      "id": "guard-05",
+      "expected": "discard",
+      "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"告诉我现在是什么状态\"\nAssistant: \"相机当前关闭。\"\nLatest user transcript: \"……\""
+    },
+    {
+      "id": "guard-06",
+      "expected": "enqueue",
+      "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"告诉我现在是什么状态\"\nAssistant: \"相机当前关闭。\"\nLatest user transcript: \"拍一张啊。\""
+    },
+    {
+      "id": "guard-07",
+      "expected": "enqueue",
+      "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"告诉我现在是什么状态\"\nAssistant: \"相机当前关闭。\"\nLatest user transcript: \"Take a photo, uh.\""
+    },
+    {
+      "id": "guard-08",
+      "expected": "enqueue",
+      "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"告诉我现在是什么状态\"\nAssistant: \"相机当前关闭。\"\nLatest user transcript: \"开相机。\""
+    },
+    {
+      "id": "guard-09",
+      "expected": "enqueue",
+      "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"告诉我现在是什么状态\"\nAssistant: \"相机当前关闭。\"\nLatest user transcript: \"Open the camera.\""
+    },
+    {
+      "id": "guard-10",
+      "expected": "enqueue",
+      "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"告诉我现在是什么状态\"\nAssistant: \"相机当前关闭。\"\nLatest user transcript: \"左边\""
+    },
+    {
+      "id": "guard-11",
+      "expected": "enqueue",
+      "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"告诉我现在是什么状态\"\nAssistant: \"相机当前关闭。\"\nLatest user transcript: \"42\""
+    },
+    {
+      "id": "guard-12",
+      "expected": "enqueue",
+      "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"告诉我现在是什么状态\"\nAssistant: \"相机当前关闭。\"\nLatest user transcript: \"Kiki\""
+    },
+    {
+      "id": "guard-13",
+      "expected": "enqueue",
+      "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"告诉我现在是什么状态\"\nAssistant: \"相机当前关闭。\"\nLatest user transcript: \"[noise] Open camera\""
+    },
+    {
+      "id": "guard-14",
+      "expected": "enqueue",
+      "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"告诉我现在是什么状态\"\nAssistant: \"相机当前关闭。\"\nLatest user transcript: \"� � 关相机\""
+    },
+    {
+      "id": "guard-15",
+      "expected": "enqueue",
+      "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"告诉我现在是什么状态\"\nAssistant: \"相机当前关闭。\"\nLatest user transcript: \"地址乱了呃先别发\""
+    },
+    {
+      "id": "guard-16",
+      "expected": "enqueue",
+      "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"告诉我现在是什么状态\"\nAssistant: \"相机当前关闭。\"\nLatest user transcript: \"嗯？\""
+    },
+    {
+      "id": "guard-17",
+      "expected": "enqueue",
+      "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"告诉我现在是什么状态\"\nAssistant: \"相机当前关闭。\"\nLatest user transcript: \"Mm?\""
+    },
+    {
+      "id": "guard-18",
+      "expected": "enqueue",
+      "input": "Playing=no Running=no Awaiting answer=unknown\nHistory:\nUser: \"告诉我现在是什么状态\"\nAssistant: \"相机当前关闭。\"\nLatest user transcript: \"帮我看一下，呃……\""
+    },
+    {
+      "id": "answer-01",
+      "expected": "enqueue",
+      "input": "Playing=no Running=no Awaiting answer=yes\nHistory:\nUser: \"继续处理\"\nAssistant: \"这个文件还没保存。\"\nPending question: \"现在就保存吗？\"\nLatest user transcript: \"嗯。\""
+    },
+    {
+      "id": "answer-02",
+      "expected": "enqueue",
+      "input": "Playing=no Running=no Awaiting answer=yes\nHistory:\nUser: \"继续处理\"\nAssistant: \"这个文件还没保存。\"\nPending question: \"Should I save it?\"\nLatest user transcript: \"Mm.\""
+    }
+  ],
+  "columns": [
+    "suite",
+    "id",
+    "expected",
+    "model_result",
+    "adopted_by_policy_replay",
+    "tokens",
+    "ms"
+  ],
+  "variants": {
+    "previous-prompt": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify only the latest utterance. Consider the history and the current situation. Keep an answer to the current question. A quote, a denial, or a request to stop later should not interrupt. Interrupt stops the active reply or action. Discard drops the latest utterance. Enqueue keeps it for normal handling. Examples: while reading, \"Read the other paragraph now\" -> interrupt. \"Read the other paragraph after this\" -> enqueue. \"Sure\" to answer an open question -> enqueue. \"Sure\" as mere backchannel -> discard.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change.",
+          "discard": "Speech not directed at the assistant, or an acknowledgment that needs no follow-up.",
+          "enqueue": "Keep any answer, request, correction or unclear utterance for the assistant."
+        }
+      },
+      "empty_prompt_tokens": 264,
+      "full_history_tokens": {
+        "short": 419,
+        "zh-100": 468,
+        "en-100": 435
+      },
+      "rows": [
+        ["new", "zh-01", "interrupt", "enqueue", "enqueue", 300, 48.661],
+        ["new", "zh-02", "enqueue", "enqueue", "enqueue", 302, 49.602],
+        ["new", "zh-03", "discard", "discard", "discard", 297, 48.243],
+        ["new", "zh-04", "interrupt", "enqueue", "enqueue", 294, 49.772],
+        ["new", "zh-05", "enqueue", "enqueue", "enqueue", 296, 50.452],
+        ["new", "zh-06", "enqueue", "enqueue", "enqueue", 293, 49.627],
+        ["new", "zh-07", "enqueue", "enqueue", "enqueue", 301, 48.376],
+        ["new", "zh-08", "discard", "discard", "discard", 288, 49.673],
+        ["new", "zh-09", "enqueue", "enqueue", "enqueue", 292, 48.257],
+        ["new", "zh-10", "enqueue", "enqueue", "enqueue", 290, 51.829],
+        ["new", "zh-11", "interrupt", "enqueue", "enqueue", 298, 48.772],
+        ["new", "zh-12", "enqueue", "enqueue", "enqueue", 273, 50.049],
+        ["new", "en-01", "interrupt", "enqueue", "enqueue", 295, 49.518],
+        ["new", "en-02", "enqueue", "enqueue", "enqueue", 295, 49.549],
+        ["new", "en-03", "discard", "enqueue", "enqueue", 294, 49.875],
+        ["new", "en-04", "interrupt", "enqueue", "enqueue", 295, 49.81],
+        ["new", "en-05", "enqueue", "enqueue", "enqueue", 293, 48.384],
+        ["new", "en-06", "enqueue", "enqueue", "enqueue", 295, 50.13],
+        ["new", "en-07", "enqueue", "enqueue", "enqueue", 305, 48.291],
+        ["new", "en-08", "discard", "discard", "discard", 293, 49.758],
+        ["new", "en-09", "enqueue", "enqueue", "enqueue", 296, 48.572],
+        ["new", "en-10", "enqueue", "enqueue", "enqueue", 293, 48.375],
+        ["new", "en-11", "interrupt", "interrupt", "interrupt", 298, 48.465],
+        ["new", "en-12", "enqueue", "enqueue", "enqueue", 274, 48.384],
+        ["new", "guard-01", "discard", "enqueue", "enqueue", 287, 49.919],
+        ["new", "guard-02", "discard", "enqueue", "enqueue", 286, 49.759],
+        ["new", "guard-03", "discard", "enqueue", "enqueue", 284, 49.777],
+        ["new", "guard-04", "discard", "enqueue", "enqueue", 286, 48.124],
+        ["new", "guard-05", "discard", "enqueue", "enqueue", 284, 49.782],
+        ["new", "guard-06", "enqueue", "enqueue", "enqueue", 287, 48.476],
+        ["new", "guard-07", "enqueue", "enqueue", "enqueue", 288, 49.814],
+        ["new", "guard-08", "enqueue", "enqueue", "enqueue", 286, 48.354],
+        ["new", "guard-09", "enqueue", "enqueue", "enqueue", 286, 51.579],
+        ["new", "guard-10", "enqueue", "discard", "discard", 284, 48.456],
+        ["new", "guard-11", "enqueue", "enqueue", "enqueue", 285, 49.959],
+        ["new", "guard-12", "enqueue", "enqueue", "enqueue", 285, 50.012],
+        ["new", "guard-13", "enqueue", "enqueue", "enqueue", 287, 50.097],
+        ["new", "guard-14", "enqueue", "enqueue", "enqueue", 288, 48.423],
+        ["new", "guard-15", "enqueue", "discard", "discard", 289, 49.862],
+        ["new", "guard-16", "enqueue", "enqueue", "enqueue", 285, 48.36],
+        ["new", "guard-17", "enqueue", "enqueue", "enqueue", 285, 49.748],
+        ["new", "guard-18", "enqueue", "enqueue", "enqueue", 289, 48.246],
+        ["new", "answer-01", "enqueue", "enqueue", "enqueue", 293, 50.095],
+        ["new", "answer-02", "enqueue", "discard", "enqueue", 293, 50.089],
+        ["additional", "fresh-1", "interrupt", "enqueue", "enqueue", 293, 51.433],
+        ["additional", "fresh-2", "enqueue", "enqueue", "enqueue", 295, 51.674],
+        ["additional", "fresh-3", "discard", "enqueue", "enqueue", 293, 50.073],
+        ["additional", "fresh-4", "enqueue", "enqueue", "enqueue", 298, 50.059],
+        ["additional", "fresh-5", "discard", "enqueue", "enqueue", 286, 51.521],
+        ["additional", "fresh-6", "interrupt", "enqueue", "enqueue", 289, 51.487],
+        ["additional", "fresh-7", "enqueue", "enqueue", "enqueue", 287, 49.743],
+        ["additional", "fresh-8", "interrupt", "enqueue", "enqueue", 293, 48.386],
+        ["additional", "fresh-9", "enqueue", "enqueue", "enqueue", 296, 51.621],
+        ["additional", "fresh-10", "discard", "enqueue", "enqueue", 293, 48.374],
+        ["additional", "fresh-11", "enqueue", "enqueue", "enqueue", 291, 49.762],
+        ["additional", "fresh-12", "discard", "enqueue", "enqueue", 285, 49.8],
+        ["additional", "fresh-13", "interrupt", "enqueue", "enqueue", 288, 49.87],
+        ["additional", "fresh-14", "enqueue", "enqueue", "enqueue", 289, 48.206],
+        ["additional", "fresh-15", "enqueue", "enqueue", "enqueue", 294, 49.751],
+        ["additional", "fresh-16", "enqueue", "enqueue", "enqueue", 291, 48.225],
+        ["additional", "fresh-17", "enqueue", "enqueue", "enqueue", 287, 49.659],
+        ["additional", "fresh-18", "discard", "discard", "discard", 290, 48.301],
+        ["previous", "ack-0", "enqueue", "enqueue", "enqueue", 291, 50.27],
+        ["previous", "ack-1", "discard", "enqueue", "enqueue", 292, 48.672],
+        ["previous", "cancel-0", "interrupt", "interrupt", "interrupt", 286, 48.396],
+        ["previous", "cancel-1", "enqueue", "enqueue", "enqueue", 296, 50.002],
+        ["previous", "no-0", "enqueue", "enqueue", "enqueue", 297, 48.285],
+        ["previous", "no-1", "discard", "discard", "discard", 293, 49.716],
+        ["previous", "now-0", "interrupt", "interrupt", "interrupt", 297, 48.33],
+        ["previous", "now-1", "discard", "enqueue", "enqueue", 296, 49.633],
+        ["previous", "same-0", "enqueue", "enqueue", "enqueue", 295, 48.275],
+        ["previous", "same-1", "discard", "discard", "discard", 296, 49.638],
+        ["previous", "stop-0", "interrupt", "interrupt", "interrupt", 290, 49.954],
+        ["previous", "stop-1", "enqueue", "interrupt", "interrupt", 302, 49.681],
+        ["previous", "tomorrow-0", "interrupt", "enqueue", "enqueue", 289, 48.135],
+        ["previous", "tomorrow-1", "enqueue", "enqueue", "enqueue", 300, 51.195],
+        ["previous", "ok-0", "enqueue", "enqueue", "enqueue", 296, 48.252],
+        ["previous", "ok-1", "discard", "enqueue", "enqueue", 289, 49.646],
+        ["previous", "wait-0", "interrupt", "enqueue", "enqueue", 292, 48.313],
+        ["previous", "wait-1", "enqueue", "enqueue", "enqueue", 300, 49.897],
+        ["previous", "yes-0", "enqueue", "enqueue", "enqueue", 285, 48.186],
+        ["previous", "yes-1", "discard", "enqueue", "enqueue", 295, 49.723],
+        ["previous", "pronoun-0", "interrupt", "interrupt", "interrupt", 294, 48.193],
+        ["previous", "pronoun-1", "discard", "interrupt", "interrupt", 296, 48.474],
+        ["previous", "defer-0", "enqueue", "enqueue", "enqueue", 300, 48.435],
+        ["previous", "defer-1", "enqueue", "enqueue", "enqueue", 298, 49.722],
+        ["previous", "older-chinese-0", "interrupt", "interrupt", "interrupt", 287, 49.596],
+        ["previous", "older-chinese-1", "discard", "interrupt", "interrupt", 287, 48.116],
+        ["previous", "older-english-0", "enqueue", "enqueue", "enqueue", 289, 49.51],
+        ["previous", "older-english-1", "discard", "enqueue", "enqueue", 289, 48.259]
+      ]
+    },
+    "conservative-prompt": {
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. Interrupt an active reply or action only for an immediate stop or change. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. \"现在停\" / \"Stop now\" during playback -> interrupt.",
+        "criteria": {
+          "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change.",
+          "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
+          "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input."
+        }
+      },
+      "empty_prompt_tokens": 304,
+      "full_history_tokens": {
+        "short": 459,
+        "zh-100": 508,
+        "en-100": 475
+      },
+      "rows": [
+        ["new", "zh-01", "interrupt", "enqueue", "enqueue", 340, 48.152],
+        ["new", "zh-02", "enqueue", "enqueue", "enqueue", 342, 49.76],
+        ["new", "zh-03", "discard", "discard", "enqueue", 337, 49.895],
+        ["new", "zh-04", "interrupt", "enqueue", "enqueue", 334, 49.924],
+        ["new", "zh-05", "enqueue", "enqueue", "enqueue", 336, 48.572],
+        ["new", "zh-06", "enqueue", "enqueue", "enqueue", 333, 49.613],
+        ["new", "zh-07", "enqueue", "enqueue", "enqueue", 341, 48.082],
+        ["new", "zh-08", "discard", "enqueue", "enqueue", 328, 49.75],
+        ["new", "zh-09", "enqueue", "enqueue", "enqueue", 332, 48.323],
+        ["new", "zh-10", "enqueue", "enqueue", "enqueue", 330, 49.597],
+        ["new", "zh-11", "interrupt", "enqueue", "enqueue", 338, 48.359],
+        ["new", "zh-12", "enqueue", "enqueue", "enqueue", 313, 49.784],
+        ["new", "en-01", "interrupt", "enqueue", "enqueue", 335, 50.192],
+        ["new", "en-02", "enqueue", "enqueue", "enqueue", 335, 49.893],
+        ["new", "en-03", "discard", "enqueue", "enqueue", 334, 48.746],
+        ["new", "en-04", "interrupt", "enqueue", "enqueue", 335, 48.481],
+        ["new", "en-05", "enqueue", "enqueue", "enqueue", 333, 48.544],
+        ["new", "en-06", "enqueue", "enqueue", "enqueue", 335, 48.234],
+        ["new", "en-07", "enqueue", "enqueue", "enqueue", 345, 49.808],
+        ["new", "en-08", "discard", "enqueue", "enqueue", 333, 49.829],
+        ["new", "en-09", "enqueue", "enqueue", "enqueue", 336, 49.813],
+        ["new", "en-10", "enqueue", "enqueue", "enqueue", 333, 48.61],
+        ["new", "en-11", "interrupt", "interrupt", "interrupt", 338, 51.266],
+        ["new", "en-12", "enqueue", "enqueue", "enqueue", 314, 48.343],
+        ["new", "guard-01", "discard", "enqueue", "enqueue", 327, 49.807],
+        ["new", "guard-02", "discard", "enqueue", "enqueue", 326, 48.387],
+        ["new", "guard-03", "discard", "discard", "discard", 324, 49.867],
+        ["new", "guard-04", "discard", "enqueue", "discard", 326, 48.233],
+        ["new", "guard-05", "discard", "enqueue", "discard", 324, 49.752],
+        ["new", "guard-06", "enqueue", "enqueue", "enqueue", 327, 48.241],
+        ["new", "guard-07", "enqueue", "enqueue", "enqueue", 328, 50.965],
+        ["new", "guard-08", "enqueue", "enqueue", "enqueue", 326, 50.132],
+        ["new", "guard-09", "enqueue", "enqueue", "enqueue", 326, 51.842],
+        ["new", "guard-10", "enqueue", "discard", "enqueue", 324, 51.795],
+        ["new", "guard-11", "enqueue", "enqueue", "enqueue", 325, 51.77],
+        ["new", "guard-12", "enqueue", "enqueue", "enqueue", 325, 50.416],
+        ["new", "guard-13", "enqueue", "enqueue", "enqueue", 327, 51.765],
+        ["new", "guard-14", "enqueue", "enqueue", "enqueue", 328, 49.65],
+        ["new", "guard-15", "enqueue", "enqueue", "enqueue", 329, 49.789],
+        ["new", "guard-16", "enqueue", "enqueue", "enqueue", 325, 50.296],
+        ["new", "guard-17", "enqueue", "enqueue", "enqueue", 325, 49.91],
+        ["new", "guard-18", "enqueue", "enqueue", "enqueue", 329, 48.428],
+        ["new", "answer-01", "enqueue", "enqueue", "enqueue", 333, 51.532],
+        ["new", "answer-02", "enqueue", "enqueue", "enqueue", 333, 48.53],
+        ["additional", "fresh-1", "interrupt", "enqueue", "enqueue", 333, 49.679],
+        ["additional", "fresh-2", "enqueue", "enqueue", "enqueue", 335, 48.376],
+        ["additional", "fresh-3", "discard", "enqueue", "enqueue", 333, 49.913],
+        ["additional", "fresh-4", "enqueue", "enqueue", "enqueue", 338, 48.231],
+        ["additional", "fresh-5", "discard", "enqueue", "enqueue", 326, 49.586],
+        ["additional", "fresh-6", "interrupt", "enqueue", "enqueue", 329, 48.625],
+        ["additional", "fresh-7", "enqueue", "interrupt", "interrupt", 327, 49.881],
+        ["additional", "fresh-8", "interrupt", "enqueue", "enqueue", 333, 48.527],
+        ["additional", "fresh-9", "enqueue", "enqueue", "enqueue", 336, 51.481],
+        ["additional", "fresh-10", "discard", "enqueue", "enqueue", 333, 48.442],
+        ["additional", "fresh-11", "enqueue", "enqueue", "enqueue", 331, 49.797],
+        ["additional", "fresh-12", "discard", "enqueue", "enqueue", 325, 48.4],
+        ["additional", "fresh-13", "interrupt", "enqueue", "enqueue", 328, 49.769],
+        ["additional", "fresh-14", "enqueue", "interrupt", "enqueue", 329, 48.457],
+        ["additional", "fresh-15", "enqueue", "enqueue", "enqueue", 334, 48.447],
+        ["additional", "fresh-16", "enqueue", "enqueue", "enqueue", 331, 48.756],
+        ["additional", "fresh-17", "enqueue", "enqueue", "enqueue", 327, 48.623],
+        ["additional", "fresh-18", "discard", "enqueue", "enqueue", 330, 49.714],
+        ["previous", "ack-0", "enqueue", "enqueue", "enqueue", 331, 50.091],
+        ["previous", "ack-1", "discard", "enqueue", "enqueue", 332, 49.619],
+        ["previous", "cancel-0", "interrupt", "interrupt", "interrupt", 326, 48.461],
+        ["previous", "cancel-1", "enqueue", "enqueue", "enqueue", 336, 49.622],
+        ["previous", "no-0", "enqueue", "enqueue", "enqueue", 337, 48.231],
+        ["previous", "no-1", "discard", "enqueue", "enqueue", 333, 49.89],
+        ["previous", "now-0", "interrupt", "interrupt", "interrupt", 337, 48.301],
+        ["previous", "now-1", "discard", "enqueue", "enqueue", 336, 49.899],
+        ["previous", "same-0", "enqueue", "enqueue", "enqueue", 335, 48.539],
+        ["previous", "same-1", "discard", "discard", "enqueue", 336, 50.033],
+        ["previous", "stop-0", "interrupt", "interrupt", "interrupt", 330, 49.98],
+        ["previous", "stop-1", "enqueue", "interrupt", "interrupt", 342, 49.99],
+        ["previous", "tomorrow-0", "interrupt", "interrupt", "interrupt", 329, 48.425],
+        ["previous", "tomorrow-1", "enqueue", "enqueue", "enqueue", 340, 49.874],
+        ["previous", "ok-0", "enqueue", "enqueue", "enqueue", 336, 48.407],
+        ["previous", "ok-1", "discard", "enqueue", "enqueue", 329, 49.8],
+        ["previous", "wait-0", "interrupt", "enqueue", "enqueue", 332, 48.477],
+        ["previous", "wait-1", "enqueue", "enqueue", "enqueue", 340, 48.88],
+        ["previous", "yes-0", "enqueue", "enqueue", "enqueue", 325, 50.158],
+        ["previous", "yes-1", "discard", "enqueue", "enqueue", 335, 48.486],
+        ["previous", "pronoun-0", "interrupt", "interrupt", "interrupt", 334, 48.593],
+        ["previous", "pronoun-1", "discard", "interrupt", "interrupt", 336, 48.927],
+        ["previous", "defer-0", "enqueue", "enqueue", "enqueue", 340, 49.746],
+        ["previous", "defer-1", "enqueue", "interrupt", "interrupt", 338, 48.372],
+        ["previous", "older-chinese-0", "interrupt", "interrupt", "interrupt", 327, 49.586],
+        ["previous", "older-chinese-1", "discard", "interrupt", "interrupt", 327, 48.233],
+        ["previous", "older-english-0", "enqueue", "enqueue", "enqueue", 329, 49.876],
+        ["previous", "older-english-1", "discard", "enqueue", "enqueue", 329, 48.6]
+      ]
+    }
+  }
+}

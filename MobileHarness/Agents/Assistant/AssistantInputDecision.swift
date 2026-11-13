@@ -88,6 +88,10 @@ public struct InputDecisionSnapshot: Sendable {
 
 /// Root-owned bounded classification and cleanup. A timeout retires its result, not its native resource.
 public actor AssistantInputDecision {
+    private enum TranscriptContent {
+        case possibleSpeech, filler, noise
+    }
+
     private let local: any ModelDecisionProviding
     public typealias Configuration = (useLocal: Bool, cloud: (@Sendable () async throws -> any ChatCapability)?)
     private let configuration: @Sendable () async throws -> Configuration
@@ -345,15 +349,52 @@ public actor AssistantInputDecision {
         _ action: InputDisposition, route: InputDecisionOutcome.Route, snapshot: InputDecisionSnapshot,
         requests: [String], localFallback: String? = nil
     ) -> InputDecisionOutcome {
+        let content = Self.transcriptContent(snapshot)
+        let adopted: InputDisposition
         let reason: String?
-        switch action {
-        case .discard where snapshot.protectsAnswer: reason = "保留当前交互的有效答复"
-        case .interrupt where !snapshot.occupied: reason = "当前没有需要打断的回复"
-        default: reason = nil
+        switch (action, content) {
+        case (_, .noise):
+            adopted = .discard
+            reason = action == .discard ? nil : "语音转写只有噪声标记或无正文字符"
+        case (.discard, .possibleSpeech):
+            adopted = .enqueue
+            reason = snapshot.protectsAnswer ? "保留当前交互的有效答复" : "保留可能有效的用户输入"
+        case (.interrupt, _) where !snapshot.occupied:
+            adopted = .enqueue
+            reason = "当前没有需要打断的回复"
+        default:
+            adopted = action
+            reason = nil
         }
         return .init(
-            route: route, modelResult: action, adopted: reason == nil ? action : .enqueue, reason: reason,
+            route: route, modelResult: action, adopted: adopted, reason: reason,
             requests: requests, localFallback: localFallback)
+    }
+
+    private static func transcriptContent(_ snapshot: InputDecisionSnapshot) -> TranscriptContent {
+        guard !snapshot.protectsAnswer, case .transcript(_, final: true)? = snapshot.input.payload.perception
+        else { return .possibleSpeech }
+        let text = snapshot.text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let noiseMarkers: Set<String> = [
+            "[noise]", "[background noise]", "[inaudible]", "[unintelligible]", "[music]", "[silence]",
+            "[杂音]", "[噪声]", "[噪音]", "[听不清]", "[音乐]", "（杂音）", "（噪声）", "（听不清）",
+        ]
+        let marker = text.trimmingCharacters(in: CharacterSet(charactersIn: ".。!！…"))
+        if noiseMarkers.contains(marker) { return .noise }
+
+        func hasQuestionMark(_ value: String) -> Bool { value.contains("?") || value.contains("？") }
+        guard !hasQuestionMark(text) else { return .possibleSpeech }
+        let separators = CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters)
+            .union(CharacterSet(charactersIn: "�"))
+        let words = text.components(separatedBy: separators).filter { !$0.isEmpty }
+        if words.isEmpty { return .noise }
+        guard !hasQuestionMark(snapshot.history?.assistant ?? "") else { return .possibleSpeech }
+
+        let englishFillers: Set<String> = ["ah", "eh", "er", "hm", "hmm", "mm", "mmm", "oh", "uh", "um", "umm"]
+        let isFiller = words.allSatisfy { word in
+            englishFillers.contains(word) || word.allSatisfy { "嗯啊呃唔哦唉欸哎".contains($0) }
+        }
+        return isFiller ? .filler : .possibleSpeech
     }
 
     private func race(
