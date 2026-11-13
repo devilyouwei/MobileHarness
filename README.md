@@ -4,13 +4,15 @@
 
 <p align="center"><em>Your phone is the best robot brain!</em></p>
 
+<p align="center">Apple-native · Bio-inspired · Embodied Agent · Multimodal · Multi-Agent · Full-duplex · Mobile Agent</p>
+
 MobileHarness is an Apple-native, bio-inspired multimodal Agent app that turns your iPhone into a harness for independent, stateful Agents. Built around a **Perception → Cognition → Action** loop, it coordinates the phone's hardware and sensors, such as its camera, microphone and speaker, so Agents can perceive the world, understand users, reason, converse and act. Its current robotic-body integration targets **NexArm**, allowing the phone to serve as the brain of an embodied Agent.
 
 <p align="center">
   <img src="docs/imgs/perception-cognition-action.svg" alt="Perception, Cognition and Action form a counterclockwise loop connected by Internal Signals. A dashed External Signal arrow enters Perception from outside the loop.">
 </p>
 
-_In MobileHarness, every input is a Signal; every output is an Action._ Signals carry information through the **Perception → Cognition → Action** loop. External Signals bring observations from the world and user interactions into perception; Internal Signals connect the three stages, carrying interpreted information, intent and feedback. Native inputs reach their responsible Agents through typed ports, while Gateway coordinates inter-Agent communication and Action execution. Agents interpret inputs, decide what to do and act through the phone's capabilities; actual outcomes feed back into the loop. See the [Signal flow design](MobileHarness/README.md#native-input-and-internal-signals) for delivery paths and execution feedback. The ultimate goal is human-like interaction: _receiving multi-channel Signal input while producing multi-channel Action output_.
+In MobileHarness, _every input is a Signal; every output is an Action_. Signals carry information through the **Perception → Cognition → Action** loop. External Signals bring observations from the world and user interactions into perception; Internal Signals connect the three stages, carrying interpreted information, intent and feedback. Native inputs reach their responsible Agents through typed ports, while Gateway coordinates inter-Agent communication and Action execution. Agents interpret inputs, decide what to do and act through the phone's capabilities; actual outcomes feed back into the loop. The goal is human-like interaction: _receiving multi-channel Signal input while producing multi-channel Action output_.
 
 <p align="center">
   <img src="docs/imgs/task-skill-capabilities.svg" alt="An Agent manages a Task and loads Skills. Each Skill declares Actions, read-only States, Instructions and dependencies on other Skills.">
@@ -18,17 +20,15 @@ _In MobileHarness, every input is a Signal; every output is an Action._ Signals 
 
 **Tasks** preserve goals and context across conversation turns, while **Skills** provide the capabilities needed to pursue them. Each Skill declares **Actions** (operations), **States** (current facts), **Instructions** (workflow guidance) and **dependencies** (other Skills). Agents load Skills as needed and use actual results to guide their next decisions.
 
-States give Agents a form of **proprioception**: awareness of current capabilities and conditions, such as camera activity or a robotic arm's target and measured position. Selected facts refresh on each model request; the underlying modules retain ownership of live state. See the [Skill catalog](MobileHarness/Resources/Skills/README.md) and [Agent design](MobileHarness/Agents/README.md).
+**States** give Agents a form of **proprioception**: awareness of current capabilities and conditions, such as camera activity or a robotic arm's target and measured position. Selected facts refresh on each model request; the underlying modules retain ownership of live state.
 
 <p align="center">
   <img src="docs/imgs/multi-agent-communication.svg" alt="Assistant delegates a goal and sends follow-up input to Writer through Gateway. Writer returns progress, questions and completion or failure while each Agent retains its own context and responsibilities.">
 </p>
 
-**Multi-Agent collaboration** lets specialized Agents exchange messages and delegate work through **Gateway**, within their declared communication permissions. For example, **Assistant** understands a user's request to write an illustrated article and delegates that goal to **Writer**, which owns its creation workflow, context and workspace. Assistant remains available for conversation and can forward the user's follow-up requirements; Writer sends progress, asks for clarification when needed and reports completion or failure so Assistant can respond to the user. Accepting a delegation means the work has been admitted, not that it is finished. Each Agent retains ownership of its own work, and Writer's delegation does not replace Assistant's foreground Task. See the [Agent communication flow](MobileHarness/README.md#assistant-agent-delegation).
+**Multi-Agent collaboration** lets specialized Agents exchange messages and delegate work through **Gateway**, within their declared communication permissions. For example, **Assistant** understands a user's request to write an illustrated article and delegates that goal to **Writer**, which owns its creation workflow, context and workspace. Assistant remains available for conversation and can forward the user's follow-up requirements; Writer sends progress, asks for clarification when needed and reports completion or failure so Assistant can respond to the user. Accepting a delegation means the work has been admitted, not that it is finished. Each Agent retains ownership of its own work, and Writer's delegation does not replace Assistant's foreground Task.
 
 Biological inspiration runs throughout MobileHarness. **Agents** resemble specialized parts of the human brain, processing observations and **Signals** through capabilities such as speech recognition, visual pose detection and reasoning. **Gateway** provides nervous-system coordination for Agent communication and execution. **UI**, **PlatformKit**, **ModelKit** and **Storage** provide independent presentation, native I/O, inference and storage capabilities; **App** assembles the modules and owns their lifetimes.
-
-**Keywords:** Apple-native · Bio-inspired · Embodied Agent · Multimodal · Multi-Agent · Agent Harness · Mobile Agent
 
 [Quick Start](#quick-start) · [Documentation](docs/README.md) · [Technical Design](MobileHarness/README.md) · [Contributing](CONTRIBUTING.md)
 
