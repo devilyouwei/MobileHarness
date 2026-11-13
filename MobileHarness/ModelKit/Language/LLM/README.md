@@ -1,7 +1,5 @@
 # Chat Requests and Provider Events
 
-✅ 已实现：仅 Gemma 的推理副本按不超过4096的后端有效总预算适配，当前排查版本移除全部system，最近5条消息按实际token计数筛减，保留当前输入；调用方请求与云端序列化不变。
-
 ## Summary
 
 Provider-neutral caller-owned conversation, image/native-call data and optional model-interface timing.
@@ -29,9 +27,7 @@ ChatRequest retains InferenceContext, caller messages, optional output token bud
 
 ChatToolDefinition is a neutral function-envelope declaration; Responses flattens it. ChatToolCall identity/name/arguments is data, never execution authority. Native transcripts require complete original call/result pairing; unsupported local requests reject rather than pretending to execute/see images.
 
-ChatTiming is one mutex-protected caller sampler per request. ✅ Providers sample monotonic request start and the first nonempty public text or validated native argument delta, whichever arrives first; consumers persist supplied evidence. Private reasoning, item creation and tool execution/completion are not first-token samples. Unsupported providers or streams without either delta retain absent timing. There is no automatic provider retry or application task loop in these values.
-
-Typed chat/image/native-call contracts and optional timing are implemented.
+ChatTiming is one mutex-protected caller sampler per request. Providers sample monotonic request start and the first nonempty public text or validated native argument delta, whichever arrives first; consumers persist supplied evidence. Private reasoning, item creation and tool execution/completion are not first-token samples. Unsupported providers or streams without either delta retain absent timing. There is no automatic provider retry or application task loop in these values.
 
 ## Related design
 
@@ -39,7 +35,7 @@ Typed chat/image/native-call contracts and optional timing are implemented.
 
 ## Consecutive user message boundaries
 
-Cloud serialization preserves every original message boundary. Gemma fits an inference-only subset to its local window, preserving selected message boundaries and the complete current input; ChatRequest.messages remains unchanged. Providers retain their existing wire/token representation, input bounds and explicit unsupported-input failures. Responses reasoning parsing remains implemented. Role-order compatibility remains provider/model-specific.
+Cloud serialization preserves every original message boundary. Gemma fits an inference-only subset to its local window, preserving selected message boundaries and the complete current input; ChatRequest.messages remains unchanged. Providers retain their existing wire/token representation, input bounds and explicit unsupported-input failures. Role-order compatibility remains provider/model-specific.
 
 ## Request validation bounds
 
@@ -53,17 +49,11 @@ Cloud serialization preserves every original message boundary. Gemma fits an inf
 
 非法请求在构造时抛出 invalidRequest，不补造配对或截断输入。保留调用者的消息边界和顺序；当前函数定义与历史调用名称集合独立。
 
-## 待实现
-
-- No additional implementation work is declared for the documented contract values. Provider-specific limitations are listed in the provider designs below.
-
-✅ ChatTokenUsage 可选 cachedInput/cacheWriteInput，校验非负及不超过输入；缺失保持 nil。系统事实可单独置于上下文尾部，Gemma4当前排查版本由适配器从推理副本移除全部system。
-
+ChatTokenUsage 可选 cachedInput/cacheWriteInput，校验非负及不超过输入；缺失保持 nil。
 
 ## 分类异常诊断
 
-✅ ChatCapability 定义 provider-neutral ChatFailureDiagnostic / ChatFailureProviding，区分 Tool 名称、身份、参数、事件顺序、完成/用量/流/HTTP/Provider 失败。诊断仅保留格式受限的协议标识、字段、索引及有界声明名称，不包含参数正文、消息、凭据或响应正文；不依赖 Agent/UI。
-
+ChatCapability 定义 provider-neutral ChatFailureDiagnostic / ChatFailureProviding，区分 Tool 名称、身份、参数、事件顺序、完成/用量/流/HTTP/Provider 失败。诊断仅保留格式受限的协议标识、字段、索引及有界声明名称，不包含参数正文、消息、凭据或响应正文；不依赖 Agent/UI。
 
 `ChatFailureProviding.chatFailure` 不包含异常对象或原始响应。公开原因按以下组划分；Agent 在代码前添加 `agent.model.`。
 
@@ -82,11 +72,6 @@ Cloud serialization preserves every original message boundary. Gemma fits an inf
 | `transport / httpStatus / provider` | 连接失败、HTTP 状态或经过格式校验的服务端错误代码。 |
 
 Stage 标识 http/framing/event/toolStart/toolArguments/toolEnd/completion/usage/reasoning；event、field、outputIndex 只在校验点可确定时出现。标识只接纳有界 ASCII 字母、数字及 `_.-`；非法/过长值用占位符表示，参数正文、用户消息、URL、Header 和凭据不进入诊断。
-
-✅ 本地Gemma在ModelKit内按后端有效窗口适配，当前iOS缓存安全限制比4096更小；接口及算法见 [Gemma4](Gemma4/README.md)。
-
-✅ 按用户要求，本地Gemma排查版本移除所有system，仅保留有界对话输入；云端及通用请求不变，详见Gemma4目录契约。
-
 
 ChatModel 保存固定模型选择的 ChatCapability 和可选 modelName；无 close/reopen，资源由 SDK 根管理。调用方按自身业务生命周期保留句柄，不把任务身份或协议交给 ModelKit。本地请求由默认八项等待的一运行 FIFO 处理，云端同客户端可并发；选择与推理 session 分离。
 

@@ -96,7 +96,7 @@ The architecture checker enforces Gateway → FunctionContracts only, AgentCore 
 
 ## Execution layer source ownership
 
-The boundary checker requires Agents/Gateway/Actions Xcode groups to mirror the physical source directories, with one reference per file, complete Swift/README/JSON coverage and no misplaced or stale groups. This navigation check does not change target source membership or runtime behavior.
+The boundary checker requires Agents/Gateway/Actions Xcode groups to mirror the physical source directories, with one reference per file, complete Swift/Markdown/JSON coverage and no misplaced or stale groups. Module documentation checks accept an explicit directory link in the immediate parent README for a simple leaf. This navigation check does not change target source membership or runtime behavior.
 
 
 `evaluate-qwen.py --robot-only` selects all robot-prefixed scenarios. The default model list is `gpt-4.1 qwen3.8-flash qwen3.8-max`; `--models` overrides it. `--cases` and `--robot-only` are mutually exclusive. Credentials remain provider-specific and reports retain production-source hashes.

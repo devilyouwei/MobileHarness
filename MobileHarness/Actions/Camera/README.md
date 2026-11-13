@@ -22,7 +22,7 @@ Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注�
 | [CameraPreviewStore.swift](CameraPreviewStore.swift) | 原图缓存目录、最新图与显式选择、分析图准备和批量保存 |
 | [CameraRuntimePorts.swift](CameraRuntimePorts.swift) | Injected resource arbitration interface and runtime dependencies; perception connections are supplied by App composition |
 | [CameraStorageFactory.swift](CameraStorageFactory.swift) | 注入仓库并选择照片保留策略 |
-| [CameraCaptureWorkflow.swift](CameraCaptureWorkflow.swift) | Canonical open 子Action与最终拍摄的失败即停组合；只返回最终媒体回执 |
+| [CameraCaptureWorkflow.swift](CameraCaptureWorkflow.swift) | 录像入口复用 canonical open 子 Action；前置失败停止组合，成功返回真实录像回执 |
 | [CaptureActions.swift](CaptureActions.swift) | 业务函数的参数校验、能力调用与完成值 |
 | [PhotoDispositionWorkflow.swift](PhotoDispositionWorkflow.swift) | 已提交保存结果与提示音失败分离 |
 
@@ -63,8 +63,7 @@ Action 函数本身没有请求队列或缓存；CameraCoordinator 拥有唯一�
 
 ## 基础相册实施契约
 
-savePhoto 改为 App 相册正式收录，不调用 Photos。新增 Album 服务与内部执行契约，分页40、原图并发2、缩略图并发4、变更单槽；保留收录照片不自动淘汰。
-
+savePhoto 将原图收录到 App 相册。Album 服务负责分页、原图、缩略图和变更准入，具体边界见下节。Photos 导出使用独立操作。
 
 ## 相册执行与请求附件
 
@@ -107,6 +106,22 @@ Window lifecycle begin/end gates lens requests across real presentation completi
 CameraInteractionWorkflow maps typed UI intent through Photographer and Gateway into fixed Capture, Video or Perception functions. No UI callback directly starts/stops/switches native capture.
 
 System permission prompts can invalidate the active scene's request generation. The interaction facade reports cancelled/stale/unavailable requests as explicit retry guidance, preserves committed photo saves, and never exposes UI request enum codes as user-facing errors. It does not automatically replay the interrupted operation.
+
+### Shared capture and photo completion
+
+```mermaid
+flowchart TB
+    Photo["Photo / video window demand"] --> Capture["CameraCoordinator · shared capture demand"]
+    Visual["Face perception demand"] --> Capture
+    Capture --> Native["Reuse healthy capture or start native generation"]
+    Native --> Frames["Preview / pose frame consumers"]
+    Frames --> Geometry["Photo branch · fresh geometry receipt"]
+    Shutter["Photo request · countdown and admission"] --> Geometry
+    Geometry --> Still["Capture and validate still"]
+    Still --> Cache["Publish temporary preview_N"]
+    Cache -->|explicit save| Album["Publish original and media_N album row"]
+    Capture -->|both demands end| Stop["Release capture lease and join native stop"]
+```
 
 ## Capture settings and recording
 

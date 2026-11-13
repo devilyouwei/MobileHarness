@@ -89,7 +89,7 @@ commitDependentTargets 声明需要父历史提交确认的目标；Worker 在�
 
 ## 请求、提示词与快照
 
-Worker 在选择 provider 前登记原始 Decision，内部 ReACT 复用该输入/使用集合。每次从角色仓库选择快照，按加载 Skill 组合不可变目录与 system；加载/释放仅影响下一请求。具体 system 章节由 [Assistant](../../Assistant/README.md#system-提示词结构与来源) 拥有，公共层不解释相机业务事实。
+Worker 在选择 provider 前登记原始 Decision，内部 ReACT 复用该输入/使用集合。每次从角色仓库选择快照，按加载 Skill 组合不可变目录与 system；加载/释放仅影响下一请求。具体 system 章节由 [Assistant](../../Assistant/README.md#共享提示词结构与来源) 拥有，公共层不解释相机业务事实。
 
 [AgentPrompts](AgentPrompts.swift) 负责 Agents Bundle 提示词资源的 `load`、`render` 和 `unload`。加载按路径缓存最多 256 份成功编译的不可变模板，文件读取与缓存变更串行化。卸载移除指定路径的缓存，后续读取会重新加载，已取得的模板继续供当前请求使用。读取和编译失败显式传播。AgentConfigurations 按 Catalog 定位角色与 Skill 资产，AgentPrompts 提供 共享协议、Action 目录、角色指令和证据、Skill 教学及 Memory 标题模板。Assistant 的证据模板要求 executionObservations、historicalExecution 和 toolFailure。渲染规则见 [Generation](../Core/Generation/README.md#prompt-resources-and-rendering)。
 
@@ -130,7 +130,7 @@ Action 正文含原轮次 call 序号、当前 action 别名、真实 status 与
 
 历史按单调 historyOrder 排序，完整 native 配对一起保留；failed/interrupted/unresolved 请求只作为文本历史证据。终态 Task 在首个来源位置替换为摘要，运行 Task/普通背景仍在窗口内，原记录可查询。选取最近十个投影块，再应用消息/字节/图片限制。
 
-用户文本接纳在历史仓库单次原子操作中选择当前会话并建立 awaitingModel 记录；模型请求校验精确快照 token。Task 创建先验证候选、提交业务身份，再绑定运行时上下文，绑定失败显式关闭该身份。完整模型消息、观察和终态按各自边界 checkpoint；delta 和队列在内存。持久化失败阻止依赖后续步骤，不把本地投影当作已落盘。真实数据库访问通过注入 AssistantHistoryStore、前台任务仓库与独立通信端口，重启不重放效果。
+用户输入接纳经历史仓库的写入围栏选择当前会话，建立内存 awaitingModel 条目。模型请求使用精确快照 token，实际发起时写入对应消息行。Task 创建先验证候选、提交业务身份，再绑定运行时上下文，绑定失败显式关闭该身份。完整模型消息、观察和终态按各自边界 checkpoint；delta 和队列在内存。持久化失败阻止依赖后续步骤，不把本地投影当作已落盘。真实数据库访问通过注入 AssistantHistoryStore、前台任务仓库与独立通信端口，重启不重放效果。
 
 ## Bounds and overflow
 
@@ -196,9 +196,6 @@ AgentChatWorker 默认 TextSegmentationPolicy 为首段 Han/其他字符 20/60�
 The request still derives capabilities, teaching and useStates from the same committed effective Skill set. Canonical domain sources are selected only by their explicit Skill paths; there is no Assistant whole-tree health or diagnostics source. There is no loadState or model-visible internal tree. Owner state reads do not change Skill retention or Task ownership; missing/read-failed observations become unknown with a bounded path/code diagnostic; cancellation, closure and capacity still abort request construction.
 
 residentContext() exposes only the repository’s initialized committed in-memory Context for Container State reflection. It performs no initialization or persistence I/O; operational contextSnapshot() keeps its existing private-context contract.
-
-
-
 
 Task 控制通过 task.start 和 task.end 管理 Assistant 前台目标，相关用户输入走常规输入流程。task.send(agent_id,text) 发送正文，可由运行时附带捕获的待答关联。接收 Agent 决定是否新建、补充或停止任务。
 

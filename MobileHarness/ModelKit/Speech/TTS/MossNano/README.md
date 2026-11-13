@@ -15,7 +15,7 @@ The adapter owns request admission/format and a ModelResource lease. The directo
 The diagram shows runtime calls and data flow, not compilation dependencies.
 
 ```mermaid
-flowchart LR
+flowchart TB
  Caller --> Input[MossInput locale and voice validation]
  Input --> Worker[MossSpeechSynthesis worker and lease]
  Worker --> Engine[LocalMossEngine]
@@ -36,8 +36,6 @@ Callbacks are serial/synchronous and mutex-protected; no upstream unbounded stre
 
 Explicit warmup drains PCM from real model execution without playback. The 60-second generated-audio bound is a provider output limit; caller deadlines, storage budgets and playback completion are separate contracts.
 
-Managed MOSS output, EOS enforcement and bounded PCM conversion are implemented.
-
 ## Related design
 
 [Parent design](../README.md)
@@ -49,7 +47,3 @@ Load four compiled graphs plus config, SentencePiece tokenizer and two preset vo
 Plan at most 32 text chunks. Each chunk has at most 512 prompt rows, 1024-position KV cache and 375 generated frames (30 seconds). Emit decoded 80 ms stereo frames synchronously; inter-chunk silence ≤400 ms. Consumer failure stops generation. Check cancellation before predictions and emission; already-running Core ML work must finish. Frame budget exhaustion without EOS is an error, not truncated success.
 
 Source is adapted from FluidAudio PR 917 commit abbde6b9b80c0e7c2c488f35b0b225c0e8cab08f under [Apache notice](../../../../../docs/licenses/FluidAudio-Apache-2.0.txt); attribution remains in source. The request-level PCM limits above apply across all generated chunks.
-
-## 待实现
-
-- Additional languages and custom voice registration are not implemented.

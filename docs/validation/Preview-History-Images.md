@@ -24,7 +24,7 @@ ConversationHistoryWorkflow 只接受 BusinessRecordID.media，新 preview_UUID 
 
 启动请求因手机锁定被系统拒绝（FBSOpenApplicationErrorDomain / Locked），没有确认启动或截图页面的真机展示。安装和启动不等同截图页面已人工验收；未使用真实视觉模型做新一轮视觉质量测试。更新应用会结束旧进程，只在旧进程内存在且未保存的照片不会因此恢复；已保存的照片通过既有持久关联读取。
 
-当前实现见 [History](../../MobileHarness/Actions/History/README.md#preview-references-in-history)、[Camera](../../MobileHarness/Actions/Camera/README.md#memory-previews-and-multimodal-state)、[UI Settings](../../MobileHarness/UI/Settings/README.md) 和 [Media](../../MobileHarness/Storage/Database/MediaFiles/README.md)。
+当前实现见 [History](../../MobileHarness/Actions/History/README.md#preview-references-in-history)、[Camera](../../MobileHarness/Actions/Camera/README.md#session-previews-state-and-gallery)、[UI Settings](../../MobileHarness/UI/Settings/README.md) 和 [Media](../../MobileHarness/Storage/Database/MediaFiles/README.md)。
 
 
 本机真机证据：`/tmp/mh-preview-history-2026110607-build.log`、`-install.json`、`-install-retry.json`、`-apps-after.json`、`-launch.json`（后四项沿用同一文件名前缀）。

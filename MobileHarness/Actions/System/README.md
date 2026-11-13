@@ -16,8 +16,8 @@ Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注�
 
 | 目录 | 责任 |
 | --- | --- |
-| [Device](Device/README.md) | 函数解析并限定操作专用参数，端口负责真实准入与结果 |
-| [Diagnostics](Diagnostics/README.md) | 显式诊断与授权 Agent Action 执行分开，不从合成检查推导真实业务或设备验收 |
+| [Device](#device) | 函数解析并限定操作专用参数，端口负责真实准入与结果 |
+| [Diagnostics](#diagnostics) | 显式诊断与授权 Agent Action 执行分开，不从合成检查推导真实业务或设备验收 |
 | [ModelResources](ModelResources/README.md) | 下载完成准入与制品实际下载完成分开 |
 | [Provider](Provider/README.md) | URL／密钥只在会话私有暂存和凭据端口中传递，函数参数仅带请求 ID |
 | [Task](Task/README.md) | 公开地址为 Agent.Task，源码归 System 的任务控制业务 |
@@ -49,3 +49,19 @@ readStatus 不接收参数，限制 16384 UTF-8 字节，内容由设备拥有�
 Task 声明描述 JSON 数组 Skills、前台/后台 Task 字段和终态控制：foreground 使用 goal 及可选 skills/execution；target/businessContract/payload 为后台字段。finishTask 的 continueDecision 默认 false，仅为同一输入剩余新目标声明显式续轮。实际验证、提交、清理与结果屏障均在宿主端口实现。
 
 [Actions 设计](../README.md) · [公共函数契约](../Support/Contracts/README.md)
+
+<a id="device"></a>
+
+## Device
+
+[`Device/`](Device/)
+
+[DeviceActions.swift](Device/DeviceActions.swift) 校验参数并调用 [DeviceCapabilities.swift](Device/DeviceCapabilities.swift) 定义的端口。[DeviceModule.swift](Device/DeviceModule.swift) 注册控制和只读状态入口。具体操作及回执见上文，机械臂连接由 [NexArm Connection](../NexArm/Connection/README.md) 执行。
+
+<a id="diagnostics"></a>
+
+## Diagnostics
+
+[`Diagnostics/`](Diagnostics/)
+
+[ChatDiagnosticWorkflow.swift](Diagnostics/ChatDiagnosticWorkflow.swift) 在 DEBUG 构建中先等待注入的准备步骤，再发起温度为 0 的合成样例请求，使用 Provider 默认输出预算，空回复明确失败。[SpeechDiagnosticWorkflow.swift](Diagnostics/SpeechDiagnosticWorkflow.swift) 在 iOS 端持有一次诊断工作，加载模型、合成并在播放分支等待真实排空。Moss 自动运行可跳过播放，模拟器返回不可用。停止加入诊断任务及播放器清理，聚合卸载和停用音频会话的错误。诊断使用独立的入口与呈现端口。

@@ -47,7 +47,7 @@ Skill 是可复用的流程与能力集合，Task 是运行时目标、状态和
 
 [WriterWorkspace](WriterWorkspace/Skill.json) 是 Writer 的基础作品库 Skill，[WriterFileEditing](WriterFileEditing/Skill.json) 随编辑域自动激活。作品库 Skill 声明 Gateway 工具与 Writer 本地工具，区分已知 ID 的直接打开或进入与按名称搜索。文件编辑 Skill 依赖作品库 Skill，编辑阶段同时提供两者的工具与教学。详见 [Writer 工作区分域](../../Agents/Writer/README.md#作品库与工作区分域)。
 
-✅ ExpressionInteraction 教学连续表情演出，提供指定子集的纯串行及“每项语音与表情并行、各项串行”的全量 XML 示例；“所有表情”按当前 express 参数枚举逐项展开，不包括仅用于清除状态的 clear。演出使用完成时等待过渡与恢复的 express，保持默认 Speech/Display Channel；不为有限演出创建需后续用户决策的 Task。资源 revision 随教学递增，通用编排规则由 Core scheduling 模板拥有。
+ExpressionInteraction 教学连续表情演出，提供指定子集的纯串行及“每项语音与表情并行、各项串行”的全量 XML 示例；“所有表情”按当前 express 参数枚举逐项展开，不包括仅用于清除状态的 clear。演出使用完成时等待过渡与恢复的 express，保持默认 Speech/Display Channel；不为有限演出创建需后续用户决策的 Task。资源 revision 随教学递增，通用编排规则由 Core scheduling 模板拥有。
 
 ### useStates 与当前事实
 
@@ -101,7 +101,7 @@ BasicSkill读取agents.applicationcontrol、agents.writer、ui.navigation、全�
 
 ## 加载、释放与 Task 生命周期
 
-BasicSkill Instructions 按概念、上下文、决策、控制动作效果、生命周期、反馈/失败组织。Skill 明确提供教学、函数、State 选择及依赖；Task 保留持续目标和完成条件，单次工作的多次模型请求不构成创建 Task 的充分理由。九项控制 Action 的教学与注册对应：加载/释放影响后续请求，start 可携带初始能力，end/cancel 先进入收尾再终态，delegate 的接纳不等于完成，send 只补充已有目标，聆听控制独立于 Task。参数和协议由 canonical 声明与 Core 拥有，JSON 只注册现有绑定、状态及指令来源。
+BasicSkill Instructions 按概念、上下文、决策、控制动作效果、生命周期、反馈/失败组织。Skill 明确提供教学、函数、State 选择及依赖；Task 保留持续目标和完成条件，单次工作的多次模型请求不构成创建 Task 的充分理由。七项控制 Action 分别负责加载／释放 Skill、开始／结束前台 Task、向同伴发送委托正文，以及开始／停止聆听。加载和释放影响后续请求，task.start 可携带初始能力，task.end 提交终态及摘要。task.send 的送达回执独立于同伴接纳与完成。参数和协议由 canonical 声明与 Core 拥有，JSON 只注册现有绑定、状态及指令来源。
 
 显式 releaseSkills 可移除确认不再需要且允许释放的近期或任务非基础根，Task 本身继续存在；基础项、非根依赖和仍被其他根依赖的指定 Skill 拒绝释放。通常保留目标需要的能力并在终态清理，不能把使用建议写成运行时禁止。加载/释放失败原子保留先前能力状态；Task 替换预校验、旧目标收尾、新目标创建是分阶段流程，不能承诺收尾后的创建失败会自动恢复旧目标。
 
@@ -137,6 +137,8 @@ BasicSkill Instructions.md先检查CURRENT STATE：已有足够事实直接回�
 | history-query / HistoryQuery | 历史只读查询 Actions。 |
 | application-control / ApplicationControl | 应用配置、资源、设备及 UI 能力。 |
 | web-browsing / WebBrowsing | 远程网页多窗口访问、原窗口跨站跳转、正文与截图观察及逐屏导航。 |
+| writer-workspace / WriterWorkspace | Writer 私有作品库查询与进入。 |
+| writer-file-editing / WriterFileEditing | Writer 私有文件读写、渲染和收尾。 |
 
 资源仅随 App 打包，无远程下载或热更新。
 
@@ -152,45 +154,39 @@ Assistant 全双工中，`task.end` 成功即提交前台终态和历史摘要�
 
 历史查询只复制 list 返回的完整 dialog_number；notFound 允许一次重新 list 和一次基于实际 ID 的修正 read，不猜测 ID 或无限重试。业务参数与 media_N 等引用来自真实反馈。语法、Channel/wait 和资源冲突由 Core/Gateway 契约决定，Skill 不重复定义。
 
-## 待实现
-
-- Trigger、完整写入源治理及更多公开事实。
-- 声明并实现生产后台业务流程；多前台任务栈尚不提供。
-- 扩展真实模型多次采样及物理设备验收；当前固定合成场景的云回归已有通过及失败证据，详见[验证报告](../../../docs/validation/Qwen-Prompt-Optimization.md)。
-
 ## 公开 State 边界
 
-✅ 全部内置 Skill 使用 schema v3，useStates 必填并递增 revision；每轮模型请求读取当前加载及依赖 Skill 声明的集合，卸载只改变后续读取集合。旧 contextFields 加载和独立状态 user 注入已移除。
+内置 Skill 使用 schema v3，并显式声明 useStates。每轮模型请求读取当前加载的 Skill 和依赖项声明的集合。卸载影响后续请求的选择。
 
 [容器上下文契约](../../Agents/Support/Context/README.md)
 
-✅ BasicSkill 统一承载 Skill 选择/Task/表达/失败规则，Photography 专注就绪/镜头/捕获/照片处理；少量示例验证主要分支，不重述通用协议。公开 State 位于独立的每轮系统数据消息。
+BasicSkill 统一承载 Skill 选择/Task/表达/失败规则，Photography 专注就绪/镜头/捕获/照片处理；少量示例验证主要分支，不重述通用协议。公开 State 位于独立的每轮系统数据消息。
 
-✅ BasicSkill 教学明确五种控制都是 XML、加载/替换关闭的独占响应与后续请求边界，查询旁支保留 Task，最近 Skill 不因短暂旁支而主动释放。Photography 明确 busy/needsSettings 门、真实 preview ID、已保存事实与未执行保存的区别；普通忽略成功经窗口收尾后结束匹配 Task，明确重拍则保留。RobotInteraction 以 connected/controlAvailable 同时为 true 作为动作前提，不以环境查询覆盖明确阻断。ApplicationControl/HistoryQuery 使用 Query Channel 的精确 XML 查询别名与跨请求结果示例。教学保持简洁，增加有针对性的正向分支示例，不扩展新能力。
+BasicSkill 教学明确五种控制都是 XML、加载/替换关闭的独占响应与后续请求边界，查询旁支保留 Task，最近 Skill 不因短暂旁支而主动释放。Photography 明确 busy/needsSettings 门、真实 preview ID、已保存事实与未执行保存的区别；普通忽略成功经窗口收尾后结束匹配 Task，明确重拍则保留。RobotInteraction 以 connected/controlAvailable 同时为 true 作为动作前提，不以环境查询覆盖明确阻断。ApplicationControl/HistoryQuery 使用 Query Channel 的精确 XML 查询别名与跨请求结果示例。教学保持简洁，增加有针对性的正向分支示例，不扩展新能力。
 
-✅ 当前 Action 目录中的查询可直接使用，不重复加载 Skill；摄影示例区分“用户请求但尚未拍摄”和“收到成功反馈”，缺失 displayedMediaID 字段也不能传空 ID。沿用相同能力、用例和执行错误，不通过放宽校验兼容错误输出。
+当前 Action 目录中的查询可直接使用，不重复加载 Skill；摄影示例区分“用户请求但尚未拍摄”和“收到成功反馈”，缺失 displayedMediaID 字段也不能传空 ID。沿用相同能力、用例和执行错误，不通过放宽校验兼容错误输出。
 
 模型以当前声明判断 Skill 可用，不要求模型计算私有闲置倒计时。倒计时/容量/所有权仍由运行时实现，教学只保留跨轮使用、终态释放和不可由释放代替设备清理的边界。
 
-## Action-only bundled Skill policy
+## 调用协议
 
-✅ Implemented: every bundled function has callType=action and an explicit Channel. History.list/read, ModelResources.snapshot, Provider.readSettings and Bluetooth.readStatus use Query. Instructions use exact XML aliases; query values enter existing round feedback. The generic loader still supports Tool declarations for isolated hosts/tests; production resources must not declare Tools. BasicSkill, ApplicationControl and HistoryQuery revisions identify the new instructions/registration.
+共享 Skill 的函数绑定均为 Action，须声明 Channel。History.list/read、ModelResources.snapshot、Provider.readSettings 和 Bluetooth.readStatus 使用 Query。WriterWorkspace 与 WriterFileEditing 归 Writer 所有，使用原生 Tool 并省略 Channel。
 
 ## 基础相册实施契约
 
-✅ Photography保存语义改为App相册；系统导出及删除不开放给Skill。
+Photography保存语义改为App相册；系统导出及删除不开放给Skill。
 
 ## 对话打开相册
 
-✅ application-control增加App相册导航示例，并推进Skill revision；只开放页面导航，不增加相册读取、删除或系统导出能力。
+application-control增加App相册导航示例，并推进Skill revision；只开放页面导航，不增加相册读取、删除或系统导出能力。
 
 ## Container 上下文
 
-✅ schema v3统一声明useActions/useStates/useInstructions；Action绑定保持原授权与执行语义。缺省useInstructions为Instructions.md，空数组不加载文档，显式列表按顺序加载；路径必须是Skill目录内Markdown。未知已选择来源按项返回unknown及路径诊断，Skill声明不会创建来源或启动设备。
+schema v3统一声明useActions/useStates/useInstructions；Action绑定保持原授权与执行语义。缺省useInstructions为Instructions.md，空数组不加载文档，显式列表按顺序加载；路径必须是Skill目录内Markdown。未知已选择来源按项返回unknown及路径诊断，Skill声明不会创建来源或启动设备。
 
 ## Basic native State selection
 
-BasicSkill selects agents.applicationcontrol and ui.navigation plus platform.system.time/power/thermal/network/permissions/audio/locale/accessibility. PlatformKit owns the native facts; AssistantStateBindings projects the complete producer-owned Business dictionary and wraps bounded JSON for CURRENT STATE on each actual request. BasicSkill teaches sampled time, unknown data, path-versus-endpoint and permission-versus-execution boundaries without adding functions or authority. There is no location/motion/depth/proximity/magnetic-attachment collection in this selection. [Source contracts](../../Agents/Support/Context/README.md#container-context-read-path) own details.
+BasicSkill selects agents.applicationcontrol, agents.writer, ui.navigation and ui.windows plus platform.system.time/power/thermal/network/permissions/audio/locale/accessibility. PlatformKit owns the native facts; AssistantStateBindings projects the complete producer-owned Business dictionary and wraps bounded JSON for CURRENT STATE on each actual request. BasicSkill teaches sampled time, unknown data, path-versus-endpoint and permission-versus-execution boundaries without adding functions or authority. There is no location/motion/depth/proximity/magnetic-attachment collection in this selection. [Source contracts](../../Agents/Support/Context/README.md#container-context-read-path) own details.
 
 ## Prefer current facts before query selection
 
@@ -200,15 +196,23 @@ RobotInteraction teaches six-axis anatomy, absolute counts versus relative degre
 
 ## Exact State selection
 
-useStates declares exact canonical paths. BasicSkill selects agents.applicationcontrol, ui.navigation and eight platform.system.* nodes. ExpressionInteraction selects ui.home.expression; RobotInteraction selects actions.robot plus actions.robot.motion; Photography selects actions.camera/ui.camera/ui.album. ApplicationControl and HistoryQuery add no State sources. There is no alias, wildcard or implicit ancestor/descendant selection.
+useStates declares exact canonical paths. | Skill | `useStates` |
+| --- | --- |
+| BasicSkill | agents.applicationcontrol、agents.writer、ui.navigation、ui.windows，以及上节八个 platform.system.* |
+| ExpressionInteraction | ui.home.expression |
+| RobotInteraction | actions.robot、actions.robot.motion |
+| Photography | actions.camera、actions.camera.preview、ui.camera、ui.album、ui.windows、platform.vision.camera、ui.island |
+| ApplicationControl | ui.windows、ui.camera、platform.vision.camera、ui.island |
+| WebBrowsing | ui.web、ui.windows、actions.web.screenshot |
+| HistoryQuery、WriterWorkspace、WriterFileEditing | 空 |
 
 Each actual request samples only those nodes and uses the producer-owned complete Business dictionary. Child indices are not recursively expanded or injected. Runtime, health/issues and diagnostic history stay outside Assistant State. Internal engineering callers can explicitly inspect a tree independently of Skills. Loading/release changes future disclosure only; no loadState, automatic wakeup, device action or changed execution authority is introduced.
 
 BasicSkill 常驻提供 `Speech.Listening.startListening` / `stopListening`，别名同函数名，使用独立 ListeningControl Channel。退出语音意图仅输出 stopListening，不在关闭后追加语音或自动重开，不隐式改变业务 Task；启动只响应明确用户意图。参数和真实完成语义由 [Listening Actions](../../Actions/Speech/Listening/README.md) 拥有。
 
-Photography and ApplicationControl share six Window.* aliases and select ui.windows; BasicSkill has no window catalog or State additions. Camera.Capture.open remains the only photo-window creation entry. Photography instructions emit known open/settings/capture steps in one response; result-dependent disposition remains a later request within the existing prompt budget.
+Photography and ApplicationControl share six Window.* aliases and select ui.windows. BasicSkill selects the window summary and leaves window controls to the owning Skills. Camera.Capture.open remains the only photo-window creation entry. Photography instructions emit known open/settings/capture steps in one response; result-dependent disposition remains a later request within the existing prompt budget.
 
-ApplicationControl exposes background Vision.open/close/flip/retry aliases for Camera.Perception.*Vision. Photography retains Capture aliases and window controls. Both select platform.vision.camera for actual native facts. Only the visible lensOwner may flip; minimizing photo retains capture and hands lens authority to visible enabled background vision. BasicSkill’s resident catalog is unchanged.
+ApplicationControl exposes background Vision.open/close/flip/retry aliases for Camera.Perception.*Vision. Photography retains Capture aliases and window controls. Both select platform.vision.camera for actual native facts. Only the visible lensOwner may flip; minimizing photo retains capture and hands lens authority to visible enabled background vision.
 
 BasicSkill routes 打开视觉／跟踪／人物或姿态跟随 to application-control and Vision.open; 拍照／拍摄照片 to photography and its capture Actions. The unloaded Skill descriptions carry this distinction, and both Skill instruction sets repeat the boundary after loading. openPage vision is model settings navigation, not vision activation. No new Camera Actions are resident in BasicSkill.
 
@@ -216,12 +220,9 @@ BasicSkill routes 打开视觉／跟踪／人物或姿态跟随 to application-c
 
 Photography exposes Capture.configure/cancelCapture plus Video.startRecording/stopRecording/saveVideo/ignoreVideo using the existing Camera channel and stable aliases. configureCamera updates supplied settings and preserves omitted fields. A native countdown belongs to takePhoto; video startup, file completion and App album inclusion remain distinct. takePhoto requires an already open visible Camera window and selects photo mode; optional delaySeconds overrides only this shot, with no configureCamera step. openCamera and takePhoto can be generated together and execute in order on Camera. Spoken preparation can sit between them in the same response: separate wait groups join open and then speech before capture, because speech uses a different Channel. startRecording internally opens/restores the Camera window and selects video mode. openCamera waits for a ready preview and completes without a business value. Same-channel lens or settings preparation can follow it in one response; window commands use ui.windows. startRecording accepts optional durationSeconds for timed recording. Photo and video have parallel start/disposition/Task-cleanup examples. startRecording defaults to awaiting the ready file before model feedback; Photographer's fixed interactive Tool requests startup-only acknowledgement. Ready feedback supplies actual media identity, fileName and duration, and requires an authorized save/ignore decision rather than reporting recording in progress. The Skill gives spoken preparation before recording, then relies on the stop button or configured duration while listening is paused. Failed/uncertain work is not automatically replayed. Confirmed photo save or video save/ignore can complete the matching Task while retaining its window; explicit close/discard intent is independent, as is background Vision.
 
-BasicSkill revision37 routes 拍照/录像 to Photography without adding permanent camera Actions. Prompt regression budgets are26,000 UTF-8 bytes for the base catalog and38,000 with Photography, which includes six additional Action declarations and recording lifecycle instructions. These are context-size checks, not model or device acceptance.
-
-Photography与ApplicationControl增加Island.setPresentation以及ui.island事实，模型以size=compact/expanded控制已有内容，现有目标任务提供detail可展开，任务详情与实时状态按内容分组独立选择，状态切换保留任务描述和手动收起偏好；不指定尺寸/动画，不把展示当业务完成。Basic常驻目录不变。摄影加载提示预算38000 UTF-8字节用于增加的通用展示声明和State说明，基础提示预算26000；实际装配长度由PromptTemplateTests验证。
+Photography与ApplicationControl增加Island.setPresentation以及ui.island事实，模型以size=compact/expanded控制已有内容，现有目标任务提供detail可展开，任务详情与实时状态按内容分组独立选择，状态切换保留任务描述和手动收起偏好；不指定尺寸/动画，不把展示当业务完成。Basic常驻目录不变。
 
 ## Web skills
-
 
 BasicSkill 公开 Assistant 前台 task.start/end 和后台消息 task.send(agent_id,text)。后台目标、补充和停止都使用正文。接收 Agent 自行决定如何处理，公开目录提供角色职责。Writer 私有工具与作品业务由 Writer 拥有。
 

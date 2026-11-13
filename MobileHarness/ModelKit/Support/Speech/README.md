@@ -10,8 +10,12 @@ Native Speech buffers are copied to/from validated ModelKit mono Float32 values.
 
 Shared Apple PCM conversion lives here.
 
-[Apple conversion](Apple/README.md) · [Parent design](../README.md)
+[Apple conversion](#apple-pcm) · [Parent design](../README.md)
 
-## 待实现
+<a id="apple-pcm"></a>
 
-- General resampling and multichannel output preservation are not implemented.
+## Apple PCM conversion
+
+[`Apple/`](Apple/)
+
+[PCMCodec.swift](Apple/PCMCodec.swift) compiles in `ModelKitAppleSpeech`. Encoding accepts 1–262,144 native Float32 or Int16 frames, averages channels from planar or interleaved storage and copies to mono Float32 at the source sample rate. Decoding copies mono Float32 into a new native buffer at that rate. Invalid frames or formats fail explicitly. Apple ASR owns its native-format converter. The caller owns buffers, callback serialization and completion.

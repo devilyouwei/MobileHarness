@@ -1,5 +1,7 @@
 # Assistant 多源输入的触发时机与合并
 
+现行流程图见 [总体技术设计](../../MobileHarness/README.md#assistant-full-duplex-interaction)。11 月 12 日的 [Channel 结算方案](technical/Assistant-Channel-Settlement.md) 更新了本页早期图中的请求发起条件。当前语义项可以在执行期间入队，下一次主模型请求须等原轮结算，再将同会话就绪项渲染为一条时间线。
+
 ## 2026-11-10 最新收敛：仅用户快决策、统一语义 Q（代码核对与目标设计）
 
 本节记录最新用户要求，覆盖此前“Agent 文本也走 Decision”和按独立续轮消费业务结果的输入策略。本节调整于 2026-11-11 获准实施；下表保留改动前的核对基线，实施结果和验证在本节末及专项验证文档更新。Message 实际发起请求才建行的规则不变。
@@ -47,7 +49,9 @@
 
 前文关于“表情完成导致循环”的说法混淆了内部执行完成与业务返回值，撤回对当前表情实现的这一推断。统一 Q 改造只需沿用上述返回契约；不能把所有完成事件包装成文本放入 Q。证据见 [表情函数](../../MobileHarness/Actions/UI/Expression/ExpressionActions.swift)、[完成契约](../../MobileHarness/Agents/Support/Core/Output/ActionResult.swift)、[推理判定](../../MobileHarness/Agents/Support/Core/Output/ToolResult.swift)。
 
-### 完整链路
+### 2026-11-10 方案流程图（历史）
+
+此图记录当时的方案。图中仅以主模型空闲为发起条件，以及 toast 和 envelope 表述，均对应当时设计。
 
 ```mermaid
 flowchart TD
@@ -203,7 +207,7 @@ Writer ｜ 13:06:37
 - 验收：语音和 input 每次均调用 Decision；Agent/Action 零分类；忙时三类输入积累，空闲后一次提交全部；单条与多条同格式；多次 ASR 标 user 且时间/轮次有序；冻结竞态；Action 未全部结束不阻塞已完成结果；工具配对；表情成功 Void 不触发请求、失败才入 Q，所有无返回值 Action 同理；旧 Action 运行不挡新 LLM、输出 channel FIFO；准备失败/丢弃零 message；一个 batch 一行、真实失败留证；Prompt 构建包含新契约。实际模型选择性回复和无声表情须独立真机/云端验收，不能用字符串断言代替。
 
 
-### 2026-11-11 代码交付状态
+### 2026-11-11 代码交付快照
 
 已实现用户专属 Decision、同伴直接 Q、普通 Action 独立结果 Q、native 完整组就绪后直接 Q（不等待无关 Action）、统一单条/多条 envelope、时间/身份、选择性回复提示词和准备失败保留。真实 Action/工具结算 journal 仍属于原请求，新语义批次不会重发旧意图。当前批次工具配对从历史去重，截图附件保留。发起边界和表结构不变。
 
@@ -231,10 +235,6 @@ Writer ｜ 13:06:37
 
 同步 Assistant、Chat、提示词资源与总体数据流说明。回归覆盖历史顺序、其他对话或无关来源隔离、文本边界、运行状态及动作结果。Mac 模型验证与 iPhone 端到端验收分别记录。
 
-### 实施所有者与文档
-
-Agents/Assistant、Support/Chat/Core 拥有输入批次、原调用续接和会话取消；Gateway/Output/Scheduling 增加跨轮顺序域。ModelKit/Language/JEV 保存Decision契约与隔离编译的D3实现，ModelKitDefaults注册/装配，现有Resources/Models目录登记固定制品。Actions/System/ModelResources、Provider与ApplicationControl负责偏好和操作，UI/Settings/Root只展示/导航。PlatformKit/Audio、Actions/Speech、SpeechPerception负责共享音频图、原生取消和连续识别。Storage/Database现有AssistantMessages与ModelRequestLog目录承载增量输入记录和证据，不新增目录。
-
 ### 2026-11-13 Decision 动作定义与示例
 
 在 `Assistant/InputDecision.json` 明确三个动作的触发条件及效果，并加入英文对照示例。打断要求用户指向正在播报或执行的工作并要求立刻改变。丢弃用于明确不需要回应的输入。入队保留回答、请求、补充、延后要求和歧义。示例覆盖短答与附和、立即停止与稍后处理，沿用现有候选顺序、最近一来一回和原文数据边界。更新 Assistant、资源说明及分类请求回归，并用 Mac 本地 D3 对照误判、输入 token 和 100 ms 上限。
@@ -248,6 +248,10 @@ Agents/Assistant、Support/Chat/Core 拥有输入批次、原调用续接和会�
 在 Mac 本地用固定 512 token 的 D3 Edge 比较短候选描述。在 `Assistant/InputDecision.json` 的 interrupt 候选中试放「停下」「别说了」「等下」等中英文常用表达，另测 enqueue 的继续、稍后处理与确认。保留 discard 定义及现有采纳保护。验收比较正在播报、正在执行、空闲、延后、否定、引用和对旁人说话，逐项记录漏打断、误打断、误丢弃、token 和热时延。若采用新描述，更新资源说明及请求回归。
 
 接入通过对照的简短版本时，将近义表达放在既有打断示例的位置，沿用候选中的立即停止或改变条件和指令中的否定、引用与延后边界。保留已有入队与丢弃示例和两个候选定义。
+
+### 实施所有者与文档
+
+Agents/Assistant、Support/Chat/Core 拥有输入批次、原调用续接和会话取消；Gateway/Output/Scheduling 增加跨轮顺序域。ModelKit/Language/JEV 保存Decision契约与隔离编译的D3实现，ModelKitDefaults注册/装配，现有Resources/Models目录登记固定制品。Actions/System/ModelResources、Provider与ApplicationControl负责偏好和操作，UI/Settings/Root只展示/导航。PlatformKit/Audio、Actions/Speech、SpeechPerception负责共享音频图、原生取消和连续识别。Storage/Database现有AssistantMessages与ModelRequestLog目录承载增量输入记录和证据，不新增目录。
 
 实施后同步以上所有者README和MobileHarness/README.md跨模块流；不把尚未实施部分写成当前技术契约。清除被替代Judge命名和半双工门控；保留文档中的历史证据。
 

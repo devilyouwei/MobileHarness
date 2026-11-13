@@ -13,7 +13,7 @@ independent runtime framework adapter depends on ModelKit. Host supplies HTTP/HT
 The diagram shows runtime calls and data flow, not compilation dependencies.
 
 ```mermaid
-flowchart LR
+flowchart TB
  Caller --> Encoding[Responses request encoding]
  Encoding --> Worker[Request worker]
  Worker -->|Acquire and release lease| Resource[ModelResource and pooled URLSession]
@@ -42,7 +42,7 @@ Emit text on response.output_text.delta. Validate argument deltas against comple
 
 Request assembly accepts at most64 messages/64KiB text and native identifiers (opaque argument payloads do not count toward that text budget) and128 declarations/64KiB declarations. SSE parsing retains the current frame without a cumulative response or line/frame generation-size ceiling; completed frames clear their contents and reuse frame-local capacity rather than retaining the stream. Large public text deltas become valid Unicode-scalar32KiB events before entering the unchanged bounded/backpressured queue. Terminal events repeating full output do not impose an artificial generation limit. Native output indices ≤128; item/call IDs ≤512 bytes, safe names ≤64 and string-object arguments have no fixed byte ceiling. Images separately retain four/16 MiB transcript and four MiB each. CR/LF/CRLF, bytewise UTF-8, comments and multiline SSE fields are supported.
 
-The session uses `StreamLimits(capacity: 128, maximumEventBytes: nil)` and serialized `yieldSuspending` for every event, including the terminal event. A full queue pauses event production without dropping fragments or failing with bufferOverflow. The request retains its operation lease while waiting; normal completion drains accepted events, and cancellation/failure wakes the producer and suppresses buffered delivery. Callers must consume or cancel a session before awaiting ordinary unload, which drains active work without cancellation. Queue limits cover decoded events, not URLSession or decoder memory. ✅ Optional timing starts immediately before URLSession.bytes and samples the first nonempty decoded text or identity-validated function argument delta before consumer delivery. Native-only timing therefore measures streamed model arguments rather than tool execution or terminal validation. Private reasoning and empty deltas do not count; missing samples remain absent. Validation/loading/consumer/voice/UI are excluded.
+The session uses `StreamLimits(capacity: 128, maximumEventBytes: nil)` and serialized `yieldSuspending` for every event, including the terminal event. A full queue pauses event production without dropping fragments or failing with bufferOverflow. The request retains its operation lease while waiting; normal completion drains accepted events, and cancellation/failure wakes the producer and suppresses buffered delivery. Callers must consume or cancel a session before awaiting ordinary unload, which drains active work without cancellation. Queue limits cover decoded events, not URLSession or decoder memory. Optional timing starts immediately before URLSession.bytes and samples the first nonempty decoded text or identity-validated function argument delta before consumer delivery. Native-only timing therefore measures streamed model arguments rather than tool execution or terminal validation. Private reasoning and empty deltas do not count; missing samples remain absent. Validation/loading/consumer/voice/UI are excluded.
 
 ## Model discovery
 
@@ -62,7 +62,7 @@ OpenAIChatConfiguration.request emits one Responses message per original user me
 
 ## Responses reasoning compatibility
 
-ChatEventDecoder accepts bounded reasoning output items and response.reasoning_text.delta/done metadata used by Alibaba Cloud Responses. Validate reasoning identity/summary shape and incremental text fields, then discard this private channel; only output_text contributes ChatEvent.text and first-token timing. Reasoning items in output_item.added/done and terminal output must not be mistaken for unsupported assistant output. Native call indices/pairing, usage/completion, explicit refusal/unknown-output failures and existing stream limits remain unchanged. No protocol switch or provider retry is introduced. Offline fixtures and an explicit live synthetic-context probe verify the behavior; provider documentation: [Alibaba Cloud Responses](https://www.alibabacloud.com/help/en/model-studio/qwen-api-via-openai-responses).
+ChatEventDecoder accepts bounded reasoning output items and response.reasoning_text.delta/done metadata used by Alibaba Cloud Responses. Validate reasoning identity/summary shape and incremental text fields, then discard this private channel; only output_text contributes ChatEvent.text and first-token timing. Reasoning items in output_item.added/done and terminal output must not be mistaken for unsupported assistant output. Native call indices/pairing, usage/completion, explicit refusal/unknown-output failures and existing stream limits remain unchanged. No protocol switch or provider retry is introduced. Provider reference. [Alibaba Cloud Responses](https://www.alibabacloud.com/help/en/model-studio/qwen-api-via-openai-responses).
 
 ## Thinking request policy
 

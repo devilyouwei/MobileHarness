@@ -1,7 +1,5 @@
 # Audio — 原生音频、反馈与数值能力
 
-✅ 录音与播放共用模块内部的同步 AVAudioSession 配置函数，各调用者继续在自身隔离域执行，不增加调度；移除临时细分计时，只保留空间启动总区间。保留完整停止、原生错误、四声道及首 PCM 就绪。
-
 ## 职责与公开协议
 
 AudioContainer 按有限命名作用域缓存原生实现，对外返回 AudioInputOutput、CuePlaying、HapticFeedbackProviding。AppleAudioIO／NativeCuePlayback／NativeHapticFeedback 实现这些端口；业务只注入需要的协议，SDK 不依赖其他项目模块。
@@ -34,13 +32,26 @@ AudioCaptureContext 区分输入、空间支持和接纳前回退；原生读buf
 
 ## 播放与完成
 
-✅ NativePlaybackGraph 私有actor拥有输出引擎、播放器、格式、mixer tap及原生连接／启动／PCM提交／停止，避免这些同步原生调用阻塞MainActor。AppleAudioIO只持有主线程接纳、token和完成等待。
+NativePlaybackGraph 私有actor拥有输出引擎、播放器、格式、mixer tap及原生连接／启动／PCM提交／停止，避免这些同步原生调用阻塞MainActor。AppleAudioIO只持有主线程接纳、token和完成等待。
 
 最多三个已调度PCM buffer、一个串行提交；单包非空、最多262144样本、有限数值、8…192kHz、mono。消费端保持同一次流的采样率，真实dataPlayedBack回调释放容量并确认排空。onStarted仅在首块提交且player启动成功后回调，不代表声音已到达用户。
 
 stopPlayback同步失效token并唤醒等待，单个清理任务加入原生停止；waitForPlaybackStop、根stop及下一次播放加入清理。旧取消不能停止新播放，未完成原生调用返回前不伪造停机。
 
 playClip拒绝捕获／播放冲突，复用同一播放端口；主因和清理错误分别保留，释放不触碰替代会话。引擎内部可复用健康连接，不提供无人使用的独立预热／播放游标API。
+
+### 采集与播放的数据流
+
+```mermaid
+flowchart TB
+    Input["原生输入 · 空间采集或单声道语音图"] --> Stream["MicrophoneCapture · 代际围栏和有序 PCM"]
+    Stream -->|首包就绪| Start["采集启动回执"]
+    Stream -->|唯一订阅| Consumer["只读 PCM 消费者"]
+    PCM["PlaybackPCM 流"] --> Graph["NativePlaybackGraph · 格式转换与提交"]
+    Graph --> Player["原生 player / mixer"]
+    Player -->|dataPlayedBack| Drain["释放槽位并确认排空"]
+    Player -->|mixer tap| Spectrum["频谱输出"]
+```
 
 ## 频谱、转换与反馈
 
@@ -52,7 +63,7 @@ CuePlaying使用一个AVAudioPlayer／delegate，重叠明确busy，取消停止
 
 HapticFeedbackProviding使用公开支持检查、缓存生成器和一个有主人的operation；最多三次触觉、间隔40…250ms，取消和停止加入，UIKit只确认请求发出。触觉预备不承诺实际产生反馈。
 
-✅ 已实现：NativeHapticFeedback.perform在每次实际impact前重新设置共享AVAudioSession允许录音时触觉，再prepare并发出impact；不能把录音启动前的设置或生成器预备视为持续有效。只修改该触觉开关，不重配category／mode／route、不停录音；取消／根接纳检查先于设置，设置失败原样抛出并沿既有Platform报告链传播。缓存生成器与可重复operation保留，单次及多次请求均按每个pulse处理。
+NativeHapticFeedback.perform在每次实际impact前重新设置共享AVAudioSession允许录音时触觉，再prepare并发出impact；不能把录音启动前的设置或生成器预备视为持续有效。只修改该触觉开关，不重配category／mode／route、不停录音；取消／根接纳检查先于设置，设置失败原样抛出并沿既有Platform报告链传播。缓存生成器与可重复operation保留，单次及多次请求均按每个pulse处理。
 
 ## 原生事件、错误与约束
 
@@ -62,14 +73,11 @@ NativeAudioEvent 是事实而非Error。路由按前后输入／输出portType+U
 
 中断仅在began且实例有活动采集／播放时报告AudioIOError.interrupted；ended不重复终止。格式、连续性、overflow、执行和清理失败保留原throw及注入报告。事件三个worker由原生所有者取消并加入，不由页面持有。
 
-❌ 原生路由、实际声音／触觉、持续模型负载及硬件连续性仍需真机验收。
+[PlatformKit](../README.md) · [Core](../Core/README.md) · [语音验收](../../../docs/validation/Voice.md)
 
-[PlatformKit](../README.md) · [Core](../Core/README.md)
+AudioContainer停止聚合使用PlatformFailure：首个失败为underlying，其余按顺序保留在cleanupErrors，分类为cleanup.failed；不以取消／设备不可用掩盖未完成清理。
 
-✅ AudioContainer停止聚合使用PlatformFailure：首个失败为underlying，其余按顺序保留在cleanupErrors，分类为cleanup.failed；不以取消／设备不可用掩盖未完成清理。
-
-录音会话同步配置，空间 AVCaptureSession 仅在请求录音时随后端实例创建，start/stopRunning 在后端 actor 执行。首 PCM 确认前不报告收音成功；空间启动失败必须加入清理，再按原支持条件回退 mono，token 围栏防止旧失败影响新捕获。容器 boot 不打开设备，不保留异步会话配置 preparation Task。
-
+采集和播放共用同步 AVAudioSession 配置函数，各自在自己的隔离域执行。空间 AVCaptureSession 仅在请求录音时随后端实例创建，start/stopRunning 在后端 actor 执行。首 PCM 确认前不报告收音成功；空间启动失败必须加入清理，再按原支持条件回退 mono，token 围栏防止旧失败影响新捕获。容器 boot 不打开设备，不保留异步会话配置 preparation Task。
 
 ## Direct container contract
 
@@ -77,9 +85,9 @@ Native data/observation capabilities remain independent of business and transpor
 
 ## 唯一 PCM 源
 
-✅ 已实现：MicrophoneFrame.swift 定义跨平台 AudioCaptureObserving、带原生 generation 的 MicrophoneCaptureInput 及 SDK 私有 MicrophoneCapture；后者直接持有唯一 64 包源、一次性订阅和原生回调围栏。AppleAudioIO／SpatialAudioCapture 直接写入该源，删除无消费者的重复 PCM 广播。startCapture 仅等待首有效 PCM 并返回完成，subscribeCapture 取得当前源而不启动硬件；重复订阅拒绝。停止、溢出或原生失败保留已接纳包并结束当前源，迟到回调不能写入替代源。
+MicrophoneFrame.swift 定义跨平台 AudioCaptureObserving、带原生 generation 的 MicrophoneCaptureInput 及 SDK 私有 MicrophoneCapture；后者直接持有唯一 64 包源、一次性订阅和原生回调围栏。AppleAudioIO／SpatialAudioCapture 直接写入该源。startCapture 仅等待首有效 PCM 并返回完成，subscribeCapture 取得当前源而不启动硬件；重复订阅拒绝。停止、溢出或原生失败保留已接纳包并结束当前源，迟到回调不能写入替代源。
 
-✅ 已实现：跨平台 AudioCaptureControlling 明确权限、采集、事件和停止的执行端口；AudioInputOutput 继承它并保留 iOS 播放能力。Agent 仍只接收 AudioCaptureObserving。Actions 音频检测可用替身验证实际取消加入，不依赖原生硬件。
+跨平台 AudioCaptureControlling 明确权限、采集、事件和停止的执行端口；AudioInputOutput 继承它并保留 iOS 播放能力。Agent 仍只接收 AudioCaptureObserving。Actions 音频检测可用替身验证实际取消加入，不依赖原生硬件。
 
 ## Passive application audio facts
 

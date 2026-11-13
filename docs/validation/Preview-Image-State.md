@@ -25,7 +25,7 @@
 
 没有调用真实视觉模型，没有在 iPhone 上验证拍照、照片退场音效／动画或内存压力。建议原生验收连续拍摄两张后跨轮追问、加载旧图比较、保存非当前显示图、忽略当前图、切换新对话及后台／恢复；检查每一步实际图片、窗口与相册内容。
 
-当前契约见 [Camera](../../MobileHarness/Actions/Camera/README.md#memory-previews-and-multimodal-state)、[State](../../MobileHarness/Agents/Support/Context/README.md) 与 [Chat](../../MobileHarness/Agents/Support/Chat/README.md)。
+当前契约见 [Camera](../../MobileHarness/Actions/Camera/README.md#session-previews-state-and-gallery)、[State](../../MobileHarness/Agents/Support/Context/README.md) 与 [Chat](../../MobileHarness/Agents/Support/Chat/README.md)。
 
 ## 2026-11-06 真机安装
 

@@ -1,6 +1,6 @@
 # Camera session cache and gallery validation
 
-2026-11-07. Scope and remaining acceptance are tracked in [the implementation plan](../requirements/technical/Camera-Session-Gallery.md). Current contracts live in [Camera](../../MobileHarness/Actions/Camera/README.md), [Image cache](../../MobileHarness/Storage/Cache/Image/README.md), [UI Camera](../../MobileHarness/UI/Camera/README.md) and [shared Chat](../../MobileHarness/Agents/Support/Chat/README.md).
+2026-11-07. Scope and remaining acceptance are tracked in [the implementation plan](../requirements/technical/Camera-Session-Gallery.md). Current contracts live in [Camera](../../MobileHarness/Actions/Camera/README.md), [Image cache](../../MobileHarness/Storage/Cache/README.md#session-image-cache), [UI Camera](../../MobileHarness/UI/Camera/README.md) and [shared Chat](../../MobileHarness/Agents/Support/Chat/README.md).
 
 ## Evidence scope
 

@@ -30,12 +30,6 @@ Output retains 128 events of ≤65,600 estimated bytes, 2048 time-range fragment
 
 SpeechDetector shares analyzer/input/converter with reportResults=false. Normal activity events are not exposed as VoiceActivityCapability; external VAD remains the endpoint source. Recognition uses SpeechAnalyzer; active failures propagate without switching provider.
 
-Managed native recognition, bounded input backpressure and joined finalization are implemented.
-
 ## Related design
 
 [Parent design](../README.md)
-
-## 待实现
-
-- Physical-device locale, cancellation and ASR/TTS coexistence acceptance remains outstanding. [Voice acceptance](../../../../../docs/validation/Voice.md) defines host-level trials.

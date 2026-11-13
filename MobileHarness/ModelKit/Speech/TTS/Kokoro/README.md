@@ -15,7 +15,7 @@ The adapter owns request admission/format and a ModelResource lease. The directo
 The diagram shows runtime calls and data flow, not compilation dependencies.
 
 ```mermaid
-flowchart LR
+flowchart TB
  Caller --> Input[KokoroInput segments]
  Input --> Worker[KokoroSpeechSynthesis worker and lease]
  Worker --> Model[KokoroModel and KokoroG2P]
@@ -36,8 +36,6 @@ One detached worker holds a model lease, emits 4096-sample PCM frames and retain
 
 Core InferenceTaskControl handles installation/cancellation races and releases the worker reference on finish. A cancelled predecessor is joined before reuse; active native graph/classifier calls may delay release. Completed handles clear retained task. It does not implement token-level waveform streaming or parallel inference.
 
-Optional local bilingual synthesis and bounded backpressure are implemented.
-
 ## Related design
 
 [Parent design](../README.md)
@@ -47,7 +45,3 @@ Optional local bilingual synthesis and bounded backpressure are implemented.
 LocalMandarinFrontend bridges published six-input g2pW and already-numbered tone labels, preserving phrase dictionary priority. At most 510 normalized characters/phoneme scalars; ambiguous single characters classify sequentially after dictionary matching. Kokoro stages retain the SDK's 2000 acoustic-frame bound. Contextual inference errors propagate.
 
 Cancellation checks between graph/classifier calls; synchronous Core ML work finishes before lease release. Backend methods never download or supply fallback audio.
-
-## 待实现
-
-- Production registration is outside this directory's current scope. Isolated real-model evidence and remaining experiments belong in [Kokoro validation](../../../../../docs/validation/Kokoro-Validation.md).

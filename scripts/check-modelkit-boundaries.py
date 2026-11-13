@@ -35,11 +35,24 @@ def imported_modules(content):
 
 
 errors = []
+source_root = ROOT / 'MobileHarness'
+for module in ('Actions', 'Agents', 'App', 'Gateway', 'ModelKit', 'PlatformKit', 'Storage', 'UI'):
+    module_root = source_root / module
+    for folder, directories, files in os.walk(module_root):
+        directories[:] = [name for name in directories if not name.startswith('.')]
+        path = Path(folder)
+        if 'README.md' in files:
+            continue
+        parent_readme = path.parent / 'README.md'
+        if path != module_root and not directories and parent_readme.is_file():
+            directory_link = rf'\]\((?:\./)?{re.escape(path.name)}/\)'
+            if re.search(directory_link, parent_readme.read_text()):
+                continue
+        errors.append(f'Missing directory documentation: {path.relative_to(ROOT)}')
+
 for folder, directories, files in os.walk(KIT):
     directories[:] = [d for d in directories if not d.startswith('.')]
     path = Path(folder)
-    if 'README.md' not in files:
-        errors.append(f'Missing directory README: {path.relative_to(ROOT)}')
     for name in files:
         if not name.endswith('.swift'):
             continue
@@ -376,9 +389,6 @@ for parent in ['Agents', 'Actions']:
             errors.append(f'Concrete backend or root container leaked to consumer: {source.relative_to(ROOT)}')
         if re.search(r'\b(?:DiskFileStore|FileDocumentStore)\s*(?:<[^>]+>)?\(', text):
             errors.append(f'Consumer constructs file backend: {source.relative_to(ROOT)}')
-for path, directories, files in os.walk(ROOT / 'MobileHarness/Storage'):
-    if 'README.md' not in files:
-        errors.append(f'Missing Storage directory README: {Path(path).relative_to(ROOT)}')
 for source in (ROOT / 'MobileHarness/Storage').rglob('*.swift'):
     text = source.read_text()
     if re.search(r'\b(?:LocalizedError|errorDescription|synthesisTimedOut)\b', text):
@@ -440,10 +450,6 @@ for source in (ROOT / 'MobileHarness/UI').rglob('*.swift'):
             errors.append(f'Forbidden UI import {imported}: {source.relative_to(ROOT)}')
     if re.search(r'\b(?:VoiceSessionCoordinator|CameraCoordinator|ApplicationRuntime|AppContainer|AppAssembly|AssistantHistoryStore|FileDocumentStore|MemoryLeaseStore)\b', content):
         errors.append(f'UI uses a runtime/service implementation: {source.relative_to(ROOT)}')
-for folder in ('App', 'UI'):
-    for path, directories, files in os.walk(ROOT / 'MobileHarness' / folder):
-        if 'README.md' not in files:
-            errors.append(f'Missing directory README: {Path(path).relative_to(ROOT)}')
 for source in (ROOT / 'MobileHarness/App').rglob('*.swift'):
     if 'ApplicationRuntime.shared(' in source.read_text():
         errors.append(f'Hidden application runtime lookup: {source.relative_to(ROOT)}')
@@ -560,9 +566,6 @@ expected_domains = {'UI', 'Speech', 'Camera', 'History', 'System', 'NexArm', 'We
 domains = {p.name for p in actions_root.iterdir() if p.is_dir()} - {'Support'}
 if domains != expected_domains:
     errors.append(f'Executable business domains must be classified explicitly: {domains}')
-for folder, directories, files in os.walk(actions_root):
-    if 'README.md' not in files:
-        errors.append(f'Missing Action directory README: {Path(folder).relative_to(ROOT)}')
 # Layout follows capability ownership, independently of call protocol or directory depth.
 for name in sorted(expected_domains):
     domain = actions_root / name
@@ -1213,7 +1216,7 @@ for source in (ROOT / 'MobileHarness').rglob('*'):
         errors.append(f'Retired Memory role alias: {source.relative_to(ROOT)}')
 if errors:
     raise SystemExit('\n'.join(errors))
-print('ModelKit boundaries: source imports, target dependencies, test location and directory READMEs passed.')
+print('ModelKit boundaries: source imports, target dependencies, test location and directory documentation passed.')
 # Runtime model catalog is the only model payload staged into either App variant.
 model_catalog = ROOT / 'MobileHarness/Resources/Models/model-catalog.json'
 if not model_catalog.is_file():

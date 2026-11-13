@@ -12,8 +12,12 @@ CoreAI wraps stateless named graph functions and tensors. CoreML wraps named flo
 
 Generic execution is separated from model-specific implementations.
 
-[CoreAI](CoreAI/README.md) · [CoreML](CoreML/README.md) · [Parent design](../README.md)
+[CoreAI](CoreAI/README.md) · [CoreML](#coreml) · [Parent design](../README.md)
 
-## 待实现
+<a id="coreml"></a>
 
-- Universal engine interchange and cross-model scheduling are unimplemented.
+## Core ML tensor graphs
+
+[`CoreML/`](CoreML/)
+
+[CoreMLGraph.swift](CoreML/CoreMLGraph.swift) owns actor-isolated loading and synchronous prediction for `ModelKitCoreML`. It validates input names, shape, count and finite values, copies multi-array outputs with their native shape and caps each output at 1,048,576 elements. Native Float16 values cross the Swift interface as Float. Providers choose function and compute units explicitly. Silero uses CPU-only and owns its recurrent state. Cancellation is checked around the native prediction, which the provider joins before releasing the lease.

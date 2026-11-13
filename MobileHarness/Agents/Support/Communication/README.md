@@ -18,7 +18,8 @@ flowchart LR
     Role["角色生产／接收"] --> Values["PerceptionMessage／语音／姿态／声源值"]
     Values --> Message["AgentCore.AgentMessage"]
     Catalog["根级 AgentContracts.communication"] -->|"注册类型与内容验证"| Message
-    Message --> Gateway["Gateway：认证与递送"]
+    Message --> Auth["Agents 适配器：认证来源与语义授权"]
+    Auth --> Gateway["Gateway：校验端点并递送"]
     Gateway --> Role
     Task["AgentTaskSignal"] --> Admission["AgentFixedTaskInput：准入"]
     Admission --> Decoder["执行角色注入的 decode"]
@@ -45,16 +46,15 @@ AgentFixedTaskInput.unwrap 只接受 request／input，核对 requester 为 Assi
 
 Native CameraFrame/PCM and typed UI/container observations reach their owning roles directly. This directory owns derived semantic messages and role-originated coordination, not a universal external-media Signal format. Perception and cognition use the same Agent communication boundary; neither denotes a new module or container. Execution requests are separate from role messages and share Gateway only for their respective transport/scheduling facilities. The cross-module view is maintained in the [overall input and Signal design](../../../README.md#native-input-and-internal-signals).
 
+Assistant 通过 `task.send(agent_id,text)` 发送 `agent.task.request`，载荷为 AgentTaskRequest。新目标、补充、答复和停止请求共用该正文契约。Writer 校验已持久化的消息后接收入队；决定开启新任务时，以原消息 ID 作为委托 ID 申请执行授权。Writer 统一发送 `agent.task.response`，包含接纳、进度、追问、答复接纳、消息拒绝及任务终态。
 
-Assistant 通过 task.send(agent_id,text) 发送 AgentTaskRequest。Writer 从自己的收件队列接纳正文，确认新任务时为认证原消息申请内部执行授权。Writer 统一发送 agent.task.response，包含接纳、进度、追问、答复接纳、消息拒绝及任务终态。
-
-WriterDelegationEvent 携带可选 workspace_N 和独立 delegateID，接收端认证 scope 并校验事件顺序。每次续作创建新 scope，不重新打开已终止的通信任务。历史请求保存稳定身份，实时传输/去重使用执行身份。
+WriterDelegationEvent 携带可选 workspace_N 和独立 delegateID，接收端认证 scope 并校验事件顺序。当前委托的补充和追问答复沿用原 scope；任务终态后再次委托，即使复用同一个工作区，也使用新消息 ID 建立新 scope。历史请求保存稳定身份，实时传输/去重使用执行身份。
 
 WriterDelegationEvent.failure 是可选 WriterFailureDiagnostic：分类、错误码、阶段、摘要、诊断字段和关联原因均为业务事实。通信值不依赖 Storage；Writer 拥有到持久化 DTO 的转换。失败消息通过认证、去重后更新 Assistant 任务视图；Writer 灵动岛展示任务摘要。
 
-AgentTaskResponse 携带 Writer 的原消息拒绝或已接纳任务的事实。Writer 进度验证活跃执行授权，终态持久投递与授权退休独立。Assistant 核对持久拒绝或终态的原消息、事件身份和正文。固定任务共用 agent.task.response，信封仍用 progress/result 区分进度与终态。Gateway 验证任务执行授权，固定任务终态在送达前收尾并回收执行授权。固定任务的 request、input、cancel 控制契约独立。
+AgentTaskResponse 携带 Writer 的原消息拒绝或已接纳任务的事实。Writer 的进度回报需要活跃执行授权。终态持久投递与授权回收由独立的 worker 处理。Assistant 核对持久拒绝或终态的原消息、事件身份和正文。固定任务共用 `agent.task.response`，以 AgentTaskSignal 的 progress/result 区分进度与终态。Agents 的输出适配器验证执行授权，在终态投递前协调 Gateway 完成在途工作，成功递送后回收授权。固定任务使用独立的 `task.request`、`task.input` 和 `task.cancel` 控制契约。
 
-普通运行步骤及请求编号由 Writer 自有展示和请求历史保留。跨角色消息承载接纳、首次草稿保存、首次恢复或渲染异常、追问和终态。Assistant 在控制路径验证并更新关联视图，从原对话向后续真实请求提供短事件事实，并通过现有合成播放播报。
+普通运行步骤及请求编号由 Writer 自有展示和请求历史保留。跨角色消息承载接纳、首次草稿保存、首次恢复或渲染异常、追问和终态。Assistant 先验证并更新关联视图。全双工模式下，符合条件且属于当前来源对话的回报直接进入语义队列，由后续模型请求选择如何汇报；同步模式使用通知播报。
 
 The sender creates a message UUID. The receiver uses it as the execution identity when admitting new work. Replies may carry a captured task and question address. Writer validates the address against its current assignment.
 

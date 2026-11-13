@@ -58,7 +58,7 @@ flowchart LR
  W["Writer"]:::agent
  end
  SP -->|"user.input.asr.final · user.input"| G
- G -->|"task.request／input／cancel"| W
+ G -->|"agent.task.request"| W
  W -->|"agent.task.response"| G
 
  classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
@@ -73,24 +73,25 @@ flowchart LR
 
 角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。角色、Skill 与 Task 授权归 Agents；Actions 来源的协作接口由 App 以中立窄端口绑定，Agents 不导入 Actions、CallRuntime 或 ExecutionRuntime。
 
-Assistant 的跨角色任务命令定向送达 Writer，Writer 回报进度和完成结果。运行时送达工具、动作、轮次和通信回执，并通过 agent.task.response 投递固定任务执行方终止反馈。语音入口订阅 SpeechPerception 在 user.input 主题发布的 user.input.asr.final。识别片段另有契约，按精确订阅分发。
+Assistant 向 Writer 定向发送 `agent.task.request`，Writer 通过 `agent.task.response` 回报任务进度、终态或消息拒绝。固定任务另用 `task.request`、`task.input` 和 `task.cancel` 控制，进度和终态共用 `agent.task.response`。运行时另行送达工具、动作、轮次和通信回执。语音入口订阅 SpeechPerception 在 user.input 主题发布的 user.input.asr.final。识别片段另有契约，按精确订阅分发。
 
 ## 内部结构与执行链
 
 ```mermaid
-flowchart LR
- subgraph Injected["注入基础能力"]
- U["UI.home.requests"]:::ui
+flowchart TB
+ subgraph Injected["输入与能力"]
+ direction LR
+ U["UI 文本／最终 ASR"]:::ui
  M["ModelKit.language.ChatCapability"]:::model
  S["Storage · Chat / Task repositories"]:::storage
  RD["AgentStateContext：Camera / Web 当前图像"]:::action
  end
  subgraph Owned["Assistant"]
- I["类型化文本／最终识别 → Decision"]:::agent
- C["Context Builder／当前公开事实"]:::agent
+ I["人类输入 · Decision"]:::agent
+ C["上下文与公开事实"]:::agent
  K["基础＋动态 Skill／依赖展开"]:::agent
- D["冻结有效目录 → Chat/ReACT"]:::agent
- O["解析调用／轮次屏障／真实观察"]:::agent
+ D["固定目录 · Chat / ReACT"]:::agent
+ O["调用解析与原轮结算"]:::agent
  end
  U --> I --> C --> D --> O
  S <--> C
@@ -99,9 +100,9 @@ flowchart LR
  RD -->|"Skill 选择的多模态 State"| C
  O --> G["Gateway：端点／租约／取消"]:::gateway
  G --> X["当前 Skill 绑定的可扩展 Actions"]:::action
- G --> PR["UI.Caption.beginReplyTurn<br/>UI.Caption.print<br/>UI.Expression.setReplyWaiting<br/>Speech.Playback.speak"]:::action
+ G --> PR["字幕、等待态与播放调用"]:::action
  PR --> F
- X --> F["UI 动画／字幕；Platform 设备；Model 资源；Storage 业务记录"]:::host
+ X --> F["注入的基础能力"]:::host
  G -->|"真实结果重新选择上下文"| C
  classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
  classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
@@ -193,10 +194,10 @@ Assistant 拥有用户意图、委托请求和面向用户的沟通；执行 Age
 
 | 阶段 | Assistant 与运行时契约 |
 | --- | --- |
-| 发送 | `task.send(agent_id,text)` 走 Control Channel 的 XML Action。运行时鉴权、持久化并递送正文，回执确认消息送达。 |
+| 发送 | `task.send(agent_id,text)` 走 Control Channel 的 XML Action。运行时鉴权、持久化正文与来源对话，并以 `agent.task.request` 递送。回执确认消息进入目标收件队列。 |
 | 接纳 | 执行者解释正文，决定是否开启、更新或停止自己的任务，并发回事实。Assistant 前台控制独立提交。 |
 | 观察 | `agent.task.response` 按原消息投影 Writer 拒绝，按任务更新接纳、进度、追问及终态。固定任务使用同一契约，按信封中的 progress 或 result 更新视图。 |
-| 补充与停止 | 同一 `task.send` 转述答复或停止要求。运行时附带已捕获的追问地址，接收方验证并处理。 |
+| 补充与停止 | 同一 `task.send` 转述补充、答复或停止要求。答复可附带运行时已捕获的委托和追问 ID。定向 UI 答复经 Assistant 校验后也走 `agent.task.request`，由 Writer 核对当前委托及追问。 |
 | 失败 | 配置、权限、接纳、持久化和递送失败显式返回；回执成功不等于业务完成，回报事实不授予重试、重新委托或改变前台 Task 的权限。 |
 
 通信输出由 [Support 独立消费者](../Support/README.md#lifetime-bounds-and-failures) 持续递送，不受等待该 Task Action 的模型轮次屏障阻塞。角色根拥有消费者及其取消/加入；通信队列与输出队列各自有界，溢出明确失败。消息值与固定任务准入见 [Communication](../Support/Communication/README.md)，执行参数见 [Task Actions](../../Actions/System/Task/README.md)。
@@ -223,9 +224,9 @@ Assistant 按每轮冻结的 Action 目录解析模型流，保留调用所属 C
 
 会话的 [AssistantGenerationTransport](AssistantGenerationTransport.swift) 通过单一输出读取器按顺序接纳 Action 和 `wait` 边界。原生 Tool 使用四个独立执行槽，最多保留 128 条工具工作记录。各轮封口独立等待本轮原生 Tool，封口任务最多 32 个。容量耗尽时明确拒绝，封口失败通过独立通知唤醒输出泵并加入取消清理。
 
-Assistant 以原会话、输入、轮次和调用身份提交输出。Gateway 适配层为 Assistant 附加会话级顺序域，同一 Channel 保持 FIFO。各 Channel 在资源许可和 `wait` 约束下并行。模型生成结束后保留原轮目录和身份，并缓冲新用户输入与执行结果。所有 Channel 和本轮原生 Tool 结算后才提交下一批模型请求。调度算法见 [Gateway Channel 调度](../../Gateway/Output/Scheduling/README.md)，批次与容量见 [Chat 全双工调度](../Support/Chat/README.md#assistant-全双工调度)。
+Assistant 以原会话、输入、轮次和调用身份提交输出。Gateway 适配层为 Assistant 附加会话级顺序域，同一 Channel 保持 FIFO。各 Channel 在资源许可和 `wait` 约束下并行。模型流结束后封口，保留原轮目录和身份，并继续接收用户输入与执行结果。Assistant 等待所有 Channel、原生 Tool 和结果递送结束，结算原轮记录。结算开始时已在接纳或分类中的同会话输入完成处理后，冻结该会话当时全部已就绪输入。之后到达的输入就绪时仍可同批，但不会延长这组等待。调度算法见 [Gateway Channel 调度](../../Gateway/Output/Scheduling/README.md)，批次与容量见 [Chat 全双工调度](../Support/Chat/README.md#assistant-全双工调度)。
 
-普通 Action 的业务值或真实异常到达后可逐条进入下一批输入，原轮继续结算执行记录。成功 Void 和纯取消只结算原调用。原生 Tool 结果在组内配对齐备后进入下一批。确认打断时，Assistant 保留已接纳的新输入和未提交终态的前台任务，取消当前生成和本会话此前未结束的输出，加入实际清理后再开放新执行。独立后台 Agent 持续运行。跨模块流向见 [总体技术设计](../../README.md#assistant-full-duplex-interaction)。
+模型生成的普通 Action 业务值或真实异常逐条入队，原轮继续结算执行记录。成功 Void 和纯取消只结算原调用。原生 Tool 结果在组内配对齐备后入队，保留原生调用及结果消息。同一回复代次的打断先保留新输入和既有待处理项，再取消当前生成和本会话未结束的输出，等待实际清理后才发起下一请求。未提交终态的前台任务和独立后台 Agent 继续保持各自状态。跨模块流向见 [总体技术设计](../../README.md#assistant-full-duplex-interaction)。
 
 ## Image context ownership
 
@@ -300,9 +301,9 @@ prepare 校验非空、至多 2000 UTF-8 字节的文本，生成唯一 audioID�
 
 ## 多源全双工输入与 Decision
 
-根装配启用 fullDuplex。AssistantInputDecision 仅分类已认证的 SpeechPerception final 与本地用户 input。英文规则和标签分别标记本会话播报、生成／执行和待答问题，历史最多保留最近一条已送模型的用户输入及对应回复，每条历史和关联追问最多保留末尾 80 字符。历史、关联追问和最新输入保留原语言并分别引用，最新输入保持完整。D3 依实验顺序读取 interrupt、discard、enqueue 的候选描述。每次分类读取一份已提交的 Decision 配置，包含本地模式与独立选择的云端模型工厂。云端采用相同规则，强制一次 classify_input 并校验唯一合法动作；本地选择 D3 时，缺失、加载、失败或超过512 token 使用同份配置的云端备用。云端未配置或失败时保守 enqueue。单个分类消费者，本地/云端各一个在途；热本地250ms、总2秒，迟到结果不修改已提交决定，后台清理有界并由根加入。Chat worker 从开始准备单条分类的上下文计时，分类器返回最终决定时结束。Decision 日志耗时包括本地与云端回退过程，排除分类排队、后续入队、打断清理和反馈。分类器在各模型调用边界采集实际请求，结果携带已采集的本地和云端上下文及本地回退原因。本地推理超时或单次请求失败仅影响当次分类，旧请求收尾后可接纳下一次请求。准备失败由资源更新重置。
+根装配启用 fullDuplex。AssistantInputDecision 仅分类已认证的 SpeechPerception final 与本地用户 input。英文规则和标签分别标记本会话播报、生成／执行和待答问题，历史最多保留最近一条已送模型的用户输入及对应回复，每条历史和关联追问最多保留末尾 80 字符。历史、关联追问和最新输入保留原语言并分别引用，最新输入保持完整。D3 依实验顺序读取 interrupt、discard、enqueue 的候选描述。每次分类读取一份已提交的 Decision 配置，包含本地模式与独立选择的云端模型工厂。云端采用相同规则，强制一次 classify_input 并校验唯一合法动作；本地选择 D3 时，缺失、加载、失败或超过512 token 使用同份配置的云端备用。云端未配置或失败时保守 enqueue。单个分类消费者，本地与云端各最多一个在途。热本地调用预算 250 ms，从输入进入分类队列起总预算 2 秒。迟到结果不修改已提交决定，后台清理由根加入。Chat worker 从开始准备单条分类的上下文计时，分类器返回最终决定时结束。Decision 日志耗时包括本地与云端回退过程，排除分类排队、后续入队、打断清理和反馈。分类器在各模型调用边界采集实际请求，结果携带已采集的本地和云端上下文及本地回退原因。本地推理超时或单次请求失败仅影响当次分类，旧请求收尾后可接纳下一次请求。准备失败由资源更新重置。
 
-`enqueue` 累积待处理输入。主模型可接纳时冻结会话全部 Q，成员保留原文、来源、时间和交互身份。`discard` 结束候选并触发短暂的灵动岛提示。采纳分类结果时，整句仅有已知噪声标记或无正文的标点／替换字符的非待答语音直接采用 `discard`。没有问题上下文的独立语气词可以采纳模型的 `discard`。手工输入、已绑定追问及可能有用的语音文本遇到模型 `discard` 时改为 `enqueue`，日志保存模型原始建议与采用原因。已验证的 Agent 消息直接入队。`interrupt` 先保留新输入，分类时没有活动回复或结果返回时回复已换代则只入队；同代打断进入[跨轮清理](#多-channel-输出与跨轮结算)。
+`enqueue` 累积待处理输入。冻结批次时保留同会话已就绪项的原文、来源、时间和交互身份。`discard` 结束候选并触发短暂的灵动岛提示。采纳分类结果时，整句仅有已知噪声标记或无正文的标点／替换字符的非待答语音直接采用 `discard`。没有问题上下文的独立语气词可以采纳模型的 `discard`。手工输入、已绑定追问及可能有用的语音文本遇到模型 `discard` 时改为 `enqueue`，日志保存模型原始建议与采用原因。已验证的 Agent 消息直接入队。`interrupt` 先保留新输入，分类时没有活动回复或结果返回时回复已换代则只入队；同代打断进入[跨轮清理](#多-channel-输出与跨轮结算)。
 
 主模型同时只运行一个请求。先前轮次的 Action 和原生 Tool 结果按 [跨轮结算](#多-channel-输出与跨轮结算) 进入后续输入批次。
 

@@ -83,8 +83,7 @@ RuntimeFailureEvent／ContainerFailureEvent 保存中立有界诊断与关联；
 
 ## 子目录
 
-[Capability](Capability/README.md) 管声明与权限；[Communication](Communication/README.md) 管通用消息和任务；[Generation](Generation/README.md) 管解析与模板；[Input](Input/README.md) 管媒体值；[Output](Output/README.md) 管调用／证据；[Runtime](Runtime/README.md) 管实例、Context 与协调。
-
+[Capability](Capability/README.md) 管声明与权限；[Communication](Communication/README.md) 管通用消息和任务；[Generation](Generation/README.md) 管解析与模板；[Input](#local-media-values) 管媒体值；[Output](Output/README.md) 管调用／证据；[Runtime](Runtime/README.md) 管实例、Context 与协调。
 
 ## Container 上下文
 
@@ -97,3 +96,13 @@ ContainerContextSource is the single type-erased snapshot reader. Its generic in
 ContainerContext exposes the shared multimodal snapshot/image contracts through AgentCore aliases. These request-time values do not put image bytes into the private AgentContext journal.
 
 AgentCategory 是 perception/cognition 两值的 Codable 枚举；AgentDescriptor.category 必填且不可变，没有默认值。Core 只定义分类值，生产角色归类由各角色资源拥有，见 [Agents 分类](../../README.md#agent-categories)。
+
+<a id="local-media-values"></a>
+
+## 局部媒体输入值
+
+[`Input/`](Input/)
+
+[AudioInput.swift](Input/AudioInput.swift) 持有不可变交错 Float PCM。验证样本非空、有限、声道帧完整，最多 16,000 个样本，采样率 8–192 kHz。布局为单声道或一阶 Ambisonics ACN/SN3D，并保留序号和捕获时间。
+
+[ImageInput.swift](Input/ImageInput.swift) 持有不透明 Sendable 帧、宽高、顺时针四分之一转、序号和时间。每边 1–4096 像素，总数最多 4,194,304，旋转为 0–3，媒体时间必须有限且非负。两种值都由感知角色在本地构造，保留原始值或附件及明确验证错误。捕获代次、连续性与过期归消费方，获授权的呈现调用可以保留同一帧附件。

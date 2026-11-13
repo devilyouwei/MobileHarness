@@ -24,7 +24,7 @@ This makes equivalent discovery operations follow different admission, correlati
 
 MossValidationView invokes [SpeechDiagnosticWorkflow](../../MobileHarness/Actions/System/Diagnostics/SpeechDiagnosticWorkflow.swift) directly. It loads a model, synthesizes audio and plays through the native audio capability without Agent/Gateway execution. The DEBUG chat validation similarly invokes ChatDiagnosticWorkflow through a validation closure. Neither operation is presentation-only. Audio detection, by contrast, already uses typed requests consumed by ApplicationControl and the Speech.Detection.run endpoint.
 
-The diagnostic bypass is explicitly documented in the existing [diagnostics design](../../MobileHarness/Actions/System/Diagnostics/README.md); it is not a newly discovered regression. It conflicts with applying the established routing rule universally. Either migrate diagnostic business requests to the standard path or explicitly scope and document a diagnostic execution exception; do not classify them as direct UI response.
+The diagnostic bypass is explicitly documented in the existing [diagnostics design](../../MobileHarness/Actions/System/README.md#diagnostics); it is not a newly discovered regression. It conflicts with applying the established routing rule universally. Either migrate diagnostic business requests to the standard path or explicitly scope and document a diagnostic execution exception; do not classify them as direct UI response.
 
 ### 3. Touch transaction completion is not consistent across roles
 

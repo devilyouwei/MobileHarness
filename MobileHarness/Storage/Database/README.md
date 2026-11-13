@@ -4,7 +4,7 @@ DatabaseStorage 拥有数据库生命周期及 AssistantConversations、Assistan
 
 ## 表与目录
 
-Database 采用三层职责：根目录是数据库核心与整体装配；[Shared](Shared/README.md) 是不含 Agent 业务的编码、ID 和分页机制；业务表按持久化责任归属到对应目录，集中保存定义、映射、仓库操作和专属规则；WriterMessages 同时拥有请求表与执行表。共十一张业务表，版本迁移集中在 SQLiteSchema，无兼容视图。
+Database 采用三层职责：根目录是数据库核心与整体装配；[Shared](#shared-mechanisms) 是不含 Agent 业务的编码、ID 和分页机制；业务表按持久化责任归属到对应目录，集中保存定义、映射、仓库操作和专属规则；WriterMessages 同时拥有请求表与执行表。共十一张业务表，版本迁移集中在 SQLiteSchema，无兼容视图。
 
 ## 数据库核心
 
@@ -24,11 +24,11 @@ AssistantRecordStore 注入本侧会话、消息、任务摘要和日志端口�
 | [WriterWorkspaces](WriterWorkspaces/README.md) / writer_workspaces | Workspace 元数据、文件状态与历史身份 |
 | [WriterMessages](WriterMessages/README.md) / writer_messages | 已发起的 Writer 模型请求、前序及 workspace 消息 |
 | [WriterMessages](WriterMessages/README.md) / writer_executions | 委托入口、执行状态、交互及最终业务结果 |
-| [WorkspaceFiles](WorkspaceFiles/README.md) / workspace_files | 当前文件索引，正文由 Files 保存 |
+| [WorkspaceFiles](#workspace-files) / workspace_files | 当前文件索引，正文由 Files 保存 |
 | [AgentMessages](AgentMessages/README.md) / agent_messages | Agent 消息正文、回复关联、接收与消费、投递重试 |
 | [ModelRequestLog](ModelRequestLog/README.md) / model_request_log | 可删除 HTTP 请求/响应、图片、参数和 generation meta |
 | [MediaFiles](MediaFiles/README.md) / media_files | 独立相册媒体及清理状态 |
-| [Devices](Devices/README.md) / devices | 原生设备身份、选择与重连 |
+| [Devices](#devices) / devices | 原生设备身份、选择与重连 |
 
 ## Assistant 链路
 
@@ -233,8 +233,32 @@ received 表示投递，consumed 表示接收方已持久化安排处理，均�
 
 Package.swift 显式将同目录公共契约编入 StorageChat/Tasks/Media/Devices，文件协调编入 StorageDatabase，全部 GRDB 实现仅编入 StorageSQLite；检查脚本验证每份源码只有一个编译拥有者。各表借用同一事务，不自行提交嵌套业务事务。
 
-旧 schema 版本全量清除后初始化新十表；当前版本正常重开不清除；高于当前程序的版本拒绝打开。真机全新安装清除旧 SQL 和旧文件。启动完成 schema 与中断状态恢复后才发布仓库，关闭先停止准入并加入在途操作。重启将未完成生成/业务标记中断，不恢复执行权限、不自动重放文件或设备效果。
+当前 schema 20261113 直接打开，高于当前程序的版本拒绝打开。启动在 schema 准备和中断状态恢复后发布仓库。关闭先停止准入，再加入在途操作。重启将未完成的生成和业务标记为中断，历史记录保留已提交事实。
 
 历史窗口重建保留在途输入的完整运行时状态；最后一条模型轮完成不代表整个输入已结束，等待 ReACT 的输入不能被另一个消息的完成刷新改写为 completed。
 
-Schema 20261113 在事务中统一 Agent 消息的契约名，保留消息 ID、关联、正文、投递状态与 Writer 执行记录。20261110/20261111 数据先执行请求边界迁移：Writer 委托移至 writer_executions，保留执行及请求主键、业务结果、工作区与日志；删除无 invocation 的旧原始输入，检查全部外键后提交。具有 invocation 但日志已清理的请求仍保留。更早格式的已批准清格式转换独立处理；不对现有版本执行整库 erase。待发 Signal/请求只在内存，coordination 随真实请求输入保存。
+[SQLiteSchema.swift](SQLiteSchema.swift) 对 20261112 事务性更新 `agent_messages.contract`。Assistant → Writer 的委托使用 `agent.task.request`，Writer → Assistant 的报告与固定任务进度／终态统一使用 `agent.task.response`。消息 ID、关联、正文与投递状态保留。20261110 和 20261111 先迁移请求表，拆出 `writer_executions`，清理无 invocation 的旧输入及其日志和失效因果引用，提交前检查外键。实际请求及独立委托证据保留，日志此前已清理的请求也保留。更早格式走清格式初始化，重建十一张表并清理显式传入的 Writer 文件根。
+
+<a id="devices"></a>
+
+## 设备记录
+
+[`Devices/`](Devices/)
+
+[DeviceRepository.swift](Devices/DeviceRepository.swift) 提供 SQL-free 设备端口。[DeviceRow.swift](Devices/DeviceRow.swift) 定义 schema 和映射，[SQLiteDeviceRepository.swift](Devices/SQLiteDeviceRepository.swift) 保存身份、名称、选择及重连偏好。切换选择在同一事务清除旧选择并更新目标，缺少目标时回滚。设备发现和连接由调用方执行。
+
+<a id="shared-mechanisms"></a>
+
+## 共享数据库机制
+
+[`Shared/`](Shared/)
+
+[SQLiteRecordCoding.swift](Shared/SQLiteRecordCoding.swift) 提供 JSON 编解码、消息编号和地址解析。[SQLiteRecordKey.swift](Shared/SQLiteRecordKey.swift) 提供稳定 ID/trace 编码。[HistoryPaging.swift](Shared/HistoryPaging.swift) 定义有界分页。编号耗尽、非法地址和编码错误显式失败。辅助机制借用调用方事务，业务查询、记录和提交仍由表仓库拥有。
+
+<a id="workspace-files"></a>
+
+## 工作区文件索引
+
+[`WorkspaceFiles/`](WorkspaceFiles/)
+
+[WorkspaceFileRow.swift](WorkspaceFiles/WorkspaceFileRow.swift) 使用 `(workspace_id, path)` 复合主键，随工作区级联删除。行只保存字节数、指纹和更新时间。读取返回有序索引；替换与工作区租约元数据在调用方事务中提交，重复路径等约束错误使整个更新回滚。文件操作见 [WriterWorkspaces](WriterWorkspaces/README.md)。

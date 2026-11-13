@@ -1313,7 +1313,7 @@ Scope: current working-tree Assistant model collection and App generation transp
 - ❌ Required scripts/build-ios.sh failed in the Simulator target: external coreai-models/CoreAIShared cannot resolve CoreAI for arm64/x86_64 Simulator. The successful device-target build is separate evidence.
 - ❌ Full scripts/check.sh did not pass. First full run:616 IntegrationTests, one issue in bluetoothLatestSliderSupersedesPresetWhileOldAimCleanupIsJoining (`disconnected`);59 AppWorkflowTests passed. After adding the open-parser regression, second full run:617 IntegrationTests, three issues across bluetoothSettingsOverridesAgentMotionAndAimWithSharedRecipe (`disconnected`) and bluetoothForegroundAfterExhaustionAlwaysStartsANewEligibleEpisode (recovery predicate plus timeout);59 AppWorkflowTests passed. All new protocol tests passed in both applicable runs. The two disconnected fixtures passed in the final focused run; bluetoothForegroundAfterExhaustionAlwaysStartsANewEligibleEpisode also passed in isolation (15.229s). These full-run failures are not a passing full suite and have not been attributed to a physical Bluetooth fault.
 
-Implementation and queue/failure contracts: [ADR0183](../adr/0183-generation-round-observations.md), [Assistant](../../MobileHarness/Agents/Support/Chat/README.md#直接关系与数据流), [App transport](../../MobileHarness/Actions/UI/Support/README.md). No new directory/module/dependency or generic Agent request/reply transport was added. Existing downstream ReAct continuation consumes the full merged round after both protocols settle.
+Implementation and queue/failure contracts: [ADR0183](../adr/0183-generation-round-observations.md), [Assistant](../../MobileHarness/Agents/Support/Chat/README.md#直接关系与数据流), [App transport](../../MobileHarness/Actions/UI/README.md#ui-shared-ports). No new directory/module/dependency or generic Agent request/reply transport was added. Existing downstream ReAct continuation consumes the full merged round after both protocols settle.
 
 ## 2026-10-08 — Camera lens-switch lifetime
 
@@ -1785,9 +1785,9 @@ Every row passed the shared structure, graph, link, navigation and current-desig
 | 8 | [MobileHarness/App/Workflows/Bluetooth/README.md](../../MobileHarness/Actions/NexArm/Support/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 9 | [MobileHarness/App/Workflows/Diagnostics/README.md](../../MobileHarness/UI/Diagnostics/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 10 | [MobileHarness/App/Workflows/History/README.md](../../MobileHarness/Agents/Memory/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
-| 11 | [MobileHarness/App/Workflows/Presentation/README.md](../../MobileHarness/Actions/UI/Support/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 11 | [MobileHarness/App/Workflows/Presentation/README.md](../../MobileHarness/Actions/UI/README.md#ui-shared-ports) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 12 | [MobileHarness/App/Workflows/Settings/README.md](../../MobileHarness/Agents/ApplicationControl/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
-| 13 | [MobileHarness/App/Workflows/Speech/README.md](../../MobileHarness/Actions/Speech/Support/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 13 | [MobileHarness/App/Workflows/Speech/README.md](../../MobileHarness/Actions/Speech/README.md#speech-shared-contracts) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 14 | [MobileHarness/Agents/README.md](../../MobileHarness/Agents/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
 | 15 | [MobileHarness/Agents/ApplicationControl/README.md](../../MobileHarness/Agents/ApplicationControl/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 16 | [MobileHarness/Agents/Assistant/README.md](../../MobileHarness/Agents/Assistant/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
@@ -1804,18 +1804,18 @@ Every row passed the shared structure, graph, link, navigation and current-desig
 | 27 | [MobileHarness/Agents/Support/Core/Capability/README.md](../../MobileHarness/Agents/Support/Core/Capability/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 28 | [MobileHarness/Agents/Support/Core/Communication/README.md](../../MobileHarness/Agents/Support/Core/Communication/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 29 | [MobileHarness/Agents/Support/Core/Generation/README.md](../../MobileHarness/Agents/Support/Core/Generation/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
-| 30 | [MobileHarness/Agents/Support/Core/Input/README.md](../../MobileHarness/Agents/Support/Core/Input/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 30 | [MobileHarness/Agents/Support/Core/Input/README.md](../../MobileHarness/Agents/Support/Core/README.md#local-media-values) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 31 | [MobileHarness/Agents/Support/Core/Output/README.md](../../MobileHarness/Agents/Support/Core/Output/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 32 | [MobileHarness/Agents/Support/Core/Runtime/README.md](../../MobileHarness/Agents/Support/Core/Runtime/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 33 | [MobileHarness/Gateway/README.md](../../MobileHarness/Gateway/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
 | 34 | [MobileHarness/Gateway/Input/README.md](../../MobileHarness/Gateway/Input/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 35 | [MobileHarness/Gateway/Output/README.md](../../MobileHarness/Gateway/Output/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
 | 36 | `MobileHarness/Gateway/Runtime/README.md` (retired; [current owner](../../MobileHarness/Actions/Support/README.md)) | 0 / 0 | 1 | ✅ Current technical design reconciled |
-| 37 | [MobileHarness/Gateway/Output/Dispatch/README.md](../../MobileHarness/Gateway/Output/Dispatch/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 37 | [MobileHarness/Gateway/Output/Dispatch/README.md](../../MobileHarness/Gateway/Output/README.md#dispatch) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 38 | `MobileHarness/Gateway/Output/Protocols/README.md` (retired; [current owner](../../MobileHarness/Actions/Support/Contracts/README.md)) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 39 | `MobileHarness/Gateway/Output/Registration/README.md` (retired; [current owner](../../MobileHarness/Actions/Support/README.md)) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 40 | [MobileHarness/Gateway/Output/Resources/README.md](../../MobileHarness/Gateway/Output/Resources/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
-| 41 | [MobileHarness/Gateway/Output/Results/README.md](../../MobileHarness/Gateway/Output/Results/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 41 | [MobileHarness/Gateway/Output/Results/README.md](../../MobileHarness/Gateway/Output/README.md#results) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 42 | `MobileHarness/Gateway/Output/Routing/README.md` (retired; [current owner](../../MobileHarness/Agents/Support/README.md)) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 43 | [MobileHarness/Gateway/Output/Scheduling/README.md](../../MobileHarness/Gateway/Output/Scheduling/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 44 | `MobileHarness/Gateway/Output/Validation/README.md` (retired; [current owner](../../MobileHarness/Agents/Support/README.md)) | 0 / 0 | 1 | ✅ Current technical design reconciled |
@@ -1830,9 +1830,9 @@ Every row passed the shared structure, graph, link, navigation and current-desig
 | 53 | [MobileHarness/Actions/Camera/Support/README.md](../../MobileHarness/Actions/Camera/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 54 | [MobileHarness/Actions/History/Support/README.md](../../MobileHarness/Actions/History/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 55 | [MobileHarness/Actions/NexArm/Support/README.md](../../MobileHarness/Actions/NexArm/Support/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
-| 56 | [MobileHarness/Actions/Speech/Support/README.md](../../MobileHarness/Actions/Speech/Support/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 56 | [MobileHarness/Actions/Speech/Support/README.md](../../MobileHarness/Actions/Speech/README.md#speech-shared-contracts) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 57 | [MobileHarness/Actions/System/Support/README.md](../../MobileHarness/Actions/System/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
-| 58 | [MobileHarness/Actions/UI/Support/README.md](../../MobileHarness/Actions/UI/Support/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 58 | [MobileHarness/Actions/UI/Support/README.md](../../MobileHarness/Actions/UI/README.md#ui-shared-ports) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 59 | [MobileHarness/ModelKit/README.md](../../MobileHarness/ModelKit/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
 | 60 | [MobileHarness/ModelKit/Backends/README.md](../../MobileHarness/ModelKit/Support/Backends/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
 | 61 | [MobileHarness/ModelKit/Core/README.md](../../MobileHarness/ModelKit/Support/Core/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
@@ -1842,7 +1842,7 @@ Every row passed the shared structure, graph, link, navigation and current-desig
 | 65 | [MobileHarness/ModelKit/Speech/README.md](../../MobileHarness/ModelKit/Speech/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
 | 66 | [MobileHarness/ModelKit/Vision/README.md](../../MobileHarness/ModelKit/Vision/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 67 | [MobileHarness/ModelKit/Backends/CoreAI/README.md](../../MobileHarness/ModelKit/Support/Backends/CoreAI/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
-| 68 | [MobileHarness/ModelKit/Backends/CoreML/README.md](../../MobileHarness/ModelKit/Support/Backends/CoreML/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 68 | [MobileHarness/ModelKit/Backends/CoreML/README.md](../../MobileHarness/ModelKit/Support/Backends/README.md#coreml) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 69 | [MobileHarness/ModelKit/Backends/FluidAudio/README.md](../../MobileHarness/ModelKit/Speech/ASR/Nemotron/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 70 | [MobileHarness/ModelKit/Backends/HuggingFace/README.md](../../MobileHarness/ModelKit/Support/Management/HuggingFace/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 71 | [MobileHarness/ModelKit/Backends/MossCoreML/README.md](../../MobileHarness/ModelKit/Speech/TTS/MossNano/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
@@ -1857,11 +1857,11 @@ Every row passed the shared structure, graph, link, navigation and current-desig
 | 80 | [MobileHarness/ModelKit/Language/LLM/OpenAI/README.md](../../MobileHarness/ModelKit/Language/LLM/OpenAI/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 81 | [MobileHarness/ModelKit/Speech/ASR/Apple/README.md](../../MobileHarness/ModelKit/Speech/ASR/Apple/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 82 | [MobileHarness/ModelKit/Speech/ASR/Nemotron/README.md](../../MobileHarness/ModelKit/Speech/ASR/Nemotron/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
-| 83 | [MobileHarness/ModelKit/Speech/Shared/Apple/README.md](../../MobileHarness/ModelKit/Support/Speech/Apple/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 83 | [MobileHarness/ModelKit/Speech/Shared/Apple/README.md](../../MobileHarness/ModelKit/Support/Speech/README.md#apple-pcm) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 84 | [MobileHarness/ModelKit/Speech/TTS/Apple/README.md](../../MobileHarness/ModelKit/Speech/TTS/Apple/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 85 | [MobileHarness/ModelKit/Speech/TTS/Kokoro/README.md](../../MobileHarness/ModelKit/Speech/TTS/Kokoro/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 86 | [MobileHarness/ModelKit/Speech/TTS/MossNano/README.md](../../MobileHarness/ModelKit/Speech/TTS/MossNano/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
-| 87 | [MobileHarness/ModelKit/Speech/VAD/Energy/README.md](../../MobileHarness/ModelKit/Speech/VAD/Energy/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 87 | [MobileHarness/ModelKit/Speech/VAD/Energy/README.md](../../MobileHarness/ModelKit/Speech/VAD/README.md#energy) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 88 | [MobileHarness/ModelKit/Speech/VAD/Silero/README.md](../../MobileHarness/ModelKit/Speech/VAD/Silero/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 89 | [MobileHarness/PlatformKit/README.md](../../MobileHarness/PlatformKit/README.md) | 0 / 0 | 2 | ✅ Current technical design reconciled |
 | 90 | [MobileHarness/PlatformKit/Audio/README.md](../../MobileHarness/PlatformKit/Audio/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
@@ -1882,7 +1882,7 @@ Every row passed the shared structure, graph, link, navigation and current-desig
 | 105 | [MobileHarness/Resources/AppIconVariants/README.md](../../MobileHarness/Resources/AppIconVariants/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 106 | [MobileHarness/Resources/Assets.xcassets/README.md](../../MobileHarness/Resources/Assets.xcassets/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 | 107 | [MobileHarness/Resources/Models/README.md](../../MobileHarness/Resources/Models/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
-| 108 | [MobileHarness/Resources/Assets.xcassets/AppIcon.appiconset/README.md](../../MobileHarness/Resources/Assets.xcassets/AppIcon.appiconset/README.md) | 0 / 0 | 1 | ✅ Current technical design reconciled |
+| 108 | [MobileHarness/Resources/Assets.xcassets/AppIcon.appiconset/README.md](../../MobileHarness/Resources/Assets.xcassets/README.md#app-icon) | 0 / 0 | 1 | ✅ Current technical design reconciled |
 
 ## 2026-10-10 — Expanded overall technical design
 
@@ -2039,7 +2039,7 @@ Documentation-only inspection of all 19 `MobileHarness/Agents/**/README.md` docu
 | [Core/Capability](../../MobileHarness/Agents/Support/Core/Capability/README.md) | v6 decoder, registry, documentation and builder; add context-construction flow, sorted catalog/render bounds and separate native definitions/internal grants. |
 | [Core/Communication](../../MobileHarness/Agents/Support/Core/Communication/README.md) | Policy, task scope/registry, delivery history and trace values; document opaque task data versus encoded envelope bounds and status/provenance checks. |
 | [Core/Generation](../../MobileHarness/Agents/Support/Core/Generation/README.md) | Incremental generator/parser, sentence/Channel/Tool consumers, trace and new template engine; distinguish native calls from XML events and document exact template schema, variables, limits and cached resources. |
-| [Core/Input](../../MobileHarness/Agents/Support/Core/Input/README.md) | AudioInput/ImageInput validation; add RGB/attachment dimensions, pixel cap, time and rotation constraints. |
+| [Core/Input](../../MobileHarness/Agents/Support/Core/README.md#local-media-values) | AudioInput/ImageInput validation; add RGB/attachment dimensions, pixel cap, time and rotation constraints. |
 | [Core/Output](../../MobileHarness/Agents/Support/Core/Output/README.md) | Calls, envelopes, mailbox, receipts/results and resource values; correct envelope versus executor identity binding, scheduling-ID precedence and shared mailbox overflow/terminal semantics. |
 | [Core/Runtime](../../MobileHarness/Agents/Support/Core/Runtime/README.md) | Manager/registry, context, inbox/gate, round coordinator and budget; clarify bounded priority/FIFO batches, owner-scoped replacement keys and expiry accounting. |
 
@@ -2352,17 +2352,17 @@ Documentation-only scope: inspected all 28 directory READMEs in MobileHarness/Mo
 | [Speech/TTS/Kokoro](../../MobileHarness/ModelKit/Speech/TTS/Kokoro/README.md) | Local bilingual frontends, backpressure and shared cancellation control | Reconciled |
 | [Speech/TTS/MossNano](../../MobileHarness/ModelKit/Speech/TTS/MossNano/README.md) | Complete owned graph pipeline, audio overflow versus terminal backpressure, lease release | Reconciled |
 | [Speech/TTS](../../MobileHarness/ModelKit/Speech/TTS/README.md) | Text-to-PCM completion separate from consumer playback | Reconciled |
-| [Speech/VAD/Energy](../../MobileHarness/ModelKit/Speech/VAD/Energy/README.md) | RMS/hysteresis bounds and acoustic limits | Reconciled |
+| [Speech/VAD/Energy](../../MobileHarness/ModelKit/Speech/VAD/README.md#energy) | RMS/hysteresis bounds and acoustic limits | Reconciled |
 | [Speech/VAD](../../MobileHarness/ModelKit/Speech/VAD/README.md) | Score-only contract and consumer interpretation | Reconciled |
 | [Speech/VAD/Silero](../../MobileHarness/ModelKit/Speech/VAD/Silero/README.md) | CoreML dependency, recurrent windows and joined cleanup | Reconciled |
 | [Support/Backends/CoreAI](../../MobileHarness/ModelKit/Support/Backends/CoreAI/README.md) | Async native execution, caller admission and platform constraints | Reconciled |
-| [Support/Backends/CoreML](../../MobileHarness/ModelKit/Support/Backends/CoreML/README.md) | Named tensor validation, synchronous prediction and output bounds | Already accurate; retained |
+| [Support/Backends/CoreML](../../MobileHarness/ModelKit/Support/Backends/README.md#coreml) | Named tensor validation, synchronous prediction and output bounds | Already accurate; retained |
 | [Support/Backends](../../MobileHarness/ModelKit/Support/Backends/README.md) | Generic execution, actor isolation and provider-owned admission | Reconciled |
 | [Support/Core](../../MobileHarness/ModelKit/Support/Core/README.md) | Opaque scope, independent states/limits, cancellation and matching lease release | Reconciled |
 | [Support/Management/HuggingFace](../../MobileHarness/ModelKit/Support/Management/HuggingFace/README.md) | Hub metadata, persisted plan, native file transfer and host-independent deadlines | Reconciled |
 | [Support/Management](../../MobileHarness/ModelKit/Support/Management/README.md) | Disjoint source lists, separate states, configurable versus fixed limits, lifecycle/artifacts | Reconciled |
 | [Support](../../MobileHarness/ModelKit/Support/README.md) | Four support responsibilities and runtime injection flow | Reconciled |
-| [Support/Speech/Apple](../../MobileHarness/ModelKit/Support/Speech/Apple/README.md) | Channel averaging, encode/decode copies and recognition-owned resampling | Reconciled |
+| [Support/Speech/Apple](../../MobileHarness/ModelKit/Support/Speech/README.md#apple-pcm) | Channel averaging, encode/decode copies and recognition-owned resampling | Reconciled |
 | [Support/Speech](../../MobileHarness/ModelKit/Support/Speech/README.md) | Speech-domain helper ownership and mono output constraints | Reconciled |
 | [Vision](../../MobileHarness/ModelKit/Vision/README.md) | Pose geometry/identity and consumer-owned motion policy | Reconciled |
 | [Vision/YOLO](../../MobileHarness/ModelKit/Vision/YOLO/README.md) | Owned image layout/graph/reader, native/RGB paths and decoder | Reconciled |

@@ -45,19 +45,14 @@ Single-checkout handles, bounded PCM, owner-scoped cleanup and error retention.
 
 Audio continues using common bounded memory/lease contracts; no SQLite, file backend or third-party package dependency is introduced.
 
-## 待实现
-
-- Durable PCM storage and multi-reader/mixed playback.
-
 ## Storage 容器关系
 
-✅ CacheContainer 按会话创建、复用和关闭 AudioCache。根接纳屏障同步拒绝新句柄与读取；AudioCache.shutdown 合并并加入同一取消任务。AudioFrame 持有 CacheBuffer，流交接不重建字节。
+CacheContainer 按会话创建、复用和关闭 AudioCache。根接纳屏障同步拒绝新句柄与读取；AudioCache.shutdown 合并并加入同一取消任务。AudioFrame 持有 CacheBuffer，流交接不重建字节。
 
 ## 统一容器异常通道
 
-✅ AudioCache 的公开有失败操作及 fail 保留原生流错误并报告，根传入相同报告器；CancellationError 不作为运行故障。原有句柄/内存/取消加入机制不变。
+AudioCache 的公开有失败操作及 fail 保留原生流错误并报告，根传入相同报告器；CancellationError 不作为运行故障。原有句柄/内存/取消加入机制不变。
 
+正常释放经 AudioStream.retire 失效旧流，不报告容器故障；真实 fail 继续报告。释放后的 lookup/next/append 仍明确失败，不以忽略所有 missing 来屏蔽真实访问异常。正常完成/取消/错误三种原因保持独立。
 
-✅ 正常释放经 AudioStream.retire 失效旧流，不报告容器故障；真实 fail 继续报告。释放后的 lookup/next/append 仍明确失败，不以忽略所有 missing 来屏蔽真实访问异常。正常完成/取消/错误三种原因保持独立。
-
-✅ 私有 checkAdmission 只翻译并抛出原生错误，register/begin/validate/checkout 各在公开操作边界报告该接纳失败，不重复报告内部检查；原错误、关闭、取消和清理契约保持。
+私有 checkAdmission 只翻译并抛出原生错误，register/begin/validate/checkout 各在公开操作边界报告该接纳失败，不重复报告内部检查；原错误、关闭、取消和清理契约保持。

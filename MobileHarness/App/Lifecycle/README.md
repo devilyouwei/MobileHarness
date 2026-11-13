@@ -30,13 +30,9 @@ Scene失活在running时只同步invalidate未声明continuesInBackground的服�
 
 [App](../README.md) · [装配](../Composition/README.md) · [测试](../../../Tests/AppWorkflowTests/README.md)
 
-## 待实现
-
-- 强制中断非合作服务、独立多窗口运行及进程被系统终止时的完成保证。
-
 ## ForegroundPreparation
 
-✅ 同文件的 Foundation 独立准备协调器接收 readiness 步骤、prepare、允许准备条件及状态／失败回调；具体业务接线归 [Composition](../Composition/README.md)。
+同文件的 Foundation 独立准备协调器接收 readiness 步骤、prepare、允许准备条件及状态／失败回调；具体业务接线归 [Composition](../Composition/README.md)。
 
 一个 worker 和一个待重检锁存位，无事件队列。代际围栏拒绝迟到结果；失活、配置替换或 stop 先关闭结果接纳，必须等旧 worker 实际退出后才能启动替代。stop 幂等加入并释放回调，不承诺系统原生加载立即停止。
 

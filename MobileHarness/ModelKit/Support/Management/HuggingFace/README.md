@@ -13,7 +13,7 @@ ModelKitHub depends on ModelKitRuntime contracts and HuggingFace; Management rem
 The diagram shows runtime calls and data flow, not compilation dependencies.
 
 ```mermaid
-flowchart LR
+flowchart TB
  Store[ModelArtifactStore] -->|Artifact declaration and staging URL| Downloader[HuggingFaceArtifactDownloader]
  Downloader -->|Resolve metadata and selected paths| Hub[HubClient]
  Hub -->|Validated file metadata| Plan[Persisted bounded transfer plan]
@@ -34,14 +34,8 @@ Transient file errors retry at most three times. Available system resume data �
 
 Progress is actual byte-weighted delegate state including reused files. The host supplies background event completion; any foreground preparation deadline belongs to that host, not this downloader. User force-quit may cancel OS transfers; no durable uninterrupted network guarantee is claimed.
 
-Persisted bounded file plans, native transfer reattachment and explicit cleanup are implemented.
-
 ## Related design
 
 [Parent design](../README.md)
 
-## 待实现
-
-- Full iPhone relaunch, force-quit and server-dependent resume acceptance remains outstanding; native transfer guarantees are limited by the OS and server. [Resource acceptance roadmap](../../../../../docs/Roadmap.md) tracks those trials.
-
-✅ 单次读取／解码 .hub-plan.json，基于同一 ID/revision/endpoint 快照决定复用；计划不匹配时按原下载流程重新获取元数据，不二次读取本地计划。只复用当前 .hub-plan/.hub-resume 所属且校验通过的文件，不导入旧 .hub-snapshot。
+单次读取／解码 .hub-plan.json，基于同一 ID/revision/endpoint 快照决定复用；计划不匹配时按原下载流程重新获取元数据，不二次读取本地计划。只复用当前 .hub-plan/.hub-resume 所属且校验通过的文件，不导入旧 .hub-snapshot。

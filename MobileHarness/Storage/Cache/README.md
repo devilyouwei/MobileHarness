@@ -22,7 +22,6 @@ CacheBuffer 持有不可变 Data，Cache 存取只转交相同实例。CacheLeas
 
 CacheContainer/BufferCache/AudioCache 共享 StorageFailureReporter，缓存拒绝与流失败报告后仍保持原失败/释放语义；没有新增缓存或逐帧诊断队列。
 
-
 AudioCache 区分句柄正常释放与失败；正常回收不进入统一异常通道，真正的缓存访问失败仍保留原错误与上报。
 
 ## Passive state reads
@@ -31,4 +30,12 @@ CacheContainer.stateSnapshot returns StorageCore.StorageStateSnapshot directly, 
 
 CacheContainer.swift owns the Cache entry/lifecycle and namespaces; BufferCache.swift owns immutable buffers and leases.
 
-[Image](Image/README.md) owns a separate112MiB session image store through CacheContainer.cameraImages. It retains at most20 originals, one capture reservation and derived analysis, commits FIFO eviction only when a new capture succeeds, and stores consumer-written disposition metadata. Camera supplies local IDs and lifecycle; Storage does not select model inputs. Root close seals the store. General BufferCache remains independently bounded at64MiB.
+<a id="session-image-cache"></a>
+
+## Session image cache
+
+[`Image/`](Image/)
+
+[PreviewImageCache.swift](Image/PreviewImageCache.swift) owns one reopenable scope with a single capture reservation and up to 20 immutable originals. It validates scope, ID, bytes and dimensions. Publish commits the new image and any oldest-entry eviction atomically. Failure before publish preserves existing entries. The independent 112 MiB budget allows up to 4 MiB per original, up to 1 MiB per analysis copy and one 4 MiB reservation.
+
+A mutex serializes cache operations. Read returns original bytes, mark changes disposition metadata, and selection release removes analysis bytes. Session end clears entries and reservations. Root close seals the cache. The caller owns numbering, selection, session timing and any durable save.

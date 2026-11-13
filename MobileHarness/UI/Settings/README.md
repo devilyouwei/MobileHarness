@@ -47,7 +47,7 @@ JSON 分享延迟编码实际展示的 Codable 值，保留原始 requestJSON；
 
 历史图片仅解析结构化引用，按身份去重并限制展示数量。全屏检查器使用共享 RetainedFullScreenCover 保留下层首页；页面图片解码／读取仍随离开取消。
 
-## 接纳、失败与待验收
+## 接纳与失败
 
 子容器统一创建状态，业务只读协议＋类型化提交；根停止后拒绝更新，后台允许保留事实。设置 revision、资源 generation、分页 ticket 独立于根接纳。
 
@@ -121,13 +121,11 @@ Album items carry MIME; video/quicktime shows a play badge and opens a local-fil
 
 SettingsInput/Reply、ResourcesInput/Reply、HistoryInput/Reply、DeviceInput分别与SettingsState、ModelResourcesState、ConversationHistoryState、BluetoothSettingsState同文件；通用传输位于Shared/UIRequests，具体输入类型由本目录拥有。
 
-
 模型表单包含独立 Writer Provider 与模型名称。Provider 具有稳定 id，编辑 URL 保留 id；Writer 选择通过既有设置事务保存，不改变 Assistant 选择。
 
 ## Writer 记录与作品
 
 UIHistoryContainer owns Assistant conversations. My Writer 的上方入口显示真实委托总数，详情展示来源、原始输入、状态、结果、前序消息与 workspace 链接；下方是 workspace 列表，使用 workspace 标题和消息数量。Workspace 详情没有委托分段；单条消息保留来源身份。工作区消息和委托列表从最新记录开始，使用现有历史列表的底部加载组件自动追加旧页。每个游标最多一个在途读取，失败保留行和游标并允许重试。页面保留已加载行与成功标志，子详情返回时复用，下拉刷新成功后从最新页开始。工作区定时刷新头部状态并合并新增消息，保持旧页游标。委托详情中的前序消息仍按原顺序读取。完整模型证据按消息身份按需加载。
-
 
 Workspace titles and Assistant conversation titles use the same HistoryRecordRow: a vertically centered 20pt icon in a 24pt column, body title with two-line tail truncation, 6pt gap, caption metadata and 12pt vertical padding. Assistant icons are blue; Writer icons are muted purple. Titles use primary text and separators begin at the text column. My Assistant keeps Current Conversation/Past Conversations and New Conversation; My Writer opens the workspace list directly. Assistant metadata shows actual turnCount (falling back to loaded turns only when absent) and createdAt, never an inferred last-active date. Writer metadata shows stable workspace ID, cumulative requestCount and updatedAt; a reusable workspace has no latest-execution status badge. Metadata and dates share a line where space permits and stack at narrow widths/large text sizes without dropping fields. HistoryListPresentation formats dates in the supplied/current calendar and time zone as MM/dd HH:mm or yyyy/MM/dd HH:mm across years. Workspace header combines a vertically centered purple icon with a text column: small secondary monospaced workspace ID above the full wrapping title. Start time, update time, total rounds and file browsing follow in that order. Workspace conversation export is an icon button in the top-right toolbar, retaining the existing share and failure flow. Request-row number badges use smaller subheadline digits and remain gray, red only for failed requests; titles, retries, timestamps and state capsules remain unchanged. WriterArtifactsControlling owns snapshot reads, native previews and source/ZIP/PDF export.
 

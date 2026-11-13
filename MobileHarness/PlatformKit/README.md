@@ -4,6 +4,19 @@
 
 PlatformKit is an independent foundation SDK using system frameworks only. It owns native audio, camera, connectivity, typed observations, platform admission, native errors and passive system facts. It imports no Agent, Gateway, Actions, UI, Storage, ModelKit or application composition code. App constructs its single scoped root and controls lifetime; business consent, resource arbitration, interpretation and execution policy remain above the SDK.
 
+## Upstream and downstream
+
+```mermaid
+flowchart LR
+    App["App"] -.->|root lifecycle and adapters| P["PlatformKit"]
+    Actions["Actions"] -->|device and native operations| P
+    P -->|native outcomes and joined cleanup| Actions
+    P -->|read-only PCM, frames and device facts| Agents["Agents"]
+    P -->|passive system status| App
+    P <-->|permissions, native handles and callbacks| OS["Apple frameworks · camera, audio, Bluetooth and OS"]
+    linkStyle default stroke:#64748b,stroke-width:1.5px
+```
+
 ## Public relationships and components
 
 | Component | Capabilities and owner |
@@ -15,6 +28,21 @@ PlatformKit is an independent foundation SDK using system frameworks only. It ow
 | [Connectivity](Connectivity/README.md) | NexArm device constraints and bounded USB/BLE writes, protocol values, connection observations, passive IP path monitoring and Bluetooth authorization queries. |
 
 Native observation capabilities are injected directly into their responsible Agent or execution owner. They never generate business Signals. Read-only capture subscription does not start hardware; capture control stays with its owner. PCM remains ordered and bounded, while camera/native state observations retain newest values under the owning contracts.
+
+## Internal flow
+
+```mermaid
+flowchart TB
+    Root["PlatformContainer · admission and lifecycle"] --> Audio["AudioContainer · capture, playback, feedback"]
+    Root --> Vision["VisionContainer · capture, media"]
+    Root --> Connection["ConnectivityContainer · NexArm and IP path"]
+    Core["Core · bounded observation and system facts"] --> Root
+    Audio -->|resident permission and audio facts| State["Platform State readers"]
+    Vision -->|camera and Photos permission facts| State
+    Connection -->|path and Bluetooth permission facts| State
+    Core -->|time, power, thermal, locale, accessibility| State
+    linkStyle default stroke:#64748b,stroke-width:1.5px
+```
 
 ## Native State port
 
@@ -47,7 +75,6 @@ The eight native source views live under platform.system; the capability contain
 Business contains native permissions, system/device conditions and measured motor positions with observation validity. Audio scope ownership/counts, lazy camera/import tasks, link generations/revisions, watchdog/query quarantine and observation timestamps belong to Runtime. State contains both classifications without caller-specific filtering.
 
 Native source fields have explicit source-owned classifications. The State root decodes through the common Value representation, partitions only declared fields and rejects unclassified additions. This prevents future native runtime/configuration fields from silently entering Business.
-
 
 Permission completion from microphone/camera/Photos operations and Bluetooth power changes updates the collection through an internal native notification. Foreground resume reconciles external Settings changes; there is no universal permission-change notification and no permission polling. Audio/Vision/Connectivity authorization reflection reads the same stored permission sample. Native sources with no current observation remain unknown; initializing monitoring is not a device-connection or action-readiness guarantee. Source encoding/sampling failures remain throwing reads until a later observation succeeds. Business execution continues to recheck native admission/permissions at effect time.
 

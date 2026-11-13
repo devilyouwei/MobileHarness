@@ -29,7 +29,3 @@ Preserved artwork and build-time selection.
 ## Related design
 
 [Parent design](../README.md)
-
-## 待实现
-
-- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。

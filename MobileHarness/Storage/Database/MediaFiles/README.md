@@ -8,7 +8,7 @@ AlbumRecord defines media metadata (MIME, dimensions, optional capture time, cam
 
 ## Publication, collection and recovery
 
-Camera previews live in StorageCache; explicit save publishes the original through importPhoto with album collection intent. Uncollected live model media and web screenshots use the ready-file ownership contract. Imports reserve metadata with collection intent before publishing bytes; only ready files become visible. A crash after publication can recover pending files by matching byte size without losing import intent. Uncollected records have null collection time and remain available to authorized live model reads without appearing in the album.
+Camera previews live in StorageCache; explicit save publishes the original through importPhoto with album collection intent. Uncollected live media uses the ready-file ownership contract. Web screenshot State is owned by Actions.Web. Imports reserve metadata with collection intent before publishing bytes; only ready files become visible. A crash after publication can recover pending files by matching byte size without losing import intent. Uncollected records have null collection time and remain available to authorized live model reads without appearing in the album.
 
 Non-overwriting file publication occurs outside SQL transactions. Failed publication preserves the original error and any compensation error. The original bytes are immutable. Camera JPEG remains limited to 4 MiB; imports permit JPEG/HEIC/PNG up to 32 MiB, with format/dimension validation supplied by the caller. Raw model/history reads retain their 4 MiB bound.
 
@@ -36,9 +36,7 @@ Preview numbering is owned by the in-memory Camera session. Explicit camera save
 
 Backend table records/operations are documented in [MediaFileRow](MediaFileRow.swift). Public contracts and workflow compile separately from the colocated GRDB implementation; consumers never import backend row types.
 
-# media_files
-
-## Ownership and interfaces
+## media_files table
 
 `id` allocates independent media_N identities; relative_path is unique. The row stores image/movie kind/MIME/path/byte count, generic ownership, created/captured dates, publication/deletion state/failure, and optional album date/dimensions/origin. Album and retention indexes retain their original ordering.
 

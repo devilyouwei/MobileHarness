@@ -18,9 +18,9 @@ Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注�
 | --- | --- |
 | [Detection](Detection/README.md) | 检测只消费角色已计算的观测值；原始 PCM 订阅属于角色 |
 | [Listening](Listening/README.md) | 实际感知注册与模型图属于注入的上游角色；本目录拥有权限、捕获启停、半双工、启动反馈及真实播放屏障 |
-| [Playback](Playback/README.md) | 播放只消费已经生成的音频句柄，不选择模型或生成语音；借出、真实排空、取消和租约释放均由播放执行拥有 |
+| [Playback](#playback) | 播放只消费已经生成的音频句柄，不选择模型或生成语音；借出、真实排空、取消和租约释放均由播放执行拥有 |
 
-[Support](Support/README.md) 仅维护跨业务能力共用的契约或算法。
+[Support](#speech-shared-contracts) 仅维护跨业务能力共用的契约或算法。
 
 ## 函数与完成
 
@@ -45,3 +45,17 @@ update 的固定使用者是 SpeechPerception；实际 source/session/revision �
 `Speech.Listening.startListening` / `stopListening` 均为无参数有限 Action，拒绝未知键，timeout 为 90 秒。SpeechModule 通过显式 SpeechListeningCapability.setListening 绑定；未绑定能力或不支持控制时抛出 listeningUnavailable。SpeechExecutionEndpoint 校验根会话并调用弱绑定的 VoiceOutputHandling。启停直接取得感知策略并实际应用，不通过 UI 请求或二次 Action 排队。模型不能提交内部 update 的 revision/paused。完成及取消边界见 [Listening](Listening/README.md)。
 
 Assistant 的语音子能力预留并生产 AudioCache 句柄；Speech.Playback.speak 可在生产期间开始读取，接纳不证明已有 PCM。Actions 不选择 TTS 模型或注册合成角色，取消/失败经同一句柄加入生产者与原生播放清理。
+
+<a id="playback"></a>
+
+## 播放执行
+
+[`Playback/`](Playback/) 的 [PlaybackActions.swift](Playback/PlaybackActions.swift) 校验参数并返回实际回执。[SpeechPlayback.swift](Playback/SpeechPlayback.swift) 借出预留的音频句柄，允许 Assistant 并行继续生产 PCM。播放结束等待原生排空，取消加入流清理和租约释放。聆听策略由根语音会话拥有。
+
+<a id="speech-shared-contracts"></a>
+
+## Speech 共享契约
+
+[`Support/`](Support/)
+
+[SpeechCapabilities.swift](Support/SpeechCapabilities.swift) 定义播放和聆听端口。内部策略用 `updateListening` 应用，公开意图用 `setListening` 提交，不接受 revision 或 paused。未提供公开控制时抛出 `listeningUnavailable`。[SpeechTypes.swift](../Support/Contracts/SpeechTypes.swift) 定义语音错误与反馈值。

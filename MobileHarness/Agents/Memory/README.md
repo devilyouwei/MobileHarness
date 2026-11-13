@@ -64,7 +64,7 @@ flowchart LR
 ## 内部结构与执行链
 
 ```mermaid
-flowchart LR
+flowchart TB
  U["注入 UI.history.requests"]:::ui
  subgraph Role["Memory"]
  H["MemoryUI：读取／变更类型化处理"]:::agent

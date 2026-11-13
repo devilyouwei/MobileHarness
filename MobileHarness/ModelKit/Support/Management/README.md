@@ -1,8 +1,6 @@
 # Model Management and Default Assembly
 
-✅ ModelContainer.swift 移至 ../../ModelContainer.swift；本目录保留默认注册／选择辅助及运行机制，仍使用显式、互斥源码清单。
-
-✅ 模块根目录 [ModelContainer.swift](../../ModelContainer.swift) 拥有根、四子能力及私有默认装配；ModelScope 合并一个准备任务，最多32个等待者，配置替换拒绝重叠。ModelManager 仍是私有注册与资源机制，消费者通过公开子能力协议访问。
+模块根目录 [ModelContainer.swift](../../ModelContainer.swift) 拥有根、四子能力及私有默认装配；ModelScope 合并一个准备任务，最多32个等待者，配置替换拒绝重叠。ModelManager 仍是私有注册与资源机制，消费者通过公开子能力协议访问。
 
 ## Summary
 
@@ -18,14 +16,14 @@ ModelKitRuntime depends only on ModelKit. Management owns ModelState (including 
 | ModelKitDefaults | 模块根 ModelContainer.swift；本目录 ChatDefaults.swift, SpeechDefaults.swift, VisionDefaults.swift, SpeechProviderSelection.swift |
 | ModelKitHub | HuggingFace/ source files |
 
-The two targets use explicit disjoint sources/excludes; Defaults is rooted at ModelKit to include the public entry file, while Runtime remains rooted in this directory. Registration and artifact contracts are separated by file; native archive transfer remains Runtime-owned. Each ModelContainer owns its manager/configuration; Chat, Speech and Vision register their own providers. SpeechProviderSelection chooses once before admission; it never retries failed active inference on another provider.
+The two targets use explicit disjoint sources/excludes; Defaults is rooted at ModelKit to include the public entry file, while Runtime remains rooted in this directory. Registration and artifact contracts are separated by file; native archive transfer remains Runtime-owned. Each ModelContainer owns its manager/configuration; Chat, Decision, Speech and Vision have separate capability registrations. SpeechProviderSelection chooses once before admission; it never retries failed active inference on another provider.
 
 ## External relationships and data flow
 
 The diagram shows runtime calls and data flow, not compilation dependencies.
 
 ```mermaid
-flowchart LR
+flowchart TB
  Host[Host configuration and lifecycle] --> Defaults[Default assembly and selection]
  Defaults -->|Register factories and bindings| Manager[ModelManager]
  Host -->|Acquire, load, unload and artifact operations| Manager
@@ -72,8 +70,6 @@ Valid settled receipts determine installed state. Identity/revision/path/actual 
 
 Delete gates every referencing resource before host quiescence, drains/unloads, joins transfer cancellation, removes files, then reopens admission. Retained handles cannot reload mid-delete. Installing never starts inference. Background native transfer/OS reattachment belongs to the injected downloader; Manager retains package state independently of pages. Force-quit/server resume behavior remains conditional rather than guaranteed.
 
-Shared providers, bounded lifecycle/replace and receipt-based artifact management are implemented.
-
 ## Default assembly and provider selection
 
 | Capability | Binding |
@@ -99,8 +95,6 @@ Registration is lazy. Explicit voice admission/diagnostics prepares selected cap
 
 Large local Gemma/Nemotron/MOSS and pose releaseWhenIdle opt into memory-pressure policy; Silero/system speech retain. Local Gemma requires supported OS/hardware/artifacts; explicit cloud works without Gemma artifacts. Native simulator CoreAI support is a separate backend constraint.
 
-Instance-local lazy assembly, independent speech switches and explicit current-binding replacement are implemented.
-
 [HuggingFace transfer](HuggingFace/README.md) · [Core lifecycle mechanisms](../Core/README.md)
 
 [Parent design](../README.md)
@@ -109,33 +103,25 @@ Instance-local lazy assembly, independent speech switches and explicit current-b
 
 ModelLanguageContainer 属于默认装配目标，按每个请求解析当前 chat binding，并转交工具/图片支持和推理会话。它不认识 App、UI、设置 schema 或业务仓库；失败的 availability 返回不可用诊断，实际 chat 错误继续抛出。SDK 仍只依赖自身目标和批准的第三方 SDK。
 
-
-## 待实现
-
-- Timed eviction, global inference scheduling, general orphan-stage collection and batch acquisition are not implemented.
-
-- Active-inference provider fallback, automatic variant/quantization selection and judgment provider are not implemented.
-
 ## Storage 文件作用域接入
 
-✅ 模型制品适配器由 App 注入 Files；后台回调复用同一制品服务。制品绑定停止时关闭接纳、取消并加入下载并保留清理错误，释放配置后允许在新 Files 作用域重新绑定，不停止无关模型实例。App 只转交接口与调度启停。
+模型制品适配器由 App 注入 Files；后台回调复用同一制品服务。制品绑定停止时关闭接纳、取消并加入下载并保留清理错误，释放配置后允许在新 Files 作用域重新绑定，不停止无关模型实例。App 只转交接口与调度启停。
 
-✅ 默认装配根实例独立，制品协议及托管加载／卸载不依赖应用模块；消费者不获得管理器。
+默认装配根实例独立，制品协议及托管加载／卸载不依赖应用模块；消费者不获得管理器。
 
-✅ 模块根目录的 ModelContainer.swift 统一模型根／子能力及实例私有默认装配；旧进程入口与 CurrentChatCapability 已移除。App 同根缓存、流式错误一次观察、停止和权重保留由自动化覆盖，真实模型／硬件证据独立记录。
+模块根目录的 ModelContainer.swift 统一模型根／子能力及实例私有默认装配；旧进程入口与 CurrentChatCapability 已移除。App 同根缓存、流式错误一次观察、停止和权重保留由自动化覆盖，真实模型／硬件证据独立记录。
 
-✅ 语言／视觉使用同一 ModelResourceControlling 协议提供 load、warmup、unload、status；语音按 recognition／synthesis／voiceActivity 选择同样操作，卸载覆盖该类别的本地和系统后端，状态反映选中的实际后端。移除合成专用卸载命名，保持接口一致。
+语言／视觉使用同一 ModelResourceControlling 协议提供 load、warmup、unload、status；语音按 recognition／synthesis／voiceActivity 选择同样操作，卸载覆盖该类别的本地和系统后端，状态反映选中的实际后端。移除合成专用卸载命名，保持接口一致。
 
-✅ 已实现：路径字符白名单缓存为不可变CharacterSet，避免资源轮询对每个路径字符重复构造集合；路径规则、安全边界及磁盘校验不变。
+路径字符白名单缓存为不可变CharacterSet，避免资源轮询对每个路径字符重复构造集合；路径规则、安全边界及磁盘校验不变。
 
-✅ 已实现：根生命周期、配置前置校验接入统一原生错误报告，取消与 admission 错误亦保留；原始 throw 类型由 underlying 保留，复合清理错误继续包含全部底层错误。
+根生命周期、配置前置校验接入统一原生错误报告，取消与 admission 错误亦保留；原始 throw 类型由 underlying 保留，复合清理错误继续包含全部底层错误。
 
 根启动／停止传播准备失败和全部清理错误；停止主动取消未完成装配时，原始 CancellationError 留在诊断，正常清理仍可完成。availability/support 的非抛错能力查询继续返回中立不可用值，原始失败同步走报告端口，不解释业务提示。
 
+ModelScope为全部原生异常报告包装ModelFailure，根生命周期使用throws(ModelFailure)。装配／制品释放的主错误和清理错误统一分开保留，不再声明专用清理聚合类型；availability／推理流仍遵循各自领域协议，不以根容器迁移冒充所有SDK抛错已替换。
 
-✅ ModelScope为全部原生异常报告包装ModelFailure，根生命周期使用throws(ModelFailure)。装配／制品释放的主错误和清理错误统一分开保留，不再声明专用清理聚合类型；availability／推理流仍遵循各自领域协议，不以根容器迁移冒充所有SDK抛错已替换。
-
-✅ 已实现：warmup 提供模块自有 reportLoading(Bool) 回调；先构造后端，再由真实资源 load 区间报告开始／结束；ready／unmanaged 不报告，语音按当前选中后端统一准备。回调不包含 UI／Signal，失败结束后原样上抛。
+warmup 提供模块自有 reportLoading(Bool) 回调；先构造后端，再由真实资源 load 区间报告开始／结束；ready／unmanaged 不报告，语音按当前选中后端统一准备。回调不包含 UI／Signal，失败结束后原样上抛。
 
 ## Artifact observation
 
@@ -147,7 +133,7 @@ Artifact revision observers are independently bounded to 16 newest-one streams. 
 
 ## 直连链路当前契约
 
-✅ 模拟器依赖闭包排除 CoreAI，真实设备保持现有模型绑定，不注入假模型。
+模拟器依赖闭包排除 CoreAI，真实设备保持现有模型绑定，不注入假模型。
 
 ## Passive state reads
 

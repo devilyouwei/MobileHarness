@@ -93,16 +93,13 @@ let databaseTargetSources: [String: [String]] = [
     ],
 ]
 let databaseDocumentation = [
-    "Shared/README.md",
     "AgentMessages/README.md",
     "AssistantConversations/README.md",
     "AssistantMessages/README.md",
     "AssistantTasks/README.md",
-    "Devices/README.md",
     "MediaFiles/README.md",
     "ModelRequestLog/README.md",
     "README.md",
-    "WorkspaceFiles/README.md",
     "WriterMessages/README.md",
     "WriterWorkspaces/README.md",
 ]
@@ -217,7 +214,7 @@ let package = Package(
         .target(
             name: "AgentCore", dependencies: ["FunctionContracts"], path: "MobileHarness/Agents/Support/Core",
             exclude: [
-                "Input/README.md", "Communication/README.md", "Capability/README.md", "Generation/README.md",
+                "Communication/README.md", "Capability/README.md", "Generation/README.md",
                 "Output/README.md",
                 "README.md",
                 "Runtime/README.md",
@@ -253,7 +250,7 @@ let package = Package(
             path: "MobileHarness/Gateway",
             exclude: [
                 "README.md", "Input/README.md", "Output/README.md", "Output/Scheduling/README.md",
-                "Output/Dispatch/README.md", "Output/Resources/README.md", "Output/Results/README.md",
+                "Output/Resources/README.md",
             ]),
         .target(
             name: "Actions",
@@ -275,12 +272,8 @@ let package = Package(
                 "README.md",
                 "Speech/Detection/README.md",
                 "Speech/Listening/README.md",
-                "Speech/Playback/README.md",
                 "Speech/README.md",
-                "Speech/Support/README.md",
                 "Support/README.md",
-                "System/Device/README.md",
-                "System/Diagnostics/README.md",
                 "System/ModelResources/README.md",
                 "System/Provider/README.md",
                 "System/README.md",
@@ -293,7 +286,6 @@ let package = Package(
                 "UI/README.md",
                 "UI/Resources/README.md",
                 "UI/Runtime/README.md",
-                "UI/Support/README.md",
                 "Support/Contracts",
                 "Support/FunctionExecutor.swift",
                 "Support/FunctionRegistry.swift",
@@ -325,7 +317,7 @@ let package = Package(
                 "Agents/Support/Chat/README.md",
                 "Agents/Support/Communication/README.md", "Agents/Support/Context/README.md", "Agents/Support/Core",
                 "Agents/Support/Core/Capability/README.md", "Agents/Support/Core/Communication/README.md",
-                "Agents/Support/Core/Generation/README.md", "Agents/Support/Core/Input/README.md",
+                "Agents/Support/Core/Generation/README.md",
                 "Agents/Support/Core/Output/README.md", "Agents/Support/Core/README.md",
                 "Agents/Support/Core/Runtime/README.md", "Agents/Support/README.md",
                 "Agents/VisionPerception/README.md", "App", "Gateway", "ModelKit", "PlatformKit", "README.md",
@@ -341,7 +333,7 @@ let package = Package(
             ], sources: ["StorageFailure.swift", "Support/Contracts", "Support/Memory"]),
         .target(
             name: "StorageCache", dependencies: ["StorageCore"], path: "MobileHarness/Storage/Cache",
-            exclude: ["README.md", "Audio/README.md", "Image/README.md"]),
+            exclude: ["README.md", "Audio/README.md"]),
         .target(
             name: "StorageFiles", dependencies: ["StorageCore"], path: "MobileHarness/Storage/Files",
             exclude: ["README.md"]),
@@ -439,14 +431,13 @@ let package = Package(
             ]),
         .target(
             name: "ModelKitEnergy", dependencies: ["ModelKit"],
-            path: "MobileHarness/ModelKit/Speech/VAD/Energy",
-            exclude: ["README.md"]),
+            path: "MobileHarness/ModelKit/Speech/VAD/Energy"),
         .target(
             name: "ModelKitAppleSpeech", dependencies: ["ModelKit"], path: "MobileHarness/ModelKit",
             exclude: [
                 "README.md", "ModelContainer.swift", "ModelFailure.swift", "Language", "Vision", "Support/README.md",
                 "Support/Core", "Support/Backends",
-                "Support/Management", "Support/Speech/README.md", "Support/Speech/Apple/README.md", "Speech/README.md",
+                "Support/Management", "Support/Speech/README.md", "Speech/README.md",
                 "Speech/ASR/README.md", "Speech/TTS/README.md", "Speech/ASR/Apple/README.md",
                 "Speech/TTS/Apple/README.md", "Speech/ASR/SpeechRecognitionCapability.swift",
                 "Speech/TTS/SpeechSynthesisCapability.swift", "Speech/TTS/Kokoro", "Speech/TTS/MossNano",
@@ -460,7 +451,7 @@ let package = Package(
             name: "YOLOPoseTests",
             dependencies: ["ModelKit", "ModelKitYOLOPose", "ModelKitCoreML", "ModelKitRuntime"],
             exclude: ["README.md"]),
-        .target(name: "ModelKitCoreML", path: "MobileHarness/ModelKit/Support/Backends/CoreML", exclude: ["README.md"]),
+        .target(name: "ModelKitCoreML", path: "MobileHarness/ModelKit/Support/Backends/CoreML"),
         .target(
             name: "ModelKitSilero", dependencies: ["ModelKit", "ModelKitCoreML"],
             path: "MobileHarness/ModelKit/Speech/VAD/Silero", exclude: ["README.md"]),

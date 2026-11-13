@@ -56,15 +56,13 @@ Input is one JPEG/PNG with explicit InputLimits: the default remains 4 MiB, 6553
 
 [Apple memory guidance](https://developer.apple.com/documentation/xcode/making-changes-to-reduce-memory-use) recommends Image I/O transforms to minimize image memory impact; [thumbnail API](https://developer.apple.com/documentation/imageio/cgimagesourcecreatethumbnailatindex(_:_:_:)) supports bounded native downsampling/orientation, and [destination API](https://developer.apple.com/library/archive/documentation/GraphicsImaging/Conceptual/ImageIOGuide/ikpg_dest/ikpg_dest.html) supports JPEG quality selection. No claim that JPEG encoding always runs on a GPU or is the fastest on every device; native latency/quality acceptance remains separate.
 
-✅ CameraVisionRestartWorkflow 是泛型的最新意图替换工具：一个 pending 值、一个切换 worker、一个活跃任务；替换取消旧任务并加入后启动最新意图。stop 清空 pending、取消并加入旧任务；不选择摄像头、感知模型或业务反馈。
+CameraVisionRestartWorkflow 是泛型的最新意图替换工具：一个 pending 值、一个切换 worker、一个活跃任务；替换取消旧任务并加入后启动最新意图。stop 清空 pending、取消并加入旧任务；不选择摄像头、感知模型或业务反馈。
 
 Physical camera/permission/latency evidence is tracked in [validation history](../../../docs/validation/Validation-History.md). Background capture is not offered.
 
-
 ## UI 容器与相机能力注入
 
-✅ 新增跨平台可替身的 CameraCapturing 原生接口与相机枚举/错误；AppleCamera 实现权限、帧订阅、启停、切换、照片、状态、事件和拍照方向能力。接口无 UI/业务依赖，静态权限方法保留原有原生入口，Coordinator 使用实例接口。
-
+CameraCapturing 定义跨平台相机操作、枚举与错误。AppleCamera 实现权限、帧订阅、启停、切换、照片、状态、事件和拍照方向能力。接口无 UI/业务依赖，静态权限方法保留原有原生入口，Coordinator 使用实例接口。
 
 ## Direct container contract
 
@@ -72,7 +70,7 @@ Native data/observation capabilities remain independent of business and transpor
 
 ## 基础相册实施契约
 
-✅ 提供有界原生照片检查、缩略图和格式保持的Photos资源导出；JPEG／HEIC／PNG，32MiB／100百万像素，add-only权限，提交后等待真实完成。
+提供有界原生照片检查、缩略图和格式保持的Photos资源导出；JPEG／HEIC／PNG，32MiB／100百万像素，add-only权限，提交后等待真实完成。
 
 ## Passive native authorization facts
 
@@ -85,7 +83,6 @@ The owning stateSnapshot entry point reads current local business/capability val
 State classifies authorization as Business; camera allocation, import task existence and admission as Runtime.
 
 Permission State projections read cached observations only. Unavailable owner scope remains unknown; an admitted cached-source/schema failure propagates through the standard throwing snapshot method instead of being converted to unknown.
-
 
 ## Capture and preview orientation
 

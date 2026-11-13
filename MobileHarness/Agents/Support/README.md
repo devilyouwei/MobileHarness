@@ -66,8 +66,7 @@ InputGateway accepts complete Action/Tool value completions without an observati
 执行日志将 UI.Caption.print、UI.Caption.beginReplyTurn 等呈现路径归入 UI 内部动作过滤器，真实失败仍可见。权限、调度和实际执行由各自入口校验。
 
 GatewayOutputConsumer区分模型/Agent协议反馈与内部完成结果。executeInternal只接受本注册角色
-声明的internalTools且roundID为空；调用仍经过Gateway的权限、资源和执行验证，真实完成或
-失败仅返回内部调用方，不向InputGateway递送ToolResult。execute与executeReturning保持原有
+声明的 internalTools 且 roundID 为空。Agents 校验内部调用权限，Gateway 校验接纳与资源许可，Actions 执行实际操作。真实完成或失败仅返回内部调用方，不向 InputGateway 递送 ToolResult。execute与executeReturning保持原有
 协议反馈，配对的模型工具结果仍按调用身份回到Agent。内部灵动岛呈现使用executeInternal。
 
 GatewayOutputConsumer 的退休端口绑定注册执行者的身份。OutputGateway 先封住任务授权的新执行，按终态加入或取消现有调用，再按接纳代际撤销授权。成功撤权后，InputGateway 写入本地任务诊断记录供状态观察。已有生命周期清理或进程重启留下的缺失授权可以收敛。Writer 的持久收尾 worker 持有调用并负责暂停和停止时加入，用户通知由另一个 worker 独立投递。

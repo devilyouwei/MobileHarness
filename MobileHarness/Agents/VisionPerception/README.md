@@ -62,7 +62,7 @@ flowchart LR
 ## 内部结构与执行链
 
 ```mermaid
-flowchart LR
+flowchart TB
  P["注入 Platform.vision：只读帧"]:::platform
  M["注入 ModelKit.vision：Pose"]:::model
  subgraph Role["VisionPerception"]

@@ -29,7 +29,7 @@ This document tracks inherited limitations and subsequently identified implement
 ❌ 通用 factory、自动重启、远程传输和持久化执行递送。
 
 - ❌ 完整 JSON Schema 和配置热更新未实现。解析见 [Generation](../../../MobileHarness/Agents/Support/Core/Generation/README.md)，消息声明见 [Communication](../../../MobileHarness/Agents/Support/Core/Communication/README.md)。
-- ❌ 通用 factory、自动重启和健康监督未实现。局部媒体见 [Input](../../../MobileHarness/Agents/Support/Core/Input/README.md)，真实结果见 [Output](../../../MobileHarness/Agents/Support/Core/Output/README.md)。
+- ❌ 通用 factory、自动重启和健康监督未实现。局部媒体见 [Input](../../../MobileHarness/Agents/Support/Core/README.md#local-media-values)，真实结果见 [Output](../../../MobileHarness/Agents/Support/Core/Output/README.md)。
 - ❌ 持久化执行递送与 control(String) 的完整类型化未实现。轮次协调见 [Runtime](../../../MobileHarness/Agents/Support/Core/Runtime/README.md)。
 - 停止和显式取消决定生命周期，重启标 interrupted，不重放设备效果。❌ 远程序列化和持久化投递未实现。业务契约见 [Agents/Communication](../../../MobileHarness/Agents/Support/Communication/README.md)。
 - ❌ 自动语法修复和计时 flush 未实现。上层流程见 [Chat](../../../MobileHarness/Agents/Support/Chat/README.md)，配置与目录见 [Capability](../../../MobileHarness/Agents/Support/Core/Capability/README.md)。

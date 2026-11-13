@@ -8,6 +8,19 @@ App缓存唯一UIContainer并管理根生命周期。Actions通过呈现端口�
 
 Interaction routing follows the [overall design rule](../README.md#two-ui-interaction-paths): presentation-only changes stay in UI; business requests go through the responsible Agent, Gateway and Actions. UI handlers submit intent and do not implement business queries, persistence, device operations or domain lifecycle coordination.
 
+## 上下游链路
+
+```mermaid
+flowchart LR
+    User["触控、输入与原生交互"] --> UI["UIContainer"]
+    App["App"] -.->|装配、Scene 与系统状态端口| UI
+    UI -->|类型化请求| Agents["负责请求的 Agent"]
+    Actions["Actions"] -->|呈现命令与业务结果| UI
+    UI -->|呈现接纳或完成回执| Actions
+    UI -->|页面、窗口和系统活动| Render["SwiftUI · WebKit · Metal · ActivityKit"]
+    linkStyle default stroke:#64748b,stroke-width:1.5px
+```
+
 ## 目录与内部关系
 
 | 位置 | 当前责任 |
@@ -42,9 +55,25 @@ Root组合功能视图与公共组件，功能拥有自身状态和输入类型�
 
 页面→子容器类型化请求→注入消费者→业务执行→UI呈现值→状态→原生绘制。请求接纳与完成独立，有界容量、取消和迟到回执规则见Shared；公开类型名称保持稳定。home聆听控制使用独立单槽源，普通请求最多64个在途。
 
-UIContainer.stateSnapshot只返回自身生命周期事实及十二子能力的路径索引；各owner只投影已有事实，不采样设备、不递归读取其他owner。密钥、本地URL、草稿、字幕和媒体字节不进入公开快照；业务操作失败与UI呈现健康分别表达。
+UIContainer.stateSnapshot只返回自身生命周期事实及十二个公开 State 节点的路径索引，RuntimeLog 由其独立组件端口读取；各owner只投影已有事实，不采样设备、不递归读取其他owner。密钥、本地URL、草稿、字幕和媒体字节不进入公开快照；业务操作失败与UI呈现健康分别表达。
 
 Writer 记录使用 UI 自有 WriterRecordsControlling 和分页 DTO 接收明确的下一游标；Settings 页面拥有已加载快照与导航返回保留，业务提供方拥有记录查询。详见 [Writer 记录](Settings/README.md#writer-记录与作品)。
+
+## 内部链路
+
+```mermaid
+flowchart TB
+    Root["Root · 页面组合和导航"] --> View["Conversation · Camera · Settings · Diagnostics"]
+    View -->|交互意图| Container["功能子容器"]
+    Container -->|有界请求与回执| Shared["Shared · 类型化交互和代际"]
+    Container -->|接纳呈现值| State["功能自有状态"]
+    State -->|状态投影| View
+    Root --> Components["Components · Window / Web / Island / RuntimeLog"]
+    Components -->|组件状态与交互| Root
+    View --> Render["原生渲染与实际完成回执"]
+    Components --> Render
+    linkStyle default stroke:#64748b,stroke-width:1.5px
+```
 
 ## 生命周期与完成
 
@@ -64,11 +93,11 @@ Face和首页WindowHost原生树与导航保持身份；层级为首页→Window
 
 [总体设计](../README.md)
 
-灵动岛默认系统状态通过根构造的只读UI值端口注入，本地组件拥有刷新/布局及实际挂载标志；Root绑定系统状态栏隐藏和恢复。系统状态不进入Action内容接口，UI不创建平台采样器。见[Island](Components/Island/README.md#默认系统状态条)。
+灵动岛默认系统状态通过根构造的只读UI值端口注入，本地组件拥有刷新/布局及实际挂载标志；Root绑定系统状态栏隐藏和恢复。系统状态不进入Action内容接口，UI不创建平台采样器。见[Island](Components/Island/README.md#默认系统状态)。
 
 CameraPresenting exposes a bounded, cancellable fresh-frame geometry receipt for capture startup. UICameraContainer resolves it from admitted camera frames or lifecycle failure, without broadcasting frame traffic as Facts; Actions awaits the receipt before requesting device capture. See [Camera](Camera/README.md) for admission, deadlines and cleanup.
 
-[Web](Components/Web/README.md) is the twelfth stable child capability, owned by UIContainer. It creates WKWebView on demand and exposes load/observe/snapshot/navigation receipts; Window.web supplies a single presentation slot. App injects this capability directly into ApplicationRootProviding. UI imports WebKit only in the owning component and never imports model, business or storage modules.
+[Web](Components/Web/README.md) is a stable child capability, owned by UIContainer. It creates WKWebView on demand and exposes load/observe/snapshot/navigation receipts; Window.web supplies a single presentation slot. App injects this capability directly into ApplicationRootProviding. UI imports WebKit only in the owning component and never imports model, business or storage modules.
 
 Window接受调用方提供的系统图标、emoji或图片字节；组件拥有校验、规范化和最小化卡片的有界自适应布局，UI不读取业务文件／URL。详细尺寸与资源边界见[Window](Components/Window/README.md)。
 

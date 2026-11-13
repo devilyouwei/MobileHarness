@@ -114,7 +114,7 @@ Reply occupancy is an optional complete revisioned publication of bounded reply 
 
 ## MobileHarness/Gateway/Output/Dispatch/README.md
 
-[现行 README](../../MobileHarness/Gateway/Output/Dispatch/README.md)
+[现行 README](../../MobileHarness/Gateway/Output/README.md#dispatch)
 
 ````markdown
 ## Result-driven ReACT (ADR0214)

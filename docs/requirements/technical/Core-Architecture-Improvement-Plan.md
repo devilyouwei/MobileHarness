@@ -51,7 +51,7 @@ App 作为应用组合根，负责模块和服务的创建、能力加载与注�
 | Agent 发起的 UI 业务控制 | Gateway → Actions → ActionBindings → UI 公开能力；复用 UI 展示接口，保留执行身份、授权和完成语义。 |
 | 生命周期、安全停止和清理 | App 调用所属服务的公开接口；服务执行必要的取消、等待与释放。 |
 
-✅ 本地导航直接在 UI 完成，业务请求由实际 Agent 处理，Agent 发起的 UI 控制保留 Action 路径。App 不再持有业务适配器或领域工作流。参见 [App 当前路由](../../../MobileHarness/App/README.md#直接上下游)、[UI 交互契约](../../../MobileHarness/UI/README.md#interaction-and-acceptance) 和 [Actions 边界](../../../MobileHarness/Actions/README.md)。
+✅ 本地导航直接在 UI 完成，业务请求由实际 Agent 处理，Agent 发起的 UI 控制保留 Action 路径。App 不再持有业务适配器或领域工作流。参见 [App 当前路由](../../../MobileHarness/App/README.md#upstream-and-downstream)、[UI 交互契约](../../../MobileHarness/UI/README.md#生命周期与完成) 和 [Actions 边界](../../../MobileHarness/Actions/README.md)。
 
 验收：点击反馈及跳转直接完成、业务操作仍返回真实结果、Agent UI 控制权限与完成语义、启动失败清理、页面离开不终止根级任务，以及模块依赖检查。
 

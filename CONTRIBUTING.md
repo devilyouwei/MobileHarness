@@ -14,7 +14,7 @@
 
 ## Capability ownership
 
-Organize ModelKit and PlatformKit by capability domain. PlatformKit owns device/OS data input and output (Audio, Vision, Connectivity); ModelKit owns model-driven data processing (Speech, Language, Vision), including model-specific preprocessing and decoding. Core holds each layer’s shared contracts. Keep basic capture format adaptation with PlatformKit, sampling/admission policy with Gateway, and business decisions with Agents. App bridges data and injects services without introducing dependencies between ModelKit and PlatformKit. Synthesis returns PCM; playback belongs to the device service. See the [comparison](MobileHarness/README.md#foundational-roots).
+Organize ModelKit and PlatformKit by capability domain. PlatformKit owns device/OS data input and output (Audio, Vision, Connectivity); ModelKit owns model-driven data processing (Speech, Language, Vision), including model-specific preprocessing and decoding. Core holds each layer’s shared contracts. Keep basic capture format adaptation with PlatformKit, sampling/admission policy with Gateway, and business decisions with Agents. App bridges data and injects services without introducing dependencies between ModelKit and PlatformKit. Synthesis returns PCM; playback belongs to the device service. See the [comparison](MobileHarness/README.md#2-framework).
 
 ## Contribution licensing
 

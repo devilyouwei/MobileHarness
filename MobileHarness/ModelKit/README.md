@@ -1,11 +1,5 @@
 # ModelKit — Independent Inference SDK
 
-✅ 根目录 ModelContainer.swift 为容器入口（仍编译于 ModelKitDefaults），ModelFailure.swift 为独立错误定义（仍编译于基础 ModelKit）。Support/Management 保留注册／制品／默认工厂，Support/Core 保留资源与并发机制；不新增目标，不改变公开类型。
-
-✅ 已实现：本地Gemma当前排查版本移除推理副本中的所有system，以实际tokenizer拟合最近最多5条对话消息和生成预算。使用后端有效窗口，当前iOS上限1024；当前输入不改写，无法容纳时明确拒绝。云端、Agent原请求及持久历史不变。
-
-✅ ModelContainer 是 App 管理的实例根，提供四个同根子能力。构造不产生模型／设备副作用；start 只注册工厂并准备制品元数据，setForeground 开放推理。实例私有配置与 manager 不跨根共享。
-
 ## Purpose and boundaries
 
 ModelKit supplies typed Language/Speech/Vision inference, model execution and model/artifact lifecycle. Core owns neutral values and concurrency mechanisms; capability domains own request/result contracts; concrete providers own algorithms and native integration; Management owns registration, residency, artifacts and default assembly.
@@ -14,16 +8,17 @@ The SDK depends on its own targets, approved third-party products and system fra
 
 ## External relationships and data flow
 
-Solid arrows show runtime calls or returned data; dashed arrows show injection. Current App and Agent consumers act as SDK clients. Host-provided protocol implementations do not create a reverse compilation dependency.
+Solid arrows show runtime calls or returned data; dashed arrows show injection. App configures the root. Agents use inference, and Actions uses model resources, configuration and diagnostic capabilities. Host-provided protocol implementations do not create a reverse compilation dependency.
 
 ```mermaid
 flowchart LR
  Host[Host composition and lifecycle] -->|Configuration and model-resource operations| SDK[ModelKit interfaces]
- Caller[Capability consumer] -->|Typed requests and input media| SDK
+ Caller["Agents / Actions · capability consumers"] -->|Typed requests and input media| SDK
  SDK -->|Events, results and neutral errors| Caller
  SDK -->|Handles and lifecycle snapshots| Host
  Host -.->|SDK-owned storage and download protocols, quiescence closure| SDK
  SDK -->|Artifact operations through injected contracts| Adapters[Host-provided implementations]
+    linkStyle default stroke:#64748b,stroke-width:1.5px
 ```
 
 ## Source ownership
@@ -44,9 +39,25 @@ flowchart LR
 
 Support is a source ownership group; each compiled target has its own boundary. Core plus capability-domain contracts form the base ModelKit target. Concrete providers own their tokenizer, prompts, recurrent/cache state and model-specific input/output rules.
 
+## Internal inference and artifact flows
+
+```mermaid
+flowchart TB
+    Root["ModelContainer · scoped configuration and admission"] --> Caps["Language · Speech · Vision"]
+    Caps -->|typed request and selected model| Provider["Provider · native or cloud"]
+    Provider -->|resource lease| Core["Core · sessions and resource lifecycle"]
+    Provider -->|model-specific input / output| Engine["Native runtime or Responses API"]
+    Engine -->|events and results| Provider
+    Provider -->|typed events| Caps
+    Root --> Artifacts["Artifacts · catalog and installation"]
+    Artifacts -->|transfer, verify, publish| Store["SDK-owned storage / download ports"]
+    Artifacts -->|installed receipt| Root
+    linkStyle default stroke:#64748b,stroke-width:1.5px
+```
+
 ## Compilation dependencies
 
-Every arrow means the left target depends directly on the right target. All 15 production targets are shown; external frameworks/products are listed separately below. ModelKitCoreAI is available independently of the current provider integrations.
+Every arrow means the left target depends directly on the right target. The production targets are shown; external frameworks/products are listed separately below. The simulator variant omits the ModelKitDefaults → ModelKitGemma4 dependency.
 
 ```mermaid
 flowchart TD
@@ -55,6 +66,7 @@ flowchart TD
  ModelKitHub[ModelKitHub]
  ModelKit[ModelKit: Core and capability contracts]
  ModelKitCoreAI[ModelKitCoreAI]
+ ModelKitD3[ModelKitD3]
  ModelKitCoreML[ModelKitCoreML]
  ModelKitGemma4[ModelKitGemma4]
  ModelKitOpenAI[ModelKitOpenAI]
@@ -67,7 +79,8 @@ flowchart TD
  ModelKitYOLOPose[ModelKitYOLOPose]
  ModelKitDefaults --> ModelKit
  ModelKitDefaults --> ModelKitRuntime
- ModelKitDefaults --> ModelKitGemma4
+ ModelKitDefaults -->|device / macOS| ModelKitGemma4
+ ModelKitDefaults --> ModelKitD3
  ModelKitDefaults --> ModelKitOpenAI
  ModelKitDefaults --> ModelKitAppleSpeech
  ModelKitDefaults --> ModelKitNemotron
@@ -78,6 +91,8 @@ flowchart TD
  ModelKitRuntime --> ModelKit
  ModelKitHub --> ModelKitRuntime
  ModelKitGemma4 --> ModelKit
+ ModelKitD3 --> ModelKit
+ ModelKitD3 --> ModelKitCoreAI
  ModelKitOpenAI --> ModelKit
  ModelKitAppleSpeech --> ModelKit
  ModelKitNemotron --> ModelKit
@@ -88,11 +103,13 @@ flowchart TD
  ModelKitEnergy --> ModelKit
  ModelKitYOLOPose --> ModelKit
  ModelKitYOLOPose --> ModelKitCoreML
+    linkStyle default stroke:#64748b,stroke-width:1.5px
 ```
 
 | Target | Third-party products |
 | --- | --- |
-| ModelKitGemma4 | CoreAILM from coreai-models; Tokenizers from swift-transformers |
+| ModelKitGemma4 | CoreAILM from coreai-models and Tokenizers from swift-transformers |
+| ModelKitD3 | Tokenizers from swift-transformers |
 | ModelKitNemotron, ModelKitKokoro | FluidAudio; each provider owns its integration |
 | ModelKitHub | HuggingFace from swift-huggingface |
 
@@ -107,7 +124,7 @@ Other external dependencies are native concurrency, media, inference, filesystem
 | Synthesis | Enabled, installed and available MOSS Nano; otherwise Apple PCM TTS |
 | Voice activity | Installed and available Silero; otherwise Energy, independent of ASR preference |
 | Pose | YOLO26n-Pose |
-| Judgment | Contract only; no default provider |
+| Decision | D3 Edge when its local artifact and platform are available. Agents selects and executes the optional cloud fallback. |
 
 Custom ASR/TTS switches default off and are independent. Kokoro is an explicitly provisioned optional provider without Defaults registration. Selection occurs before admission; failure during active inference never switches provider. Local inference never initiates artifact downloads. The simulator local-chat binding reports unavailable; the Gemma package's native framework requirements still apply at compilation.
 
@@ -121,70 +138,54 @@ Artifacts have an independent schema-v2 catalog, bounded transfer state, validat
 
 ## Coverage and platform constraints
 
-Typed contracts, concrete providers, independent runtime/assembly targets, shared PCM conversion and explicit bounded lifecycles are implemented. SDK products use the root repository Package.swift; no separate publishing package exists.
+SDK products use the repository’s [Package.swift](../../Package.swift). Concrete providers publish their platform and input constraints. The simulator build reports Gemma unavailable.
 
 ## Related design
 
 [Parent design](../README.md) · [Support](Support/README.md) · [Core](Support/Core/README.md) · [Backends](Support/Backends/README.md) · [Management](Support/Management/README.md) · [Language](Language/README.md) · [Speech](Speech/README.md) · [Vision](Vision/README.md)
 
-## Cloud non-thinking requests
+## Cloud thinking modes
 
-the OpenAI adapter owns provider/model-specific non-thinking request options for all SDK consumers, including title generation. Alibaba Cloud endpoint identity and OpenAI model identity determine legal wire fields; mandatory-thinking models fail explicitly instead of using a lower reasoning fallback. The base ChatRequest and module interfaces remain unchanged. See [the adapter contract](Language/LLM/OpenAI/README.md#non-thinking-request-policy).
+The Responses adapter maps minimum and enabled modes to provider-specific wire fields. Minimum uses a supported low reasoning level for models that require reasoning. See [the adapter contract](Language/LLM/OpenAI/README.md#thinking-request-policy).
 
 ## Streaming TTS latency
 
-Apple TTS retains one native synthesizer per capability, fence request cleanup, and emit the first bounded PCM portion without coalescing delay. Provider ownership and neutral text-to-PCM interface remain unchanged.
-
-## 待实现
-
-- Production judgment, embeddings, general video sessions and cross-model fairness/thermal scheduling are not implemented. Gemma requires CoreAI on supported OS/hardware; its third-party CoreAIShared dependency currently cannot resolve CoreAI in the simulator SDK. Runtime/device acceptance evidence belongs in docs.
+Apple TTS retains one native synthesizer per capability, fences request cleanup and emits its first bounded PCM portion immediately. See [Apple TTS](Speech/TTS/Apple/README.md).
 
 ## Storage 文件作用域接入
 
-✅ 模型制品适配器由 App 注入 Files；后台回调复用同一制品服务。制品绑定停止时关闭接纳、取消并加入下载并保留清理错误，释放配置后允许在新 Files 作用域重新绑定，不停止无关模型实例。App 只转交接口与调度启停。
-
-✅ ChatTokenUsage 提供可选 cachedInput/cacheWriteInput；具体 provider 解码，消费者透传。Gemma4 当前排查版本在推理副本中移除全部system，不改写原请求，不将系统数据降级为user。
-
+模型制品适配器由 App 注入 Files；后台回调复用同一制品服务。制品绑定停止时关闭接纳、取消并加入下载并保留清理错误，释放配置后允许在新 Files 作用域重新绑定，不停止无关模型实例。App 只转交接口与调度启停。
 
 ## 分类异常诊断
 
-✅ LLM 中立失败诊断向消费者提供原因/协议阶段及安全标识；具体 Provider 在校验点记录，ModelKit 不决定 Agent 的恢复或用户提示。见 [Chat](Language/LLM/README.md)。
+LLM 中立失败诊断向消费者提供原因/协议阶段及安全标识；具体 Provider 在校验点记录，ModelKit 不决定 Agent 的恢复或用户提示。见 [Chat](Language/LLM/README.md)。
 
 ## 基础能力审查
 
-✅ 制品下载一次读取／解码恢复计划，按 ID/revision/endpoint 选择复用；旧暂存迁移和完整文件复用保留。ModelLanguageContainer 每次操作解析当前绑定；不存在进程级 manager 或共享语音配置。ModelKitRuntime 不包含 App 源码或其他项目模块依赖。
+制品下载一次读取／解码恢复计划，按 ID/revision/endpoint 选择复用；旧暂存迁移和完整文件复用保留。ModelLanguageContainer 每次操作解析当前绑定；不存在进程级 manager 或共享语音配置。ModelKitRuntime 不包含 App 源码或其他项目模块依赖。
 
 ## Root and child ports
 
 | 子能力 | 对外协议／内容 |
 | --- | --- |
-| language | ModelLanguageProviding：聊天、当前绑定配置及统一资源控制 |
+| language | ModelLanguageProviding：聊天、本地 Decision、当前绑定配置及统一资源控制 |
 | speech | ModelSpeechProviding：识别／合成／VAD，选择配置及按语音类别的资源控制 |
 | vision | ModelVisionProviding：单帧姿态、可用性及统一资源控制 |
 | artifacts | ModelArtifactsManaging：准备、库存、下载、取消及带宿主静默屏障的删除 |
 
-语言／视觉共享 ModelResourceControlling 的 load、warmup、unload、status；语音按类别提供同名操作，状态对应所选后端、卸载覆盖同类本地与系统后端。子能力不暴露注册、manager 或根关闭权限；首次准备和后台恢复共用一个实例级准备任务。查询元信息不加载权重。关闭推理不终止后台制品传输；根 stop 先加入推理，再关闭制品，最后终止 manager，Storage 随后关闭。取消与生命周期拒绝不升级为故障；真实调用失败及流失败由所属子能力上报中立回调，Gateway 负责广播。
+语言／视觉共享 ModelResourceControlling 的 load、warmup、unload、status；语音按类别提供同名操作，状态对应所选后端、卸载覆盖同类本地与系统后端。子能力不暴露注册、manager 或根关闭权限；首次准备和后台恢复共用一个实例级准备任务。查询元信息不加载权重。关闭推理不终止后台制品传输；根 stop 先加入推理，再关闭制品，最后终止 manager，Storage 随后关闭。取消与生命周期拒绝不升级为故障；真实调用失败及流失败由所属子能力通过注入的中立回调上报给宿主。
 
-✅ 本地Gemma在ModelKit内按后端有效窗口适配，当前iOS缓存安全限制比4096更小；接口及算法见 [Gemma4](Language/LLM/Gemma4/README.md)。
+[Gemma4](Language/LLM/Gemma4/README.md) owns context fitting and local engine timing.
 
-✅ 按用户要求，本地Gemma排查版本移除所有system，仅保留有界对话输入；云端及通用请求不变，详见Gemma4目录契约。
+模型根生命周期和配置拒绝完整报告原始 Error；生命周期拒绝和取消由宿主区分记录／广播，不丢弃底层错误信息。
 
-✅ 已实现：Gemma使用Apple系统OSLog signpost提供不含消息正文的本地性能事件，源码边界检查允许该系统模块；不引入项目依赖或第三方包。
+根目录 ModelFailure.swift 由基础 ModelKit 目标拥有；根start／setForeground／stop类型化抛错，ModelScope报告统一结构。模型推理／流的既有领域错误契约保留，完整底层对象放在报告的underlying；制品及装配清理均使用同一复合结构。
 
-✅ 已实现：模型根生命周期和配置拒绝完整报告原始 Error；生命周期拒绝和取消由宿主区分记录／广播，不丢弃底层错误信息。
-
-
-✅ 根目录 ModelFailure.swift 由基础 ModelKit 目标拥有；根start／setForeground／stop类型化抛错，ModelScope报告统一结构。模型推理／流的既有领域错误契约保留，完整底层对象放在报告的underlying；制品及装配清理均使用同一复合结构。
-
-✅ 已实现：语言／语音／视觉 warmup 统一提供 reportLoading 回调，只报告实际资源加载等待，不承载 UI／Signal 或业务展示。
+语言／语音／视觉 warmup 统一提供 reportLoading 回调，只报告实际资源加载等待，不承载 UI／Signal 或业务展示。
 
 ## Artifact observation
 
-The artifact capability exposes independent bounded newest-one revision observation. Changes wake consumers without JSON fingerprints or business polling. Native progress reports synchronously coalesce; cancellation detaches observers and shutdown ends streams.
-
-## Direct container contract
-
-Artifact revision observers are independently bounded to 16 newest-one streams. Native progress coalesces synchronously, changes wake consumers without JSON polling, and close ends observation. Current cross-module ownership is defined by the [overall design](../README.md).
+The artifact capability admits up to 16 revision observers. Each stream retains the newest revision. Native progress coalesces synchronously, cancellation detaches observers, and close ends all streams.
 
 ## Reflexive state reads
 
@@ -199,7 +200,6 @@ ModelState Runtime values and resource-child phases use the declared raw-value v
 Retained artifact-operation failure counts remain Runtime; they do not establish current ModelKit health. Explicit root lifecycle/cleanup failure remains independently reported.
 
 ModelPreparationRequirement and ModelPreparationStep expose generic language/recognition/synthesis/voiceActivity/vision preparation. ModelContainer.preparationSteps preserves requested order, deduplicates requirements and binds the same root capabilities. ModelKit interprets ready/unmanaged as ready and forwards actual loading reports; callers choose required capabilities and activation time. No UI, Agent or AppLifecycle dependency is introduced.
-
 
 ModelLanguageProviding.chatModel(configuration:) 返回固定配置的轻量 ChatModel（能力句柄与可选模型名称），不占推理槽位，不要求调用方关闭或重开。ModelLanguageContainer.chat(request, using:) 直接指定配置，nil 为本地；普通 chat(request) 捕获当前默认配置。默认配置改变不替换在途实例。云端按不可变配置通过同根 ModelManager 复用客户端，沿用注册资源容量而不设置两个请求槽位；同客户端请求并行，各自取消/完成。根停止统一加入客户端与资源。
 

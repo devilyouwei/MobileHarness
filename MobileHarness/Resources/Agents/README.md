@@ -150,12 +150,11 @@ Assistant 配置显式声明 container.failure 标准输入及 runtime 来源订
 
 ApplicationControl 的配置声明 container.failure/runtime.failure observation 输入和 runtime 来源订阅。Assistant 保留容器异常的被动订阅；异常呈现使用角色代码中的内部权限，不向模型扩展函数目录。
 
-通信注册表只保留 Agent 消息与执行反馈；删除本地 UI／媒体／环境／故障的历史 schema 和仅供外部来源的测试声明，本地类型自身继续验证。
-
+通信注册表描述 Agent 消息和执行反馈。本地 UI、媒体、环境及故障输入使用各自的类型化接口。
 
 Writer 是面向作品的独立生成角色。Writer 接收 agent.task.request，由私有工作流决定接纳、补充、停止或拒绝。agent.task.response 将接纳、精选里程碑、追问、消息拒绝及终态送回 Assistant。普通进度由 Writer 自有灵动岛呈现。接纳、首次草稿保存、首次异常、追问和终态进入 Assistant 的统一 Q，由下一批模型选择性呈现，并保留后续对话事实。工作流与原生工具目录由 Writer 代码拥有。
 
-Writer 的公开 description 说明独立执行、委托生命周期和回馈。Writer 自有灵动岛显示进度、追问和终态。Assistant 将经过认证的精选控制事实按 Agent 来源入 Q，合并和选择性回复。真实用户输入可发起后续模型决策。
+Writer 的公开 description 说明独立执行、委托生命周期和回馈。
 
 Writer 在明确创建工作区时分配 workspace_N。发送端生成消息 UUID，Writer 接纳新目标时使用该身份申请内部执行授权。追问关联由运行时附带。
 
@@ -179,4 +178,12 @@ BasicSkill 的 Lifetime and completion 独占通用窗口生命周期教学：�
 
 独立的单段固定指令使用 `.md`。同一职责的多个具名字段放在一个 `.json` 中，固定规则正文也可作为其中一个字段，动态字段使用 `{{variable}}`。角色通用模板使用 `Prompts.json`，细分业务按职责命名，如 InputProtocol、InputDecision 和 ContentPrompts。角色标识、工具 Schema、执行限制和动态事实由各自运行时契约定义。
 
-提示词资源只供 cognition Agent 使用。Actions 的描述、参数、正常返回、异常与文件上下文完全由内部管理，不依赖 Resources；ModelKit 内部文本同样不参与本次迁移。
+提示词资源只供 cognition Agent 使用。Actions 的函数契约与 ModelKit 的内部推理文本由各自代码拥有。
+
+<a id="shared-prompt-templates"></a>
+
+## 共享提示词与模板
+
+[`Shared/`](Shared/)
+
+[OutputProtocol.md](Shared/OutputProtocol.md) 定义固定 Action 输出协议。[ActionCatalog.json](Shared/ActionCatalog.json)、[SkillCatalog.json](Shared/SkillCatalog.json) 和 [AgentCatalog.json](Shared/AgentCatalog.json) 定义目录排版。[RequestContext.json](Shared/RequestContext.json) 提供请求事实框架，[ExecutionFeedback.json](Shared/ExecutionFeedback.json) 和 [CommunicationContext.json](Shared/CommunicationContext.json) 定义回馈及通信模板。加载器按本轮协议、权限及实际数据选择资源。角色身份、输入策略和任务流程由各自配置拥有。

@@ -10,26 +10,16 @@ Domains, modules and individual actions remain extensible declarations and funct
 
 ```mermaid
 flowchart LR
-    App["App · Construction / lifecycle"] -.-> X
-    G["Gateway · Scheduling"] ==>|prepare / execute / discard| X
-    subgraph Execution["ACTIONS MODULE"]
-        X["ActionsContainer"] --> A["Business assembly / owned services"]
-        X --> L["Composable Domains · Modules · Functions"]
-        A --> L
-    end
-    X -.->|completion / failure| G
-    X --> C["FunctionContracts · Immutable catalog / execution ports"]
-    A --> F["Selected public foundation capabilities"]
-    classDef host fill:#eaf2ff,stroke:#5078b8,color:#203b64
-    classDef gateway fill:#fff2d9,stroke:#bf842c,color:#694511
-    classDef action fill:#ffecef,stroke:#b86178,color:#6b2b3d
-    class App host
-    class G gateway
-    class X,A,L action
-    style Execution fill:#fff5f6,stroke:#b86178
+    App["App"] -.->|dependencies and lifecycle| X["ActionsContainer"]
+    G["Gateway"] -->|prepare, execute, discard| X
+    X -->|completion and failure| G
+    X -->|immutable function metadata| C["Agents · authorization"]
+    X <-->|injected Task / perception / model-maintenance ports| C
+    X <-->|public capabilities and real outcomes| F["UI · PlatformKit · ModelKit · Storage"]
+    linkStyle default stroke:#64748b,stroke-width:1.5px
 ```
 
-Lifecycle uses dashed arrows, execution uses thick arrows, and results use dashed return arrows. Cognitive collaboration (Task control, perception connection, model maintenance) uses explicit host ports. Actions does not retain or search an upstream container.
+Cognitive collaboration uses neutral host ports bound by App. The execution root retains its domain services and the injected capabilities they use.
 
 ## Source and target ownership
 
@@ -45,9 +35,26 @@ Lifecycle uses dashed arrows, execution uses thick arrows, and results use dashe
 | [Speech](Speech/README.md) | Playback, listening, detection and native voice sessions. |
 | [System](System/README.md) | Provider, artifacts, device, Task host operations and diagnostics. |
 | [UI](UI/README.md) | Callable presentation and interaction facades using UI-owned protocols. Passive Agent activity interpretation remains with Agents. |
+| [Web](Web/README.md) | Remote navigation, observation and screenshot execution. |
+| [Artifacts](Artifacts/README.md) | Workspace files, streaming edits, render evidence and project windows. |
 | [Support](Support/README.md) | FunctionContracts plus explicitly compiled ExecutionRuntime and CallRuntime mechanisms. |
 
 FunctionContracts has no project dependencies. ExecutionRuntime and CallRuntime retain existing target identities with explicit source lists under Support. Actions imports them and selected foundation SDKs; directory placement alone grants no dependency.
+
+## Internal flow
+
+```mermaid
+flowchart TB
+    Declarations["CapabilityModules · canonical functions"] --> Assembly["BehaviorAssembly · Action / Tool projections"]
+    Assembly --> Catalog["Read-only catalog"]
+    Assembly --> Prepare["ActionsContainer.prepare · protocol, input and budget"]
+    Bindings["ActionsBusinessAssembly · domain services"] --> Execute
+    Prepare -->|single-use credential| Permit["execute admission · live resource context"]
+    Permit --> Execute["FunctionExecutor · validate and invoke domain handler"]
+    Execute -->|value, completion, or structured failure| Receipt["Execution outcome"]
+    Prepare -->|discard or invalidation| Release["Release preparation"]
+    linkStyle default stroke:#64748b,stroke-width:1.5px
+```
 
 ## Registration and validation
 
@@ -105,7 +112,7 @@ setSceneActive只调用原生场景服务的失活/加入端口，不暂停Actio
 
 ## Web operations
 
-[Web](Web/README.md) owns remote browsing, inspection, navigation and screenshot execution. [Artifacts](Artifacts/README.md) owns project storage, streaming edit transactions, immutable versions and multi-window presentation. ActionsBusinessAssembly injects foundation ports and returns a task-bound streaming continuation; short literal patches validate fresh read ownership and unique matches before atomic replacement; no development model runs inside Actions. Writer reaches keyword workspace search and existing-work presentation through native tools. Assistant delegates the goal. Explicit creation or entry prepares the editing session before file operations. Writer selects explicit rendering or per-edit streaming previews. Artifacts performs bounded native file operations and reports render evidence. Actions owns and joins scene preview restoration separately from scene admission, and a failed restoration is reported at its window.
+[Web](Web/README.md) owns remote browsing, inspection, navigation and screenshot execution. [Artifacts](Artifacts/README.md) owns current workspace files, streaming edit transactions, render evidence and multi-window presentation. ActionsBusinessAssembly injects foundation ports and returns a task-bound streaming continuation; short literal patches validate fresh read ownership and unique matches before atomic replacement; no development model runs inside Actions. Writer reaches keyword workspace search and existing-work presentation through native tools. Assistant delegates the goal. Explicit creation or entry prepares the editing session before file operations. Writer selects explicit rendering or per-edit streaming previews. Artifacts performs bounded native file operations and reports render evidence. Actions owns and joins scene preview restoration separately from scene admission, and a failed restoration is reported at its window.
 
 Camera与Web在创建UI窗口时显式提供各自图标。Actions只选择显示身份，UI.Window拥有图标接纳、最小化尺寸和原生渲染；不新增函数参数或资源访问链路。
 
@@ -125,9 +132,7 @@ Caption execution gives recognition and replies independent slots. SpeechPercept
 
 Artifacts拥有作品窗口的简洁标题/操作副标题、每项目最新快照和场景恢复。Writer通过Gateway提交命名/步骤；Actions内部直接更新UI，不重新通信。场景隐藏时保留文件与业务执行，渲染返回deferred；恢复不重开用户关闭或最小化的窗口。详见[Artifacts](Artifacts/README.md)。
 
-Artifacts receives the shared SQLite WorkspaceRepository through ActionsDependencies; Actions owns file/SQL publication ordering, editing and rendering, while Storage owns relational persistence. Generic value results have no single-result byte quota; model context remains an Agent concern.
-
-Artifacts consumes the neutral StorageDatabase.Workspaces contracts/coordinator and StorageFiles primitives. It never imports SQLite/GRDB; formats, rendering and acceptance remain Actions responsibilities.
+Artifacts receives a neutral WorkspaceRepository through ActionsDependencies. StorageDatabase.WorkspaceStore coordinates current file publication and its SQL index. Actions owns editing, format validation and rendering.
 
 Camera owns memory-only photo capture, automatic latest and explicit image selections, and saving by previewID. Opening the camera and taking a photo are independent Actions ordered by Gateway on the Camera Channel; takePhoto accepts a single-shot countdown without changing capture preferences. Its scoped State reader supplies immutable image attachments; ordinary inspection remains metadata-only. Storage owns bytes/persistence, Agents owns Skill selection, and App binds the interfaces.
 

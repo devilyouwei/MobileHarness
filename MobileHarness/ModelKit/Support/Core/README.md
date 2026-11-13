@@ -1,8 +1,6 @@
 # Inference Data, Sessions and Resource Admission
 
-✅ 统一异常封装 ModelFailure.swift 移到 ../../ModelFailure.swift，基础 ModelKit 编译归属保持；本目录不保留重复定义。
-
-✅ InferenceAdmission 同步关闭接纳并更新代际，旧加载等待与迟到结果不能越过暂停；ModelResource.suspend 取消并加入活动租约／加载、保留已加载权重。终止关闭不可恢复。InferenceSession 允许唯一故障观察者，迟安装仍收到一次真实失败；不增加消费任务或事件队列。
+InferenceAdmission 同步关闭接纳并更新代际，旧加载等待与迟到结果不能越过暂停；ModelResource.suspend 取消并加入活动租约／加载、保留已加载权重。终止关闭不可恢复。InferenceSession 允许唯一故障观察者，迟安装仍收到一次真实失败；不增加消费任务或事件队列。
 
 ## Summary
 
@@ -47,8 +45,6 @@ AudioFormat/AudioFrame validates model PCM and metadata, separate from PlatformK
 
 ModelResourceState is residency (unloaded/loading/ready/unloading/closed or unmanaged), not availability. CapabilityError/Availability provide neutral typed diagnostics; consumers localize and choose recovery.
 
-Explicit session backpressure, media boundaries and matching-ID resource admission are implemented.
-
 ## Shared worker cancellation
 
 InferenceTaskControl provides install/cancel/finish for one worker per request across Gemma, MOSS, Kokoro and OpenAI. Duplicate installation cancels the rejected worker and throws CapabilityError.inputBusy. Cancellation is idempotent, reaches late installation and runs outside the mutex. Finish releases the task reference and prevents a fast worker's late installation from retaining it again. Providers own joined cleanup and lease release; HTTP registration/cancellation remains OpenAI-owned. No worker queue or forced native interruption is introduced.
@@ -61,14 +57,9 @@ ModelLoadGate requires an explicit positive maximumConcurrentLoads. ModelContext
 
 [Parent design](../README.md)
 
-## 待实现
+模块根目录 [ModelFailure](../../ModelFailure.swift) 为只依赖Foundation的中立错误封装，仍编译于基础 ModelKit，结构同其他基础根；Source只记录包装处源码位置，不承诺异步调用堆栈。InferenceAdmissionError分类为unavailable／stopped，未知提供者错误为execution.failed并完整保留underlying，不在Core依赖领域能力或业务模块。
 
-- Durable event replay, inference waiting queues and forced native interruption are not implemented.
-
-
-✅ 模块根目录 [ModelFailure](../../ModelFailure.swift) 为只依赖Foundation的中立错误封装，仍编译于基础 ModelKit，结构同其他基础根；Source只记录包装处源码位置，不承诺异步调用堆栈。InferenceAdmissionError分类为unavailable／stopped，未知提供者错误为execution.failed并完整保留underlying，不在Core依赖领域能力或业务模块。
-
-✅ 已实现：ModelResource 在 actor 内通过实际无缓存资源加载分支报告 loading；已有缓存直接返回，不发送事件；共享任务的等待方按真实等待结束报告退出，错误仍传播，不新增线程或订阅队列。
+ModelResource 在 actor 内通过实际无缓存资源加载分支报告 loading；已有缓存直接返回，不发送事件；共享任务的等待方按真实等待结束报告退出，错误仍传播，不新增线程或订阅队列。
 
 ## Passive inference activity
 

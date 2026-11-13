@@ -7,7 +7,7 @@ One AgentContainer exposes stable Assistant, ApplicationControl, Memory, Photogr
 ## Current contract owners
 
 - [Agents](../../../MobileHarness/Agents/README.md#agent-container): root API, seven stable role capabilities, ownership and module failure contract.
-- [Support](../../../MobileHarness/Agents/Support/README.md#根生命周期机制): lifecycle algorithm, bounds, cancellation and cleanup.
+- [Support](../../../MobileHarness/Agents/Support/README.md#lifetime-bounds-and-failures): lifecycle algorithm, bounds, cancellation and cleanup.
 - [App composition](../../../MobileHarness/App/Composition/README.md): cached root, dependency graph and presentation wiring.
 
 ## Implementation

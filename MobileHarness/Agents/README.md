@@ -10,23 +10,17 @@ UI requests and native observations reach their responsible roles directly. Role
 
 ```mermaid
 flowchart LR
-    App["App · Construction / lifecycle"] -.-> A
-    subgraph Cognition["AGENTS"]
-        A["AgentContainer / AgentRuntime"] --> Roles["Roles · Private Context · Skill · Task"]
-        Roles --> Policy["InputGateway / OutputGateway<br/>Policy and decision authorization"]
-    end
-    Inputs["UI requests / Native observations"] --> Roles
-    Roles --> F["Selected ModelKit / Storage capabilities"]
-    Policy -->|authorized calls / messages| G["Injected Gateway ports"]
-    G -.->|outcomes / Signals| Policy
-    Catalog["Immutable FunctionContracts catalog"] -.-> Roles
-    classDef host fill:#eaf2ff,stroke:#5078b8,color:#203b64
-    classDef agent fill:#f0eaff,stroke:#8261b5,color:#463065
-    classDef gateway fill:#fff2d9,stroke:#bf842c,color:#694511
-    class App host
-    class A,Roles,Policy agent
-    class G gateway
-    style Cognition fill:#faf7fd,stroke:#b1a0c4
+    App["App"] -.->|lifecycle and injected host ports| Agents["Agents"]
+    UI["UI"] -->|typed requests| Agents
+    Platform["PlatformKit"] -->|native observations| Agents
+    Resources["Packaged Agent / Skill declarations"] --> Agents
+    Agents -->|inference requests| Model["ModelKit"]
+    Model -->|events / failures| Agents
+    Agents <-->|repositories / cache| Storage["Storage"]
+    Agents <-->|bound calls, Signals and feedback| Gateway["Gateway"]
+    Catalog["Actions catalog via FunctionContracts"] -->|immutable metadata| Agents
+    Agents -->|diagnostics and scoped presentation values| UI
+    linkStyle default stroke:#64748b,stroke-width:1.5px
 ```
 
 App binds camera/device/voice and maintenance collaboration through neutral ports. No adapter retains or searches an Actions/Gateway upstream container. The complete execution path is in the [overall design](../README.md); this diagram shows only direct neighbors.
@@ -46,7 +40,7 @@ cognition 表示认知职责；perception 包括感知预处理、快速响应�
 
 | Owner | Inputs and collaboration |
 | --- | --- |
-| [Assistant](Assistant/README.md) | Home text, Chat and private decision context; receives speech finals, owns asynchronous synthesis and delegates fixed Tasks; selects dynamic Skills. |
+| [Assistant](Assistant/README.md) | Home text, Chat and private decision context; receives speech finals, owns asynchronous synthesis and delegates peer work by addressed messages; selects dynamic Skills. |
 | [ApplicationControl](ApplicationControl/README.md) | Settings/resources/devices/diagnostics requests and device/artifact/failure observations; owns administrative and diagnostic policy. |
 | [Memory](Memory/README.md) | History requests and private context; authorizes history calls and fixed Task results. |
 | [Writer](Writer/README.md) | Background authoring tasks, workspace-scoped Skills and native tool schemas, raw file streams, fixed model selections and recoverable artifacts. |
@@ -58,6 +52,27 @@ cognition 表示认知职责；perception 包括感知预处理、快速响应�
 AgentContainer installs one AssistantStateBindings resolver backed by App local node reads. Loaded Skill.useStates alone controls exact paths; the producer-owned complete Business dictionary is projected. Ancestors/descendants are not implicitly read or disclosed. Generic Context/Chat remains independent of that policy. See [source mappings](Support/Context/README.md#container-context-read-path).
 
 AgentRuntime assembles cognitive services and role hosts. Its preparation stage returns a neutral business request to App. App calls ActionsContainer configuration, passes the resulting host ports into the single-use Agent validation stage, configures Gateway from the resulting configuration, then calls AgentContainer.bindExecution. AgentRuntime does not invoke Actions/Gateway configuration callbacks. Preparation and binding handles consume their continuation before execution; failures require scope rollback rather than retrying a partially prepared scope. Role-specific resource takeover policy is authored here and injected as opaque endpoint values. Native stop callbacks belong to the execution owner.
+
+## Internal flow
+
+```mermaid
+flowchart TB
+    Root["AgentContainer / AgentRuntime"] -.-> Roles
+    subgraph Roles["Role-owned entry points"]
+        Typed["Typed UI / native input"]
+        Peer["InputGateway · authenticated Signals / results"]
+        Role["Receiving role · local policy and lifecycle"]
+        Typed --> Role
+        Peer --> Role
+    end
+    Role -->|request-scoped context and capabilities| Support["Context / Chat / AgentCore"]
+    Support -->|parsed decisions or native calls| Role
+    Role -->|role, Skill and Task authorization| Output["OutputGateway"]
+    Output -->|neutral envelopes| Port["Bound Gateway ports"]
+    Port -->|Signals and scheduled results| Peer
+    Port -->|direct completion| Role
+    linkStyle default stroke:#64748b,stroke-width:1.5px
+```
 
 ## Native intake and semantic roles
 

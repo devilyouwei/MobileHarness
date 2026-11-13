@@ -46,8 +46,6 @@ Release/expiry/owner closure/shutdown observing an existing handoff uses bounded
 
 Production camera capture requires its persistent lease. NexArm's six motors share a writer group; concrete takeover is composed by App. Manual Settings control is an explicit host bypass. Software cleanup never proves hardware stop/arrival/clearance.
 
-Live occupancy, revocable permits and late-cleanup-safe handoff are implemented.
-
 ## Related design
 
 [Parent design](../README.md)

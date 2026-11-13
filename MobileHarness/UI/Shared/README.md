@@ -8,6 +8,7 @@
 | --- | --- |
 | UIRequests.swift | 泛型请求/回执、单消费者、容量和取消围栏 |
 | UIPresentation.swift | 呈现接纳、可用性接口与代际凭证 |
+| ExecutionIssue.swift | 调用方提供的结构化运行故障与呈现值 |
 
 模块级失败/回调与State契约分别位于根下[UIFailure.swift](../UIFailure.swift)和[UIStateSnapshot.swift](../UIStateSnapshot.swift)。具体输入/回执跟随功能owner，不在此集中定义；呈现凭证只授权UI状态接纳，不代表设备或业务权限。失活使旧实时凭证失效，停止关闭所有接纳；失败保留原始错误和清理错误，由上层决定如何展示。
 

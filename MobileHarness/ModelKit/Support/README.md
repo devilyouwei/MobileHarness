@@ -1,8 +1,8 @@
 # ModelKit Shared Support
 
-✅ 容器入口与统一异常定义移到 ModelKit 根目录；Support 只保留内部机制。ModelContainer 的编译拥有者仍为 ModelKitDefaults，ModelFailure 仍属于基础 ModelKit。
+模块根目录提供 ModelContainer 和 ModelFailure，分别由 ModelKitDefaults 与 ModelKit 编译。Support 提供共用机制。
 
-✅ 模块根目录的 ModelContainer 组合实例级默认装配与四个子能力，Management 提供注册／选择辅助；Core 提供同步 InferenceAdmission、可恢复资源暂停和流式错误观察。Provider 和资源机制保持隔离。
+模块根目录的 ModelContainer 组合实例级默认装配与四个子能力，Management 提供注册／选择辅助；Core 提供同步 InferenceAdmission、可恢复资源暂停和流式错误观察。Provider 和资源机制保持隔离。
 
 ## Purpose and boundaries
 
@@ -35,14 +35,8 @@ flowchart LR
  Host[Host implementations] -.-> Contracts
 ```
 
-Independent source ownership, neutral Core mechanisms, generic native execution, lifecycle/assembly boundaries and shared Apple PCM conversion are implemented.
-
 [Core](Core/README.md) · [Backends](Backends/README.md) · [Management](Management/README.md) · [Speech](Speech/README.md) · [Parent design](../README.md)
-
-## 待实现
-
-- General engine interchange and cross-model scheduling are not implemented. Capability and platform-specific limits are documented by the owning directory.
 
 ## Storage 文件作用域接入
 
-✅ 模型制品适配器由 App 注入 Files；后台回调复用同一制品服务。制品绑定停止时关闭接纳、取消并加入下载并保留清理错误，释放配置后允许在新 Files 作用域重新绑定，不停止无关模型实例。App 只转交接口与调度启停。
+模型制品适配器由 App 注入 Files；后台回调复用同一制品服务。制品绑定停止时关闭接纳、取消并加入下载并保留清理错误，释放配置后允许在新 Files 作用域重新绑定，不停止无关模型实例。App 只转交接口与调度启停。

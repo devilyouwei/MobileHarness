@@ -56,8 +56,6 @@ Diagnostics retains 256 records by default (configurable 1–4096), counted olde
 
 Eight observers receive newest-one complete snapshots, including initial/final state. The main scheduler also offers updated snapshots to the optional App callback. No observer await can block execution. The scheduler retains the canonical function path, bounded request parameter previews, and completion evidence into the execution ledger. Credential fields are masked before retention and each argument preview is limited to 2048 UTF-8 bytes. Failure text is limited to 512 characters. Tools never appear in this Action ledger.
 
-Bounded wait/FIFO scheduling, scoped feedback barriers and passive observation are implemented.
-
 ## Preparation and root lifetime
 
 The scheduler owns at most 128 preparation-admission tasks. It reserves Channel capacity before the asynchronous prepare hop, validates matching envelope/context and registered endpoint scope, and rechecks scope/admission after actor hops. Rejection discards the credential; each accepted job retains the same report store. Caller cancellation and matching scope cancellation join preparation as well as queued/running work.

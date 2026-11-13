@@ -29,8 +29,6 @@ One model lease and one send/finish operation reject overlap without queuing. Pe
 
 Cancel joins the active SDK call, clears session and releases lease without final event. Warmup executes silence through the same backend; no provider fallback occurs.
 
-Exact local-export validation and bounded multilingual streaming are implemented.
-
 ## Related design
 
 [Parent design](../README.md)
@@ -38,7 +36,3 @@ Exact local-export validation and bounded multilingual streaming are implemented
 ## Local Nemotron engine
 
 LocalNemotronEngine validates metadata/tokenizer and five compiled preprocessor/encoder/decoder/joint/decoder_joint graphs. The multilingual 2240 ms layout is shared on macOS/iOS; native mel/fused decoder state belongs to each session.
-
-## 待实现
-
-- Physical-device Chinese/English quality, end-to-end latency and sustained thermal/memory acceptance remains outstanding. [Provider evidence](../../../../../docs/validation/Nemotron-Validation.md) is maintained separately.

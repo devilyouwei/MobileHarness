@@ -42,8 +42,19 @@ ProviderSettingsStore 是 actor，以 busy 排斥重叠读写，保存 version=1
 
 替换时先写新凭据，再按 revision 保存文档；文档失败时尽力删除新凭据，提交成功后尽力删除旧凭据。凭据清理是 best effort，可能留下无引用记录，不将已提交配置改判为未提交。原生凭据策略及原始网络错误不进入协议结果；安全失败码与有界摘要由 ProviderSettingsError 提供。
 
-
 [所属域设计](../README.md) · [Actions 模块](../../README.md)
+
+### 保存与失败路径
+
+```mermaid
+flowchart TB
+    Draft["会话私有草稿 · requestID"] --> Resolve["解析对应请求并校验配置"]
+    Resolve --> Commit["ProviderSettingsService · 保存事务"]
+    Commit --> Apply["持久化配置和凭据后应用运行时配置"]
+    Apply -->|成功| Success["确认保存结果"]
+    Apply -->|应用失败| Rollback["加入文档回滚并保留两类失败"]
+    Commit -->|持久化失败| Failure["返回保存失败并清理暂存凭据"]
+```
 
 ## 多 Provider 管理
 
@@ -58,7 +69,6 @@ SettingsProviderAdapter 的结果呈现调用显式忽略 UI 返回的接纳布�
 ## Execution ownership and lifecycle
 
 ProviderSettingsClient is an Actions-owned facade with coalesced restoration (at most 32 waiters) and joined shutdown. Provider draft/configuration and staging ports live in FunctionContracts; ApplicationControl owns cognitive authorization. UI SettingsFormController owns bounded discovery presentation workers and exposes joined shutdown, invoked by Actions cleanup.
-
 
 设置文档包含 Assistant 选择 cloud、共享 providers 列表和 Writer、Decision 的独立选择。编辑 Provider 保留稳定 ID。Writer 获取其绑定的 Provider 和钥匙串凭据。未绑定云端时，旧设置仍可解析到本地能力，Agent Brains 将 Writer 显示为未配置，因为 Gemma 缺少其所需的原生工具调用。
 

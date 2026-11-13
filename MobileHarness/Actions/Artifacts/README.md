@@ -18,12 +18,29 @@ ArtifactPresentation 连接 UI 页面/窗口与 StorageFiles 临时预览；每�
 
 同项目呈现通过独立串行门合并为安全磁盘/导航顺序，最多两个可取消等待者，超限显式 busy；不同项目仍可独立进行。关闭先标记页面退出，导航中断返回“草稿保留、视觉验证不可用”，再加入呈现并清理双缓冲目录；最小化期间保留最新快照供恢复时呈现。Writer 的 open/delete 同样持有项目锁，不能与正在编辑的项目并发。
 
+### 编辑流与发布
+
+```mermaid
+flowchart TB
+    Start["已授权 edit · 校验会话和读取引用"] --> Open["建立编辑流并返回 streamID"]
+    Open --> Append["逐片追加 · 调用方背压"]
+    Append --> Draft["草稿检查点"]
+    Draft -->|可选| Preview["安全快照 · 预览不执行脚本"]
+    Draft --> Complete["完成流 · 提交当前文件和索引"]
+    Complete --> Render["显式 render · 当前草稿的证据"]
+    Render --> Gate{"当前渲染资格和诊断"}
+    Gate -->|有资格| Publish["publish · 校验后提交作品"]
+    Publish --> Joined["调用方 release · 加入工作并关闭编辑会话"]
+    Gate -->|缺失资格或已报告错误| Reject["返回原因 · 保留草稿"]
+    Reject -->|修订或重渲染| Render
+    Append -->|取消 / 撤销| Cleanup["加入在途操作并清理 · 保留已提交事实"]
+```
+
 ## 文件工具与修改一致性
 
 所有操作限定在 StorageFiles.workspaces 内，不使用 Shell。目录由相对文件路径隐式形成，不保存空目录；list(path) 返回目录下文件和字节数。move/removeTree 在读取全部受影响文件后验证整个候选草稿再更新，拒绝穿越/覆盖/路径冲突；入口禁止删除，移动入口同步更新 entry，链接内容不自动改写。相对文件的新建和最后文件的删除分别形成/移除隐式目录。
 
 read 返回内容、起始行、字符范围、文件版本和宿主引用。limit 指定正数行数或字符数，省略时分别读取 60 行或 2500 字符，后续读取可使用 nextOffset。修改文件只失效该文件引用，其他引用继续有效。edit 的 contextReferences 使用同一会话的有效读取引用，宿主校验版本后装配关联片段。字符 start/end 可进一步缩小已读取范围。edit 指令、搜索词、作品标题和相对路径没有 Artifacts 自定长度门槛。相对路径仍校验文件类型、路径成分与沙盒，实际文件系统错误由存储层报告。
-
 
 ## 预览与诊断
 
@@ -68,8 +85,6 @@ replace使用fresh read引用约束字面旧文本，唯一匹配后原子替换
 窗口身份在等待首次呈现前预留并绑定，切后台导致回执中断时保留同一窗口，不按标题猜测归属。正在渲染时隐藏转换为 deferred，截图不可见返回 nil。显式文件与渲染命令保留原始失败结果。UI窗口生命周期与Writer执行独立。后台CPU/进程存活由系统控制，本能力不伪造后台运行权限。
 
 ## Workspace and editing identities
-
-
 
 Writer passes a workspace_N identity to library, editing and preview interfaces. ArtifactService dispatches by canonical Action path. Each open uses the selected workspace gate and reports its own window result. Library inventory includes workspaceID, title, entry and state. Storage derives the writer/workspace_N directory from the typed identity.
 

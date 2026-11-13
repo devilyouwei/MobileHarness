@@ -21,14 +21,16 @@ flowchart LR
 
 ## Catalog contract
 
-`Contents.json` uses asset-catalog version 1 and Xcode author metadata. [AppIcon](AppIcon.appiconset/README.md) provides the universal iOS icon. Build-time asset compilation resolves packaging; this directory has no model weights, prompt catalog or dynamic resource loader.
-
-Asset catalog and selected icon.
+`Contents.json` uses asset-catalog version 1 and Xcode author metadata. [AppIcon](#app-icon) provides the universal iOS icon. Build-time asset compilation resolves packaging; this directory has no model weights, prompt catalog or dynamic resource loader.
 
 ## Related design
 
-[Parent design](../README.md) · [AppIcon.appiconset](AppIcon.appiconset/README.md)
+[Parent design](../README.md) · [AppIcon.appiconset](#app-icon)
 
-## 待实现
+<a id="app-icon"></a>
 
-- 暂无本目录独立的实现待办；跨模块及实际模型/设备验收见所属模块说明。
+## Universal iOS icon
+
+[`AppIcon.appiconset/`](AppIcon.appiconset/)
+
+[Contents.json](AppIcon.appiconset/Contents.json) declares the universal iOS 1024×1024 [AppIcon.png](AppIcon.appiconset/AppIcon.png). [The icon selection script](../../../scripts/select-app-icon.sh) copies the chosen artwork into the app icon set before asset compilation. The project banner is maintained as a separate asset.

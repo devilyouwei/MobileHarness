@@ -125,7 +125,7 @@ stage 以待领取项加 completed 项少于 32 作为准入条件。❌ 发现�
 
 ## MobileHarness/Actions/UI/Support/README.md
 
-[现行 README](../../MobileHarness/Actions/UI/Support/README.md)
+[现行 README](../../MobileHarness/Actions/UI/README.md#ui-shared-ports)
 
 ````markdown
 ## 姿态载荷与校验
@@ -1476,7 +1476,7 @@ Model exposure comes from [../../Resources/Agents/VisionPerception/Agent.json](.
 
 ## MobileHarness/App/Workflows/Presentation/README.md
 
-[现行 README](../../MobileHarness/Actions/UI/Support/README.md)
+[现行 README](../../MobileHarness/Actions/UI/README.md#ui-shared-ports)
 
 ````markdown
 ## Vision replacement
@@ -1516,7 +1516,7 @@ Tool feedback uses a fresh ten-second admission deadline, preserved root/parent/
 
 ## MobileHarness/Gateway/Output/Dispatch/README.md
 
-[现行 README](../../MobileHarness/Gateway/Output/Dispatch/README.md)
+[现行 README](../../MobileHarness/Gateway/Output/README.md#dispatch)
 
 ````markdown
 ## Result and cancellation contract
@@ -1562,7 +1562,7 @@ Capture ExecutionOwner and original causality before execution. Return feedback 
 
 ## MobileHarness/Gateway/Output/Results/README.md
 
-[现行 README](../../MobileHarness/Gateway/Output/Results/README.md)
+[现行 README](../../MobileHarness/Gateway/Output/README.md#results)
 
 ````markdown
 ## Effect and failure evidence
@@ -1720,7 +1720,7 @@ Capture ExecutionOwner and original causality before execution. Return feedback 
 
 ## MobileHarness/ModelKit/Support/Backends/CoreML/README.md
 
-[现行 README](../../MobileHarness/ModelKit/Support/Backends/CoreML/README.md)
+[现行 README](../../MobileHarness/ModelKit/Support/Backends/README.md#coreml)
 
 ````markdown
 ## Interfaces and algorithms
@@ -1784,7 +1784,7 @@ Capture ExecutionOwner and original causality before execution. Return feedback 
 
 ## MobileHarness/ModelKit/Support/Speech/Apple/README.md
 
-[现行 README](../../MobileHarness/ModelKit/Support/Speech/Apple/README.md)
+[现行 README](../../MobileHarness/ModelKit/Support/Speech/README.md#apple-pcm)
 
 ````markdown
 ## Encoding rules
@@ -2012,7 +2012,7 @@ HistoryPresentationAdapter validates root session/source, reads actual records a
 
 ## MobileHarness/Resources/Assets.xcassets/AppIcon.appiconset/README.md
 
-[现行 README](../../MobileHarness/Resources/Assets.xcassets/AppIcon.appiconset/README.md)
+[现行 README](../../MobileHarness/Resources/Assets.xcassets/README.md#app-icon)
 
 ````markdown
 ## Asset declaration
@@ -2207,7 +2207,7 @@ sequenceDiagram
 
 ## MobileHarness/Storage/Devices/README.md
 
-[现行 README](../../MobileHarness/Storage/Database/Devices/README.md)
+[现行 README](../../MobileHarness/Storage/Database/README.md#devices)
 
 ````markdown
 ## Outstanding work

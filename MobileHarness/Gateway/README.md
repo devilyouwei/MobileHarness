@@ -10,35 +10,15 @@ Agents owns role instances, communication policy, Skill/Task availability and au
 
 ```mermaid
 flowchart LR
-    App["App · Lifecycle"] -.-> G
-    subgraph Callers["BOUND ENDPOINTS"]
-        A["Caller A"]
-        B["Caller B"]
-    end
-    subgraph Coordination["GATEWAY"]
-        G["GatewayContainer"] --> T["SignalTransport"]
-        G --> Q["ChannelScheduler / DirectExecutionDispatcher"]
-        Q --> R["ResourceCoordinator"]
-        Q --> O["Result outbox / diagnostics"]
-    end
-    A -->|validated envelope| T
-    T -.->|opaque payload| B
-    Q ==>|neutral prepare / execute / discard| X["Injected execution port"]
-    X -.->|real completion / failure| Q
-    O -.->|identity-bound delivery| A
-    classDef host fill:#eaf2ff,stroke:#5078b8,color:#203b64
-    classDef agent fill:#f0eaff,stroke:#8261b5,color:#463065
-    classDef gateway fill:#fff2d9,stroke:#bf842c,color:#694511
-    classDef action fill:#ffecef,stroke:#b86178,color:#6b2b3d
-    class App host
-    class A,B agent
-    class G,T,Q,R,O gateway
-    class X action
-    style Coordination fill:#fffbef,stroke:#bf842c
-    style Callers fill:#faf7fd,stroke:#b1a0c4
+    App["App"] -.->|configure and control lifecycle| G["GatewayContainer"]
+    Agent["Bound Agents adapters"] -->|Signal, Action or Tool envelope| G
+    G -->|delivery, admission or terminal result| Agent
+    G -->|prepare, execute, discard via FunctionContracts| X["ActionsExecutionPort"]
+    X -->|descriptor / completion / failure| G
+    linkStyle default stroke:#64748b,stroke-width:1.5px
 ```
 
-Dashed lifecycle/return arrows, solid request arrows and thick execution arrows distinguish responsibilities. Returned callbacks do not introduce reverse implementation dependencies.
+The App edge shows lifecycle and configuration. Solid arrows show requests, delivery and returned data.
 
 ## Internal ownership
 
@@ -46,12 +26,28 @@ Dashed lifecycle/return arrows, solid request arrows and thick execution arrows 
 | --- | --- |
 | GatewayContainer / GatewayFailure | Configuration, admission, revision-fenced foreground transitions, main facilities and bounded isolated scopes. |
 | [Input](Input/README.md) | Opaque Signal delivery, endpoint tokens/incarnations, envelope checks, bounded sends and joined retirement. |
-| [Output/Dispatch](Output/Dispatch/README.md) | Neutral envelopes, scheduling requests and bounded direct execution. |
+| [Output/Dispatch](Output/README.md#dispatch) | Neutral envelopes, scheduling requests and bounded direct execution. |
 | [Output/Scheduling](Output/Scheduling/README.md) | Channel FIFO, wait groups, joined cancellation and passive execution snapshots. |
 | [Output/Resources](Output/Resources/README.md) | Opaque endpoint policy, leases, revocable permits and joined takeover. |
-| [Output/Results](Output/Results/README.md) | Correlated neutral completion, bounded delivery retry and failure evidence. |
+| [Output/Results](Output/README.md#results) | Correlated neutral completion, bounded delivery retry and failure evidence. |
 
 Registration, function execution and protocol adapters compile from Actions/Support. Role routing, coverage and policy validation compile from Agents/Support. Those implementations are not retained here as alternate execution paths.
+
+## Internal flow
+
+```mermaid
+flowchart TB
+    Envelope["Bound endpoint and live scope"] --> Route{"Envelope kind"}
+    Route -->|Signal| T["SignalTransport · endpoint delivery"]
+    Route -->|Action| Q["ChannelScheduler · admission and FIFO"]
+    Route -->|Tool| D["DirectExecutionDispatcher · bounded active calls"]
+    Q --> Prepare["Prepare and acquire resource permit"]
+    D --> Prepare
+    Prepare --> Execute["Execute and join cleanup"]
+    Execute -->|scheduled| Outbox["ActionResultLedger · delivery and retry"]
+    Execute -->|direct| Return["Correlated return"]
+    linkStyle default stroke:#64748b,stroke-width:1.5px
+```
 
 ## Admission and execution
 

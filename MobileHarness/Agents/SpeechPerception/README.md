@@ -72,14 +72,15 @@ SpeechPerception 在 user.input 主题发布 user.input.asr.partial 和 user.inp
 ## 内部结构与执行链
 
 ```mermaid
-flowchart LR
+flowchart TB
  subgraph Injected["注入基础能力"]
+ direction LR
  U["UI.home.listeningRequests"]:::ui
  P["Platform.audio：只读 PCM／采集代"]:::platform
  M["ModelKit：VAD／ASR"]:::model
  end
  subgraph Role["SpeechPerception"]
- V["VoiceInteractionSession：能力装配／语音与检测会话生命周期"]:::agent
+ V["VoiceInteractionSession · 语音和检测生命周期"]:::agent
  L["同意／采集代／播放准入"]:::agent
  N["Microphone 消费：一个长期任务"]:::agent
  R["声道选择／16kHz resampler"]:::agent
@@ -98,9 +99,9 @@ flowchart LR
  M <--> T
  L --> G["Gateway"]:::gateway
  T --> G
- G --> X["Speech.Listening.update<br/>Speech.Listening.prepare"]:::action
- G --> Y["UI.Caption.setTranscript<br/>UI.Caption.finishTranscript<br/>UI.VoiceState.setVoiceState"]:::action
- X --> PC["Platform.audio：权限／采集／播放屏障"]:::platform
+ G --> X["Actions · 聆听控制"]:::action
+ G --> Y["Actions · 字幕和语音状态"]:::action
+ X --> PC["PlatformKit · 权限、采集和播放"]:::platform
  X --> UE["UI.home：准备提示／触觉等效果"]:::ui
  Y --> UC["UI.home：字幕／语音状态"]:::ui
  S --> AP["注入 Actions 频谱／检测呈现服务"]:::action
@@ -160,8 +161,7 @@ Mono publishes unavailable once per format/listening epoch and still supports AS
 
 `reportError` 未校验输出 yield，32 槽满载／关闭时诊断可能丢失；普通输出失败会显式抛错。
 
-
-通信见 [Agent.json](../../Resources/Agents/SpeechPerception/Agent.json)，原生执行见 [Actions/Speech](../../Actions/Speech/Support/README.md)。
+通信见 [Agent.json](../../Resources/Agents/SpeechPerception/Agent.json)，原生执行见 [Actions/Speech](../../Actions/Speech/README.md#speech-shared-contracts)。
 
 AudioDetectionAgentSession 只注册检测角色、构造模型 Context 并绑定结果泵；Actions 中的 AudioDetectionSession 经中立连接端口组合该角色与 AudioDetectionExecution，不消费或转交原始 PCM。播放失败文案由 [Assistant](../Assistant/README.md#语音生产与播放) 拥有，感知角色只处理识别与聆听政策。
 

@@ -23,8 +23,6 @@ Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注�
 
 [Support](Support/README.md) 仅维护跨业务能力共用的契约或算法。
 
-
-
 ## 接口与电机范围
 
 目录包含十一项有限运动函数及一项跟踪发布函数。
@@ -43,13 +41,25 @@ Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注�
 
 运动请求以 GestureRequest 或注入闭包传递。有限动作要求新鲜反馈判定完成；aim 只确认最新目标发布，跟踪和资源持有属于根 worker。`NexArm.Tracking.aim` 接收 base/pitch 位置弧度，直接映射为有限编码器位置目标。单目标位置算法使用 3 count 死区，有限前瞻不超过本次已接纳目标步幅并钳制到 PlatformKit 六轴位置范围；根据实际采样间隔选择位置动作速度，最高速度与原生参数校验由 PlatformKit 提供。跟踪 worker 使用 SDK 的 50 ms 更新间隔，手动 worker 使用 SDK 的最小 BLE 写间隔；原生链路最终执行连接级限频与背压。首次接纳包包含肩/肘水平准备，后续只寻址1/4，不操作5/6。停止只关闭并加入 live session，不再补发目标、扭矩、模式或持续速度指令。收到包不等于实际到位；设备须预先处于位置模式。
 
+## 控制链路
+
+```mermaid
+flowchart TB
+    Link["Connection · 当前设备和连接代"] --> Control["NexArmControlService · 模式及资源准入"]
+    Move["Motion · 有限计划"] --> Control
+    Manual["手动控制 · 当前目标"] --> Control
+    Track["Tracking · 最新目标槽"] --> Control
+    Control --> Native["PlatformKit NexArm · 连接级写入和反馈"]
+    Native -->|匹配连接的新鲜位置| Control
+    Control -->|有限动作| Report["逐电机实际结果与清理错误"]
+    Control -->|持续控制| Live["保留活动会话并加入替换或停止"]
+```
 
 ## 资源与预算
 
 NexArmRegistration 将资源命名为 `nexarm.motor.1` 至 `.6`。nod/shakeHead 只声明相应电机，move/resetMotor 解析指定电机，其余有限动作声明 1…5。无效单电机参数不能据空解析结果取得运动授权，函数参数校验仍会拒绝执行。
 
 有限函数使用 dynamicTimeout。注册前按速度/加速度、最大合法行程、动作段数估算：段内电机预算取最大，段间求和，每段包括一秒发送准入余量，整体再加入五秒准备/清理余量。实际逐电机 deadline 由控制器按已获得的位置计算。预计时间不插入最低等待，预算不包含调度排队。aim 使用共享的默认 30 秒发布预算。
-
 
 ## 完成、状态与失败
 

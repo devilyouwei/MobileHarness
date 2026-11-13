@@ -24,7 +24,7 @@
 
 首次安装时 iPhone 17 Pro 为 unavailable，CoreDeviceError 4016 拒绝建立受信连接／设备服务断言；没有安装成功。日志 `/tmp/mh-readable-preview-2026110608-install.log` 与同名 JSON。最终设备清单仍为 unavailable，见 `/tmp/mh-readable-preview-2026110608-devices-final.json`；未再次安装或尝试启动。此前单独确认的设备版本为 2026110607，不能把本轮成功构建当作成功更新。
 
-未执行真实视觉模型、实际拍照或聊天记录页面的原生视觉验收。自动测试使用明确的图片字节／模型替身。当前技术契约见 [共享 Chat](../../MobileHarness/Agents/Support/Chat/README.md#request-only-state-images)、[Camera](../../MobileHarness/Actions/Camera/README.md#memory-previews-and-multimodal-state) 和 [SQLite](../../MobileHarness/Storage/Database/README.md)。
+未执行真实视觉模型、实际拍照或聊天记录页面的原生视觉验收。自动测试使用明确的图片字节／模型替身。当前技术契约见 [共享 Chat](../../MobileHarness/Agents/Support/Chat/README.md#request-only-state-images)、[Camera](../../MobileHarness/Actions/Camera/README.md#session-previews-state-and-gallery) 和 [SQLite](../../MobileHarness/Storage/Database/README.md)。
 
 变更文档的本地链接与 `git diff --check` 已校验。原生窗口测试／运行器完成性和手机连接恢复后的安装、界面与真实视觉模型验收仍需单独确认。
 

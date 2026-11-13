@@ -81,7 +81,7 @@ ServiceFactories supplies ActionsDependencies through the App callback bridge, a
 
 ApplicationPresentation requires bootstrap and delegates complete session availability to SpeechPerception.presentation. Gateway owns runInCurrentContext, coordinated acquire and isSettled; the resource adapter contains only forwarding and boundary error conversion. Foreground model requirements come from Agents and preparation steps come from ModelKit. ServiceFactories maps those generic steps into the App-owned lifecycle coordinator without inspecting ModelState or selecting model providers.
 
-ApplicationContainer caches the root window capability; AgentContainer and ApplicationPresentation receive that same WindowState. The root attaches WindowHost above persistent navigation. Navigation visibility affects home model preparation but no longer calls camera admission; Actions handles camera scene and window lifecycle.
+ApplicationContainer caches the root window capability; AgentContainer and ApplicationPresentation receive that same WindowState. The root attaches WindowHost above persistent navigation. Navigation visibility gates home model preparation. Actions handles camera scene and window lifecycle.
 
 ApplicationPresentation.cameraPreview builds the photo renderer with showsPose=false. The root retains the separate Face background visual renderer, shares the same native camera injection, and uses actual native image aspect to update the camera window sizing policy. Composition creates no second capture session.
 

@@ -1,5 +1,7 @@
 # 已完成需求归档
 
+- [MobileHarness 技术文档核对](Readme-Ownership-Audit.md)（2026-11-14）。总设计、九个一级模块和子目录的职责、数据流与实现说明同步。
+
 - [Agent 静态类别](Agent-Categories.md)（2026-11-10）：perception/cognition 资源声明、运行时身份保留与严格配置校验。
 
 - [Writer 按 ID 直接打开和进入](Writer-Direct-Workspace-Access.md)（2026-11-10）。已知工作区 ID 可直接使用，搜索用于发现作品。

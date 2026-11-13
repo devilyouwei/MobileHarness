@@ -2,7 +2,7 @@
 
 ## 职责与接口
 
-✅ StorageFiles 只依赖 StorageCore、Foundation/Synchronization。FilesContainer 配置 settings/photos/models/workspaces 四个命名空间，公开 document(Value.self, in:name:) 与 file(namespace:)。具体业务 Codable 类型留在调用方；照片字节、配置文档与模型目录共享文件拥有者，但保留不同访问能力。
+StorageFiles 只依赖 StorageCore、Foundation/Synchronization。FilesContainer 配置 settings/photos/models/workspaces 四个命名空间，公开 document(Value.self, in:name:) 与 file(namespace:)。具体业务 Codable 类型留在调用方；照片字节、配置文档与模型目录共享文件拥有者，但保留不同访问能力。
 
 DocumentStore 提供 load/refresh/invalidate、UUID revision 的 save/CAS 和 replace。FileDocumentStore 保留 envelope version 1、默认 64 KiB、按文件的进程内 CAS 锁和原子替换；MemoryDocumentStore 是显式内存替身。FileStore 提供有界 read/info、putIfAbsent、remove 和有界列举；DiskFileStore 另提供真实目录、空间预留和发布，MemoryFileStore 是显式内存替身，不伪造文件 URL。
 
@@ -16,15 +16,11 @@ DocumentStore 提供 load/refresh/invalidate、UUID revision 的 save/CAS 和 re
 
 [Storage](../README.md)
 
-## 待完成
-
-❌ 跨进程文档 CAS、物理存储保护验收；不提供自动磁盘/内存回退。
-
 ## 统一容器异常通道
 
-✅ FilesContainer 与 FileAccess 将相同错误报告器传入 DiskFileStore/FileDocumentStore，工厂及实际文件操作异常原样抛出并报告；不增加磁盘回退或重试，回调不等待消费者。
+FilesContainer 与 FileAccess 将相同错误报告器传入 DiskFileStore/FileDocumentStore，工厂及实际文件操作异常原样抛出并报告；不增加磁盘回退或重试，回调不等待消费者。
 
-✅ FileStorageError 与其他存储值错误一致声明 Equatable/Sendable，FileStore/DocumentStore 保持独立协议；显式内存后端是受限的可用实现，不是生产失败时的隐式回退。
+FileStorageError 与其他存储值错误一致声明 Equatable/Sendable，FileStore/DocumentStore 保持独立协议；显式内存后端是受限的可用实现，不是生产失败时的隐式回退。
 
 ## Passive state reads
 

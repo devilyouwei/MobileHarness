@@ -41,12 +41,6 @@ ASR provides Nemotron/Apple; TTS provides MOSS/Apple plus isolated Kokoro; VAD p
 
 Apple's transcriber/detector share analyzer state; normal detector activity callbacks are not assumed usable, so consumers use a separate VoiceActivityCapability for endpoint interpretation. Local graph resources are provisioned through Management, never during inference.
 
-Independent managed speech capabilities and shared codec adaptation are implemented.
-
 ## Related design
 
 [Parent design](../README.md) · [ASR](ASR/README.md) · [Shared support](../Support/Speech/README.md) · [TTS](TTS/README.md) · [VAD](VAD/README.md)
-
-## 待实现
-
-- No additional implementation work is declared for the current capability group. Provider-specific limitations and acceptance work are documented by ASR/TTS/VAD owners.

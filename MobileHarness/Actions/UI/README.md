@@ -24,7 +24,7 @@ Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注�
 | [Resources](Resources/README.md) | 只呈现真实资源快照、结果与已分类错误，不发起下载或修改模型偏好 |
 | [Runtime](Runtime/README.md) | 运行异常分类属于 ApplicationControl，本目录校验已分类值并呈现；蓝牙展示只更新事实，不连接或控制设备 |
 
-[Support](Support/README.md) 仅维护跨业务能力共用的契约或算法。
+[Support](#ui-shared-ports) 提供跨业务能力共用的呈现端口。
 
 ## 接口与完成语义
 | 模块 | 函数与参数 | 完成边界 |
@@ -61,3 +61,11 @@ WindowModule and WindowExecutionService in Navigation provide generic window con
 Runtime中的IslandActions.execute统一注册的UI.Island调用，IslandPresentationService只校验身份、内容并执行UI端口。各Agent自己管理展示语义及内部调用；Actions根仅持有执行服务，不持有跨角色展示观察器。有限调用完成与长期活动寿命分别定义，见[Runtime](Runtime/README.md)。
 
 灵动岛领域适配声明中立摘要、阶段提醒与详情内容；UI独占前台组件动画/挂载、ActivityKit提交、容量合并和结束生命周期。系统框架不进入Actions；UI.Island.setPresentation设置compact/expanded，后者要求通用detail；尺寸/动画由组件管理。
+
+<a id="ui-shared-ports"></a>
+
+## UI 共享呈现端口
+
+[`Support/`](Support/)
+
+[UIPresentationCapabilities.swift](Support/UIPresentationCapabilities.swift) 将转写与回复呈现交给各自的端口。会话控制器验证 `beginReplyTurn` 并更新回复字幕槽。共用文字、语音状态、视线值与错误见 [UIPresentationTypes.swift](../Support/Contracts/UIPresentationTypes.swift)。

@@ -13,11 +13,35 @@ App creates and retains the unique scoped roots, injects narrow public interface
 | Agents | One AgentContainer receiving Gateway ports, immutable metadata and neutral host collaboration ports. |
 | AppLifecycle | Generic ManagedService graph, preparation, rollback and foreground barriers. |
 
+## Upstream and downstream
+
+```mermaid
+flowchart TB
+    OS["iOS · scene and background callbacks"] --> App["App · composition and lifecycle"]
+    App <-.->|roots, ports and readiness| Foundation["UI · PlatformKit · ModelKit · Storage"]
+    App <-.->|bindings, lifecycle and cleanup| Business["Agents · Gateway · Actions"]
+    linkStyle default stroke:#64748b,stroke-width:1.5px
+```
+
 ## Internal structure
 
 [Composition](Composition/README.md) owns registration, factories, public adapters and lifecycle installation. [Lifecycle](Lifecycle/README.md) owns the generic graph and preparation/system callback mechanisms. MobileHarnessApp mounts UI.ApplicationRootView and forwards Scene state. ApplicationPresentation composes existing UI/role interfaces; pages do not own module work.
 
 ServiceFactories creates roots and thin adapters. Actions constructs domain services and business functions; Agents constructs cognitive roles and policy. App injects Task control/perception/resource interfaces without decoding business schemas or interpreting resource ownership. Domains, modules and functions have no App registrations or peer containers.
+
+## Internal flow
+
+```mermaid
+flowchart TB
+    Host["MobileHarnessApp / system delegate"] --> Composition["AppComposition · scoped services"]
+    Composition --> Factories["ApplicationContainer / ServiceFactories"]
+    Factories --> Registration["ModuleRegistration · roots and adapters"]
+    Registration --> Life["ApplicationLifecycle · start, scene, stop"]
+    Life --> Presentation["ApplicationPresentation"]
+    Life --> Preparation["ForegroundPreparation"]
+    Life -->|startup failure| Rollback["Joined rollback"]
+    linkStyle default stroke:#64748b,stroke-width:1.5px
+```
 
 ## Lifecycle and failure
 

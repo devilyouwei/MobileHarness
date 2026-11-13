@@ -96,6 +96,8 @@
 
 - [Execution layer cleanup](Execution-Layers-Cleanup.md): redundant adapters/contracts, physical/Xcode source ownership, context snapshot regression and automated/build evidence.
 
+- [MobileHarness 技术文档核对](Readme-Ownership-Audit.md)记录目录覆盖、链接、Mermaid 渲染及仓库检查。
+
 - [Overall technical design audit](Overall-Design-Audit.md): source-aligned root/authorization/routing contracts, corrected workflow figure placement, 23 rendered Mermaid figures and a tracked execution-policy discrepancy.
 
 - [Native input and internal Signal overview](Signal-Flow-Overview.md): direct sensory/local intake, perception/cognition responsibilities, semantic role communication and execution/feedback, with rendered diagram and evidence boundaries.

@@ -1,22 +1,11 @@
 # Common Storage Mechanisms
 
-✅ StorageFailure.swift 的物理文件移到模块根，仍由 StorageCore 编译；Support 的 Contracts／Memory 继续复用该定义，不引入根容器目标依赖。
+## 职责与边界
 
-✅ StorageCore 编译 Contracts 与 Memory，无其他项目或第三方依赖。Contracts 提供 Storage 模块内统一 State 数据契约、身份、持久化标识、通用错误和指纹；Memory 提供有界流、owner 租约与接纳门。Cache、Files、数据库领域和后端使用这些机制。
-
-文件与文档契约归 Files；运行状态归所属外部 Container；音频归 Cache/Audio；数据库核心归 Database 根目录，共用业务归 Database/Shared，领域 SQL 实现归各业务表目录。公共机制不解释业务状态、模型、设备、UI 或 SQL schema，不提供全局查找与后端回退。
-
-[契约](Contracts/README.md) · [内存机制](Memory/README.md) · [Storage](../README.md)
-
-## 待完成
-
-❌ 新机制须由实际消费者需要驱动；不增加空适配后端。
+StorageCore 编译 [Contracts](Contracts/README.md)、[Memory](Memory/README.md) 和模块根的 [StorageFailure.swift](../StorageFailure.swift)。Contracts 定义共享标识、结构化状态、持久化和错误值。Memory 提供有界流、拥有者租约与接纳门。Cache、Files 和数据库仓库复用这些机制。
 
 ## 统一容器异常通道
 
-✅ StorageFailureReporter 属于 StorageCore，仅 Foundation；统一非阻塞错误回调，普通 CancellationError 不升级。它不存储历史、不执行 UI/Agent 或重试。
+StorageFailureReporter 向宿主的注入回调传递结构化 StorageFailure，保留组件、操作、原始错误和清理失败。取消证据保留在原错误中。报告器由调用方提供有界、非阻塞实现。运行时事实、持久化策略和恢复由实际能力拥有者决定。
 
-✅ 已实现：统一报告端口完整转交原始 Error，不在基础库删除取消证据；不选择业务呈现。
-
-
-✅ StorageFailureReporter统一构造StorageFailure；底层领域错误保留在underlying，不吞取消，不决定展示。结构由模块根目录 [StorageFailure.swift](../StorageFailure.swift) 定义，编译归属仍为 StorageCore。
+[Storage](../README.md)
