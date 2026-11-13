@@ -7,6 +7,8 @@ public enum WriterFailure: String, Error, Sendable {
     case unsupportedModel, invalidOutput, incomplete, capacity, unavailable, cancelled
 }
 
+enum WriterInboxIntent: String { case followUp, stop, newWork }
+
 /// Host ports bind authenticated request identity. Writer may select its work, never its execution owner.
 public struct WriterTools: Sendable {
     public let definitions: [ChatToolDefinition]
@@ -92,8 +94,8 @@ enum WriterLocalTools {
                 .init(
                     "outcome", required: false,
                     description:
-                        "Defaults to artifact for publishing or reporting library operations. Before editing, use explanation for a completed answer without an artifact or declined for an infeasible request.",
-                    values: ["artifact", "explanation", "declined"]),
+                        "Use artifact for publishing or library operations, explanation for a completed answer, declined for infeasible work, or cancelled when the user asks you to stop. Cancelled preserves the draft without publishing.",
+                    values: ["artifact", "explanation", "declined", "cancelled"]),
             ]),
         tool(
             "enter", "Enter a saved workspace for editing or switch to another saved workspace. Call alone.",
@@ -151,6 +153,41 @@ public struct WriterRequestProgress: Codable, Sendable, Equatable {
 
 /// A private native-tool loop. Source generation has no tools and bypasses every XML parser.
 public struct WriterWorkflow: Sendable {
+    static func inboxIntent(
+        _ text: String, goal: String, question: String?, model: any ChatCapability
+    ) async throws -> WriterInboxIntent {
+        let data = try JSONEncoder().encode(["goal": goal, "question": question ?? "", "message": text])
+        let request = try ChatRequest(
+            messages: [
+                .init(role: .system, content: try AgentPrompts.text("Writer/Prompts", "inboxIntent")),
+                .init(role: .user, content: String(decoding: data, as: UTF8.self)),
+            ], maximumOutputTokens: 24, temperature: 0)
+        let session = try await model.chat(request)
+        return try await session.withCleanup {
+            try await withTaskCancellationHandler {
+                var response = ""
+                var finished = false
+                for try await event in session.events {
+                    try Task.checkCancellation()
+                    switch event {
+                    case .text(let text) where !finished:
+                        response += text
+                        guard response.utf8.count <= 96 else { throw WriterFailure.invalidOutput }
+                    case .finished(.stop) where !finished: finished = true
+                    case .usage: break
+                    default: throw WriterFailure.invalidOutput
+                    }
+                }
+                guard finished,
+                    let intent = WriterInboxIntent(rawValue: response.trimmingCharacters(in: .whitespacesAndNewlines))
+                else { throw WriterFailure.invalidOutput }
+                return intent
+            } onCancel: {
+                session.cancel()
+            }
+        }
+    }
+
     private let model: any ChatCapability
     private let history: WriterHistory?
     private let diagnostics: WriterDiagnosticCapture?

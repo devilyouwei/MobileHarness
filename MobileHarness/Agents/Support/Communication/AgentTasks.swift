@@ -3,6 +3,35 @@ import Foundation
 import FunctionContracts
 import StorageCore
 
+/// A peer message may carry a reply address captured by the runtime.
+struct AgentTaskRequest: Codable, Equatable, Sendable {
+    static let contract = "agent.task.request"
+    let id: String
+    let text: String
+    let replyTo: String?
+    let interactionID: String?
+
+    init(id: String = UUID().uuidString, text: String, replyTo: String? = nil, interactionID: String? = nil) {
+        self.id = id
+        self.text = text
+        self.replyTo = replyTo
+        self.interactionID = interactionID
+    }
+
+    func validate() throws {
+        guard UUID(uuidString: id) != nil, text.utf8.count <= 4096,
+            !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            (replyTo == nil) == (interactionID == nil),
+            replyTo.map({ UUID(uuidString: $0) != nil && $0 != id }) ?? true,
+            interactionID.map({ UUID(uuidString: $0) != nil }) ?? true
+        else { throw CommunicationError.invalidPayload }
+    }
+
+    var message: AgentMessage {
+        AgentMessage(contract: Self.contract, content: self, maximumBytes: 32768, validate: { try $0.validate() })
+    }
+}
+
 /// Writer-owned failure facts; persistence and presentation adapters project this value explicitly.
 public struct WriterFailureDiagnostic: Codable, Sendable, Equatable {
     public let category: String
@@ -27,7 +56,7 @@ public struct WriterFailureDiagnostic: Codable, Sendable, Equatable {
 /// Writer business evidence carried by the authenticated task transport.
 public struct WriterDelegationEvent: Codable, Sendable, Equatable {
     public enum Kind: String, Codable, Sendable {
-        case started, draftUpdated, recovering, userInput, completed, declined, failed, cancelled
+        case started, draftUpdated, recovering, userInput, inputAccepted, completed, declined, failed, cancelled
 
         var isMilestone: Bool { self == .draftUpdated || self == .recovering }
     }
@@ -93,7 +122,7 @@ public struct AgentTaskContent: Codable, Sendable, Equatable {
     public func signal(_ kind: AgentTaskSignal.Kind, scope: AgentTaskScope, status: AgentTaskSignal.Status? = nil)
         throws -> AgentTaskSignal
     {
-        try AgentTaskSignal(
+        return try AgentTaskSignal(
             kind: kind, scope: scope, businessContract: Self.contract,
             data: JSONEncoder().encode(self), status: status)
     }
@@ -106,29 +135,62 @@ public struct AgentTaskContent: Codable, Sendable, Equatable {
     }
 }
 
-/// A completed Writer fact outlives the execution grant. Gateway authenticates the role;
-/// the Assistant validates its persisted task and event binding before settling its view.
-public struct WriterDelegationCompletion: Codable, Sendable, Equatable {
-    public static let contract = "writer.completion"
-    public let signal: AgentTaskSignal
-    public init(_ signal: AgentTaskSignal) throws {
+/// A peer report refers to either an incoming message or an admitted task.
+public struct AgentTaskResponse: Codable, Sendable, Equatable {
+    static let contract = AgentTaskSignal.responseContract
+
+    struct Rejection: Codable, Sendable, Equatable {
+        let eventID: String
+        let messageID: String
+        let sessionID: String
+        let text: String
+    }
+
+    public let signal: AgentTaskSignal?
+    let rejection: Rejection?
+
+    init(_ signal: AgentTaskSignal) throws {
         self.signal = signal
+        rejection = nil
         try validate()
     }
-    public func validate() throws {
+
+    init(rejecting messageID: String, sessionID: String, text: String) throws {
+        signal = nil
+        rejection = Rejection(eventID: UUID().uuidString, messageID: messageID, sessionID: sessionID, text: text)
+        try validate()
+    }
+
+    func validate() throws {
+        if let rejection, signal == nil {
+            guard UUID(uuidString: rejection.eventID) != nil, UUID(uuidString: rejection.messageID) != nil,
+                !rejection.sessionID.isEmpty, rejection.sessionID.utf8.count <= 128,
+                !rejection.text.isEmpty, rejection.text.utf8.count <= 4096
+            else { throw CommunicationError.invalidPayload }
+            return
+        }
+        guard let signal, rejection == nil else { throw CommunicationError.invalidPayload }
         try signal.validate()
         let content = try AgentTaskContent.decode(signal)
-        guard signal.kind == .result, signal.scope.requester == .assistant, signal.scope.executor == .writer,
-            signal.scope.execution == .background, content.stage == .completed, let event = content.writerEvent,
-            event.delegateID == signal.scope.id,
+        guard signal.scope.requester != signal.scope.executor, signal.scope.execution == .background,
+            let event = content.writerEvent, event.delegateID == nil || event.delegateID == signal.scope.id
+        else { throw CommunicationError.invalidPayload }
+        if signal.kind == .progress {
+            guard [.started, .draftUpdated, .recovering, .userInput, .inputAccepted].contains(event.kind),
+                event.kind == .userInput
+                    ? content.stage == .waitingUser && content.interactionID != nil
+                    : content.stage == .running && content.interactionID == nil
+            else { throw CommunicationError.invalidPayload }
+            return
+        }
+        guard signal.kind == .result, content.stage == .completed, event.delegateID == signal.scope.id,
             (event.kind == .completed && signal.status == .succeeded)
                 || ([.failed, .declined].contains(event.kind) && signal.status == .failed)
                 || (event.kind == .cancelled && signal.status == .cancelled)
-        else {
-            throw CommunicationError.invalidPayload
-        }
+        else { throw CommunicationError.invalidPayload }
     }
-    public var message: AgentMessage {
+
+    var message: AgentMessage {
         AgentMessage(contract: Self.contract, content: self, maximumBytes: 131072, validate: { try $0.validate() })
     }
 }
@@ -244,12 +306,14 @@ enum AgentTaskSkillIDs {
 
 /// Implemented public task adapters, shared by discovery and execution admission.
 /// A resource description or a communication grant alone cannot create an adapter.
-enum AgentTaskDelegation {
+enum AgentTaskMessaging {
     static func permits(
         target: AgentID, requester: AgentID, communication: CommunicationDeclaration
     ) -> Bool {
         requester == .assistant && target == .writer
-            && communication.sends.contains { $0.contract == "task.request" && $0.target == target.rawValue }
+            && communication.sends.contains {
+                $0.contract == AgentTaskRequest.contract && $0.target == target.rawValue
+            }
     }
 }
 

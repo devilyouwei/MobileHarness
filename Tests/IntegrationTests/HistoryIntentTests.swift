@@ -629,20 +629,20 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
         ConversationHistoryPresentation.turns(currentRecords).filter { $0.historyTaskID == historyTaskID }
             .count == 1)
     _ = try await agent.controlTask(
-        "task.cancel", arguments: ["reason": "用户开始新对话"], source: "assistant", sessionID: session,
+        "task.end", arguments: ["summary": "用户开始新对话"], source: "assistant", sessionID: session,
         inputID: UUID().uuidString, decisionID: nil)
     let archived = try #require(try await store.startNew())
     #expect(archived.turns.first?.id == input)
     #expect(archived.taskCompressions.first?.taskID == historyTaskID)
-    #expect(archived.taskCompressions.first?.status == .cancelled)
+    #expect(archived.taskCompressions.first?.status == .completed)
     #expect(try await repository.snapshot().state.skillState?.tasks.isEmpty == true)
     let archivedRecords = try HistoryPresentationAdapter.conversation(try await store.conversation(archived.id))
     let archivedItems = ConversationHistoryPresentation.timeline(archivedRecords)
     guard case .task(let savedTask, let sources) = try #require(archivedItems.first) else {
-        Issue.record("Archived conversation must retain cancelled Task and full request source")
+        Issue.record("Archived conversation must retain ended Task and full request source")
         return
     }
-    #expect(savedTask.taskID == historyTaskID && savedTask.status == .cancelled)
+    #expect(savedTask.taskID == historyTaskID && savedTask.status == .completed)
     #expect(sources.count == 1 && sources[0].raw == "照片已拍摄，要保存吗？")
     try await adapter.showHistory(invocation: invocation)
     #expect(state.archive?.current.turns.isEmpty == true)

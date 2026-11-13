@@ -53,7 +53,7 @@ public struct AssistantContextState: AgentChatContextState {
         }
         let skillInstructions = try (skills ?? base).instructions(includeOverview: false)
         let delegates =
-            capabilities.actions.contains { $0.path.description == "Agent.Task.delegateTask" }
+            capabilities.actions.contains { $0.path.description == "Agent.Task.sendMessage" }
             ? try AgentConfigurations.delegationOverview(requester: agentID, communication: communication) : ""
         let capabilityContext = try AgentPrompts.capabilityContext()
         let sections = [

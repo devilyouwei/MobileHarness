@@ -5,7 +5,7 @@
     @MainActor
     public protocol ApplicationSessionProviding: AnyObject {
         var conversation: ConversationState { get }
-        var actionActivity: ActionActivityState { get }
+        var homeNotices: HomeNoticeState { get }
         var audioDetectionState: AudioDetectionState { get }
         var audioDetectionRequests: UIRequests<AudioDetectionInput, Void> { get }
         var listeningRequests: UIRequests<ListeningInput, Void> { get }
@@ -15,6 +15,7 @@
 
     @MainActor
     public protocol ApplicationRootProviding: AnyObject {
+        var runtimeLog: RuntimeLogState { get }
         var homePreparation: HomeModelPreparation { get }
         func retryHomePreparation()
         func interactionActivityChanged()

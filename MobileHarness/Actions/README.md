@@ -137,7 +137,7 @@ Camera uses memory-only preview_N references within one window lifetime, indepen
 
 History.Conversation.clearLogs为用户日志管理提供内部业务函数：按request_N或共享全库物理删除可选日志。Memory拥有调用与结果处理，Storage保留对话、消息和业务请求记录，UI仅刷新Prompts可用性。
 
-Task Actions expose foreground task.start/end and independent task.delegate; agent_id on task.send/cancel selects communication, without selecting the receiver's workspace. History reads role-owned messages and shared log details. Prompt images decode only logged request bytes; no history-to-camera-cache or history-to-album fallback port is assembled.
+Task Actions expose foreground task.start/end. task.send requires agent_id and text to relay a message to a peer Agent; the receiving Agent owns task admission, workspace selection and completion. History reads role-owned messages and shared log details. Prompt images decode only logged request bytes; no history-to-camera-cache or history-to-album fallback port is assembled.
 
 历史 UI facade 只注入真实读取、分页、摘要、删除及日志清理端口；不注入对旧回复重新解析的 execution preview formatter。
 

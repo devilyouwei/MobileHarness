@@ -6,7 +6,7 @@ WriterWorkflow 消费独立注入的 ModelKit.ChatCapability，要求原生工�
 
 控制历史按完整调用/结果组裁剪，保留本次目标及最新配对；不设置固定创作轮数或整任务期限；委托统一通过显式 finish 结束。控制轮只返回正文时，运行时在恢复预算内要求补交工具调用。编辑任务通过Gateway发布校验，纯作品库任务核对实际成功库操作，显式 outcome=explanation 在尚无文件操作时完成无产物说明，成功后直接结束，不额外要求一轮模型调用。控制响应文本与源码流均不设额外字节截断，模型采用 Provider 默认输出预算；原生参数与完整观察不设置单项字节拒绝，源码响应不受历史层256KiB累积上限限制。取消会取消模型会话并中止写入；中止失败与原始错误同时保留。未正常结束的流不得完成事务。每个检查点读取追加要求，文件流期间不切换目标。
 
-WriterAgent 是独立 AgentCore 角色，WriterContainer 随 Agents 根注册、暂停、恢复和关闭。来自 Assistant 的后台 task.request 请求通过真实 Input/OutputGateway 认证；工作区工具直接返回，不进入 ChannelScheduler。单任务准入（等待补充、暂停和取消清理也占用），每任务通过 ModelKit ChatModel 获取固定模型配置的能力句柄，暂停/补充期间保留；SDK 统一管理并发/本地排队和资源回收，Writer 不关闭或重开模型租约。Writer 不复用 Assistant 的 ChatWorker、XML、提示词或对话历史。
+WriterAgent 是独立 AgentCore 角色，WriterContainer 随 Agents 根注册、暂停、恢复和关闭。来自 Assistant 的 agent.task.request 正文通过真实 Input/OutputGateway 认证；工作区工具直接返回，不进入 ChannelScheduler。单任务准入（等待补充、暂停和取消清理也占用），每任务通过 ModelKit ChatModel 获取固定模型配置的能力句柄，暂停/补充期间保留；SDK 统一管理并发/本地排队和资源回收，Writer 不关闭或重开模型租约。Writer 不复用 Assistant 的 ChatWorker、XML、提示词或对话历史。
 
 工作区工具与内容续写共享同一个委托所有者，但完成边界不同：Gateway 的 edit 结果仅创建编辑流；append/complete/abort 经宿主 ArtifactStreaming 直接进入已接纳会话，单次 complete 只完成文件写入。取消、根暂停和停止先取消已捕获的生成 worker 并 revoke 续写准入，再加入这些 worker；worker 负责加入模型、预览和 release 后才提交终态或允许恢复。revoke 不取消已开始的 abort；release 等待全部在途效果，不因取消者自身退出而提前释放。恢复经 Gateway start/resume 重新接纳，旧 streamID 无效。Actions 根另有 shutdown 兜底。普通 Scene 隐藏不撤销创作会话。服务的互斥、容量与失败契约见 [Artifacts 生命周期](../../Actions/Artifacts/README.md#执行与续写生命周期)。
 
@@ -51,7 +51,7 @@ flowchart TD
     Cancel["显式 cancel / 根停止"] --> Cleanup
     Cleanup --> Terminal["持久化终态与不可变通知<br/>创作占用不等待通知接纳"]
     Terminal --> Retirement["独立 worker：调用运行时<br/>退休执行权限"]
-    Terminal --> Notification["独立 worker：writer.completion<br/>认证通知 Assistant"]
+    Terminal --> Notification["独立 worker：agent.task.response<br/>认证通知 Assistant"]
 ```
 
 图中的恢复边返回所属控制/内容请求；内容重试必须先加入 abort，并创建新流，不能重复追加旧前缀。预览是独立 worker，源码接收不等待页面重载；步骤汇报才加入已安排的最新预览。完整渲染与发布失败保留实际证据，不能用通知接纳替代文件或清理成功。各队列、恢复次数、暂停/停止及补偿契约见下文对应章节和 [Artifacts](../../Actions/Artifacts/README.md)。
@@ -88,11 +88,11 @@ WriterRequestNaming 从工具与控制域派生请求行标题，包括作品查
 
 ## 委托与主动事件
 
-Writer 经认证的 task.progress 发送接纳、追问及两类精选里程碑。首批文件改动完成检查点和工具记录后发送 draftUpdated，首次模型/写入重试或渲染检查异常发送 recovering。两种里程碑各保留一次，跨暂停和补充续作去重。逐轮进度、临时预览和普通读写观察由 Writer 自身呈现。投递队列每个事件类别最多保留一项待送达事实，另有一个不可变在途事件。终态释放过期的待送达进度，独立走持久通知。
+Writer 经认证的 agent.task.response 发送接纳、追问及两类精选里程碑。首批文件改动完成检查点和工具记录后发送 draftUpdated，首次模型/写入重试或渲染检查异常发送 recovering。两种里程碑各保留一次，跨暂停和补充续作去重。逐轮进度、临时预览和普通读写观察由 Writer 自身呈现。投递队列每个事件类别最多保留一项待送达事实，另有一个不可变在途事件。终态释放过期的待送达进度，独立走持久通知。
 
-Assistant 的 BasicSkill 通过调度的 XML task.delegate(agent_id=writer,description) 发送目标与实际用户输入，Writer 先获取模型判断操作；模型显式创建或进入时通过工作区 start/resume 准备窗口和草稿，单纯作品库操作不创建文件。agents.writer 公开 idle/starting/running/waitingUser/cancelling/paused、agentID、workspaceID、goal、step、waitingForInput。已有窗口不等于运行任务；单任务忙碌明确拒绝。task.send 由运行时绑定待答 interactionID，Writer验证其匹配；task.cancel(agent_id,reason) 转换为可信 cancel 信号并立即接纳，由根拥有的 worker 加入清理并回报。
+Writer 通过 task.send(agent_id=writer,text) 接收认证正文，收件队列最多八项，满时拒绝。收件 worker 串行处理，暂停时保留待处理输入。空闲的新目标由 Writer 申请内部授权并建立任务。活跃期间 Writer 用自己的模型区分当前目标的补充、停止和无关新目标。可信追问关联必须匹配当前任务和问题，迟到答复回报拒绝。明确停止请求直接进入取消清理。
 
-AgentTaskContent.writerEvent 携带版本 3、UUID eventID、递增 sequence 和可选工作区及窗口身份。运行阶段由 reportWorker 投递 started、draftUpdated、recovering 和 userInput，经 task.progress 发送并读取 sendResult 返回的 DeliveryReport。拒收每 500 ms 重试，创作可继续。completed、declined、failed 和 cancelled 经持久 writer.completion 独立投递。
+AgentTaskContent.writerEvent 携带版本 3、UUID eventID、递增 sequence 和可选工作区及窗口身份。运行阶段由 reportWorker 投递 started、draftUpdated、recovering、userInput 和 inputAccepted，经 agent.task.response 发送并读取 sendResult 返回的 DeliveryReport。拒收每 500 ms 重试，创作可继续。completed、declined、failed 和 cancelled 经持久 agent.task.response 独立投递。
 
 Database 根目录拥有连接、schema 装配与生命周期；Shared 只保存编码、ID 与分页机制。Assistant 和 Writer 分别拥有消息/任务接口、历史 DTO、窗口及 SQL 实现。日志和 Agent 通信通过独立共享端口注入，不经统一 Chat/Task 门面。详见 [Database](../../Storage/Database/README.md)。
 
@@ -102,15 +102,15 @@ Writer 私有控制提示只教本角色的选择、文件操作、追问与完�
 
 ### Assistant 接收与用户汇报
 
-默认 BasicSkill 的后台入口与 task.start 平级，同一目标不先建立前台 Task，也不加载 Skill；运行时发送单行 goal 与当前真实用户输入。单任务忙碌时明确拒绝，Assistant 根据用户意图选择补充或取消；再次委派必须等待旧执行清理，不能因为通知尚未到达而重复创作。忙碌由 WriterMessages 的单活跃委托入口约束；Assistant 通过可信通信结果更新委派视图。具体公开参数由 [Task Actions](../../Actions/System/Task/README.md) 拥有。
+Writer 单任务准入覆盖等待、暂停及清理。无关新请求或过期关联通过 agent.task.response 回报，关联原消息。任务清理完成后可接纳下一目标，终态消息通过既有持久路径独立投递。
 
-Writer 自有灵动岛显示接纳、补充、取消、进度、追问和终态。普通进度也更新窗口副标题和 State。Assistant 验证接纳、精选里程碑、追问和持久终态后更新委托视图。在全双工模式下，这些语义摘要保留 Agent 身份进入统一 Q，不经过 Decision；下一批 LLM 综合选择性呈现，不强制逐条播报。同步轮次兼容模式仍使用直接通知播报。追问保存 interactionID，补充必须匹配当前委托及追问。终态经 writer.completion 持久投递，Assistant 验证不可变通知后标记消费。
+Writer 自有灵动岛显示接纳、补充、取消、进度、追问和终态。普通进度也更新窗口副标题和 State。Assistant 验证接纳、精选里程碑、追问和持久终态后更新委托视图。在全双工模式下，这些语义摘要保留 Agent 身份进入统一 Q，不经过 Decision；下一批 LLM 综合选择性呈现，不强制逐条播报。同步轮次兼容模式仍使用直接通知播报。追问保存 interactionID，补充必须匹配当前委托及追问。终态经 agent.task.response 持久投递，Assistant 验证不可变通知后标记消费。
 
-Writer 接收 task.request、task.input 和 task.cancel。工作区工具结果直接返回调用方。task.progress 与 writer.completion 通过绑定注册身份的 AgentMessaging 直接取得投递报告。独立收尾 worker 加入执行清理并退休原授权。旧委派终态不能覆盖新执行。投递失败保留出站状态并独立重试。
+Writer 接收 agent.task.request，验证关联后以原子事务接纳停止请求，随后加入模型与文件操作清理、保留草稿并提交终态。agent.task.response 使用绑定注册身份的 AgentMessaging 取得投递报告。消息拒绝和任务终态共用持久投递；进度沿用有界队列。
 
 ## Writer 自有任务与纯通信
 
-Assistant 只发送 task.delegate(agent_id,description)，不分配 Writer workspace。Writer 接纳认证通信后创建委托入口消息，模型自主查询或选择。模型可以在选择工作区前用 finish(outcome=declined,summary) 拒绝无法完成的目标。拒绝理由通过持久 writer.completion 回报，使用未成功的运行时终态收尾。纯库操作可以完成而不创建 workspace；busy/waiting/paused/cleanup 不自动替换。
+Writer 私有模型可在选择工作区前用 finish(outcome=declined,summary) 拒绝无法完成的目标。拒绝理由进入持久 agent.task.response。纯库操作可以完成而不创建 workspace。
 
 create 和 enter 的触发请求保留发起时的历史归属。Writer 在历史写门内 checkpoint 后绑定编辑工作区。后续读取、编辑与发布使用该目标，模型消息携带 workspace_id。open 展示指定作品并保持当前阶段，同一轮可顺序执行最多八个 open。
 

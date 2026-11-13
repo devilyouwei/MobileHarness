@@ -79,7 +79,6 @@
         }
         let lifecycle: any AgentVoiceLifecycle
         public let conversation: ConversationState
-        public let actionActivity: ActionActivityState
         public let diagnostic: any SpeechDiagnosticControlling
         public let diagnosticState: SpeechDiagnosticState
         public let audioDetectionState: AudioDetectionState
@@ -111,7 +110,6 @@
             progress: @MainActor (String) -> Void
         ) async throws {
             audioDetectionState = diagnostics.audioDetection
-            actionActivity = home.activity
             let recognition = speech.recognition
             let chat = language
             let vad = speech.voiceActivity

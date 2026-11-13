@@ -645,7 +645,7 @@ func hostCancelTerminatesActiveInferenceBeforeQueuedCancellationAndOtherSessionR
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
-func closingSessionCancelsRunningAndWaitingForegroundTasksAndAllowsFreshConversation(_ running: Bool) async throws {
+func closingSessionStopsExecutionAndKeepsRunningOrWaitingForegroundTask(_ running: Bool) async throws {
     let session = UUID().uuidString
     let original = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("wait"))
     let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
@@ -655,7 +655,7 @@ func closingSessionCancelsRunningAndWaitingForegroundTasksAndAllowsFreshConversa
     _ = try skills.control(
         "task.start", arguments: ["description": "拍照并等待选择", "skills": "[\"photography\"]"],
         inputID: original.id, fixed: fixed, sessionID: session, taskID: try fixtureTaskID())
-    if !running { try skills.decisionCompleted(failed: false, fixed: fixed, inputID: original.id) }
+    if !running { try skills.decisionCompleted(inputID: original.id) }
     initial.skillState = skills
     let repository = try AgentContextRepository(
         agent: .assistant, scope: UUID().uuidString, state: initial
@@ -671,10 +671,10 @@ func closingSessionCancelsRunningAndWaitingForegroundTasksAndAllowsFreshConversa
     }
     try await agent.receive(AssistantSessionControl.cancelSession.input(sessionID: session))
     let state = try #require(try await repository.snapshot().state.skillState)
-    #expect(state.activeTaskID == nil)
-    #expect(state.tasks.last?.status == "cancelled")
+    #expect(state.activeTaskID == skills.activeTaskID)
+    #expect(state.tasks.last?.status == "waitingUser")
     #expect(state.tasks.last?.failure == nil)
-    #expect(!state.loaded.contains("photography"))
+    #expect(state.loaded.contains("photography"))
     try await agent.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("hello again")))
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     while let output = try await outputs.next() {
@@ -700,12 +700,12 @@ func executionInterruptionPreservesConversationSkillsGoalAndPublicScope(control:
         _ = try skills.control(
             "loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: original.id,
             fixed: fixed, sessionID: session)
-        try skills.decisionCompleted(failed: false, fixed: fixed, inputID: original.id)
+        try skills.decisionCompleted(inputID: original.id)
     } else {
         _ = try skills.control(
             "task.start", arguments: ["description": "拍照并等待选择", "skills": "[\"photography\"]"],
             inputID: original.id, fixed: fixed, sessionID: session, taskID: try fixtureTaskID())
-        if mode == "waiting" { try skills.decisionCompleted(failed: false, fixed: fixed, inputID: original.id) }
+        if mode == "waiting" { try skills.decisionCompleted(inputID: original.id) }
     }
     var initial = AssistantContextState()
     initial.skillState = skills
@@ -754,7 +754,7 @@ func executionInterruptionPreservesConversationSkillsGoalAndPublicScope(control:
     let continued = try #require(try await repository.snapshot().state.skillState)
     #expect(continued.recentSkills["photography"]?.remainingDecisions == (mode == "recent" ? 4 : nil))
     try await agent.receive(AssistantSessionControl.cancelSession.input(sessionID: session))
-    #expect(try await repository.snapshot().state.skillState?.loaded.contains("photography") == false)
+    #expect(try await repository.snapshot().state.skillState?.loaded.contains("photography") == (mode != "recent"))
     await #expect(throws: ContainerContextError.closed) {
         try await publicContext.snapshot(session: session, names: [])
     }

@@ -15,12 +15,12 @@ public struct ActionExecutionRecord: Identifiable, Equatable, Sendable {
     }
     public let id: String
     public let path: ActionIdentifier
-    /// Copied from the registered definition at admission, not resolved by presentation.
-    public let displayName: String
     public let source: String
     public let sessionID: String
     public let inputID: String
     public let channel: String
+    /// Captured argument values for inspection, with credential fields hidden and long values marked.
+    public let parameters: [String: String]
     public let semantics: Semantics
     public var phase: Phase
     public let admittedAt: Date
@@ -32,19 +32,19 @@ public struct ActionExecutionRecord: Identifiable, Equatable, Sendable {
     public var isTerminal: Bool { phase == .succeeded || phase == .failed || phase == .cancelled }
 
     public init(
-        id: String, path: ActionIdentifier, displayName: String, source: String, sessionID: String, inputID: String,
+        id: String, path: ActionIdentifier, source: String, sessionID: String, inputID: String,
         channel: String,
         semantics: Semantics, phase: Phase = .queued, admittedAt: Date = .now, startedAt: Date? = nil,
         endedAt: Date? = nil, failure: Failure? = nil, completion: ActionCompletion? = nil,
-        failureDescription: String? = nil
+        failureDescription: String? = nil, parameters: [String: String] = [:]
     ) {
         self.id = id
         self.path = path
-        self.displayName = displayName
         self.source = source
         self.sessionID = sessionID
         self.inputID = inputID
         self.channel = channel
+        self.parameters = parameters
         self.semantics = semantics
         self.phase = phase
         self.admittedAt = admittedAt
@@ -53,6 +53,17 @@ public struct ActionExecutionRecord: Identifiable, Equatable, Sendable {
         self.failureDescription = failureDescription.map { String($0.prefix(512)) }
         self.failure = failure
         self.completion = completion
+    }
+    /// Bound visible payloads by UTF-8 size without emitting a broken code point.
+    public static func logPreview(_ value: String, maximumUTF8Bytes: Int) -> String {
+        let suffix = "…［已截断］"
+        precondition(maximumUTF8Bytes >= suffix.utf8.count)
+        guard value.utf8.count > maximumUTF8Bytes else { return value }
+        var end = value.utf8.index(value.utf8.startIndex, offsetBy: maximumUTF8Bytes - suffix.utf8.count)
+        while value.utf8[end] & 0b1100_0000 == 0b1000_0000 {
+            value.utf8.formIndex(before: &end)
+        }
+        return String(decoding: value.utf8[..<end], as: UTF8.self) + suffix
     }
 }
 

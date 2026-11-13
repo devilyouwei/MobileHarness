@@ -33,7 +33,9 @@ extension SQLiteWriterExecutionRepository {
                 return try Self.requestView(delegateID, db: db)
             }
             guard let incoming = try AgentMessageRow.fetchOne(db, key: delegateID),
-                incoming.receiverAgentID == "writer", incoming.consumedAt == nil
+                incoming.receiverAgentID == "writer", incoming.senderAgentID == "assistant",
+                ["agent.task.request", "agent.taskMessage", "task.request"].contains(incoming.contract),
+                incoming.correlationID == delegateID, incoming.replyToID == nil, incoming.consumedAt == nil
             else { throw RecordStorageError.conflict }
             let busy =
                 try Int.fetchOne(
@@ -164,7 +166,7 @@ extension SQLiteWriterExecutionRepository {
         }
     }
 
-    public func acceptWriterInput(_ id: String, requestID: String, text: String, questionID: String?) async throws
+    public func acceptWriterInput(_ id: String, requestID: String, questionID: String?) async throws
         -> Bool
     {
         try database.write { db in
@@ -174,14 +176,44 @@ extension SQLiteWriterExecutionRepository {
                 ["running", "waiting_input", "paused"].contains(root["run_state"] as String)
             else { throw RecordStorageError.conflict }
             if incoming.consumedAt != nil { return false }
-            guard incoming.contract == "task.cancel" || (root["pending_question_id"] as String?) == questionID else {
+            guard incoming.contract == "agent.task.request", incoming.senderAgentID == "assistant",
+                (root["pending_question_id"] as String?) == questionID
+            else {
                 throw RecordStorageError.conflict
             }
             let now = Date().timeIntervalSince1970
+            if questionID != nil {
+                try db.execute(
+                    sql: """
+                        UPDATE writer_executions
+                        SET pending_question_id=NULL,pending_question_json=NULL,
+                            run_state=CASE WHEN run_state='paused' THEN 'paused' ELSE 'running' END,
+                            request_revision=request_revision+1,updated_at=?
+                        WHERE request_message_id=?
+                        """, arguments: [now, requestID])
+            }
+            try SQLiteAgentMessageRepository.consumeSource(id, at: now, db: db)
+            return true
+        }
+    }
+    public func acceptWriterCancellation(_ id: String, requestID: String, reason: String) async throws -> Bool {
+        guard !reason.isEmpty, reason.utf8.count <= 4096 else { throw RecordStorageError.invalidRecord }
+        return try database.write { db in
+            guard let incoming = try AgentMessageRow.fetchOne(db, key: id),
+                incoming.contract == "agent.task.request", incoming.senderAgentID == "assistant",
+                incoming.receiverAgentID == "writer", incoming.correlationID == requestID
+            else { throw RecordStorageError.conflict }
+            if incoming.consumedAt != nil { return false }
+            let marker = try SQLiteRecordCoding.json(["kind": "cancellation", "reason": reason])
+            let now = Date().timeIntervalSince1970
             try db.execute(
-                sql:
-                    "UPDATE agent_messages SET delivery_state='received',received_at=COALESCE(received_at,?),consumed_at=? WHERE id=?",
-                arguments: [now, now, id])
+                sql: """
+                    UPDATE writer_executions SET run_state='closing',request_revision=request_revision+1,updated_at=?,
+                        runtime_results_json=json_insert(runtime_results_json,'$[#]',json(?))
+                    WHERE request_message_id=? AND run_state IN ('running','waiting_input','paused') AND terminal_state IS NULL
+                    """, arguments: [now, marker, requestID])
+            guard db.changesCount == 1 else { throw RecordStorageError.conflict }
+            try SQLiteAgentMessageRepository.consumeSource(id, at: now, db: db)
             return true
         }
     }
@@ -223,7 +255,6 @@ extension SQLiteWriterExecutionRepository {
     public func updateRequestPhase(requestID: String, phase: String) async throws {
         let states = [
             "starting": "running", "running": "running", "waitingUser": "waiting_input", "paused": "paused",
-            "cancelling": "closing",
         ]
         guard let state = states[phase] else { throw RecordStorageError.invalidRecord }
         try database.write { db in

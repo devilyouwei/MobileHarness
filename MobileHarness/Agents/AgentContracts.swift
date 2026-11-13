@@ -19,13 +19,26 @@ public enum AgentContracts {
             try CommunicationContracts(
                 additional: AgentTaskSignal.contracts + [
                     CommunicationContract(
-                        name: WriterDelegationCompletion.contract, kind: .observation, maximumBytes: 131072,
-                        startsNewWork: true,
+                        name: AgentTaskRequest.contract, kind: .observation, maximumBytes: 32768, startsNewWork: true,
                         validateMessage: { message in
-                            guard let value = message.content(as: WriterDelegationCompletion.self) else {
+                            guard let value = message.content(as: AgentTaskRequest.self) else {
                                 throw CommunicationError.invalidPayload
                             }
                             try value.validate()
+                        }),
+                    CommunicationContract(
+                        name: AgentTaskResponse.contract, kind: .observation, maximumBytes: 131072, startsNewWork: true,
+                        validateMessage: { message in
+                            if let response = message.content(as: AgentTaskResponse.self) {
+                                try response.validate()
+                                return
+                            }
+                            guard let signal = message.content(as: AgentTaskSignal.self),
+                                signal.kind == .progress || signal.kind == .result
+                            else {
+                                throw CommunicationError.invalidPayload
+                            }
+                            try signal.validate()
                         }),
                     contract(PerceptionMessage.asrPartialContract, topic: PerceptionMessage.userInputTopic),
                     contract(PerceptionMessage.asrFinalContract, topic: PerceptionMessage.userInputTopic),

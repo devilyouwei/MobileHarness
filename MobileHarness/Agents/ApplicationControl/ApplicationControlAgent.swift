@@ -65,10 +65,9 @@ public actor ApplicationControlAgent: Agent {
     private var diagnosticCounts: [String: UInt64] = [:]
     private var diagnosticOrder: [String] = []
     var windowCalls: Set<String> = []
-    private var diagnosticCalls: Set<String> = []
-    private var diagnosticPresentationFailures: [String] = []
+    private var statePresentationCalls: Set<String> = []
+    private let publishIssue: @MainActor @Sendable (ExecutionIssue, Bool) -> Void
     private let diagnosticContracts: Set<String> = [ContainerFailureEvent.contract, RuntimeFailureEvent.contract]
-    public func failurePresentationErrors() -> [String] { diagnosticPresentationFailures }
 
     private var deviceResults = ActionResultInbox()
     private let taskCoordinator: AgentFixedTaskCoordinator<ApplicationControlContextState>
@@ -94,8 +93,10 @@ public actor ApplicationControlAgent: Agent {
         decodeResources: @escaping @Sendable (String) throws -> ModelResourceViewSnapshot = { _ in
             throw CommunicationError.invalidPayload
         },
+        publishIssue: @escaping @MainActor @Sendable (ExecutionIssue, Bool) -> Void = { _, _ in },
         context: AgentContextRepository<ApplicationControlContextState>
     ) throws {
+        self.publishIssue = publishIssue
         self.decodeResources = decodeResources
         self.connectionFacts = connectionFacts
         self.resourceChanges = resourceChanges
@@ -119,7 +120,7 @@ public actor ApplicationControlAgent: Agent {
             outputs: [.communication, .actionCall, .toolCall, .control, .scheduling],
             capabilities: try configuration.capabilities.adding(
                 internalTools: [
-                    InternalTool(path: "Speech.Detection.run"), ApplicationControlFunctions.runtimeFailure,
+                    InternalTool(path: "Speech.Detection.run"),
                     ApplicationControlFunctions.bluetoothHome,
                     ApplicationControlFunctions.bluetoothSettings, ApplicationControlFunctions.loadingExpression,
                     ApplicationControlFunctions.download, ApplicationControlFunctions.cancellation,
@@ -263,7 +264,7 @@ public actor ApplicationControlAgent: Agent {
         uiExecution.consumer = nil
         admission.close()
         lifecycle = .stopped
-        diagnosticCalls.removeAll()
+        statePresentationCalls.removeAll()
         windowCalls.removeAll()
         diagnosticCounts.removeAll()
         diagnosticOrder.removeAll()
@@ -301,8 +302,7 @@ public actor ApplicationControlAgent: Agent {
             }
             let diagnosticInput: Bool
             if case .observation(let message) = input.payload {
-                diagnosticInput = [ContainerFailureEvent.contract, RuntimeFailureEvent.contract].contains(
-                    message.contract)
+                diagnosticInput = diagnosticContracts.contains(message.contract)
             } else {
                 diagnosticInput = false
             }
@@ -321,9 +321,9 @@ public actor ApplicationControlAgent: Agent {
 
     private func receiveSignal(_ input: AgentInput) async throws {
         if case .observation(let message) = input.payload,
-            [ContainerFailureEvent.contract, RuntimeFailureEvent.contract].contains(message.contract)
+            diagnosticContracts.contains(message.contract)
         {
-            try receiveFailure(input, message: message)
+            try await receiveFailure(input, message: message)
             return
         }
         if case .toolResult(let result) = input.payload,
@@ -336,16 +336,12 @@ public actor ApplicationControlAgent: Agent {
             windowCalls.remove(result.callID)
             return
         }
-        if case .toolResult(let result) = input.payload, diagnosticCalls.contains(result.callID) {
+        if case .toolResult(let result) = input.payload, statePresentationCalls.contains(result.callID) {
             guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
             guard input.metadata.origin == .runtime, input.metadata.source == "runtime",
                 input.sessionID == sessionID, input.taskScope == nil
             else { throw CommunicationError.unauthorized }
-            diagnosticCalls.remove(result.callID)
-            if result.isError {
-                if diagnosticPresentationFailures.count == 128 { diagnosticPresentationFailures.removeFirst() }
-                diagnosticPresentationFailures.append(String(result.value.prefix(512)))
-            }
+            statePresentationCalls.remove(result.callID)
             return
         }
         if await taskCoordinator.ownsFeedback(input) {
@@ -428,7 +424,7 @@ public actor ApplicationControlAgent: Agent {
         }
     }
     /// Failure presentation must work even when the context store or model has failed.
-    private func receiveFailure(_ input: AgentInput, message: AgentMessage) throws {
+    private func receiveFailure(_ input: AgentInput, message: AgentMessage) async throws {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
         guard input.sessionID == sessionID, input.metadata.origin == .local,
             input.metadata.incarnation == nil, input.taskScope == nil, input.metadata.source == "runtime",
@@ -437,11 +433,8 @@ public actor ApplicationControlAgent: Agent {
         else { throw CommunicationError.unauthorized }
         guard !input.metadata.expired else { throw CommunicationError.expired }
         try input.validate(message)
-        var parameters: [String: String]
-        let key: String
+        let issue: ExecutionIssue
         let count: UInt64
-        let time: Date
-        var userMessage: String?
         if message.contract == ContainerFailureEvent.contract {
             guard let event = message.content(as: ContainerFailureEvent.self) else {
                 throw CommunicationError.invalidPayload
@@ -454,70 +447,48 @@ public actor ApplicationControlAgent: Agent {
                 processed += 1
                 return
             }
-            key = "container:" + event.scopeID + ":" + event.id
             count = event.occurrences
-            time = event.lastOccurred
-            parameters = [
-                "id": key, "title": event.module + "." + event.component, "source": event.module,
-                "message": event.operation + ": " + event.message, "workerID": event.component,
-                "sessionID": event.scopeID, "failureCode": "container.failure", "category": "容器异常",
-            ]
-            userMessage = "基础能力发生异常，请查看运行异常"
+            issue = .init(
+                id: "container:" + event.scopeID + ":" + event.id, title: event.module + "." + event.component,
+                source: event.module, message: event.operation + ": " + event.message, time: event.lastOccurred,
+                failureCode: "container.failure", context: .init(workerID: event.component, sessionID: event.scopeID),
+                userMessage: "基础能力发生异常，请查看运行异常", category: "容器异常")
         } else {
             guard let event = message.content(as: RuntimeFailureEvent.self) else {
                 throw CommunicationError.invalidPayload
             }
             try event.validate()
-            key = "runtime:" + event.id
             count = 1
-            time = event.time
-            parameters = [
-                "id": key, "title": event.title, "source": event.sourceAgent, "message": event.message,
-                "workerID": event.workerID ?? event.sourceAgent,
-            ]
-            parameters["sessionID"] = event.sessionID
-            parameters["inputID"] = event.inputID
-            parameters["roundID"] = event.roundID
-            parameters["callID"] = event.callID
-            parameters["failureCode"] = event.failureCode
-            if let raw = event.category, let category = AgentFailureDiagnostic.Category(rawValue: raw) {
-                parameters["category"] = ApplicationControlFailurePolicy.categoryTitle(category)
-            }
-            userMessage =
-                ApplicationControlFailurePolicy.userMessage(
+            issue = .init(
+                id: "runtime:" + event.id, title: event.title, source: event.sourceAgent, message: event.message,
+                time: event.time, failureCode: event.failureCode,
+                context: .init(
+                    workerID: event.workerID ?? event.sourceAgent, sessionID: event.sessionID, inputID: event.inputID,
+                    callID: event.callID, roundID: event.roundID),
+                userMessage: ApplicationControlFailurePolicy.userMessage(
                     source: event.sourceAgent, message: event.message, code: event.failureCode)
-                ?? String(event.message.replacingOccurrences(of: "agent.error: ", with: "").prefix(512))
+                    ?? event.message.replacingOccurrences(of: "agent.error: ", with: ""),
+                category: event.category.flatMap(AgentFailureDiagnostic.Category.init(rawValue:))
+                    .map(ApplicationControlFailurePolicy.categoryTitle))
         }
-        if let previous = diagnosticCounts[key], count <= previous { return }
-        let age = Date().timeIntervalSince(time)
-        // Historical evidence stays visible, but does not replay an old toast.
-        if diagnosticCounts[key] == nil, parameters["callID"] == nil, age >= -5, age <= 15 {
-            parameters["userMessage"] = userMessage
-        }
-        parameters["time"] = String(time.timeIntervalSince1970)
-        guard diagnosticCalls.count < 128 else { throw CommunicationError.capacityExceeded }
-        let call = try ApplicationControlFunctions.runtimeFailure.call(parameters)
-        sequence &+= 1
-        guard
-            case .enqueued = continuation.yield(
-                OutputEnvelope(
-                    source: descriptor.id, context: input.context, output: .toolCall(call), sequence: sequence,
-                    taskScope: input.taskScope))
-        else { throw CommunicationError.capacityExceeded }
-        diagnosticCalls.insert(call.id)
-        if diagnosticCounts[key] == nil {
+        let previous = diagnosticCounts[issue.id]
+        if let previous, count <= previous { return }
+        let age = Date().timeIntervalSince(issue.time)
+        let showsToast = previous == nil && issue.context?.callID == nil && (-5...15).contains(age)
+        if previous == nil {
             if diagnosticOrder.count == 128 {
                 diagnosticCounts.removeValue(forKey: diagnosticOrder.removeFirst())
             }
-            diagnosticOrder.append(key)
+            diagnosticOrder.append(issue.id)
         }
-        diagnosticCounts[key] = count
+        diagnosticCounts[issue.id] = count
         processed += 1
+        await publishIssue(issue, showsToast)
     }
 
     private func presentLoading(_ fact: AppEnvironmentFact, input: AgentInput) throws {
         let enabled = fact.value == "loading"
-        guard diagnosticCalls.count < 128 else { throw CommunicationError.capacityExceeded }
+        guard statePresentationCalls.count < 128 else { throw CommunicationError.capacityExceeded }
         let call = try ApplicationControlFunctions.loadingExpression.call([
             "enabled": enabled ? "true" : "false", "revision": String(fact.sequence),
         ])
@@ -528,12 +499,12 @@ public actor ApplicationControlAgent: Agent {
                     source: descriptor.id, context: input.context, output: .toolCall(call), sequence: sequence,
                     taskScope: input.taskScope))
         else { throw CommunicationError.capacityExceeded }
-        diagnosticCalls.insert(call.id)
+        statePresentationCalls.insert(call.id)
     }
 
     private func presentBluetooth(_ state: ApplicationControlBluetoothState, input: AgentInput) throws {
         guard state != bluetoothPresented else { return }
-        guard diagnosticCalls.count <= 126, bluetoothRevision < UInt64.max else {
+        guard statePresentationCalls.count <= 126, bluetoothRevision < UInt64.max else {
             throw CommunicationError.capacityExceeded
         }
         bluetoothRevision += 1
@@ -549,7 +520,7 @@ public actor ApplicationControlAgent: Agent {
                         source: descriptor.id, context: input.context, output: .toolCall(call), sequence: sequence,
                         taskScope: input.taskScope))
             else { throw CommunicationError.capacityExceeded }
-            diagnosticCalls.insert(call.id)
+            statePresentationCalls.insert(call.id)
         }
         bluetoothPresented = state
     }
@@ -1016,7 +987,8 @@ public actor ApplicationControlAgent: Agent {
 
     public func status() -> AgentStatus {
         AgentStatus(
-            lifecycle: lifecycle, queuedInputs: pending.count + diagnosticCalls.count, processedInputs: processed)
+            lifecycle: lifecycle, queuedInputs: pending.count + statePresentationCalls.count, processedInputs: processed
+        )
     }
 
     /// Passive State reflection, independent of persistence initialization.

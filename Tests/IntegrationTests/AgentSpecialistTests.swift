@@ -246,11 +246,11 @@ private struct SpecialistTaskControls: TaskControlCapability {
         #expect(await effects.failures.isEmpty)
         let snapshot = try await context.snapshot()
         #expect(snapshot.state.taskViews?.isEmpty != false)
-        #expect(snapshot.records.contains { $0.kind == "action.result" })
+        #expect(snapshot.records.contains { $0.kind == "runtime.action.result" })
         var observations = try await input.observeSignals().makeAsyncIterator()
         let signals = try #require(await observations.next()).records
         #expect(!signals.contains { $0.task?.kind == .request })
-        #expect(signals.contains { $0.contract == "action.result" && $0.branches.first?.target == .assistant })
+        #expect(signals.contains { $0.contract == "runtime.action.result" && $0.branches.first?.target == .assistant })
     } catch {
         await manager.stopAll()
         await gateway.shutdown()

@@ -10,10 +10,6 @@ enum ApplicationControlFunctions {
         path: "UI.BluetoothStatus.showBluetoothHome", required: ["phase", "revision"])
     static let bluetoothSettings = InternalTool(
         path: "UI.BluetoothStatus.showBluetoothSettings", required: ["phase", "revision"])
-    static let runtimeFailure = InternalTool(
-        path: "UI.RuntimeDiagnostics.recordFailure",
-        required: ["id", "title", "source", "message", "time", "workerID"],
-        optional: ["failureCode", "sessionID", "inputID", "roundID", "callID", "category", "userMessage"])
     // Application interaction.
     static let deviceControl = InternalTool(
         path: "System.Device.control", required: ["operation"], optional: ["id", "value", "action", "fence"])

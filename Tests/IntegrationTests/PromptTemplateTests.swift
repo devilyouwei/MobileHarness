@@ -134,7 +134,10 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
         guard let send = catalog.actions.first(where: { $0.alias == "send" }) else { continue }
         let doc = try #require(send.documentation)
         #expect(!doc.doc.contains("Example:"))
-        for target in Set(configuration.communication.sends.filter { $0.contract.hasPrefix("task.") }.map(\.target)) {
+        let targets = configuration.communication.sends.filter { send in
+            AgentTaskSignal.Kind.allCases.contains { $0.contract == send.contract }
+        }.map(\.target)
+        for target in Set(targets) {
             #expect(doc.doc.contains(target))
         }
     }
@@ -169,7 +172,7 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
     let basic = try AgentConfigurations.skillInstructions("basic-skill")
     #expect(role.contains("becomes audio on independent Speech"))
     #expect(!basic.contains("becomes audio on independent Speech"))
-    #expect(basic.contains("**task.delegate**") && basic.contains("Do not replay effects"))
+    #expect(basic.contains("**task.send**") && basic.contains("Do not replay effects"))
     #expect(prompt.contains("Skill ID=photography; description="))
     #expect(prompt.contains("Skill IDs are arguments, not tags."))
     #expect(prompt.contains("<task.start description="))
@@ -220,19 +223,25 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
 }
 
 @Test(.actionCatalog) func communicationCatalogDescribesOnlyPermittedTargetKindPairs() throws {
-    let config = try AgentConfigurations.load(named: "Assistant")
+    let config = try taskFixtureConfiguration(parent: true)
     let registry = try AgentCommunicationAdapter.catalog(
         fixtureCatalogWithCommunication(config.capabilities), policy: config.communication)
     let send = try #require(registry.actions.first { $0.alias == "send" })
     let doc = try #require(send.documentation?.doc)
-    let grants = Set(
-        config.communication.sends.filter { $0.contract.hasPrefix("task.") }.map {
-            "\($0.target): \($0.contract.dropFirst("task.".count))"
-        }
-    ).sorted()
-    #expect(doc.hasSuffix("Allowed target/kind pairs: " + grants.joined(separator: ", ") + "."))
+    #expect(
+        doc.hasSuffix(
+            "Allowed target/kind pairs: taskPhotographer: cancel, taskPhotographer: input, taskPhotographer: request."))
     let taskID = try #require(send.documentation?.parameters.first { $0.name == "taskID" })
     #expect(taskID.constraints.contains("Omit for request"))
+}
+
+@Test(.actionCatalog) func communicationCatalogDocumentsFixedTaskResponseKinds() throws {
+    let config = try taskFixtureConfiguration(parent: false)
+    let registry = try AgentCommunicationAdapter.catalog(
+        fixtureCatalogWithCommunication(config.capabilities), policy: config.communication)
+    let send = try #require(registry.actions.first { $0.alias == "send" })
+    let doc = try #require(send.documentation?.doc)
+    #expect(doc.hasSuffix("Allowed target/kind pairs: taskParent: progress, taskParent: result."))
 }
 
 private func skillResponseExamples(_ id: String) throws -> [String] {
@@ -364,7 +373,7 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
     #expect(instructions.contains("instructions, callable functions, selected State sources"))
     #expect(instructions.contains("several model/action/feedback rounds without needing a Task"))
     #expect(instructions.contains("Task-held root while leaving the Task itself active"))
-    #expect(instructions.contains("do not assume the old Task was restored"))
+    #expect(instructions.contains("After the close succeeds, start the new goal"))
     #expect(!instructions.contains("Never invent IDs or release Task-owned Skills this way"))
 }
 
@@ -504,12 +513,13 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
         #expect(prompt.contains("Use AVAILABLE SKILLS and DELEGATABLE AGENTS descriptions"))
         #expect(prompt.contains("Load a missing Skill only for work this Agent itself performs"))
         #expect(prompt.contains("Recent Skills expire or are evicted"))
-        #expect(prompt.contains("require a CURRENT foreground Task"))
-        #expect(prompt.contains("only after confirmed completion"))
+        #expect(prompt.contains("task.start requires an empty foreground slot"))
+        #expect(prompt.contains("when the conversation clearly moves on"))
         #expect(prompt.contains("Asides retain the foreground Task"))
-        #expect(prompt.contains("task.start ends the previous scope"))
-        #expect(prompt.contains("No nesting"))
-        #expect(prompt.contains("Cleanup failure refuses the new task"))
+        #expect(prompt.contains("proactively ask whether to end the Task"))
+        #expect(prompt.contains("Retry the control if its transition did not commit"))
+        #expect(prompt.contains("first call task.end with a truthful summary"))
+        #expect(prompt.contains("A failed reply leaves the foreground goal active"))
         #expect(prompt.contains("including wait text"))
         #expect(prompt.contains("Say useful new information once"))
         if loaded {
@@ -584,8 +594,8 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
     var closure = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
     try closure.append(replacement)
     closure.finish()
-    #expect(closure.calls.count == 1 && closure.calls[0].actionPath.description == "Agent.Task.startTask")
-    #expect(closure.calls[0].parameters["description"] == "处理新的用户目标，旧任务未完成")
+    #expect(closure.calls.count == 1 && closure.calls[0].actionPath.description == "Agent.Task.finishTask")
+    #expect(closure.calls[0].parameters["continueDecision"] == "true")
 }
 
 @Test(.actionCatalog, arguments: ["photography", "history-query"])
@@ -597,7 +607,7 @@ func businessSkillTeachingCannotFinishAnAbsentOrUnrelatedTask(skill: String) thr
         #expect(text.contains("use AGENT CONTEXT task"))
     } else {
         #expect(text.contains("current facts show an active matching query Task"))
-        #expect(text.contains("With no Task, answer and end without task.end or task.cancel"))
+        #expect(text.contains("With no Task, answer directly"))
         #expect(text.contains("An unrelated query must not close another goal"))
     }
 }
@@ -761,22 +771,28 @@ func webSkillExamplesParseAgainstTheirEffectiveCatalogAndStayWithinBudget(skill:
     }
     let basic = try AgentSkillLoader.registry(["basic-skill"], fixed: fixed)
     for (name, arguments) in [
-        ("task.delegate", ["agent_id": "writer", "description": "绘制流程图"]),
+        ("task.send", ["agent_id": "writer", "text": "绘制流程图"]),
         ("task.send", ["agent_id": "writer", "text": "蓝色"]),
-        ("task.cancel", ["agent_id": "writer", "reason": "User cancelled"]),
+        ("task.send", ["agent_id": "writer", "text": "User cancelled"]),
     ] {
         #expect(try basic.resolveAction(name, parameters: arguments).channel == "Control")
         #expect(throws: GenerationError.unknownCapability) { try basic.resolveTool(name, arguments: arguments) }
     }
-    #expect(basic.actions.contains { $0.alias == "task.delegate" })
-    #expect(throws: GenerationError.invalidParameters) {
+    #expect(!basic.actions.contains { $0.alias == "task.delegate" })
+    #expect(!basic.actions.contains { $0.alias == "task.cancel" })
+    #expect(throws: GenerationError.unknownCapability) {
         try basic.resolveAction("task.delegate", parameters: ["target": "writer", "goal": "old"])
     }
     let start = try #require(basic.actions.first { $0.alias == "task.start" })
     #expect(start.optionalParameters == ["skills"])
     #expect(!start.optionalParameters.contains("target"))
     let send = try #require(basic.actions.first { $0.alias == "task.send" })
-    #expect(send.requiredParameters.contains("text") && !send.optionalParameters.contains("type"))
+    #expect(send.requiredParameters == ["agent_id", "text"] && send.optionalParameters.isEmpty)
+    for arguments in [["text": "蓝色"], ["agent_id": "writer"]] {
+        #expect(throws: GenerationError.invalidParameters) {
+            try basic.resolveAction("task.send", parameters: arguments)
+        }
+    }
     let finish = try #require(basic.actions.first { $0.alias == "task.end" })
     #expect(!finish.optionalParameters.contains("taskID"))
     let prompt = try AssistantAgent.systemPrompt(capabilities: fixed)
@@ -787,8 +803,8 @@ func webSkillExamplesParseAgainstTheirEffectiveCatalogAndStayWithinBudget(skill:
     ] {
         #expect(!prompt.contains("Agent ID=" + role + ";"))
     }
-    #expect(prompt.contains("task.start and task.delegate are peer alternatives for the SAME goal"))
-    #expect(prompt.contains("task.delegate(agent_id,description) directly"))
+    #expect(prompt.contains("use task.start for work you own or send it directly to the peer using task.send"))
+    #expect(prompt.contains("Send a concise, self-contained account of what the user wants."))
     #expect(prompt.contains("task.send(agent_id,text)"))
     #expect(!prompt.contains("two distinct call protocols"))
 }
@@ -812,7 +828,7 @@ func webSkillExamplesParseAgainstTheirEffectiveCatalogAndStayWithinBudget(skill:
         #expect(!registry.actions.contains { $0.alias == "Artifact_library" })
     }
     let prompt = try AssistantContextState.systemPrompt(state.registry(fixed: fixed), skills: state)
-    #expect(prompt.contains("peer alternatives for the SAME goal"))
+    #expect(prompt.contains("use task.start for work you own or send it directly to the peer using task.send"))
     #expect(prompt.contains(try AgentConfigurations.publicDescription(named: "Writer")))
     #expect(!prompt.contains("Artifact_library"))
 }

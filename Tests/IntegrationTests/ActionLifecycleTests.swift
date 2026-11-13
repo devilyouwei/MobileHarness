@@ -1061,29 +1061,3 @@ func hostProducerCancellationPreservesOtherSessionAndOtherAgent() async throws {
     #expect(await resources.isSettled(armResource))
     await resources.shutdown()
 }
-
-@Test(.actionCatalog, .timeLimit(.minutes(1)))
-func taskSwitchDrainsEffectsAndPreservesItsControlLane() async throws {
-    let probe = ProducerCancellationProbe()
-    let registry = try ActionRegistry(definitions: [
-        ActionBinding(
-            path: lifecyclePath, displayName: "Fixture", kind: .finite, completion: "Actual completion.",
-            completing: { invocation in try await probe.run(try #require(invocation.call.parameters["id"])) })
-    ])
-    let scheduler = ChannelScheduler(registry: registry)
-    let owner = lifecycleOwner()
-    let input = AgentInput(id: UUID().uuidString, sessionID: owner.sessionID, payload: .text("switch"))
-    for channel in ["Control", "Display"] {
-        let envelope = OutputEnvelope(
-            source: .assistant, context: input.context,
-            output: .actionCall(.init(actionPath: lifecyclePath, channel: channel, parameters: ["id": channel])))
-        try await scheduler.enqueue(invocation: ScheduledAction(envelope: envelope, owner: owner, feedback: .none))
-    }
-    var started = probe.entered.stream.makeAsyncIterator()
-    _ = await started.next()
-    _ = await started.next()
-    try await scheduler.drainEffects(inputID: input.id, source: "assistant")
-    #expect(await probe.cleaned == ["Display"])
-    await scheduler.cancel(inputID: input.id, source: "assistant")
-    #expect(await probe.cleaned == ["Display", "Control"])
-}

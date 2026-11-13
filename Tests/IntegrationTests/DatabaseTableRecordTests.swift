@@ -114,6 +114,38 @@ func requestBoundaryMigrationRetainsInvocationsAndMovesWriterExecutions(version:
     try pool.close()
 }
 
+@Test func taskContractMigrationRetainsPendingWriterResponse() async throws {
+    let repository = try SQLiteRepositories.temporary()
+    let request = try await repository.seedDelegation(
+        workspaceID: nil, goal: "work", input: "work", sourceDialog: nil, agent: "writer")
+    let event = UUID().uuidString
+    let payload = Data("{}".utf8)
+    try await repository.writerExecutions.completeRequest(
+        .init(delegateID: request.delegateID, agent: "writer", eventID: event, data: payload),
+        status: "completed", failure: nil)
+    try repository.database.write { db in
+        try db.execute(
+            sql: "UPDATE agent_messages SET contract='agent.task.message' WHERE id=?",
+            arguments: [request.delegateID])
+        try db.execute(
+            sql: "UPDATE agent_messages SET contract='agent.task.report' WHERE id=?", arguments: [event])
+        try db.execute(sql: "PRAGMA user_version=20261112")
+    }
+
+    try repository.database.prepareSchema { try SQLiteSchema.prepare($0) }
+    try repository.database.prepareSchema { try SQLiteSchema.prepare($0) }
+    let original = try #require(try await repository.agentMessages.agentMessage(request.delegateID))
+    #expect(original.contract == "agent.task.request")
+    let stored = try #require(try await repository.agentMessages.agentMessage(event))
+    #expect(stored.contract == "agent.task.response")
+    #expect(stored.replyTo == original.id)
+    #expect(stored.payload == payload)
+    let pending = try await repository.writerExecutions.pendingDelegationNotifications(
+        agent: "writer", retirement: false, after: nil, limit: 1)
+    #expect(pending.first?.eventID == event)
+    try await repository.shutdown()
+}
+
 @Test func independentAgentTablesAndForeignKeys() async throws {
     let repository = try SQLiteRepositories.temporary()
     try repository.database.write { db throws -> Void in
@@ -261,7 +293,8 @@ func requestBoundaryMigrationRetainsInvocationsAndMovesWriterExecutions(version:
     try await repository.shutdown()
 }
 
-@Test func completionOutboxRejectsStaleClaimsAndStopsAfterEightFailures() async throws {
+@Test(arguments: ["agent.task.response", "writer.completion"])
+func completionOutboxRejectsStaleClaimsAndStopsAfterEightFailures(contract: String) async throws {
     let repository = try SQLiteRepositories.temporary()
     let request = try await repository.seedDelegation(
         workspaceID: nil, goal: "work", input: "work", sourceDialog: nil, agent: "writer")
@@ -269,6 +302,12 @@ func requestBoundaryMigrationRetainsInvocationsAndMovesWriterExecutions(version:
     try await repository.writerExecutions.completeRequest(
         .init(delegateID: request.delegateID, agent: "writer", eventID: event, data: Data("{}".utf8)),
         status: "completed", failure: nil)
+    if contract == "writer.completion" {
+        try repository.database.write {
+            try $0.execute(sql: "UPDATE agent_messages SET contract=? WHERE id=?", arguments: [contract, event])
+        }
+    }
+    #expect(try await repository.agentMessages.agentMessage(event)?.contract == contract)
     var prior: String?
     for attempt in 1...8 {
         // Advance only the delivery clock; business work is never replayed.
@@ -459,14 +498,14 @@ func requestBoundaryMigrationRetainsInvocationsAndMovesWriterExecutions(version:
     let supplement = UUID().uuidString
     try await records.agentMessages.enqueueAgentMessage(
         .init(
-            id: supplement, sender: "assistant", receiver: "writer", contract: "task.input",
+            id: supplement, sender: "assistant", receiver: "writer", contract: "agent.task.request",
             payload: Data("{\"text\":\"blue\"}".utf8), correlationID: id, replyTo: id, dedupeKey: supplement))
     #expect(
         try await records.writerExecutions.acceptWriterInput(
-            supplement, requestID: id, text: "blue", questionID: question))
+            supplement, requestID: id, questionID: question))
     #expect(
         try await !records.writerExecutions.acceptWriterInput(
-            supplement, requestID: id, text: "blue", questionID: question))
+            supplement, requestID: id, questionID: question))
     try await records.writerExecutions.saveInteraction(delegateID: id, interactionID: nil, data: nil)
     let busy = UUID().uuidString
     try await records.agentMessages.seedAgentRequest(

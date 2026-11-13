@@ -11,10 +11,10 @@ import Testing
 @testable import UI
 
 @Test @MainActor func homeEffectsKeepConsentAndErrorEvidenceIndependent() async throws {
-    let activity = ActionActivityState()
+    let activity = HomeNoticeState()
     let state = ConversationState()
     state.expressionRendererAvailable = true
-    let effects = HomeEffectsWorkflow(activity: activity)
+    let effects = HomeEffectsWorkflow(notices: activity)
     effects.bind(state)
     let owner = PresentationOwner(source: "assistant", session: UUID().uuidString)
     try await effects.updateLight(
@@ -22,8 +22,8 @@ import Testing
     #expect(state.decorativeLight?.origin == .init(x: 0.1, y: 0.8))
     #expect(!state.isVoiceActive && state.displayedExpression == .closed && state.listeningAnimationID == nil)
     try await effects.showNotice(.init(text: "提醒", tone: .info), owner: owner)
-    #expect(activity.visibleNotice?.text == "提醒" && activity.backgroundIssues.isEmpty)
-    activity.recordIssue(.init(title: "失败", source: "assistant", message: "真实异常"))
+    #expect(activity.visibleNotice?.text == "提醒")
+    activity.offerToast(.init(title: "失败", source: "assistant", message: "真实异常"))
     #expect(activity.visibleNotice?.text == "真实异常")
     await #expect(throws: HomeEffectsWorkflow.Error.self) {
         try await effects.showNotice(.init(text: "不能覆盖异常", tone: .warning), owner: owner)
@@ -37,8 +37,8 @@ import Testing
 @Test @MainActor func homeEffectsFenceExpiryReplacementAndForeignDismissal() async throws {
     let state = ConversationState()
     state.expressionRendererAvailable = true
-    let activity = ActionActivityState()
-    let effects = HomeEffectsWorkflow(activity: activity)
+    let activity = HomeNoticeState()
+    let effects = HomeEffectsWorkflow(notices: activity)
     effects.bind(state)
     let owner = PresentationOwner(source: "assistant", session: UUID().uuidString)
     try await effects.showNotice(.init(text: "先", tone: .warning), durationMS: 500, owner: owner)
@@ -76,7 +76,7 @@ import Testing
 @Test @MainActor func replyEndRetainsCaptionsUntilTheirOwnerClearsOrSessionCloses() async throws {
     let state = ConversationState()
     state.isVoiceActive = true
-    let effects = HomeEffectsWorkflow(activity: ActionActivityState())
+    let effects = HomeEffectsWorkflow(notices: HomeNoticeState())
     effects.bind(state)
     effects.replyDidBegin()
     state.assistantReply = "第一段"
@@ -107,7 +107,7 @@ func listeningRestorationRetainsFinalUserCaptionEvenWithoutReplyText(reply: Stri
     state.presentTranscript("本轮用户输入")
     state.finishUserTranscript()
     state.appendReply(reply)
-    let effects = HomeEffectsWorkflow(activity: ActionActivityState())
+    let effects = HomeEffectsWorkflow(notices: HomeNoticeState())
     effects.bind(state)
 
     effects.replyDidFinish()
@@ -122,7 +122,7 @@ func listeningRestorationRetainsFinalUserCaptionEvenWithoutReplyText(reply: Stri
     state.isVoiceActive = true
     state.presentTranscript("下一轮正在说话")
     state.appendReply("上一轮回复")
-    let effects = HomeEffectsWorkflow(activity: ActionActivityState())
+    let effects = HomeEffectsWorkflow(notices: HomeNoticeState())
     effects.bind(state)
 
     effects.replyDidFinish()
@@ -134,11 +134,11 @@ func listeningRestorationRetainsFinalUserCaptionEvenWithoutReplyText(reply: Stri
 }
 
 @Test @MainActor func transientToastRemainsIndependentOfReplyCaptionsAndErrorNotice() async throws {
-    let activity = ActionActivityState()
+    let activity = HomeNoticeState()
     let state = ConversationState()
     state.assistantReply = "正在回复"
     state.liveTranscript = "嗯嗯"
-    let effects = HomeEffectsWorkflow(activity: activity)
+    let effects = HomeEffectsWorkflow(notices: activity)
     effects.bind(state)
     let owner = PresentationOwner(source: "assistant.input", session: "discard")
     try await effects.showNotice(
@@ -146,7 +146,7 @@ func listeningRestorationRetainsFinalUserCaptionEvenWithoutReplyText(reply: Stri
     #expect(activity.transientToast?.text == "已丢弃：嗯嗯")
     #expect(activity.visibleNotice == nil)
     #expect(state.assistantReply == "正在回复" && state.liveTranscript == "嗯嗯")
-    activity.recordIssue(.init(title: "失败", source: "assistant", message: "真实异常"))
+    activity.offerToast(.init(title: "失败", source: "assistant", message: "真实异常"))
     try await effects.showNotice(
         .init(text: "已丢弃：好的", tone: .info, placement: .toast), durationMS: 500, owner: owner)
     #expect(activity.visibleNotice?.text == "真实异常")

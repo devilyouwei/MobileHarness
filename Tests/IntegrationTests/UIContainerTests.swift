@@ -39,7 +39,7 @@ extension LiveRuntimeTests {
         #expect(root.devices === registry.devicesPresentation())
         #expect(root.diagnostics === registry.diagnosticsPresentation())
         #expect(root.home.conversation !== other.ui().home.conversation)
-        #expect(root.home.activity !== other.ui().home.activity)
+        #expect(root.runtimeLog !== other.ui().runtimeLog)
         #expect(root.settings.state !== other.ui().settings.state)
         #expect(root.diagnostics.speech !== other.ui().diagnostics.speech)
         #expect(root.settings.state.url == "https://fixture.invalid")
@@ -47,7 +47,7 @@ extension LiveRuntimeTests {
         #expect(!root.settings.presentation.present(.notice("early")))
         #expect(!root.home.conversationPresentation.present(.liveTranscript("early")))
         #expect(!FileManager.default.fileExists(atPath: path.path))
-        #expect(root.home.activity.items.isEmpty && root.camera.state.videoFrame == nil)
+        #expect(root.runtimeLog.items.isEmpty && root.camera.state.videoFrame == nil)
         await root.stop()
         await other.ui().stop()
     }
@@ -91,10 +91,12 @@ extension LiveRuntimeTests {
         #expect(!root.home.conversationPresentation.present(.liveTranscript("late")))
         #expect(root.settings.presentation.present(.notice("background fact")))
         #expect(root.devices.presentation.present(.error("background device fact")))
-        root.home.activityPresentation.recordIssue(
-            .init(title: "failure", source: "runtime", message: "background", userMessage: "background"))
-        #expect(root.home.activity.backgroundIssues.count == 1)
-        #expect(root.home.activity.errorToast == nil)
+        let issue = ExecutionIssue(
+            title: "failure", source: "runtime", message: "background", userMessage: "background")
+        root.runtimeLog.record(.issue(issue))
+        root.home.notices.offerToast(issue)
+        #expect(root.runtimeLog.issues.count == 1)
+        #expect(root.home.notices.errorToast == nil)
         try root.setForeground(true)
         #expect(!root.home.present(.liveTranscript("old generation"), token: token))
         #expect(throws: UIContainerError.unavailable) {
@@ -103,7 +105,7 @@ extension LiveRuntimeTests {
         #expect(root.home.present(.liveTranscript("new generation"), token: root.home.token))
         #expect(root.settings.state.url == "https://draft.invalid")
         #expect(root.navigation.state.path == [.settings])
-        #expect(root.home.activity.errorToast == nil)
+        #expect(root.home.notices.errorToast == nil)
         #expect(!root.home.conversation.isVoiceActive)
         await root.stop()
     }
@@ -142,19 +144,21 @@ extension LiveRuntimeTests {
 extension LiveRuntimeTests {
     @Test @MainActor func uiFullHomeOwnsToastExpiryWithoutAViewAndStopJoinsEffects() async throws {
         let root = UIContainer()
-        root.home.activity.toastDuration = .milliseconds(20)
+        root.home.notices.toastDuration = .milliseconds(20)
         try root.start()
-        root.home.activityPresentation.recordIssue(
-            .init(id: "fault", title: "fault", source: "runtime", message: "detail", userMessage: "notice"))
-        #expect(root.home.activity.errorToast?.id == "fault")
-        try await uiFullEventually { root.home.activity.errorToast == nil }
-        #expect(root.home.activity.backgroundIssues.count == 1)
+        let issue = ExecutionIssue(
+            id: "fault", title: "fault", source: "runtime", message: "detail", userMessage: "notice")
+        root.runtimeLog.record(.issue(issue))
+        root.home.notices.offerToast(issue)
+        #expect(root.home.notices.errorToast?.id == "fault")
+        try await uiFullEventually { root.home.notices.errorToast == nil }
+        #expect(root.runtimeLog.issues.count == 1)
         try await root.home.effects.showNotice(
             .init(text: "temporary", tone: .warning), durationMS: 30_000,
             owner: .init(source: "fixture", session: "fixture"))
         await root.stop()
-        #expect(root.home.activity.notice == nil)
-        #expect(root.home.activity.errorToast == nil)
+        #expect(root.home.notices.notice == nil)
+        #expect(root.home.notices.errorToast == nil)
     }
 }
 

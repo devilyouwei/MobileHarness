@@ -75,7 +75,7 @@ After Gateway admission, Skill permissions are not queried again. Revocation exp
 
 ### Assistant delegation and executor ownership
 
-Assistant's scheduled `task.delegate(agent_id,description)` enters the injected Task controller, which validates the target/contract, persists a UUID communication request in agent_messages and sends an authenticated TaskSignal through Gateway. The executor admits its own business task and owns execution/cleanup; the receipt only establishes acceptance. Foreground Task/Skills remain separate. Public controls use agent_id to resolve the active communication, while runtime delegation/question identities stay private. See the [cross-module sequence](../README.md#assistant-agent-delegation) and [Assistant contract](Assistant/README.md#对其他-agent-的委托).
+Assistant sends a persisted, authenticated message through scheduled `task.send(agent_id,text)`. The receiver decides whether to start, update or stop work and owns execution, cleanup and outcomes. Delivery only acknowledges the message. See [the cross-module sequence](../README.md#assistant-agent-delegation).
 
 Writer is the current public creative executor. It owns its control/content model workflow, local task/workspace selection, input checkpoints, Island feedback and durable completion delivery. Ordinary progress stays in Writer presentation; Gateway direct calls reach Actions.Artifacts for deterministic file work. WriterContainer exposes records to UI and joins role-owned workers. Recovery, progress/reply policy, persistent terminal notifications and task-specific limits belong to [Writer](Writer/README.md), with shared consumers in [Chat](Support/Chat/README.md). They are not implicit capabilities of every Agent or Gateway transport.
 
@@ -133,7 +133,7 @@ Shared output execution carries private resource-scope bindings outside model me
 
 Agent startup binds the shared communication repository to its output router before any role accepts work. Assistant owns foreground scopes and its conversation messages; Writer owns workspace tasks and its own messages. Cross-role control and completion travel through authenticated communication records, while HTTP transport evidence uses the shared deletable log. History presentation never reads another role's private task state to decide execution.
 
-Assistant 的 start 与 delegate 是按所有者选择的平级入口，Writer 工作不建立前台包装任务。Writer 在作品库域按关键词分页查询，显式创建或进入后切到隔离的工作区域。纯查看使用只读呈现域。职责、延迟准备与完成边界见 [Writer](Writer/README.md#作品库与工作区分域)。
+Assistant 通过 task.start/task.end 管理前台任务，通过 task.send 向 Writer 发出 agent.task.request。Writer 自主管理任务并回报 agent.task.response。固定任务执行方共用回报契约，按信封类型执行固定任务收尾。Writer 在作品库域按关键词分页查询，显式创建或进入后切到隔离的工作区域。纯查看使用只读呈现域。职责、延迟准备与完成边界见 [Writer](Writer/README.md#作品库与工作区分域)。
 
 ## Prompt ownership and discovery
 

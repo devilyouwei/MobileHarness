@@ -19,6 +19,10 @@ public actor AgentManager {
         var finishing = false
     }
     private var taskGrants: [String: TaskGrant] = [:]
+    public func grantReceivedTask(_ scope: AgentTaskScope, sender incarnation: String) throws -> String {
+        try validate(scope.requester, incarnation: incarnation, sessionID: scope.sessionID)
+        return try grantTask(scope, sender: scope.requester)
+    }
     @discardableResult public func grantTask(_ scope: AgentTaskScope, sender: AgentID) throws -> String {
         guard sender == scope.requester, scope.requester != scope.executor,
             taskGrants[scope.id] == nil, taskGrants.count < 32,

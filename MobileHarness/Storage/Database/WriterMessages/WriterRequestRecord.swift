@@ -34,7 +34,7 @@ public struct WriterRequestRecord: Codable, Sendable, Identifiable {
     }
 }
 
-/// Opaque Writer delegation completion evidence; execution and user-notification delivery have independent receipts.
+/// Opaque durable report. The subject is the original message for a rejection and the task root for a terminal report.
 public struct WriterDelegationNotification: Sendable {
     public let delegateID: String
     public let claimToken: String?

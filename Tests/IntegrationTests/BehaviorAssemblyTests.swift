@@ -461,7 +461,7 @@ private actor LockedTaskRequests {
 {
     let ui = UIContainer()
     let endpoints = ActionEndpoints(
-        cameraControl: EndpointCameraFixture(), rootSessionID: "root", activity: ui.home.activity,
+        cameraControl: EndpointCameraFixture(), rootSessionID: "root",
         effects: ui.home.effects, expressions: ui.home.expressions,
         homeBluetooth: ui.home.conversation, deviceBluetooth: ui.devices.state)
     let first = EndpointVoiceFixture()

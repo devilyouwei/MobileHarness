@@ -41,7 +41,9 @@ import Gateway
                     let communication = AgentGatewayAssembly(
                         signals: services.gateway.signals,
                         admission: services.gateway.admissionPort, configuration: binding.configuration)
-                    let ports = try services.gateway.configureExecution(communication.configuration)
+                    let log = services.actionAssembly.connectActionLog(to: services.uiContainer.runtimeLog)
+                    let ports = try services.gateway.configureExecution(
+                        communication.configuration, onExecutionSnapshot: log)
                     let facilities = communication.bind(ports: ports, observations: services.gateway.observations)
                     try services.agents.bindExecution(binding, facilities: facilities)
                 },
@@ -54,6 +56,7 @@ import Gateway
                         do { try await services.actions.stop() } catch { if failure == nil { failure = error } }
                     }
                     await services.agents.releaseExecutionBindings()
+                    await services.actionAssembly.stopActionLog()
                     if let failure { throw failure }
                 }),
             ManagedService(

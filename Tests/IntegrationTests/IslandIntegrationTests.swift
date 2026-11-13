@@ -199,9 +199,11 @@ private func islandInput(_ function: String, parameters: [String: String], sourc
     await writer.update(delegateID: "writer-run", phase: .running, step: "迟到进度")
     try await wait { ui.island.detailActivity == nil }
     // Assistant Task logs are no longer a producer of Writer Island content.
-    ui.home.activity.updateTask(
-        .init(id: "stale", parentID: nil, requester: "assistant", executor: "writer", title: "旧日志", phase: .running),
-        event: .init(id: "late", time: Date(), title: "旧步骤", detail: "不能覆盖"))
+    ui.runtimeLog.record(
+        .task(
+            .init(
+                id: "stale", parentID: nil, requester: "assistant", executor: "writer", title: "旧日志", phase: .running),
+            .init(id: "late", time: Date(), title: "旧步骤", detail: "不能覆盖")))
     try await Task.sleep(for: .milliseconds(30))
     #expect(ui.island.detailActivity == nil)
     #expect(!ui.island.activities.contains { $0.owner == "domain.writer" })
@@ -359,7 +361,7 @@ private actor WriterIslandPublicationProbe {
     #expect(content.detail?.text == "测试前台目标")
     #expect(content.expansionID == skills.activeTaskID)
     _ = try skills.control("task.end", arguments: ["summary": "完成"], inputID: input, fixed: fixed)
-    try skills.decisionCompleted(failed: false, fixed: fixed)
+    try skills.decisionCompleted()
     #expect(AssistantExecutionSession.taskContent(skills) == nil)
 }
 

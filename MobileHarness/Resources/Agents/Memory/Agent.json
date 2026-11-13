@@ -6,7 +6,7 @@
   "communication": {
     "inputs": [
       {
-        "contract": "tool.result",
+        "contract": "runtime.tool.result",
         "version": 1,
         "kind": "toolResult"
       },
@@ -21,12 +21,7 @@
         "kind": "observation"
       },
       {
-        "contract": "task.progress",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
-        "contract": "task.result",
+        "contract": "agent.task.response",
         "version": 1,
         "kind": "observation"
       },
@@ -36,7 +31,7 @@
         "kind": "observation"
       },
       {
-        "contract": "communication.receipt",
+        "contract": "runtime.message.receipt",
         "version": 1,
         "kind": "communicationReceipt"
       }
@@ -45,11 +40,7 @@
     "publications": [],
     "sends": [
       {
-        "contract": "task.progress",
-        "target": "assistant"
-      },
-      {
-        "contract": "task.result",
+        "contract": "agent.task.response",
         "target": "assistant"
       }
     ]

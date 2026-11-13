@@ -58,7 +58,7 @@ import UI
                 containerFailures: containerFailures,
                 home: uiContainer.home, settings: uiContainer.settings, modelResources: uiContainer.modelResources,
                 navigation: uiContainer.navigation, history: uiContainer.history, devices: uiContainer.devices,
-                diagnostics: uiContainer.diagnostics,
+                diagnostics: uiContainer.diagnostics, runtimeLog: uiContainer.runtimeLog,
                 repositories: {
                     return try AgentRepositories(
                         assistantConversations: storage.database.assistantConversations,
@@ -165,7 +165,7 @@ import UI
             uiContainer: uiContainer, platform: platform, storage: storage, model: model,
             actions: actions, gateway: gateway, agents: agents, inspection: inspection, actionAssembly: actionAssembly,
             ui: ApplicationPresentation(
-                features: agents, home: home, web: uiContainer.web),
+                features: agents, home: home, web: uiContainer.web, runtimeLog: uiContainer.runtimeLog),
             homePreparation: homePreparation)
     }
 }

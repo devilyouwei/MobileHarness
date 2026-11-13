@@ -591,7 +591,7 @@ private actor SignalFeedbackRecorder: Agent {
         data: Data(
             #"""
             {"version":8,"category":"cognition","id":"assistant","actions":{},"tools":[],"communication":{
-            "inputs":[{"contract":"tool.result","version":1,"kind":"toolResult"}],
+            "inputs":[{"contract":"runtime.tool.result","version":1,"kind":"toolResult"}],
             "subscriptions":[],"publications":[],"sends":[]}}
             """#.utf8))
     let policy = try CommunicationPolicy(configurations: [configuration])

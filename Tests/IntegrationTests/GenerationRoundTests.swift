@@ -1259,8 +1259,8 @@ private func agentRequestFailuresTerminateWithoutRetryOrEffectReplay(_ failure: 
     }
     if let context {
         let state = try await context.snapshot().state.skillState
-        #expect(state?.activeTaskID == nil)
-        #expect(state?.tasks.last?.status == "failed")
+        #expect(state?.activeTaskID != nil)
+        #expect(state?.tasks.last?.status == "waitingUser")
         #expect(
             record.modelRequests?.first?.decisionMetadata?.taskID
                 == record.modelRequests?.last?.decisionMetadata?.taskID)

@@ -2,21 +2,11 @@
   "version": 10,
   "category": "cognition",
   "id": "writer",
-  "description": "I create and revise drawings, diagrams, HTML/CSS/JS pages, Markdown documents and text files, and find, open or delete saved works. Delegate these goals directly to me. Supply a short goal and any known real work title or returned workspace_N reference; I verify the target, and ask when ambiguous. Do not send source code or assign my workspace identity. Request deletion only when the user explicitly asks. I accept one assignment at a time, including waiting, paused and cleanup states; relevant follow-up input supplements that assignment, and cancellation must finish cleanup before a new one. Accepted work survives the requesting conversation or listening session ending. I show acceptance, progress, questions, results, refusals and failures directly as text on my Island. The app announces selected updates automatically. Forward relevant user answers or corrections to me. Successful delivery needs no extra reply. Completion ends the assignment rather than the saved work. My private tools and execution instructions remain private.",
+  "description": "I create and revise drawings, diagrams, HTML/CSS/JS pages, Markdown and text files, and find, open or delete saved works. Send me the user's goal, updates, answers or stop requests via task.send. Include any known work title or returned workspace_N reference. I decide whether to start work, update an assignment or ask a question. I handle one assignment at a time and report acceptance, questions, progress and outcomes. Request deletion only when the user explicitly asks. Accepted work survives the requesting conversation or listening session ending. My private tools and execution instructions remain private.",
   "communication": {
     "inputs": [
       {
-        "contract": "task.request",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
-        "contract": "task.input",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
-        "contract": "task.cancel",
+        "contract": "agent.task.request",
         "version": 1,
         "kind": "observation"
       }
@@ -25,11 +15,7 @@
     "publications": [],
     "sends": [
       {
-        "contract": "task.progress",
-        "target": "assistant"
-      },
-      {
-        "contract": "writer.completion",
+        "contract": "agent.task.response",
         "target": "assistant"
       }
     ]

@@ -31,7 +31,7 @@ PerceptionMessage 包含 user.input.asr.partial、user.input.asr.final、sound.s
 
 姿态、声源和识别阶段由对应角色拥有。见 [VisionPerception](../../VisionPerception/README.md) 与 [SpeechPerception](../../SpeechPerception/README.md)。
 
-AgentTaskContent 保存最多 4096 字节的业务文本与 running／waitingUser／completed 阶段；waitingUser 要求 interactionID。AgentTaskInputIntent 显式指向既有 taskID 与 interactionID，标识各最多 128 字节；运行时所有权由可信上下文提供。后台委派使用 AgentTaskSignal.request 携带目标及原始用户输入。固定能力继续用信封类型标记解释自己的载荷。
+AgentTaskContent 保存最多 4096 字节的业务文本与 running／waitingUser／completed 阶段；waitingUser 要求 interactionID。AgentTaskInputIntent 显式指向既有 taskID 与 interactionID，标识各最多 128 字节；运行时所有权由可信上下文提供。固定任务用 AgentTaskSignal.request 传输业务载荷。后台 Writer 通过 AgentTaskRequest 接收文本，任务级进度与终态继续使用执行范围。
 
 ## 固定任务准入
 
@@ -46,20 +46,20 @@ AgentFixedTaskInput.unwrap 只接受 request／input，核对 requester 为 Assi
 Native CameraFrame/PCM and typed UI/container observations reach their owning roles directly. This directory owns derived semantic messages and role-originated coordination, not a universal external-media Signal format. Perception and cognition use the same Agent communication boundary; neither denotes a new module or container. Execution requests are separate from role messages and share Gateway only for their respective transport/scheduling facilities. The cross-module view is maintained in the [overall input and Signal design](../../../README.md#native-input-and-internal-signals).
 
 
-Assistant 通过 task.delegate(agent_id=writer,description) 发送原始用户输入和单行目标。Writer 验证来源、执行范围和容量后接纳，由内部模型判断执行、追问或拒绝。模型拒绝以 declined 业务事件进入 writer.completion，并携带理由。task.progress 回报接纳、精选里程碑与追问，writer.completion 回报持久终态。追加输入在文件检查点消费，显式 cancel 加入取消清理。授权退休由 Writer 通过运行时端口发起。
+Assistant 通过 task.send(agent_id,text) 发送 AgentTaskRequest。Writer 从自己的收件队列接纳正文，确认新任务时为认证原消息申请内部执行授权。Writer 统一发送 agent.task.response，包含接纳、进度、追问、答复接纳、消息拒绝及任务终态。
 
 WriterDelegationEvent 携带可选 workspace_N 和独立 delegateID，接收端认证 scope 并校验事件顺序。每次续作创建新 scope，不重新打开已终止的通信任务。历史请求保存稳定身份，实时传输/去重使用执行身份。
 
 WriterDelegationEvent.failure 是可选 WriterFailureDiagnostic：分类、错误码、阶段、摘要、诊断字段和关联原因均为业务事实。通信值不依赖 Storage；Writer 拥有到持久化 DTO 的转换。失败消息通过认证、去重后更新 Assistant 任务视图；Writer 灵动岛展示任务摘要。
 
-WriterDelegationCompletion（writer.completion）封装已结束的 Writer AgentTaskSignal，限定后台 assistant→writer 身份及业务事件/终态配对。通过无 taskScope 的普通角色通信递送，只携带事实，不恢复旧执行授权。Assistant 额外核对共享 SQLite 中不可变通知与任务归属；控制退休和终态投递独立接纳。该契约不引入 Gateway 调度机制或通用持久消息设施。
+AgentTaskResponse 携带 Writer 的原消息拒绝或已接纳任务的事实。Writer 进度验证活跃执行授权，终态持久投递与授权退休独立。Assistant 核对持久拒绝或终态的原消息、事件身份和正文。固定任务共用 agent.task.response，信封仍用 progress/result 区分进度与终态。Gateway 验证任务执行授权，固定任务终态在送达前收尾并回收执行授权。固定任务的 request、input、cancel 控制契约独立。
 
 普通运行步骤及请求编号由 Writer 自有展示和请求历史保留。跨角色消息承载接纳、首次草稿保存、首次恢复或渲染异常、追问和终态。Assistant 在控制路径验证并更新关联视图，从原对话向后续真实请求提供短事件事实，并通过现有合成播放播报。
 
-Assistant creates the delegation UUID in AgentTaskScope.id. Writer allocates a workspace only on explicit creation. The event workspaceID identifies the reusable work. Writer events retain internal event/interaction/delegate IDs for verification, while the next real user input can carry the captured pending question as contextual data. Public task.send/task.cancel uses agent_id; runtime injects current delegation and pending interaction after ownership and captured-question checks.
+The sender creates a message UUID. The receiver uses it as the execution identity when admitting new work. Replies may carry a captured task and question address. Writer validates the address against its current assignment.
 
 WriterDelegationEvent version 3 carries one optional workspaceID, the current goal and window evidence alongside the delegation and event identity.
 
 ## 公开委派适配
 
-AgentTaskDelegation 是已实现公开任务适配的唯一查询入口，当前只匹配 assistant→writer 并要求调用者具有 task.request 发送权限。AgentConfigurations 的发现目录和 ChatWorker 的 task.delegate 准入共同使用它。描述、注册或新增通信声明本身不会创建适配；底层 Gateway 和接收端分别校验来源和任务授权。
+AgentTaskMessaging 供角色目录与发送端校验已实现的后台消息路由。当前允许 assistant→writer，须具备 agent.task.request 权限。Gateway 校验实际身份，Writer 决定业务准入。

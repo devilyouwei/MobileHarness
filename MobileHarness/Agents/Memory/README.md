@@ -47,7 +47,7 @@ flowchart LR
  AS["Assistant"]:::agent
  end
  AS -->|"task.request／input／cancel"| G
- G -->|"task.progress／result"| AS
+ G -->|"agent.task.response"| AS
 
  classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
  classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
@@ -98,7 +98,7 @@ flowchart LR
 
 `MemoryUI.swift` 在 MemoryAgent 隔离域内同步读取角色状态；历史执行前和异步结果返回后均检查角色仍在运行，Gateway 执行与结果端口读取保持异步。
 
-新会话先通过业务屏障取消活跃 Assistant Task，再归档；归档提交后独立生成标题，标题失败不撤回归档。固定操作和模型 history-query 暴露范围分别声明，Assistant 可直接调用相同 History Actions。回执等待真实读取／变更／呈现结果，接纳不等于完成。
+新会话先通过 Assistant 的 task.end 提交活跃前台任务的摘要和终态，再归档。归档提交后独立生成标题，标题失败不撤回归档。固定操作和模型 history-query 暴露范围分别声明，Assistant 可直接调用相同 History Actions。回执等待真实读取、变更或呈现结果。
 
 ## 标题算法
 

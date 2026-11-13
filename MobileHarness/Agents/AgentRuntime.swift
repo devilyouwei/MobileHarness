@@ -66,7 +66,7 @@ import StorageFiles
         private var containerFailuresConnected = false
         func connectFailures() {
             startObservers()
-            actionActivity.connectFailures { [applicationControlSession] event in
+            runtimeLogWorkflow.connectFailures { [applicationControlSession] event in
                 try await applicationControlSession.agent.observeFailure(event)
             }
             guard !containerFailuresConnected else { return }
@@ -81,7 +81,7 @@ import StorageFiles
             containerFailures.disconnect()
             containerFailuresConnected = false
             await output.shutdown(closeResources: false)
-            await actionActivity.shutdown()
+            await runtimeLogWorkflow.shutdown()
             skillObservation?.cancel()
             await skillObservation?.value
             business.bindTracking { false }
@@ -95,13 +95,13 @@ import StorageFiles
         let output: OutputGateway
         let business: AgentBusinessBindings
         let actions: ChannelScheduler
-        let actionActivity: ActionActivityWorkflow
+        let runtimeLogWorkflow: AgentRuntimeLogWorkflow
         let resources: ResourceCoordinator
 
         static func prepare(
             makeInputDecision: @escaping @MainActor (AgentBusinessBindings) -> AssistantInputDecision,
             maintenance: AgentMaintenancePorts,
-            containerFailures: ContainerFailureChannel, home: UIHomeContainer,
+            containerFailures: ContainerFailureChannel, home: UIHomeContainer, log: (any RuntimeLogWriting)?,
             assistantContainer: AssistantContainer, applicationControlContainer: ApplicationControlContainer,
             memoryContainer: MemoryContainer, photographerContainer: PhotographerContainer,
             writerContainer: WriterContainer,
@@ -127,11 +127,11 @@ import StorageFiles
                 tasks: repositories.assistantTasks, conversations: repositories.assistantConversations,
                 logs: repositories.logs)
             let applicationControlSessionID = UUID().uuidString
-            let activity = ActionActivityWorkflow(state: home.activityPresentation)
+            let activity = AgentRuntimeLogWorkflow(log: log)
             let conversations = historyStore
             let request = AgentBusinessRequest(
                 sessionID: applicationControlSessionID,
-                conversations: conversations, activity: activity.state, failures: activity,
+                conversations: conversations, failures: activity,
                 maintenance: maintenance, summarizeTitle: summarizeTitle,
                 titlePositions: { ConversationTitleGenerator.samplePositions(count: $0) },
                 resourcePolicies: (1...6).map { motor in
@@ -165,6 +165,10 @@ import StorageFiles
                     },
                     uiProviderSettings: business.settings, uiProviderDiscovery: business.discovery,
                     uiProviderPresentation: business.providerPresentation, decodeResources: business.decodeResources,
+                    publishIssue: { [weak home] issue, showsToast in
+                        log?.record(.issue(issue))
+                        if showsToast { home?.notices.offerToast(issue) }
+                    },
                     context: applicationContext)
                 let photographerSessionID = applicationControlSessionID
                 let photographerAgent = try PhotographerAgent(
@@ -196,7 +200,7 @@ import StorageFiles
                                 throw CommunicationError.unavailableTarget
                             }
                             _ = try await control(
-                                "task.cancel", ["reason": "用户开始新对话"], "assistant",
+                                "task.end", ["summary": "用户开始新对话，结束当前目标。"], "assistant",
                                 applicationControlSessionID, UUID().uuidString, nil)
                         }
                     }, context: memoryContext)
@@ -222,7 +226,9 @@ import StorageFiles
                         case .text(let text): return String(text.prefix(256))
                         case .observation(let message):
                             if case .transcript(let text, _) = message.perception { return String(text.prefix(256)) }
-                            if let task = message.content(as: AgentTaskSignal.self),
+                            let report = message.content(as: AgentTaskResponse.self)
+                            if let rejection = report?.rejection { return String(rejection.text.prefix(256)) }
+                            if let task = report?.signal ?? message.content(as: AgentTaskSignal.self),
                                 let content = try? AgentTaskContent.decode(task)
                             {
                                 return String(content.text.prefix(256))
@@ -249,7 +255,7 @@ import StorageFiles
                         containerFailures: containerFailures, cache: cache, assistantContext: assistantContext,
                         conversations: conversations, communications: repositories.agentMessages,
                         applicationControlSessionID: applicationControlSessionID,
-                        activity: activity, photographerAgent: photographerAgent,
+                        activity: activity, log: log, photographerAgent: photographerAgent,
                         applicationControlAgent: applicationControlAgent, historyAgent: historyAgent,
                         stateContext: stateContext, cameraControl: cameraControl, chatProvider: chatProvider,
                         inputDecision: makeInputDecision(business), inputQueueStatus: business.inputQueueStatus,
@@ -264,7 +270,8 @@ import StorageFiles
             home: UIHomeContainer, containerFailures: ContainerFailureChannel, cache: CacheContainer,
             assistantContext: AgentContextRepository<AssistantContextState>, conversations: AssistantHistoryStore,
             communications: any AgentMessageRepository,
-            applicationControlSessionID: String, activity: ActionActivityWorkflow, photographerAgent: PhotographerAgent,
+            applicationControlSessionID: String, activity: AgentRuntimeLogWorkflow, log: (any RuntimeLogWriting)?,
+            photographerAgent: PhotographerAgent,
             applicationControlAgent: ApplicationControlAgent, historyAgent: MemoryAgent,
             stateContext: AgentStateContext, cameraControl: any AgentCameraAccess,
             chatProvider: @escaping @Sendable () async throws -> any ChatCapability,
@@ -298,7 +305,7 @@ import StorageFiles
             }
             writerContainer.bindArtifacts(business.writerArtifacts)
             try writerContainer.install(manager: manager, output: gateway, model: writerModel, streaming: streaming)
-            actionActivity = activity
+            runtimeLogWorkflow = activity
             business.bindResources(resources, actions)
             business.bindDeferredFailure { result in
                 let feedback = ActionResult(
@@ -332,8 +339,18 @@ import StorageFiles
             try stateContext.registerMedia(
                 "actions.web.screenshot", read: business.readWebScreenshot, reset: { _ in })
             let speechOutput = AssistantSpeechOutput()
+            let decisionLog: (@MainActor @Sendable (InputDecisionSnapshot, InputDecisionOutcome, Duration) -> Void)?
+            if let log {
+                decisionLog = { @MainActor snapshot, decision, duration in
+                    guard !Task.isCancelled else { return }
+                    log.record(.decision(decision.logItem(for: snapshot, duration: duration)))
+                }
+            } else {
+                decisionLog = nil
+            }
             let main = try AssistantAgent(
                 stateContext: stateContext, speechOutput: speechOutput, inputDecision: inputDecision, fullDuplex: true,
+                decisionLog: decisionLog,
                 inputQueueStatus: { ready, deciding in await inputQueueStatus(ready, deciding) },
                 uiHome: home, uiSessionID: applicationControlSessionID,
                 presentsReply: true, chatProvider: chatProvider, conversations: conversations,
@@ -343,10 +360,7 @@ import StorageFiles
             business.tasks.handler = { operation, arguments, source, session, input, decision in
                 try await main.controlTask(
                     operation, arguments: arguments, source: source, sessionID: session, inputID: input,
-                    decisionID: decision,
-                    beforeSuperseding: {
-                        try await facilities.actions.drainEffects(inputID: decision ?? input, source: source)
-                    })
+                    decisionID: decision)
             }
             let interaction = AssistantExecutionSession(
                 agent: main, manager: manager, output: gateway, speech: speechOutput,
@@ -363,13 +377,12 @@ import StorageFiles
         private func startObservers() {
             guard !observersStarted else { return }
             observersStarted = true
-            let activity = actionActivity
+            let activity = runtimeLogWorkflow
             let input = input
             let manager = manager
             let interaction = interaction
             let main = interaction.agent
             let gateway = output
-            let actions = actions
             activity.startTasks(
                 observe: { try await input.observeTasks() },
                 taskContent: { signal in
@@ -385,18 +398,11 @@ import StorageFiles
                 }
                 return values
             }
-            activity.start { try await actions.observeExecutions() }
             skillObservation = Task { [activity] in
                 var previous: [String: String] = [:]
                 for await skills in main.skillUpdates {
                     guard !Task.isCancelled else { return }
                     await interaction.presentTaskState(skills)
-                    let active = skills.tasks.first { $0.id == skills.activeTaskID }
-                    activity.presentTaskState(
-                        id: active?.id, title: active?.goal ?? "", status: active?.status ?? "",
-                        ownership: Dictionary(
-                            uniqueKeysWithValues: skills.loaded.map { ($0, (try? skills.ownership($0)) ?? "unknown") }),
-                        loaded: skills.loaded)
                     for task in skills.tasks {
                         let marker = task.status + task.skills.joined(separator: ",") + (task.failure ?? "")
                         guard previous[task.id] != marker else { continue }
@@ -407,7 +413,6 @@ import StorageFiles
                         case "completed": phase = .succeeded
                         case "cancelled": phase = .cancelled
                         case "failed", "interrupted": phase = .failed
-                        case "cancelling": phase = .cancelling
                         default: phase = .running
                         }
                         var item = TaskLogItem(

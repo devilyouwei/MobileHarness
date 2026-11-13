@@ -51,14 +51,14 @@ import Foundation
     @MainActor
     public struct ConversationView: View {
         @Bindable var state: ConversationState
-        @Bindable var activity: ActionActivityState
+        @Bindable var notices: HomeNoticeState
         private let toggleVoice: () -> Void
         public init(
-            state: ConversationState, activity: ActionActivityState,
+            state: ConversationState, notices: HomeNoticeState,
             listeningRequests: UIRequests<ListeningInput, Void>
         ) {
             self.state = state
-            self.activity = activity
+            self.notices = notices
             func submit(_ value: ListeningInput) {
                 Task {
                     do { try await listeningRequests.submitControl(value) } catch {
@@ -73,7 +73,7 @@ import Foundation
 
         public var body: some View {
             GeometryReader { geometry in
-                let presentationNotice = state.assistantReply.isEmpty ? activity.visibleNotice : nil
+                let presentationNotice = state.assistantReply.isEmpty ? notices.visibleNotice : nil
                 let diameter = min(geometry.size.width * 0.84, 360.0)
                 let layout = ConversationCaptionLayout(viewportHeight: geometry.size.height, faceDiameter: diameter)
                 ZStack {
@@ -215,26 +215,17 @@ import Foundation
                         .position(
                             x: geometry.size.width / 2,
                             y: geometry.size.height + geometry.safeAreaInsets.bottom / 2 - 50)
-                    VStack {
-                        Spacer(minLength: 0)
-                        if activity.hasRecords || activity.observationUnavailable {
-                            ActionActivityView(state: activity)
-                        }
-                    }
-                    .frame(width: geometry.size.width - 40)
-                    .padding(.bottom, 16)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
 
                 }
             }
             .onChange(of: state.assistantReply) { _, text in
-                if !text.isEmpty, let issue = activity.errorToast {
-                    activity.dismissErrorToast(id: issue.id)
+                if !text.isEmpty, let issue = notices.errorToast {
+                    notices.dismissErrorToast(id: issue.id)
                 }
             }
             .onChange(of: state.liveTranscript) { _, text in
-                if !text.isEmpty && !state.transcriptFinalized, let issue = activity.errorToast {
-                    activity.dismissErrorToast(id: issue.id)
+                if !text.isEmpty && !state.transcriptFinalized, let issue = notices.errorToast {
+                    notices.dismissErrorToast(id: issue.id)
                 }
             }
             .preferredColorScheme(.dark)

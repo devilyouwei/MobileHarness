@@ -17,7 +17,6 @@ public actor ApplicationControlExecutionSession {
     private var registered = false
     private var closed = false
     public private(set) var lastExecutionFailure: String?
-    public private(set) var lastDiagnosticDeliveryFailure: String?
 
     public init(manager: AgentManager, output: OutputGateway, agent: ApplicationControlAgent) {
         self.manager = manager
@@ -43,7 +42,7 @@ public actor ApplicationControlExecutionSession {
                     do {
                         try await IndependentOutputWorkflow.consumeGeneration(agent.outputs) { envelope in
                             do { _ = try await consumer.execute(envelope) } catch {
-                                await self.recordFailure(error, envelope: envelope)
+                                await self.recordFailure(error)
                             }
                         }
                     } catch is CancellationError {} catch {
@@ -69,13 +68,8 @@ public actor ApplicationControlExecutionSession {
             operation.cancel()
         }
     }
-    private func recordFailure(_ error: any Error, envelope: OutputEnvelope) {
+    private func recordFailure(_ error: any Error) {
         lastExecutionFailure = String(String(describing: error).prefix(512))
-        if [ContainerFailureEvent.contract, RuntimeFailureEvent.contract, AppEnvironmentFact.contract].contains(
-            envelope.inputMetadata.contract)
-        {
-            lastDiagnosticDeliveryFailure = lastExecutionFailure
-        }
     }
     public func shutdown() async {
         await closeResources()

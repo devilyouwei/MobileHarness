@@ -226,7 +226,7 @@ private actor WriterEvaluationSink: Agent {
     func stop() {}
     func receive(_ input: AgentInput) {
         guard case .observation(let message) = input.payload,
-            let signal = message.content(as: WriterDelegationCompletion.self)?.signal
+            let signal = message.content(as: AgentTaskResponse.self)?.signal
                 ?? message.content(as: AgentTaskSignal.self)
         else { return }
         signals.append(signal)
@@ -341,21 +341,17 @@ func writerRealModelWorkflowRegression() async throws {
             }
             let delegateID = UUID().uuidString
             let requestGoal = scenario.goal + (previous.map { " 已知作品引用：" + $0.workspaceID } ?? "")
-            try await records.agentMessages.seedAgentRequest(
-                id: delegateID, requester: "assistant", executor: "writer", goal: requestGoal, input: requestGoal,
-                sourceDialog: nil)
             item["delegateID"] = delegateID
-            let scope = AgentTaskScope(
-                id: delegateID, requester: .assistant, executor: .writer, sessionID: session, execution: .background)
-            let data = ["request": requestGoal, "goal": requestGoal]
-            let signal = try AgentTaskSignal(
-                kind: .request, scope: scope, data: JSONEncoder().encode(data))
-            let receipt = try await messaging.send(
-                signal.message(),
-                parent: .init(id: UUID().uuidString, sessionID: session, payload: .text(scenario.goal)), to: .writer)
+            let receipt = try await sendWriterMessage(
+                AgentTaskRequest(id: delegateID, text: requestGoal), through: messaging, records: records,
+                session: session)
             guard receipt.rejected.isEmpty else { throw WriterFailure.unavailable }
             while true {
-                let current = try await records.writerExecutions.request(delegateID, agent: "writer")
+                guard let current = try? await records.writerExecutions.request(delegateID, agent: "writer") else {
+                    guard Date().timeIntervalSince(start) <= seconds else { throw WriterFailure.incomplete }
+                    try await Task.sleep(for: .milliseconds(20))
+                    continue
+                }
                 item["workspaceID"] = current.workspaceID
                 if ["completed", "failed", "cancelled", "interrupted"].contains(current.status) {
                     item["status"] = current.status
@@ -369,10 +365,8 @@ func writerRealModelWorkflowRegression() async throws {
                 }
                 if Date().timeIntervalSince(start) > seconds {
                     issues.append("Evaluation deadline exceeded; explicit cancel, not production timeout")
-                    let cancel = try AgentTaskContent(text: "Evaluation deadline").signal(.cancel, scope: scope)
-                    _ = try await messaging.send(
-                        cancel.message(),
-                        parent: .init(id: UUID().uuidString, sessionID: session, payload: .text("cancel")), to: .writer)
+                    let cancel = AgentTaskRequest(text: "Cancel this assignment")
+                    _ = try await sendWriterMessage(cancel, through: messaging, records: records, session: session)
                     let until = Date().addingTimeInterval(20)
                     while Date() < until, await writer.observationSnapshot().business["phase"] != .text("idle") {
                         try await Task.sleep(for: .milliseconds(100))
@@ -775,18 +769,11 @@ private func writerPromptCase(_ scenario: WriterPromptCase, env: [String: String
         let previous = scenario.resumeSeed.flatMap { seeds[$0] }
         let delegateID = UUID().uuidString
         let requestGoal = scenario.goal + (previous.map { " 已知作品引用：" + $0.workspaceID } ?? "")
-        try await records.agentMessages.seedAgentRequest(
-            id: delegateID, requester: "assistant", executor: "writer", goal: requestGoal, input: requestGoal,
-            sourceDialog: nil)
         let scope = AgentTaskScope(
             id: delegateID, requester: .assistant, executor: .writer, sessionID: session, execution: .background)
         item["delegateID"] = delegateID
-        let data = ["request": requestGoal, "goal": requestGoal]
-        let signal = try AgentTaskSignal(
-            kind: .request, scope: scope, data: JSONEncoder().encode(data))
-        let receipt = try await messaging.send(
-            signal.message(), parent: .init(id: UUID().uuidString, sessionID: session, payload: .text(scenario.goal)),
-            to: .writer)
+        let receipt = try await sendWriterMessage(
+            AgentTaskRequest(id: delegateID, text: requestGoal), through: messaging, records: records, session: session)
         guard receipt.rejected.isEmpty else {
             item["admissionRejected"] = String(describing: receipt.rejected)
             throw WriterFailure.unavailable
@@ -799,17 +786,9 @@ private func writerPromptCase(_ scenario: WriterPromptCase, env: [String: String
         while true {
             let phase = await writer.observationSnapshot().business["phase"]
             if !busyChecked, scenario.expectCancelled == true, phase == .text("running") {
-                let other = AgentTaskScope(
-                    id: UUID().uuidString, requester: .assistant, executor: .writer, sessionID: session,
-                    execution: .background)
-                let competing = try AgentTaskSignal(
-                    kind: .request, scope: other,
-                    data: JSONEncoder().encode(["request": "another"]))
-                let rejection = try await messaging.send(
-                    competing.message(),
-                    parent: .init(id: UUID().uuidString, sessionID: session, payload: .text("another")), to: .writer)
-                item["busyRejected"] = !rejection.rejected.isEmpty
-                if rejection.rejected.isEmpty { issues.append("Busy assignment was accepted") }
+                let competing = AgentTaskRequest(text: "Create a separate, independent new document")
+                _ = try await sendWriterMessage(competing, through: messaging, records: records, session: session)
+                item["busyMessageID"] = competing.id
                 busyChecked = true
             }
             if phase == .text("waitingUser") {
@@ -820,12 +799,9 @@ private func writerPromptCase(_ scenario: WriterPromptCase, env: [String: String
                         $0.interactionID != nil
                     }
                     if let content {
-                        let reply = try AgentTaskContent(text: answer, interactionID: content.interactionID).signal(
-                            .input, scope: scope)
-                        _ = try await messaging.send(
-                            reply.message(),
-                            parent: .init(id: UUID().uuidString, sessionID: session, payload: .text(answer)),
-                            to: .writer)
+                        let reply = AgentTaskRequest(
+                            text: answer, replyTo: scope.id, interactionID: content.interactionID)
+                        _ = try await sendWriterMessage(reply, through: messaging, records: records, session: session)
                         answered = true
                     }
                 } else if scenario.answer == nil {
@@ -836,14 +812,17 @@ private func writerPromptCase(_ scenario: WriterPromptCase, env: [String: String
             if scenario.expectCancelled == true, !cancelled,
                 await model.records.contains(where: { $0["phase"] == "content" })
             {
-                let cancel = try AgentTaskContent(text: "User cancellation in evaluation").signal(.cancel, scope: scope)
-                _ = try await messaging.send(
-                    cancel.message(),
-                    parent: .init(id: UUID().uuidString, sessionID: session, payload: .text("cancel")), to: .writer)
+                let cancel = AgentTaskRequest(text: "Cancel this assignment")
+                _ = try await sendWriterMessage(cancel, through: messaging, records: records, session: session)
                 cancelled = true
             }
-            let currentRequest = try await records.writerExecutions.request(delegateID, agent: "writer")
-            let current = currentRequest
+            guard let current = try? await records.writerExecutions.request(delegateID, agent: "writer") else {
+                guard Date().timeIntervalSince(started) <= Double(env["MH_WRITER_EVAL_SECONDS"] ?? "300")! else {
+                    throw WriterFailure.incomplete
+                }
+                try await Task.sleep(for: .milliseconds(20))
+                continue
+            }
             item["workspaceID"] = current.workspaceID
             if ["completed", "failed", "cancelled", "interrupted"].contains(current.status) {
                 terminal = current.status
@@ -856,6 +835,13 @@ private func writerPromptCase(_ scenario: WriterPromptCase, env: [String: String
             }
             try await Task.sleep(for: .milliseconds(50))
         }
+        if let busyID = item["busyMessageID"] as? String {
+            let rejected =
+                try await records.agentMessages.agentReply(to: busyID, contract: "agent.task.response")
+                != nil
+            item["busyRejected"] = rejected
+            if !rejected { issues.append("Busy assignment was accepted") }
+        }
         item["status"] = terminal
         item["waitingSeen"] = waitingSeen
         if scenario.expectWaiting == true {
@@ -867,11 +853,13 @@ private func writerPromptCase(_ scenario: WriterPromptCase, env: [String: String
         }
         if scenario.answer != nil && !answered { issues.append("Required question/follow-up did not occur") }
         if terminal == "waitingUser" || terminal == "evaluationTimeout" {
-            let cancel = try AgentTaskContent(text: "Evaluation cleanup after recorded outcome").signal(
-                .cancel, scope: scope)
-            _ = try await messaging.send(
-                cancel.message(), parent: .init(id: UUID().uuidString, sessionID: session, payload: .text("cancel")),
-                to: .writer)
+            let interaction = await sink.signals.reversed().compactMap { signal in
+                try? AgentTaskContent.decode(signal).interactionID
+            }.first
+            let cancel = AgentTaskRequest(
+                text: "Cancel this assignment", replyTo: terminal == "waitingUser" ? scope.id : nil,
+                interactionID: terminal == "waitingUser" ? interaction : nil)
+            _ = try await sendWriterMessage(cancel, through: messaging, records: records, session: session)
         }
         // Join all owned work before examining final files and late window effects.
         await writer.stop()

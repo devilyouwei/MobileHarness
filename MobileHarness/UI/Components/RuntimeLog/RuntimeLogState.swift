@@ -22,16 +22,17 @@ public struct ActionActivityItem: Identifiable, Equatable, Sendable {
     public let id: String
     public let title: String
     public let channel: String
-    public var channelTitle: String { channel }
     public let status: String
+    public let parameters: [String: String]
+    public let output: String?
     public let issueDescriptions: [String]
-    public let symbol: String
     public let execution: Execution
     public var isActive: Bool { [.queued, .running, .cancelling].contains(execution.phase) }
     public var isFailure: Bool { execution.phase == .failed }
     public init(
-        id: String, title: String, channel: String, status: String, issueDescriptions: [String], symbol: String,
-        execution: Execution, source: String = "", inputID: String? = nil, isInternal: Bool = false
+        id: String, title: String, channel: String, status: String, issueDescriptions: [String],
+        execution: Execution, source: String = "", inputID: String? = nil, isInternal: Bool = false,
+        parameters: [String: String] = [:], output: String? = nil
     ) {
         self.source = source
         self.inputID = inputID
@@ -40,57 +41,10 @@ public struct ActionActivityItem: Identifiable, Equatable, Sendable {
         self.title = title
         self.channel = channel
         self.status = status
+        self.parameters = parameters
+        self.output = output
         self.issueDescriptions = issueDescriptions
-        self.symbol = symbol
         self.execution = execution
-    }
-}
-
-/// Display-only execution issue; no device state or SDK fault classification.
-public struct ExecutionIssue: Identifiable, Sendable, Equatable {
-    public struct Context: Sendable, Equatable {
-        public let workerID: String
-        public let sessionID: String?
-        public let inputID: String?
-        public let callID: String?
-        public let roundID: String?
-        public init(
-            workerID: String, sessionID: String? = nil, inputID: String? = nil, callID: String? = nil,
-            roundID: String? = nil
-        ) {
-            self.workerID = workerID
-            self.sessionID = sessionID
-            self.inputID = inputID
-            self.callID = callID
-            self.roundID = roundID
-        }
-    }
-    public let inputID: String?
-    public let context: Context?
-    public let failureCode: String?
-    public let id: String
-    public let title: String
-    public let source: String
-    public let message: String
-    public let userMessage: String?
-    public let category: String?
-    public let time: Date
-    public init(
-        id: String = UUID().uuidString, title: String, source: String, message: String, time: Date = Date(),
-        failureCode: String? = nil, context: Context? = nil, inputID: String? = nil, userMessage: String? = nil,
-        category: String? = nil
-    ) {
-        self.inputID = inputID ?? context?.inputID
-        self.id = id
-        self.title = String(title.prefix(128))
-        self.source = String(source.prefix(64))
-        self.category = category.map { String($0.prefix(64)) }
-        self.message = String(message.prefix(category == nil ? 512 : 2048))
-        self.userMessage = userMessage.map { String($0.prefix(512)) }
-        precondition(failureCode.map { !$0.isEmpty && $0.utf8.count <= 64 } ?? true)
-        self.failureCode = failureCode
-        self.context = context
-        self.time = time
     }
 }
 
@@ -105,22 +59,16 @@ public struct ActionChannelSummary: Identifiable {
 /// Presentation only. The root-owned workflow consumes snapshots; views never own observation tasks.
 @MainActor
 @Observable
-public final class ActionActivityState {
+public final class RuntimeLogState: RuntimeLogWriting {
     @ObservationIgnored var presentationAdmission: UIPresentationAdmission?
-    public var isPresentationAvailable: Bool { presentationAdmission.map { $0.started && !$0.stopped } ?? true }
 
-    public internal(set) var currentTaskID: String?
-    public internal(set) var skillOwnership: [String: String] = [:]
-    public var backgroundTaskCount: Int { tasks.filter { $0.execution == "background" && !$0.isTerminal }.count }
-    public internal(set) var currentTaskTitle = ""
-    public internal(set) var currentTaskStatus = ""
-    public internal(set) var loadedSkills: [String] = []
     public internal(set) var showsExecutionHistory = false
     public internal(set) var selectedTab: ExecutionLogTab = .action
     public internal(set) var selectedTaskID: String?
     public private(set) var agentEvents: [AgentRuntimeLogItem] = []
     public private(set) var agentEventEvictions: UInt64 = 0
     public internal(set) var selectedSource = "全部"
+    public internal(set) var selectedChannel: String?
     public internal(set) var selectedFilter: ExecutionLogFilter = .all
     public internal(set) var showsInternalActions = false
     public private(set) var tasks: [TaskLogItem] = []
@@ -129,89 +77,40 @@ public final class ActionActivityState {
     public private(set) var revision: UInt64?
     public private(set) var evictedCount: UInt64 = 0
     public internal(set) var observationUnavailable = false
-    public internal(set) var notice: HomeNotice?
-    public var visibleNotice: HomeNotice? {
-        if let errorToast {
-            return HomeNotice(
-                id: errorToast.id,
-                text: errorToast.userMessage ?? errorToast.message.replacingOccurrences(of: "agent.error: ", with: ""),
-                tone: .error)
-        }
-        return notice?.placement == .caption ? notice : nil
-    }
-    public var transientToast: HomeNotice? { notice?.placement == .toast ? notice : nil }
-    public private(set) var errorToast: ExecutionIssue?
-    @ObservationIgnored var toastDuration = Duration.seconds(8)
-    @ObservationIgnored private var toastExpiry: Task<Void, Never>?
-    private var toastKeys: [String] = []
-    public func dismissErrorToast(id: String) { if errorToast?.id == id { errorToast = nil } }
-    private func offerToast(_ issue: ExecutionIssue, now: Date = Date()) {
-        // Initial/repeated retained snapshots do not replay old failures as new incidents.
-        guard presentationAdmission?.active ?? true, issue.context?.callID == nil,
-            now.timeIntervalSince(issue.time) <= 15
-        else { return }
-        let key = "\(issue.source)|\(issue.inputID ?? issue.id)|\(issue.message)"
-        guard !toastKeys.contains(key) else { return }
-        toastKeys.append(key)
-        toastKeys = Array(toastKeys.suffix(100))
-        errorToast = issue
-        let previous = toastExpiry
-        previous?.cancel()
-        toastExpiry = Task { [weak self] in
-            await previous?.value
-            do { try await Task.sleep(for: self?.toastDuration ?? .seconds(8)) } catch { return }
-            self?.dismissErrorToast(id: issue.id)
-        }
-    }
-    deinit { toastExpiry?.cancel() }
-    func stopPresentation() async {
-        toastExpiry?.cancel()
-        await toastExpiry?.value
-        toastExpiry = nil
-        errorToast = nil
-        notice = nil
-    }
-    public private(set) var outputIssues: [ExecutionIssue] = []
-    public private(set) var backgroundIssues: [ExecutionIssue] = []
-    private var outputEvictions: UInt64 = 0
-    private var backgroundEvictions: UInt64 = 0
-    public var issueEvictions: UInt64 { outputEvictions + backgroundEvictions }
-    private var issueRevision: UInt64?
-    public func replaceIssues(revision: UInt64, records: [ExecutionIssue], evictedCount: UInt64) {
-        guard presentationAdmission?.acceptsRetained() ?? true else { return }
-        guard issueRevision == nil || revision > issueRevision! else { return }
-        issueRevision = revision
-        let previous = Set(outputIssues.map(\.id))
-        if let newest = records.filter({ !previous.contains($0.id) && $0.context?.callID == nil }).max(by: {
-            $0.time < $1.time
-        }) {
-            offerToast(newest)
-        }
-        outputIssues = Array(records.suffix(100))
-        outputEvictions = evictedCount
-    }
-    public func recordIssue(_ issue: ExecutionIssue, showsToast: Bool = true) {
-        guard presentationAdmission?.acceptsRetained() ?? true else { return }
-        if showsToast { offerToast(issue) }
-        if let index = backgroundIssues.firstIndex(where: { $0.id == issue.id }) {
-            backgroundIssues[index] = issue
+    public private(set) var issues: [ExecutionIssue] = []
+    public private(set) var issueEvictions: UInt64 = 0
+    public private(set) var decisions: [DecisionLogItem] = []
+    public private(set) var decisionEvictions: UInt64 = 0
+
+    private func recordIssue(_ issue: ExecutionIssue) {
+        if let index = issues.firstIndex(where: { $0.id == issue.id }) {
+            issues[index] = issue
             return
         }
-        if backgroundIssues.count == 100 {
-            backgroundIssues.removeFirst()
-            backgroundEvictions &+= 1
+        if issues.count == 100 {
+            issues.removeFirst()
+            issueEvictions &+= 1
         }
-        backgroundIssues.append(issue)
+        issues.append(issue)
     }
+
+    private func recordDecision(_ decision: DecisionLogItem) {
+        guard !decisions.contains(where: { $0.id == decision.id }) else { return }
+        if decisions.count == 100 {
+            decisions.removeFirst()
+            decisionEvictions &+= 1
+        }
+        decisions.append(decision)
+    }
+
     public var hasRecords: Bool {
-        !items.isEmpty || !tasks.isEmpty || !agentEvents.isEmpty || !outputIssues.isEmpty
-            || !backgroundIssues.isEmpty
+        !items.isEmpty || !tasks.isEmpty || !agentEvents.isEmpty || !issues.isEmpty || !decisions.isEmpty
     }
     public var sources: [String] {
         Array(
             Set(
                 items.map(\.source) + tasks.flatMap { [$0.requester, $0.executor] } + runtimeIssues.map(\.source)
-                    + agentEvents.map(\.source))
+                    + agentEvents.map(\.source) + decisions.map(\.source))
         ).filter { !$0.isEmpty }.sorted()
     }
     public func matchesSource(_ values: [String]) -> Bool { selectedSource == "全部" || values.contains(selectedSource) }
@@ -223,11 +122,14 @@ public final class ActionActivityState {
         case .failed: failure
         }
     }
+    public var actionChannels: [String] { Set(items.map(\.channel)).sorted() }
+
     public var visibleActions: [ActionActivityItem] {
         items.filter { item in
             (selectedTaskID == nil
                 || tasks.contains { task in task.id == selectedTaskID && task.events.contains { $0.id == item.inputID }
                 })
+                && (selectedChannel == nil || selectedChannel == item.channel)
                 && (showsInternalActions || !item.isInternal || item.isFailure) && matchesSource([item.source])
                 && matchesStatus(
                     active: item.isActive, success: item.execution.phase == .succeeded, failure: item.isFailure)
@@ -239,12 +141,19 @@ public final class ActionActivityState {
                 && matchesStatus(active: !$0.isTerminal, success: $0.phase == .succeeded, failure: $0.phase == .failed)
         }
     }
+    public var visibleDecisions: [DecisionLogItem] {
+        decisions.reversed().filter {
+            matchesSource([$0.source])
+                && matchesStatus(active: false, success: $0.modelResult != nil, failure: $0.modelResult == nil)
+        }.sorted { $0.time > $1.time }
+    }
+
     public var runtimeIssues: [ExecutionIssue] {
         var seen: Set<String> = []
-        return (outputIssues + backgroundIssues).sorted { $0.time > $1.time }.filter { issue in
+        return issues.sorted { $0.time > $1.time }.filter { issue in
             let linked =
                 items.contains { item in
-                    item.inputID == issue.inputID && item.isFailure
+                    issue.inputID != nil && item.inputID == issue.inputID && item.isFailure
                         && item.issueDescriptions.contains { !$0.isEmpty && issue.message.contains($0) }
                 }
             return !linked
@@ -252,16 +161,14 @@ public final class ActionActivityState {
                     .inserted
         }
     }
-    public func recordAgentEvent(_ event: AgentRuntimeLogItem) {
-        guard presentationAdmission?.acceptsRetained() ?? true else { return }
+    func recordAgentEvent(_ event: AgentRuntimeLogItem) {
         if agentEvents.count == 100 {
             agentEvents.removeFirst()
             agentEventEvictions &+= 1
         }
         agentEvents.append(event)
     }
-    public func updateTask(_ incoming: TaskLogItem, event: TaskLogEvent) {
-        guard presentationAdmission?.acceptsRetained() ?? true else { return }
+    func updateTask(_ incoming: TaskLogItem, event: TaskLogEvent) {
         if let index = tasks.firstIndex(where: { $0.id == incoming.id }) {
             if let existing = tasks[index].events.firstIndex(where: { $0.id == event.id }) {
                 tasks[index].events[existing] = event
@@ -293,14 +200,15 @@ public final class ActionActivityState {
     private var dismissed: Set<String> = []
 
     public init() {}
-    public func replace(revision: UInt64, records: [ActionActivityItem], evictedCount: UInt64) {
-        guard presentationAdmission?.acceptsRetained() ?? true else { return }
+    func replace(revision: UInt64, records: [ActionActivityItem], evictedCount: UInt64) {
         guard self.revision == nil || revision > self.revision! else { return }
         self.revision = revision
         self.items = records
+        if let selectedChannel, !records.contains(where: { $0.channel == selectedChannel }) {
+            self.selectedChannel = nil
+        }
         self.evictedCount = evictedCount
         dismissed.formIntersection(Set(records.map(\.id)))
-        observationUnavailable = false
     }
     public func dismiss(_ id: String) {
         guard items.contains(where: { $0.id == id && !$0.isActive }) else { return }
@@ -336,98 +244,74 @@ public final class ActionActivityState {
     }
 
     @discardableResult
-    public func present(_ update: ActivityUpdate) -> Bool {
+    public func record(_ event: RuntimeLogEvent) -> Bool {
         guard presentationAdmission?.acceptsRetained() ?? true else { return false }
-        apply(update)
+        switch event {
+        case .agent(let event): recordAgentEvent(event)
+        case .task(let task, let event): updateTask(task, event: event)
+        case .actions(let revision, let records, let evictedCount):
+            replace(revision: revision, records: records, evictedCount: evictedCount)
+        case .decision(let decision): recordDecision(decision)
+        case .issue(let issue): recordIssue(issue)
+        case .observationUnavailable: observationUnavailable = true
+        }
         return true
     }
-    func apply(_ update: ActivityUpdate) {
-        switch update {
-        case .currentTaskID(let value): currentTaskID = value
-        case .skillOwnership(let value): skillOwnership = value
-        case .currentTaskTitle(let value): currentTaskTitle = value
-        case .currentTaskStatus(let value): currentTaskStatus = value
-        case .loadedSkills(let value): loadedSkills = value
-        case .showsExecutionHistory(let value): showsExecutionHistory = value
-        case .selectedTab(let value): selectedTab = value
-        case .selectedTaskID(let value): selectedTaskID = value
-        case .selectedSource(let value): selectedSource = value
-        case .selectedFilter(let value): selectedFilter = value
-        case .showsInternalActions(let value): showsInternalActions = value
-        case .observationUnavailable(let value): observationUnavailable = value
-        }
-    }
-}
-
-/// A display notice is never an ExecutionIssue or a task goal.
-public struct HomeNotice: Sendable, Equatable {
-    public enum Tone: String, Sendable { case info, warning, error }
-    public enum Placement: Sendable { case caption, toast }
-    public let placement: Placement
-    public let id: String
-    public let text: String
-    public let tone: Tone
-    public init(id: String = UUID().uuidString, text: String, tone: Tone, placement: Placement = .caption) {
-        self.placement = placement
-        self.id = id
-        self.text = text
-        self.tone = tone
-    }
-}
-
-public enum ActivityUpdate {
-    case currentTaskID(String?)
-    case skillOwnership([String: String])
-    case currentTaskTitle(String)
-    case currentTaskStatus(String)
-    case loadedSkills([String])
-    case showsExecutionHistory(Bool)
-    case selectedTab(ExecutionLogTab)
-    case selectedTaskID(String?)
-    case selectedSource(String)
-    case selectedFilter(ExecutionLogFilter)
-    case showsInternalActions(Bool)
-    case observationUnavailable(Bool)
 }
 
 @MainActor
-public protocol ActivityPresenting: UIPresentationAccess {
-    var currentTaskID: String? { get }
-    var skillOwnership: [String: String] { get }
-    var currentTaskTitle: String { get }
-    var currentTaskStatus: String { get }
-    var loadedSkills: [String] { get }
-    var showsExecutionHistory: Bool { get }
-    var selectedTab: ExecutionLogTab { get }
-    var selectedTaskID: String? { get }
-    var selectedSource: String { get }
-    var selectedFilter: ExecutionLogFilter { get }
-    var showsInternalActions: Bool { get }
-    var observationUnavailable: Bool { get }
-    var notice: HomeNotice? { get }
-    var errorToast: ExecutionIssue? { get }
-    var backgroundIssues: [ExecutionIssue] { get }
-    var runtimeIssues: [ExecutionIssue] { get }
-    var items: [ActionActivityItem] { get }
-    var tasks: [TaskLogItem] { get }
-    var agentEvents: [AgentRuntimeLogItem] { get }
-    var issueEvictions: UInt64 { get }
-    var hasRecords: Bool { get }
-    var backgroundTaskCount: Int { get }
+public protocol RuntimeLogWriting: Sendable {
     @discardableResult
-    func present(_ update: ActivityUpdate) -> Bool
-    func recordIssue(_ issue: ExecutionIssue, showsToast: Bool)
-    func dismissErrorToast(id: String)
-    func replaceIssues(revision: UInt64, records: [ExecutionIssue], evictedCount: UInt64)
-    func recordAgentEvent(_ event: AgentRuntimeLogItem)
-    func updateTask(_ incoming: TaskLogItem, event: TaskLogEvent)
-    func replace(revision: UInt64, records: [ActionActivityItem], evictedCount: UInt64)
+    func record(_ event: RuntimeLogEvent) -> Bool
 }
 
-extension ActionActivityState: ActivityPresenting {}
+public enum RuntimeLogEvent: Sendable {
+    case agent(AgentRuntimeLogItem)
+    case task(TaskLogItem, TaskLogEvent)
+    case actions(revision: UInt64, records: [ActionActivityItem], evictedCount: UInt64)
+    case decision(DecisionLogItem)
+    case issue(ExecutionIssue)
+    case observationUnavailable
+}
 
-extension ActivityPresenting {
-    public func recordIssue(_ issue: ExecutionIssue) { recordIssue(issue, showsToast: true) }
+public struct DecisionLogItem: Identifiable, Sendable, Equatable {
+    public enum Route: String, Sendable {
+        case local = "本地 D3"
+        case cloud = "云端 Decision"
+        case fallback = "回退"
+    }
+    public enum Disposition: String, Sendable {
+        case enqueue, discard, interrupt
+    }
+    public let id: String
+    public let source: String
+    public let inputText: String
+    public let time: Date
+    public let duration: Duration
+    public let route: Route
+    public let modelResult: Disposition?
+    public let adoptedResult: Disposition
+    public let reason: String?
+    public let requests: [String]
+    public let localFallback: String?
+
+    public init(
+        id: String, source: String, inputText: String, time: Date = .now, duration: Duration, route: Route,
+        modelResult: Disposition?,
+        adoptedResult: Disposition, reason: String? = nil, requests: [String], localFallback: String? = nil
+    ) {
+        self.id = id
+        self.source = String(source.prefix(64))
+        self.inputText = inputText
+        self.time = time
+        self.duration = duration
+        self.route = route
+        self.modelResult = modelResult
+        self.adoptedResult = adoptedResult
+        self.reason = reason.map { String($0.prefix(256)) }
+        self.requests = requests
+        self.localFallback = localFallback.map { String($0.prefix(256)) }
+    }
 }
 
 /// Passive log projections. Neither observation nor filtering drives Agent execution.
@@ -435,6 +319,7 @@ public enum ExecutionLogTab: String, CaseIterable, Sendable {
     case action = "Action"
     case task = "Task"
     case agent = "Agent"
+    case decision = "Decision"
 }
 public enum ExecutionLogFilter: String, CaseIterable, Sendable {
     case all = "全部"
@@ -507,10 +392,4 @@ public struct AgentRuntimeLogItem: Identifiable, Equatable, Sendable {
         self.isFailure = isFailure
         self.time = time
     }
-}
-
-@MainActor
-public protocol ExecutionFailureReporting: AnyObject, Sendable {
-    func recordFailure(
-        title: String, source: String, message: String, failureCode: String?, context: ExecutionIssue.Context?)
 }

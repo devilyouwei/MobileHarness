@@ -2,27 +2,87 @@ import AgentCore
 import Foundation
 import ModelKit
 import ModelKitDefaults
+import Synchronization
 
 public enum InputDisposition: String, Codable, Sendable { case enqueue, discard, interrupt }
 
-/// Minimal application snapshot. Classification never receives the conversation transcript.
+public struct InputDecisionOutcome: Sendable, Equatable {
+    public enum Route: String, Sendable {
+        case local = "local:d3-edge"
+        case cloud = "cloud:decision"
+        case fallback = "enqueue:fallback"
+    }
+    public let route: Route
+    public let modelResult: InputDisposition?
+    public let adopted: InputDisposition
+    public let reason: String?
+    public let requests: [String]
+    public let localFallback: String?
+}
+
+/// One pending input and at most one earlier user/assistant exchange from the current dialog.
 public struct InputDecisionSnapshot: Sendable {
+    public struct Exchange: Sendable, Equatable {
+        public let user: String
+        public let assistant: String
+
+        public init(user: String, assistant: String) {
+            self.user = String(user.suffix(80))
+            self.assistant = String(assistant.suffix(80))
+        }
+    }
+
     public let input: AgentInput
     public let text: String
-    public let occupied: Bool
-    public let context: String
-    public let protectsAnswer: Bool
+    public let running: Bool
+    public let playing: Bool?
+    public let history: Exchange?
+    public let question: String?
+    public var occupied: Bool { running || playing == true }
+    public var protectsAnswer: Bool { question != nil }
     public let receivedAt: ContinuousClock.Instant
     public init(
-        input: AgentInput, text: String, occupied: Bool, context: String, protectsAnswer: Bool = false,
+        input: AgentInput, text: String, running: Bool, playing: Bool? = nil, history: Exchange? = nil,
+        question: String? = nil,
         receivedAt: ContinuousClock.Instant = .now
     ) {
         self.input = input
         self.text = text
-        self.occupied = occupied
-        self.context = String(context.prefix(384))
-        self.protectsAnswer = protectsAnswer
+        self.running = running
+        self.playing = playing
+        self.history = history
+        self.question = question.map { String($0.suffix(80)) }
         self.receivedAt = receivedAt
+    }
+
+    func request() throws -> DecisionRequest {
+        let owner = "Assistant/InputDecision"
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .withoutEscapingSlashes
+        func quote(_ text: String) throws -> String {
+            String(decoding: try encoder.encode(text), as: UTF8.self)
+                .replacingOccurrences(of: "<", with: "\\u003c")
+                .replacingOccurrences(of: "\u{2028}", with: "\\u2028")
+                .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
+        }
+        let historyText =
+            try history.map {
+                try AgentPrompts.text(owner, "history", ["user": quote($0.user), "assistant": quote($0.assistant)])
+            } ?? ""
+        let questionText = try question.map { try AgentPrompts.text(owner, "question", ["question": quote($0)]) } ?? ""
+        return try DecisionRequest(
+            text: AgentPrompts.text(
+                owner, "input",
+                [
+                    "playing": playing.map { $0 ? "yes" : "no" } ?? "unknown",
+                    "running": running ? "yes" : "no", "awaitingAnswer": protectsAnswer ? "yes" : "unknown",
+                    "history": historyText, "question": questionText, "input": quote(text),
+                ]),
+            candidates: [InputDisposition.interrupt, .discard, .enqueue].map { action in
+                try "\(action.rawValue): \(AgentPrompts.text(owner, action.rawValue))"
+            },
+            context: .init(requestID: input.id + ".decision", scopeID: input.sessionID),
+            instructions: AgentPrompts.text(owner, "instructions"))
     }
 }
 
@@ -32,13 +92,18 @@ public actor AssistantInputDecision {
     public typealias Configuration = (useLocal: Bool, cloud: (@Sendable () async throws -> any ChatCapability)?)
     private let configuration: @Sendable () async throws -> Configuration
     private let report: @Sendable (String) async -> Void
+    private let timeout: Duration
+    private let localTimeout: Duration
     private var workers: [String: Task<Void, Never>] = [:]
     private var timers: [String: Task<Void, Never>] = [:]
-    private var waiters: [String: CheckedContinuation<InputDisposition?, Never>] = [:]
-    private var localFailed = false
+    private enum Attempt: Sendable {
+        case selected(InputDisposition)
+        case failed(String)
+    }
+    private var waiters: [String: CheckedContinuation<Attempt, Never>] = [:]
+    private var localFailure: String?
     private var preparation: Task<Void, Never>?
     private var stopped = false
-    public private(set) var lastRoute = "enqueue:fallback"
     public init(
         local: any ModelDecisionProviding,
         selection: @escaping @Sendable () async throws -> Bool,
@@ -52,13 +117,26 @@ public actor AssistantInputDecision {
         configuration: @escaping @Sendable () async throws -> Configuration,
         report: @escaping @Sendable (String) async -> Void = { _ in }
     ) {
+        self.init(
+            local: local, configuration: configuration, timeout: .seconds(2), localTimeout: .milliseconds(250),
+            report: report)
+    }
+
+    init(
+        local: any ModelDecisionProviding,
+        configuration: @escaping @Sendable () async throws -> Configuration,
+        timeout: Duration, localTimeout: Duration,
+        report: @escaping @Sendable (String) async -> Void = { _ in }
+    ) {
         self.local = local
         self.configuration = configuration
         self.report = report
+        self.timeout = timeout
+        self.localTimeout = localTimeout
     }
-    public func resetLocalFailure() { localFailed = false }
+    public func resetLocalFailure() { localFailure = nil }
     public func quiesceLocal() async {
-        localFailed = true
+        localFailure = "D3 资源正在释放"
         preparation?.cancel()
         cancel("local")
         await preparation?.value
@@ -68,7 +146,7 @@ public actor AssistantInputDecision {
     public func stop() async {
         stopped = true
         for timer in timers.values { timer.cancel() }
-        for waiter in waiters.values { waiter.resume(returning: nil) }
+        for waiter in waiters.values { waiter.resume(returning: .failed("分类已取消")) }
         waiters.removeAll()
         let active = Array(workers.values)
         for task in active { task.cancel() }
@@ -76,48 +154,57 @@ public actor AssistantInputDecision {
         for task in active { await task.value }
         await preparation?.value
     }
-    public func classify(_ snapshot: InputDecisionSnapshot) async -> InputDisposition {
-        guard !stopped, !Task.isCancelled else { return .enqueue }
-        lastRoute = "enqueue:fallback"
-        let deadline = snapshot.receivedAt.advanced(by: .seconds(2))
-        guard ContinuousClock.now < deadline else { return .enqueue }
+    public func classify(_ snapshot: InputDecisionSnapshot) async -> InputDecisionOutcome {
+        let requests = Mutex<[String]>([])
+        var localFallback: String?
+        func fallback(_ reason: String) -> InputDecisionOutcome {
+            .init(
+                route: .fallback, modelResult: nil, adopted: .enqueue, reason: reason,
+                requests: requests.withLock { $0 }, localFallback: localFallback)
+        }
+        guard !stopped, !Task.isCancelled else { return fallback("分类已取消") }
+        let deadline = snapshot.receivedAt.advanced(by: timeout)
+        guard ContinuousClock.now < deadline else { return fallback("分类超时") }
         let route: Configuration
         do { route = try await configuration() } catch {
             await report("分类偏好读取失败，保留输入并排队：\(error)")
-            return .enqueue
+            return fallback("分类配置读取失败")
         }
         let request: DecisionRequest
         do {
-            request = try DecisionRequest(
-                text:
-                    try AgentPrompts.text(
-                        "Assistant/InputDecision", "input",
-                        [
-                            "source": snapshot.input.metadata.source,
-                            "time": String(describing: snapshot.input.metadata.capturedAt),
-                            "occupied": String(snapshot.occupied), "context": snapshot.context, "input": snapshot.text,
-                        ]),
-                candidates: ["enqueue", "discard", "interrupt"],
-                context: .init(requestID: snapshot.input.id + ".decision", scopeID: snapshot.input.sessionID),
-                instructions: try AgentPrompts.text("Assistant/InputDecision", "instructions")
-            )
+            request = try snapshot.request()
         } catch {
             await report("分类请求准备失败，保留输入并排队：\(error)")
-            return .enqueue
+            return fallback("分类请求准备失败")
         }
-        if route.useLocal, !localFailed {
+        if route.useLocal {
+            localFallback = localFailure
+        } else {
+            localFallback = "当前配置使用云端 Decision"
+        }
+        if route.useLocal, localFailure == nil {
             do {
-                if try await local.status() == .ready {
+                let status = try await local.status()
+                if status == .ready {
                     await report("本地 D3")
                     let local = local
-                    let result = await race("local", until: min(deadline, .now.advanced(by: .milliseconds(250)))) {
+                    let result = await race("local", until: min(deadline, .now.advanced(by: localTimeout))) {
+                        try Task.checkCancellation()
+                        requests.withLock {
+                            $0.append(
+                                "本地 D3\n\nInstructions\n" + request.instructions
+                                    + "\n\nCandidates\n" + request.candidates.joined(separator: "\n")
+                                    + "\n\nInput\n" + request.text)
+                        }
                         let session = try await local.decide(request)
                         return try await withTaskCancellationHandler {
                             var result: InputDisposition?
                             do {
                                 for try await value in session.events {
                                     guard result == nil, case .selected(let label, _) = value.decision,
-                                        let action = InputDisposition(rawValue: label)
+                                        let id = label.split(separator: ":", maxSplits: 1).first,
+                                        request.candidates.contains(label),
+                                        let action = InputDisposition(rawValue: String(id))
                                     else {
                                         throw CapabilityError.invalidRequest("Invalid Decision result")
                                     }
@@ -134,32 +221,40 @@ public actor AssistantInputDecision {
                             session.cancel()
                         }
                     }
-                    if let result {
-                        lastRoute = "local:d3-edge"
-                        return validate(result, snapshot)
+                    switch result {
+                    case .selected(let action):
+                        return outcome(action, route: .local, snapshot: snapshot, requests: requests.withLock { $0 })
+                    case .failed(let reason):
+                        localFallback = reason
                     }
-                } else if preparation == nil {
-                    let local = local
-                    preparation = Task {
-                        do { try await local.warmup() } catch {
-                            self.localFailed = true
-                            await self.report("D3 准备失败，暂用云端：\(error)")
+                } else {
+                    localFallback = "D3 尚未就绪（\(status.rawValue)）"
+                    if preparation == nil {
+                        let local = local
+                        preparation = Task {
+                            do { try await local.warmup() } catch
+                                where !Task.isCancelled && !(error is CancellationError)
+                            {
+                                self.localFailure = "D3 准备失败：\(error.localizedDescription)"
+                                await self.report("D3 准备失败，暂用云端：\(error)")
+                            } catch {}
+                            self.preparation = nil
                         }
-                        self.preparation = nil
                     }
                 }
             } catch {
-                localFailed = true
+                localFallback = "D3 状态读取失败：\(error.localizedDescription)"
                 await report("D3 不可用，暂用云端：\(error)")
             }
         }
+        guard !stopped, !Task.isCancelled else { return fallback("分类已取消") }
         guard ContinuousClock.now < deadline else {
             await report("分类超时，保留输入并排队")
-            return .enqueue
+            return fallback("分类超时")
         }
         guard let cloud = route.cloud else {
             await report("Decision 云端未配置，保留输入并排队")
-            return .enqueue
+            return fallback("Decision 云端未配置")
         }
         await report(route.useLocal ? "暂用云端 · Decision 独立配置" : "云端 · Decision 独立配置")
         let result = await race("cloud", until: deadline) {
@@ -181,11 +276,24 @@ public actor AssistantInputDecision {
             ])
             let chat = try ChatRequest(
                 messages: [
-                    .init(role: .system, content: request.instructions), .init(role: .user, content: request.text),
+                    .init(
+                        role: .system, content: ([request.instructions] + request.candidates).joined(separator: "\n")),
+                    .init(role: .user, content: request.text),
                 ],
                 context: request.context, maximumOutputTokens: 128, temperature: 0,
                 tools: [ChatToolDefinition(declaration: declaration)],
                 toolChoice: .required(name: "classify_input"))
+            try Task.checkCancellation()
+            let messages = chat.messages.map { $0.role.rawValue + "\n" + $0.content }
+            let tools = chat.tools.map { "Tool\n" + String(decoding: $0.declaration, as: UTF8.self) }
+            let tokenLimit = chat.maximumOutputTokens.map(String.init) ?? "default"
+            requests.withLock {
+                $0.append(
+                    (["云端 Decision"] + messages + tools + [
+                        "tool_choice: \(chat.toolChoice)",
+                        "maximum_output_tokens: \(tokenLimit)\ntemperature: \(chat.temperature)",
+                    ]).joined(separator: "\n\n"))
+            }
             let session = try await model.chat(chat)
             return try await withTaskCancellationHandler {
                 do {
@@ -223,47 +331,64 @@ public actor AssistantInputDecision {
                 session.cancel()
             }
         }
-        if let result {
-            lastRoute = "cloud:decision"
-            return validate(result, snapshot)
+        if case .selected(let action) = result {
+            return outcome(
+                action, route: .cloud, snapshot: snapshot, requests: requests.withLock { $0 },
+                localFallback: localFallback)
         }
         await report("分类不可用，保留输入并排队")
-        return .enqueue
+        if stopped || Task.isCancelled { return fallback("分类已取消") }
+        return fallback(ContinuousClock.now >= deadline ? "分类超时" : "模型未返回有效分类")
     }
-    private func validate(_ action: InputDisposition, _ snapshot: InputDecisionSnapshot) -> InputDisposition {
-        if action == .discard {
-            if snapshot.protectsAnswer { return .enqueue }
+
+    private func outcome(
+        _ action: InputDisposition, route: InputDecisionOutcome.Route, snapshot: InputDecisionSnapshot,
+        requests: [String], localFallback: String? = nil
+    ) -> InputDecisionOutcome {
+        let reason: String?
+        switch action {
+        case .discard where snapshot.protectsAnswer: reason = "保留当前交互的有效答复"
+        case .interrupt where !snapshot.occupied: reason = "当前没有需要打断的回复"
+        default: reason = nil
         }
-        if action == .interrupt, !snapshot.occupied { return .enqueue }
-        return action
+        return .init(
+            route: route, modelResult: action, adopted: reason == nil ? action : .enqueue, reason: reason,
+            requests: requests, localFallback: localFallback)
     }
+
     private func race(
         _ key: String, until deadline: ContinuousClock.Instant,
         operation: @escaping @Sendable () async throws -> InputDisposition?
-    ) async -> InputDisposition? {
-        guard workers[key] == nil, !stopped else { return nil }
+    ) async -> Attempt {
+        let model = key == "local" ? "D3" : "云端 Decision"
+        let timeout = Attempt.failed("\(model) 超时")
+        guard !stopped, !Task.isCancelled else { return .failed("分类已取消") }
+        guard workers[key] == nil else { return .failed("\(model) 上次请求仍在清理") }
+        guard ContinuousClock.now < deadline else { return timeout }
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 waiters[key] = continuation
                 workers[key] = Task {
-                    var result: InputDisposition?
-                    do { result = try await operation() } catch {
-                        await self.report("Decision \(key) 失败：\(error)")
-                        if key == "local" {
-                            if let capability = error as? CapabilityError, case .invalidRequest = capability {
-                                // An oversized candidate falls back for this input only.
-                            } else {
-                                self.localFailed = true
-                            }
+                    let result: Attempt
+                    do {
+                        result = try await operation().map(Attempt.selected) ?? .failed("\(model) 未返回有效分类")
+                    } catch {
+                        let reason = "\(model) 失败：\(error.localizedDescription)"
+                        result = .failed(reason)
+                        if !Task.isCancelled, !(error is CancellationError), ContinuousClock.now < deadline {
+                            // Request failures can fall back without disabling the model for later inputs.
+                            await self.report(reason)
                         }
                     }
-                    self.resolve(key, result: result)
+                    if !Task.isCancelled {
+                        self.resolve(key, result: ContinuousClock.now < deadline ? result : timeout)
+                    }
                     self.workers[key] = nil
                 }
                 timers[key] = Task {
                     do { try await ContinuousClock().sleep(until: deadline) } catch { return }
                     self.workers[key]?.cancel()
-                    self.resolve(key, result: nil)
+                    self.resolve(key, result: timeout)
                 }
             }
         } onCancel: {
@@ -272,9 +397,9 @@ public actor AssistantInputDecision {
     }
     private func cancel(_ key: String) {
         workers[key]?.cancel()
-        resolve(key, result: nil)
+        resolve(key, result: .failed("分类已取消"))
     }
-    private func resolve(_ key: String, result: InputDisposition?) {
+    private func resolve(_ key: String, result: Attempt) {
         timers.removeValue(forKey: key)?.cancel()
         waiters.removeValue(forKey: key)?.resume(returning: result)
     }

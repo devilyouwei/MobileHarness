@@ -19,7 +19,9 @@ public protocol WriterExecutionRepository: Sendable {
     func requests(_ id: String, agent: String) async throws -> [WriterRequestRecord]
     func requestStatus(_ delegateID: String, agent: String) async throws -> String?
     func request(_ delegateID: String, agent: String) async throws -> WriterRequestRecord
-    func completeRequest(_ notification: WriterDelegationNotification, status: String, failure: String?) async throws
+    func completeRequest(
+        _ notification: WriterDelegationNotification, status: String, failure: String?, cancellationReason: String?
+    ) async throws
     func delegationNotification(_ delegateID: String, agent: String) async throws -> WriterDelegationNotification?
     func pendingDelegationNotifications(agent: String, retirement: Bool, after: Int64?, limit: Int) async throws
         -> [WriterDelegationNotification]
@@ -30,10 +32,16 @@ public protocol WriterExecutionRepository: Sendable {
         async throws
     func updateRequestPhase(requestID: String, phase: String) async throws
     func saveInteraction(delegateID: String, interactionID: String?, data: Data?) async throws
-    func acceptWriterInput(_ id: String, requestID: String, text: String, questionID: String?) async throws -> Bool
+    func acceptWriterInput(_ id: String, requestID: String, questionID: String?) async throws -> Bool
+    func acceptWriterCancellation(_ id: String, requestID: String, reason: String) async throws -> Bool
 }
 
 extension WriterExecutionRepository {
+    public func completeRequest(_ notification: WriterDelegationNotification, status: String, failure: String?)
+        async throws
+    {
+        try await completeRequest(notification, status: status, failure: failure, cancellationReason: nil)
+    }
     public func delegations(before: UInt64?, limit: Int) async throws -> [WriterRequestRecord] {
         throw RecordStorageError.invalidRecord
     }
@@ -63,9 +71,9 @@ extension WriterExecutionRepository {
     public func request(_ delegateID: String, agent: String) async throws -> WriterRequestRecord {
         throw RecordStorageError.missingRecord
     }
-    public func completeRequest(_ notification: WriterDelegationNotification, status: String, failure: String?)
-        async throws
-    {
+    public func completeRequest(
+        _ notification: WriterDelegationNotification, status: String, failure: String?, cancellationReason: String?
+    ) async throws {
         throw RecordStorageError.invalidRecord
     }
     public func delegationNotification(_ delegateID: String, agent: String) async throws
@@ -115,9 +123,12 @@ extension WriterExecutionRepository {
     public func updateRequestPhase(requestID: String, phase: String) async throws {
         throw RecordStorageError.invalidRecord
     }
-    public func acceptWriterInput(_ id: String, requestID: String, text: String, questionID: String?) async throws
+    public func acceptWriterInput(_ id: String, requestID: String, questionID: String?) async throws
         -> Bool
     {
+        throw RecordStorageError.invalidRecord
+    }
+    public func acceptWriterCancellation(_ id: String, requestID: String, reason: String) async throws -> Bool {
         throw RecordStorageError.invalidRecord
     }
 }

@@ -6,7 +6,7 @@
   "communication": {
     "inputs": [
       {
-        "contract": "action.result",
+        "contract": "runtime.action.result",
         "version": 1,
         "kind": "actionResult"
       }

@@ -494,7 +494,6 @@
           "user": "顺便问一下，你叫什么名字？",
           "forbidden": [
             "task.end",
-            "task.cancel",
             "releaseSkills",
             "takePhoto"
           ],
@@ -520,7 +519,6 @@
           "user": "昨天的聊天记录呢？",
           "forbidden": [
             "task.end",
-            "task.cancel",
             "releaseSkills",
             "task.start"
           ],
@@ -567,13 +565,13 @@
       "taskGoal": "拍照并等待保存决定"
     },
     {
-      "id": "task-explicit-cancel",
+      "id": "task-explicit-stop",
       "category": "task",
       "turns": [
         {
           "user": "取消当前任务。",
           "required": [
-            "task.cancel"
+            "task.end"
           ],
           "forbidden": [
             "task.start",
@@ -1315,7 +1313,6 @@
           ],
           "forbidden": [
             "task.end",
-            "task.cancel",
             "releaseSkills",
             "takePhoto",
             "savePhoto"
@@ -1329,7 +1326,6 @@
           ],
           "forbidden": [
             "task.end",
-            "task.cancel",
             "releaseSkills",
             "takePhoto",
             "savePhoto"
@@ -1343,7 +1339,6 @@
           ],
           "forbidden": [
             "task.end",
-            "task.cancel",
             "releaseSkills",
             "takePhoto",
             "savePhoto"
@@ -1357,7 +1352,6 @@
           ],
           "forbidden": [
             "task.end",
-            "task.cancel",
             "releaseSkills",
             "takePhoto",
             "savePhoto"
@@ -1371,7 +1365,6 @@
           ],
           "forbidden": [
             "task.end",
-            "task.cancel",
             "releaseSkills",
             "takePhoto",
             "savePhoto"
@@ -1443,7 +1436,6 @@
           ],
           "forbidden": [
             "task.end",
-            "task.cancel",
             "releaseSkills",
             "History.list",
             "task.start",
@@ -1467,8 +1459,7 @@
             "task.start",
             "loadSkills",
             "releaseSkills",
-            "task.end",
-            "task.cancel"
+            "task.end"
           ],
           "counts": {
             "express": 4
@@ -1499,8 +1490,7 @@
             "task.start",
             "loadSkills",
             "releaseSkills",
-            "task.end",
-            "task.cancel"
+            "task.end"
           ],
           "counts": {
             "express": 11
@@ -1538,8 +1528,7 @@
             "task.start",
             "loadSkills",
             "releaseSkills",
-            "task.end",
-            "task.cancel"
+            "task.end"
           ],
           "counts": {
             "express": 3
@@ -1569,8 +1558,7 @@
             "task.start",
             "loadSkills",
             "releaseSkills",
-            "task.end",
-            "task.cancel"
+            "task.end"
           ],
           "counts": {
             "express": 11
@@ -1608,8 +1596,7 @@
             "task.start",
             "loadSkills",
             "releaseSkills",
-            "task.end",
-            "task.cancel"
+            "task.end"
           ],
           "counts": {
             "express": 4
@@ -1634,8 +1621,7 @@
             "task.start",
             "loadSkills",
             "releaseSkills",
-            "task.end",
-            "task.cancel"
+            "task.end"
           ],
           "counts": {
             "express": 4
@@ -1666,8 +1652,7 @@
             "task.start",
             "loadSkills",
             "releaseSkills",
-            "task.end",
-            "task.cancel"
+            "task.end"
           ],
           "counts": {
             "express": 3
@@ -2133,7 +2118,7 @@
           ],
           "forbidden": [
             "task.start",
-            "task.delegate",
+            "task.send",
             "openPage",
             "Web.snapshot",
             "Web.inspect"
@@ -2168,7 +2153,7 @@
           ],
           "forbidden": [
             "task.start",
-            "task.delegate",
+            "task.send",
             "openPage",
             "Web.snapshot",
             "Web.inspect"
@@ -2207,7 +2192,7 @@
           ],
           "forbidden": [
             "task.start",
-            "task.delegate",
+            "task.send",
             "openPage",
             "Web.snapshot",
             "Web.inspect",
@@ -2239,7 +2224,7 @@
           ],
           "forbidden": [
             "task.start",
-            "task.delegate",
+            "task.send",
             "openPage",
             "Web.snapshot",
             "Web.inspect"
@@ -2272,7 +2257,7 @@
           "forbidden": [
             "loadSkills",
             "task.start",
-            "task.delegate",
+            "task.send",
             "Web.browse"
           ],
           "task": false
@@ -2291,7 +2276,7 @@
           "forbidden": [
             "loadSkills",
             "task.start",
-            "task.delegate",
+            "task.send",
             "Web.browse",
             "Web.navigate",
             "Web.snapshot",
@@ -2313,10 +2298,9 @@
           ],
           "forbidden": [
             "task.start",
-            "task.delegate",
+            "task.send",
             "loadSkills",
-            "releaseSkills",
-            "task.cancel"
+            "releaseSkills"
           ],
           "task": false,
           "counts": {

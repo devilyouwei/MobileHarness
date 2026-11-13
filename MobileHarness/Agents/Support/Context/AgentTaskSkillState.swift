@@ -208,9 +208,6 @@ public struct AgentTaskSkillState: Codable, Sendable {
         case "task.end":
             allowed = ["summary", "continueDecision"]
             required = ["summary"]
-        case "task.cancel":
-            allowed = ["reason"]
-            required = allowed
         default: throw HarnessError.forbiddenFunction
         }
         guard required.isSubset(of: Set(arguments.keys)), Set(arguments.keys).isSubset(of: allowed),
@@ -260,13 +257,13 @@ public struct AgentTaskSkillState: Codable, Sendable {
             try next.refreshLoaded()
             // A requested dependency still needed by another root cannot be released.
             guard requested.allSatisfy({ !next.loaded.contains($0) }) else { throw CommunicationError.unauthorized }
-        case "task.end", "task.cancel":
+        case "task.end":
             guard let id = activeTaskID, let index = next.tasks.firstIndex(where: { $0.id == id }),
                 ["running", "waitingUser"].contains(next.tasks[index].status)
             else { throw CommunicationError.scopeClosed }
-            next.tasks[index].status = operation == "task.end" ? "finishing" : "cancelling"
-            next.tasks[index].continueDecision = operation == "task.end" && arguments["continueDecision"] == "true"
-            next.tasks[index].summary = arguments[operation == "task.end" ? "summary" : "reason"]
+            next.tasks[index].status = "finishing"
+            next.tasks[index].continueDecision = arguments["continueDecision"] == "true"
+            next.tasks[index].summary = arguments["summary"]
         default: throw HarnessError.forbiddenFunction
         }
         try next.recordChanges(
@@ -297,18 +294,13 @@ public struct AgentTaskSkillState: Codable, Sendable {
         events = Array(events.suffix(256))
     }
     /// Task closure is separate from input settlement: finishTask can continue to another goal.
-    public mutating func settleTask(
-        failed: Bool, fixed fixedCapabilities: CapabilityRegistry, failure: String? = nil, cancelled: Bool = false,
-        finishedAt: Date = Date()
-    ) throws {
+    public mutating func settleTask(finishRequested: Bool = true, finishedAt: Date = Date()) throws {
         guard let id = activeTaskID, let index = tasks.firstIndex(where: { $0.id == id }) else { return }
         var next = self
         next.tasks[index].updatedAt = finishedAt
-        if failed && !cancelled { next.tasks[index].failure = failure.map { String($0.prefix(4096)) } }
         let status = next.tasks[index].status
-        if failed || cancelled || status == "finishing" || status == "cancelling" {
-            next.tasks[index].status =
-                cancelled || status == "cancelling" ? "cancelled" : (failed ? "failed" : "completed")
+        if finishRequested && status == "finishing" {
+            next.tasks[index].status = "completed"
             for root in next.taskSkillRoots { next.recentSkills[root] = nil }
             next.activeTaskID = nil
             let retired = next.taskSkillRoots
@@ -318,16 +310,19 @@ public struct AgentTaskSkillState: Codable, Sendable {
             try next.recordChanges(previous: loaded, task: id, releaseReason: "taskEnded")
         } else {
             next.tasks[index].status = "waitingUser"
+            if status == "finishing" {
+                next.tasks[index].summary = nil
+                next.tasks[index].continueDecision = nil
+            }
         }
         self = next
     }
 
     public mutating func decisionCompleted(
-        failed: Bool, fixed fixedCapabilities: CapabilityRegistry, inputID: String? = nil, failure: String? = nil,
-        cancelled: Bool = false
+        inputID: String? = nil, finishRequested: Bool = true
     ) throws {
         var next = self
-        try next.settleTask(failed: failed, fixed: fixedCapabilities, failure: failure, cancelled: cancelled)
+        try next.settleTask(finishRequested: finishRequested)
         let beforeIdle = next.loaded
         if let inputID, let usage = next.decisions.removeValue(forKey: inputID),
             usage.countsIdle && !usage.observedTask && next.activeTaskID == nil
@@ -355,16 +350,12 @@ public struct AgentTaskSkillState: Codable, Sendable {
     }
 
     /// Execution interruption keeps the conversation, counters and unfinished business goal.
-    public mutating func interruptSession(
-        _ session: String? = nil, inputs: Set<String> = [], fixed: CapabilityRegistry
-    ) throws {
+    public mutating func interruptSession(_ session: String? = nil, inputs: Set<String> = []) throws {
         var next = self
         if let task = next.tasks.first(where: { $0.id == next.activeTaskID }),
             session == nil || task.sessionID == session || !Set(task.inputIDs).isDisjoint(with: inputs)
         {
-            // Explicit closure already in progress must still join cancellation, not fabricate completion.
-            try next.settleTask(
-                failed: false, fixed: fixed, cancelled: ["finishing", "cancelling"].contains(task.status))
+            try next.settleTask(finishRequested: false)
         }
         next.decisions = next.decisions.filter {
             session != nil && $0.value.sessionID != session && !inputs.contains($0.key)
@@ -372,24 +363,9 @@ public struct AgentTaskSkillState: Codable, Sendable {
         self = next
     }
 
-    public mutating func resetSession(fixed: CapabilityRegistry) throws {
-        try settleTask(failed: false, fixed: fixed, cancelled: true)
+    public mutating func closeSession(_ session: String, inputs: Set<String>) throws {
+        try interruptSession(session, inputs: inputs)
         let previous = loaded
-        recentSkills = [:]
-        taskSkillRoots = []
-        decisions = [:]
-        try refreshLoaded()
-        try recordChanges(previous: previous, task: nil, releaseReason: "sessionClosed")
-    }
-
-    public mutating func cancelSession(_ session: String, inputs: Set<String>, fixed: CapabilityRegistry) throws {
-        if let task = tasks.first(where: { $0.id == activeTaskID }),
-            task.sessionID.map({ $0 == session }) ?? !Set(task.inputIDs).isDisjoint(with: inputs)
-        {
-            try settleTask(failed: false, fixed: fixed, cancelled: true)
-        }
-        let previous = loaded
-        decisions = decisions.filter { !inputs.contains($0.key) && $0.value.sessionID != session }
         recentSkills = recentSkills.filter { $0.value.sessionID != session }
         try refreshLoaded()
         try recordChanges(previous: previous, task: nil, releaseReason: "sessionClosed")

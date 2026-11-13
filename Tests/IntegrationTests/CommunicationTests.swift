@@ -282,8 +282,13 @@ extension LiveRuntimeTests {
     #expect(Set(speech.publications) == ["user.input.asr.partial", "user.input.asr.final", "sound.source"])
     #expect(assistant.publications.isEmpty && speech.subscriptions.isEmpty)
 
-    let commands: Set<String> = ["task.request", "task.input", "task.cancel"]
-    #expect(Set(assistant.inputs.map(\.contract)).isDisjoint(with: commands))
+    let commands: Set<String> = ["agent.task.request"]
+    #expect(
+        Set(assistant.inputs.map(\.contract))
+            == [
+                "agent.task.response", "runtime.action.result", "runtime.tool.result", "runtime.round.result",
+                "runtime.message.receipt",
+            ])
     #expect(Set(assistant.sends.map(\.target)) == ["writer"])
     #expect(Set(assistant.sends.map(\.contract)) == commands)
 }

@@ -109,13 +109,13 @@ BasicSkill 在加载前按用户目标匹配 AVAILABLE SKILLS / DELEGATABLE AGEN
 
 默认基础能力由 Agent 的 baseSkills 初始化。`loadSkills` / `releaseSkills` 是 Control Channel Action Call；`task.start(description, skills?)` 在创建本 Agent 的前台目标任务时同时加载所需 Skill 组；BasicSkill 教学要求携带已知必要的初始 Skill 数组，成功反馈后下一轮使用提交后的函数，无需再 loadSkills。已有 Skill 可随启动转为任务持有；后续出现新的缺失能力才额外加载。输入参数及数组编码以 Agent.Task canonical 元数据为准。
 
-BasicSkill Instructions.md先检查CURRENT STATE：已有足够事实直接回答，不加载Skill或重复查询；确需执行单步控制/查询/拍摄且函数缺失时才使用loadSkills，多轮持续目标使用startTask。一次拍照且无后续操作不强制创建Task。直接加载只扩展能力，不建立任务目标；默认决策链可包含多次模型请求；无 Task 的 Skill 跨链保留，加载/合法调用重置为 5，未使用的完整用户决策扣 1。Task 先设定目标及可判断的完成条件，等待用户时持续保留；模型根据真实结果判断目标达成或用户明确替换目标后使用 task.end，并如实记录结果；用户取消使用 task.cancel。可恢复动作失败不等于任务结束；运行时决策异常进入 failed，重启进入 interrupted。在已有 Task 中 loadSkills 仅补充任务能力，不创建或替换目标。一次性历史查询仅在所需函数缺失时直接加载，多轮筛选与确认示例使用 Task。
+BasicSkill Instructions.md先检查CURRENT STATE：已有足够事实直接回答，不加载Skill或重复查询；确需执行单步控制/查询/拍摄且函数缺失时才使用loadSkills，多轮持续目标使用startTask。一次拍照且无后续操作不强制创建Task。直接加载只扩展能力，不建立任务目标；默认决策链可包含多次模型请求；无 Task 的 Skill 跨链保留，加载/合法调用重置为 5，未使用的完整用户决策扣 1。Task 先设定目标及可判断的完成条件，等待用户时持续保留；模型根据真实结果判断目标达成或用户明确替换目标后使用 task.end，并如实记录结果；用户取消使用 task.end 并记录未完成结果。可恢复动作失败不等于任务结束；运行时决策异常进入 failed，重启进入 interrupted。在已有 Task 中 loadSkills 仅补充任务能力，不创建或替换目标。一次性历史查询仅在所需函数缺失时直接加载，多轮筛选与确认示例使用 Task。
 
 加载先展开依赖，再验证资源、canonical 函数、别名和 Channel，全部成功后提交；任一失败保持原状态。依赖链最多 8 层，展开后最多 16 个 Skill，有效函数含内部能力最多 128 项，Channel 最多 16 个。
 
 每次模型请求持有不可变的 Skill / 函数快照。切换只影响后续请求，本轮不能立即调用刚加载的函数；成功结果通过现有屏障进入 ReACT。无 Task 的近期 Skill 在五次闲置用户决策后回收，内部 ReACT 不扣次数；任务所属 Skill 在 waitingUser 保留，任务终态清理后释放，基础 Skill 继续有效。Skill 不保存运行时业务状态，不能通过修改文件恢复旧任务或重放动作。
 
-后台委派使用 task.delegate 发送目标和用户输入。接收角色拥有自己的能力与 Context，并由内部工作流判断执行、追问或拒绝。
+后台工作使用 task.send(agent_id,text) 转述用户要求。接收角色拥有自己的能力、Context 和工作流，决定如何接纳与回报。
 
 ## 开发与 Review 标准
 
@@ -146,9 +146,9 @@ BasicSkill Instructions.md先检查CURRENT STATE：已有足够事实直接回�
 
 Photography 的匹配摄影 Task 在保存或视频处置结果确认后可以结束，Camera 窗口独立保留。只有用户明确关闭或丢弃照片时才执行 closeCamera，收到 operation=close、enabled=false 后确认关闭并完成匹配目标。Task 取消/替换、打开新窗口不授权关窗。关闭直接清空未保存照片；待处置视频需先明确保存或忽略。关闭失败或取消时保留 Task 和已提交的保存结果。Capture 关闭不关闭背景视觉。独立拍照／保存操作不创建 Task；重拍保留原 Task、窗口及先前缓存照片。
 
-BasicSkill 要求以 AGENT CONTEXT task 和匹配目标判断关闭：无 Task 单步完成只回复，不生成 task.end/task.cancel。明确目标切换可释放无关非基础近期 Skill；不确定是否放弃旧目标时先问是否继续实际 Task，保持等待状态。明确替换或正常目标完成不重复询问。continueDecision 只继续同一输入剩余新目标；释放 Skill 不代表相机/照片清理。Photography 与 HistoryQuery 的完成示例遵循同一规则。
+BasicSkill 要求以 AGENT CONTEXT task 和匹配目标判断关闭：无 Task 单步完成只回复。明确目标切换可释放无关非基础近期 Skill；不确定是否放弃旧目标时先问是否继续实际 Task，保持等待状态。明确替换或正常目标完成不重复询问。continueDecision 只继续同一输入剩余新目标；释放 Skill 不代表相机/照片清理。Photography 与 HistoryQuery 的完成示例遵循同一规则。
 
-Assistant 全双工中，`task.end` 成功即提交前台终态和历史摘要；明确结束当前目标时需实际调用，单独回复确认会保留任务。Control 与语音、显示等 channel 各自调度。
+Assistant 全双工中，`task.end` 成功即提交前台终态和历史摘要。开始或结束被打断时，根据当前任务及回执决定是否再发起控制。短暂岔题保留任务，去向不明时询问，明显转向且旧目标无需继续时可主动结束。Control 与语音、显示等 channel 各自调度。
 
 历史查询只复制 list 返回的完整 dialog_number；notFound 允许一次重新 list 和一次基于实际 ID 的修正 read，不猜测 ID 或无限重试。业务参数与 media_N 等引用来自真实反馈。语法、Channel/wait 和资源冲突由 Core/Gateway 契约决定，Skill 不重复定义。
 
@@ -223,7 +223,7 @@ Photography与ApplicationControl增加Island.setPresentation以及ui.island事�
 ## Web skills
 
 
-BasicSkill 默认暴露前台 task.start/end、独立 task.delegate、支持可选 agent_id 的 task.cancel/send，教学前台 scope 与后台通信的区别。同一目标的 start/delegate 是按所有者选择的平级入口；其他 Agent 用途和输入要求从 DELEGATABLE AGENTS 读取，BasicSkill 不维护角色职责清单。忙碌、补充、取消清理与接纳不等于完成采用通用规则。Catalog 没有 Writing Skill 或 Artifact_library；Writer 原生工具目录与作品业务由该角色自己拥有。Assistant 当前 Skills 均声明 Action 和显式 Channel；通用 Skill schema 保留 tool 能力。
+BasicSkill 公开 Assistant 前台 task.start/end 和后台消息 task.send(agent_id,text)。后台目标、补充和停止都使用正文。接收 Agent 自行决定如何处理，公开目录提供角色职责。Writer 私有工具与作品业务由 Writer 拥有。
 
 BasicSkill 要求将同伴报告视为证据，不由通知重委托；运行时拥有播放排空后的启听衔接，不靠模型生成startListening。
 

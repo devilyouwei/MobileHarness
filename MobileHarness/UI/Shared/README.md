@@ -34,3 +34,5 @@ UI subcontainers expose typed request sources. The injected business consumer ow
 A request owns one cancellation callback bound to its Agent-owned processing task. Page cancellation, root invalidation and consumer closure cancel admitted work as well as ending the receipt. The Agent joins its task before consuming replacement ordinary work; the source and unrelated requests remain available. The common consumer owns the existing 120-second deadline, removing role-specific deadline wrappers. No event bus or media buffer is added.
 
 [UI模块](../README.md)
+
+`ExecutionIssue` 为日志和首页提示提供共同的显示值。失败报告端口由应用注入，各生产者提供关联身份和结构化失败码。

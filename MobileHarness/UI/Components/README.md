@@ -6,6 +6,7 @@
 
 | 组件 | 当前职责 |
 | --- | --- |
+| [RuntimeLog](RuntimeLog/README.md) | 首页 Channel 摘要和 Action／Task／Agent／Decision 日志面板 |
 | [Island](Island/README.md) | App/系统灵动岛的内容、状态、渲染与交互 |
 | [Window](Window/README.md) | 通用窗口状态、层级、几何、壳与宿主 |
 | VoiceBars.swift | 有界实测频带的原生显示与可测试几何 |

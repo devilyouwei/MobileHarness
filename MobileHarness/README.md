@@ -425,71 +425,36 @@ Solid arrows carry the three classes of incoming Signal; dashed arrows carry out
 
 <a id="assistant-agent-delegation"></a>
 
-Assistant owns the user goal and chooses between peer `task.start` and `task.delegate` entries: start retains its own foreground work; writing, drawing, file changes and saved-work search/open/delete go directly to Writer. An unrelated foreground Task and its Skills may coexist with delegation. The selected executor owns admitted business work, progress, cancellation cleanup and terminal evidence.
+Assistant uses task.start and task.end for its foreground work and task.send(agent_id,text) for peer-owned work. The peer owns message interpretation, task admission, execution, cleanup and outcomes. An unrelated foreground task can continue concurrently.
 
 ```mermaid
 sequenceDiagram
-    participant A as Agents · Assistant
+    participant A as Assistant
     participant G as Gateway
-    participant X as Actions · Task endpoint
-    participant H as Agents · Task controller
-    participant S as Storage · Task repository
-    participant E as Agents · Executor
-    participant R as Agents · Execution authorization
-    participant I as UI · Writer Island
-    A->>G: task.delegate(agent_id, description)
-    G->>X: Scheduled Task Action
-    X->>H: Validated request through injected port
-    H->>H: Validate delegation parameters and permission
-    H->>S: Persist agent_messages request
-    H->>G: Bound task.request
-    G->>E: Authenticated delivery
-    E->>E: Validate request and capacity
-    alt Accepted
-        E->>S: Persist delegation entry and correlate request
-        E-->>G: Acceptance
-    else Rejected
-        E-->>G: Explicit failure
+    participant S as Storage
+    participant W as Writer
+    A->>S: Persist addressed text and captured reply association
+    A->>G: Send authenticated agent.task.request
+    G->>W: Deliver to bounded inbox
+    G-->>A: runtime.message.receipt
+    W->>W: Decide how to handle the message
+    alt New assignment
+        W->>G: Request internal execution grant
+        W->>S: Admit and own the execution
+        W-->>A: agent.task.response for started, progress or question
+    else Update or stop
+        W->>S: Apply input or start cancellation cleanup
+    else Decline message
+        W-->>A: agent.task.response for the rejected message
     end
-    G-->>H: Admission receipt
-    H-->>X: Admission receipt or failure
-    X-->>G: Structured completion or failure
-    G-->>A: Failure is observable
-    opt Accepted delegation
-        E->>E: Resolve goal and select own work target
-        opt Existing work selected by Writer
-            E->>S: Bind selected workspace without moving earlier messages
-        end
-        E->>G: Started / request for input
-        G->>H: Correlated task facts
-        H->>H: Update correlated task view
-        E->>I: Show progress or question
-        opt User supplement or cancellation
-            A->>G: Scheduled supplement or cancellation
-            G->>X: Task control Action
-            X->>H: Resolve agent_id and active communication
-            H->>G: Bound task.input / task.cancel
-            G->>E: Deliver control request
-        end
-        E->>E: Join execution and cleanup
-        E->>S: Persist terminal evidence
-        par Runtime retirement
-            E->>R: Bound runtime retirement call
-            R->>G: Join existing executions
-            R-->>E: Cleanup joined and scope retired
-        and Durable completion delivery
-            E->>G: Authenticated role notification
-            G->>H: Verify terminal evidence and reconcile task view
-            H->>H: Mark notification consumed
-        and User presentation
-            E->>I: Display terminal text
-        end
-    end
+    W->>S: Persist terminal outcome
+    W->>G: Retire execution grant
+    W-->>A: Durable agent.task.response for the task outcome
 ```
 
-Task Actions validate and forward control through injected Agents ports. Independent communication consumers deliver messages while the scheduled Action waits for admission. Public controls use `agent_id`; runtime resolves the current communication and captured question identity. The caller does not allocate the target role’s local task/workspace. Late events remain fenced to their original execution. Successful Writer transport completes without a model continuation. Writer presents progress on its Island. Assistant reconciles authenticated state and speaks selected events using its existing playback path without triggering inference. Subsequent user requests receive a bounded digest from the originating conversation. Admission, execution cleanup, scope retirement and presentation have separate completion boundaries.
+Assistant projects verified reports into the originating conversation. The transport receipt confirms delivery, while Writer reports business acceptance and results. Writer owns workspace selection and exposes its own progress and results in its Island.
 
-Background delegation requires an implemented route and communication permission. The receiver admits the assignment and its model can execute, ask for clarification or decline with a reason. Writer is the current public creative executor, and `sendMessage` currently adapts Writer input. Writer's artifact-library and file-editing Skills are private to Writer. The role calls Actions' native workspace tool through Gateway: search reads library metadata, open presents saved work, and explicit create initializes an empty directory before subsequent scoped file operations. Its library/workspace domains belong to [Writer](Agents/Writer/README.md#作品库与工作区分域), deterministic file validation/rendering/export to [Artifacts](Actions/Artifacts/README.md), and Island feedback and durable terminal notifications to the [Writer communication contract](Agents/Writer/README.md#委托与主动事件).
+Fixed-task executors also send `agent.task.response`. Gateway validates their execution scope and joins outstanding work before delivering a terminal response. Writer retires its own execution grant and delivers its persisted outcome independently.
 
 [Assistant delegation](Agents/Assistant/README.md#对其他-agent-的委托) · [Task Actions](Actions/System/Task/README.md) · [Task message values](Agents/Support/Communication/README.md) · [Independent output consumers](Agents/Support/README.md#lifetime-bounds-and-failures)
 
@@ -1132,9 +1097,9 @@ flowchart TB
     classDef storage fill:#faf3e4,stroke:#a18a4c,color:#61512a
 ```
 
-PlatformKit reports the active capture route capability. SpeechPerception publishes partial and final ASR on user.input and owns recognition presentation. Assistant subscribes to the final contract and classifies it alongside typed input. The voice coordinator gates recognition on restricted routes during actual playback and restores it after playback cleanup. See [audio routing](PlatformKit/Audio/README.md) and [Assistant input handling](Agents/Assistant/README.md#多源全双工输入与-decision).
+PlatformKit reports the active capture route capability. SpeechPerception publishes partial and final ASR on user.input and owns recognition presentation. Assistant subscribes to the final contract and classifies it alongside typed input. Decision receives the latest input, the current conversation's most recent dispatched exchange, and separate playback, execution and pending-question context. The voice coordinator gates recognition on restricted routes during actual playback and restores it after playback cleanup. The Decision execution log receives Assistant’s elapsed classification duration through the UI log port. See [audio routing](PlatformKit/Audio/README.md) and [Assistant input handling](Agents/Assistant/README.md#多源全双工输入与-decision).
 
-Model generation closes the set of calls. Gateway preserves ordering within each Channel and coordinates resource use across Channels. Assistant buffers user inputs and execution feedback until the round's Channels and native calls settle, then dispatches the accumulated batch. A confirmed interruption joins cancellation and cleanup before the next generation. Storage records dispatched requests, replies, Action results and Task commits at their respective boundaries. See [Assistant multi-Channel output](Agents/Assistant/README.md#多-channel-输出与跨轮结算), [Gateway scheduling](Gateway/Output/Scheduling/README.md) and [history and restart](#18-history-business-records-and-restart-behavior).
+Model generation closes the set of calls. Gateway preserves ordering within each Channel and coordinates resource use across Channels. Assistant buffers user inputs and execution feedback until the round's Channels and native calls settle, then dispatches the accumulated batch. A confirmed interruption joins cancellation and cleanup before the next generation. The next input can continue the same foreground task until task.end commits. Storage records dispatched requests, replies, Action results and Task commits at their respective boundaries. See [Assistant multi-Channel output](Agents/Assistant/README.md#多-channel-输出与跨轮结算), [Gateway scheduling](Gateway/Output/Scheduling/README.md) and [history and restart](#18-history-business-records-and-restart-behavior).
 
 ### 13. Camera preview, vision and tracking
 
@@ -1537,7 +1502,7 @@ See [Memory](Agents/Memory/README.md), [History](Actions/History/README.md) and 
 
 Storage separates Assistant conversation themes and foreground tasks from Writer workspaces and delegation executions. Writer messages contain delegation entries and child messages whose optional workspace ownership is fixed at creation; selecting a workspace does not move earlier messages. AgentMessages retains original communication and delivery facts. The stable workspace key is `workspace_N`; completion ends one delegation, not the lifetime of a reusable workspace. Request/event records retain runtime trace identities, while models receive readable workspace/window/editing handles with owner-projected metadata. WindowState owns window mapping independently of the creator. See [Task storage](Storage/Database/README.md) and [artifact identities](Actions/Artifacts/README.md#workspace-and-editing-identities).
 
-Assistant and Writer create business Message rows at inference dispatch. Assistant stores the submitted timeline separately from the original input and batch coordination, and stores one reply for the batch. Actions presents that submitted text in request history. In full-duplex mode, `task.end` runs on Gateway's Control Channel. Agents commits the foreground task's terminal state and Message summary through Storage before the Action returns success. The summary covers dispatched Messages, including the one that issued `task.end`. The existing Message receives the reply at generation completion and Action results at execution settlement. Historical requests remain readable, and older JSON batches are projected into the timeline when replayed as model context. See [Assistant task lifecycle](Agents/Assistant/README.md#前台与-writer-入口选择) and [Assistant history storage](Storage/Database/AssistantMessages/README.md).
+Assistant and Writer create business Message rows at inference dispatch. Assistant stores the submitted timeline separately from the original input and batch coordination, and stores one reply for the batch. Actions presents that submitted text in request history. In full-duplex mode, `task.end` runs on Gateway's Control Channel. Writer receives cancellation requests as `task.input` and owns its own execution cleanup and terminal result. Agents commits the foreground task's terminal state and Message summary through Storage before the Action returns success. The summary covers dispatched Messages, including the one that issued `task.end`. The existing Message receives the reply at generation completion and Action results at execution settlement. Historical requests remain readable, and older JSON batches are projected into the timeline when replayed as model context. See [Assistant task lifecycle](Agents/Assistant/README.md#前台与-writer-入口选择) and [Assistant history storage](Storage/Database/AssistantMessages/README.md).
 
 Writer uses its own WriterExecutionRepository and WriterMessageRepository, with WriterRecordStore/WriterHistoryStore owning its private history. Runtime history is scoped to the delegation; Settings queries delegation entries and workspace messages separately. Database message keys define ordering, while revision is a state version. A later delegation may reuse the same workspace while retaining separate execution history. Deleting the requesting Assistant dialog clears provenance without deleting the Writer workspace. App composes Writer's records interface and Actions' preview/export interface for Settings. Model timing flows through ModelKit → role history → Storage evidence → UI detail; Writer projects workspace start/update timestamps, request counts and operation summaries, while UI renders neutral values. Writer projects request overview, the current input, verified prior tool references, model output and host finalization through its Settings detail interface. The business sections survive request-log deletion, which clears prompt and generation diagnostics. Full persisted request/tool evidence is distinct from the Agent's selected model context. See [Writer history](Agents/Writer/README.md#sqlite-历史与设置页).
 
@@ -1615,7 +1580,7 @@ flowchart TB
     end
     style Coordination fill:#fff2d9,stroke:#bf842c,color:#694511
     subgraph Execution["ACTIONS"]
-        X["Notice / conversation /<br/>diagnostics functions"]:::action
+        X["Notice / conversation /<br/>state functions"]:::action
     end
     style Execution fill:#ffecef,stroke:#b86178,color:#6b2b3d
     subgraph Display["UI"]
@@ -1625,7 +1590,8 @@ flowchart TB
     Failure -->|"original structured<br/>error"| App
     App -->|"bounded retained<br/>evidence"| Channel
     Channel -->|"diagnostic delivery"| A
-    A -->|"authorized presentation<br/>call"| G
+    A -->|"runtime issue and<br/>optional toast"| UI
+    A -->|"authorized state<br/>presentation call"| G
     G ==>|"prepare / execute"| X
     X ==>|"public UI presentation<br/>capability"| UI
     Bootstrap -->|"App-bound bootstrap<br/>fallback"| UI
@@ -1641,12 +1607,13 @@ flowchart TB
     linkStyle 3 stroke:#5078b8,stroke-width:1.5px
     linkStyle 4 stroke:#bf842c,stroke-width:2.5px
     linkStyle 5 stroke:#bf842c,stroke-width:2.5px
-    linkStyle 6 stroke:#5078b8,stroke-width:1.5px
+    linkStyle 6 stroke:#3985a4,stroke-width:1.5px
+    linkStyle 7 stroke:#5078b8,stroke-width:1.5px
 ```
 
-Foundations report their own native Failure types without business wording, Signals or automatic recovery. App preserves original errors and source identity in its bounded ContainerFailureChannel. ApplicationControl owns classification/presentation policy and sends authorized display calls through Gateway to Actions. Bootstrap failure has an App-owned fallback before roles are available. Reporting failure does not recursively generate more failures.
+Foundations report their own native Failure types without business wording, Signals or automatic recovery. App preserves original errors and source identity in its bounded ContainerFailureChannel. ApplicationControl owns diagnostic classification and submits runtime issues and optional Toasts directly to UI. Authorized device and model presentation calls use the business execution path. Bootstrap failure has an App-owned fallback before roles are available. Reporting failure does not recursively generate more failures.
 
-Pure cancellation is distinct from real or mixed execution/cleanup failure; classification uses structured reports rather than error strings. Display filters do not cancel work or establish released resources. Passive Agent activity projection lives with cognitive adapters; callable presentation and effects live in Actions.
+Pure cancellation is distinct from real or mixed execution/cleanup failure; classification uses structured reports rather than error strings. Display filters do not cancel work or establish released resources. Agents supplies Task, Agent and Decision display values. App binds scheduler snapshots to the same UI-owned [RuntimeLog component](UI/Components/RuntimeLog/README.md).
 
 UI presentation admission differs from native completion. Finite expressions await their presentation/restoration; persistent base state acknowledges admission. Metal owns window/layer/GPU completion. Photo disappearance/display receipts retain media and generation identity. Updating a UI field cannot prove GPU or physical completion. See [UI](UI/README.md), [ApplicationControl](Agents/ApplicationControl/README.md) and [runtime presentation](Actions/UI/Runtime/README.md).
 
@@ -1738,9 +1705,3 @@ App requests iOS continued processing for each foreground user-initiated Writer 
 | Navigation/inactivity            | UI lifetime or App invalidation → owned cancellation/join.                                              | Committed creations remain; root cleanup outlives pages.       |
 
 Automated checks, iOS builds, real-model samples, native UI and physical-device acceptance are separate evidence categories maintained in [validation](../docs/validation/README.md). Requirements and decisions live in [requirements](../docs/requirements/README.md) and [ADR](../docs/adr/README.md); historical design rationale lives in [documentation history](../docs/history/Documentation-History.md).
-
-### Prompt resource ownership across modules
-
-Resources/Agents/Shared contains reusable protocols and generic request framing without role ownership. Each cognitive role selects its own Markdown instructions and JSON templates; deterministic perception roles have no artificial prompt configuration. Agents owns request assembly and strict template rendering. Action descriptions and parameter documentation remain canonical code-owned declarations.
-
-Prompt resources serve cognition Agents only. Actions retains its descriptions, parameters, return values, errors and editing context in code and has no prompt-resource dependency. ModelKit retains model-specific adaptation and warmup text internally. Agents consumes those original values as data and owns its request framing. Missing or invalid Agent resources fail explicitly; existing module and target boundaries remain unchanged.

@@ -70,16 +70,6 @@ import Testing
     #expect(successful.withExecutionFailure(.cancelled).status == .cancelled)
 }
 
-@Test(.actionCatalog) func actionFailureTranslationPreservesProducerIdentifiers() {
-    let failures: [ActionFailure] = [
-        .operationFailed, .resourceUnavailable, .invalidArguments,
-        .init(rawValue: "fixture.customFailure"), .init(rawValue: "feedbackTimeout"),
-    ]
-    for failure in failures {
-        #expect(failure.observationFailure.rawValue == failure.rawValue)
-    }
-}
-
 @Test(.actionCatalog) func runtimeTransportsProducerReportCodeWithoutInterpretingFailureIdentity() {
     struct FixtureError: ActionReportFailureProviding {
         let actionExecutionFailure = ActionFailure(rawValue: "feedbackTimeout")

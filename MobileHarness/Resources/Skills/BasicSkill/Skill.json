@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "basic-skill",
-  "revision": 53,
+  "revision": 55,
   "description": "Discover and load capabilities, manage foreground goals and Skill lifecycles, coordinate delegated work, and control listening using current context and execution feedback.",
   "dependencies": [],
   "useActions": [
@@ -30,12 +30,6 @@
       "channel": "Control"
     },
     {
-      "path": "Agent.Task.cancelTask",
-      "callType": "action",
-      "alias": "task.cancel",
-      "channel": "Control"
-    },
-    {
       "path": "Speech.Listening.startListening",
       "callType": "action",
       "alias": "startListening",
@@ -51,12 +45,6 @@
       "path": "Agent.Task.sendMessage",
       "callType": "action",
       "alias": "task.send",
-      "channel": "Control"
-    },
-    {
-      "path": "Agent.Task.delegateTask",
-      "callType": "action",
-      "alias": "task.delegate",
       "channel": "Control"
     }
   ],

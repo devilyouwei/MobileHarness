@@ -1,26 +1,21 @@
 import AgentCore
 import Foundation
-import PlatformKit
-import StorageCore
 import UI
 
-/// Root-owned execution-state subscription. The injected stream carries full snapshots, bounded error descriptions without call arguments.
+/// Root-owned projections of Agent and Task state and delivery of failure evidence.
 @MainActor
-public final class ActionActivityWorkflow: ExecutionFailureReporting {
-    public let state: any ActivityPresenting
+public final class AgentRuntimeLogWorkflow: ExecutionFailureReporting {
+    private let log: (any RuntimeLogWriting)?
     private var taskObservation: Task<Void, Never>?
     private var agentObservation: Task<Void, Never>?
-    private var observation: Task<Void, Never>?
     private var failureObservation: Task<Void, Never>?
     private let failureEvents = AsyncStream<RuntimeFailureEvent>.makeStream(bufferingPolicy: .bufferingOldest(100))
     private var failureDelivery: Task<Void, Never>?
     public private(set) var rejectedFailureEvents: UInt64 = 0
-    public private(set) var lastFailureDeliveryError: String?
-    public init(state: any ActivityPresenting) { self.state = state }
+    public init(log: (any RuntimeLogWriting)? = nil) { self.log = log }
     deinit {
         taskObservation?.cancel()
         agentObservation?.cancel()
-        observation?.cancel()
         failureObservation?.cancel()
         failureEvents.continuation.finish()
         failureDelivery?.cancel()
@@ -33,8 +28,7 @@ public final class ActionActivityWorkflow: ExecutionFailureReporting {
                 guard !Task.isCancelled else { return }
                 do { try await deliver(event) } catch {
                     guard !Task.isCancelled else { return }
-                    self?.lastFailureDeliveryError = String(String(describing: error).prefix(512))
-                    self?.state.present(.observationUnavailable(true))
+                    self?.log?.record(.observationUnavailable)
                 }
             }
         }
@@ -48,22 +42,20 @@ public final class ActionActivityWorkflow: ExecutionFailureReporting {
     }
     public func shutdown() async {
         await stopFailureObservations()
-        let tasks = [taskObservation, agentObservation, observation]
+        let tasks = [taskObservation, agentObservation]
         for task in tasks { task?.cancel() }
         for task in tasks { await task?.value }
         taskObservation = nil
         agentObservation = nil
-        observation = nil
     }
     private func forwardFailure(_ event: RuntimeFailureEvent) {
         switch failureEvents.continuation.yield(event) {
         case .enqueued: break
         case .dropped, .terminated:
             rejectedFailureEvents &+= 1
-            lastFailureDeliveryError = "Runtime failure Signal forwarding unavailable or full"
-            state.present(.observationUnavailable(true))
+            log?.record(.observationUnavailable)
         @unknown default:
-            state.present(.observationUnavailable(true))
+            log?.record(.observationUnavailable)
         }
     }
     public func recordFailure(
@@ -85,20 +77,10 @@ public final class ActionActivityWorkflow: ExecutionFailureReporting {
                 category: diagnostic?.category.rawValue, workerID: context?.workerID, callID: context?.callID))
     }
 
-    public func presentTaskState(
-        id: String?, title: String, status: String, ownership: [String: String], loaded: [String]
-    ) {
-        guard state.isPresentationAvailable else { return }
-        state.present(.currentTaskID(id))
-        state.present(.currentTaskTitle(title))
-        state.present(.currentTaskStatus(status))
-        state.present(.skillOwnership(ownership))
-        state.present(.loadedSkills(loaded))
-    }
-    public func updateTask(_ item: TaskLogItem, event: TaskLogEvent) { state.updateTask(item, event: event) }
+    public func updateTask(_ item: TaskLogItem, event: TaskLogEvent) { log?.record(.task(item, event)) }
     public func startFailures(observe: @escaping @Sendable () async throws -> AsyncStream<OutputFailureSnapshot>) {
         guard failureObservation == nil else { return }
-        let state = state
+        let log = log
         failureObservation = Task { [weak self] in
             do {
                 let stream = try await observe()
@@ -112,16 +94,11 @@ public final class ActionActivityWorkflow: ExecutionFailureReporting {
                     seen = seen.intersection(retained)
                     for record in snapshot.records where !seen.contains(record.id) {
                         seen.insert(record.id)
-                        // A failed diagnostic presentation is already evidence; never recursively present it.
-                        guard
-                            !(record.source.rawValue == "applicationControl"
-                                && record.title == "UI.RuntimeDiagnostics.recordFailure")
-                        else { continue }
                         self?.forwardFailure(RuntimeFailureEvent(record))
                     }
                 }
             } catch {
-                if !Task.isCancelled { state.present(.observationUnavailable(true)) }
+                if !Task.isCancelled { log?.record(.observationUnavailable) }
             }
         }
     }
@@ -130,8 +107,7 @@ public final class ActionActivityWorkflow: ExecutionFailureReporting {
         observe: @escaping @Sendable () async throws -> AsyncStream<SignalTraceSnapshot>,
         taskContent: @escaping @Sendable (AgentTaskSignal) -> (String, Bool) = { _ in ("", false) }
     ) {
-        guard taskObservation == nil else { return }
-        let state = state
+        guard taskObservation == nil, let log else { return }
         taskObservation = Task { [weak self] in
             do {
                 let stream = try await observe()
@@ -180,11 +156,12 @@ public final class ActionActivityWorkflow: ExecutionFailureReporting {
                             title: signal.kind == .request ? (signal.goal ?? text) : "", phase: phase)
                         value.execution = signal.scope.execution.rawValue
                         value.skills = signal.requestedSkills ?? []
-                        state.updateTask(
-                            value,
-                            event: .init(
-                                id: record.id, time: record.time,
-                                title: signal.kind.logTitle + " · " + record.phase.displayTitle, detail: text))
+                        log.record(
+                            .task(
+                                value,
+                                .init(
+                                    id: record.id, time: record.time,
+                                    title: signal.kind.logTitle + " · " + record.phase.displayTitle, detail: text)))
                     }
                 }
             } catch {
@@ -195,8 +172,7 @@ public final class ActionActivityWorkflow: ExecutionFailureReporting {
         }
     }
     public func startAgents(statuses: @escaping @Sendable () async -> [(String, AgentLifecycle)]) {
-        guard agentObservation == nil else { return }
-        let state = state
+        guard agentObservation == nil, let log else { return }
         agentObservation = Task {
             var previous: [String: AgentLifecycle] = [:]
             while !Task.isCancelled {
@@ -204,31 +180,15 @@ public final class ActionActivityWorkflow: ExecutionFailureReporting {
                 guard !Task.isCancelled else { return }
                 let current = Dictionary(uniqueKeysWithValues: values)
                 for (source, lifecycle) in values where previous[source] != lifecycle {
-                    state.recordAgentEvent(
-                        .init(source: source, status: lifecycle.logTitle, isFailure: lifecycle == .failed))
+                    log.record(
+                        .agent(
+                            .init(source: source, status: lifecycle.logTitle, isFailure: lifecycle == .failed)))
                 }
                 for source in previous.keys where current[source] == nil {
-                    state.recordAgentEvent(.init(source: source, status: "已移除", isFailure: false))
+                    log.record(.agent(.init(source: source, status: "已移除", isFailure: false)))
                 }
                 previous = current
                 do { try await Task.sleep(for: .seconds(1)) } catch { return }
-            }
-        }
-    }
-    public func start(observe: @escaping @Sendable () async throws -> AsyncStream<ActionExecutionSnapshot>) {
-        guard observation == nil else { return }
-        let state = state
-        observation = Task {
-            do {
-                let stream = try await observe()
-                for await snapshot in stream {
-                    guard !Task.isCancelled else { return }
-                    state.replace(
-                        revision: snapshot.revision, records: snapshot.records.map(ActionActivityItem.init),
-                        evictedCount: snapshot.evictedCount)
-                }
-            } catch {
-                if !Task.isCancelled { state.present(.observationUnavailable(true)) }
             }
         }
     }

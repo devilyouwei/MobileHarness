@@ -3227,8 +3227,9 @@ extension LiveRuntimeTests {
         defer { try? FileManager.default.removeItem(at: file) }
         let link = BluetoothArmFixture()
         let workflow = bluetoothTestWorkflow(link, file: file)
-        let activity = ActionActivityWorkflow(state: ActionActivityState())
-        let diagnosticFixture = try await RuntimeFailurePresentationFixture(activity: activity)
+        let runtimeLog = RuntimeLogState()
+        let activity = AgentRuntimeLogWorkflow(log: runtimeLog)
+        let diagnosticFixture = try await RuntimeFailurePresentationFixture(log: runtimeLog)
         try await diagnosticFixture.start(activity: activity)
         let observer = Task { await workflow.run() }
         workflow.openPage()
@@ -3243,10 +3244,10 @@ extension LiveRuntimeTests {
         await link.failLiveValidationOnce()
         // A held target does not send again; the next target exercises the worker's late failure path.
         try await workflow.aim(base: -0.6, pitch: 0.5)
-        try await until { activity.state.backgroundIssues.count == 1 }
+        try await until { runtimeLog.issues.count == 1 }
         await workflow.waitUntilIdle()
-        #expect(activity.state.backgroundIssues.first?.message == "invalidMotion")
-        #expect(activity.state.items.isEmpty)
+        #expect(runtimeLog.issues.first?.message == "invalidMotion")
+        #expect(runtimeLog.items.isEmpty)
         #expect(workflow.state.error == nil && workflow.state.transportIssue == nil && workflow.state.canControl)
         #expect(await link.connects == 1)
         try await workflow.aim(base: 0.8, pitch: -0.5)
@@ -3337,8 +3338,9 @@ extension LiveRuntimeTests {
         defer { try? FileManager.default.removeItem(at: file) }
         let link = BluetoothArmFixture()
         let workflow = bluetoothTestWorkflow(link, file: file)
-        let activity = ActionActivityWorkflow(state: ActionActivityState())
-        let diagnosticFixture = try await RuntimeFailurePresentationFixture(activity: activity)
+        let runtimeLog = RuntimeLogState()
+        let activity = AgentRuntimeLogWorkflow(log: runtimeLog)
+        let diagnosticFixture = try await RuntimeFailurePresentationFixture(log: runtimeLog)
         try await diagnosticFixture.start(activity: activity)
         let observer = Task { await workflow.run() }
         workflow.openPage()
@@ -3363,12 +3365,12 @@ extension LiveRuntimeTests {
         try await until(context: "native failure before caller returns") { await link.waitingForLiveFailure }
         try await until(context: "recovery fences old generation") { workflow.state.recoveryStage == .cleaning }
         await link.releaseLiveFailure()
-        try await until(context: "late execution failure reaches home") { activity.state.backgroundIssues.count == 1 }
-        #expect(activity.state.backgroundIssues.first?.message == "timeout")
-        #expect(activity.state.backgroundIssues.first?.context?.callID == origin.callID)
-        #expect(activity.state.backgroundIssues.first?.context?.sessionID == origin.sessionID)
-        #expect(activity.state.backgroundIssues.first?.context?.inputID == origin.inputID)
-        #expect(activity.state.backgroundIssues.first?.context?.workerID != nil)
+        try await until(context: "late execution failure reaches home") { runtimeLog.issues.count == 1 }
+        #expect(runtimeLog.issues.first?.message == "timeout")
+        #expect(runtimeLog.issues.first?.context?.callID == origin.callID)
+        #expect(runtimeLog.issues.first?.context?.sessionID == origin.sessionID)
+        #expect(runtimeLog.issues.first?.context?.inputID == origin.inputID)
+        #expect(runtimeLog.issues.first?.context?.workerID != nil)
         try await until {
             await link.connects == 2 && workflow.state.phase == .connected && workflow.state.canControl
         }

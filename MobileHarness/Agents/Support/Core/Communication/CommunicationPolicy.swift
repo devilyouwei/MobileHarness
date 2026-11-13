@@ -30,10 +30,10 @@ public struct CommunicationContract: Sendable {
 public struct CommunicationContracts: Sendable {
     private let entries: [String: CommunicationContract]
     public static let standard = CommunicationContracts(standard: [
-        CommunicationContract(name: "communication.receipt", kind: .communicationReceipt),
-        CommunicationContract(name: "tool.result", kind: .toolResult),
-        CommunicationContract(name: "action.result", kind: .actionResult),
-        CommunicationContract(name: "generation.round.result", kind: .roundResult),
+        CommunicationContract(name: "runtime.message.receipt", kind: .communicationReceipt),
+        CommunicationContract(name: "runtime.tool.result", kind: .toolResult),
+        CommunicationContract(name: "runtime.action.result", kind: .actionResult),
+        CommunicationContract(name: "runtime.round.result", kind: .roundResult),
         CommunicationContract(name: "activity.event", kind: .activityEvent),
     ])
     private init(standard: [CommunicationContract]) {

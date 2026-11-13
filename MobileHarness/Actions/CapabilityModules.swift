@@ -46,7 +46,6 @@ public enum CapabilityModules {
         detection: (any AudioDetectionCapability)? = nil,
         taskControl: (any TaskControlCapability)? = nil,
         loading: (any LoadingExpressionPresentationCapability)? = nil,
-        runtimeFailures: (any RuntimeFailurePresentationCapability)? = nil,
         bluetoothStatus: (any BluetoothStatusPresentationCapability)? = nil,
         gesture: @escaping @Sendable (NexArmActions.GestureRequest, any FunctionInput) async throws -> Void,
         shakeBase: @escaping @Sendable (Int, any FunctionInput) async throws -> Void,
@@ -55,7 +54,7 @@ public enum CapabilityModules {
         var modules: [any CapabilityModule] = [
             UIModule(
                 expression: presentation, pose: pose, updates: presentation, history: historyPresentation,
-                feedback: feedback, effects: effects, loading: loading, runtimeFailures: runtimeFailures,
+                feedback: feedback, effects: effects, loading: loading,
                 bluetoothStatus: bluetoothStatus),
             ResourcePresentationModule(inventory: resourceInventory, presentation: resourcePresentation),
             SpeechModule(playback: playback, listening: listening, gesture: listeningGesture, detection: detection),

@@ -125,7 +125,7 @@ Assistant 的技术诊断输入声明属于 Agents 资源契约；container.fail
 
 BasicSkill selects eight passive native platform.* State sources alongside UI navigation. Source schemas and native lifetime remain owned by [PlatformKit](../PlatformKit/README.md#native-state-port); [Skill declarations](Skills/README.md#basic-native-state-selection) select reads without starting hardware or granting execution authority.
 
-Assistant 身份只介绍自身。BasicSkill 拥有 start/delegate 平级选择的通用教学；各 Agent.json.description 维护各自用途，加载器按真实适配与实例通信权限生成公开目录。Catalog 不包含 writing；作品查找、打开与创作由 Writer 原生工具拥有。详见 [Skill 契约](Skills/README.md) 与 [角色配置](Agents/README.md)。
+Assistant 身份只介绍自身。BasicSkill 说明如何区分自己的前台任务和发给其他 Agent 的后台消息。各 Agent.json.description 维护各自用途，加载器按实际路由与实例通信权限生成公开目录。作品查找、打开与创作由 Writer 原生工具拥有。详见 [Skill 契约](Skills/README.md) 与 [角色配置](Agents/README.md)。
 
 ## 提示词目录归属
 

@@ -11,7 +11,7 @@ AgentChatWorker 将注入 ChatCapability、UIHomeContainer、AgentStateContext�
 | [AgentChatContext.swift](AgentChatContext.swift) | 角色 Context 协议、通用会话控制意图与历史事务适配 |
 | [AgentChatContextBuilder.swift](AgentChatContextBuilder.swift) | 历史／执行观察投影、请求预算及公开 State 消息选择 |
 | [AgentChatDriver.swift](AgentChatDriver.swift) | Provider 会话、文本与 native 事件消费和取消加入 |
-| [AgentSpeechOutput.swift](AgentSpeechOutput.swift) | 调用者注入的语音句柄生产、按输入取消与停止接口；不拥有具体合成实现 |
+| [AgentSpeechOutput.swift](AgentSpeechOutput.swift) | 调用者注入的语音句柄生产、按会话查询播放、按输入取消与停止接口；不拥有具体合成实现 |
 | [AgentChatWorker.swift](AgentChatWorker.swift) | Decision／ReACT、UI 接纳、Task／Skill 控制、输出与结果屏障 |
 | [AgentCommunicationAdapter.swift](AgentCommunicationAdapter.swift) | 定向消息内容和因果元数据校验 |
 | [AgentPrompts.swift](AgentPrompts.swift) | 加载、渲染、缓存和卸载 Agents Bundle 的提示词模板 |
@@ -114,9 +114,9 @@ Roles without dynamic Skills do not automatically receive this public-state coll
 
 ## Task/Skill 控制与执行边界
 
-BasicSkill 的五个控制是 Control Channel Actions。startTask/loadSkills/releaseSkills 提交事务值后经结果屏障重建目录；finish/cancel 先标记 finishing/cancelling，加入回复/清理后才进入终态。finishTask 通常结束决策，continueDecision=true 仅继续同一输入剩余新目标；cancelTask 结束决策。开始、等待和收尾中的 Task 均不能被覆盖。
+BasicSkill 的任务与 Skill 控制使用 Control Channel。task.start、loadSkills 和 releaseSkills 提交状态后重建目录。task.end 提交摘要和终态，continueDecision=true 继续同一输入剩余的新目标。已有前台任务时拒绝 task.start。
 
-Action/native Tool 仅在合法解析且输出已接纳后记录 Skill 使用；执行失败算使用，解析/参数拒绝不算。Task 屏障与完整用户 Decision 结算分离，系统观察不扣闲置次数。取消清理在途集合；无关输入失败不得终止其他 Task，迟到 ASR 不改投新目标。状态算法由 [Context](../Context/README.md) 拥有。
+Action/native Tool 仅在合法解析且输出已接纳后记录 Skill 使用；执行失败算使用，解析/参数拒绝不算。Task 屏障与完整用户 Decision 结算分离，系统观察不扣闲置次数。轮次失败或取消结算原输入并保留未结束的前台任务。迟到 ASR 沿用原任务绑定。状态算法由 [Context](../Context/README.md) 拥有。
 
 可信固定 Task 控制只在 worker/队列/接纳均空闲时执行，验证 root session 与来源；模型控制验证当前 input/session/round。固定控制不启动模型。未运行时的输入返回 notRunning，业务/执行/提交失败按原链路显式报告。
 
@@ -147,7 +147,7 @@ The driver's secondary queues use synchronous checked yields. They do not suspen
 
 ## 生命周期、时序与错误
 
-worker 独立于 UI 页面。结果必须匹配 call、round、task、session、incarnation 与完成屏障。pause 和 interrupt 取消并等待当前 Decision 退出，保留 Task、Skill 与公开状态作用域，目标回到 waitingUser，被中断 Decision 保留原闲置次数。close 关闭匹配会话，stop 关闭全部。回复占用由 worker 为本地 Decision 管理，输入终态释放对应记录。输出传输失败也会清理。
+worker 独立于 UI 页面。结果必须匹配 call、round、task、session、incarnation 与完成屏障。pause 和 interrupt 取消并等待当前 Decision 退出，保留 Task、Skill 与公开状态作用域，目标回到 waitingUser，被中断 Decision 保留原闲置次数。close 关闭匹配会话的执行和公开状态作用域，保留前台目标；stop 清理全部执行。回复占用由 worker 为本地 Decision 管理，输入终态释放对应记录。输出传输失败也会清理。
 
 ChatTiming 由支持的 provider 在请求发出及首个非空文本或已校验身份的原生工具参数增量时取单调样本；取先到者，排除私有推理和工具执行时间。不支持计时或没有有效增量时不产生 TTFT；driver 沿用同一快照持久化链路。消费、ASR、TTS 与 UI 耗时不是模型首 token 时延。网络传输自身超时和实时感知 freshness 不作为整个决策时限。
 
@@ -200,21 +200,23 @@ residentContext() exposes only the repository’s initialized committed in-memor
 
 
 
-Task 控制通过 task.start/end 管理 Assistant 前台 scope，task.delegate(agent_id,description) 发送独立请求；task.send/cancel 带 agent_id 时发送消息，不带时作用于前台。目标自主选择 task/workspace，外部不提供 taskID。连续 start 排空旧 scope 副作用并取消旧任务后建立新任务；等待用户仍保留活跃 scope。
+Task 控制通过 task.start 和 task.end 管理 Assistant 前台目标，相关用户输入走常规输入流程。task.send(agent_id,text) 发送正文，可由运行时附带捕获的待答关联。接收 Agent 决定是否新建、补充或停止任务。
 
-全双工的 `task.end` 在 Control Action 内验证原模型请求及任务绑定，串行提交 SQLite 终态、摘要和来源后发布私有 Context，释放任务 Skill。普通成功回执留在原轮 journal，`continueDecision=true` 产生供下一个目标使用的结果。生成结束保存模型回复，执行收尾仍补写原 Message 的 journal；这两个边界独立于任务关闭。
+任务控制入口校验调用方、会话和轮次，并拒绝已取消的轮次。前台和 Skill 控制继续核对请求绑定的前台任务，并串行提交本地状态。后台发送按目标权限准入，通过 Agent 消息仓库持久化。
 
-Writer 的 started、draftUpdated、recovering 和 userInput 作为认证控制事实更新任务视图。按委派和事件序号去重。终态由 writer.completion 提供，核对 SQLite 不可变通知并标记消费。运行时独立清理并退休执行授权。旧委派的终态只结算原视图，创作不因投递重试而重放。
+全双工的 `task.end` 在 Control Action 内验证原模型请求及任务绑定，串行提交 SQLite 终态、摘要和来源后发布私有 Context，释放任务 Skill。可信宿主结束走同一提交路径。同步轮次在结束调用和执行屏障成功后结算任务。点对点任务回执更新自己的任务视图。普通成功回执留在原轮 journal，`continueDecision=true` 产生供下一个目标使用的结果。生成结束保存模型回复，执行收尾仍补写原 Message 的 journal。
 
-Assistant 全双工模式下，Writer 与其他经过身份验证的语义通知进入 Decision；任务事实先提交，可靠终态和交互问题受保留保护。原 task/interaction 绑定用于后续补充校验。非全双工绑定保留原确定性播报适配。
+Writer 的 started、draftUpdated、recovering 和 userInput 作为认证控制事实更新任务视图。按委派和事件序号去重。统一契约 agent.task.response 接收 Writer 事件与固定任务信封。Writer 的消息拒绝和任务终态走持久通知验证，固定任务沿用任务注册表的状态转换。Assistant 按原消息或任务关联，核对 SQLite 不可变通知并标记消费。运行时独立清理并退休执行授权。旧委派的终态只结算原视图，创作不因投递重试而重放。
 
-模型历史 read-token/begin 短事务与 Assistant 输入接纳共用 admission gate。模型生成和工具执行在锁外。输入和回复占用是 Decision 的本地事实，播放由 Speech.Playback 处理。
+Assistant 全双工模式下，Writer 与其他经过身份验证的语义通知进入待处理队列。任务事实先提交，原 task/interaction 绑定用于后续补充校验。非全双工绑定保留原确定性播报适配。
+
+模型历史 read-token/begin 短事务与 Assistant 输入接纳共用 admission gate。模型生成和工具执行在锁外。输入分类从当前会话已提交的内存快照选取当前输入之前最新的一来一回，略过未发出、只有非用户输入或没有可用回复的记录。合并批次取其中最近一条用户原文。Worker 在分类前读取当前会话播放与活动轮次，关联追问在接纳时固定。播放由 Speech.Playback 处理。
 
 ChatDriver scopes request consumption with InferenceSession.withCleanup, joining the SDK request worker on normal/error/cancellation exits. It owns no model-instance lease and does not unload shared clients.
 
 Assistant 按完整语音文本接纳时的会话及任务上下文分类并归属。识别字幕和阶段展示由 SpeechPerception 管理。
 
-Background task.delegate persists a request in agent_messages without creating a target task. Assistant reconciles authenticated communication facts; Writer owns its private task and workspace. Task send/cancel resolve agent_id to the active communication, with pending-question matching for answers. No caller-supplied task/workspace selection is accepted.
+Background task.send persists a message in agent_messages. Assistant builds its view from authenticated Writer facts and checks the origin message to recover conversation identity.
 
 ## Model request recording
 
@@ -249,7 +251,9 @@ fullDuplex 为角色装配选择；其他 Chat Worker 可继续使用同步轮�
 
 待处理输入至多32、后台候选至多16、单条16 KiB、待处理文本512 KiB、来源32、活跃输入64。执行结算另有保留槽。满载明确拒绝。模型流封口后，drain 只取已收到 Gateway 终态回执的原轮次结算入口。等待期间语义输入持续入队。结算开始时冻结同会话已在接纳和分类的身份，这批身份处理完后再原子取同会话已就绪输入。联合请求保留每个 native call/result 块一次。批次窗口压缩只移除可省历史，超限明确报告准备失败并保留内存批次。
 
-interrupt 保留未处理 Q，取消已生成各轮及当前生成；执行 owner join 后补记未确认结果为取消/效果未知，不能重放。各批次成员在完成、取消、失败时一并结算。AssistantInputCoordination 在内存保存分类路径、来源与主批次关联，仅随实际发起请求落盘；批次成员不单独建行。discard 释放输入后回报已确认决定，同代 interrupt 完成旧执行结算后回报打断。角色会话消费这两个回调，enqueue 不发布。根停止加入分类/模型任务，关闭挂起上下文。
+interrupt 保留未处理 Q，取消已生成各轮及当前生成；执行 owner join 后补记未确认结果为取消/效果未知，不能重放。会话屏障释放后，旧轮取消只结算原消息，未提交终态的前台任务保留供新输入继续。各批次成员在完成、取消、失败时一并结算。AssistantInputCoordination 在内存保存分类路径、来源与主批次关联，仅随实际发起请求落盘；批次成员不单独建行。discard 释放输入后回报已确认决定，同代 interrupt 完成旧执行结算后回报打断。角色会话消费这两个回调，enqueue 不发布。根停止加入分类/模型任务，关闭挂起上下文。
+
+分类消费者从读取单条输入的播放与历史上下文前计时，到分类器返回结果时取得单调时钟耗时，并经日志回调传递。队列等待、决定执行和日志发布的时间不计入。
 
 暂停取消分类消费者、当前与挂起请求以及整批成员，关闭旧轮授权；恢复只接纳新输入，不续跑旧批次。绑定模型/发出前准备失败保留批次并阻塞该会话；新用户输入解除阻塞并合并重试，不自动热循环。取消后的缺失原生工具结果显式落盘为取消且效果未知。
 
@@ -267,4 +271,4 @@ interrupt 保留未处理 Q，取消已生成各轮及当前生成；执行 owne
 
 ## 共享与角色文案
 
-AgentPrompts.text 以角色/职责路径和模板键加载资源；Shared 是没有具体角色所有权的协议、目录和通用反馈目录。Assistant 时间线与配对工具提示读取 InputProtocol.json，任务历史摘要前缀与执行证据读取 Prompts.json，任务控制回执读取 TaskFeedback.json。Writer 私有恢复从自身目录读取。模型请求组装使用严格、单次变量插入，不将插入内容再次作为模板解释。Action 描述保持 canonical 代码声明；Action 原始错误和结果仍由执行模块管理。
+AgentPrompts.text 以角色和模板键加载资源。Assistant 时间线读取 InputProtocol.json，历史摘要与执行证据读取 Prompts.json。Writer 私有分类和恢复从自身目录读取。Action 描述来自代码声明。

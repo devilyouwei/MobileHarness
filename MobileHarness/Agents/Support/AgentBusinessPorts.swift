@@ -72,7 +72,7 @@ import UI
 }
 public typealias AgentMaintenancePorts = ActionMaintenancePorts<any ModelArtifactsManaging>
 public typealias AgentBusinessRequest = ActionAssemblyRequest<
-    AssistantHistoryStore, any ActivityPresenting,
+    AssistantHistoryStore,
     any ExecutionFailureReporting, any ModelArtifactsManaging, AssistantConversation
 >
 @MainActor public struct AgentBusinessBindings {

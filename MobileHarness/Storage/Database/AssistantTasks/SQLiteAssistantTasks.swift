@@ -27,7 +27,7 @@ extension SQLiteAssistantTaskRepository {
                 sql:
                     "UPDATE assistant_tasks SET state=?,end_reason=?,failure_json=?,ended_at=? WHERE id=? AND state IN ('running','finishing','closing','cleanup_failed')",
                 arguments: [
-                    status, failure == "superseded" ? "superseded" : status,
+                    status, status,
                     try failure.map { try SQLiteRecordCoding.json(["message": $0]) },
                     finishedAt.timeIntervalSince1970, key,
                 ])

@@ -20,8 +20,7 @@ Assistant 是唯一面向用户的对话 Agent；摄影、历史查询、应用�
 | `<AgentName>/Agent.json` | 必需。v10 身份、角色自有公开 description、通信权限和基础 Skill。 |
 | `Assistant/Instructions.md` | Assistant 自身的身份、用户沟通和如实汇报责任。业务流程归 Skill，共用协议提示词归 `Shared/`。 |
 | `Assistant/Prompts.json` | Assistant 主请求的执行证据、任务历史摘要及 Writer 协作事实模板。 |
-| `Assistant/InputDecision.json` | 独立输入分类的规则、动态输入格式和云端分类工具描述。 |
-| `Assistant/TaskFeedback.json` | 前台任务控制与委派回执。 |
+| `Assistant/InputDecision.json` | 英文输入分类规则、三种动作描述、现场与最近一来一回的输入格式、云端分类工具描述。对话内容沿用原文。 |
 | `Writer/Instructions.md` | Writer 私有共用身份，仅供自己的控制请求。 |
 | `Writer/Prompts.json` | Writer 作品库及编辑控制请求、补充输入和轮次模板。 |
 | `Writer/ContentPrompts.json` | 无工具内容请求的输出规则、文件格式、编辑上下文与重试模板。 |
@@ -59,7 +58,7 @@ Assistant 是唯一面向用户的对话 Agent；摄影、历史查询、应用�
 | `publications` | 可发布的 observation 协议名数组，最多 64 项。 |
 | `sends` | 定向发送权限，最多 64 项。每项为 `contract` 和 `target`，目标用运行时 Agent ID；协议必须是 observation，且目标声明相应 input。 |
 
-Assistant 订阅 SpeechPerception 在 user.input 主题发布的 user.input.asr.final。SpeechPerception 还在同主题发布 user.input.asr.partial。Assistant 向 Writer 定向发送 task.request、task.input 和 task.cancel，并接收任务反馈与运行时回执。
+Assistant 订阅 SpeechPerception 在 user.input 主题发布的 user.input.asr.final。SpeechPerception 还在同主题发布 user.input.asr.partial。Assistant 向 Writer 定向发送 agent.task.request。Writer 和固定任务执行方使用 agent.task.response 回报。运行时反馈使用 runtime.action.result、runtime.tool.result、runtime.round.result 和 runtime.message.receipt，各 Agent 仅声明其消费的反馈。
 
 各数组不得有重复条目。来源如果是 Agent，必须由该 Agent 声明相应 publication；外部来源必须在运行时外部来源集合中授权。全局最多 64 个主题，每个主题最多 16 个订阅者。
 
@@ -114,7 +113,7 @@ Agent.json 保留身份、基础 Skill 与通信契约。App 安装各 Action �
 
 ## Task controls through Action Calls
 
-BasicSkill 的 Task/Skill 控制函数使用 Control Channel Action Call；运行集成通过 ChannelScheduler 返回已提交状态。task.start/loadSkills/releaseSkills 返回的已提交业务状态在结果屏障后重建目录并 ReACT，task.end/task.cancel 加入回复及清理屏障后恢复默认。新目录仅影响后续请求，不允许加载轮提前调用新函数。可信固定调用复用同一实现。
+BasicSkill 的 Task/Skill 控制函数使用 Control Channel Action Call；运行集成通过 ChannelScheduler 返回已提交状态。task.start/loadSkills/releaseSkills 返回的已提交业务状态在结果屏障后重建目录并 ReACT，task.end 按任务来源提交终态与摘要，Writer 通过 agent.task.request 接收用户要求的转述，并解释正文。新目录仅影响后续请求，不允许加载轮提前调用新函数。可信固定调用复用同一实现。
 
 ## Agent → Skill → Function registration
 
@@ -154,19 +153,19 @@ ApplicationControl 的配置声明 container.failure/runtime.failure observation
 通信注册表只保留 Agent 消息与执行反馈；删除本地 UI／媒体／环境／故障的历史 schema 和仅供外部来源的测试声明，本地类型自身继续验证。
 
 
-Writer 是面向作品的独立生成角色。Writer 接纳后台 task.request，由私有模型判断能否执行。task.progress 和 writer.completion 将接纳、精选里程碑、追问与终态送回 Assistant。普通进度由 Writer 自有灵动岛呈现。接纳、首次草稿保存、首次异常、追问和终态进入 Assistant 的统一 Q，由下一批模型选择性呈现，并保留后续对话事实。工作流与原生工具目录由 Writer 代码拥有。
+Writer 是面向作品的独立生成角色。Writer 接收 agent.task.request，由私有工作流决定接纳、补充、停止或拒绝。agent.task.response 将接纳、精选里程碑、追问、消息拒绝及终态送回 Assistant。普通进度由 Writer 自有灵动岛呈现。接纳、首次草稿保存、首次异常、追问和终态进入 Assistant 的统一 Q，由下一批模型选择性呈现，并保留后续对话事实。工作流与原生工具目录由 Writer 代码拥有。
 
 Writer 的公开 description 说明独立执行、委托生命周期和回馈。Writer 自有灵动岛显示进度、追问和终态。Assistant 将经过认证的精选控制事实按 Agent 来源入 Q，合并和选择性回复。真实用户输入可发起后续模型决策。
 
-Writer allocates workspace_N on explicit workspace creation after authenticated admission. Assistant creates an internal request UUID per communication; Writer alone chooses/reuses its workspace. Models address active background communication by agent_id and windows by window_N; runtime carries delegation/event/question/trace identity. Writer workspaces persist after an assignment completes.
+Writer 在明确创建工作区时分配 workspace_N。发送端生成消息 UUID，Writer 接纳新目标时使用该身份申请内部执行授权。追问关联由运行时附带。
 
-BasicSkill 统一教 start/delegate 平级与按目标所有者选择，不维护具体角色用途。Writer 自己的公开 description 拥有作品职责与委派条件。Catalog 不注册 writing，Assistant 无法加载作品库技能。Writer 工具与私有循环由 [Writer](../../Agents/Writer/README.md) 实现。
+BasicSkill 统一教 start/send 平级与按目标所有者选择，不维护具体角色用途。Writer 自己的公开 description 拥有作品职责与委派条件。Catalog 不注册 writing，Assistant 无法加载作品库技能。Writer 工具与私有循环由 [Writer](../../Agents/Writer/README.md) 实现。
 
 ## 公开目录装配与失败
 
 AgentConfigurations 按 Catalog 读取 v10 资源并校验必填字段、身份、通信声明与容量；缺失、未知字段、错误类型、旧版本和超限均明确失败，不用旧介绍兜底。最多 32 个角色，每条介绍最多 2048 UTF-8 字节，最终目录最多 8192 字节，超限不截断。
 
-Assistant 的实际请求传入实例 communicationPolicy；目录与 task.delegate 执行共用 AgentTaskDelegation 适配查询。当前只有 assistant→writer 适配，且必须有 task.request 发送权限和接收端声明。有效函数目录没有 delegateTask 时不展示目标。其他角色虽维护公开介绍，注册和描述本身不会创建委派入口。实时 busy、暂停和结果保持在 State/证据数据中。
+Assistant 用当前实例的通信权限和 AgentTaskMessaging 组装公开目录。有效函数目录包含 task.send 时展示获准接收 agent.task.request 的角色，目前为 Writer。
 
 Writer 控制请求组合 Instructions.md 与 Prompts.json 的 control.library 或 control.workspace。内容请求读取 ContentPrompts.json 的 instructions、format 字段、编辑事实模板和可选 retry。Writer 根据实际文件路径选格式，并拥有请求顺序、工具参数 Schema、恢复和校验。公开目录读取 Agent.json 的自描述。
 
@@ -178,6 +177,6 @@ BasicSkill 的 Lifetime and completion 独占通用窗口生命周期教学：�
 
 `Shared/` 保存跨角色协议、目录排版和通用执行/通信框架，不能放入 Assistant 或 Writer 的业务政策。每个 cognition 角色目录拥有自己的模型请求内容。Agent.json.category 仍是 perception/cognition 分类唯一来源；perception 不配置提示词，cognition 按实际模型事务配置，分类本身不强制每个 cognition 角色运行 LLM。
 
-独立的单段固定指令使用 `.md`。同一职责的多个具名字段放在一个 `.json` 中，固定规则正文也可作为其中一个字段，动态字段使用 `{{variable}}`。角色通用模板使用 `Prompts.json`，细分业务按职责命名，如 InputProtocol、InputDecision、TaskFeedback 和 ContentPrompts。角色标识、工具 Schema、执行限制和动态事实由各自运行时契约定义。
+独立的单段固定指令使用 `.md`。同一职责的多个具名字段放在一个 `.json` 中，固定规则正文也可作为其中一个字段，动态字段使用 `{{variable}}`。角色通用模板使用 `Prompts.json`，细分业务按职责命名，如 InputProtocol、InputDecision 和 ContentPrompts。角色标识、工具 Schema、执行限制和动态事实由各自运行时契约定义。
 
 提示词资源只供 cognition Agent 使用。Actions 的描述、参数、正常返回、异常与文件上下文完全由内部管理，不依赖 Resources；ModelKit 内部文本同样不参与本次迁移。

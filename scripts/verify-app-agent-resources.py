@@ -43,7 +43,7 @@ if set(expected) != set(actual):
 for path, original in expected.items():
     if original.read_bytes() != actual[path].read_bytes():
         raise SystemExit(f'Stale Agent asset: {path}')
-for name in ('InputProtocol.json', 'InputDecision.json', 'Prompts.json', 'TaskFeedback.json', 'Instructions.md'):
+for name in ('InputProtocol.json', 'InputDecision.json', 'Prompts.json', 'Instructions.md'):
     if not (bundle / 'Agents/Assistant' / name).is_file():
         raise SystemExit(f'Missing Assistant prompt resource: {name}')
 writer = bundle / 'Agents/Writer'

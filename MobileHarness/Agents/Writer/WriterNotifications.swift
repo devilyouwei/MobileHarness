@@ -3,9 +3,9 @@ import Foundation
 import StorageCore
 import StorageTasks
 
-/// Durable completion facts have a lifetime independent of creative work and execution grants.
+/// Durable task reports have a lifetime independent of creative work and execution grants.
 actor WriterNotifications {
-    typealias Sender = @Sendable (WriterDelegationCompletion) async throws -> DeliveryReport
+    typealias Sender = @Sendable (AgentTaskResponse) async throws -> DeliveryReport
     typealias Retirement = @Sendable (AgentTaskSignal) async throws -> Void
     private let communications: any AgentMessageRepository
     private let executions: any WriterExecutionRepository
@@ -60,12 +60,15 @@ actor WriterNotifications {
                         continue
                     }
                     if revision != observed { continue }
-                    if !retirement,
+                    if !retirement {
                         let next = try await communications.nextAgentDelivery(
+                            sender: "writer", contract: AgentTaskResponse.contract)
+                        let historical = try await communications.nextAgentDelivery(
                             sender: "writer", contract: "writer.completion")
-                    {
-                        try await Task.sleep(for: .seconds(max(0.05, min(1, next.timeIntervalSinceNow))))
-                        continue
+                        if let due = [next, historical].compactMap({ $0 }).min() {
+                            try await Task.sleep(for: .seconds(max(0.05, min(1, due.timeIntervalSinceNow))))
+                            continue
+                        }
                     }
                     failures.removeValue(forKey: retirement)
                     return
@@ -74,21 +77,30 @@ actor WriterNotifications {
                     cursor = row.position
                     do {
                         try Task.checkCancellation()
-                        let completion = try JSONDecoder().decode(WriterDelegationCompletion.self, from: row.data)
-                        try completion.validate()
-                        guard completion.signal.scope.id == row.delegateID,
-                            try AgentTaskContent.decode(completion.signal).writerEvent?.eventID == row.eventID,
-                            let sender, let retire
-                        else { throw CommunicationError.invalidPayload }
+                        let report = try JSONDecoder().decode(AgentTaskResponse.self, from: row.data)
+                        try report.validate()
+                        if let signal = report.signal {
+                            guard signal.kind == .result, signal.scope.id == row.delegateID,
+                                try AgentTaskContent.decode(signal).writerEvent?.eventID == row.eventID
+                            else { throw CommunicationError.invalidPayload }
+                        } else {
+                            guard let rejection = report.rejection, rejection.eventID == row.eventID,
+                                rejection.messageID == row.delegateID
+                            else { throw CommunicationError.invalidPayload }
+                        }
                         let failure: String?
                         if retirement {
-                            try await retire(completion.signal)
+                            guard let signal = report.signal, let retire else {
+                                throw CommunicationError.invalidPayload
+                            }
+                            try await retire(signal)
                             failure = nil
                         } else {
-                            let report = try await sender(completion)
+                            guard let sender else { throw CommunicationError.unavailableTarget }
+                            let delivery = try await sender(report)
                             failure =
-                                report.failure ?? report.rejected[.assistant]
-                                ?? (report.delivered.contains(.assistant) ? nil : "Assistant unavailable")
+                                delivery.failure ?? delivery.rejected[.assistant]
+                                ?? (delivery.delivered.contains(.assistant) ? nil : "Assistant unavailable")
                         }
                         try await executions.finishDelegationNotification(
                             row.delegateID, agent: "writer", retirement: retirement,

@@ -74,18 +74,38 @@ public final class SQLiteAgentMessageRepository: AgentMessageRepository {
             guard db.changesCount == 1 else { throw RecordStorageError.missingRecord }
         }
     }
-    public func rejectDelegation(_ id: String, failure: String) async throws {
+    public func isAgentMessageConsumed(_ id: String) async throws -> Bool {
+        try database.read { db in
+            guard let row = try AgentMessageRow.fetchOne(db, key: id) else { throw RecordStorageError.missingRecord }
+            return row.consumedAt != nil
+        }
+    }
+    public func associateAgentMessage(_ id: String, receiver: String, replyTo: String) async throws {
+        try database.write { db in
+            try db.execute(
+                sql: """
+                    UPDATE agent_messages SET correlation_id=?,reply_to_id=?
+                    WHERE id=? AND receiver_agent_id=? AND consumed_at IS NULL AND id<>?
+                      AND (reply_to_id IS NULL OR reply_to_id=?)
+                      AND EXISTS(SELECT 1 FROM agent_messages root
+                                 WHERE root.id=? AND root.receiver_agent_id=agent_messages.receiver_agent_id
+                                   AND root.sender_agent_id=agent_messages.sender_agent_id)
+                    """, arguments: [replyTo, replyTo, id, receiver, replyTo, replyTo, replyTo])
+            guard db.changesCount == 1 else { throw RecordStorageError.conflict }
+        }
+    }
+    public func rejectAgentMessage(_ id: String, eventID: String, payload: Data) async throws {
         try database.write { db in
             guard let request = try AgentMessageRow.fetchOne(db, key: id) else {
                 throw RecordStorageError.missingRecord
             }
-            let resultID =
-                try String.fetchOne(
-                    db, sql: "SELECT id FROM agent_messages WHERE reply_to_id=? AND contract='agent.rejected'",
-                    arguments: [id]) ?? UUID().uuidString
+            guard request.consumedAt == nil else { return }
+            guard request.contract == "agent.task.request", request.senderAgentID == "assistant",
+                request.receiverAgentID == "writer"
+            else { throw RecordStorageError.invalidRecord }
             let result = AgentCommunicationRecord(
-                id: resultID, sender: request.receiverAgentID, receiver: request.senderAgentID,
-                contract: "agent.rejected", payload: Data(try SQLiteRecordCoding.json(["error": failure]).utf8),
+                id: eventID, sender: request.receiverAgentID, receiver: request.senderAgentID,
+                contract: "agent.task.response", payload: payload,
                 correlationID: request.correlationID, replyTo: id, senderContext: request.senderContext,
                 dedupeKey: id + ":rejected")
             try Self.enqueue(result, db: db)

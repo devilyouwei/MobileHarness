@@ -54,6 +54,7 @@ public final class UIContainer {
     public let island: IslandState
     public let windows: WindowState = WindowState()
     public let web = WebPageContainer()
+    public let runtimeLog: RuntimeLogState
     public let home: UIHomeContainer
     public let camera: UICameraContainer
     public let settings: UISettingsContainer
@@ -73,6 +74,8 @@ public final class UIContainer {
     ) {
         island = IslandState(systemStatus: systemStatus, onFailure: onFailure)
         self.onFailure = onFailure
+        runtimeLog = RuntimeLogState()
+        runtimeLog.presentationAdmission = admission
         home = UIHomeContainer(admission: admission)
         camera = UICameraContainer(admission: admission, onFailure: onFailure)
         settings = UISettingsContainer(initial: configuration.settings, admission: admission)

@@ -35,9 +35,11 @@ private actor ObservationGate {
     }
 }
 
-private func observationCall(_ path: ActionPath, input: AgentInput, channel: String) -> ScheduledAction {
+private func observationCall(
+    _ path: ActionPath, input: AgentInput, channel: String, parameters: [String: String] = [:]
+) -> ScheduledAction {
     ScheduledAction(
-        source: .assistant, input: input, call: ActionCall(actionPath: path, channel: channel),
+        source: .assistant, input: input, call: ActionCall(actionPath: path, channel: channel, parameters: parameters),
         executionID: UUID().uuidString)
 }
 
@@ -124,14 +126,12 @@ func actionObservationTracksParallelChannelsAndQueuedWorkWithoutFeedbackOptIn()
         id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("bounds"))
     let path = ActionPath(domain: "Fixture", module: "Control", function: "work")
     let active = observationCall(path, input: input, channel: "Robot")
-    let definition = ActionBinding(
-        path: path, displayName: "测试动作", kind: .finite, completion: "Fixture completed.", handler: { _ in })
-    ledger.admit(active, definition: definition)
+    ledger.admit(active, kind: .finite)
     ledger.transition(active.executionID, to: .running)
     var lastID = UUID().uuidString
     for _ in 0..<20 {
         let job = observationCall(path, input: input, channel: "Speech")
-        ledger.admit(job, definition: definition)
+        ledger.admit(job, kind: .finite)
         ledger.transition(job.executionID, to: .succeeded, completion: .completed)
         lastID = job.executionID
     }
@@ -174,32 +174,56 @@ func actionObservationTracksParallelChannelsAndQueuedWorkWithoutFeedbackOptIn()
     #expect(end == nil)
 }
 
-@Test(.actionCatalog) @MainActor func unfamiliarActionDisplaysItsRegisteredNameThroughTheWholeObservationPath()
+@Test(.actionCatalog) @MainActor func actionLogDisplaysCanonicalNameAndActualPayloadThroughScheduler()
     async throws
 {
     // Explicit test-only behavior: no device, model or media access.
     let path = ActionPath(domain: "NewDomain", module: "Control", function: "newOperation")
+    let long = String(repeating: "汉", count: 800)
+    let parameters = ["text": "实际输入", "empty": "", "api_key": "fixture-secret", "long": long]
     let registry = try ActionRegistry(definitions: [
-        ActionBinding(path: path, displayName: "新领域操作", kind: .finite, completion: "Fixture acknowledged.") { _ in }
+        ActionBinding(
+            path: path, displayName: "新领域操作", kind: .finite, completion: "Fixture acknowledged.",
+            completing: { invocation in
+                #expect(invocation.call.parameters == parameters)
+                return .value("实际输出")
+            })
     ])
-    let scheduler = ChannelScheduler(registry: registry)
-    let state = ActionActivityState()
-    let workflow = ActionActivityWorkflow(state: state)
-    workflow.start { try await scheduler.observeExecutions() }
+    let state = RuntimeLogState()
+    let snapshots = AsyncStream<ActionExecutionSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
+    let scheduler = ChannelScheduler(registry: registry, onExecutionSnapshot: { snapshots.continuation.yield($0) })
+    let observer = Task {
+        for await snapshot in snapshots.stream {
+            state.record(
+                .actions(
+                    revision: snapshot.revision, records: snapshot.records.map(ActionActivityItem.init),
+                    evictedCount: snapshot.evictedCount))
+        }
+    }
     let input = AgentInput(
         id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("metadata fixture"))
-    let id = try await scheduler.enqueue(invocation: observationCall(path, input: input, channel: "CustomLane"))
+    let id = try await scheduler.enqueue(
+        invocation: observationCall(path, input: input, channel: "CustomLane", parameters: parameters))
     try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
     let snapshot = await scheduler.executionSnapshot()
     let deadline = ContinuousClock.now.advanced(by: .seconds(2))
     while state.revision != snapshot.revision, ContinuousClock.now < deadline { await Task.yield() }
     let item = try #require(state.items.first { $0.id == id })
-    #expect(item.title == "新领域操作")
-    #expect(item.channelTitle == "CustomLane")
+    #expect(item.title == "NewDomain.Control.newOperation")
+    #expect(item.parameters["text"] == "实际输入")
+    #expect(item.parameters["empty"] == "")
+    #expect(item.parameters["api_key"] == "［已隐藏］")
+    let shortened = try #require(item.parameters["long"])
+    #expect(shortened.utf8.count <= 2048 && shortened.hasSuffix("…［已截断］"))
+    #expect(shortened.hasPrefix(String(repeating: "汉", count: 650)))
+    #expect(item.output == "实际输出")
+    #expect(item.channel == "CustomLane")
     #expect(item.status == "已完成")
-    #expect(snapshot.records.first?.displayName == "新领域操作")
+    #expect(snapshot.records.first?.path == path.executionIdentifier)
     #expect(await scheduler.resultSnapshot().isEmpty)
     await scheduler.shutdown()
+    snapshots.continuation.finish()
+    await observer.value
 }
 
 @Test(.actionCatalog) func actionsOwnExecutionFailureMappingWithoutBluetoothDiagnostics() {
@@ -249,6 +273,12 @@ func actionObservationTracksParallelChannelsAndQueuedWorkWithoutFeedbackOptIn()
     }
     #expect(report.failureDescription == "Fixture transport cause")
     #expect(report.entries.count == 2)
+    let item = ActionActivityItem(execution: record)
+    let output = try #require(item.output)
+    let json = try #require(JSONSerialization.jsonObject(with: Data(output.utf8)) as? [String: Any])
+    let entries = try #require(json["entries"] as? [[String: Any]])
+    #expect(json["failureDescription"] as? String == "Fixture transport cause")
+    #expect(entries.contains { $0["status"] as? String == "failed" })
     await scheduler.shutdown()
 }
 
@@ -264,7 +294,7 @@ func cancelledActionPresentationRetainsOnlyIndependentRealIssues(_ mixed: Bool) 
     .withExecutionFailure(.cancelled, description: "CancellationError()")
     let record = ActionExecutionRecord(
         id: UUID().uuidString, path: .init(domain: "UI", module: "Caption", function: "print"),
-        displayName: "Caption", source: AgentID.assistant.rawValue, sessionID: UUID().uuidString,
+        source: AgentID.assistant.rawValue, sessionID: UUID().uuidString,
         inputID: UUID().uuidString, channel: "Display",
         semantics: .finite, phase: mixed ? .failed : .cancelled, completion: .report(report))
     let item = ActionActivityItem(execution: record)
@@ -388,23 +418,23 @@ private actor VisionSessionRecorder {
         "vision.pose.failed", "vision.pipeline.failed", "vision.input.failed", "vision.pose.stalled",
         "vision.pose.stale", "vision.input.stalled", "vision.presentation.failed",
     ] {
-        let state = ActionActivityState()
-        let workflow = ActionActivityWorkflow(state: state)
-        let fixture = try await RuntimeFailurePresentationFixture(activity: workflow)
+        let state = RuntimeLogState()
+        let workflow = AgentRuntimeLogWorkflow(log: state)
+        let fixture = try await RuntimeFailurePresentationFixture(log: state)
         try await fixture.start(activity: workflow)
         let diagnostic = AgentFailureDiagnostic(category: .runtime, code: code, detail: "fixture native cause")
         workflow.recordFailure(
             title: "视觉异常", source: "visionPerception", message: diagnostic.detail, failureCode: code,
             context: .init(workerID: "visionPerception", sessionID: "fixture"), diagnostic: diagnostic)
         let deadline = ContinuousClock.now + .seconds(4)
-        while state.backgroundIssues.isEmpty {
+        while state.issues.isEmpty {
             guard ContinuousClock.now < deadline else { throw CommunicationError.expired }
             try await Task.sleep(for: .milliseconds(5))
         }
-        #expect(state.backgroundIssues.last?.category == "Agent 运行异常")
-        #expect(state.backgroundIssues.last?.message == "fixture native cause")
-        #expect(state.errorToast?.userMessage != nil)
-        #expect(state.visibleNotice?.tone == .error)
+        #expect(state.issues.last?.category == "Agent 运行异常")
+        #expect(state.issues.last?.message == "fixture native cause")
+        #expect(fixture.ui.home.notices.errorToast?.userMessage != nil)
+        #expect(fixture.ui.home.notices.visibleNotice?.tone == .error)
         await fixture.stop(activity: workflow)
     }
 }

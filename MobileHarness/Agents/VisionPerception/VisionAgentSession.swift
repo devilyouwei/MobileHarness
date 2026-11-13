@@ -155,7 +155,7 @@ public enum VisionPipelineWorkflow {
                 if let diagnostic = health.diagnostic {
                     guard reported != diagnostic.code else { continue }
                     reported = diagnostic.code
-                    runtime.actionActivity.recordFailure(
+                    runtime.runtimeLogWorkflow.recordFailure(
                         title: "视觉管线无进展", source: "visionPerception", message: diagnostic.detail,
                         failureCode: diagnostic.code,
                         context: .init(workerID: "visionPerception", sessionID: sessionID, inputID: health.inputID),

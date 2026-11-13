@@ -16,8 +16,8 @@ Interaction routing follows the [overall design rule](../README.md#two-ui-intera
 | [Root](Root/README.md) | 根视图、组合端口、持久Face导航和页面上下文 |
 | UIFailure.swift / UIStateSnapshot.swift | 模块统一失败、错误回调及整体State契约 |
 | [Shared](Shared/README.md) | 跨功能请求/回执、呈现接纳与代际凭证 |
-| [Components](Components/README.md) | 通用字幕、频谱、播放器、覆盖层，以及完整Island/Window组件 |
-| [Conversation](Conversation/README.md) | Face、会话、执行记录、眼睛与Metal光环 |
+| [Components](Components/README.md) | 通用字幕、频谱、播放器、覆盖层，以及完整 Island、Window 和 RuntimeLog 组件 |
+| [Conversation](Conversation/README.md) | Face、会话、首页提示、眼睛与 Metal 光环 |
 | [Camera](Camera/README.md) | 相机视频、骨架、照片与视频呈现 |
 | [Settings](Settings/README.md) | 设置、模型资源、蓝牙、历史和相册呈现 |
 | [Diagnostics](Diagnostics/README.md) | 真实诊断页面与输入/结果呈现 |
@@ -26,7 +26,7 @@ Root组合功能视图与公共组件，功能拥有自身状态和输入类型�
 
 ## 直接接口与数据流
 
-根构造时创建十二个稳定子能力，不在首次回复或页面切换时补建：
+根构造时创建稳定的子能力，不在首次回复或页面切换时补建：
 
 | 子能力 | 状态owner |
 | --- | --- |
@@ -38,6 +38,7 @@ Root组合功能视图与公共组件，功能拥有自身状态和输入类型�
 | windows | Components/Window/WindowState |
 | web | Components/Web/WebPageContainer |
 | island | Components/Island/IslandState |
+| runtimeLog | Components/RuntimeLog/RuntimeLogState |
 
 页面→子容器类型化请求→注入消费者→业务执行→UI呈现值→状态→原生绘制。请求接纳与完成独立，有界容量、取消和迟到回执规则见Shared；公开类型名称保持稳定。home聆听控制使用独立单槽源，普通请求最多64个在途。
 

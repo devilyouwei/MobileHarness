@@ -1410,22 +1410,23 @@ if 'ContextDocumentAdapter' in context_repository or 'AssistantConversationRecov
     raise SystemExit('Retired Context JSON adapters and duplicate Task recovery blobs must stay removed.')
 print('Runtime memory-state and database record lifecycle boundaries pass.')
 
-# ApplicationControl owns runtime failure presentation policy; bindings only forward evidence.
-activity_source = (ROOT / 'MobileHarness/Agents/Support/ActionActivityWorkflow.swift').read_text()
-if any(marker in activity_source for marker in ('startContainerFailures', 'state.recordIssue(', 'state.replaceIssues(', 'func userMessage(')):
-    raise SystemExit('Agents support must not bypass ApplicationControl to present runtime failures.')
+# Technical logs are a direct presentation path.
 application_control_config = json.loads((ROOT / 'MobileHarness/Resources/Agents/ApplicationControl/Agent.json').read_text())
 if any(value['source'] == 'runtime' for value in application_control_config['communication']['subscriptions']):
     raise SystemExit('Native diagnostics must be observed directly, not subscribed through Gateway.')
+application_control = (ROOT / 'MobileHarness/Agents/ApplicationControl/ApplicationControlAgent.swift').read_text()
+if 'publishIssue(issue, showsToast)' not in application_control:
+    raise SystemExit('ApplicationControl must publish classified runtime issues directly.')
+for source in (ROOT / 'MobileHarness').rglob('*.swift'):
+    if 'UI.RuntimeDiagnostics.recordFailure' in source.read_text():
+        raise SystemExit(f'Retired runtime diagnostics call remains: {source.relative_to(ROOT)}')
 runtime_presentation = (ROOT / 'MobileHarness/Actions/UI/RuntimePresentation.swift').read_text()
-if 'showsToast: issue.userMessage != nil' not in runtime_presentation or 'ApplicationControlFunctions.runtimeFailure' not in (ROOT / 'MobileHarness/Agents/ApplicationControl/ApplicationControlAgent.swift').read_text():
-    raise SystemExit('Agents must authorize runtime diagnostics; Actions retain the explicit toast policy.')
 if 'invocation.context.source == "applicationControl"' in runtime_presentation:
     raise SystemExit('Actions must not duplicate Agent role authorization.')
-print('ApplicationControl owns diagnostic policy; Actions own actual presentation.')
+print('ApplicationControl owns diagnostic policy and directly publishes runtime issues.')
 
 # UI presentation models are owned by the UI root; consumers receive read-only capability protocols.
-ui_model_names = ('ConversationState', 'ActionActivityState', 'SettingsState', 'ModelResourcesState', 'NavigationState', 'ConversationHistoryState', 'BluetoothSettingsState', 'SpeechDiagnosticState', 'AudioDetectionState', 'ConversationExpressionPresentation', 'HomeEffectsWorkflow', 'CapturedPhotoPresentation')
+ui_model_names = ('ConversationState', 'RuntimeLogState', 'SettingsState', 'ModelResourcesState', 'NavigationState', 'ConversationHistoryState', 'BluetoothSettingsState', 'SpeechDiagnosticState', 'AudioDetectionState', 'ConversationExpressionPresentation', 'HomeEffectsWorkflow', 'CapturedPhotoPresentation')
 for source in (ROOT / 'MobileHarness').rglob('*.swift'):
     if ROOT / 'MobileHarness/UI' in source.parents:
         continue
@@ -1682,7 +1683,7 @@ for retired in (
     if (ROOT / 'MobileHarness/Agents' / retired).exists():
         errors.append(f'Retired presentation/input staging owner remains: {retired}')
 for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
-    if source.name != 'ActionActivityWorkflow.swift' and re.search(r'(?:state|presentation|historyState|activity\.state)\.present\(', source.read_text()):
+    if re.search(r'(?:state|presentation|historyState|activity\.state)\.present\(', source.read_text()):
         errors.append(f'Agent directly commits business UI presentation: {source}')
 if 'executionAttachment' not in (ROOT / 'MobileHarness/Agents/Support/Core/Output/OutputEnvelope.swift').read_text():
     errors.append('Protected typed executions require an opaque per-request attachment')
@@ -1731,7 +1732,7 @@ for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
         raise SystemExit(f'Obsolete Chat compatibility policy: {source.relative_to(ROOT)}')
     if re.search(r'\b(?:ConversationHistoryView|MossValidationView|ChatValidationView)\s*\(', content):
         raise SystemExit(f'App must compose UI pages: {source.relative_to(ROOT)}')
-for marker in ('environmentSequence', 'pendingEnvironment', 'recordEnvironmentFailure', 'actionActivity.recordFailure'):
+for marker in ('environmentSequence', 'pendingEnvironment', 'recordEnvironmentFailure', 'runtimeLogWorkflow.recordFailure'):
     if marker in assembly:
         raise SystemExit(f'AgentContainer must only wire environment policy: {marker}')
 for owner, names in {
@@ -1764,7 +1765,7 @@ print('Support ownership, retired policies and fixed Memory commit confirmation 
 
 # Shared mechanisms never decode concrete role business schemas or construct the application graph.
 for source in support.glob('*.swift'):
-    if source.name not in {'AgentConfigurations.swift', 'AgentSkillLoader.swift', 'AgentUIRequests.swift', 'AgentInputMetrics.swift', 'ContainerFailureChannel.swift', 'AgentContainerLifecycle.swift', 'ActionActivityPresentation.swift', 'ActionActivityWorkflow.swift', 'ActionDispatcher.swift', 'AgentBusinessPorts.swift', 'AgentGatewayBindings.swift', 'BehaviorCoverage.swift', 'ExecutionRouter.swift', 'GatewayProjections.swift', 'IndependentOutputWorkflow.swift', 'InputGateway.swift', 'OutputExecutionResult.swift', 'OutputGateway.swift', 'OutputValidator.swift', 'ToolDispatcher.swift'}:
+    if source.name not in {'AgentConfigurations.swift', 'AgentSkillLoader.swift', 'AgentUIRequests.swift', 'AgentInputMetrics.swift', 'ContainerFailureChannel.swift', 'AgentContainerLifecycle.swift', 'ActionActivityPresentation.swift', 'AgentRuntimeLogWorkflow.swift', 'ActionDispatcher.swift', 'AgentBusinessPorts.swift', 'AgentGatewayBindings.swift', 'BehaviorCoverage.swift', 'ExecutionRouter.swift', 'GatewayProjections.swift', 'IndependentOutputWorkflow.swift', 'InputGateway.swift', 'OutputExecutionResult.swift', 'OutputGateway.swift', 'OutputValidator.swift', 'ToolDispatcher.swift'}:
         raise SystemExit(f'Concrete assembly in Agent Support: {source.relative_to(ROOT)}')
 for source in list((support / 'Chat').glob('*.swift')) + [(support / 'Communication/AgentTasks.swift')]:
     if re.search(r'\b(?:AssistantSessionControl|PhotographerCameraIntent|MemoryHistoryIntent|AppInteractionIntent|ModelResourceIntent|ProviderSettingsIntent|ProviderDiscoveryIntent)\b', source.read_text()):
@@ -1819,7 +1820,7 @@ for source in target_sources(targets['Actions']):
 print('App-owned Actions/Gateway/Agents roots and one-way capability boundaries pass.')
 
 # Agent activity is passive cognitive observation, never a callable/native execution service.
-activity_observer = (ROOT / 'MobileHarness/Agents/Support/ActionActivityWorkflow.swift').read_text()
+activity_observer = (ROOT / 'MobileHarness/Agents/Support/AgentRuntimeLogWorkflow.swift').read_text()
 if re.search(r'\bFunctionInput\b|\.(?:startCapture|playStream|sendLive|performPlan)\(', activity_observer):
     raise SystemExit('Cognitive activity observation must not execute actions or native work.')
 

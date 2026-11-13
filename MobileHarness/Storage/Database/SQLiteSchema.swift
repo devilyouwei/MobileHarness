@@ -2,7 +2,7 @@ import Foundation
 internal import GRDB
 
 enum SQLiteSchema {
-    static let currentVersion = 20_261_112
+    static let currentVersion = 20_261_113
     static let statements = [
         AgentMessageRow.schemaSQL, AssistantConversationRow.schemaSQL, AssistantTaskRow.schemaSQL,
         WriterWorkspaceRow.schemaSQL, AssistantMessageRow.schemaSQL, SQLiteWriterExecutionRepository.schemaSQL,
@@ -13,6 +13,10 @@ enum SQLiteSchema {
         let installed = try pool.read { try Int.fetchOne($0, sql: "PRAGMA user_version") ?? 0 }
         guard installed <= currentVersion else { throw SQLiteSchemaError.unsupportedVersion(installed) }
         if installed == currentVersion { return }
+        if installed == 20_261_112 {
+            try pool.write { db in try migrateTaskContracts(db) }
+            return
+        }
         if [20_261_110, 20_261_111].contains(installed) {
             try migrateRequestMessages(pool)
             return
@@ -88,7 +92,7 @@ enum SQLiteSchema {
                     guard try Row.fetchAll(db, sql: "PRAGMA foreign_key_check").isEmpty else {
                         throw SQLiteSchemaError.invalidMigration
                     }
-                    try db.execute(sql: "PRAGMA user_version=\(currentVersion)")
+                    try migrateTaskContracts(db)
                     return .commit
                 }
                 try db.execute(sql: "PRAGMA foreign_keys=ON")
@@ -97,6 +101,18 @@ enum SQLiteSchema {
                 throw error
             }
         }
+    }
+
+    private static func migrateTaskContracts(_ db: Database) throws {
+        try db.execute(
+            sql: """
+                UPDATE agent_messages SET contract='agent.task.request'
+                WHERE contract='agent.task.message' AND sender_agent_id='assistant' AND receiver_agent_id='writer';
+                UPDATE agent_messages SET contract='agent.task.response'
+                WHERE (contract='agent.task.report' AND sender_agent_id='writer' AND receiver_agent_id='assistant')
+                    OR contract IN ('task.progress','task.result');
+                PRAGMA user_version=\(currentVersion);
+                """)
     }
 
 }

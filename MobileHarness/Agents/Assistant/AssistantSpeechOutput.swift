@@ -66,6 +66,11 @@ actor AssistantSpeechOutput: AgentSpeechOutput {
         if active { playing = audioID } else if playing == audioID { playing = nil }
         await refreshIsland()
     }
+    func isPlaying(sessionID: String) -> Bool? {
+        guard !closed, binding != nil else { return nil }
+        guard let playing else { return false }
+        return handles[playing].map { $0.input.sessionID == sessionID }
+    }
     private func refreshIsland() async {
         let content: IslandContent?
         if closed || binding == nil {

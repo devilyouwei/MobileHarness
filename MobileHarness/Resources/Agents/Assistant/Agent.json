@@ -6,39 +6,29 @@
   "communication": {
     "inputs": [
       {
-        "contract": "tool.result",
+        "contract": "agent.task.response",
         "version": 1,
-        "kind": "toolResult"
+        "kind": "observation"
       },
       {
-        "contract": "action.result",
+        "contract": "runtime.action.result",
         "version": 1,
         "kind": "actionResult"
       },
       {
-        "contract": "generation.round.result",
+        "contract": "runtime.tool.result",
+        "version": 1,
+        "kind": "toolResult"
+      },
+      {
+        "contract": "runtime.round.result",
         "version": 1,
         "kind": "roundResult"
       },
       {
-        "contract": "communication.receipt",
+        "contract": "runtime.message.receipt",
         "version": 1,
         "kind": "communicationReceipt"
-      },
-      {
-        "contract": "task.progress",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
-        "contract": "task.result",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
-        "contract": "writer.completion",
-        "version": 1,
-        "kind": "observation"
       }
     ],
     "subscriptions": [
@@ -51,15 +41,7 @@
     "publications": [],
     "sends": [
       {
-        "contract": "task.request",
-        "target": "writer"
-      },
-      {
-        "contract": "task.input",
-        "target": "writer"
-      },
-      {
-        "contract": "task.cancel",
+        "contract": "agent.task.request",
         "target": "writer"
       }
     ]

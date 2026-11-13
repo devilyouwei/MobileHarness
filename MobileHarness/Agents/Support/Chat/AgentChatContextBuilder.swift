@@ -6,6 +6,37 @@ import StorageCore
 
 /// Preserve provider call/result blocks when interleaving independent task rounds.
 public enum AgentChatContextBuilder {
+    /// Read only the current dialog's earlier, dispatched exchange, including a reply still streaming.
+    static func decisionExchange(in conversation: AssistantConversation, before inputID: String)
+        -> InputDecisionSnapshot.Exchange?
+    {
+        guard let boundary = conversation.turns.firstIndex(where: { $0.id == inputID }) else { return nil }
+        let earlier = conversation.turns[..<boundary]
+        func isUser(_ turn: AssistantRecord) -> Bool {
+            guard !turn.user.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+            guard let evidence = turn.coordination else { return true }
+            if let action = evidence.decision { return action != InputDisposition.discard.rawValue }
+            return evidence.source == "user" || evidence.source == AgentID.speechPerception.rawValue
+        }
+        for turn in earlier.reversed() {
+            guard
+                let request = turn.modelRequests?.last(where: {
+                    $0.awaitingDispatch != true && $0.state != .failed && $0.state != .cancelled
+                        && !$0.response.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                })
+            else { continue }
+            if let members = turn.coordination?.memberIDs, members.count > 1,
+                let user = earlier.last(where: { members.contains($0.id) && isUser($0) })
+            {
+                return .init(user: user.user, assistant: request.response)
+            }
+            if isUser(turn) {
+                return .init(user: turn.user, assistant: request.response)
+            }
+        }
+        return nil
+    }
+
     struct StateImageProjection {
         let messages: [ChatMessage]
         let manifest: String?

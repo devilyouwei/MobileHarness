@@ -62,13 +62,15 @@ extension ChannelScheduler {
         registry: ActionRegistry, capacityPerChannel: Int = 32, maximumTrackedInputs: Int = 64,
         maximumChannels: Int = 16, diagnosticCapacity: Int = 256, resources: ResourceCoordinator? = nil,
         resultCapacity: Int = 512, admission: GatewayAdmission? = nil,
-        deliverResult: @escaping @Sendable (ActionResult) async -> ActionResultDelivery = { _ in .closed }
+        deliverResult: @escaping @Sendable (ActionResult) async -> ActionResultDelivery = { _ in .closed },
+        onExecutionSnapshot: (@Sendable (ActionExecutionSnapshot) -> Void)? = nil
     ) {
         self.init(
             executor: fixtureExecutionPort(actions: registry.bindings), capacityPerChannel: capacityPerChannel,
             maximumTrackedInputs: maximumTrackedInputs, maximumChannels: maximumChannels,
             diagnosticCapacity: diagnosticCapacity, resources: resources, resultCapacity: resultCapacity,
-            admission: admission, deliverResult: { await deliverResult($0.agentValue) })
+            admission: admission, deliverResult: { await deliverResult($0.agentValue) },
+            onExecutionSnapshot: onExecutionSnapshot)
     }
 }
 
@@ -117,12 +119,6 @@ extension OutputGateway {
             direct: DirectExecutionDispatcher(executor: executor, resources: coordinator, admission: fence),
             policy: policy, actionFeedback: actionFeedback, observedContracts: observedContracts,
             observeEvent: observeEvent, admission: admission, sink: sink)
-    }
-}
-
-extension ActionExecutionLedger {
-    mutating func admit(_ invocation: ScheduledAction, definition: ActionBinding) {
-        admit(invocation, definition: fixtureDescriptor(definition))
     }
 }
 

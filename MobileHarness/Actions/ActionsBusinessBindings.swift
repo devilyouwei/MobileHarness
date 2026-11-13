@@ -68,7 +68,7 @@
     >
 
     public typealias ActionsBusinessRequest = ActionAssemblyRequest<
-        AssistantHistoryStore, any ActivityPresenting,
+        AssistantHistoryStore,
         any ExecutionFailureReporting, any ModelArtifactsManaging, AssistantConversation
     >
     @MainActor public struct ActionsVoiceHost {

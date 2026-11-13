@@ -139,7 +139,7 @@
             let history = HistoryPresentationAdapter(
                 state: ui.history.presentation, store: request.conversations, sessionID: request.sessionID)
             let endpoints = ActionEndpoints(
-                cameraControl: camera, rootSessionID: request.sessionID, activity: request.activity,
+                cameraControl: camera, rootSessionID: request.sessionID,
                 effects: ui.home.effects, expressions: ui.home.expressions, homeBluetooth: ui.home.conversation,
                 deviceBluetooth: bluetooth.state)
             self.endpoints = endpoints
@@ -218,7 +218,7 @@
                 feedback: presentation, effects: presentation, listening: endpoints.speech,
                 listeningGesture: endpoints.speech,
                 detection: endpoints.speech, taskControl: endpoints.tasks, loading: presentation,
-                runtimeFailures: presentation, bluetoothStatus: presentation,
+                bluetoothStatus: presentation,
                 gesture: { value, input in try await robot.gesture(value, input) },
                 shakeBase: { value, input in try await robot.shakeBase(value, input) },
                 aim: { base, pitch, input in try await robot.aim(base, pitch, input) })

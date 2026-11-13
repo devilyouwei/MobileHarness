@@ -95,11 +95,11 @@ public actor ChannelScheduler {
     private let maximumTrackedInputs: Int
     private var inputs: [InputKey: InputState] = [:]
     private var channelCounts: [String: Int] = [:]
-    private var drainingChannels: Set<InputKey> = []
     private var isShutdown = false
     private var sequence: UInt64 = 0
     private var discards: [String: Task<Void, Never>] = [:]
     private var executionLedger = ActionExecutionLedger()
+    private let onExecutionSnapshot: (@Sendable (ActionExecutionSnapshot) -> Void)?
     private var executionObservers: [String: AsyncStream<ActionExecutionSnapshot>.Continuation] = [:]
     public enum ObservationError: Error { case capacityExceeded }
 
@@ -122,8 +122,9 @@ public actor ChannelScheduler {
     public func executionSnapshot() -> ActionExecutionSnapshot { executionLedger.snapshot() }
     private func removeExecutionObserver(_ id: String) { executionObservers.removeValue(forKey: id) }
     private func publishExecutions() {
-        guard !executionObservers.isEmpty else { return }
+        guard onExecutionSnapshot != nil || !executionObservers.isEmpty else { return }
         let snapshot = executionLedger.snapshot()
+        onExecutionSnapshot?(snapshot)
         for observer in executionObservers.values { observer.yield(snapshot) }
     }
     private func executionTransition(
@@ -195,7 +196,8 @@ public actor ChannelScheduler {
         resources: ResourceCoordinator? = nil, resultCapacity: Int = 512,
         admission: GatewayAdmission? = nil,
         validateScope: @escaping @Sendable (FunctionInvocation, ExecutionOwner?) async throws -> Void = { _, _ in },
-        deliverResult: @escaping @Sendable (ExecutionResult) async -> ActionResultDelivery = { _ in .closed }
+        deliverResult: @escaping @Sendable (ExecutionResult) async -> ActionResultDelivery = { _ in .closed },
+        onExecutionSnapshot: (@Sendable (ActionExecutionSnapshot) -> Void)? = nil
     ) {
         precondition(capacityPerChannel > 0 && maximumTrackedInputs > 0 && maximumChannels > 0)
         self.admission = admission
@@ -204,6 +206,7 @@ public actor ChannelScheduler {
         self.resources = resources
         self.resultLedger = ActionResultLedger(capacity: resultCapacity)
         self.deliverResult = deliverResult
+        self.onExecutionSnapshot = onExecutionSnapshot
         self.diagnostics = ActionDiagnostics(capacity: diagnosticCapacity)
         self.capacityPerChannel = capacityPerChannel
         self.maximumTrackedInputs = maximumTrackedInputs
@@ -230,10 +233,6 @@ public actor ChannelScheduler {
     public func enqueue(invocation submitted: ScheduledAction) async throws -> String {
         try admission?.check()
         guard admissionWork.count < 128 else { throw ActionSchedulingError.inputCapacityExceeded }
-        let key = InputKey(source: submitted.envelope.source, inputID: submitted.envelope.schedulingID)
-        guard submitted.channel == "Control" || !drainingChannels.contains(key) else {
-            throw ActionSchedulingError.inputClosing
-        }
         let id = UUID()
         let task = Task { try await self.admit(submitted) }
         admissionWork[id] = (submitted, task)
@@ -294,9 +293,6 @@ public actor ChannelScheduler {
             try resultLedger.checkCapacity(invocation)
             let channel = invocation.channel
             let key = InputKey(source: invocation.envelope.source, inputID: invocation.envelope.schedulingID)
-            guard channel == "Control" || !drainingChannels.contains(key) else {
-                throw ActionSchedulingError.inputClosing
-            }
             guard channelCounts[channel] != nil || channelCounts.count < maximumChannels else {
                 throw ActionSchedulingError.channelCountExceeded
             }
@@ -321,7 +317,7 @@ public actor ChannelScheduler {
                     sequence: sequence, phase: state.writePhase,
                     kind: definition.kind, resources: required,
                     invocation: invocation))
-            executionLedger.admit(invocation, definition: definition)
+            executionLedger.admit(invocation, kind: definition.kind)
             publishExecutions()
             diagnostics.record(invocation, kind: definition.kind, phase: .admitted, effect: .notStarted)
             startEligibleChannels()
@@ -389,50 +385,6 @@ public actor ChannelScheduler {
         }
         try outcome.get()
         try Task.checkCancellation()
-    }
-    /// Join effects without waiting for the Control Action that requested the transition.
-    public func drainEffects(inputID: String, source: String) async throws {
-        let key = InputKey(source: source, inputID: inputID)
-        guard drainingChannels.insert(key).inserted else { throw ActionSchedulingError.inputClosing }
-        defer { drainingChannels.remove(key) }
-        await joinAdmissions {
-            $0.envelope.source == source && $0.envelope.schedulingID == inputID && $0.channel != "Control"
-        }
-        guard let state = inputs[key] else { return }
-        var running: [Running] = []
-        var discarded: [Task<Void, Never>] = []
-        for phase in state.phases.indices {
-            for name in Array(state.phases[phase].lanes.keys) where name != "Control" {
-                let queued = state.phases[phase].lanes[name]?.queued ?? []
-                state.phases[phase].lanes[name]?.queued.removeAll()
-                state.pending -= queued.count
-                decrementChannel(name, by: queued.count)
-                for job in queued {
-                    if let ticket = job.invocation.prepared {
-                        let executor = self.executor
-                        discarded.append(Task { await executor.discard(ticket) })
-                    }
-                    executionTransition(job.id, to: .cancelled)
-                    resultLedger.complete(job.invocation, status: .cancelled, effect: .notStarted, failure: .cancelled)
-                    diagnostics.record(job.invocation, kind: job.kind, phase: .cancelled, effect: .notStarted)
-                }
-                if let job = state.phases[phase].lanes[name]?.running {
-                    running.append(job)
-                    executionTransition(job.job.id, to: .cancelling)
-                    job.task.cancel()
-                }
-            }
-        }
-        for task in discarded { await task.value }
-        for job in running { await job.task.value }
-        let selected = Set(running.map { $0.job.id })
-        for record in resultLedger.snapshot() where selected.contains(record.executionID) {
-            if let result = record.result, result.status != .succeeded && result.status != .cancelled {
-                throw ActionSchedulingError.resultDeliveryFailed(
-                    executionID: record.executionID, path: result.path.description, state: "cleanup_failed")
-            }
-        }
-        startResultDelivery()
     }
     public func cancel(inputID: String, source: String) async {
         await joinAdmissions { $0.envelope.source == source && $0.envelope.schedulingID == inputID }

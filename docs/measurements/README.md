@@ -6,6 +6,9 @@ Purpose: retain bounded raw model/device measurements independently of productio
 
 - [Mac 本地 Decision 模型对照](decision-model-mac-2026-11-11.csv)保留 D3、Laya 和 UniMC 的 456 次逐条判定、分数和时延，方法见[验证报告](../validation/Decision-Model-Mac-Comparison.md)。
 - [D3 提示词与句向量对照](decision-request-embedding-2026-11-11.json)保留输入、定义、代表例和 957 次判定，方法见[追加验证](../validation/Decision-Model-Mac-Comparison.md#d3-请求格式与句向量追加对照)。
+- [全双工小模型 Core AI 对照](duplex-llm-coreai-2026-11-13.json)保留逐条候选分数、时延、制品版本和复现脚本，方法见[验证记录](../validation/Decision-Model-Mac-Comparison.md#小参数生成模型的-core-ai-对照)。
+- [全双工对话历史窗口 Core AI 对照](duplex-history-coreai-2026-11-13.json)保留同句异义样例、四款制品在各窗口的原始分数、超时和复现脚本，方法见[验证记录](../validation/Decision-Model-Mac-Comparison.md#对话历史窗口对照)。
+- [2、4、8、10 条历史窗口续测](duplex-history-windows-coreai-2026-11-13.json)保留 9 款 Core AI 制品的历史窗口对照、超限终止和复现脚本，方法见[验证记录](../validation/Decision-Model-Mac-Comparison.md#24810-条历史的续测)。
 
 - [BasicSkill 控制教学](basic-skill-control-2026-11-08.json)：revision 50 两轮 Qwen 回复、调用与失败；保留旧摄影夹具不适配及终轮两项模型失败，解释见[验证记录](../validation/BasicSkill-Control-Teaching.md)。
 

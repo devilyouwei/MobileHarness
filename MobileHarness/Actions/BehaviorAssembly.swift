@@ -34,7 +34,6 @@ public struct BehaviorAssembly: Sendable {
         detection: (any AudioDetectionCapability)? = nil,
         taskControl: (any TaskControlCapability)? = nil,
         loading: (any LoadingExpressionPresentationCapability)? = nil,
-        runtimeFailures: (any RuntimeFailurePresentationCapability)? = nil,
         bluetoothStatus: (any BluetoothStatusPresentationCapability)? = nil,
         gesture: @escaping @Sendable (NexArmActions.GestureRequest, any FunctionInput) async throws -> Void,
         shakeBase: @escaping @Sendable (Int, any FunctionInput) async throws -> Void,
@@ -50,7 +49,7 @@ public struct BehaviorAssembly: Sendable {
             resourcePresentation: resourcePresentation, providerDiscovery: providerDiscovery,
             providerSettings: providerSettings, device: device,
             feedback: feedback, effects: effects, listening: listening, listeningGesture: listeningGesture,
-            detection: detection, taskControl: taskControl, loading: loading, runtimeFailures: runtimeFailures,
+            detection: detection, taskControl: taskControl, loading: loading,
             bluetoothStatus: bluetoothStatus, gesture: gesture,
             shakeBase: shakeBase, aim: aim)
         try self.init(capabilityModules: modules)

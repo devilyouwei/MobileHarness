@@ -145,11 +145,6 @@ extension ActionReport {
             }, executionFailure: executionFailure?.agentValue, failureDescription: failureDescription)
     }
 }
-extension ActionFailure {
-    var observationFailure: ActionExecutionRecord.Failure {
-        .init(rawValue: rawValue)
-    }
-}
 extension ToolCall {
     public var executionRequest: ToolRequest { .init(id: id, toolPath: toolPath, arguments: arguments) }
 }

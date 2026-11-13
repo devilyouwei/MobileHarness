@@ -5,13 +5,13 @@ import Foundation
 public final class HomeEffectsWorkflow: HomeEffectsPresenting {
     public enum Error: Swift.Error { case busy, unavailable, invalidArguments }
     var presentationAdmission: UIPresentationAdmission?
-    private let activity: ActionActivityState
+    private let notices: HomeNoticeState
     private weak var conversation: ConversationState?
     private var noticeExpiry: Task<Void, Never>?
     private var lightExpiry: Task<Void, Never>?
     private var noticeOwner: PresentationOwner?
     private var lightOwner: PresentationOwner?
-    public init(activity: ActionActivityState) { self.activity = activity }
+    public init(notices: HomeNoticeState) { self.notices = notices }
     public func bind(_ state: ConversationState) { conversation = state }
     deinit {
         noticeExpiry?.cancel()
@@ -26,7 +26,7 @@ public final class HomeEffectsWorkflow: HomeEffectsPresenting {
         replyDidBegin()
         noticeExpiry?.cancel()
         lightExpiry?.cancel()
-        activity.notice = nil
+        notices.notice = nil
         conversation?.decorativeLight = nil
         noticeOwner = nil
         lightOwner = nil
@@ -45,17 +45,17 @@ public final class HomeEffectsWorkflow: HomeEffectsPresenting {
         guard (500...30000).contains(durationMS), !notice.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
             notice.text.utf8.count <= 1024
         else { throw Error.invalidArguments }
-        guard notice.placement == .toast || activity.errorToast == nil else { throw Error.busy }
+        guard notice.placement == .toast || notices.errorToast == nil else { throw Error.busy }
         noticeExpiry?.cancel()
-        activity.notice = notice
+        notices.notice = notice
         noticeOwner = owner
         let previousNotice = noticeExpiry
         previousNotice?.cancel()
         noticeExpiry = Task { [weak self] in
             await previousNotice?.value
             do { try await Task.sleep(for: .milliseconds(durationMS)) } catch { return }
-            guard let self, self.activity.notice?.id == notice.id else { return }
-            self.activity.notice = nil
+            guard let self, self.notices.notice?.id == notice.id else { return }
+            self.notices.notice = nil
             self.noticeOwner = nil
         }
     }
@@ -64,7 +64,7 @@ public final class HomeEffectsWorkflow: HomeEffectsPresenting {
         guard noticeOwner == nil || noticeOwner == owner else { throw Error.busy }
         noticeExpiry?.cancel()
         noticeOwner = nil
-        activity.notice = nil
+        notices.notice = nil
     }
     public func updateLight(_ light: DecorativeLight?, durationMS: Int = 3000, owner: PresentationOwner)
         async throws

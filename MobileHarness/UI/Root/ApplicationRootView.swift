@@ -58,7 +58,7 @@
                         .id(assembly.navigation.generation)
                 }
                 .overlay(alignment: .top) {
-                    if let notice = container?.actionActivity.transientToast {
+                    if let notice = container?.homeNotices.transientToast {
                         Label(notice.text, systemImage: "info.circle.fill")
                             .font(.subheadline)
                             .foregroundStyle(.primary)
@@ -276,8 +276,14 @@
                 container.speechValidationContent()
             } else {
                 ConversationView(
-                    state: container.conversation, activity: container.actionActivity,
-                    listeningRequests: container.listeningRequests)
+                    state: container.conversation, notices: container.homeNotices,
+                    listeningRequests: container.listeningRequests
+                )
+                .overlay(alignment: .bottom) {
+                    RuntimeLogView(state: assembly.runtimeLog)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 16)
+                }
             }
         }
 

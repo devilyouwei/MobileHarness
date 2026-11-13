@@ -183,6 +183,47 @@ Decision 页面独立选择本地 D3/云端，云端 Provider/模型沿用共享
 - `./scripts/build-ios.sh` 四个目标构建通过。BasicSkill 提示词最终修改后增量重建主应用，33 项 Skill 资源与 WidgetKit 嵌入复核通过，包内 BasicSkill 指令与源码逐字节一致。
 - 真机签名构建及深层严格签名验证通过，33 项 Skill 资源、WidgetKit 和最终 BasicSkill 指令核对通过。iPhone 17 Pro 覆盖安装并成功启动 `0.1.0 (2026111106)`，设备清单确认版本，安装序号 6672。此次验证覆盖安装和进程启动，实际模型任务关闭未复测。日志位于 `/tmp/mobileharness-foreground-end-device-{build,install,launch,app}.log`。
 
+## 2026-11-13 打断回复后保留拍照任务
+
+- 真机 SQLite 的 `task_6` 在旧回复播放被打断后以 `cancelled` 结束，`summary` 为空。随后 `Camera.Capture.close` 成功，关相机的 Message 无任务归属。
+- `fullDuplexInterruptedReplyPreservesPhotographyTaskAndPersistsSummary` 通过。使用脚本模型、阻塞的旧轮 Action、实际 AssistantExecutionSession、Gateway 和 SQLite，检查打断留在旧消息，新输入仍绑定同一任务，收到关相机结果后由 `task.end` 写入完成状态和非空摘要。原始消息及摘要来源均可查询。
+- 最终 `./scripts/check.sh` 退出 0。第一阶段 1146 项集成测试通过，设备与原生运行套件 228 项通过，边界、格式和 plist 校验通过。`git diff --check` 通过。
+- `./scripts/build-ios.sh` 的四个 iOS Simulator scheme 均构建通过，主应用资源和 WidgetKit 校验通过。该修复尚未进行真机交互复测。
+
+## Decision 原文与任务结束入口
+
+- 手工输入和语音最终文本走同一 Decision 日志路径。替身分类器验证被丢弃输入的原文仍与决策同条保留。UI 状态回归验证原文随相同记录身份保留。
+- 前台回归覆盖关闭会话、打断、模型失败和重复启动。明确 `task.end` 可提交终态及摘要。Writer 回归覆盖正在生成和等待补充时接收取消消息、终态原因保存、清理及拒绝已取消执行继续选择工作区。
+- `./scripts/check.sh` 退出 0，第一阶段 1144 项集成测试通过，设备与原生运行套件 228 项通过。格式、边界与 plist 检查通过。`git diff --check` 通过。
+- `./scripts/build-ios.sh` 四个 iOS Simulator scheme 构建通过，主应用资源和 WidgetKit 校验通过。尚未在真机交互复测。
+
+### 结束入口清理复验
+
+- 移除旧前台终态写入及未用参数后，`./scripts/check.sh` 退出 0。第一阶段 1144 项集成测试和设备与原生运行套件 228 项通过。检查覆盖拍照摘要、Writer 新旧取消记录以及 Decision 原文。
+- `./scripts/build-ios.sh` 四个 scheme 构建通过。`git diff --check` 通过。
+
+### 前台重试与 Writer 正文转述复验
+
+- 验证 BasicSkill 提示词覆盖控制失败后的状态检查与重试，以及继续意图不明确时询问和明确转向时结束。工具目录校验 `task.send` 只接受目标和正文。
+- Writer 的脚本模型及 SQLite 回归覆盖正在生成和等待补充时收到明确停止消息，以及普通转述由 Writer 私有模型选择 `finish(outcome=cancelled)`。终态保留取消原因，普通补充仍按待答身份处理。
+- `./scripts/check.sh` 和 `./scripts/build-ios.sh` 退出 0，`git diff --check` 通过。该版未在真机或真实模型上复测。
+
+### 前台控制与后台定向通信
+
+- 目录回归验证 `task.send` 缺少 `agent_id` 或 `text` 时拒绝。活跃前台任务期间，运行时拒绝无目标或以 Assistant 为目标的发送，保留原任务，直至 `task.end` 提交摘要。
+- Writer 脚本回归验证委派与前台任务可并行。前台结束后，原 Writer 委派仍活跃，可接收停止正文并独立提交终态。
+- `./scripts/check.sh` 退出 0，1144 项集成测试及 228 项设备与原生运行测试通过。`./scripts/build-ios.sh` 四个 iOS Simulator 目标构建通过，包内 BasicSkill 指令与任务反馈资源和源码一致。未进行真机或真实模型复测。
+
+### 单一后台消息入口
+
+- 脚本模型和 SQLite 回归覆盖仅通过 `task.send` 启动任务、匹配活跃补充、拒绝独立新目标及过期待答、保存取消原因、持久终态和前台独立性。专项复跑的四组测试通过，共 56 个参数化场景。
+- `./scripts/build-ios.sh` 退出 0，四个 iOS Simulator 目标、46 项 Agent 与 Skill 资源及 Live Activity 校验通过。`./scripts/check.sh` 退出 1，1147 项集成测试中的同一输入分类计数用例有两个参数场景失败，两者专项复跑通过。228 项设备与原生运行测试通过。`git diff --check` 通过。未运行真实模型或真机验收。
+
+### 后台消息与统一回报契约
+
+- `agent.task.message` 用于发送正文，`agent.task.report` 用于回报。脚本模型、Gateway 和 SQLite 回归覆盖忙碌拒绝与过期追问答复的持久重投、事件身份稳定、拒绝不改变原任务终态，以及新旧终态记录的领取和重试上限。
+- `./scripts/check.sh` 退出 0，1147 项集成测试及 228 项设备与原生运行测试通过。最终变更后的五组专项测试通过。`./scripts/build-ios.sh` 四个 iOS Simulator 目标及应用资源校验通过。`git diff --check` 通过。未运行真实模型或真机验收。
+
 ## 2026-11-11 Assistant 输入时间线
 
 - 模型请求替身和 SQLite 回归核对正文在前、来源与本地秒级时间在后、跨来源事件顺序、同秒内稳定排序，以及 User Request 保存实际发送的正文。原生工具配对、Action 结果提前就绪及前台任务结束回归覆盖原有执行路径。
@@ -196,3 +237,20 @@ Decision 页面独立选择本地 D3/云端，云端 Provider/模型沿用共享
 - 第一次全量检查发现批次夹具的时间锚点问题后中止；修正后全量脚本退出 1。1147 项集成测试中，Writer 窗口、相机首帧、云台跟踪和三项诊断呈现共六个用例失败。上述六项与三个提示词及批次用例一并专项复跑，九项全部通过。LiveRuntimeTests 229 项通过，相机 Metal 用例仅有启动记录。日志见 `/tmp/mobileharness-signal-priorities-{check,check-final,targeted}.log`。
 - `./scripts/build-ios.sh` 四个目标构建通过，33 项 Skill 资源和 WidgetKit 复核通过，包内 Assistant/Prompts.json 与源码逐字节一致（`/tmp/mobileharness-signal-priorities-ios.log`）。
 - 真机签名构建、深层严格签名及资源核对通过。iPhone 17 Pro 已覆盖安装并成功启动 `0.1.0 (2026111107)`，设备清单确认版本，安装序号 6680。此次验证覆盖安装和进程启动，真实模型的取舍和澄清效果未复测。日志见 `/tmp/mobileharness-signal-priorities-device-{build,install,app,launch}.log`。
+
+## 2026-11-13 Decision 一来一回窗口
+
+- 10 项 Decision 专项回归通过。回归从最终 ASR 入口检查实际分类请求，覆盖历史配对、批次中用户原文、当前状态字段、关联追问、候选顺序及对话正文中的换行和控制标记。Swift 原生 D3 制品冒烟测试通过，热调用 65.97 ms（`/tmp/mh-decision-history-focused-final.log`）。
+- Mac 上用本地 D3 Edge Core AI 对照 28 条合成样例。英文版 18/28，误丢弃 0，误打断 5，漏打断 1，最长 51.89 ms。iPhone 并发播报时的端到端 100 ms 仍需实测。 [中英文对照](Decision-Model-Mac-Comparison.md#同一窗口的英文提示词对照)
+- 四个 iOS Simulator scheme 构建通过。最终主应用增量重建通过，包内 `InputDecision.json` 与源码逐字节一致，资源和 WidgetKit 校验通过（`/tmp/mh-decision-history-ios-final.log`）。
+- 首轮全量集成检查在更新过程命中旧中文标签断言、旧资源副本及两个 Writer 追问用例。最终 `./scripts/check.sh` 退出 0，1,147 项集成测试与 228 项 LiveRuntimeTests 通过。相机 Metal 用例只有启动记录（`/tmp/mh-decision-history-check-final.log`）。Writer 目标选择用例的 17 个场景也单独复跑通过（`/tmp/mh-decision-history-adjacent.log`）。
+
+## 2026-11-13 任务请求、回报与运行时反馈命名
+
+- 角色配置断言核对 Assistant 的完整接收与发送权限及 Writer 的一收一发。固定任务的进度和终态共用 `agent.task.response`，历史预览按消息类型解析，父子执行停止回归核对运行时终态及资源清理。
+- SQLite 迁移回归以 20261112 契约名写入待发 Writer 终态，升级后验证正文、原消息关联及 outbox 领取。脚本模型回归验证 Writer 终态拒收后仅重投通知，以及多来源批次对固定任务回报保留可信来源。
+- `./scripts/check.sh` 退出 0，1149 项集成测试和 228 项运行时测试通过。`./scripts/build-ios.sh` 退出 0，四个 iOS Simulator 目标和应用内 46 项 Agent 与 Skill 资源校验通过。`git diff --check` 通过。本轮未执行真实模型或真机验收。
+
+### 真机覆盖安装
+
+- Mobile Harness 0.1.0（2026111304）签名构建通过，校验 46 项 Agent 与 Skill 资源及 Live Activity。已覆盖安装至 Youwei’s iPhone 17 Pro（安装回执 6860），设备清单确认构建号，系统启动成功。覆盖安装保留应用数据。真实模型及真机交互未在本次安装中验收。

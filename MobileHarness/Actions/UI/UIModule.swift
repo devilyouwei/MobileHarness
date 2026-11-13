@@ -9,7 +9,6 @@ public struct UIModule: CapabilityModule {
     private let history: any HistoryPresentationCapability
     private let effects: (any UIEffectCapability)?
     private let loading: (any LoadingExpressionPresentationCapability)?
-    private let runtimeFailures: (any RuntimeFailurePresentationCapability)?
     private let bluetoothStatus: (any BluetoothStatusPresentationCapability)?
     private let feedback: (any UIFeedbackCapability)?
     public init(
@@ -17,11 +16,9 @@ public struct UIModule: CapabilityModule {
         updates: any UIUpdateCapability, history: any HistoryPresentationCapability,
         feedback: (any UIFeedbackCapability)? = nil, effects: (any UIEffectCapability)? = nil,
         loading: (any LoadingExpressionPresentationCapability)? = nil,
-        runtimeFailures: (any RuntimeFailurePresentationCapability)? = nil,
         bluetoothStatus: (any BluetoothStatusPresentationCapability)? = nil
     ) {
         self.loading = loading
-        self.runtimeFailures = runtimeFailures
         self.bluetoothStatus = bluetoothStatus
         self.expression = expression
         self.pose = pose
@@ -32,12 +29,6 @@ public struct UIModule: CapabilityModule {
     }
     public var definitions: [ActionFunction] {
         expressionFunctions + presentationFunctions + feedbackFunctions + effectFunctions + [
-            UIActions.recordFailureDefinition(handler: { [runtimeFailures] invocation in
-                guard let presentation = runtimeFailures else {
-                    throw UIActions.PresentationError.invalidCall
-                }
-                try await UIActions.recordFailure(invocation: invocation, using: presentation)
-            }),
             UIActions.showBluetoothHomeDefinition(handler: { [bluetoothStatus] invocation in
                 guard let presentation = bluetoothStatus else {
                     throw UIActions.PresentationError.invalidCall

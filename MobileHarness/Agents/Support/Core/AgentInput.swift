@@ -179,14 +179,14 @@ public struct InputMetadata: Sendable {
         let contract: String
         var defaultSource = "runtime"
         switch payload {
-        case .communicationReceipt: contract = "communication.receipt"
+        case .communicationReceipt: contract = "runtime.message.receipt"
         case .text:
             contract = "user.text"
             defaultSource = "user"
         case .event: contract = "runtime.event"
-        case .toolResult: contract = "tool.result"
-        case .actionResult: contract = "action.result"
-        case .roundResult: contract = "generation.round.result"
+        case .toolResult: contract = "runtime.tool.result"
+        case .actionResult: contract = "runtime.action.result"
+        case .roundResult: contract = "runtime.round.result"
         case .activityEvent: contract = "activity.event"
         case .audio:
             contract = "media.audio"

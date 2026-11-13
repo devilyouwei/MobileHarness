@@ -5,14 +5,20 @@ import Foundation
 
     /// Compact multi-channel status with a read-only execution history sheet.
     @MainActor
-    public struct ActionActivityView: View {
-        @Bindable private var state: ActionActivityState
+    public struct RuntimeLogView: View {
+        @Bindable private var state: RuntimeLogState
         @State private var taskPath: [String] = []
-        public init(state: ActionActivityState) {
+        public init(state: RuntimeLogState) {
             self.state = state
         }
 
         public var body: some View {
+            if state.hasRecords || state.observationUnavailable {
+                panel
+            }
+        }
+
+        private var panel: some View {
             TimelineView(.periodic(from: .now, by: 0.5)) { context in
                 let channels = state.summaries(at: context.date)
                 VStack(alignment: .trailing, spacing: 12) {
@@ -24,19 +30,20 @@ import Foundation
                                         state.showsExecutionHistory = true
                                     } label: {
                                         HStack(alignment: .top, spacing: 8) {
-                                            Image(systemName: channel.item.symbol)
+                                            actionStatusIcon(channel.item.execution.phase)
                                                 .frame(width: 16)
                                             VStack(alignment: .leading, spacing: 2) {
-                                                Text("\(channel.item.channelTitle) · \(channel.item.title)")
-                                                    .font(.caption.weight(.medium))
+                                                HStack(alignment: .top, spacing: 6) {
+                                                    channelLabel(channel.id)
+                                                    Text(channel.item.title)
+                                                        .font(.system(.caption, design: .monospaced).weight(.medium))
+                                                }
                                                 Text(channel.item.status + extra(channel))
                                                     .font(.caption2).foregroundStyle(.secondary)
                                             }
                                             Spacer(minLength: 0)
                                         }
-                                        .foregroundStyle(
-                                            channel.item.isFailure ? Color.orange : Color.white.opacity(0.85)
-                                        )
+                                        .foregroundStyle(.primary)
                                         .contentShape(Rectangle())
                                     }
                                     .buttonStyle(.plain)
@@ -71,12 +78,11 @@ import Foundation
                         }
                         .buttonStyle(.plain)
                         .modifier(ActionPanelGlass())
-                        .accessibilityLabel("执行记录")
+                        .accessibilityLabel("执行日志")
                         .accessibilityIdentifier("conversation.actions.history")
                     }
                 }
             }
-            .accessibilityIdentifier("conversation.actions.status")
             .sheet(isPresented: $state.showsExecutionHistory) {
                 NavigationStack(path: $taskPath) {
                     VStack(spacing: 0) {
@@ -96,6 +102,7 @@ import Foundation
                             }
                             Spacer()
                             if state.selectedTab == .action {
+                                channelFilter
                                 Toggle("内部动作", isOn: $state.showsInternalActions).font(.caption).fixedSize()
                             }
                         }.padding(.horizontal).padding(.vertical, 8)
@@ -114,7 +121,7 @@ import Foundation
                         List { logRows }
                     }
                     .navigationDestination(for: String.self) { taskDetail($0) }
-                    .navigationTitle("执行记录")
+                    .navigationTitle("执行日志")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
@@ -181,6 +188,48 @@ import Foundation
                 }
                 if issues.isEmpty && events.isEmpty { emptyRow("暂无符合条件的 Agent 记录") }
                 retention(state.issueEvictions + state.agentEventEvictions)
+            case .decision:
+                ForEach(state.visibleDecisions) { decision in
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(decision.source + " · " + decision.route.rawValue).font(.body.weight(.medium))
+                        Text(decision.adoptedResult.rawValue)
+                            .foregroundStyle(decision.modelResult == nil ? .orange : .primary)
+                        if let result = decision.modelResult, result != decision.adoptedResult {
+                            Text("模型结果 · " + result.rawValue).foregroundStyle(.secondary)
+                        }
+                        if let reason = decision.reason {
+                            Text(reason).foregroundStyle(.secondary)
+                        }
+                        if let localFallback = decision.localFallback {
+                            Text(localFallback).foregroundStyle(.secondary)
+                        }
+                        DisclosureGroup {
+                            Text(
+                                decision.requests.isEmpty
+                                    ? "未发起模型请求"
+                                    : decision.requests.joined(separator: "\n\n")
+                            )
+                            .font(.subheadline)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("用户输入").font(.caption).foregroundStyle(.secondary)
+                                Text(decision.inputText).font(.subheadline).lineLimit(2)
+                            }
+                        }
+                        HStack {
+                            Text(decision.time, style: .time)
+                            Text("决策耗时 " + decision.duration.formatted(.units(allowed: [.milliseconds])))
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                    .accessibilityIdentifier("runtimeLog.decision." + decision.id)
+                }
+                if state.visibleDecisions.isEmpty { emptyRow("暂无符合条件的 Decision 记录") }
+                retention(state.decisionEvictions)
             }
         }
         private func emptyRow(_ title: String) -> some View { Text(title).foregroundStyle(.secondary) }
@@ -226,7 +275,7 @@ import Foundation
                         }
                     }
                     Section("关联记录") {
-                        Button("查看 Action") { selectRelated(.action, task: id) }
+                        Button("查看 Action") { showTaskActions(id) }
 
                     }
                 }.navigationTitle("任务详情")
@@ -234,13 +283,83 @@ import Foundation
                 Text("该任务记录已超出保留范围")
             }
         }
-        private func selectRelated(_ tab: ExecutionLogTab, task: String) {
+        private func showTaskActions(_ task: String) {
             taskPath.removeAll()
             state.selectedTaskID = task
-            state.selectedTab = tab
+            state.selectedTab = .action
             state.selectedFilter = .all
             state.selectedSource = "全部"
+            state.selectedChannel = nil
         }
+
+        private var channelFilter: some View {
+            Menu {
+                Picker("Channel", selection: $state.selectedChannel) {
+                    Text("全部 Channel").tag(nil as String?)
+                    ForEach(state.actionChannels, id: \.self) { channel in
+                        Text(channel).tag(Optional(channel))
+                    }
+                }
+            } label: {
+                if let selected = state.selectedChannel {
+                    channelLabel(selected)
+                } else {
+                    Label("Channel", systemImage: "line.3.horizontal.decrease")
+                }
+            }
+            .accessibilityLabel("筛选 Channel")
+            .accessibilityValue(state.selectedChannel ?? "全部")
+            .accessibilityIdentifier("runtimeLog.action.channelFilter")
+        }
+
+        private func channelLabel(_ channel: String) -> some View {
+            let color = channelColor(channel)
+            return Label {
+                Text(channel)
+            } icon: {
+                Circle().fill(color).frame(width: 6, height: 6)
+            }
+            .lineLimit(1)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(color.opacity(0.24), in: Capsule())
+        }
+
+        private func channelColor(_ channel: String) -> Color {
+            switch channel {
+            case "Camera": return .cyan
+            case "Control": return .purple
+            case "Display": return .indigo
+            case "Listening": return .teal
+            case "ListeningControl": return .mint
+            case "Query": return .blue
+            case "Robot": return .orange
+            case "Speech": return .pink
+            case "System": return .brown
+            default:
+                let palette: [Color] = [.blue, .purple, .orange, .teal, .pink, .indigo, .brown, .cyan]
+                let hash = channel.utf8.reduce(UInt32(2_166_136_261)) { ($0 ^ UInt32($1)) &* 16_777_619 }
+                return palette[Int(hash % UInt32(palette.count))]
+            }
+        }
+
+        private func actionStatusIcon(_ phase: ActionActivityItem.Execution.Phase) -> some View {
+            let appearance: (symbol: String, color: Color) =
+                switch phase {
+                case .queued: ("clock", .secondary)
+                case .running: ("arrow.triangle.2.circlepath", .blue)
+                case .cancelling: ("hourglass", .orange)
+                case .succeeded: ("checkmark.circle", .green)
+                case .failed: ("exclamationmark.circle", .red)
+                case .cancelled: ("minus.circle", .secondary)
+                }
+            return Image(systemName: appearance.symbol)
+                .foregroundStyle(appearance.color)
+                .accessibilityHidden(true)
+        }
+
         private func issueRow(_ issue: ExecutionIssue) -> some View {
             VStack(alignment: .leading, spacing: 5) {
                 Text(issue.title).font(.body.weight(.medium))
@@ -271,37 +390,68 @@ import Foundation
         }
 
         private func historyRow(_ item: ActionActivityItem) -> some View {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: item.symbol)
-                    .foregroundStyle(item.isFailure ? Color.orange : Color.secondary)
-                    .frame(width: 20)
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack {
-                        Text(item.title).font(.body.weight(.medium))
-                        if item.isInternal { Text("内部").font(.caption2).foregroundStyle(.secondary) }
-                    }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .top, spacing: 8) {
+                    actionStatusIcon(item.execution.phase)
+                        .frame(width: 20)
+                    Text(item.title)
+                        .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+                        .textSelection(.enabled)
+                    Spacer(minLength: 4)
+                    Text(item.execution.endedAt ?? item.execution.startedAt ?? item.execution.admittedAt, style: .time)
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                HStack(spacing: 8) {
+                    channelLabel(item.channel)
+                    if !item.source.isEmpty { Text(item.source) }
+                    if item.isInternal { Text("内部") }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    Text(item.status)
                     if let start = item.execution.startedAt, let end = item.execution.endedAt {
                         Text(end.timeIntervalSince(start).formatted(.number.precision(.fractionLength(2))) + " 秒")
-                            .font(.caption).foregroundStyle(.secondary)
                     }
-                    Text(
-                        "\(item.source.isEmpty ? item.channelTitle : item.source + " · " + item.channelTitle) · \(item.status)"
-                    )
-                    .font(.subheadline).foregroundStyle(.secondary)
-                    if !item.issueDescriptions.isEmpty {
-                        DisclosureGroup("查看全部问题") {
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                DisclosureGroup("输入参数与输出结果") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("输入参数").font(.caption.weight(.semibold))
+                            if item.parameters.isEmpty {
+                                Text("无参数").font(.caption).foregroundStyle(.secondary)
+                            } else {
+                                ForEach(item.parameters.sorted { $0.key < $1.key }, id: \.key) { parameter in
+                                    Text(parameter.key + " = " + (parameter.value.isEmpty ? "\"\"" : parameter.value))
+                                        .font(.system(.caption, design: .monospaced))
+                                        .textSelection(.enabled)
+                                }
+                            }
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("输出结果").font(.caption.weight(.semibold))
+                            if let output = item.output {
+                                Text(output.isEmpty ? "空字符串" : output)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .textSelection(.enabled)
+                            } else {
+                                Text(item.isActive ? "等待执行结果" : "未取得返回结果")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
                             ForEach(Array(item.issueDescriptions.enumerated()), id: \.offset) { _, description in
-                                Text(description).font(.caption).frame(maxWidth: .infinity, alignment: .leading)
+                                Text(description).font(.caption).textSelection(.enabled)
                             }
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 6)
                 }
-                Spacer(minLength: 8)
-                Text(item.execution.endedAt ?? item.execution.startedAt ?? item.execution.admittedAt, style: .time)
-                    .font(.caption).foregroundStyle(.secondary)
+                .font(.subheadline)
+                .accessibilityIdentifier("runtimeLog.action.details." + item.id)
             }
-            .padding(.vertical, 3)
-            .accessibilityElement(children: .combine)
+            .padding(.vertical, 4)
         }
     }
     private struct ActionPanelGlass: ViewModifier {

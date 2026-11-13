@@ -287,7 +287,18 @@ extension SQLiteRepositories {
     }
     #expect(try await records.writerExecutions.request(current.delegateID, agent: "writer").workspaceID == current.id)
     try await records.workspaces.release(target, lease: lease)
-    try await records.writerExecutions.updateRequestPhase(requestID: current.delegateID, phase: "cancelling")
+    let messageID = UUID().uuidString
+    try await records.agentMessages.enqueueAgentMessage(
+        .init(
+            id: messageID, sender: "assistant", receiver: "writer", contract: "agent.task.request",
+            payload: Data(#"{"text":"Stop"}"#.utf8),
+            correlationID: current.delegateID, replyTo: current.delegateID, dedupeKey: messageID))
+    #expect(
+        try await records.writerExecutions.acceptWriterCancellation(
+            messageID, requestID: current.delegateID, reason: "Stop"))
+    #expect(
+        try await !records.writerExecutions.acceptWriterCancellation(
+            messageID, requestID: current.delegateID, reason: "Stop"))
     await #expect(throws: (any Error).self) {
         try await records.writerExecutions.selectWorkspace(requestID: current.delegateID, workspaceID: old.id)
     }

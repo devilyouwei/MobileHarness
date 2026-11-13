@@ -198,7 +198,7 @@ extension LiveRuntimeTests {
     ] {
         #expect(contracts[name] == nil)
     }
-    #expect(contracts["vision.pose"] != nil && contracts["action.result"] != nil)
+    #expect(contracts["vision.pose"] != nil && contracts["runtime.action.result"] != nil)
 }
 
 extension LiveRuntimeTests {

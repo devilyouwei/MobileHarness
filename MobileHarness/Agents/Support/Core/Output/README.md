@@ -67,7 +67,7 @@ flowchart LR
 
 ActionCall 保留已解析 ActionPath、有效 Channel 与字符串参数；ToolCall 无 Channel 成员关系；rejectedCall 不可执行。OutputEnvelope 从处理上下文保留 input/session/task/turn、root/parent/hops、round/call 与生产者序号；实际 incarnation/execution owner 由传输绑定。schedulingID 优先 round，再 task，再 input，与资源 owner 独立。
 
-ActionResult、ToolResult、GenerationRoundResult 和 CommunicationReceipt 各有语义。send 的 receipt 只说明目标接纳，publish 无回执；轮次 seal 不等于最终回复。完成值至多 64 KiB UTF-8。AgentActionReport 至多 256 项，path ≤128 字节、code 1–64、detail 至多 16 键，key ≤64、value ≤512；保留部分成功、失败、超时和取消。
+ActionResult、ToolResult、GenerationRoundResult 和 CommunicationReceipt 分别使用 `runtime.action.result`、`runtime.tool.result`、`runtime.round.result`、`runtime.message.receipt`。send 的 receipt 只说明目标接纳，publish 无回执；轮次 seal 不等于最终回复。完成值至多 64 KiB UTF-8。AgentActionReport 至多 256 项，path ≤128 字节、code 1–64、detail 至多 16 键，key ≤64、value ≤512；保留部分成功、失败、超时和取消。
 
 hasBusinessOutput 只识别显式 value，包括空字符串。真实失败也可授权上层续推；成功 report、completed 和 activity 句柄只提供完成证据。纯取消不视为失败；混合报告真实失败优先。agent.cancelled 与 agent.finished/agent.error 区分，ToolResult 无 completion 时保留 value 语义，ActionResult 无 completion 时规范化为 completed。
 

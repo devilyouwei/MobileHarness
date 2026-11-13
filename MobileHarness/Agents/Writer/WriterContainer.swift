@@ -116,9 +116,10 @@ extension WriterContainer: WriterRecordsControlling {
         if !row.workspaceID.isEmpty { linkedWorkspace = try await workspace(row.workspaceID) }
         var result: String?
         if let raw = row.result,
-            let completion = try? JSONDecoder().decode(WriterDelegationCompletion.self, from: Data(raw.utf8))
+            let completion = try? JSONDecoder().decode(AgentTaskResponse.self, from: Data(raw.utf8)),
+            let signal = completion.signal
         {
-            result = try AgentTaskContent.decode(completion.signal).text
+            result = try AgentTaskContent.decode(signal).text
         }
         let failure = row.failure.flatMap { raw in
             (try? JSONDecoder().decode([String: String].self, from: Data(raw.utf8)))?["message"] ?? raw

@@ -45,7 +45,7 @@ flowchart LR
  end
  V -->|"vision.pose"| G
  AS -->|"task.request／input／cancel"| G
- G -->|"task.progress／result"| AS
+ G -->|"agent.task.response"| AS
 
  classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
  classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d

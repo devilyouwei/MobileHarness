@@ -24,25 +24,23 @@ import Foundation
 }
 @MainActor
 public struct ActionAssemblyRequest<
-    Conversations: Sendable, Activity: Sendable, Failures: Sendable, Artifacts: Sendable, Conversation: Sendable
+    Conversations: Sendable, Failures: Sendable, Artifacts: Sendable, Conversation: Sendable
 > {
     public let sessionID: String
     public let conversations: Conversations
-    public let activity: Activity
     public let failures: Failures
     public let maintenance: ActionMaintenancePorts<Artifacts>
     public let summarizeTitle: @Sendable (Conversation) async throws -> String
     public let titlePositions: @Sendable (Int) -> [Int]
     public let resourcePolicies: [ResourcePolicy]
     public init(
-        sessionID: String, conversations: Conversations, activity: Activity,
+        sessionID: String, conversations: Conversations,
         failures: Failures, maintenance: ActionMaintenancePorts<Artifacts>,
         summarizeTitle: @escaping @Sendable (Conversation) async throws -> String,
         titlePositions: @escaping @Sendable (Int) -> [Int], resourcePolicies: [ResourcePolicy] = []
     ) {
         self.sessionID = sessionID
         self.conversations = conversations
-        self.activity = activity
         self.failures = failures
         self.maintenance = maintenance
         self.summarizeTitle = summarizeTitle

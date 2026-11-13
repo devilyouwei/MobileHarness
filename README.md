@@ -1,12 +1,12 @@
-![MobileHarness concept banner: a blue winking eye logo appears on the central phone, connected by abstract bidirectional data flows to a robotic arm, rover, drone and friendly humanoid in a bright cartoon office.](output/mobileharness-office-banner-v1.png)
+![MobileHarness concept banner showing a winking phone, four robots, and illustrated panels for drawing, document writing, web browsing, and taking photos.](output/mobileharness-office-banner-v2.png)
 
 <h1 align="center"><img src="docs/imgs/mobileharness-eyes.png" width="48" alt="" style="vertical-align: 0.1em;"> MobileHarness</h1>
 
-<p align="center"><em>Your phone is the best robot brain!</em></p>
+<p align="center"><em>The phone is the best gateway to robotics.</em></p>
 
-<p align="center">Apple-native · Bio-inspired · Embodied Agent · Multimodal · Multi-Agent · Full-duplex · Mobile Agent</p>
+<p align="center">Apple-native · Bio-inspired · Embodied Agent · Full-duplex · Multimodal · Multi-Agent · Mobile Agent</p>
 
-MobileHarness is an Apple-native, bio-inspired multimodal Agent app that turns your iPhone into a harness for independent, stateful Agents. Built around a **Perception → Cognition → Action** loop, it coordinates the phone's hardware and sensors, such as its camera, microphone and speaker, so Agents can perceive the world, understand users, reason, converse and act. Its current robotic-body integration targets **NexArm**, allowing the phone to serve as the brain of an embodied Agent.
+MobileHarness is a bio-inspired, multimodal agentic app that turns your phone into an embodied agent capable of serving as a robot’s brain and controlling its movements. Built around a **Perception → Cognition → Action** loop, it coordinates the phone's hardware and sensors, such as its camera, microphone and speaker, so Agents can perceive the world, understand users, reason, converse and act. You can now use MobileHarness to connect your iPhone to a **NexArm** robotic arm and control it to carry out grounded tasks.
 
 <p align="center">
   <img src="docs/imgs/perception-cognition-action.svg" alt="Perception, Cognition and Action form a counterclockwise loop connected by Internal Signals. A dashed External Signal arrow enters Perception from outside the loop.">

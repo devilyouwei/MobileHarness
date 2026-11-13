@@ -54,7 +54,7 @@ Generated scheduling uses envelope.schedulingID (round identity); round acknowle
 
 Diagnostics retains 256 records by default (configurable 1–4096), counted oldest overwrite. ActionExecutionLedger retains all active executions and 100 terminal entries with eviction count. Queued cancellation is notStarted; running failure/cancellation has unknown effects; success means contractCompleted. Cancelling remains nonterminal until join. Rejected admission has no execution record.
 
-Eight observers receive newest-one complete snapshots, including initial/final state. No observer await can block execution. displayName and ≤512-character failure text are captured from validated definition/throw boundary. Tools never appear in this Action ledger.
+Eight observers receive newest-one complete snapshots, including initial/final state. The main scheduler also offers updated snapshots to the optional App callback. No observer await can block execution. The scheduler retains the canonical function path, bounded request parameter previews, and completion evidence into the execution ledger. Credential fields are masked before retention and each argument preview is limited to 2048 UTF-8 bytes. Failure text is limited to 512 characters. Tools never appear in this Action ledger.
 
 Bounded wait/FIFO scheduling, scoped feedback barriers and passive observation are implemented.
 
@@ -75,5 +75,3 @@ A root-bound enqueue checks the admission fence before allocating preparation wo
 The owning stateSnapshot entry point reads current local business/capability values and runtime admission/work facts in the owner's isolation domain. It performs no action, acquisition or device activation. The module root composes the explicitly selected fields; unknown diagnostic coverage is not healthy evidence. Domain-specific completion and failure contracts above remain authoritative.
 
 ## Channel 排空
-
-ChannelScheduler.drainEffects 用于拥有方切换业务 scope：冻结指定 input 的非 Control 接纳，取消并加入已排队/执行的效果和 prepared ticket 清理，保留当前 Control Action 避免自等待。取消与失败均进入原结果账本；清理产生非取消失败时抛错，由拥有方拒绝切换。接口不理解 Agent task 或数据库，不自行创建下一任务。

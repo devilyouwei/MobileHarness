@@ -1438,9 +1438,10 @@ extension LiveRuntimeTests {
         let gateway = await OutputGateway(
             manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(), sink: { _ in })
         let consumer = try await gateway.consumer(for: agent)
-        let state = ActionActivityState()
-        let workflow = ActionActivityWorkflow(state: state)
-        let fixture = try await RuntimeFailurePresentationFixture(activity: workflow)
+        let state = RuntimeLogState()
+        let workflow = AgentRuntimeLogWorkflow(log: state)
+        let fixture = try await RuntimeFailurePresentationFixture(log: state)
+        try fixture.ui.start()
         try await fixture.runtime.prepareForInteraction()
         workflow.connectFailures { event in try await fixture.runtime.agent.observeFailure(event) }
         workflow.startFailures { try await gateway.observeFailures() }
@@ -1457,8 +1458,8 @@ extension LiveRuntimeTests {
         #expect(issue.context?.sessionID == session)
         #expect(issue.inputID == terminal.inputID)
         #expect(issue.category == "Agent 运行异常")
-        #expect(state.errorToast?.userMessage == "姿态识别已停止，请查看日志后重试")
-        #expect(state.visibleNotice?.tone == .error)
+        #expect(fixture.ui.home.notices.errorToast?.userMessage == "姿态识别已停止，请查看日志后重试")
+        #expect(fixture.ui.home.notices.visibleNotice?.tone == .error)
         await agent.stop()
         await gateway.shutdown()
         await fixture.stop(activity: workflow)

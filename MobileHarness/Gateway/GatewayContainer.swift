@@ -122,12 +122,13 @@ public struct GatewayObservationAccess: Sendable {
             return configured
         }
     }
-    @discardableResult public func configureExecution(_ configuration: GatewayConfiguration) throws(GatewayFailure)
-        -> GatewayCapabilities
-    {
+    @discardableResult public func configureExecution(
+        _ configuration: GatewayConfiguration,
+        onExecutionSnapshot: (@Sendable (ActionExecutionSnapshot) -> Void)? = nil
+    ) throws(GatewayFailure) -> GatewayCapabilities {
         do {
             guard state == .cold else { throw GatewayContainerError.alreadyConfigured }
-            let capabilities = try assemble(configuration)
+            let capabilities = try assemble(configuration, onExecutionSnapshot: onExecutionSnapshot)
             configured = capabilities
             state = .configured
             return capabilities
@@ -136,9 +137,10 @@ public struct GatewayObservationAccess: Sendable {
             throw failure("configureExecution", error, code: error is GatewayContainerError ? .conflict : nil)
         }
     }
-    private func assemble(_ configuration: GatewayConfiguration, admission supplied: GatewayAdmission? = nil) throws
-        -> GatewayCapabilities
-    {
+    private func assemble(
+        _ configuration: GatewayConfiguration, admission supplied: GatewayAdmission? = nil,
+        onExecutionSnapshot: (@Sendable (ActionExecutionSnapshot) -> Void)? = nil
+    ) throws -> GatewayCapabilities {
         let admission = supplied ?? self.admission
         let signals = supplied == nil ? self.signals : SignalTransport(admission: admission)
         let validateScope: @Sendable (FunctionInvocation, ExecutionOwner?) async throws -> Void = {
@@ -147,7 +149,8 @@ public struct GatewayObservationAccess: Sendable {
         let resources = try ResourceCoordinator(definitions: configuration.resources, admission: admission)
         let actions = ChannelScheduler(
             executor: configuration.executor, resources: resources,
-            admission: admission, validateScope: validateScope, deliverResult: configuration.deliverResult)
+            admission: admission, validateScope: validateScope, deliverResult: configuration.deliverResult,
+            onExecutionSnapshot: onExecutionSnapshot)
         return GatewayCapabilities(
             admission: admission, signals: signals, actions: actions,
             direct: DirectExecutionDispatcher(

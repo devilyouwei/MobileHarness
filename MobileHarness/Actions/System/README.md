@@ -31,7 +31,7 @@ Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注�
 | System.Device | control | 60 秒；accepted 操作回执，不等于连接成功或电机到位 |
 | System.Device | readStatus | 默认 30 秒；设备状态与已发现设备 ID，不扫描或移动 |
 | System.Runtime | runtimeInfo | 默认 30 秒；固定文字“本地聊天与语音能力已配置” |
-| Agent.Task | loadSkills、releaseSkills、startTask、finishTask、cancelTask | 5 秒；宿主返回的 value completion |
+| Agent.Task | loadSkills、releaseSkills、startTask、finishTask、sendMessage | Skill 控制与结束 5 秒，启动与消息发送 30 秒；返回宿主提交或送达结果 |
 
 TaskActions 属于 System 目录，但公开地址为 `Agent.Task`，这是显式的地址映射。它转发完整参数和 invocation，不在这里维护 Agent 状态或重复宿主的权限、参数及轮次验证。
 

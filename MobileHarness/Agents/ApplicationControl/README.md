@@ -57,7 +57,7 @@ flowchart LR
  AS["Assistant"]:::agent
  end
  AS -->|"task.request／input／cancel"| G
- G -->|"task.progress／result"| AS
+ G -->|"agent.task.response"| AS
 
  classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
  classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
@@ -103,7 +103,7 @@ flowchart LR
  subgraph UICalls["Actions：业务呈现"]
  RP["UI.ResourcePresentation.showProviderResult<br/>UI.ResourcePresentation.showResources<br/>UI.ResourcePresentation.showResourceFailure<br/>UI.ResourcePresentation.showResourceOperationFailure<br/>UI.ResourcePresentation.showResourcePreferenceFailure"]:::action
  BP["UI.BluetoothStatus.showBluetoothHome<br/>UI.BluetoothStatus.showBluetoothSettings"]:::action
- DP["UI.RuntimeDiagnostics.recordFailure<br/>UI.Expression.setLoading<br/>UI.Navigation.open"]:::action
+ DP["UI.Expression.setLoading<br/>UI.Navigation.open"]:::action
  end
  G --> PRO
  G --> RES
@@ -146,7 +146,7 @@ Provider restore/save/discover 与资源偏好事务由 Actions 执行；偏好�
 
 ## 故障与业务呈现
 
-容器／运行失败是直接被动观察值，允许 running/paused 下记录，校验来源、会话和执行关联；不登记为 Gateway 外部输入。ApplicationControl 合并证据后调用 `UI.RuntimeDiagnostics.recordFailure`。最多 128 个事件键及 128 个未完成内部呈现调用；保留至多 128 条呈现失败详情，不递归上报呈现失败。首次、无 callID、发生时间在当前 −5…15 秒内的事件可提示；历史、重复及调用关联事件只保留证据。
+容器／运行失败是直接被动观察值，允许 running/paused 下记录，校验来源、会话和执行关联；不登记为 Gateway 外部输入。ApplicationControl 合并最多 128 个事件键，通过注入的直接接口发布 [日志](../../UI/Components/RuntimeLog/README.md) 和首页提示。首次、无 callID、发生时间在当前 −5…15 秒内的事件可提示；历史、重复及调用关联事件只保留证据。
 
 连接条件通过 `UI.BluetoothStatus.showBluetoothHome/showBluetoothSettings` 展示；模型准备通过 `UI.Expression.setLoading` 按 revision 更新。实际 UI 写入和动画由 Actions 提交，角色不改基础状态字段。App 在角色尚不可用时保留启动失败兜底。
 

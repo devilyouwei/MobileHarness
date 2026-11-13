@@ -16,11 +16,16 @@ public enum AgentCommunicationAdapter {
             throw CommunicationError.invalidPayload
         }
         var actions = functions.actions.filter { $0.path.description != "Agent.Communication.send" }
-        let taskSends = policy.sends.filter { $0.contract.hasPrefix("task.") }
-        if !taskSends.isEmpty {
+        let grants = Set(
+            policy.sends.flatMap { send in
+                AgentTaskSignal.Kind.allCases.filter { $0.contract == send.contract }.map {
+                    "\(send.target): \($0.rawValue)"
+                }
+            }
+        ).sorted()
+        if !grants.isEmpty {
             let required: Set<String> = ["target", "kind", "content"]
             let optional: Set<String> = ["taskID", "artifactID"]
-            let grants = Set(taskSends.map { "\($0.target): \($0.contract.dropFirst("task.".count))" }).sorted()
             actions.append(
                 ActionRegistration(
                     alias: "send", path: ActionPath(domain: "Agent", module: "Communication", function: "send"),
@@ -59,7 +64,7 @@ public enum AgentCommunicationAdapter {
             let kind = AgentTaskSignal.Kind(rawValue: kindText), let text = arguments["content"]
         else { throw CommunicationError.invalidPayload }
         let target = arguments["target"].map { AgentID(rawValue: $0) }
-        let contract = "task." + kind.rawValue
+        let contract = kind.contract
         if path.hasSuffix(".send") {
             guard let target, policy.sends.contains(where: { $0.target == target.rawValue && $0.contract == contract })
             else { throw CommunicationError.unauthorized }

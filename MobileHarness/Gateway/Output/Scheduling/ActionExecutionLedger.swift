@@ -15,9 +15,9 @@ struct ActionExecutionLedger {
         self.terminalCapacity = terminalCapacity
     }
 
-    mutating func admit(_ invocation: ScheduledAction, definition: ActionExecutionDescriptor) {
+    mutating func admit(_ invocation: ScheduledAction, kind: ActionFunction.Kind) {
         let semantics: ActionExecutionRecord.Semantics
-        switch definition.kind {
+        switch kind {
         case .finite: semantics = .finite
         case .state: semantics = .state
         case .activityStart: semantics = .activityStart
@@ -25,10 +25,11 @@ struct ActionExecutionLedger {
         case .activityStop: semantics = .activityStop
         }
         records[invocation.executionID] = ActionExecutionRecord(
-            id: invocation.executionID, path: invocation.call.actionPath, displayName: definition.displayName,
+            id: invocation.executionID, path: invocation.call.actionPath,
             source: invocation.envelope.source,
             sessionID: invocation.envelope.sessionID, inputID: invocation.envelope.inputID,
-            channel: invocation.channel, semantics: semantics)
+            channel: invocation.channel, semantics: semantics,
+            parameters: Self.logParameters(invocation.call.parameters))
         order.append(invocation.executionID)
         revision += 1
     }
@@ -60,6 +61,21 @@ struct ActionExecutionLedger {
         }
         revision += 1
         return true
+    }
+
+    private static let credentialFields: Set<String> = [
+        "key", "apikey", "token", "accesstoken", "refreshtoken", "authorization", "password",
+        "secret", "clientsecret", "credential", "credentials", "cookie",
+    ]
+
+    private static func logParameters(_ parameters: [String: String]) -> [String: String] {
+        parameters.reduce(into: [:]) { result, entry in
+            let (name, value) = entry
+            let normalized = name.lowercased().filter(\.isLetter)
+            result[name] =
+                credentialFields.contains(normalized)
+                ? "［已隐藏］" : ActionExecutionRecord.logPreview(value, maximumUTF8Bytes: 2048)
+        }
     }
 
     func snapshot() -> ActionExecutionSnapshot {

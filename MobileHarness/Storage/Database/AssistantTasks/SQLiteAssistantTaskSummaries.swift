@@ -4,7 +4,7 @@ import StorageChat
 import StorageCore
 
 extension SQLiteAssistantTaskRepository {
-    public func completeTask(_ completion: TaskCompressionRecord, dialog: String, endingRequest: String) throws {
+    public func completeTask(_ completion: TaskCompressionRecord, dialog: String, endingRequest: String?) throws {
         guard completion.status == "completed", let summary = completion.summary,
             !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, summary.utf8.count <= 4096
         else { throw RecordStorageError.invalidRecord }
@@ -12,7 +12,7 @@ extension SQLiteAssistantTaskRepository {
         let conversation = try BusinessRecordID.number(dialog, kind: .dialog)
         try database.write { db in
             let sources = try Self.taskSources(task, db: db).map(\.requestID)
-            guard sources == completion.sources, sources.contains(endingRequest) else {
+            guard sources == completion.sources, endingRequest.map(sources.contains) ?? true else {
                 throw RecordStorageError.conflict
             }
             try db.execute(

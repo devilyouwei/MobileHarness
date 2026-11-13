@@ -156,17 +156,17 @@ private actor TaskFixtureChat: ChatCapability {
         return pair.session
     }
 }
-private func taskFixtureConfiguration(parent: Bool) throws -> AgentConfiguration {
+func taskFixtureConfiguration(parent: Bool) throws -> AgentConfiguration {
     let id = parent ? "taskParent" : "taskPhotographer"
     let peer = parent ? "taskPhotographer" : "taskParent"
     let accepted =
         parent
-        ? ["task.progress", "task.result", "communication.receipt"]
+        ? ["agent.task.response", "runtime.message.receipt"]
         : [
-            "task.request", "task.input", "task.cancel", "communication.receipt", "action.result",
-            "generation.round.result",
+            "task.request", "task.input", "task.cancel", "runtime.message.receipt", "runtime.action.result",
+            "runtime.round.result",
         ]
-    let sends = parent ? ["task.request", "task.input", "task.cancel"] : ["task.progress", "task.result"]
+    let sends = parent ? ["task.request", "task.input", "task.cancel"] : ["agent.task.response"]
     let actions: [String: Any] =
         parent
         ? [:]
@@ -182,10 +182,10 @@ private func taskFixtureConfiguration(parent: Bool) throws -> AgentConfiguration
         ]
     let inputs: [[String: Any]] = accepted.map { contract in
         let kind =
-            contract == "communication.receipt"
+            contract == "runtime.message.receipt"
             ? "communicationReceipt"
-            : contract == "action.result"
-                ? "actionResult" : contract == "generation.round.result" ? "roundResult" : "observation"
+            : contract == "runtime.action.result"
+                ? "actionResult" : contract == "runtime.round.result" ? "roundResult" : "observation"
         return ["contract": contract, "version": 1, "kind": kind]
     }
     return try AgentConfiguration(
@@ -968,7 +968,7 @@ extension LiveRuntimeTests {
 }
 
 @Test(.actionCatalog) func communicationCatalogDefinesRequestKindsAndExcludesTelemetryPublish() throws {
-    let configuration = try AgentConfigurations.load(named: "Assistant")
+    let configuration = try taskFixtureConfiguration(parent: true)
     for role in try AgentConfigurations.all() {
         let catalog = try AgentCommunicationAdapter.catalog(role.capabilities, policy: role.communication)
         #expect(catalog.tools.map(\.path) == role.capabilities.tools.map(\.path))
@@ -976,7 +976,9 @@ extension LiveRuntimeTests {
         #expect(
             catalog.actions.contains { $0.alias == "send" }
                 == (role.capabilities.actions.contains { $0.path.description == "Agent.Communication.send" }
-                    && role.communication.sends.contains { $0.contract.hasPrefix("task.") }))
+                    && role.communication.sends.contains { send in
+                        AgentTaskSignal.Kind.allCases.contains { $0.contract == send.contract }
+                    }))
     }
     let catalog = try AgentCommunicationAdapter.catalog(
         fixtureCatalogWithCommunication(configuration.capabilities), policy: configuration.communication)

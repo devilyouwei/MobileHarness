@@ -4,7 +4,7 @@ import Testing
 @testable import UI
 
 @Test @MainActor func executionLogTaskAndRuntimeRetentionIsBounded() {
-    let state = ActionActivityState()
+    let state = RuntimeLogState()
     let taskID = UUID().uuidString
     var value = TaskLogItem(
         id: taskID, parentID: nil, requester: "assistant", executor: "photographer", title: "拍照", phase: .running)
@@ -24,7 +24,7 @@ import Testing
     #expect(state.tasks.count == 100 && state.taskEvictions == 11)
     #expect(state.agentEvents.count == 100 && state.agentEventEvictions == 10)
     state.selectedSource = "photographer"
-    #expect(state.visibleTasks.count == 1 && state.backgroundTaskCount == 1)
+    #expect(state.visibleTasks.map(\.id) == [taskID])
     state.selectedSource = "memory"
     state.selectedFilter = .succeeded
     #expect(state.visibleTasks.count == 99)
@@ -32,21 +32,22 @@ import Testing
     #expect(state.visibleTasks.isEmpty)
 }
 
-@Test @MainActor func executionLogHasThreeTabsAndPreservesAgentFailuresWithoutSignalRows() {
-    #expect(ExecutionLogTab.allCases.map(\.rawValue) == ["Action", "Task", "Agent"])
-    let state = ActionActivityState()
+@Test @MainActor func executionLogHasFourTabsAndPreservesAgentFailuresWithoutSignalRows() {
+    #expect(ExecutionLogTab.allCases.map(\.rawValue) == ["Action", "Task", "Agent", "Decision"])
+    let state = RuntimeLogState()
     let id = UUID().uuidString
-    state.recordIssue(.init(title: "Output", source: "assistant", message: "input rejected: queueFull", inputID: id))
-    state.recordIssue(.init(title: "Output", source: "assistant", message: "input rejected: queueFull", inputID: id))
+    state.record(.issue(.init(title: "Output", source: "assistant", message: "input rejected: queueFull", inputID: id)))
+    state.record(.issue(.init(title: "Output", source: "assistant", message: "input rejected: queueFull", inputID: id)))
     let other = UUID().uuidString
-    state.recordIssue(.init(title: "Output", source: "assistant", message: "input rejected: queueFull", inputID: other))
+    state.record(
+        .issue(.init(title: "Output", source: "assistant", message: "input rejected: queueFull", inputID: other)))
     #expect(state.runtimeIssues.count == 2)
     #expect(Set(state.runtimeIssues.compactMap(\.inputID)) == [id, other])
     #expect(state.sources == ["assistant"])
 }
 
 @Test @MainActor func taskActionFilteringUsesRetainedTimelineInputIdentity() {
-    let state = ActionActivityState()
+    let state = RuntimeLogState()
     let taskID = UUID().uuidString
     let inputID = UUID().uuidString
     state.updateTask(
@@ -55,7 +56,6 @@ import Testing
         event: .init(id: inputID, time: .now, title: "接纳", detail: ""))
     let action = ActionActivityItem(
         id: UUID().uuidString, title: "拍摄", channel: "Camera", status: "运行", issueDescriptions: [],
-        symbol: "camera",
         execution: .init(phase: .running, admittedAt: .now, startedAt: .now, endedAt: nil),
         source: "photographer", inputID: inputID)
     state.replace(revision: 1, records: [action], evictedCount: 0)
@@ -66,7 +66,7 @@ import Testing
 }
 
 @Test @MainActor func taskLogRetainsFailureAndOriginalTimestamp() {
-    let state = ActionActivityState()
+    let state = RuntimeLogState()
     let original = Date(timeIntervalSince1970: 100)
     var task = TaskLogItem(
         id: UUID().uuidString, parentID: nil, requester: "", executor: "assistant", title: "拍照",
@@ -121,81 +121,147 @@ func homeCaptionsKeepFixedDisjointRoleRegions(viewportHeight: CGFloat) {
     #expect(EyeExpression(rawValue: "closed") == .closed)
 }
 
-@Test @MainActor func homeToastShowsNewAgentErrorsWithoutReplayingSnapshotsOrClearingEvidence() {
-    let state = ActionActivityState()
+@Test @MainActor func homeToastShowsNewAgentErrorsWithoutReplayingOrClearingEvidence() {
+    let log = RuntimeLogState()
+    let notices = HomeNoticeState()
     let old = ExecutionIssue(
         title: "Output", source: "assistant", message: "old error", time: Date(timeIntervalSinceNow: -60))
-    state.replaceIssues(revision: 1, records: [old], evictedCount: 0)
-    #expect(state.errorToast == nil)
-    let input = UUID().uuidString
+    log.record(.issue(old))
+    notices.offerToast(old)
+    #expect(notices.errorToast == nil)
     let fresh = ExecutionIssue(
-        title: "Output", source: "assistant", message: "agent.error: httpStatus(400)", inputID: input)
-    state.replaceIssues(revision: 2, records: [old, fresh], evictedCount: 0)
-    #expect(state.errorToast?.message == fresh.message)
-    state.dismissErrorToast(id: UUID().uuidString)
-    #expect(state.errorToast?.id == fresh.id)
-    state.dismissErrorToast(id: fresh.id)
-    state.replaceIssues(revision: 3, records: [old, fresh], evictedCount: 0)
-    state.recordIssue(.init(title: "Output", source: "assistant", message: fresh.message, inputID: input))
-    #expect(state.errorToast == nil && state.outputIssues.count == 2)
-    let other = ExecutionIssue(
-        title: "Output", source: "assistant", message: fresh.message, inputID: UUID().uuidString)
-    state.recordIssue(other)
-    #expect(state.errorToast?.id == other.id)
-    state.replaceIssues(revision: 2, records: [], evictedCount: 0)
-    #expect(state.outputIssues.count == 2)
+        title: "Output", source: "assistant", message: "agent.error: httpStatus(400)", inputID: "fresh")
+    log.record(.issue(fresh))
+    notices.offerToast(fresh)
+    #expect(notices.errorToast?.message == fresh.message)
+    notices.dismissErrorToast(id: "different")
+    #expect(notices.errorToast?.id == fresh.id)
+    notices.dismissErrorToast(id: fresh.id)
+    notices.offerToast(fresh)
+    #expect(notices.errorToast == nil && log.issues.count == 2)
 }
 
 @Test @MainActor func homeToastKeepsActionFailuresInThePanelWithoutReplacingAgentNotice() {
-    let state = ActionActivityState()
+    let state = RuntimeLogState()
+    let notices = HomeNoticeState()
     let id = UUID().uuidString
     func item(_ phase: ActionActivityItem.Execution.Phase) -> ActionActivityItem {
         .init(
             id: id, title: "History.Conversation.summarize", channel: "History", status: "failed",
-            issueDescriptions: ["httpStatus(400)"], symbol: "exclamationmark.triangle",
+            issueDescriptions: ["httpStatus(400)"],
             execution: .init(phase: phase, admittedAt: .now, startedAt: .now, endedAt: phase == .failed ? .now : nil),
             source: "memory")
     }
     state.replace(revision: 1, records: [item(.running)], evictedCount: 0)
-    #expect(state.errorToast == nil)
+    #expect(notices.errorToast == nil)
     state.replace(revision: 2, records: [item(.failed)], evictedCount: 0)
-    #expect(state.errorToast == nil && state.items.first?.isFailure == true)
+    #expect(notices.errorToast == nil && state.items.first?.isFailure == true)
     let agent = ExecutionIssue(title: "Output", source: "assistant", message: "agent.error: httpStatus(400)")
-    state.recordIssue(agent)
+    state.record(.issue(agent))
+    notices.offerToast(agent)
     state.replace(revision: 3, records: [item(.failed)], evictedCount: 0)
-    #expect(state.errorToast?.id == agent.id)
-    state.dismissErrorToast(id: agent.id)
+    #expect(notices.errorToast?.id == agent.id)
+    notices.dismissErrorToast(id: agent.id)
     state.replace(revision: 4, records: [item(.failed)], evictedCount: 0)
-    #expect(state.errorToast == nil && state.items.first?.isFailure == true)
+    #expect(notices.errorToast == nil && state.items.first?.isFailure == true)
 }
 
 @Test @MainActor func homeToastShowsUpperLayerFailuresButRetainsCallScopedFailuresOnlyInLogs() {
-    let state = ActionActivityState()
+    let state = RuntimeLogState()
+    let notices = HomeNoticeState()
     let app = ExecutionIssue(title: "App", source: "runtime", message: "Scene transition failed")
-    state.recordIssue(app)
-    #expect(state.errorToast?.id == app.id)
+    state.record(.issue(app))
+    notices.offerToast(app)
+    #expect(notices.errorToast?.id == app.id)
     let action = ExecutionIssue(
         title: "NexArm.Tracking.aim", source: "assistant", message: "device disconnected",
         context: .init(workerID: UUID().uuidString, callID: UUID().uuidString))
-    state.recordIssue(action)
-    #expect(state.errorToast?.id == app.id)
-    #expect(state.backgroundIssues.contains(action))
-    state.dismissErrorToast(id: app.id)
-    state.recordIssue(action)
-    #expect(state.errorToast == nil)
+    state.record(.issue(action))
+    notices.offerToast(action)
+    #expect(notices.errorToast?.id == app.id)
+    #expect(state.issues.contains(action))
+    notices.dismissErrorToast(id: app.id)
+    state.record(.issue(action))
+    notices.offerToast(action)
+    #expect(notices.errorToast == nil)
     let system = ExecutionIssue(title: "System", source: "system", message: "Service unavailable")
-    state.replaceIssues(revision: 1, records: [system, action], evictedCount: 0)
-    #expect(state.errorToast?.id == system.id)
-    #expect(state.outputIssues.contains(action))
+    state.record(.issue(system))
+    notices.offerToast(system)
+    #expect(notices.errorToast?.id == system.id)
+    #expect(state.issues.contains(action))
 }
 
 @Test @MainActor func classifiedAgentIssueBoundsDetailsWithoutLeakingThemIntoToast() {
-    let state = ActionActivityState()
+    let state = RuntimeLogState()
     let issue = ExecutionIssue(
         title: "modelResponse", source: "assistant", message: String(repeating: "x", count: 3000),
         failureCode: "agent.model.tool.invalidArguments", userMessage: "工具参数格式错误", category: "模型响应异常")
-    state.recordIssue(issue)
+    state.record(.issue(issue))
     #expect(issue.message.count == 2048)
-    #expect(state.visibleNotice?.text == "工具参数格式错误")
+    let notices = HomeNoticeState()
+    notices.offerToast(issue)
+    #expect(notices.visibleNotice?.text == "工具参数格式错误")
     #expect(state.runtimeIssues.first?.failureCode == "agent.model.tool.invalidArguments")
+}
+
+@Test @MainActor func runtimeLogDecisionRetentionSortingAndFiltering() {
+    let state = RuntimeLogState()
+    for index in 0..<101 {
+        let failed = index == 100
+        state.record(
+            .decision(
+                .init(
+                    id: String(index), source: failed ? "assistant" : "fixture", inputText: "输入 \(index)",
+                    time: Date(timeIntervalSince1970: Double(index)), duration: .milliseconds(index),
+                    route: failed ? .fallback : .local,
+                    modelResult: failed ? nil : .interrupt, adoptedResult: .enqueue, reason: "fixture",
+                    requests: failed ? [] : ["system\nfixture"])))
+    }
+    state.record(
+        .decision(
+            .init(
+                id: "100", source: "assistant", inputText: "重复记录", duration: .seconds(1), route: .cloud,
+                modelResult: .discard,
+                adoptedResult: .discard, requests: [])))
+    #expect(state.decisions.count == 100 && state.decisionEvictions == 1)
+    #expect(state.visibleDecisions.first?.id == "100" && state.visibleDecisions.last?.id == "1")
+    #expect(state.visibleDecisions.first?.modelResult == nil)
+    #expect(state.visibleDecisions.first?.inputText == "输入 100")
+    #expect(state.visibleDecisions.first?.duration == .milliseconds(100))
+    state.selectedFilter = .failed
+    #expect(state.visibleDecisions.map(\.id) == ["100"])
+    state.selectedSource = "fixture"
+    #expect(state.visibleDecisions.isEmpty)
+    state.selectedFilter = .succeeded
+    #expect(state.visibleDecisions.count == 99)
+    #expect(state.visibleDecisions.first?.modelResult == .interrupt)
+    #expect(state.visibleDecisions.first?.adoptedResult == .enqueue)
+    #expect(state.visibleDecisions.first?.requests == ["system\nfixture"])
+}
+
+@Test @MainActor func actionLogFiltersExactChannelAlongsideStatusAndSource() {
+    let state = RuntimeLogState()
+    func item(_ id: String, channel: String, source: String, phase: ActionActivityItem.Execution.Phase)
+        -> ActionActivityItem
+    {
+        .init(
+            id: id, title: "Fixture.Action.perform", channel: channel, status: "status", issueDescriptions: [],
+            execution: .init(phase: phase, admittedAt: .now, startedAt: nil, endedAt: nil),
+            source: source)
+    }
+    let robot = item("robot", channel: "Robot", source: "assistant", phase: .succeeded)
+    let camera = item("camera", channel: "Camera", source: "assistant", phase: .succeeded)
+    let failed = item("failed", channel: "Robot", source: "assistant", phase: .failed)
+    let custom = item("custom", channel: "robot", source: "other", phase: .succeeded)
+    state.replace(revision: 1, records: [robot, camera, failed, custom], evictedCount: 0)
+    #expect(state.actionChannels == ["Camera", "Robot", "robot"])
+    state.selectedChannel = "Robot"
+    #expect(state.visibleActions.map(\.id) == ["robot", "failed"])
+    state.selectedFilter = .succeeded
+    #expect(state.visibleActions.map(\.id) == ["robot"])
+    state.selectedSource = "other"
+    #expect(state.visibleActions.isEmpty)
+    state.replace(revision: 2, records: [camera, custom], evictedCount: 2)
+    #expect(state.selectedChannel == nil)
+    #expect(state.visibleActions.map(\.id) == ["custom"])
 }

@@ -12,7 +12,7 @@ Support owns reusable cognitive input/execution correlation, authorization, rout
 | ActionDispatcher / ToolDispatcher / ExecutionRouter | Cognitive output translation, protocol-specific dispatch and authorized submission to injected neutral Gateway facilities. No raw handlers or function registry. |
 | BehaviorCoverage / OutputValidator | Catalog coverage and cognitive request validation. |
 | AgentGatewayBindings / AgentBusinessPorts / GatewayProjections | App-bound neutral hosts, generic observation scopes and immutable catalog. GatewayProjections owns all cognitive-to-neutral call/envelope and outcome conversion in one place. |
-| ActionActivityWorkflow / ActionActivityPresentation | Passive Agent/Task activity projection into UI values, never callable native/business execution. |
+| AgentRuntimeLogWorkflow / ActionActivityPresentation | Passive Agent/Task log projection and bounded failure delivery, plus an adapter that projects scheduler snapshots into canonical function names, argument previews and actual completion text. |
 | AgentContainerLifecycle | Coalesced startup/transition/cleanup/shutdown tasks, revision fencing and preserved failure. |
 | AgentUIRequests | Long-lived ordinary/control consumers, request cancellation, processing identity and original reply completion. |
 | ContainerFailureChannel / AgentInputMetrics | Bounded failure evidence/delivery and optional content-free input diagnostics. |
@@ -63,7 +63,7 @@ InputGateway 按投递方式分别校验。广播要求精确订阅，定向消�
 
 InputGateway accepts complete Action/Tool value completions without an observation-byte quota; trusted source/session identity, task permissions and result status consistency remain mandatory. Per-agent model context selection is separate from result delivery.
 
-执行记录将 UI.Caption.print、UI.Caption.beginReplyTurn 等呈现路径归入 UI 内部动作过滤器，真实失败仍可见。权限、调度和实际执行由各自入口校验。
+执行日志将 UI.Caption.print、UI.Caption.beginReplyTurn 等呈现路径归入 UI 内部动作过滤器，真实失败仍可见。权限、调度和实际执行由各自入口校验。
 
 GatewayOutputConsumer区分模型/Agent协议反馈与内部完成结果。executeInternal只接受本注册角色
 声明的internalTools且roundID为空；调用仍经过Gateway的权限、资源和执行验证，真实完成或
@@ -71,6 +71,8 @@ GatewayOutputConsumer区分模型/Agent协议反馈与内部完成结果。execu
 协议反馈，配对的模型工具结果仍按调用身份回到Agent。内部灵动岛呈现使用executeInternal。
 
 GatewayOutputConsumer 的退休端口绑定注册执行者的身份。OutputGateway 先封住任务授权的新执行，按终态加入或取消现有调用，再按接纳代际撤销授权。成功撤权后，InputGateway 写入本地任务诊断记录供状态观察。已有生命周期清理或进程重启留下的缺失授权可以收敛。Writer 的持久收尾 worker 持有调用并负责暂停和停止时加入，用户通知由另一个 worker 独立投递。
+
+Writer 接纳新的普通消息后，可通过绑定的 GatewayOutputConsumer 申请执行授权。端口核对消息身份、会话和双方实例；业务接纳失败时撤回该次申请。进度与终态保留已绑定的执行范围。
 
 默认内部动作过滤同时覆盖识别字幕/封口、回复字幕、等待态、语音状态和灵动岛呈现，不把这些
 成功的运行时维护调用混入业务记录；用户打开内部动作后可查看。失败仍沿现有诊断策略可见。
@@ -81,7 +83,7 @@ OutputGateway binds only AgentMessageRepository for durable Agent communication.
 
 ## Agent 公开元数据
 
-AgentConfigurations 校验 Catalog 索引的 v10 Agent 资源（category、description、身份、通信和 baseSkills），再投影为 AgentCore v8 的函数/通信配置。公开 description 由各角色维护，单条最多 2048 UTF-8 字节。delegationOverview 与任务执行共用 Communication/AgentTaskDelegation 的真实适配和调用者权限；总目录最多 8192 字节，超限或无效配置明确失败。它只组装公开介绍，不加载同伴私有指令；模型上下文采用当前实例的通信策略，实时可用性由 State 提供。
+AgentConfigurations 校验 Catalog 索引的 v10 Agent 资源（category、description、身份、通信和 baseSkills），再投影为 AgentCore v8 的函数/通信配置。公开 description 由各角色维护，单条最多 2048 UTF-8 字节。delegationOverview 与任务执行共用 Communication/AgentTaskMessaging 的真实适配和调用者权限；总目录最多 8192 字节，超限或无效配置明确失败。它只组装公开介绍，不加载同伴私有指令；模型上下文采用当前实例的通信策略，实时可用性由 State 提供。
 
 AgentSkillLoader 共享依赖展开、函数绑定和教学读取。Skill 可声明 owner 限定运行时 Agent ID。共享发现仅列出无 owner 的 Skill，共享 Task/Skill 加载按同一规则校验根 Skill 和依赖。Agent 基础目录按可信配置身份解析；Writer 以自己的身份组合各控制域的 Skill。共享目录也解析 Writer 专属的 Agent.Writer 工具声明，校验 Skill 所有者并为其生成同样的模型参数。Gateway 覆盖检查只要求外部执行入口，本地工具由 Writer 消费。
 

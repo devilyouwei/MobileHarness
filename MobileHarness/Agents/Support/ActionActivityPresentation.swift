@@ -1,20 +1,24 @@
 import AgentCore
-import Foundation
 import FunctionContracts
-import Gateway
-import PlatformKit
-import StorageCore
 import UI
 
-private struct ActionActivityMapping: Identifiable, Equatable, Sendable {
-    public let execution: ActionExecutionRecord
-    public var title: String { execution.displayName }
-    public var channelTitle: String { execution.channel }
-    public var report: AgentActionReport? {
-        if case .report(let report) = execution.completion { return report.agentValue }
+private struct ActionActivityMapping {
+    let execution: ActionExecutionRecord
+    var output: String? {
+        guard let completion = execution.completion else { return nil }
+        if case .completed = completion { return "已完成（无返回值）" }
+        do {
+            let response = try ToolResponse.response(completion, policy: .returning, callID: execution.id)
+            return response.map { ActionExecutionRecord.logPreview($0.value, maximumUTF8Bytes: 16_384) }
+        } catch {
+            return "执行结果无法编码"
+        }
+    }
+    var report: ActionReport? {
+        if case .report(let report) = execution.completion { return report }
         return nil
     }
-    public var issueDescriptions: [String] {
+    var issueDescriptions: [String] {
         guard let report else { return [] }
         let executionIssues: [String] =
             report.executionFailure.flatMap {
@@ -39,7 +43,6 @@ private struct ActionActivityMapping: Identifiable, Equatable, Sendable {
                 case "timedOut": reason = "执行超时"
                 case "invalidArguments": reason = "参数无效"
                 case "unavailable": reason = "当前不可执行"
-                case "cancelled": reason = entry.status == .notStarted ? "已取消，未执行" : "执行已取消"
                 case "resultCapacityExceeded": reason = "结果数量超出声明上限"
                 default:
                     if report.entries.count == 1, let detail = execution.failureDescription, !detail.isEmpty {
@@ -59,7 +62,7 @@ private struct ActionActivityMapping: Identifiable, Equatable, Sendable {
                 return "第\(index + 1)项\(motor)：\(capturedReason)\(position)"
             }
     }
-    public var status: String {
+    var status: String {
         switch execution.phase {
         case .queued: "等待执行"
         case .running: "正在执行"
@@ -80,31 +83,15 @@ private struct ActionActivityMapping: Identifiable, Equatable, Sendable {
             }
         }
     }
-    public var id: String { execution.id }
-    public var channel: String { execution.channel }
-    public var isActive: Bool { !execution.isTerminal }
-    public var isFailure: Bool { execution.phase == .failed }
-    public var symbol: String {
-        switch execution.phase {
-        case .queued: "clock"
-        case .running: "arrow.triangle.2.circlepath"
-        case .cancelling: "hourglass"
-        case .succeeded: "checkmark.circle"
-        case .failed: "exclamationmark.circle"
-        case .cancelled: "minus.circle"
-        }
-    }
-    public init(execution: ActionExecutionRecord) {
-        self.execution = execution
-    }
+
 }
 
 extension ActionActivityItem {
     public init(execution: ActionExecutionRecord) {
         let mapped = ActionActivityMapping(execution: execution)
         self.init(
-            id: execution.id, title: mapped.title, channel: mapped.channel, status: mapped.status,
-            issueDescriptions: mapped.issueDescriptions, symbol: mapped.symbol,
+            id: execution.id, title: execution.path.description, channel: execution.channel, status: mapped.status,
+            issueDescriptions: mapped.issueDescriptions,
             execution: .init(
                 phase: execution.phase.presentationPhase, admittedAt: execution.admittedAt,
                 startedAt: execution.startedAt, endedAt: execution.endedAt),
@@ -114,8 +101,8 @@ extension ActionActivityItem {
                 "UI.Caption.finishTranscript", "UI.Expression.setReplyWaiting", "UI.VoiceState.setVoiceState",
                 "Speech.Listening.update", "UI.Island.present", "UI.Island.update", "UI.Island.end",
                 "UI.Island.setPresentation",
-            ].contains(
-                execution.path.description))
+            ].contains(execution.path.description),
+            parameters: execution.parameters, output: mapped.output)
     }
 }
 
@@ -165,6 +152,32 @@ extension AgentLifecycle {
         case .paused: "已暂停"
         case .stopped: "已停止"
         case .failed: "运行失败"
+        }
+    }
+}
+
+extension InputDecisionOutcome {
+    func logItem(for snapshot: InputDecisionSnapshot, duration: Duration) -> DecisionLogItem {
+        let route: DecisionLogItem.Route =
+            switch self.route {
+            case .local: .local
+            case .cloud: .cloud
+            case .fallback: .fallback
+            }
+        return .init(
+            id: snapshot.input.id, source: AgentID.assistant.rawValue, inputText: snapshot.text, duration: duration,
+            route: route,
+            modelResult: modelResult.map(\.logDisposition), adoptedResult: adopted.logDisposition,
+            reason: reason, requests: requests, localFallback: localFallback)
+    }
+}
+
+extension InputDisposition {
+    fileprivate var logDisposition: DecisionLogItem.Disposition {
+        switch self {
+        case .enqueue: .enqueue
+        case .discard: .discard
+        case .interrupt: .interrupt
         }
     }
 }

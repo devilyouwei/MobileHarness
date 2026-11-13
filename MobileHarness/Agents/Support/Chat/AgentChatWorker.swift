@@ -42,8 +42,6 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     }
     private var taskControlInProgress = false
     private let inputAdmission = AgentAdmissionGate(capacity: 32)
-    private var delegationInputID: String?
-    private var delegationInProgress = false
     private let contextRepository: AgentContextRepository<State>
     private let contextBuilder = AgentChatRequestBuilder<State>()
 
@@ -118,15 +116,18 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     private func publishInputQueue() async { await inputQueueStatus(queue.count, decisionPending.count) }
     private let fullDuplex: Bool
     private let inputDecision: AssistantInputDecision?
-    private var decisionPending: [InputDecisionSnapshot] = []
+    private let decisionLog: (@MainActor @Sendable (InputDecisionSnapshot, InputDecisionOutcome, Duration) -> Void)?
+    private struct PendingInputDecision {
+        let input: AgentInput
+        let text: String
+        let question: String?
+        let receivedAt = ContinuousClock.now
+    }
+    private var decisionPending: [PendingInputDecision] = []
     private var decisionWorker: Task<Void, Never>?
     private var inputInterruption: (@Sendable (String) async throws -> Void)?
-    private var latestReplySnippet = ""
     public func bindInputInterruption(_ callback: @escaping @Sendable (String) async throws -> Void) {
         inputInterruption = callback
-    }
-    private func appendDecisionReply(_ text: String) {
-        latestReplySnippet = String((latestReplySnippet + text).suffix(160))
     }
     private func classifyPendingInputs() {
         guard decisionWorker == nil, let inputDecision else { return }
@@ -134,19 +135,33 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             defer { decisionWorker = nil }
             while !decisionPending.isEmpty, !Task.isCancelled, lifecycle != .stopped {
                 let queued = decisionPending[0]
+                let startedAt = ContinuousClock.now
+                let playing = await speechOutput?.isPlaying(sessionID: queued.input.sessionID)
+                let history = await contextRepository.residentSnapshot()?.state.history.current
+                guard !Task.isCancelled, lifecycle != .stopped else { return }
+                guard decisionPending.first?.input.id == queued.input.id else { continue }
+                let running =
+                    activeInput?.sessionID == queued.input.sessionID
+                    || pendingRounds.values.contains {
+                        $0.input.sessionID == queued.input.sessionID && !$0.cancelled
+                    }
                 let snapshot = InputDecisionSnapshot(
-                    input: queued.input, text: queued.text,
-                    occupied: worker != nil || !pendingRounds.isEmpty || !replyInputs.isEmpty,
-                    context: queued.context, protectsAnswer: queued.protectsAnswer, receivedAt: queued.receivedAt)
+                    input: queued.input, text: queued.text, running: running, playing: playing,
+                    history: history.flatMap {
+                        AgentChatContextBuilder.decisionExchange(in: $0, before: queued.input.id)
+                    },
+                    question: queued.question, receivedAt: queued.receivedAt)
                 let observedEpoch = generationEpoch
-                let disposition = await inputDecision.classify(snapshot)
+                let decision = await inputDecision.classify(snapshot)
+                let duration = startedAt.duration(to: .now)
                 guard !Task.isCancelled, lifecycle != .stopped else { return }
                 guard decisionPending.first?.input.id == snapshot.input.id else { continue }
                 let input = snapshot.input
+                let disposition = decision.adopted
                 do {
                     if var evidence = coordination[input.id] {
                         evidence.decision = disposition.rawValue
-                        evidence.route = await inputDecision.lastRoute
+                        evidence.route = decision.route.rawValue
                         coordination[input.id] = evidence
                         try await conversations.recordCoordination(evidence, for: input.id)
                     }
@@ -165,6 +180,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                         }
                         await publishInputQueue()
                         if settlementAdmissions.contains(input.id) { drain() }
+                        if !Task.isCancelled { await decisionLog?(snapshot, decision, duration) }
                         continue
                     }
                     try queue.admit(input, disposition: .enqueue(priority: 0))
@@ -178,6 +194,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                     }
                     await publishInputQueue()
                     if lifecycle == .running { drain() }
+                    if !Task.isCancelled { await decisionLog?(snapshot, decision, duration) }
                 } catch {
                     decisionPending.removeAll { $0.input.id == input.id }
                     queue.remove(id: input.id)
@@ -196,6 +213,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                     replyInputs.remove(input.id)
                     emit(.control("agent.error: input decision failed: \(error)"), for: input)
                     if settlementAdmissions.contains(input.id) { drain() }
+                    if !Task.isCancelled { await decisionLog?(snapshot, decision, duration) }
                 }
             }
         }
@@ -233,7 +251,6 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     private let prompt: @Sendable (CapabilityRegistry) throws -> String
     private var hostCancellationInProgress = false
     private var hostCancellationSession: String?
-    private var hostCancellationClosesSession = false
     private var reportHostCancellationFailure = false
     private var hostCancelledInput: (id: String, round: String?)?
     private var worker: Task<Void, Never>?
@@ -314,7 +331,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         let input: AgentInput
         let scopeID: String
         let originDialog: String
-        let kind: WriterDelegationEvent.Kind
+        let kind: WriterDelegationEvent.Kind?
         let interactionID: String?
         let text: String
     }
@@ -358,6 +375,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         stateContext: AgentStateContext? = nil,
         speechOutput: (any AgentSpeechOutput)? = nil,
         inputDecision: AssistantInputDecision? = nil, fullDuplex: Bool = false,
+        decisionLog: (@MainActor @Sendable (InputDecisionSnapshot, InputDecisionOutcome, Duration) -> Void)? = nil,
         inputQueueStatus: @escaping @Sendable (Int, Int) async -> Void = { _, _ in },
         uiHome: UIHomeContainer? = nil, uiSessionID: String? = nil,
         capacity: Int = 32, presentsReply: Bool = false,
@@ -377,6 +395,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         self.inputQueueStatus = inputQueueStatus
         self.fullDuplex = fullDuplex
         self.inputDecision = inputDecision
+        self.decisionLog = decisionLog
         self.speechOutput = speechOutput
         self.uiHome = uiHome
         self.uiSessionID = uiSessionID
@@ -572,9 +591,8 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                     status: .cancelled)
             }
         }
-        let fixed = descriptor.capabilities
         try await contextRepository.update {
-            try $0.state.skillState?.interruptSession(fixed: fixed)
+            try $0.state.skillState?.interruptSession()
             $0.state.reconcileTaskCompressions()
         }
         if let skills = try await contextRepository.snapshot().state.skillState { skillContinuation.yield(skills) }
@@ -666,7 +684,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         } else if case .transcript(_, final: true)? = input.payload.perception {
             ordered = true
         } else if case .observation(let message) = input.payload,
-            message.content(as: WriterDelegationCompletion.self) != nil
+            message.content(as: AgentTaskResponse.self) != nil
                 || message.content(as: AgentTaskSignal.self)?.scope.executor == .writer
         {
             ordered = true
@@ -711,14 +729,18 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             return
         }
         if case .observation(let message) = input.payload,
-            let completion = message.content(as: WriterDelegationCompletion.self)
+            let report = message.content(as: AgentTaskResponse.self)
         {
-            try await receiveWriterCompletion(completion, input: input)
+            try await receiveTaskReport(report, input: input)
             return
         }
         if case .observation(let message) = input.payload,
             let signal = message.content(as: AgentTaskSignal.self)
         {
+            guard
+                input.metadata.origin == .runtime || signal.scope.executor != .writer
+                    || (signal.kind != .progress && signal.kind != .result)
+            else { throw CommunicationError.unauthorized }
             try await receiveTask(signal, input: input)
             return
         }
@@ -816,12 +838,10 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                 guard !hostCancellationInProgress else { throw HarnessError.invalidTransition }
                 hostCancellationInProgress = true
                 hostCancellationSession = input.sessionID
-                hostCancellationClosesSession = closesSession
                 cancelledAdmissions.formUnion(admittingInputs.filter { $0.value == input.sessionID }.map(\.key))
                 defer {
                     hostCancellationInProgress = false
                     hostCancellationSession = nil
-                    hostCancellationClosesSession = false
                     drain()
                 }
                 reportHostCancellationFailure = false
@@ -912,16 +932,15 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                     guard report.failure == nil, report.rejected.isEmpty, report.delivered.contains(view.scope.executor)
                     else { throw CommunicationError.unavailableTarget }
                 }
-                let fixed = descriptor.capabilities
                 try await contextRepository.update { context in
                     let inputs = Set(
                         context.work.filter {
                             $0.value.sessionID == input.sessionID && (closesSession || oldIDs.contains($0.key))
                         }.map(\.key))
                     if closesSession {
-                        try context.state.skillState?.cancelSession(input.sessionID, inputs: inputs, fixed: fixed)
+                        try context.state.skillState?.closeSession(input.sessionID, inputs: inputs)
                     } else {
-                        try context.state.skillState?.interruptSession(input.sessionID, inputs: inputs, fixed: fixed)
+                        try context.state.skillState?.interruptSession(input.sessionID, inputs: inputs)
                     }
                     context.state.reconcileTaskCompressions()
                 }
@@ -1065,13 +1084,8 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             throw CancellationError()
         }
         if let userText, isUser, inputDecision != nil {
-            let interactions = inputInteractions[input.id] ?? []
-            let context = ([latestReplySnippet] + interactions.prefix(1).map(\.text)).joined(separator: "\n")
             decisionPending.append(
-                .init(
-                    input: input, text: userText,
-                    occupied: worker != nil || !pendingRounds.isEmpty || !replyInputs.isEmpty, context: context,
-                    protectsAnswer: !interactions.isEmpty))
+                .init(input: input, text: userText, question: inputInteractions[input.id]?.first?.text))
             await publishInputQueue()
             admitted = true
             classifyPendingInputs()
@@ -1145,7 +1159,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                     emit(.control("agent.error: context commit failed: \(error)"), for: input)
                 }
                 do {
-                    try await finishLocalDecision(input: input, failed: true, failure: String(describing: error))
+                    try await finishLocalDecision(input: input, finishRequested: false)
                 } catch { emit(.control("agent.error: task cleanup failed: \(error)"), for: input) }
                 do { try await conversations.finish(input.id, state: .failed, error: String(describing: error)) } catch
                 { emit(.control("agent.historyError: \(error)"), for: input) }
@@ -1344,10 +1358,12 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         budget = resumed?.budget
         resultBytes = 0
         generationFinishReason = nil
+        var cancelledParkedRound = false
         do {
             if let key = pendingRounds.first(where: { $0.value.input.id == input.id && $0.value.queued })?.key,
                 let parked = pendingRounds.removeValue(forKey: key)
             {
+                cancelledParkedRound = parked.cancelled
                 recorded = true
                 roundID = key
                 currentOrdinal = parked.ordinal
@@ -1528,7 +1544,8 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             }
             do {
                 try await finishLocalDecision(
-                    input: input, failed: !cancelled, failure: cancelled ? nil : failure, cancelled: cancelled)
+                    input: input, finishRequested: false,
+                    interrupted: cancelled || cancelledParkedRound)
             } catch {
                 failure += "; local task cleanup failed: \(error)"
             }
@@ -1602,7 +1619,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         }
         try await contextRepository.update { try $0.transitionWork(input.id, to: .completed) }
         guard lifecycle == .running || lifecycle == .paused else { return }
-        try await finishLocalDecision(input: input, failed: false)
+        try await finishLocalDecision(input: input)
         try await completeTaskDecision(input)
         try await conversations.finish(input.id, state: .completed, reason: generationFinishReason)
         try await finishBatch(input)
@@ -1615,7 +1632,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     )
         async throws -> ChatRequest?
     {
-        var request = initial
+        let request = initial
         let inputText = suppliedText ?? initial.messages.last?.content ?? ""
         do {
             generationCalls = 0
@@ -1833,16 +1850,14 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         try await releaseDelegations(parent: input)
         if let skills = try await contextRepository.snapshot().state.skillState,
             let id = skills.activeTaskID, let task = skills.tasks.first(where: { $0.id == id }),
-            ["finishing", "cancelling"].contains(task.status)
+            task.status == "finishing"
         {
-            if let generationError { throw generationError }
             if let failed = roundCalls.first(where: { $0.result?.hasFailure == true }), let result = failed.result {
                 throw CapabilityError.invalidRequest(
                     "Task closure failed at \(failed.path): \(try Self.observationText(result))")
             }
-            let cancelled = task.status == "cancelling"
-            try await finishLocalDecision(input: input, failed: false, taskBoundaryOnly: true)
-            if cancelled || task.continueDecision != true { return nil }
+            try await finishLocalDecision(input: input, taskBoundaryOnly: true)
+            if task.continueDecision != true { return nil }
         }
         guard roundCalls.contains(where: { !isInternalRuntimeCall($0) && $0.result?.requiresReasoning == true })
         else {
@@ -2277,7 +2292,6 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                             try await self.dispatchRequest(input)
                             switch event {
                             case .text(let text) where !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty:
-                                await self.appendDecisionReply(text)
                                 try await self.finishReplyWaiting(requestID, input: input)
                             case .toolCall, .finished:
                                 try await self.finishReplyWaiting(requestID, input: input)
@@ -2705,9 +2719,11 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         let signal = message.content(as: AgentTaskSignal.self)
         let durable = signal?.scope.execution == .background && target != nil
         let action = try CommunicationAction(
-            id: durable && signal?.kind == .request ? signal?.scope.id : nil, message: message, target: target)
-        if durable, let signal, let target, let taskRecords, signal.kind != .request {
-            try await requireCommunications().enqueueAgentMessage(
+            id: durable && signal?.kind == .request ? signal?.scope.id : message.content(as: AgentTaskRequest.self)?.id,
+            message: message, target: target)
+        let messageRecords = durable && State.agentID == .assistant ? try requireCommunications() : nil
+        if let messageRecords, let signal, let target, signal.kind != .request {
+            try await messageRecords.enqueueAgentMessage(
                 .init(
                     id: action.id, sender: descriptor.id.rawValue, receiver: target.rawValue,
                     contract: signal.contract, payload: try JSONEncoder().encode(signal),
@@ -2735,12 +2751,12 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             return DeliveryReport()
         }
         let report = try await communicationReceipts.wait(action.id)
-        if durable, let target, let taskRecords {
+        if let messageRecords, let target {
             if report.delivered.contains(target) {
-                try await requireCommunications().receiveAgentMessage(
+                try await messageRecords.receiveAgentMessage(
                     action.id, receiver: target.rawValue, consumed: false)
             } else {
-                try await requireCommunications().failAgentMessage(
+                try await messageRecords.failAgentMessage(
                     action.id, failure: report.failure ?? report.rejected[target] ?? "Not delivered")
             }
         }
@@ -2896,8 +2912,10 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         } else {
             content = try AgentTaskContent.decode(signal)
         }
-        if signal.scope.executor == .writer, let event = content.writerEvent {
-            try await receiveWriterEvent(signal, content: content, event: event, input: input)
+        if signal.scope.executor == .writer, signal.scope.execution == .background, signal.kind == .result,
+            signal.businessContract == "runtime.taskTermination"
+        {
+            // The Writer persists and reports its own terminal outcome independently of the grant.
             return
         }
         let prior = (try await contextRepository.snapshot()).state.taskViews?[signal.scope.id]
@@ -2919,14 +2937,6 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                 views[signal.scope.id]?.createdAt = prior?.createdAt
             }
             context.state.taskViews = views
-        }
-        if signal.kind == .result, signal.scope.execution == .foreground,
-            BusinessRecordID(rawValue: signal.scope.id)?.kind == .task
-        {
-            try await taskRecords?.endTask(
-                signal.scope.id,
-                status: signal.status == .succeeded ? "completed" : (signal.status?.rawValue ?? "failed"),
-                failure: signal.status == .succeeded ? nil : content.text)
         }
         if signal.scope.execution == .background {
             if fullDuplex, signal.kind == .progress || signal.kind == .result {
@@ -2984,108 +2994,100 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         }
     }
 
+    private func receiveTaskReport(_ report: AgentTaskResponse, input: AgentInput) async throws {
+        guard lifecycle == .running || lifecycle == .paused, State.agentID == .assistant,
+            input.metadata.origin == .agent, input.metadata.source == AgentID.writer.rawValue,
+            input.metadata.incarnation != nil
+        else { throw CommunicationError.unauthorized }
+        try report.validate()
+        if let rejection = report.rejection {
+            guard rejection.sessionID == input.sessionID else { throw CommunicationError.unauthorized }
+            try await receiveTaskMessageRejection(rejection, report: report, input: input)
+            return
+        }
+        guard let signal = report.signal, signal.scope.requester == descriptor.id, signal.scope.executor == .writer,
+            signal.scope.sessionID == input.sessionID
+        else { throw CommunicationError.unauthorized }
+        let content = try AgentTaskContent.decode(signal)
+        guard let event = content.writerEvent else { throw CommunicationError.invalidPayload }
+        if signal.kind == .result {
+            try await receiveWriterCompletion(report, signal: signal, content: content, event: event, input: input)
+        } else {
+            try await receiveWriterEvent(signal, content: content, event: event, input: input)
+        }
+    }
+
     private func receiveWriterEvent(
         _ signal: AgentTaskSignal, content: AgentTaskContent, event: WriterDelegationEvent, input: AgentInput
     ) async throws {
-        try event.validate()
-        guard input.metadata.origin == .agent, input.metadata.source == "writer", input.metadata.incarnation != nil,
-            signal.scope.requester == descriptor.id, signal.scope.execution == .background
-        else { throw CommunicationError.unauthorized }
-        guard signal.kind == .progress,
-            [.started, .draftUpdated, .recovering, .userInput].contains(event.kind),
-            event.kind == .userInput
-                ? content.stage == .waitingUser && content.interactionID != nil
-                : content.stage == .running && content.interactionID == nil
-        else { throw CommunicationError.invalidPayload }
         let snapshot = try await contextRepository.snapshot()
-        guard let prior = snapshot.state.taskViews?[signal.scope.id], prior.scope == signal.scope else {
-            throw CommunicationError.scopeClosed
-        }
-        if prior.terminal || (prior.stage == .waitingUser && event.kind.isMilestone)
-            || prior.writerEvent?.eventID == event.eventID
-            || event.sequence <= (prior.writerEvent?.sequence ?? 0)
+        let prior = snapshot.state.taskViews?[signal.scope.id]
+        if let prior, prior.scope != signal.scope { throw CommunicationError.scopeClosed }
+        if prior?.terminal == true || (prior?.stage == .waitingUser && event.kind.isMilestone)
+            || prior?.writerEvent?.eventID == event.eventID
+            || event.sequence <= (prior?.writerEvent?.sequence ?? 0)
         {
             return
         }
+        let origin = try await writerMessageOrigin(signal.scope.id)
         try await contextRepository.recordSignal(
             input, disposition: .control, admissionSequence: snapshot.revision + 1, consumed: true,
             retainingLast: 4096
         ) { context in
-            guard let prior = context.state.taskViews?[signal.scope.id], prior.scope == signal.scope else {
-                throw CommunicationError.scopeClosed
-            }
+            let prior = context.state.taskViews?[signal.scope.id]
+            if let prior, prior.scope != signal.scope { throw CommunicationError.scopeClosed }
             guard event.delegateID == nil || event.delegateID == signal.scope.id
             else { throw CommunicationError.invalidPayload }
-            if prior.terminal || (prior.stage == .waitingUser && event.kind.isMilestone)
-                || prior.writerEvent?.eventID == event.eventID
-                || event.sequence <= (prior.writerEvent?.sequence ?? 0)
+            if prior?.terminal == true || (prior?.stage == .waitingUser && event.kind.isMilestone)
+                || prior?.writerEvent?.eventID == event.eventID
+                || event.sequence <= (prior?.writerEvent?.sequence ?? 0)
             {
                 return
             }
-            try context.tasks.accept(signal, input: input, agent: State.agentID)
+            if context.state.taskViews?.count == 256, prior == nil {
+                guard let retired = context.state.taskViews?.first(where: { $0.value.terminal })?.key
+                else { throw CommunicationError.capacityExceeded }
+                context.state.taskViews?[retired] = nil
+            }
             var view = AgentTaskView(scope: signal.scope, content: content)
-            view.goal = prior.goal
-            view.originDialog = prior.originDialog
-            view.createdAt = prior.createdAt
-            view.retainWriterFacts(from: prior)
+            view.goal = event.goal ?? prior?.goal
+            view.originDialog = prior?.originDialog ?? origin
+            view.createdAt = prior?.createdAt ?? Date()
+            if event.kind == .inputAccepted {
+                view.writerFacts = prior?.writerFacts
+            } else {
+                view.retainWriterFacts(from: prior)
+            }
+            if context.state.taskViews == nil { context.state.taskViews = [:] }
             context.state.taskViews?[signal.scope.id] = view
         }
-        if let view = (try await contextRepository.snapshot()).state.taskViews?[signal.scope.id],
+        if event.kind != .inputAccepted,
+            let view = (try await contextRepository.snapshot()).state.taskViews?[signal.scope.id],
             view.writerEvent?.eventID == event.eventID
         {
             try await enqueueWriterNotice(view, input: input)
         }
     }
 
-    /// Canonical Writer completion, not a user-notification receipt, ends task occupancy.
-    private func reconcileWriterExecutions() async throws {
-        guard taskRecords != nil else { throw RecordStorageError.missingRecord }
-        let snapshot = try await contextRepository.snapshot()
-        for view in (snapshot.state.taskViews ?? [:]).values
-        where view.scope.executor == .writer {
-            let active =
-                snapshot.tasks.task(view.scope.id).map {
-                    ![AgentTaskRegistry.State.succeeded, .failed, .cancelled, .interrupted].contains($0.state)
-                } ?? false
-            guard !view.terminal || active else { continue }
-            guard
-                let message = try await requireCommunications().agentReply(
-                    to: view.scope.id, contract: "writer.completion")
-            else { continue }
-            let ended = try JSONDecoder().decode(WriterDelegationCompletion.self, from: message.payload).signal
-            guard message.sender == "writer", message.receiver == descriptor.id.rawValue, ended.scope == view.scope
-            else { throw CommunicationError.invalidPayload }
-            try await contextRepository.update { context in
-                if let state = context.tasks.task(view.scope.id)?.state,
-                    ![.succeeded, .failed, .cancelled, .interrupted].contains(state)
-                {
-                    try context.tasks.report(ended, agent: .writer)
-                }
-                guard var value = context.state.taskViews?[view.scope.id], !value.terminal else { return }
-                value.terminal = true
-                value.stage = .completed
-                value.text = try AgentTaskContent.decode(ended).text
-                context.state.taskViews?[view.scope.id] = value
-                try context.append(
-                    .init(taskID: view.scope.id, kind: "writer.execution.closed", data: JSONEncoder().encode(ended)))
-            }
-        }
-    }
-    private func receiveWriterCompletion(_ completion: WriterDelegationCompletion, input: AgentInput) async throws {
-        guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
-        try completion.validate()
-        guard State.agentID == .assistant, input.metadata.origin == .agent, input.metadata.source == "writer",
-            input.metadata.incarnation != nil, taskRecords != nil
+    private func writerMessageOrigin(_ id: String) async throws -> String? {
+        guard let record = try await requireCommunications().agentMessage(id), record.sender == descriptor.id.rawValue,
+            record.receiver == AgentID.writer.rawValue, record.replyTo == nil, record.correlationID == id,
+            [AgentTaskRequest.contract, "agent.taskMessage", "task.request"].contains(record.contract)
         else { throw CommunicationError.unauthorized }
-        let signal = completion.signal
-        guard input.sessionID == signal.scope.sessionID else { throw CommunicationError.unauthorized }
-        let content = try AgentTaskContent.decode(signal)
-        guard let event = content.writerEvent else { throw CommunicationError.invalidPayload }
+        return record.senderContext
+    }
+
+    private func receiveWriterCompletion(
+        _ report: AgentTaskResponse, signal: AgentTaskSignal, content: AgentTaskContent, event: WriterDelegationEvent,
+        input: AgentInput
+    ) async throws {
         guard let stored = try await requireCommunications().agentMessage(event.eventID),
             stored.sender == "writer", stored.receiver == descriptor.id.rawValue,
-            stored.contract == "writer.completion", stored.correlationID == signal.scope.id,
-            try JSONDecoder().decode(WriterDelegationCompletion.self, from: stored.payload) == completion
+            [AgentTaskResponse.contract, "writer.completion"].contains(stored.contract),
+            stored.correlationID == signal.scope.id, stored.replyTo == signal.scope.id,
+            try JSONDecoder().decode(AgentTaskResponse.self, from: stored.payload) == report
         else { throw CommunicationError.invalidPayload }
+        let origin = try await writerMessageOrigin(signal.scope.id)
         let snapshot = try await contextRepository.snapshot()
         if snapshot.state.taskViews?[signal.scope.id]?.writerEvent?.eventID == event.eventID {
             try await requireCommunications().receiveAgentMessage(
@@ -3109,8 +3111,8 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             }
             let prior = context.state.taskViews?[signal.scope.id]
             var view = AgentTaskView(scope: signal.scope, content: content, terminal: true)
-            view.goal = prior?.goal
-            view.originDialog = prior?.originDialog
+            view.goal = event.goal ?? prior?.goal
+            view.originDialog = prior?.originDialog ?? origin
             view.createdAt = prior?.createdAt ?? Date()
             view.retainWriterFacts(from: prior)
             context.state.taskViews = context.state.taskViews ?? [:]
@@ -3179,23 +3181,27 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         guard presentsReply, let event = view.writerEvent, let originDialog = view.originDialog else { return }
         if view.terminal {
             writerNotices.removeAll {
-                $0.scopeID == view.scope.id && ($0.kind.isMilestone || $0.kind == .userInput)
+                $0.scopeID == view.scope.id && ($0.kind?.isMilestone == true || $0.kind == .userInput)
             }
-        }
-        if writerNotices.count == 8 {
-            let index = writerNotices.firstIndex(where: { $0.kind.isMilestone }) ?? writerNotices.startIndex
-            writerNotices.remove(at: index)
-            Logger(subsystem: "dev.mobileharness", category: "WriterNotice").warning(
-                "Assistant Writer notice queue full")
         }
         let text = view.text.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
         let summary = text.count == 2 && text[0].hasPrefix("工作区 workspace_") ? text[1] : view.text[...]
         let anchor = AgentInput(
             id: event.eventID, sessionID: input.sessionID, payload: input.payload, metadata: input.metadata)
-        writerNotices.append(
+        enqueueWriterNotice(
             WriterNotice(
                 input: anchor, scopeID: view.scope.id, originDialog: originDialog, kind: event.kind,
                 interactionID: view.interactionID, text: "Writer。 " + String(summary.prefix(180))))
+    }
+
+    private func enqueueWriterNotice(_ notice: WriterNotice) {
+        if writerNotices.count == 8 {
+            let index = writerNotices.firstIndex(where: { $0.kind?.isMilestone == true }) ?? writerNotices.startIndex
+            writerNotices.remove(at: index)
+            Logger(subsystem: "dev.mobileharness", category: "WriterNotice").warning(
+                "Assistant Writer notice queue full")
+        }
+        writerNotices.append(notice)
         drain()
     }
 
@@ -3212,7 +3218,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             let snapshot = try await contextRepository.snapshot()
             try Task.checkCancellation()
             guard lifecycle == .running, snapshot.state.history.current.id == notice.originDialog else { return }
-            if notice.kind == .userInput || notice.kind.isMilestone {
+            if notice.kind == .userInput || notice.kind?.isMilestone == true {
                 let view = snapshot.state.taskViews?[notice.scopeID]
                 guard view?.terminal == false else { return }
                 if notice.kind == .userInput, view?.interactionID != notice.interactionID { return }
@@ -3287,16 +3293,6 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         }
     }
 
-    private func clearWriterInteraction(_ view: AgentTaskView) async throws {
-        try await contextRepository.update { context in
-            guard let current = context.state.taskViews?[view.scope.id], !current.terminal,
-                current.interactionID == view.interactionID
-            else { return }
-            context.state.taskViews?[view.scope.id]?.interactionID = nil
-            context.state.taskViews?[view.scope.id]?.stage = .running
-        }
-    }
-
     private func forwardDirectedInput(_ intent: AgentTaskInputIntent, input: AgentInput) async throws {
         guard lifecycle == .running, input.metadata.origin == .local, input.metadata.source == "user",
             input.metadata.incarnation == nil,
@@ -3319,11 +3315,16 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                 routingSessions[input.id] = nil
             }
             do {
+                if view.scope.executor == .writer {
+                    let content = AgentTaskRequest(
+                        text: intent.text, replyTo: view.scope.id, interactionID: intent.interactionID)
+                    try await deliverTaskMessage(content, to: .writer, parent: input)
+                    return
+                }
                 let report = try await communicate(signal.message(), parent: input, to: view.scope.executor)
                 guard report.delivered.contains(view.scope.executor), report.rejected.isEmpty else {
                     throw CommunicationError.unavailableTarget
                 }
-                if view.scope.executor == .writer { try await clearWriterInteraction(view) }
                 if foregroundInteraction == view.scope.id {
                     pendingInteractions.removeAll { $0 == view.scope.id }
                     foregroundInteraction = nil
@@ -3401,8 +3402,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     }
     public func controlTask(
         _ operation: String, arguments: [String: String], source: String, sessionID: String,
-        inputID: String, decisionID: String?,
-        beforeSuperseding: @Sendable () async throws -> Void = {}
+        inputID: String, decisionID: String?
     ) async throws -> ActionCompletion {
         guard usesSkills, source == descriptor.id.rawValue, lifecycle == .running else {
             throw CommunicationError.unauthorized
@@ -3410,11 +3410,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         let fixed = decisionID == nil
         let parked = decisionID.flatMap { pendingRounds[$0] }
         let controlInput = parked?.input ?? activeInput
-        if let parked {
-            guard !parked.cancelled,
-                parked.requestTaskID == (try await contextRepository.snapshot()).state.skillState?.activeTaskID
-            else { throw CommunicationError.scopeClosed }
-        }
+        guard parked?.cancelled != true else { throw CommunicationError.scopeClosed }
         if fixed {
             let idleForControl = (activeInput == nil && worker == nil) || activeWriterNoticeID != nil
             guard idleForControl, queue.count == 0, admitting == 0 else {
@@ -3427,108 +3423,48 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                 throw CommunicationError.unauthorized
             }
         }
-        if ["task.send", "task.cancel"].contains(operation), let target = arguments["agent_id"] {
-            try await reconcileWriterExecutions()
-            let cancelling = operation == "task.cancel"
-            let allowed: Set<String> = cancelling ? ["agent_id", "reason"] : ["agent_id", "text"]
-            let matches =
-                try await contextRepository.snapshot().state.taskViews?.values.filter {
-                    !$0.terminal && $0.scope.executor.rawValue == target && $0.scope.sessionID == sessionID
-                } ?? []
-            guard matches.count == 1, Set(arguments.keys).isSubset(of: allowed),
-                let text = arguments[cancelling ? "reason" : "text"],
-                !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.utf8.count <= 16_384,
-                let view = matches.first, view.scope.sessionID == sessionID, view.scope.execution == .background,
-                cancelling || view.scope.executor == .writer
-            else { throw CommunicationError.invalidPayload }
-            if !cancelling, let interaction = view.interactionID {
-                guard let captured = inputInteractions[inputID]?.first(where: { $0.scope.id == view.scope.id }),
-                    captured.interactionID == interaction
+        switch operation {
+        case "task.send":
+            try await sendTaskMessage(
+                arguments: arguments, parent: fixed ? nil : controlInput, sessionID: sessionID, inputID: inputID)
+            return .completed
+        case "task.start", "task.end", "loadSkills", "releaseSkills":
+            if let parked {
+                guard parked.requestTaskID == (try await contextRepository.snapshot()).state.skillState?.activeTaskID
                 else { throw CommunicationError.scopeClosed }
             }
-            let parent =
-                (fixed ? nil : controlInput) ?? AgentInput(id: inputID, sessionID: sessionID, payload: .text(text))
-            let signal = try AgentTaskContent(text: text, interactionID: cancelling ? nil : view.interactionID).signal(
-                cancelling ? .cancel : .input, scope: view.scope)
-            let report = try await communicate(signal.message(), parent: parent, to: view.scope.executor)
-            guard report.failure == nil, report.rejected.isEmpty, report.delivered.contains(view.scope.executor) else {
-                throw CommunicationError.unavailableTarget
-            }
-            if !cancelling { try await clearWriterInteraction(view) }
-            if view.scope.executor == .writer { return .completed }
-            return .value(try AgentPrompts.text("Assistant/TaskFeedback", "cancellationDelivered"))
+            return try await controlLocalTaskAndSkills(
+                operation, arguments: arguments, sessionID: sessionID, inputID: inputID, decisionID: decisionID)
+        default:
+            throw HarnessError.forbiddenFunction
         }
-        if operation == "task.delegate" {
-            guard !fixed, Set(arguments.keys) == ["agent_id", "description"],
-                let target = arguments["agent_id"],
-                AgentTaskDelegation.permits(
-                    target: AgentID(rawValue: target), requester: descriptor.id, communication: communicationPolicy),
-                let parent = controlInput,
-                let goal = arguments["description"], !goal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                goal.utf8.count <= 1024, !goal.contains("\n"), !goal.contains("\r")
-            else { throw CommunicationError.invalidPayload }
-            guard !delegationInProgress, delegationInputID != parent.id else {
-                throw CapabilityError.unavailable("Delegation already attempted for this input")
-            }
-            delegationInProgress = true
-            defer { delegationInProgress = false }
-            try await reconcileWriterExecutions()
-            guard
-                try await contextRepository.snapshot().state.taskViews?.values.contains(where: {
-                    $0.scope.executor == .writer && !$0.terminal
-                }) != true
-            else { throw CapabilityError.unavailable(try AgentPrompts.text("Assistant/TaskFeedback", "busy")) }
-            let original: String
-            switch parent.payload {
-            case .text(let text): original = text
-            case .observation(let message):
-                if case .transcript(let text, _) = message.perception {
-                    original = text
-                } else {
-                    throw CommunicationError.invalidPayload
-                }
-            default: throw CommunicationError.invalidPayload
-            }
-            delegationInputID = parent.id
-            try await delegate(goal: goal, request: original, to: AgentID(rawValue: target), parent: parent)
-            return .completed
-        }
-        if operation == "task.send" {
-            guard Set(arguments.keys) == ["text"], let text = arguments["text"],
-                !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.utf8.count <= 16_384,
-                try await contextRepository.snapshot().state.skillState?.activeTaskID != nil
-            else { throw CommunicationError.invalidPayload }
-            // The Action result is persisted as input evidence for the next ReACT round.
-            return .value(try AgentPrompts.text("Assistant/TaskFeedback", "foregroundInput") + text)
-        }
+    }
+
+    private func controlLocalTaskAndSkills(
+        _ operation: String, arguments: [String: String], sessionID: String, inputID: String, decisionID: String?
+    ) async throws -> ActionCompletion {
+        let fixed = decisionID == nil
         try stateContext?.open(session: sessionID)
         guard !taskControlInProgress else { throw AssistantHistoryError.busy }
         taskControlInProgress = true
         defer { taskControlInProgress = false }
-        if fullDuplex, operation == "task.end", let decisionID {
+        if operation == "task.end", fullDuplex || fixed {
             return try await completeForegroundTask(arguments: arguments, inputID: inputID, requestID: decisionID)
         }
         let fixedCapabilities = descriptor.capabilities
         var newTaskID: String?
         if operation == "task.start" {
+            guard Set(arguments.keys).isSubset(of: ["description", "skills"]) else {
+                throw CommunicationError.invalidPayload
+            }
             var preview = try await contextRepository.snapshot().state.skillState
             guard preview != nil else { throw CommunicationError.invalidPayload }
-            let previous = preview?.activeTaskID
-            if previous != nil { try preview?.settleTask(failed: false, fixed: fixedCapabilities, cancelled: true) }
+            guard preview?.activeTaskID == nil else { throw CommunicationError.scopeClosed }
             // Validate all Skill/state constraints without changing the authoritative context.
             _ = try preview?.control(
                 operation, arguments: arguments, inputID: inputID,
                 fixed: fixedCapabilities, sessionID: sessionID, taskID: "task_1")
             guard let taskRecords else { throw RecordStorageError.missingRecord }
-            if let previous {
-                try await beforeSuperseding()
-                try await conversations.checkpoint(inputID: inputID)
-                try await taskRecords.endTask(previous, status: "cancelled", failure: "superseded")
-                try await contextRepository.update {
-                    try $0.state.skillState?.settleTask(failed: false, fixed: fixedCapabilities, cancelled: true)
-                    $0.state.reconcileTaskCompressions()
-                }
-            }
             let dialog = try await conversations.readCurrent().current.id
             newTaskID = try await taskRecords.createTask(
                 dialog: BusinessRecordID(rawValue: dialog)?.kind == .dialog ? dialog : nil,
@@ -3542,16 +3478,9 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                 if fixed && operation == "loadSkills" && skills.activeTaskID == nil {
                     throw CommunicationError.scopeClosed
                 }
-                var result = try skills.control(
+                let result = try skills.control(
                     operation, arguments: arguments, inputID: inputID, fixed: fixedCapabilities, sessionID: sessionID,
                     taskID: committedTaskID)
-                if fixed && ["task.end", "task.cancel"].contains(operation) {
-                    try skills.settleTask(failed: false, fixed: fixedCapabilities)
-                    result =
-                        try AgentPrompts.text(
-                            "Assistant/TaskFeedback", "transition",
-                            ["mode": skills.mode, "skills": skills.loaded.joined(separator: ",")])
-                }
                 if operation == "task.start", let decisionID, let taskID = skills.activeTaskID {
                     try context.state.history.assignHistoryTask(taskID, inputID: inputID, requestID: decisionID)
                 }
@@ -3566,25 +3495,19 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             throw error
         }
         if let committed = try await contextRepository.snapshot().state.skillState {
-            if let task = committed.tasks.last,
-                ["completed", "cancelled", "failed", "interrupted"].contains(task.status)
-            {
-                try await taskRecords?.endTask(
-                    task.id, status: task.status, failure: task.failure, finishedAt: task.updatedAt ?? Date())
-            }
             skillContinuation.yield(committed)
         }
         try await conversations.checkpoint(inputID: inputID)
         return .value(result)
     }
 
-    private func completeForegroundTask(arguments: [String: String], inputID: String, requestID: String) async throws
+    private func completeForegroundTask(arguments: [String: String], inputID: String, requestID: String?) async throws
         -> ActionCompletion
     {
         let fixed = descriptor.capabilities
         guard var skills = try await contextRepository.snapshot().state.skillState,
             let task = skills.tasks.first(where: { $0.id == skills.activeTaskID }),
-            skills.taskID(for: inputID) == task.id, let summary = arguments["summary"]
+            requestID == nil || skills.taskID(for: inputID) == task.id, let summary = arguments["summary"]
         else { throw CommunicationError.scopeClosed }
         _ = try skills.control("task.end", arguments: arguments, inputID: inputID, fixed: fixed)
         let finishedAt = Date()
@@ -3596,7 +3519,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                     context.state.history.revision == archive.revision - 1
                 else { throw CommunicationError.scopeClosed }
                 _ = try skills.control("task.end", arguments: arguments, inputID: inputID, fixed: fixed)
-                try skills.settleTask(failed: false, fixed: fixed, finishedAt: finishedAt)
+                try skills.settleTask(finishedAt: finishedAt)
                 context.state.skillState = skills
                 context.state.history = archive
             }
@@ -3607,66 +3530,78 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         return .value(String(decoding: try JSONEncoder().encode(receipt), as: UTF8.self))
     }
 
-    private func delegate(goal: String, request: String, to target: AgentID, parent: AgentInput) async throws {
-        let snapshot = try await contextRepository.snapshot()
-        guard taskRecords != nil else { throw RecordStorageError.missingRecord }
-        let delegateID = UUID().uuidString
-        let signal = try AgentTaskSignal(
-            kind: .request,
-            scope: AgentTaskScope(
-                id: delegateID, requester: descriptor.id, executor: target,
-                sessionID: parent.sessionID, execution: .background),
-            data: JSONEncoder().encode(["request": request]), goal: goal)
-        try await requireCommunications().enqueueAgentMessage(
+    private func sendTaskMessage(
+        arguments: [String: String], parent: AgentInput?, sessionID: String, inputID: String
+    ) async throws {
+        guard Set(arguments.keys) == ["agent_id", "text"], let targetID = arguments["agent_id"],
+            let text = arguments["text"]
+        else { throw CommunicationError.invalidPayload }
+        let target = AgentID(rawValue: targetID)
+        guard
+            AgentTaskMessaging.permits(target: target, requester: descriptor.id, communication: communicationPolicy)
+        else { throw CommunicationError.invalidPayload }
+        let question = inputInteractions[inputID]?.first { $0.scope.executor == target }
+        let content = AgentTaskRequest(
+            text: text, replyTo: question?.scope.id, interactionID: question?.interactionID)
+        try await deliverTaskMessage(
+            content, to: target,
+            parent: parent ?? AgentInput(id: inputID, sessionID: sessionID, payload: .text(text)))
+    }
+
+    private func deliverTaskMessage(_ content: AgentTaskRequest, to target: AgentID, parent: AgentInput) async throws {
+        let payload = try content.message.encodedContent()
+        let records = try requireCommunications()
+        let dialog = try await contextRepository.snapshot().state.history.current.id
+        try await records.enqueueAgentMessage(
             .init(
-                id: delegateID, sender: descriptor.id.rawValue, receiver: target.rawValue,
-                contract: signal.contract, payload: try JSONEncoder().encode(signal), correlationID: delegateID,
-                senderContext: snapshot.state.history.current.id, dedupeKey: delegateID))
+                id: content.id, sender: descriptor.id.rawValue, receiver: target.rawValue,
+                contract: AgentTaskRequest.contract, payload: payload, correlationID: content.replyTo ?? content.id,
+                replyTo: content.replyTo, senderContext: dialog, dedupeKey: content.id))
         do {
-            try await contextRepository.update {
-                try $0.tasks.register(signal.scope)
-                var views = $0.state.taskViews ?? [:]
-                if views.count == 256, let retired = views.first(where: { $0.value.terminal }) {
-                    views[retired.key] = nil
-                }
-                guard views.count < 256 else { throw CommunicationError.capacityExceeded }
-                views[signal.scope.id] = AgentTaskView(
-                    scope: signal.scope, content: try AgentTaskContent(text: goal))
-                views[signal.scope.id]?.originDialog = snapshot.state.history.current.id
-                views[signal.scope.id]?.goal = goal
-                views[signal.scope.id]?.createdAt = Date()
-                $0.state.taskViews = views
+            let report = try await communicate(content.message, parent: parent, to: target)
+            guard report.failure == nil, report.rejected.isEmpty, report.delivered.contains(target)
+            else {
+                throw CapabilityError.unavailable(report.rejected[target] ?? report.failure ?? "Message unavailable")
             }
-            let report = try await communicate(signal.message(), parent: parent, to: target)
-            let accepted = report.failure == nil && report.rejected.isEmpty && report.delivered.contains(target)
-            try await contextRepository.update {
-                try $0.tasks.acknowledge(signal.scope.id, accepted: accepted)
-                if !accepted { $0.state.taskViews?[signal.scope.id]?.terminal = true }
-            }
-            guard accepted else { throw CommunicationError.unavailableTarget }
+            try await records.receiveAgentMessage(content.id, receiver: target.rawValue, consumed: false)
         } catch {
-            var cleanup: [any Error] = []
             do {
-                try await contextRepository.update {
-                    if $0.tasks.task(signal.scope.id) != nil {
-                        try $0.tasks.acknowledge(signal.scope.id, accepted: false)
-                    }
-                    if $0.tasks.task(signal.scope.id)?.state == .failed {
-                        $0.state.taskViews?[signal.scope.id]?.terminal = true
-                        $0.state.taskViews?[signal.scope.id]?.stage = .completed
-                        $0.state.taskViews?[signal.scope.id]?.text = String(describing: error)
-                    }
-                }
-            } catch { cleanup.append(error) }
-            do {
-                try await requireCommunications().failAgentMessage(delegateID, failure: String(describing: error))
-            } catch { cleanup.append(error) }
-            if !cleanup.isEmpty {
+                try await records.failAgentMessage(content.id, failure: String(describing: error))
+            } catch let cleanup {
                 throw AgentFailure(
-                    component: "assistant", operation: "task.delegate", underlying: error, cleanupErrors: cleanup)
+                    component: "assistant", operation: "task.send", underlying: error, cleanupErrors: [cleanup])
             }
             throw error
         }
+    }
+
+    private func receiveTaskMessageRejection(
+        _ rejection: AgentTaskResponse.Rejection, report: AgentTaskResponse, input: AgentInput
+    ) async throws {
+        let records = try requireCommunications()
+        guard let sent = try await records.agentMessage(rejection.messageID), sent.sender == descriptor.id.rawValue,
+            sent.receiver == input.metadata.source, sent.contract == AgentTaskRequest.contract,
+            let stored = try await records.agentMessage(rejection.eventID),
+            stored.contract == AgentTaskResponse.contract,
+            stored.sender == sent.receiver, stored.receiver == sent.sender, stored.replyTo == sent.id,
+            stored.correlationID == sent.correlationID,
+            try JSONDecoder().decode(AgentTaskResponse.self, from: stored.payload) == report
+        else { throw CommunicationError.unauthorized }
+        guard try await !records.isAgentMessageConsumed(stored.id) else { return }
+        if let origin = sent.senderContext, origin == (try await contextRepository.snapshot()).state.history.current.id
+        {
+            let notice = AgentInput(
+                id: stored.id, sessionID: input.sessionID, payload: input.payload, metadata: input.metadata)
+            if fullDuplex {
+                try await admitPeerText(rejection.text, input: notice)
+            } else if presentsReply {
+                enqueueWriterNotice(
+                    .init(
+                        input: notice, scopeID: sent.id, originDialog: origin, kind: nil, interactionID: nil,
+                        text: "Writer。 " + String(rejection.text.prefix(180))))
+            }
+        }
+        try await records.receiveAgentMessage(stored.id, receiver: descriptor.id.rawValue, consumed: true)
     }
 
     private func beginHistoryRequest(input: AgentInput, text: String, messages: [ChatMessage]) async throws
@@ -3687,42 +3622,34 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     }
 
     private func finishLocalDecision(
-        input: AgentInput, failed: Bool, failure: String? = nil, cancelled: Bool = false,
-        taskBoundaryOnly: Bool = false
+        input: AgentInput, finishRequested: Bool = true, interrupted: Bool = false, taskBoundaryOnly: Bool = false
     ) async throws {
         guard usesSkills else { return }
-        let fixedCapabilities = descriptor.capabilities
-        let retainsConversation =
-            cancelled
-            && (lifecycle == .paused
-                || (hostCancellationSession == input.sessionID && !hostCancellationClosesSession))
-        try await contextRepository.update {
-            guard let skills = $0.state.skillState,
+        let completed = try await contextRepository.transaction { context -> AgentTaskSkillState.TaskRecord? in
+            guard var skills = context.state.skillState,
                 skills.activeTaskID == nil || skills.taskID(for: input.id) == skills.activeTaskID
             else {
-                $0.state.skillState?.discardDecision(input.id)
-                return
+                context.state.skillState?.discardDecision(input.id)
+                return nil
             }
-            if retainsConversation {
-                try $0.state.skillState?.interruptSession(
-                    input.sessionID, inputs: [input.id], fixed: fixedCapabilities)
+            let activeTaskID = skills.activeTaskID
+            if interrupted {
+                try skills.settleTask(finishRequested: false)
+                skills.discardDecision(input.id)
             } else if taskBoundaryOnly {
-                try $0.state.skillState?.settleTask(
-                    failed: failed, fixed: fixedCapabilities, failure: failure, cancelled: cancelled)
+                try skills.settleTask()
             } else {
-                try $0.state.skillState?.decisionCompleted(
-                    failed: failed, fixed: fixedCapabilities, inputID: input.id, failure: failure, cancelled: cancelled)
+                try skills.decisionCompleted(inputID: input.id, finishRequested: finishRequested)
             }
-            $0.state.reconcileTaskCompressions()
+            context.state.skillState = skills
+            context.state.reconcileTaskCompressions()
+            return skills.tasks.first { $0.id == activeTaskID && $0.status == "completed" }
+        }
+        if let completed {
+            try await taskRecords?.endTask(
+                completed.id, status: "completed", failure: nil, finishedAt: completed.updatedAt ?? Date())
         }
         if let skills = try await contextRepository.snapshot().state.skillState {
-            for task in skills.tasks
-            where task.inputIDs.contains(input.id)
-                && ["completed", "cancelled", "failed", "interrupted"].contains(task.status)
-            {
-                try await taskRecords?.endTask(
-                    task.id, status: task.status, failure: task.failure, finishedAt: task.updatedAt ?? Date())
-            }
             skillContinuation.yield(skills)
         }
     }

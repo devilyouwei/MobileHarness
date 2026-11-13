@@ -13,6 +13,7 @@ This existing target imports Foundation and Synchronization only, with no projec
 | FunctionInput / FunctionInvocation / ActionExecutionContext | Invocation identity, source/session/input and opaque correlation, reporting and optional Sendable attachment. Cognitive Task/decision strings are opaque correlation, never permission. |
 | ActionExecutionDescriptor / ActionCatalogSnapshot | Immutable descriptions, call protocols and execution/return policies; no handler or mutation API. |
 | PreparedAction / ActionsExecutionPort | Effect-free prepare, one-use revision-bound credential, resources/budget, execute and discard. Root instances retain actual invocations privately. |
+| ActionExecutionRecord / ActionExecutionSnapshot | Read-only scheduling observation with canonical path, bounded parameter previews and actual completion evidence. |
 | ActionCompletion / ActionReport / ActionFailure | Real completion/value/activity/report, per-leaf partial effects and independent failure. |
 | ExecutionOwner / ResourceDefinition / ResourceLease / ResourceExecutionPermit | Opaque endpoint owner, configured resource mechanisms and live revocable authority. No Agent identity or role lookup. |
 | ActionRequestSlot | Per-request typed attachment/result, session/input admission, single completion/take and explicit close; not a global table or role authorization gate. |

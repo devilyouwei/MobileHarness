@@ -14,6 +14,7 @@
     @MainActor @Observable public final class ApplicationPresentation: ApplicationRootProviding {
         private let features: AgentContainer
         private let home: UIHomeContainer
+        public let runtimeLog: RuntimeLogState
         public let web: WebPageContainer
         public var onHomeVisibilityChanged: (@MainActor (Bool) -> Void)?
         public var onPreparationRequested: (@MainActor () -> Void)?
@@ -31,11 +32,12 @@
         private var startupFailure: (any Error)?
         public var startupIssue: String? { startupFailure.map { String(describing: $0) } }
         public init(
-            features: AgentContainer, home: UIHomeContainer, web: WebPageContainer,
+            features: AgentContainer, home: UIHomeContainer, web: WebPageContainer, runtimeLog: RuntimeLogState
         ) {
             self.features = features
             self.home = home
             self.web = web
+            self.runtimeLog = runtimeLog
             features.onModelConfigurationChanged = { [weak self] in self?.onPreparationRequested?() }
         }
         @ObservationIgnored private var sessionPresentation: SessionPresentation?
@@ -45,7 +47,7 @@
                 return nil
             }
             if sessionPresentation?.source !== source {
-                sessionPresentation = SessionPresentation(source: source)
+                sessionPresentation = SessionPresentation(source: source, notices: home.notices)
             }
             return sessionPresentation
         }
@@ -104,16 +106,16 @@
     @MainActor private final class SessionPresentation: ApplicationSessionProviding {
         let source: SpeechSessionPresentation
         let conversation: ConversationState
-        let actionActivity: ActionActivityState
+        let homeNotices: HomeNoticeState
         let audioDetectionState: AudioDetectionState
         let listeningRequests: UIRequests<ListeningInput, Void>
         let audioDetectionRequests: UIRequests<AudioDetectionInput, Void>
         private let diagnosticState: SpeechDiagnosticState
         private let diagnostic: any SpeechDiagnosticControlling
-        init(source: SpeechSessionPresentation) {
+        init(source: SpeechSessionPresentation, notices: HomeNoticeState) {
             self.source = source
             conversation = source.conversation
-            actionActivity = source.actionActivity
+            homeNotices = notices
             audioDetectionState = source.audioDetectionState
             listeningRequests = source.listeningRequests
             audioDetectionRequests = source.detectionRequests

@@ -26,9 +26,8 @@ public final class UIHomeContainer {
     public let listeningRequests = UIRequests<ListeningInput, Void>(controlOnly: true)
 
     public let conversation = ConversationState()
-    public let activity = ActionActivityState()
+    public let notices = HomeNoticeState()
     public var conversationPresentation: any ConversationPresenting { conversation }
-    public var activityPresentation: any ActivityPresenting { activity }
     public var effects: any HomeEffectsPresenting { effectOwner }
     public var expressions: any ExpressionPresenting { expressionOwner }
     private let effectOwner: HomeEffectsWorkflow
@@ -37,8 +36,8 @@ public final class UIHomeContainer {
     init(admission: UIPresentationAdmission) {
         self.admission = admission
         conversation.presentationAdmission = admission
-        activity.presentationAdmission = admission
-        effectOwner = HomeEffectsWorkflow(activity: activity)
+        notices.presentationAdmission = admission
+        effectOwner = HomeEffectsWorkflow(notices: notices)
         effectOwner.bind(conversation)
         effectOwner.presentationAdmission = admission
         expressionOwner = ConversationExpressionPresentation(state: conversation)
@@ -68,11 +67,11 @@ public final class UIHomeContainer {
         conversation.listeningAnimationID = nil
         conversation.microphoneSpectrum = [Float](repeating: 0, count: 32)
         conversation.playbackSpectrum = [Float](repeating: 0, count: 32)
-        activity.dismissErrorToast(id: activity.errorToast?.id ?? "")
+        notices.dismissErrorToast(id: notices.errorToast?.id ?? "")
     }
     func stop() async {
         await effectOwner.stopAndWait()
-        await activity.stopPresentation()
+        await notices.stopPresentation()
         conversation.modelPreparation = .inactive
         conversation.isReady = false
         expressionOwner.resetExpression()

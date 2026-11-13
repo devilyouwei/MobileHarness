@@ -25,14 +25,14 @@ AssistantRecordStore 注入本侧会话、消息、任务摘要和日志端口�
 | [WriterMessages](WriterMessages/README.md) / writer_messages | 已发起的 Writer 模型请求、前序及 workspace 消息 |
 | [WriterMessages](WriterMessages/README.md) / writer_executions | 委托入口、执行状态、交互及最终业务结果 |
 | [WorkspaceFiles](WorkspaceFiles/README.md) / workspace_files | 当前文件索引，正文由 Files 保存 |
-| [AgentMessages](AgentMessages/README.md) / agent_messages | 不可变 Agent 通信、接收/消费、投递重试 |
+| [AgentMessages](AgentMessages/README.md) / agent_messages | Agent 消息正文、回复关联、接收与消费、投递重试 |
 | [ModelRequestLog](ModelRequestLog/README.md) / model_request_log | 可删除 HTTP 请求/响应、图片、参数和 generation meta |
 | [MediaFiles](MediaFiles/README.md) / media_files | 独立相册媒体及清理状态 |
 | [Devices](Devices/README.md) / devices | 原生设备身份、选择与重连 |
 
 ## Assistant 链路
 
-ReACT 是新消息行。task_id 是前台摘要 scope，无 parent，也不代表后台委派。一个前台任务结束后才能开始下一个；连续 start 由 Agents 加入副作用清理，再保存 superseded 终态并新建。消息已归属的旧 scope 不重绑。
+ReACT 是新消息行。task_id 标识前台摘要范围。前台任务经 task.end 保存终态及摘要后，才可启动下一个任务。已有 Message 保留原任务归属。
 
 ```mermaid
 erDiagram
@@ -237,4 +237,4 @@ Package.swift 显式将同目录公共契约编入 StorageChat/Tasks/Media/Devic
 
 历史窗口重建保留在途输入的完整运行时状态；最后一条模型轮完成不代表整个输入已结束，等待 ReACT 的输入不能被另一个消息的完成刷新改写为 completed。
 
-Schema 20261112 从20261110/20261111事务迁移：Writer 委托移至 writer_executions，保留执行及请求主键、业务结果、工作区与日志；删除无 invocation 的旧原始输入，检查全部外键后提交。具有 invocation 但日志已清理的请求仍保留。更早格式的已批准清格式转换独立处理；不对现有版本执行整库 erase。待发 Signal/请求只在内存，coordination 随真实请求输入保存。
+Schema 20261113 在事务中统一 Agent 消息的契约名，保留消息 ID、关联、正文、投递状态与 Writer 执行记录。20261110/20261111 数据先执行请求边界迁移：Writer 委托移至 writer_executions，保留执行及请求主键、业务结果、工作区与日志；删除无 invocation 的旧原始输入，检查全部外键后提交。具有 invocation 但日志已清理的请求仍保留。更早格式的已批准清格式转换独立处理；不对现有版本执行整库 erase。待发 Signal/请求只在内存，coordination 随真实请求输入保存。

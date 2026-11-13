@@ -165,11 +165,11 @@ public enum AgentConfigurations {
         for name in try catalog().agents.keys.sorted() {
             let value = try resource(named: name)
             guard
-                AgentTaskDelegation.permits(
+                AgentTaskMessaging.permits(
                     target: AgentID(rawValue: value.id), requester: requester, communication: communication)
             else { continue }
             let target = try load(named: name)
-            guard target.communication.inputs.contains(where: { $0.contract == "task.request" }) else {
+            guard target.communication.inputs.contains(where: { $0.contract == AgentTaskRequest.contract }) else {
                 throw CommunicationError.unsupportedContract
             }
             entries.append(

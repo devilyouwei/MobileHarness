@@ -197,15 +197,13 @@ public actor AssistantExecutionSession {
         let status: String
         switch task.status {
         case "waitingUser": status = "等待你的操作"
-        case "pending", "queued": status = "等待执行"
-        case "paused", "suspended": status = "已暂停"
-        case "cancelling": status = "正在取消"
+        case "finishing": status = "正在结束"
         default: status = "正在执行"
         }
         return .init(
             title: String(task.goal.prefix(80)), subtitle: status,
             primary: .symbol(name: "scope"), tone: .blue, priority: .normal,
-            secondary: ["waitingUser", "paused", "suspended"].contains(task.status) ? nil : .loading,
+            secondary: task.status == "waitingUser" ? nil : .loading,
             liveActivity: true, expansionID: task.id,
             detail: .init(text: String(task.goal.prefix(320))))
     }

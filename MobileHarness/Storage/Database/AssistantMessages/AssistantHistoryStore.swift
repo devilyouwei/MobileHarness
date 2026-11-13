@@ -228,18 +228,18 @@ public actor AssistantHistoryStore {
         try await checkpointLocked()
     }
     public func completeForegroundTask(
-        _ taskID: String, goal: String, summary: String, finishedAt: Date, inputID: String, requestID: String,
+        _ taskID: String, goal: String, summary: String, finishedAt: Date, inputID: String, requestID: String?,
         publish: @Sendable (AssistantArchive, @escaping @Sendable () async throws -> Void) async throws -> Void
     ) async throws {
         try await acquireWrite()
         defer { releaseWrite() }
         try await load()
-        guard
-            let request = value.current.turns.first(where: { $0.id == inputID })?.modelRequests?.first(where: {
-                $0.id == requestID
-            }), request.historyTaskID == taskID, request.awaitingDispatch != true
-        else {
-            throw RecordStorageError.conflict
+        if let requestID {
+            guard
+                let request = value.current.turns.first(where: { $0.id == inputID })?.modelRequests?.first(where: {
+                    $0.id == requestID
+                }), request.historyTaskID == taskID, request.awaitingDispatch != true
+            else { throw RecordStorageError.conflict }
         }
         try await checkpointLocked()
 
@@ -255,14 +255,16 @@ public actor AssistantHistoryStore {
                 }
             }.sorted { $0.0 < $1.0 }.map(\.1)
         }
-        guard sources.contains(where: { $0.requestID == requestID }) else { throw RecordStorageError.conflict }
+        if let requestID, !sources.contains(where: { $0.requestID == requestID }) {
+            throw RecordStorageError.conflict
+        }
         let compression = AssistantTaskCompression(
             taskID: taskID, goal: goal, status: .completed, reportedSummary: summary, failure: nil,
             completedAt: finishedAt, sources: sources, closedAtAction: true)
         var next = value
         guard next.revision < UInt64.max else { throw AssistantHistoryError.capacityExceeded }
         next.revision += 1
-        next.current.taskCompressions.append(compression)
+        if !sources.isEmpty { next.current.taskCompressions.append(compression) }
         try next.validate()
         let completion = try TaskCompressionRecord(
             id: taskID, goal: goal, status: "completed", summary: summary, failure: nil, finishedAt: finishedAt,

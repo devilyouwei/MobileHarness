@@ -110,7 +110,6 @@
     @MainActor @available(iOS 27, *)
     public final class SpeechSessionPresentation {
         public let conversation: ConversationState
-        public let actionActivity: ActionActivityState
         public let audioDetectionState: AudioDetectionState
         public let listeningRequests: UIRequests<ListeningInput, Void>
         public let detectionRequests: UIRequests<AudioDetectionInput, Void>
@@ -130,7 +129,6 @@
         }
         init(_ session: VoiceInteractionSession) {
             conversation = session.conversation
-            actionActivity = session.actionActivity
             audioDetectionState = session.audioDetectionState
             listeningRequests = session.listeningRequests
             detectionRequests = session.detectionRequests

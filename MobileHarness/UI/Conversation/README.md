@@ -1,4 +1,4 @@
-# Conversation — 首页与运行记录呈现
+# Conversation — 首页会话呈现
 
 首页触摸仅在 LongPressGesture 半秒门槛成功后提交一次 toggle；短按、双击、抬起和页面退出不提交 press 准备请求。拖动仅更新本地光源位置，长按视觉状态保持本地 GestureState。内部 press 能力保留兼容接口，首页不使用；实际启动提示音仍由聆听执行流程拥有。
 
@@ -8,7 +8,7 @@ HomeModelPreparation 只在 failed 提供重试资格；移除 cancelled 用户�
 
 ## 职责与接口
 
-UIHomeContainer 唯一创建 ConversationState、ActionActivityState、HomeEffectsWorkflow 和 ConversationExpressionPresentation，向业务分别暴露 ConversationPresenting、ActivityPresenting、HomeEffectsPresenting、ExpressionPresenting。
+UIHomeContainer 唯一创建 ConversationState、HomeNoticeState、HomeEffectsWorkflow 和 ConversationExpressionPresentation，向业务分别暴露 ConversationPresenting、HomeEffectsPresenting、ExpressionPresenting。
 
 上游业务集成提交经会话／轮次验证的 UI 值；本目录拥有Face原生呈现，并消费 Components 的字幕、频谱和覆盖组件，向上游转发聆听／重试意图及表情回执。没有 Signal 订阅、模型调用、设备控制或持久化。
 
@@ -19,11 +19,10 @@ UIHomeContainer 唯一创建 ConversationState、ActionActivityState、HomeEffec
 | UIHomeContainer.swift | 子容器装配、共享根接纳及失活／停止 |
 | ConversationState.swift | 会话值、字幕几何、呈现协议与表情事务 |
 | ConversationView.swift | 首页和启动界面，隔离频谱、表情与字幕观察 |
-| ActionActivityState.swift | Action／Task／Agent 日志值、异常、过滤及有界展示状态 |
-| ActionActivityView.swift | 运行摘要、日志面板和详情 |
+| HomeNoticeState.swift | 首页提示、错误 Toast 及到期任务 |
 | HomeEffectsWorkflow.swift | Notice／装饰光／回复清理及其到期任务 |
 
-日志值及异常呈现接口归 ActionActivityState，效果／表情协议与实现同文件；导航由 UI 根提供。首页消费真实状态，不包含另行构造的模拟记录或视觉演示页面。
+首页日志由 Root 挂载 [RuntimeLog](../Components/RuntimeLog/README.md)，效果／表情协议与实现同文件；导航由 UI 根提供。首页消费真实状态，不包含另行构造的模拟记录或视觉演示页面。
 
 ## 字幕、表情与交互
 
@@ -37,13 +36,7 @@ ConversationCaptionLayout只计算字幕，任务目标由根灵动岛展开区�
 
 表情基态只提交状态；有限表演拥有独立身份和等待者，替换、失活、离窗或取消不能伪造成功。默认关闭眼睛跟随会话关闭；显式表情动作仍保留资格与真实完成校验。
 
-## 日志、异常和装饰
-
-首页最多展示三个 Channel 摘要，日志分 Action／Task／Agent 页签。显示值保留真实执行身份、状态、来源、排队／并发计数及淘汰数量；内部维护成功默认隐藏，失败可见。关闭摘要不取消执行，Tool 不虚构调度记录。
-
-Task 详情按实际 task/call 身份关联 Action；独立的 Agent 聊天记录由设置历史页面呈现。缺失证据保持缺失，不推断物理回滚或执行成功。日志时间仅以半秒节奏刷新显示值。
-
-ExecutionIssue 保留分类、短提示、最多2048字符详情及轮次关联。调用者决定 showsToast；UI 执行去重、身份替换、八秒到期及新输入撤销，保留日志。后台只记录不弹出，不在前台重放。replaceIssues 是独立宿主的纯值快照接口，当前应用使用 recordIssue。
+## 提示与装饰
 
 Toast 为最多三行的黄色图标／文字，不拦截触摸，无回复时占用状态区。事实异常优先于装饰 Notice；装饰光不改变聆听同意或设备状态。
 
@@ -51,7 +44,7 @@ HomeEffectsWorkflow 拥有独立、可替换且按身份隔离的 Notice 和光�
 
 ## 生命周期与约束
 
-共享根接纳及实时 token 拒绝后台、迟到和旧根更新；会话／轮次和日志 revision 校验仍由各自接口保留。失活解除表情等待并清理实时状态，停止加入期限任务。业务异常策略不在 UI 内决定。
+共享根接纳及实时 token 拒绝后台、迟到和旧根更新；会话和轮次校验由各自接口处理。失活解除表情等待并清理实时状态，停止加入期限任务。业务异常策略不在 UI 内决定。
 
 持久化审计、设备实际阶段及完整真机动画／前后台验收仍独立跟进。
 

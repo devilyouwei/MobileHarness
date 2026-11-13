@@ -186,5 +186,6 @@ refactor, Agent-only model recording, current-file recovery and automated/build/
 
 - [D3 Edge Core AI](D3-Edge-CoreAI.md)：本机 Core AI/PyTorch/Swift 对照、全双工文本三分类、性能与实验性发布证据。
 - [Mac 本地 Decision 模型对照](Decision-Model-Mac-Comparison.md)记录 D3、Laya 和 UniMC 在同一组全双工样例上的分类错误与热调用时延。
+- [小参数生成模型的 Core AI 对照](Decision-Model-Mac-Comparison.md#小参数生成模型的-core-ai-对照)记录 0.6B 至 1.54B 制品在 100 条中英全双工探测上的分类、延迟和提示词复测。
 
 [资源刷新过期误报](Resource-Refresh-Supersession.md)：保存成功快速离页后的迟到刷新、二次错误提示、失败保留和设备交付证据。

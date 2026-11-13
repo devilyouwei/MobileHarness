@@ -510,7 +510,7 @@ private func qwenRun(_ scenario: QwenCase, provider: OpenAIChat) async throws ->
             "task.start", arguments: ["description": goal, "skills": encoded], inputID: "setup", fixed: fixed,
             taskID: taskID)
         skills.tasks[skills.tasks.count - 1].sessionID = session
-        try skills.decisionCompleted(failed: false, fixed: fixed)
+        try skills.decisionCompleted()
     }
     initial.skillState = skills
     let repository = try AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: initial)

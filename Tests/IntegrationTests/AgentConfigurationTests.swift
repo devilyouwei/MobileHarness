@@ -55,7 +55,7 @@ private func document() -> [String: Any] {
         "version": 8, "category": "cognition",
         "communication": [
             "inputs": [
-                ["contract": "tool.result", "version": 1, "kind": "toolResult"]
+                ["contract": "runtime.tool.result", "version": 1, "kind": "toolResult"]
             ], "subscriptions": [], "publications": [], "sends": [],
         ],
         "id": "assistant",
@@ -168,7 +168,7 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     #expect(active.tools.isEmpty)
     #expect(!active.actions.contains { $0.path.domain == "Camera" })
     #expect(active.actions.contains { $0.alias == "task.start" })
-    #expect(active.actions.filter { $0.path.domain == "Agent" && $0.path.module == "Task" }.count == 7)
+    #expect(active.actions.filter { $0.path.domain == "Agent" && $0.path.module == "Task" }.count == 5)
     let agent = try AssistantAgent(
         stateContext: try publicStateFixture(),
         chat: FixedTextChat(),
@@ -539,7 +539,7 @@ func threeLevelConfigurationRejectsAmbiguousBindings(_ mutation: String) throws 
 @Test(
     .actionCatalog,
     arguments: [
-        ("Assistant", "photographer", "request"),
+        ("Assistant", "taskPhotographer", "request"),
         ("Photographer", "assistant", "progress"),
         ("Photographer", "assistant", "result"),
         ("Memory", "assistant", "progress"),
@@ -564,8 +564,10 @@ func historyPreviewRecognizesDirectedTaskActions(_ scenario: (String, String, St
     default: runtime = try AssistantAgent.runtimeCapabilities(configuration.capabilities)
     }
     let declared = try AgentSkillLoader.registry(["basic-skill"], fixed: runtime)
+    let communication =
+        name == "Assistant" ? try taskFixtureConfiguration(parent: true).communication : configuration.communication
     let catalog = try AgentCommunicationAdapter.catalog(
-        fixtureCatalogWithCommunication(declared), policy: configuration.communication)
+        fixtureCatalogWithCommunication(declared), policy: communication)
     var trace = try GenerationTrace(
         capabilities: catalog, textMapping: AssistantAgent.mapText, segmentation: try AssistantAgent.textSegmentation)
     let task = kind == "request" ? "" : " taskID=\"\(UUID().uuidString)\""
@@ -635,9 +637,9 @@ func skillUseStateRejectsInvalidDeclarations(_ mutation: String) throws {
     let communication = try AgentConfigurations.load(named: "Writer").communication
     #expect(
         Set(communication.inputs.map(\.contract)) == [
-            "task.request", "task.input", "task.cancel",
+            "agent.task.request"
         ])
-    #expect(Set(communication.sends.map(\.contract)) == ["task.progress", "writer.completion"])
+    #expect(Set(communication.sends.map(\.contract)) == ["agent.task.response"])
     #expect(communication.sends.allSatisfy { $0.target == "assistant" })
 }
 

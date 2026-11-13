@@ -87,6 +87,7 @@ import StorageFiles
             ]
         }
         public var onModelConfigurationChanged: (@MainActor () -> Void)?
+        private let runtimeLog: (any RuntimeLogWriting)?
         private let homeUI: UIHomeContainer
         private let settingsUI: UISettingsContainer
         private let resourcesUI: UIModelResourcesContainer
@@ -102,7 +103,7 @@ import StorageFiles
             containerFailures: ContainerFailureChannel,
             home: UIHomeContainer, settings: UISettingsContainer, modelResources: UIModelResourcesContainer,
             navigation: UINavigationContainer, history: UIHistoryContainer, devices: UIDeviceSettingsContainer,
-            diagnostics: UIDiagnosticsContainer,
+            diagnostics: UIDiagnosticsContainer, runtimeLog: (any RuntimeLogWriting)? = nil,
             repositories: @escaping @Sendable () throws -> AgentRepositories,
             cache: CacheContainer, files: FilesContainer,
             camera: any CameraCapturing, cameraPresentation: any CameraPresenting,
@@ -122,6 +123,7 @@ import StorageFiles
             memory = MemoryContainer(history: history, facades: facades)
             photographer = PhotographerContainer(camera: cameraUI, facades: facades)
             homeUI = home
+            self.runtimeLog = runtimeLog
             settingsUI = settings
             resourcesUI = modelResources
             navigationUI = navigation
@@ -286,7 +288,7 @@ import StorageFiles
             return try AgentRuntime.prepare(
                 makeInputDecision: makeDecision,
                 maintenance: maintenance,
-                containerFailures: containerFailures, home: homeUI,
+                containerFailures: containerFailures, home: homeUI, log: runtimeLog,
                 assistantContainer: assistant, applicationControlContainer: applicationControl,
                 memoryContainer: memory, photographerContainer: photographer, writerContainer: writer,
                 stateContext: try makeStateContext(), cache: cacheStorage,

@@ -16,7 +16,7 @@ private func activityRecord(
     failure: ActionExecutionRecord.Failure? = nil, completion: ActionCompletion? = nil
 ) -> ActionExecutionRecord {
     ActionExecutionRecord(
-        id: id, path: ActionIdentifier(domain: "NexArm", module: "Gesture", function: "dance"), displayName: "跳舞",
+        id: id, path: ActionIdentifier(domain: "NexArm", module: "Gesture", function: "dance"),
         source: AgentID.assistant.rawValue,
         sessionID: UUID().uuidString, inputID: UUID().uuidString, channel: channel,
         semantics: semantics, phase: phase,
@@ -26,7 +26,7 @@ private func activityRecord(
 }
 
 @Test @MainActor func actionActivityGroupsParallelChannelsAndKeepsDetailsAfterAutoHide() {
-    let state = ActionActivityState()
+    let state = RuntimeLogState()
     let now = Date()
     let robot = activityRecord(at: now)
     let speech = activityRecord(channel: "Speech", at: now)
@@ -46,7 +46,7 @@ private func activityRecord(
 }
 
 @Test @MainActor func actionActivityFailuresPersistUntilDismissedOrReplacedAndNeverResurface() {
-    let state = ActionActivityState()
+    let state = RuntimeLogState()
     let now = Date()
     let failure = activityRecord(phase: .failed, at: now, failure: .init(rawValue: "feedbackTimeout"))
     state.replace(revision: 1, records: [failure], evictedCount: 0)
@@ -65,7 +65,8 @@ private func activityRecord(
     let cancelling = ActionActivityItem(execution: activityRecord(phase: .cancelling))
     #expect(cancelling.status == "正在取消")
     #expect(cancelling.isActive)
-    let setting = ActionActivityItem(execution: activityRecord(phase: .succeeded, semantics: .state))
+    let setting = ActionActivityItem(
+        execution: activityRecord(phase: .succeeded, semantics: .state, completion: .completed))
     #expect(setting.status == "已设置")
     let start = ActionActivityItem(
         execution:
@@ -85,29 +86,15 @@ private func activityRecord(
     let failure = ActionActivityItem(
         execution: activityRecord(phase: .failed, failure: .init(rawValue: "feedbackTimeout")))
     #expect(failure.status == "执行未完成")
-    #expect(failure.title == "跳舞")
+    #expect(failure.title == "NexArm.Gesture.dance")
+    #expect(setting.output == "已完成（无返回值）")
+    #expect(start.output?.hasPrefix("activityStarted:") == true)
 }
 
-@Test @MainActor func actionActivityWorkflowConsumesInitialAndLatestSnapshotsWithoutPageLifetime() async throws {
-    let state = ActionActivityState()
-    let workflow = ActionActivityWorkflow(state: state)
-    let pair = AsyncStream<ActionExecutionSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
-    workflow.start { pair.stream }
-    let record = activityRecord(phase: .succeeded)
-    pair.continuation.yield(ActionExecutionSnapshot(revision: 5, records: [record], evictedCount: 3))
-    let deadline = ContinuousClock.now.advanced(by: .seconds(2))
-    while state.revision != 5, ContinuousClock.now < deadline { await Task.yield() }
-    #expect(state.revision == 5)
-    #expect(state.items.first?.id == record.id)
-    #expect(state.evictedCount == 3)
-    pair.continuation.finish()
-}
-
-@Test @MainActor func actionActivityShowsEveryScheduledActionRegardlessOfModuleOrSource() async {
+@Test @MainActor func actionActivityShowsEveryScheduledActionRegardlessOfModuleOrSource() {
     func record(module: String, source: AgentID, channel: String) -> ActionExecutionRecord {
         ActionExecutionRecord(
             id: UUID().uuidString, path: ActionIdentifier(domain: module, module: "Control", function: "fixture"),
-            displayName: "跳舞",
             source: source.rawValue,
             sessionID: UUID().uuidString, inputID: UUID().uuidString, channel: channel,
             semantics: .finite)
@@ -121,16 +108,10 @@ private func activityRecord(
         record(module: "UI", source: .visionPerception, channel: "Gaze"),
         record(module: "Recognition", source: .speechPerception, channel: "Transcript"),
     ]
-    let state = ActionActivityState()
-    let workflow = ActionActivityWorkflow(state: state)
-    let pair = AsyncStream<ActionExecutionSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
-    workflow.start { pair.stream }
-    pair.continuation.yield(ActionExecutionSnapshot(revision: 1, records: visible + hidden))
-    let deadline = ContinuousClock.now.advanced(by: .seconds(2))
-    while state.revision != 1, ContinuousClock.now < deadline { await Task.yield() }
+    let state = RuntimeLogState()
+    state.replace(revision: 1, records: visible + hidden, evictedCount: 0)
     #expect(state.items.map(\.id) == (visible + hidden).map(\.id))
     #expect(state.summaries(at: .now).count == 5)
-    pair.continuation.finish()
 }
 
 @Test @MainActor func actionActivityUsesThrownDescriptionWithoutAnErrorCatalog() {
@@ -143,7 +124,7 @@ private func activityRecord(
 }
 
 @Test @MainActor func channelSummariesPreserveExactNamesWithoutAssumingSharedTaskOrdering() {
-    let state = ActionActivityState()
+    let state = RuntimeLogState()
     let first = activityRecord(channel: "CustomLane")
     let anotherTask = activityRecord(channel: "CustomLane")
     let differentCase = activityRecord(channel: "customlane")
@@ -151,10 +132,10 @@ private func activityRecord(
     let summaries = state.summaries(at: .now)
     #expect(Set(summaries.map(\.id)) == ["CustomLane", "customlane"])
     #expect(summaries.first { $0.id == "CustomLane" }?.additionalRunning == 1)
-    #expect(summaries.first { $0.id == "CustomLane" }?.item.channelTitle == "CustomLane")
+    #expect(summaries.first { $0.id == "CustomLane" }?.item.channel == "CustomLane")
 }
 
-extension ActionActivityState {
+extension RuntimeLogState {
     func replace(revision: UInt64, records: [ActionExecutionRecord], evictedCount: UInt64) {
         replace(revision: revision, records: records.map(ActionActivityItem.init), evictedCount: evictedCount)
     }
@@ -171,7 +152,7 @@ extension ActionActivityState {
     let item = ActionActivityItem(
         execution: ActionExecutionRecord(
             id: UUID().uuidString,
-            path: ActionIdentifier(domain: "NexArm", module: "Gesture", function: "dance"), displayName: "跳舞",
+            path: ActionIdentifier(domain: "NexArm", module: "Gesture", function: "dance"),
             source: AgentID.assistant.rawValue,
             sessionID: UUID().uuidString, inputID: UUID().uuidString, channel: "Robot",
             semantics: .finite, phase: .failed,
@@ -187,7 +168,6 @@ extension ActionActivityState {
     let item = ActionActivityItem(
         execution: ActionExecutionRecord(
             id: UUID().uuidString, path: ActionIdentifier(domain: "Speech", module: "Playback", function: "speak"),
-            displayName: "朗读回复",
             source: AgentID.assistant.rawValue,
             sessionID: UUID().uuidString, inputID: UUID().uuidString, channel: "Speech",
             semantics: .finite, phase: .failed,
@@ -218,11 +198,11 @@ extension ActionActivityState {
         .init(
             execution: .init(
                 id: UUID().uuidString, path: .init(domain: parts[0], module: parts[1], function: parts[2]),
-                displayName: "字幕", source: AgentID.assistant.rawValue, sessionID: UUID().uuidString,
+                source: AgentID.assistant.rawValue, sessionID: UUID().uuidString,
                 inputID: UUID().uuidString, channel: "Display",
                 semantics: .finite, phase: phase, admittedAt: .now))
     }
-    let state = ActionActivityState()
+    let state = RuntimeLogState()
     let internalSuccess = caption(.succeeded)
     let internalFailure = caption(.failed)
     let business = ActionActivityItem(execution: activityRecord())
@@ -236,8 +216,8 @@ extension ActionActivityState {
 }
 
 @Test @MainActor func executionLogTaskReceiptIsNotCompletionAndLateProgressCannotReopen() async throws {
-    let state = ActionActivityState()
-    let workflow = ActionActivityWorkflow(state: state)
+    let state = RuntimeLogState()
+    let workflow = AgentRuntimeLogWorkflow(log: state)
     let pair = AsyncStream<SignalTraceSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
     workflow.startTasks(
         observe: { pair.stream }, taskContent: { signal in ("task report", signal.kind == .progress) })

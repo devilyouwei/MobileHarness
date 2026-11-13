@@ -12,7 +12,28 @@ import UI
 final class ApplicationActionAssembly {
     let gateway: GatewayContainer
     weak var agents: AgentContainer?
+    private let actionSnapshots = AsyncStream<ActionExecutionSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
+    private var actionLog: Task<Void, Never>?
     init(gateway: GatewayContainer) { self.gateway = gateway }
+
+    func connectActionLog(to log: any RuntimeLogWriting) -> @Sendable (ActionExecutionSnapshot) -> Void {
+        let (stream, continuation) = actionSnapshots
+        actionLog = Task {
+            for await snapshot in stream {
+                log.record(
+                    .actions(
+                        revision: snapshot.revision, records: snapshot.records.map(ActionActivityItem.init),
+                        evictedCount: snapshot.evictedCount))
+            }
+        }
+        return { snapshot in continuation.yield(snapshot) }
+    }
+
+    func stopActionLog() async {
+        actionSnapshots.continuation.finish()
+        await actionLog?.value
+        actionLog = nil
+    }
     func dependencies(
         storage: StorageContainer, model: ModelContainer, platform: PlatformContainer,
         ui: UIContainer

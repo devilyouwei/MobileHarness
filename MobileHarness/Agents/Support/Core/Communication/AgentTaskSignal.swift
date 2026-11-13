@@ -36,8 +36,18 @@ public struct AgentTaskScope: Codable, Sendable, Equatable {
 }
 
 public struct AgentTaskSignal: Codable, Sendable, Equatable {
-    public enum Kind: String, Codable, Sendable { case request, input, progress, result, cancel }
+    public enum Kind: String, CaseIterable, Codable, Sendable {
+        case request, input, progress, result, cancel
+
+        public var contract: String {
+            switch self {
+            case .progress, .result: AgentTaskSignal.responseContract
+            case .request, .input, .cancel: "task." + rawValue
+            }
+        }
+    }
     public enum Status: String, Codable, Sendable { case succeeded, failed, cancelled }
+    public static let responseContract = "agent.task.response"
     public let kind: Kind
     public let scope: AgentTaskScope
     public let businessContract: String?
@@ -45,7 +55,7 @@ public struct AgentTaskSignal: Codable, Sendable, Equatable {
     public let status: Status?
     public let goal: String?
     public let requestedSkills: [String]?
-    public var contract: String { "task." + kind.rawValue }
+    public var contract: String { kind.contract }
     public init(
         kind: Kind, scope: AgentTaskScope, businessContract: String? = nil, data: Data, status: Status? = nil,
         goal: String? = nil, requestedSkills: [String]? = nil
@@ -76,9 +86,9 @@ public struct AgentTaskSignal: Codable, Sendable, Equatable {
         return AgentMessage(contract: contract, content: self, maximumBytes: 131_072, validate: { try $0.validate() })
     }
     public static var contracts: [CommunicationContract] {
-        [Kind.request, .input, .progress, .result, .cancel].map { kind in
+        [Kind.request, .input, .cancel].map { kind in
             CommunicationContract(
-                name: "task." + kind.rawValue, kind: .observation, maximumBytes: 131_072,
+                name: kind.contract, kind: .observation, maximumBytes: 131_072,
                 startsNewWork: true,
                 validateMessage: { message in
                     guard let signal = message.content(as: AgentTaskSignal.self), signal.kind == kind else {

@@ -3,10 +3,10 @@ import FunctionContracts
 extension SystemActions {
     @Action(
         domain: "Agent", module: "Task", title: "sendMessage",
-        doc: "Send input to the foreground task or to a target Agent.",
+        doc: "Relay the user's request, reply or correction to a peer Agent. The receiver decides how to handle it.",
         parameters: [
-            .init("text", description: "Relevant input or correction"),
-            .init("agent_id", required: false, description: "Target Agent; omit for foreground"),
+            .init("agent_id", description: "Target Agent ID"),
+            .init("text", description: "User request, reply, correction or stop request"),
         ], timeout: .seconds(30))
     public static func sendMessage(_ input: any FunctionInput, capability: any TaskControlCapability) async throws
         -> ActionCompletion
@@ -42,7 +42,7 @@ extension SystemActions {
     @Action(
         domain: "Agent", module: "Task", title: "startTask",
         doc:
-            "Start a foreground goal owned by the calling Agent. Peer alternative to delegateTask, never its prerequisite.",
+            "Start a foreground goal when none is active. End an existing foreground goal before starting another.",
         parameters: [
             .init("description", description: "Foreground task description"),
             .init("skills", required: false, description: "Optional JSON array of initial foreground Skill IDs"),
@@ -70,30 +70,5 @@ extension SystemActions {
         -> ActionCompletion
     {
         try await capability.controlTask("task.end", arguments: input.call.parameters, invocation: input)
-    }
-    @Action(
-        domain: "Agent", module: "Task", title: "cancelTask",
-        doc: "Cancel foreground or send cancellation to a target Agent.",
-        parameters: [
-            .init("reason", description: "Cancellation reason"),
-            .init("agent_id", required: false, description: "Target Agent; omit for foreground"),
-        ], completion: "Cancellation accepted", timeout: .seconds(30))
-    public static func cancelTask(_ input: any FunctionInput, capability: any TaskControlCapability) async throws
-        -> ActionCompletion
-    {
-        try await capability.controlTask("task.cancel", arguments: input.call.parameters, invocation: input)
-    }
-    @Action(
-        domain: "Agent", module: "Task", title: "delegateTask",
-        doc:
-            "Directly delegate to a target from the available Agent directory. Peer alternative to startTask; no foreground prerequisite.",
-        parameters: [
-            .init("agent_id", description: "Target Agent ID"),
-            .init("description", description: "Task description; no code"),
-        ], completion: "Request accepted; not task completion", timeout: .seconds(30))
-    public static func delegateTask(_ input: any FunctionInput, capability: any TaskControlCapability) async throws
-        -> ActionCompletion
-    {
-        try await capability.controlTask("task.delegate", arguments: input.call.parameters, invocation: input)
     }
 }

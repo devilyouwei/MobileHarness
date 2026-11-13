@@ -29,7 +29,7 @@ flowchart LR
 | --- | --- |
 | [AgentMessaging.swift](AgentMessaging.swift) | AgentMessage 类型擦除／验证、身份绑定传输端口与 DeliveryReport |
 | [CommunicationPolicy.swift](CommunicationPolicy.swift) | 契约目录、精确输入／订阅／发布／定向声明及权限判断 |
-| [AgentTaskSignal.swift](AgentTaskSignal.swift) | Task 作用域／信封与有界注册表的接纳和状态校验 |
+| [AgentTaskSignal.swift](AgentTaskSignal.swift) | Task 作用域／信封与有界注册表的接纳和状态校验。进度、终态共用 `agent.task.response`，按信封类型区分。 |
 | [DeliveryHistory.swift](DeliveryHistory.swift) | 单传输端口的有界投递结果证据 |
 | [SignalObservation.swift](SignalObservation.swift) | Signal 的因果、分支接纳状态、摘要及可选 Task 信封快照 |
 

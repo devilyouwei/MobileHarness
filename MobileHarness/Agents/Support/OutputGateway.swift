@@ -20,12 +20,18 @@ public struct GatewayOutputConsumer: Sendable {
     }
     private let consume: @Sendable (OutputEnvelope, GatewayOutputMode) async throws -> OutputExecutionResult
     let retireTask: @Sendable (AgentTaskSignal) async throws -> Void
+    let authorizeReceivedTask: @Sendable (AgentTaskScope, AgentInput) async throws -> (@Sendable () async -> Void)
     fileprivate init(
         consume: @escaping @Sendable (OutputEnvelope, GatewayOutputMode) async throws -> OutputExecutionResult,
-        retireTask: @escaping @Sendable (AgentTaskSignal) async throws -> Void
+        retireTask: @escaping @Sendable (AgentTaskSignal) async throws -> Void,
+        authorizeReceivedTask:
+            @escaping @Sendable (AgentTaskScope, AgentInput) async throws -> (
+                @Sendable () async -> Void
+            )
     ) {
         self.consume = consume
         self.retireTask = retireTask
+        self.authorizeReceivedTask = authorizeReceivedTask
     }
     @discardableResult public func execute(_ envelope: OutputEnvelope) async throws -> OutputExecutionResult {
         try await consume(envelope, .protocolFeedback)
@@ -250,6 +256,16 @@ public actor OutputGateway {
         } retireTask: { [self] terminal in
             try await retireTask(
                 terminal, owner: .init(agent: id, incarnation: incarnation, sessionID: terminal.scope.sessionID))
+        } authorizeReceivedTask: { [manager] scope, input in
+            guard scope.executor == id, scope.sessionID == input.sessionID, scope.id == input.id,
+                scope.execution == .background, scope.parentID == nil,
+                input.metadata.origin == .agent, input.metadata.source == scope.requester.rawValue,
+                let sender = input.metadata.incarnation, case .observation(let message) = input.payload,
+                let content = message.content(as: AgentTaskRequest.self), content.id == input.id, content.replyTo == nil
+            else { throw CommunicationError.unauthorized }
+            try await manager.validate(id, incarnation: incarnation, sessionID: input.sessionID)
+            let token = try await manager.grantReceivedTask(scope, sender: sender)
+            return { _ = await manager.retireTask(scope.id, admissionID: token) }
         }
     }
     private func sourceIdentity(_ envelope: OutputEnvelope) async throws -> String {
@@ -318,12 +334,24 @@ public actor OutputGateway {
                     throw CommunicationError.unauthorized
                 }
             }
+            if let response = observation.content(as: AgentTaskResponse.self) {
+                guard source == .writer, target == .assistant else { throw CommunicationError.unauthorized }
+                if let signal = response.signal {
+                    guard source == signal.scope.executor, target == signal.scope.requester,
+                        sessionID == signal.scope.sessionID
+                    else { throw CommunicationError.unauthorized }
+                    if signal.kind == .progress {
+                        try await manager.validateTask(signal.scope, agent: source, sessionID: sessionID)
+                    }
+                }
+            }
             // These commands are newly produced work, not forwarded sensor observations. Their
             // admission deadline starts now; the accepted input may outlive its original routing TTL.
             let task = observation.content(as: AgentTaskSignal.self)
             if let task {
                 try task.validate()
                 let incoming = task.kind == .request || task.kind == .input || task.kind == .cancel
+                guard incoming || source != .writer else { throw CommunicationError.unauthorized }
                 guard sessionID == task.scope.sessionID,
                     source == (incoming ? task.scope.requester : task.scope.executor),
                     target == (incoming ? task.scope.executor : task.scope.requester)
@@ -348,7 +376,9 @@ public actor OutputGateway {
             guard generatedCommand || !metadata.expired else { throw CommunicationError.expired }
             sequences[source, default: 0] += 1
             let payload = InputPayload.observation(observation)
-            let communicationID = task?.kind == .request ? task?.scope.id : messageID
+            let communicationID =
+                task?.kind == .request
+                ? task?.scope.id : observation.content(as: AgentTaskRequest.self)?.id ?? messageID
             let durableID = communicationID ?? UUID().uuidString
             if let communications, let target, let task, task.scope.execution == .background,
                 try await communications.agentMessage(durableID) == nil

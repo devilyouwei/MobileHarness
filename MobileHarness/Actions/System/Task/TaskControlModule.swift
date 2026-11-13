@@ -16,18 +16,12 @@ public struct TaskControlModule: CapabilityModule {
             SystemActions.releaseSkillsDefinition(completing: {
                 try await SystemActions.releaseSkills($0, capability: capability)
             }),
-            SystemActions.delegateTaskDefinition(completing: {
-                try await SystemActions.delegateTask($0, capability: capability)
-            }),
             SystemActions.startTaskDefinition(completing: {
                 try await SystemActions.startTask($0, capability: capability)
             }
             ),
             SystemActions.finishTaskDefinition(completing: {
                 try await SystemActions.finishTask($0, capability: capability)
-            }),
-            SystemActions.cancelTaskDefinition(completing: {
-                try await SystemActions.cancelTask($0, capability: capability)
             }),
         ]
     }

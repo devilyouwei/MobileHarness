@@ -1,9 +1,0 @@
-{
-  "version": 1,
-  "templates": {
-    "transition": "Mode={{mode}}; task=none; Skills={{skills}}; transition committed.",
-    "cancellationDelivered": "Cancellation delivered; await executor terminal confirmation. Foreground unchanged.",
-    "foregroundInput": "Foreground task input: ",
-    "busy": "Writer busy; send input or cancel and await cleanup"
-  }
-}

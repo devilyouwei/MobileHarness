@@ -4,16 +4,14 @@
 
 本目录校验、执行已经由调用方决定的展示请求；运行异常分类属于 ApplicationControl，蓝牙显示函数只更新展示事实。Agent 使用自身绑定的 Gateway consumer 调用注册函数；Actions 不观察 UI 状态推断角色阶段，也不替角色调用灵动岛。
 
-recordFailure、showHome 和 showSettings 以 Void 完成，调用方仍可收到结构化回执或实际失败。
+showHome 和 showSettings 以 Void 完成，调用方仍可收到结构化回执或实际失败。
 
 | 文件 | 当前职责 |
 | --- | --- |
 | [BluetoothStatusActions.swift](BluetoothStatusActions.swift) | 已分类连接状态的参数校验和呈现 |
 | [MicrophoneSpectrumPresentation.swift](MicrophoneSpectrumPresentation.swift) | 频谱测量校验、平滑及采集句柄／UI 代际接纳 |
-| [RuntimeDiagnosticsActions.swift](RuntimeDiagnosticsActions.swift) | 已分类异常的校验、呈现和完成值 |
 | [IslandActions.swift](IslandActions.swift) | Action 声明、命令解析、模块绑定、可信身份、执行服务与图片端口 |
-| [RuntimeIssue.swift](RuntimeIssue.swift) | 已分类运行异常的有界值 |
-| [RuntimePresentationCapabilities.swift](RuntimePresentationCapabilities.swift) | 异常和连接显示能力接口 |
+| [RuntimePresentationCapabilities.swift](RuntimePresentationCapabilities.swift) | 连接显示能力接口 |
 
 [所属域设计](../README.md) · [Actions 模块](../../README.md) · [角色展示所有权](../../../Agents/README.md#role-owned-presentation-and-speech-facts)
 
@@ -31,4 +29,4 @@ IslandThumbnailPresenting 仅提供图片注册/释放，图片 owner 与活动�
 
 各角色决定开始、内容和结束，复用 [AgentIslandPublication](../../../Agents/Support/README.md#agent-owned-island-publication) 的有界传输和错误处理；本目录没有领域观察 worker、蓝牙到期策略或角色阶段映射。实际播放频谱由 Speech/Listening 的播放器送到 UI 专用数据端口，麦克风频谱由 SpeechPerception 经 SpectrumPresenting 提交；两者不逐帧调用 Action 或 ActivityKit。
 
-ActionActivityWorkflow/ActionActivityPresentation 属于 Agents/Support 的日志机制，日志不是灵动岛展示权威。RuntimePresentation 校验业务会话、序号和代际；MicrophoneSpectrumPresentation 使用 UUID 句柄，旧句柄不能更新新采集。角色内部执行的成功、失败和异常由调用方处理，不向 Assistant 生成新的模型输入。
+运行异常日志和写入接口见 [RuntimeLog](../../../UI/Components/RuntimeLog/README.md)。RuntimePresentation 校验业务会话、序号和代际；MicrophoneSpectrumPresentation 使用 UUID 句柄，旧句柄不能更新新采集。角色内部执行的成功、失败和异常由调用方处理，不向 Assistant 生成新的模型输入。

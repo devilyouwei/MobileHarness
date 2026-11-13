@@ -2,6 +2,8 @@
 
 日期：2026-11-07。状态：已完成并归档。新十表、按表目录、业务调用方、日志及历史 UI 已完成，旧表和兼容代码已删除；按用户授权清洁安装真机并验证启动与十表初始化。自动验证、历史失败和独立原生 UI/真实模型验收边界见验证记录。
 
+本文保留当时的任务入口设计。现行前台控制和后台委派接口见 [Task Actions](../../MobileHarness/Actions/System/Task/README.md)。
+
 ## 1. 当前确定的边界
 
 - Assistant / Writer 两侧独立保存各自的任务、完整消息和业务状态。上级仍为 assistant_conversations / writer_tasks，不共享 messages，也不创建 message_assistant/message_writer 扩展表。
