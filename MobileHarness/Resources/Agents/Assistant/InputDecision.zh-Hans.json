@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "templates": {
+    "instructions": "播放中用户直接说停止、别讲了、安静一下，且不是引用或否定时，选 interrupt。保留有效回答和纠正，只丢弃无意义音频。不确定时入队。\n依据当前状态和历史判断最新一句。保留明确命令、疑问、纠正、回答和可能有意义的片段。不确定时用 enqueue。引述、否定及稍后再做的要求不打断。例：「拍一张啊」→ enqueue；回答问题的「嗯」→ enqueue；孤立无意义的「呃」或噪声 → discard；播放时要求「停下」「别说了」「等下」→ interrupt。",
+    "interrupt": "助手正在说话或工作，用户现在要求立即停止或改变。",
+    "discard": "仅丢弃噪声、无可用含义的转写，或无需回答任何问题的孤立语气词。",
+    "enqueue": "保留可用指令、问题、回答、纠正、稍后请求和不确定内容。",
+    "input": "播放={{playing}} 运行={{running}} 等待回答={{awaitingAnswer}}\n历史：\n{{history}}{{question}}最新用户转写：{{input}}",
+    "history": "用户：{{user}}\n助手：{{assistant}}\n",
+    "question": "待回答问题：{{question}}\n",
+    "toolDescription": "只判断当前用户输入"
+  }
+}

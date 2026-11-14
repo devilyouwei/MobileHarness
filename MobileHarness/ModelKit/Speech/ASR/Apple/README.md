@@ -4,6 +4,8 @@
 
 Modern native recognition with transcriber/detector, required locale assets and request-local ordered PCM.
 
+The default adapter locale is `en-US`. The host's speech selection supplies `zh-CN` for Simplified Chinese and selects before acquiring a model lease. Active analyzer sessions retain their initial locale until completion or cancellation.
+
 ## Ownership and boundaries
 
 Depends on ModelKit/system Speech frameworks. The host owns permissions/capture; the capability consumer owns silence endpoint policy. Every request owns analyzer/transcriber/detector/conversion under an exclusive ModelResource lease.

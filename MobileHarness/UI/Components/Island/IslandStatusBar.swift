@@ -147,8 +147,8 @@ struct IslandBatteryGeometry {
             for view in [clock, network, battery] { addSubview(view) }
         }
         required init?(coder: NSCoder) { nil }
-        func update(state: IslandStatusBarState) {
-            formatter.locale = .current
+        func update(state: IslandStatusBarState, language: AppLanguage) {
+            formatter.locale = language.locale
             formatter.timeZone = .current
             formatter.setLocalizedDateFormatFromTemplate("HHmm")
             clock.text = formatter.string(from: state.date)
@@ -158,27 +158,27 @@ struct IslandBatteryGeometry {
             switch value.network {
             case .unknown:
                 symbol = "questionmark"
-                label = "网络状态未知"
+                label = "Network status unknown"
             case .offline:
                 symbol = "wifi.slash"
-                label = "网络未连接"
+                label = "No network connection"
             case .wifi:
                 symbol = "wifi"
-                label = "Wi-Fi 网络"
+                label = "Wi-Fi network"
             case .cellular:
                 symbol = "antenna.radiowaves.left.and.right"
-                label = "蜂窝网络"
+                label = "Cellular network"
             case .wired:
                 symbol = "network"
-                label = "有线网络"
+                label = "Wired network"
             case .other:
                 symbol = "network"
-                label = "其他网络"
+                label = "Other network"
             }
             network.image = UIImage(
                 systemName: symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold))
-            network.accessibilityLabel = label
-            battery.update(value)
+            network.accessibilityLabel = language.text(label)
+            battery.update(value, language: language)
         }
         var visualState: [(CGRect, CGFloat)] {
             [clock, network, battery].map {
@@ -220,12 +220,13 @@ struct IslandBatteryGeometry {
             contentMode = .redraw
         }
         required init?(coder: NSCoder) { nil }
-        func update(_ value: IslandDeviceStatus) {
+        func update(_ value: IslandDeviceStatus, language: AppLanguage) {
             self.value = value
             accessibilityLabel =
                 value.batteryPercent.map {
-                    "电池 \($0)%" + (value.charging ? "，充电中" : "") + (value.lowPower ? "，低电量模式" : "")
-                } ?? "电量未知"
+                    language.format("Battery %@%%", String($0)) + (value.charging ? language.text(", charging") : "")
+                        + (value.lowPower ? language.text(", Low Power Mode") : "")
+                } ?? language.text("Battery level unknown")
             setNeedsDisplay()
         }
         override func draw(_ rect: CGRect) {

@@ -15,8 +15,8 @@ import FunctionContracts
             let session = try await chat.chat(
                 ChatRequest(
                     messages: [
-                        .init(role: .system, content: "你是中文助手，直接简短回答。"),
-                        .init(role: .user, content: "我有3个苹果，又买了2个，吃掉1个，还剩几个？只回答数字。"),
+                        .init(role: .system, content: "Answer the arithmetic question with a number only."),
+                        .init(role: .user, content: "I have three apples, buy two more, and eat one. How many remain?"),
                     ], temperature: 0))
             defer { session.cancel() }
             var answer = ""

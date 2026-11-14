@@ -64,7 +64,7 @@ public struct WriterRequestItem: Identifiable, Sendable {
     public let title: String
     public init(
         id: String, position: UInt64, number: Int, delegateID: String, phase: String, path: String?, attempt: Int,
-        date: Date, state: String, title: String = "创作步骤", workspaceID: String? = nil
+        date: Date, state: String, title: String = "Writing step", workspaceID: String? = nil
     ) {
         self.id = id
         self.position = position
@@ -78,17 +78,17 @@ public struct WriterRequestItem: Identifiable, Sendable {
         self.state = state
         self.title = title
     }
-    public var displayTitle: String { title + (attempt > 1 ? "（重试）" : "") }
+    public var displayTitle: String { title + (attempt > 1 ? " (retry)" : "") }
     public var statusTitle: String { Self.statusTitle(state) }
     static func statusTitle(_ state: String) -> String {
         switch state {
-        case "generating": "生成中"
-        case "executing": "执行中"
-        case "completed": "已完成"
-        case "failed": "失败"
-        case "cancelled": "已取消"
-        case "interrupted": "已中断"
-        default: "未知"
+        case "generating": "Generating"
+        case "executing": "Running"
+        case "completed": "Completed"
+        case "failed": "Failed"
+        case "cancelled": "Cancelled"
+        case "interrupted": "Interrupted"
+        default: "Unknown"
         }
     }
 }
@@ -189,10 +189,10 @@ public struct WriterDelegationItem: Identifiable, Sendable {
     public let workspace: WriterWorkspaceItem?
     public var stateTitle: String {
         switch state {
-        case "waiting_input": return "等待补充"
-        case "paused": return "已暂停"
-        case "closing": return "正在收尾"
-        case "cleanup_failed": return "清理失败"
+        case "waiting_input": return "Waiting for input"
+        case "paused": return "Paused"
+        case "closing": return "Finishing"
+        case "cleanup_failed": return "Cleanup failed"
         default: return WriterRequestItem.statusTitle(state)
         }
     }
@@ -286,9 +286,9 @@ public enum WriterRecordPresentation {
             !changes.isEmpty, changes.allSatisfy({ $0.status == "draft edited; render before finish" })
         {
             let summary = changes.prefix(2).map {
-                "\($0.path) · 草稿已修改，待渲染\n\($0.beforeBytes) → \($0.afterBytes) 字节 · 首个变化行 \($0.firstChangedLine)"
+                "\($0.path) · Draft changed, pending render\n\($0.beforeBytes) → \($0.afterBytes) bytes · First changed line \($0.firstChangedLine)"
             }.joined(separator: "\n")
-            return changes.count <= 2 ? summary : summary + "\n共 \(changes.count) 个文件"
+            return changes.count <= 2 ? summary : summary + "\n\(changes.count) files"
         }
         let excerpt = content.prefix(240)
         return String(excerpt) + (excerpt.endIndex == content.endIndex ? "" : "…")
@@ -298,10 +298,10 @@ public enum WriterRecordPresentation {
     }
     static func toolStateTitle(_ state: HistoryToolCall.State) -> String {
         switch state {
-        case .received: "待完成"
-        case .completed: "已完成"
-        case .failed: "失败"
-        case .cancelled: "已取消"
+        case .received: "Pending"
+        case .completed: "Completed"
+        case .failed: "Failed"
+        case .cancelled: "Cancelled"
         }
     }
     static func clearingLogs(_ request: HistoryModelRequest) -> HistoryModelRequest {
@@ -316,15 +316,15 @@ public enum WriterRecordPresentation {
 
     public static func firstToken(_ request: HistoryModelRequest) -> String {
         guard let latency = request.firstTokenLatency, latency.isFinite, latency >= 0 else {
-            return "首 token 耗时：未知"
+            return "Time to first token: Unknown"
         }
-        return "首 token 耗时：\(String(format: "%.3f", latency)) 秒"
+        return "Time to first token: \(String(format: "%.3f", latency)) sec"
     }
     public static func requestDuration(_ request: HistoryModelRequest, at now: Date) -> String {
         let end = request.modelRequestCompletedAt ?? (request.state == .generating ? now : nil)
-        guard let end else { return "总计耗时：未知" }
+        guard let end else { return "Total duration: Unknown" }
         let elapsed = max(0, end.timeIntervalSince(request.modelRequestStartedAt ?? request.date))
-        return "总计耗时：\(String(format: "%.3f", elapsed)) 秒"
+        return "Total duration: \(String(format: "%.3f", elapsed)) sec"
     }
 }
 #if os(iOS)
@@ -332,6 +332,8 @@ public enum WriterRecordPresentation {
     import UIKit
 
     @MainActor public struct WriterRecordsView: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         private let controls: any WriterRecordsControlling
         private let artifacts: any WriterArtifactsControlling
         @State private var pages = WriterRecordPages<WriterWorkspaceItem, String>()
@@ -352,10 +354,10 @@ public enum WriterRecordPresentation {
                     NavigationLink {
                         WriterDelegationsView(controls: controls, artifacts: artifacts)
                     } label: {
-                        LabeledContent("委托记录", value: String(delegationTotal))
+                        LabeledContent(appCopy.text("Assignments"), value: String(delegationTotal))
                     }.accessibilityIdentifier("writer.delegations")
                 }
-                Section("工作区") {
+                Section(appCopy.text("Workspace")) {
                     ForEach(items) { item in
                         NavigationLink {
                             WriterWorkspaceDetail(seed: item, controls: controls, artifacts: artifacts).id(item.id)
@@ -373,39 +375,44 @@ public enum WriterRecordPresentation {
                         .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
                         .accessibilityIdentifier("writer.workspace." + item.id)
                     }
-                    if items.isEmpty && !loading && failure == nil { Text("尚无工作区") }
+                    if items.isEmpty && !loading && failure == nil { Text(appCopy.text("No workspaces yet")) }
                     if !pages.hasLoaded || pages.next != nil {
-                        Button(loading ? "Loading…" : "Load More") { Task { await load(reset: false) } }
+                        Button(loading ? appCopy.text("Loading…") : "Load More") { Task { await load(reset: false) } }
                             .disabled(loading)
                     }
                 }
-            }.navigationTitle("My Writer").navigationBarTitleDisplayMode(.inline).task {
+            }.navigationTitle(appCopy.text("My Writer")).navigationBarTitleDisplayMode(.inline).task {
                 if !pages.hasLoaded { await load(reset: true) }
                 while !Task.isCancelled {
                     do {
                         try await Task.sleep(for: .seconds(2))
                         try await refreshWorkspaces()
                     } catch is CancellationError { return } catch {
-                        failure = "记录更新失败：\(error)"
+                        failure = "Could not update records: \(error)"
                         return
                     }
                 }
             }.refreshable { await load(reset: true) }
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("清空请求日志", systemImage: "trash") { clearingLogs = true }
+                        Button(appCopy.text("Clear request logs"), systemImage: "trash") { clearingLogs = true }
                     }
                 }
-                .confirmationDialog("清空整个请求日志库？", isPresented: $clearingLogs, titleVisibility: .visible) {
-                    Button("清空全部日志", role: .destructive) {
+                .confirmationDialog(
+                    appCopy.text("Clear all request logs?"), isPresented: $clearingLogs, titleVisibility: .visible
+                ) {
+                    Button(appCopy.text("Clear all logs"), role: .destructive) {
                         Task {
                             do { try await controls.clearRequestLogs(requestID: nil) } catch {
-                                failure = "日志清空失败：\(error)"
+                                failure = "Could not clear logs: \(error)"
                             }
                         }
                     }
                 } message: {
-                    Text("删除 Assistant 和 Writer 的全部请求日志；保留任务、工作区、消息及其他详情。")
+                    Text(
+                        appCopy.text(
+                            "Deletes all Assistant and Writer request logs. Tasks, workspaces, messages, and other details are kept."
+                        ))
                 }
         }
         @ViewBuilder private func metadata(_ item: WriterWorkspaceItem, stacked: Bool) -> some View {
@@ -426,7 +433,7 @@ public enum WriterRecordPresentation {
             HStack(spacing: 5) {
                 Text(item.id)
                 Text("·")
-                Text("\(item.requestCount) 条消息")
+                Text("\(item.requestCount) messages")
 
             }
         }
@@ -459,7 +466,7 @@ public enum WriterRecordPresentation {
                 try pages.apply(page.items, next: page.nextID, reset: reset)
                 if reset { refreshOffset = 0 }
                 failure = nil
-            } catch is CancellationError {} catch { failure = "读取失败：\(error)" }
+            } catch is CancellationError {} catch { failure = "Could not load: \(error)" }
         }
     }
     @MainActor private struct WriterRecordPagingFooter<Item: Identifiable & Sendable>: View {
@@ -485,11 +492,13 @@ public enum WriterRecordPresentation {
             } catch is CancellationError {
                 pages.paging.cancel(ticket)
             } catch {
-                pages.paging.finish(ticket, error: "读取失败：\(error)")
+                pages.paging.finish(ticket, error: "Could not load: \(error)")
             }
         }
     }
     @MainActor private struct WriterDelegationsView: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let controls: any WriterRecordsControlling
         let artifacts: any WriterArtifactsControlling
         @State private var pages = WriterRecordPages<WriterDelegationItem, UInt64>()
@@ -515,7 +524,7 @@ public enum WriterRecordPresentation {
                         return (page.items, page.next)
                     }
                 }
-            }.navigationTitle("委托记录").task { if !pages.hasLoaded { await load() } }.refreshable {
+            }.navigationTitle(appCopy.text("Assignments")).task { if !pages.hasLoaded { await load() } }.refreshable {
                 await load()
             }
         }
@@ -531,6 +540,8 @@ public enum WriterRecordPresentation {
         }
     }
     @MainActor private struct WriterDelegationDetail: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let seed: WriterDelegationItem
         let controls: any WriterRecordsControlling
         let artifacts: any WriterArtifactsControlling
@@ -541,28 +552,34 @@ public enum WriterRecordPresentation {
         private var item: WriterDelegationItem { current ?? seed }
         var body: some View {
             List {
-                Section("委托") {
-                    LabeledContent("来源 Agent", value: item.sourceAgent)
-                    if let source = item.sourceContext { LabeledContent("来源会话", value: source) }
-                    LabeledContent("接收时间", value: item.date.formatted())
-                    LabeledContent("状态", value: item.stateTitle)
+                Section(appCopy.text("Assignment")) {
+                    LabeledContent(appCopy.text("Source Agent"), value: item.sourceAgent)
+                    if let source = item.sourceContext {
+                        LabeledContent(appCopy.text("Source conversation"), value: source)
+                    }
+                    LabeledContent(appCopy.text("Received at"), value: item.date.formatted())
+                    LabeledContent(appCopy.text("Status"), value: appCopy.text(item.stateTitle))
                     Text(item.goal)
                 }
-                if let waiting = item.waiting { Section("等待补充") { Text(verbatim: waiting) } }
-                Section("原始输入") { Text(verbatim: item.input).textSelection(.enabled) }
-                if let result = item.result { Section("结果") { Text(verbatim: result).textSelection(.enabled) } }
-                if let error = item.failure { Section("失败") { Text(verbatim: error).foregroundStyle(.red) } }
+                if let waiting = item.waiting { Section(appCopy.text("Waiting for input")) { Text(verbatim: waiting) } }
+                Section(appCopy.text("Original input")) { Text(verbatim: item.input).textSelection(.enabled) }
+                if let result = item.result {
+                    Section(appCopy.text("Result")) { Text(verbatim: result).textSelection(.enabled) }
+                }
+                if let error = item.failure {
+                    Section(appCopy.text("Failed")) { Text(verbatim: error).foregroundStyle(.red) }
+                }
                 if let workspace = item.workspace {
-                    Section("工作区") {
+                    Section(appCopy.text("Workspace")) {
                         NavigationLink {
                             WriterWorkspaceDetail(seed: workspace, controls: controls, artifacts: artifacts)
                         } label: {
-                            Text(workspace.title + (workspace.isDeleted ? "（已删除）" : ""))
+                            Text(workspace.title + (workspace.isDeleted ? appCopy.text(" (deleted)") : ""))
                         }
                     }
                 }
                 if let failure { Text(failure).foregroundStyle(.red) }
-                Section("进入工作区前的消息") {
+                Section(appCopy.text("Messages before entering the workspace")) {
                     ForEach(pages.items) { row in
                         NavigationLink {
                             WriterRequestDetail(requestID: row.id, controls: controls)
@@ -574,10 +591,11 @@ public enum WriterRecordPresentation {
                         }.accessibilityIdentifier("writer.preflight.request." + row.id)
                     }
                     if let next = pages.next {
-                        Button("加载更多") { Task { await load(after: next, reset: false) } }.disabled(reading)
+                        Button(appCopy.text("Load more")) { Task { await load(after: next, reset: false) } }.disabled(
+                            reading)
                     }
                 }
-            }.navigationTitle("委托详情").task {
+            }.navigationTitle(appCopy.text("Assignment details")).task {
                 if !pages.hasLoaded { await load(after: 0, reset: true) }
                 while !Task.isCancelled {
                     do {
@@ -605,6 +623,8 @@ public enum WriterRecordPresentation {
         }
     }
     @MainActor private struct WriterWorkspaceDetail: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let seed: WriterWorkspaceItem
         let controls: any WriterRecordsControlling
         let artifacts: any WriterArtifactsControlling
@@ -630,15 +650,20 @@ public enum WriterRecordPresentation {
                         }.frame(maxWidth: .infinity, alignment: .leading)
                     }
                     if let date = (current ?? seed).startedAt {
-                        LabeledContent("开始时间", value: date.formatted(date: .abbreviated, time: .standard))
-                            .accessibilityIdentifier("writer.workspace.started")
+                        LabeledContent(
+                            appCopy.text("Started at"), value: date.formatted(date: .abbreviated, time: .standard)
+                        )
+                        .accessibilityIdentifier("writer.workspace.started")
                     }
                     LabeledContent(
-                        "更新时间", value: (current ?? seed).updatedAt.formatted(date: .abbreviated, time: .standard)
+                        appCopy.text("Updated at"),
+                        value: (current ?? seed).updatedAt.formatted(date: .abbreviated, time: .standard)
                     )
                     .accessibilityIdentifier("writer.workspace.updated")
-                    LabeledContent("消息数量", value: String((current ?? seed).requestCount))
-                    if (current ?? seed).isDeleted { LabeledContent("状态", value: "工作区已删除") }
+                    LabeledContent(appCopy.text("Message count"), value: String((current ?? seed).requestCount))
+                    if (current ?? seed).isDeleted {
+                        LabeledContent(appCopy.text("Status"), value: appCopy.text("Workspace deleted"))
+                    }
                     if !(current ?? seed).isDeleted {
                         let project = seed.workspaceID
                         NavigationLink {
@@ -646,15 +671,16 @@ public enum WriterRecordPresentation {
                                 item: .init(id: project, title: seed.title, state: "draft", entry: "index.html"),
                                 controls: artifacts)
                         } label: {
-                            Label("浏览目录文件", systemImage: "folder")
+                            Label(appCopy.text("Browse files"), systemImage: "folder")
                         }.accessibilityIdentifier("writer.workspace.files")
                     } else {
-                        Label("尚未建立作品目录", systemImage: "folder").foregroundStyle(.secondary)
+                        Label(appCopy.text("No project directory yet"), systemImage: "folder").foregroundStyle(
+                            .secondary)
                     }
 
                 }
                 if let failure { Text(failure).foregroundStyle(.red) }
-                Section("工作区消息") {
+                Section(appCopy.text("Workspace messages")) {
                     ForEach(items) { item in
                         NavigationLink {
                             WriterRequestDetail(requestID: item.id, controls: controls)
@@ -666,7 +692,7 @@ public enum WriterRecordPresentation {
                                 .frame(minWidth: 34, minHeight: 36).padding(.horizontal, 3)
                                 .foregroundStyle(numberTint(item))
                                 .background(numberTint(item).opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
-                                .accessibilityLabel("第\(item.number)轮")
+                                .accessibilityLabel("Round \(item.number)")
                                 VStack(alignment: .leading, spacing: 7) {
                                     Text(verbatim: item.displayTitle).font(.body).foregroundStyle(.primary)
                                         .lineLimit(2).truncationMode(.tail)
@@ -674,9 +700,11 @@ public enum WriterRecordPresentation {
                                         Text(item.date, format: .dateTime.month().day().hour().minute().second())
                                             .foregroundStyle(.secondary).lineLimit(1)
                                         Spacer(minLength: 0)
-                                        Text(item.statusTitle).padding(.horizontal, 6).padding(.vertical, 2)
-                                            .foregroundStyle(stateTint(item.state))
-                                            .background(stateTint(item.state).opacity(0.12), in: Capsule()).fixedSize()
+                                        Text(appCopy.text(item.statusTitle)).padding(.horizontal, 6).padding(
+                                            .vertical, 2
+                                        )
+                                        .foregroundStyle(stateTint(item.state))
+                                        .background(stateTint(item.state).opacity(0.12), in: Capsule()).fixedSize()
                                     }.font(.caption2)
                                 }
                             }.padding(.vertical, 3)
@@ -689,13 +717,13 @@ public enum WriterRecordPresentation {
                         }
                     }
                 }
-            }.navigationTitle("工作区")
+            }.navigationTitle(appCopy.text("Workspace"))
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("导出", systemImage: "square.and.arrow.up") { showsShare = true }
+                        Button(appCopy.text("Export"), systemImage: "square.and.arrow.up") { showsShare = true }
                             .labelStyle(.iconOnly)
                             .disabled(sharingBusy)
-                            .accessibilityLabel("导出工作区记录")
+                            .accessibilityLabel(appCopy.text("Export workspace records"))
                             .accessibilityIdentifier("writer.workspace.export")
                     }
                 }
@@ -706,23 +734,29 @@ public enum WriterRecordPresentation {
                             try await Task.sleep(for: .seconds(2))
                             await refreshVisible()
                         } catch is CancellationError { return } catch {
-                            failure = "记录更新失败：\(error)"
+                            failure = "Could not update records: \(error)"
                             return
                         }
                     }
                 }.refreshable { await load() }
                 .sheet(isPresented: $showsShare) {
-                    Group { if let sharing { WriterTextShare(text: sharing) } else { ProgressView("正在导出…") } }
-                        .task {
-                            guard !sharingBusy else { return }
-                            sharingBusy = true
-                            defer { sharingBusy = false }
-                            do { sharing = try await controls.shareWorkspace(seed.id) } catch is CancellationError {
-                            } catch {
-                                failure = "导出失败：\(error)"
-                                showsShare = false
-                            }
+                    Group {
+                        if let sharing {
+                            WriterTextShare(text: sharing)
+                        } else {
+                            ProgressView(appCopy.text("Exporting…"))
                         }
+                    }
+                    .task {
+                        guard !sharingBusy else { return }
+                        sharingBusy = true
+                        defer { sharingBusy = false }
+                        do { sharing = try await controls.shareWorkspace(seed.id) } catch is CancellationError {
+                        } catch {
+                            failure = "Export failed: \(error)"
+                            showsShare = false
+                        }
+                    }
                 }
         }
         private func stateTint(_ state: String) -> Color {
@@ -754,7 +788,7 @@ public enum WriterRecordPresentation {
                 try pages.replaceHead(Array(page.items.reversed()), replacing: count)
                 current = updated
                 failure = nil
-            } catch is CancellationError {} catch { failure = "记录更新失败：\(error)" }
+            } catch is CancellationError {} catch { failure = "Could not update records: \(error)" }
         }
         private func load() async {
             guard !reading else { return }
@@ -766,10 +800,12 @@ public enum WriterRecordPresentation {
                 try pages.apply(page.items, next: page.nextPosition, reset: true)
                 current = updated
                 failure = nil
-            } catch is CancellationError {} catch { failure = "读取失败：\(error)" }
+            } catch is CancellationError {} catch { failure = "Could not load: \(error)" }
         }
     }
     @MainActor private struct WriterRequestDetail: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let requestID: String
         let controls: any WriterRecordsControlling
         @State private var detail: WriterRequestDetails?
@@ -791,11 +827,13 @@ public enum WriterRecordPresentation {
                     ProgressView()
                 }
             }
-            .navigationTitle("请求详情")
+            .navigationTitle(appCopy.text("Request details"))
             .task { await load() }
             .refreshable { await load() }
-            .confirmationDialog("清空此条请求日志？", isPresented: $confirmsClearing, titleVisibility: .visible) {
-                Button("清空日志", role: .destructive) { Task { await clearLogs() } }
+            .confirmationDialog(
+                appCopy.text("Clear this request log?"), isPresented: $confirmsClearing, titleVisibility: .visible
+            ) {
+                Button(appCopy.text("Clear log"), role: .destructive) { Task { await clearLogs() } }
             }
         }
 
@@ -809,7 +847,7 @@ public enum WriterRecordPresentation {
                 detail = result
                 failure = nil
             } catch is CancellationError {} catch {
-                failure = "读取失败：\(error)"
+                failure = "Could not load: \(error)"
             }
         }
 
@@ -822,12 +860,14 @@ public enum WriterRecordPresentation {
                 detail?.clearLogs()
                 failure = nil
             } catch {
-                failure = "日志清空失败：\(error)"
+                failure = "Could not clear logs: \(error)"
             }
         }
     }
 
     @MainActor private struct WriterRequestSections: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let detail: WriterRequestDetails
         let controls: any WriterRecordsControlling
         let canClearLogs: Bool
@@ -835,22 +875,22 @@ public enum WriterRecordPresentation {
 
         var body: some View {
             overview
-            Section("本轮输入") {
+            Section(appCopy.text("Input for this round")) {
                 let inputs = detail.request.map(WriterRecordPresentation.requestInputs) ?? []
                 if inputs.isEmpty {
-                    inputRow(detail.fallbackInput, title: "输入")
+                    inputRow(detail.fallbackInput, title: appCopy.text("Input"))
                 } else {
                     ForEach(Array(inputs.enumerated()), id: \.offset) { _, message in
                         inputRow(
                             message.content,
-                            title: message.role == .tool ? "工具反馈" : "用户输入",
+                            title: message.role == .tool ? appCopy.text("Tool feedback") : appCopy.text("User input"),
                             message: message)
                     }
                 }
                 if let request = detail.request { tools(request) }
             }
             if let request = detail.request, !request.toolCalls.isEmpty {
-                Section("本轮工具调用") {
+                Section(appCopy.text("Tool calls for this round")) {
                     ForEach(request.toolCalls) { call in
                         WriterRequestToolCard(call: call)
                     }
@@ -862,26 +902,30 @@ public enum WriterRecordPresentation {
 
         private var overview: some View {
             let summary = detail.summary
-            return Section("本轮概览") {
-                Text("第 \(summary.number) 轮 · \(summary.title)").font(.headline)
-                    .accessibilityIdentifier("writer.detail.overview")
-                LabeledContent("阶段", value: summary.phase)
-                if let id = summary.workspaceID { WriterRecordIdentifier(label: "工作区 ID", value: id) }
-                if let path = summary.path { LabeledContent("目标文件", value: path) }
-                if summary.attempt > 1 { LabeledContent("尝试次数", value: String(summary.attempt)) }
+            return Section(appCopy.text("Round overview")) {
+                Text(appCopy.format("Round %@ · %@", String(summary.number), appCopy.text(summary.title))).font(
+                    .headline
+                )
+                .accessibilityIdentifier("writer.detail.overview")
+                LabeledContent(appCopy.text("Phase"), value: summary.phase)
+                if let id = summary.workspaceID {
+                    WriterRecordIdentifier(label: appCopy.text("Workspace ID"), value: id)
+                }
+                if let path = summary.path { LabeledContent(appCopy.text("Target file"), value: path) }
+                if summary.attempt > 1 { LabeledContent(appCopy.text("Attempts"), value: String(summary.attempt)) }
                 if let request = detail.request {
-                    LabeledContent("模型", value: WriterRequestItem.statusTitle(request.state.rawValue))
+                    LabeledContent(appCopy.text("Model"), value: WriterRequestItem.statusTitle(request.state.rawValue))
                         .accessibilityIdentifier("writer.detail.model-state")
                     if let tool = WriterRecordPresentation.toolState(request.toolCalls) {
-                        LabeledContent("工具", value: WriterRecordPresentation.toolStateTitle(tool))
+                        LabeledContent(appCopy.text("Tool"), value: WriterRecordPresentation.toolStateTitle(tool))
                             .accessibilityIdentifier("writer.detail.tool-state")
                     }
-                    LabeledContent("请求时间") {
+                    LabeledContent(appCopy.text("Request time")) {
                         Text(summary.date, format: .dateTime.year().month().day().hour().minute().second())
                     }
-                    WriterRecordIdentifier(label: "请求 ID", value: request.id)
+                    WriterRecordIdentifier(label: appCopy.text("Request ID"), value: request.id)
                 } else {
-                    LabeledContent("记录时间") {
+                    LabeledContent(appCopy.text("Recorded at")) {
                         Text(summary.date, format: .dateTime.year().month().day().hour().minute().second())
                     }
                 }
@@ -894,7 +938,9 @@ public enum WriterRecordPresentation {
             let isTool = message?.role == .tool
             DisclosureGroup {
                 WriterRecordedText(content)
-                if let id = message?.toolCallID { WriterRecordIdentifier(label: "来源调用 ID", value: id) }
+                if let id = message?.toolCallID {
+                    WriterRecordIdentifier(label: appCopy.text("Source call ID"), value: id)
+                }
             } label: {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(isTool && message?.toolName != nil ? "\(title) · \(message?.toolName ?? "")" : title)
@@ -906,7 +952,7 @@ public enum WriterRecordPresentation {
                 NavigationLink {
                     WriterRequestDetail(requestID: source, controls: controls)
                 } label: {
-                    Text("查看来源调用")
+                    Text(appCopy.text("View source call"))
                 }.accessibilityIdentifier("writer.detail.tool-source")
             }
         }
@@ -914,37 +960,40 @@ public enum WriterRecordPresentation {
         @ViewBuilder private func tools(_ request: HistoryModelRequest) -> some View {
             switch Result(catching: { try WriterRecordPresentation.tools(request) }) {
             case .success(let entries?):
-                DisclosureGroup("本轮可用工具（\(entries.count)）") {
+                DisclosureGroup("Available tools (\(entries.count))") {
                     ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
                         HistoryCatalogEntryRow(entry: entry)
                     }
                 }.accessibilityIdentifier("writer.request.tools")
                     .disabled(entries.isEmpty)
             case .success(nil):
-                LabeledContent("本轮可用工具", value: "未记录")
+                LabeledContent(appCopy.text("Available tools"), value: appCopy.text("Unrecorded"))
             case .failure:
-                LabeledContent("本轮可用工具", value: "读取失败")
+                LabeledContent(appCopy.text("Available tools"), value: appCopy.text("Could not read"))
             }
         }
 
         @ViewBuilder private var output: some View {
             let content = detail.request.flatMap { $0.response.isEmpty ? nil : $0 }
             if content != nil || detail.finalization != nil {
-                Section("本轮产出") {
+                Section(appCopy.text("Output for this round")) {
                     if let content {
                         let path = WriterRecordPresentation.contentPath(content)
                         DisclosureGroup {
                             WriterRecordedText(content.response).accessibilityIdentifier("writer.request.source")
                         } label: {
-                            Label(path ?? "生成文本", systemImage: path == nil ? "text.alignleft" : "doc.text")
+                            Label(
+                                path ?? appCopy.text("Generated text"),
+                                systemImage: path == nil ? "text.alignleft" : "doc.text")
                         }.accessibilityIdentifier("writer.request.content.toggle")
                     }
                     if let finalization = detail.finalization {
-                        let status = finalization.state == .completed ? "成功" : "失败"
+                        let status =
+                            finalization.state == .completed ? appCopy.text("Succeeded") : appCopy.text("Failed")
                         if let evidence = finalization.error ?? finalization.result, !evidence.isEmpty {
-                            DisclosureGroup("宿主收尾 · " + status) { WriterRecordedText(evidence) }
+                            DisclosureGroup(appCopy.text("Host cleanup · ") + status) { WriterRecordedText(evidence) }
                         } else {
-                            LabeledContent("宿主收尾", value: status)
+                            LabeledContent(appCopy.text("Host cleanup"), value: status)
                         }
                     }
                 }
@@ -952,40 +1001,47 @@ public enum WriterRecordPresentation {
         }
 
         private func logs(_ request: HistoryModelRequest) -> some View {
-            Section("调试日志") {
+            Section(appCopy.text("Debug log")) {
                 if request.logsCleared == true {
-                    Text("日志已清空").foregroundStyle(.secondary)
+                    Text(appCopy.text("Log cleared")).foregroundStyle(.secondary)
                         .accessibilityIdentifier("writer.prompts.cleared")
                 } else {
-                    DisclosureGroup("完整 Prompts") {
+                    DisclosureGroup(appCopy.text("Full prompts")) {
                         ForEach(HistoryRecordedImages.references(request.requestParametersJSON)) { reference in
                             WriterRequestImage(
                                 recorded: HistoryRecordedImages.data(reference.id, json: request.requestParametersJSON))
                         }
                         let messages = WriterRecordPresentation.promptMessages(request)
-                        if messages.isEmpty { Text("未记录").foregroundStyle(.secondary) }
+                        if messages.isEmpty { Text(appCopy.text("Unrecorded")).foregroundStyle(.secondary) }
                         HistoryPromptItems(messages: messages)
                     }
-                    DisclosureGroup("生成指标") {
-                        LabeledContent("模型名称", value: request.model.flatMap { $0.isEmpty ? nil : $0 } ?? "未记录")
-                        LabeledContent("输出 Token 上限", value: request.maximumOutputTokens?.formatted() ?? "未记录")
-                        LabeledContent("Temperature", value: request.temperature?.formatted() ?? "未记录")
+                    DisclosureGroup(appCopy.text("Generation metrics")) {
+                        LabeledContent(
+                            appCopy.text("Model name"),
+                            value: request.model.flatMap { $0.isEmpty ? nil : $0 } ?? appCopy.text("Unrecorded"))
+                        LabeledContent(
+                            appCopy.text("Output token limit"),
+                            value: request.maximumOutputTokens?.formatted() ?? appCopy.text("Unrecorded"))
+                        LabeledContent(
+                            "Temperature", value: request.temperature?.formatted() ?? appCopy.text("Unrecorded"))
                         Text(WriterRecordPresentation.firstToken(request)).accessibilityIdentifier(
                             "writer.request.ttft")
                         Text(WriterRecordPresentation.requestDuration(request, at: .now)).accessibilityIdentifier(
                             "writer.request.duration")
-                        LabeledContent("结束原因", value: request.finishReason ?? "未记录")
+                        LabeledContent(
+                            appCopy.text("Finish reason"), value: request.finishReason ?? appCopy.text("Unrecorded"))
                         if let usage = request.tokenUsage {
                             LabeledContent(
-                                "输入 / 输出 / 总 Token", value: "\(usage.input) / \(usage.generated) / \(usage.total)")
+                                appCopy.text("Input / Output / Total tokens"),
+                                value: "\(usage.input) / \(usage.generated) / \(usage.total)")
                             if let cached = usage.cachedInput {
-                                LabeledContent("缓存读取 Token", value: cached.formatted())
+                                LabeledContent(appCopy.text("Cache read tokens"), value: cached.formatted())
                             }
                             if let written = usage.cacheWriteInput {
-                                LabeledContent("缓存写入 Token", value: written.formatted())
+                                LabeledContent(appCopy.text("Cache write tokens"), value: written.formatted())
                             }
                         } else {
-                            LabeledContent("Token 用量", value: "未记录")
+                            LabeledContent(appCopy.text("Token usage"), value: appCopy.text("Unrecorded"))
                         }
                         if let diagnostic = request.failureDiagnostic {
                             WriterFailureDetail(diagnostic: diagnostic)
@@ -993,7 +1049,7 @@ public enum WriterRecordPresentation {
                             Text(error).foregroundStyle(.red).textSelection(.enabled)
                         }
                     }.accessibilityIdentifier("writer.detail.generation")
-                    Button("清空此条请求日志", role: .destructive, action: clearLogs)
+                    Button(appCopy.text("Clear this request log"), role: .destructive, action: clearLogs)
                         .disabled(!canClearLogs)
                         .accessibilityIdentifier("writer.detail.clear-logs")
                 }
@@ -1002,6 +1058,8 @@ public enum WriterRecordPresentation {
     }
 
     @MainActor private struct WriterRequestToolCard: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let call: HistoryToolCall
 
         var body: some View {
@@ -1016,16 +1074,20 @@ public enum WriterRecordPresentation {
                         .font(.headline)
                 }
                 if let path = arguments["path"] ?? arguments["entry"] ?? arguments["workspaceID"] {
-                    LabeledContent("目标", value: path)
+                    LabeledContent(appCopy.text("Goal"), value: path)
                 }
-                if let destination = arguments["destination"] { LabeledContent("目的路径", value: destination) }
-                DisclosureGroup("参数") { WriterRecordedText(call.argumentsJSON) }
+                if let destination = arguments["destination"] {
+                    LabeledContent(appCopy.text("Destination path"), value: destination)
+                }
+                DisclosureGroup(appCopy.text("Arguments")) { WriterRecordedText(call.argumentsJSON) }
                 if let output = call.output {
-                    DisclosureGroup("结果") { WriterRecordedText(output) }
+                    DisclosureGroup(appCopy.text("Result")) { WriterRecordedText(output) }
                 } else {
-                    LabeledContent("结果", value: call.state == .received ? "待完成" : "未记录")
+                    LabeledContent(
+                        appCopy.text("Result"),
+                        value: call.state == .received ? appCopy.text("Pending") : appCopy.text("Unrecorded"))
                 }
-                WriterRecordIdentifier(label: "调用 ID", value: call.providerID)
+                WriterRecordIdentifier(label: appCopy.text("Call ID"), value: call.providerID)
                 if let diagnostic = call.failureDiagnostic {
                     WriterFailureDetail(diagnostic: diagnostic)
                 } else if let error = call.error {
@@ -1036,6 +1098,8 @@ public enum WriterRecordPresentation {
     }
 
     @MainActor private struct WriterRecordIdentifier: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let label: String
         let value: String
         var body: some View {
@@ -1043,8 +1107,10 @@ public enum WriterRecordPresentation {
                 HStack {
                     Text(verbatim: value).font(.system(.caption, design: .monospaced))
                         .lineLimit(1).truncationMode(.middle)
-                    Button("复制" + label, systemImage: "document.on.document") { UIPasteboard.general.string = value }
-                        .labelStyle(.iconOnly).buttonStyle(.borderless)
+                    Button(appCopy.text("Copy") + label, systemImage: "document.on.document") {
+                        UIPasteboard.general.string = value
+                    }
+                    .labelStyle(.iconOnly).buttonStyle(.borderless)
                 }
             } label: {
                 Text(label)
@@ -1061,22 +1127,24 @@ public enum WriterRecordPresentation {
     }
 
     @MainActor private struct WriterFailureDetail: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let diagnostic: HistoryFailureDiagnostic
         var body: some View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(diagnostic.message).foregroundStyle(.red).textSelection(.enabled)
-                LabeledContent("分类", value: diagnostic.category)
-                LabeledContent("阶段", value: diagnostic.stage)
-                LabeledContent("错误代码", value: diagnostic.code)
+                LabeledContent(appCopy.text("Category"), value: diagnostic.category)
+                LabeledContent(appCopy.text("Phase"), value: diagnostic.stage)
+                LabeledContent(appCopy.text("Error code"), value: diagnostic.code)
                 ForEach(diagnostic.details.keys.sorted(), id: \.self) { key in
                     LabeledContent(key, value: diagnostic.details[key] ?? "").textSelection(.enabled)
                 }
                 ForEach(Array(diagnostic.causes.enumerated()), id: \.offset) { index, cause in
-                    DisclosureGroup("关联原因 \(index + 1)") {
+                    DisclosureGroup("Related cause \(index + 1)") {
                         Text(cause.message).foregroundStyle(.red).textSelection(.enabled)
-                        LabeledContent("分类", value: cause.category)
-                        LabeledContent("阶段", value: cause.stage)
-                        LabeledContent("错误代码", value: cause.code)
+                        LabeledContent(appCopy.text("Category"), value: cause.category)
+                        LabeledContent(appCopy.text("Phase"), value: cause.stage)
+                        LabeledContent(appCopy.text("Error code"), value: cause.code)
                         ForEach(cause.details.keys.sorted(), id: \.self) { key in
                             LabeledContent(key, value: cause.details[key] ?? "").textSelection(.enabled)
                         }
@@ -1087,6 +1155,8 @@ public enum WriterRecordPresentation {
     }
 
     @MainActor private struct WriterRequestImage: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         var recorded: Data? = nil
         @State private var data: Data?
         @State private var image: UIImage?
@@ -1108,7 +1178,7 @@ public enum WriterRecordPresentation {
             }.task {
                 data = recorded
                 if let data { image = await HistoryImageDecoder.decode(data, maximumPixelSize: 320) }
-                if image == nil { failure = "截图不可用" }
+                if image == nil { failure = appCopy.text("Screenshot unavailable") }
             }.sheet(isPresented: $expanded) { if let data { HistoryImagePreview(data: data).background(.black) } }
         }
     }
@@ -1120,6 +1190,8 @@ public enum WriterRecordPresentation {
         func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
     }
     @MainActor private struct WriterArtifactDetail: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let item: WriterArtifactItem
         let controls: any WriterArtifactsControlling
         @State private var snapshot: WriterArtifactSnapshot?
@@ -1132,15 +1204,23 @@ public enum WriterRecordPresentation {
                 if let failure { Text(failure).foregroundStyle(.red).textSelection(.enabled) }
                 if let snapshot {
                     Section {
-                        Text(snapshot.item.state == "published" ? "已发布作品快照" : "草稿快照 · 可能包含未完成内容")
-                            .foregroundStyle(.secondary)
+                        Text(
+                            snapshot.item.state == "published"
+                                ? appCopy.text("Published project snapshot")
+                                : appCopy.text("Draft snapshot · May contain unfinished work")
+                        )
+                        .foregroundStyle(.secondary)
                     }
-                    Section("导出当前快照") {
-                        Button("导出全部源文件（ZIP）") { export(snapshot, path: nil, pdf: false) }
-                        Button("导出作品 PDF") { export(snapshot, path: snapshot.item.entry, pdf: true) }
-                        if busy { ProgressView("正在准备导出…") }
+                    Section(appCopy.text("Export current snapshot")) {
+                        Button(appCopy.text("Export all source files (ZIP)")) {
+                            export(snapshot, path: nil, pdf: false)
+                        }
+                        Button(appCopy.text("Export project PDF")) {
+                            export(snapshot, path: snapshot.item.entry, pdf: true)
+                        }
+                        if busy { ProgressView(appCopy.text("Preparing export…")) }
                     }.disabled(busy)
-                    Section("文件") {
+                    Section(appCopy.text("Files")) {
                         ForEach(snapshot.files) { file in
                             NavigationLink(file.path) {
                                 WriterFileView(snapshot: snapshot, file: file, controls: controls)
@@ -1151,13 +1231,15 @@ public enum WriterRecordPresentation {
                 }
             }.navigationTitle(item.title)
                 .task {
-                    do { snapshot = try await controls.read(item.id) } catch { failure = "读取失败：\(error)" }
+                    do { snapshot = try await controls.read(item.id) } catch { failure = "Could not load: \(error)" }
                 }
                 .sheet(
                     item: $share,
                     onDismiss: {
                         operation = Task {
-                            do { try await controls.discardExport() } catch { failure = "导出清理失败：\(error)" }
+                            do { try await controls.discardExport() } catch {
+                                failure = "Export cleanup failed: \(error)"
+                            }
                         }
                     }
                 ) { WriterActivitySheet(url: $0.url) }
@@ -1173,11 +1255,13 @@ public enum WriterRecordPresentation {
                     let url = try await controls.export(snapshot, path: path, pdf: pdf)
                     try Task.checkCancellation()
                     share = WriterShareFile(url: url)
-                } catch is CancellationError {} catch { failure = "导出失败：\(error)" }
+                } catch is CancellationError {} catch { failure = "Export failed: \(error)" }
             }
         }
     }
     @MainActor private struct WriterFileView: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let snapshot: WriterArtifactSnapshot
         let file: WriterArtifactFile
         let controls: any WriterArtifactsControlling
@@ -1191,7 +1275,7 @@ public enum WriterRecordPresentation {
         @State private var share: WriterShareFile?
         var body: some View {
             VStack {
-                Toggle("查看源码", isOn: $source).padding(.horizontal)
+                Toggle(appCopy.text("View source"), isOn: $source).padding(.horizontal)
                 if let failure { Text(failure).foregroundStyle(.red) }
                 if !source, preview != nil {
                     WebPageView(page: page)
@@ -1207,17 +1291,19 @@ public enum WriterRecordPresentation {
                     page.setAvailable(scenePhase == .active)
                     _ = try await page.loadLocal(prepared.url, executesScripts: true, readAccessRoot: prepared.root)
                 } catch {
-                    failure = "预览失败：\(error)"
+                    failure = "Preview failed: \(error)"
                 }
             }
             .toolbar {
-                Button("导出源文件") { export(pdf: false) }.disabled(busy)
+                Button(appCopy.text("Export source file")) { export(pdf: false) }.disabled(busy)
                 Button("PDF") { export(pdf: true) }.disabled(busy)
             }
             .sheet(
                 item: $share,
                 onDismiss: {
-                    operation = Task { do { try await controls.discardExport() } catch { failure = "导出清理失败：\(error)" } }
+                    operation = Task {
+                        do { try await controls.discardExport() } catch { failure = "Export cleanup failed: \(error)" }
+                    }
                 }
             ) { WriterActivitySheet(url: $0.url) }
             .onChange(of: scenePhase) { _, value in page.setAvailable(value == .active) }
@@ -1225,7 +1311,7 @@ public enum WriterRecordPresentation {
                 page.close()
                 operation?.cancel()
                 page.close()
-                Task { do { try await controls.closePreview() } catch { failure = "预览清理失败：\(error)" } }
+                Task { do { try await controls.closePreview() } catch { failure = "Preview cleanup failed: \(error)" } }
             }
         }
         private func export(pdf: Bool) {
@@ -1238,7 +1324,7 @@ public enum WriterRecordPresentation {
                     let url = try await controls.export(snapshot, path: file.path, pdf: pdf)
                     try Task.checkCancellation()
                     share = WriterShareFile(url: url)
-                } catch is CancellationError {} catch { failure = "导出失败：\(error)" }
+                } catch is CancellationError {} catch { failure = "Export failed: \(error)" }
             }
         }
     }

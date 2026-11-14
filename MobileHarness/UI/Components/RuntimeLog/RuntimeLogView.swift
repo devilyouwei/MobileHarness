@@ -54,12 +54,12 @@ import Foundation
                                             Image(systemName: "xmark").font(.caption).padding(8)
                                         }
                                         .buttonStyle(.plain)
-                                        .accessibilityLabel("收起\(channel.item.title)状态")
+                                        .accessibilityLabel("Hide \(channel.item.title) status")
                                     }
                                 }
                             }
                             if state.observationUnavailable {
-                                Text("执行状态暂不可用").font(.caption).foregroundStyle(.orange)
+                                Text("Execution status temporarily unavailable").font(.caption).foregroundStyle(.orange)
                             }
                         }
                         .padding(12)
@@ -78,7 +78,7 @@ import Foundation
                         }
                         .buttonStyle(.plain)
                         .modifier(ActionPanelGlass())
-                        .accessibilityLabel("执行日志")
+                        .accessibilityLabel("Execution Log")
                         .accessibilityIdentifier("conversation.actions.history")
                     }
                 }
@@ -86,46 +86,46 @@ import Foundation
             .sheet(isPresented: $state.showsExecutionHistory) {
                 NavigationStack(path: $taskPath) {
                     VStack(spacing: 0) {
-                        Picker("记录类型", selection: $state.selectedTab) {
+                        Picker("Record type", selection: $state.selectedTab) {
                             ForEach(ExecutionLogTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                         }.pickerStyle(.segmented).padding(.horizontal).padding(.top, 12)
                         HStack {
                             Menu {
-                                Button("全部 Agent") { state.selectedSource = "全部" }
+                                Button("All Agents") { state.selectedSource = "All" }
                                 ForEach(state.sources, id: \.self) { source in
                                     Button(source) { state.selectedSource = source }
                                 }
                             } label: {
                                 Label(
-                                    state.selectedSource == "全部" ? "全部 Agent" : state.selectedSource,
+                                    state.selectedSource == "All" ? "All Agents" : state.selectedSource,
                                     systemImage: "line.3.horizontal.decrease")
                             }
                             Spacer()
                             if state.selectedTab == .action {
                                 channelFilter
-                                Toggle("内部动作", isOn: $state.showsInternalActions).font(.caption).fixedSize()
+                                Toggle("Internal actions", isOn: $state.showsInternalActions).font(.caption).fixedSize()
                             }
                         }.padding(.horizontal).padding(.vertical, 8)
-                        Picker("状态", selection: $state.selectedFilter) {
+                        Picker("Status", selection: $state.selectedFilter) {
                             ForEach(ExecutionLogFilter.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                         }.pickerStyle(.segmented).padding(.horizontal).padding(.bottom, 8)
                         if let taskID = state.selectedTaskID,
                             state.selectedTab == .action
                         {
                             HStack {
-                                Text("任务：" + taskID).font(.caption)
+                                Text("Task: " + taskID).font(.caption)
                                 Spacer()
-                                Button("查看全部") { state.selectedTaskID = nil }
+                                Button("Show all") { state.selectedTaskID = nil }
                             }.padding(.horizontal).padding(.bottom, 8)
                         }
                         List { logRows }
                     }
                     .navigationDestination(for: String.self) { taskDetail($0) }
-                    .navigationTitle("执行日志")
+                    .navigationTitle("Execution Log")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
-                            Button("完成") { state.showsExecutionHistory = false }
+                            Button("Done") { state.showsExecutionHistory = false }
                         }
                     }
                 }
@@ -138,20 +138,21 @@ import Foundation
             case .action:
                 let active = state.visibleActions.filter(\.isActive)
                 let finished = state.visibleActions.filter { !$0.isActive }
-                if !active.isEmpty { Section("正在执行与等待") { ForEach(active) { historyRow($0) } } }
-                if !finished.isEmpty { Section("最近结果") { ForEach(finished.reversed()) { historyRow($0) } } }
-                if state.visibleActions.isEmpty { emptyRow("暂无符合条件的动作") }
+                if !active.isEmpty { Section("Running and queued") { ForEach(active) { historyRow($0) } } }
+                if !finished.isEmpty { Section("Recent results") { ForEach(finished.reversed()) { historyRow($0) } } }
+                if state.visibleActions.isEmpty { emptyRow("No matching actions") }
                 retention(state.evictedCount)
             case .task:
                 ForEach(state.visibleTasks.reversed()) { task in
                     NavigationLink(value: task.id) {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(task.title.isEmpty ? "任务 " + task.id : task.title)
+                            Text(task.title.isEmpty ? "Task " + task.id : task.title)
                                 .lineLimit(2)
                             Text(
                                 task.execution == nil
                                     ? task.requester + " → " + task.executor
-                                    : (task.execution == "background" ? "后台任务" : "前台任务") + " · " + task.executor
+                                    : (task.execution == "background" ? "Background task" : "Foreground task") + " · "
+                                        + task.executor
                             ).font(.caption).foregroundStyle(.secondary)
                             Text(task.phase.rawValue).font(.subheadline).foregroundStyle(
                                 task.phase == .failed ? .orange : .secondary)
@@ -162,7 +163,7 @@ import Foundation
                         }.padding(.vertical, 4)
                     }
                 }
-                if state.visibleTasks.isEmpty { emptyRow("暂无符合条件的任务") }
+                if state.visibleTasks.isEmpty { emptyRow("No matching tasks") }
                 retention(state.taskEvictions)
             case .agent:
                 let issues = state.runtimeIssues.filter {
@@ -173,9 +174,9 @@ import Foundation
                     state.matchesSource([$0.source])
                         && state.matchesStatus(active: false, success: !$0.isFailure, failure: $0.isFailure)
                 }
-                if !issues.isEmpty { Section("运行异常") { ForEach(issues) { issueRow($0) } } }
+                if !issues.isEmpty { Section("Runtime issues") { ForEach(issues) { issueRow($0) } } }
                 if !events.isEmpty {
-                    Section("Agent 状态") {
+                    Section("Agent status") {
                         ForEach(events.reversed()) { event in
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(event.source).font(.body.weight(.medium))
@@ -186,7 +187,7 @@ import Foundation
                         }
                     }
                 }
-                if issues.isEmpty && events.isEmpty { emptyRow("暂无符合条件的 Agent 记录") }
+                if issues.isEmpty && events.isEmpty { emptyRow("No matching Agent records") }
                 retention(state.issueEvictions + state.agentEventEvictions)
             case .decision:
                 ForEach(state.visibleDecisions) { decision in
@@ -195,7 +196,7 @@ import Foundation
                         Text(decision.adoptedResult.rawValue)
                             .foregroundStyle(decision.modelResult == nil ? .orange : .primary)
                         if let result = decision.modelResult, result != decision.adoptedResult {
-                            Text("模型结果 · " + result.rawValue).foregroundStyle(.secondary)
+                            Text("Model result · " + result.rawValue).foregroundStyle(.secondary)
                         }
                         if let reason = decision.reason {
                             Text(reason).foregroundStyle(.secondary)
@@ -206,7 +207,7 @@ import Foundation
                         DisclosureGroup {
                             Text(
                                 decision.requests.isEmpty
-                                    ? "未发起模型请求"
+                                    ? "No model request was sent"
                                     : decision.requests.joined(separator: "\n\n")
                             )
                             .font(.subheadline)
@@ -214,13 +215,13 @@ import Foundation
                             .textSelection(.enabled)
                         } label: {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("用户输入").font(.caption).foregroundStyle(.secondary)
+                                Text("User input").font(.caption).foregroundStyle(.secondary)
                                 Text(decision.inputText).font(.subheadline).lineLimit(2)
                             }
                         }
                         HStack {
                             Text(decision.time, style: .time)
-                            Text("决策耗时 " + decision.duration.formatted(.units(allowed: [.milliseconds])))
+                            Text("Decision duration " + decision.duration.formatted(.units(allowed: [.milliseconds])))
                         }
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -228,36 +229,40 @@ import Foundation
                     .padding(.vertical, 4)
                     .accessibilityIdentifier("runtimeLog.decision." + decision.id)
                 }
-                if state.visibleDecisions.isEmpty { emptyRow("暂无符合条件的 Decision 记录") }
+                if state.visibleDecisions.isEmpty { emptyRow("No matching Decision records") }
                 retention(state.decisionEvictions)
             }
         }
         private func emptyRow(_ title: String) -> some View { Text(title).foregroundStyle(.secondary) }
         @ViewBuilder private func retention(_ count: UInt64) -> some View {
-            if count > 0 { Text("已移除 \(count) 条较早记录").font(.footnote).foregroundStyle(.secondary) }
+            if count > 0 { Text("Removed \(count) older records").font(.footnote).foregroundStyle(.secondary) }
         }
         @ViewBuilder private func taskDetail(_ id: String) -> some View {
             if let task = state.tasks.first(where: { $0.id == id }) {
                 List {
-                    Section("任务") {
+                    Section("Task") {
                         Text(task.title)
                         Text(
                             task.execution == nil
                                 ? task.requester + " → " + task.executor
-                                : (task.execution == "background" ? "后台任务" : "前台任务") + " · " + task.executor)
+                                : (task.execution == "background" ? "Background task" : "Foreground task") + " · "
+                                    + task.executor)
                         Text(task.phase.rawValue)
                         if !task.skills.isEmpty { Text("Skills: " + task.skills.joined(separator: ", ")) }
                         if let parentID = task.parentID {
-                            Text("父任务 / 输入：" + parentID).font(.caption).textSelection(.enabled)
+                            Text("Parent task / input: " + parentID).font(.caption).textSelection(.enabled)
                         }
                     }
                     if task.phase == .failed {
-                        Section("失败原因") {
-                            Text(task.failure ?? "该记录未保留失败原因，请查看关联 Action；可用的 Agent 请求记录见设置中的 Agent 记录。")
-                                .textSelection(.enabled)
+                        Section("Failure reason") {
+                            Text(
+                                task.failure
+                                    ?? "This record has no retained cause. Check related Actions and the Agent records in Settings."
+                            )
+                            .textSelection(.enabled)
                         }
                     }
-                    Section("时间线") {
+                    Section("Timeline") {
                         ForEach(task.events) { event in
                             HStack(alignment: .top, spacing: 12) {
                                 Image(systemName: "circle.fill").font(.caption2).foregroundStyle(.blue).padding(.top, 5)
@@ -271,16 +276,17 @@ import Foundation
                             }
                         }
                         if task.evictedEvents > 0 {
-                            Text("已移除 \(task.evictedEvents) 条较早事件").font(.caption).foregroundStyle(.secondary)
+                            Text("Removed \(task.evictedEvents) older events").font(.caption).foregroundStyle(
+                                .secondary)
                         }
                     }
-                    Section("关联记录") {
-                        Button("查看 Action") { showTaskActions(id) }
+                    Section("Related records") {
+                        Button("View Actions") { showTaskActions(id) }
 
                     }
-                }.navigationTitle("任务详情")
+                }.navigationTitle("Task details")
             } else {
-                Text("该任务记录已超出保留范围")
+                Text("This task record is no longer retained")
             }
         }
         private func showTaskActions(_ task: String) {
@@ -288,14 +294,14 @@ import Foundation
             state.selectedTaskID = task
             state.selectedTab = .action
             state.selectedFilter = .all
-            state.selectedSource = "全部"
+            state.selectedSource = "All"
             state.selectedChannel = nil
         }
 
         private var channelFilter: some View {
             Menu {
                 Picker("Channel", selection: $state.selectedChannel) {
-                    Text("全部 Channel").tag(nil as String?)
+                    Text("All Channels").tag(nil as String?)
                     ForEach(state.actionChannels, id: \.self) { channel in
                         Text(channel).tag(Optional(channel))
                     }
@@ -307,8 +313,8 @@ import Foundation
                     Label("Channel", systemImage: "line.3.horizontal.decrease")
                 }
             }
-            .accessibilityLabel("筛选 Channel")
-            .accessibilityValue(state.selectedChannel ?? "全部")
+            .accessibilityLabel("Filter by Channel")
+            .accessibilityValue(state.selectedChannel ?? "All")
             .accessibilityIdentifier("runtimeLog.action.channelFilter")
         }
 
@@ -364,19 +370,19 @@ import Foundation
             VStack(alignment: .leading, spacing: 5) {
                 Text(issue.title).font(.body.weight(.medium))
                 Text(issue.source).font(.caption).foregroundStyle(.secondary)
-                if let category = issue.category { Text("类别：" + category).font(.caption) }
+                if let category = issue.category { Text("Category: " + category).font(.caption) }
                 Text(issue.message).font(.subheadline).textSelection(.enabled)
                 Text(issue.time, style: .time).font(.caption).foregroundStyle(.secondary)
-                if let code = issue.failureCode { Text("错误代码：" + code).font(.caption) }
+                if let code = issue.failureCode { Text("Error code: " + code).font(.caption) }
                 if let input = issue.inputID {
-                    Text("来源输入：" + input).font(.caption2).textSelection(.enabled)
+                    Text("Source input: " + input).font(.caption2).textSelection(.enabled)
                 }
                 if let context = issue.context {
-                    DisclosureGroup("关联信息") {
-                        Text("所属运行：" + context.workerID)
-                        if let callID = context.callID { Text("来源调用：" + callID) }
-                        if let sessionID = context.sessionID { Text("会话：" + sessionID) }
-                        if let roundID = context.roundID { Text("模型请求/轮次：" + roundID) }
+                    DisclosureGroup("Related context") {
+                        Text("Worker: " + context.workerID)
+                        if let callID = context.callID { Text("Source call: " + callID) }
+                        if let sessionID = context.sessionID { Text("Session: " + sessionID) }
+                        if let roundID = context.roundID { Text("Model request / round: " + roundID) }
                     }.font(.caption).textSelection(.enabled)
                 }
             }
@@ -384,8 +390,8 @@ import Foundation
 
         private func extra(_ channel: ActionChannelSummary) -> String {
             var parts: [String] = []
-            if channel.additionalRunning > 0 { parts.append("另有 \(channel.additionalRunning) 项执行中") }
-            if channel.queued > 0 { parts.append("还有 \(channel.queued) 项等待") }
+            if channel.additionalRunning > 0 { parts.append("\(channel.additionalRunning) more running") }
+            if channel.queued > 0 { parts.append("\(channel.queued) more queued") }
             return parts.isEmpty ? "" : " · " + parts.joined(separator: " · ")
         }
 
@@ -404,24 +410,24 @@ import Foundation
                 HStack(spacing: 8) {
                     channelLabel(item.channel)
                     if !item.source.isEmpty { Text(item.source) }
-                    if item.isInternal { Text("内部") }
+                    if item.isInternal { Text("Internal") }
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 HStack(spacing: 8) {
                     Text(item.status)
                     if let start = item.execution.startedAt, let end = item.execution.endedAt {
-                        Text(end.timeIntervalSince(start).formatted(.number.precision(.fractionLength(2))) + " 秒")
+                        Text(end.timeIntervalSince(start).formatted(.number.precision(.fractionLength(2))) + " sec")
                     }
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                DisclosureGroup("输入参数与输出结果") {
+                DisclosureGroup("Inputs and outputs") {
                     VStack(alignment: .leading, spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("输入参数").font(.caption.weight(.semibold))
+                            Text("Input parameters").font(.caption.weight(.semibold))
                             if item.parameters.isEmpty {
-                                Text("无参数").font(.caption).foregroundStyle(.secondary)
+                                Text("No parameters").font(.caption).foregroundStyle(.secondary)
                             } else {
                                 ForEach(item.parameters.sorted { $0.key < $1.key }, id: \.key) { parameter in
                                     Text(parameter.key + " = " + (parameter.value.isEmpty ? "\"\"" : parameter.value))
@@ -431,13 +437,13 @@ import Foundation
                             }
                         }
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("输出结果").font(.caption.weight(.semibold))
+                            Text("Output").font(.caption.weight(.semibold))
                             if let output = item.output {
-                                Text(output.isEmpty ? "空字符串" : output)
+                                Text(output.isEmpty ? "Empty string" : output)
                                     .font(.system(.caption, design: .monospaced))
                                     .textSelection(.enabled)
                             } else {
-                                Text(item.isActive ? "等待执行结果" : "未取得返回结果")
+                                Text(item.isActive ? "Waiting for result" : "No result received")
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             ForEach(Array(item.issueDescriptions.enumerated()), id: \.offset) { _, description in

@@ -140,7 +140,7 @@ import Foundation
                     failure: { [weak self] message in Task { @MainActor in self?.latest?.failure?(message) } })
                 latest?.failure?(nil)
             case .failure(let error):
-                latest?.failure?("光环不可用：" + error.localizedDescription)
+                latest?.failure?("Halo unavailable: " + error.localizedDescription)
             }
             // Even on a renderer failure, eyes still acknowledge real expression execution.
             pipelineReady = true

@@ -125,7 +125,9 @@ public actor PhotographerExecutionSession {
     public func detachTracking(sessionID: String) async {
         guard trackingSession == sessionID else { return }
         trackingSession = nil
-        do { try await agent.unbindTracking(sessionID: sessionID) } catch { await report("保存追踪结束状态失败：\(error)") }
+        do { try await agent.unbindTracking(sessionID: sessionID) } catch {
+            await report("Could not save tracking completion: \(error)")
+        }
         pendingTracking = nil
         let worker = trackingWorker
         worker?.cancel()

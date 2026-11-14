@@ -56,13 +56,15 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             content = nil
         } else if phase == .processing {
             islandListeningStart = nil
-            content = .init(title: "正在识别", primary: .symbol(name: "waveform"), priority: .low, secondary: .loading)
+            content = .init(
+                title: "Recognizing speech", primary: .symbol(name: "waveform"), priority: .low,
+                secondary: .loading, localizedLabels: true)
         } else {
             if islandListeningStart == nil { islandListeningStart = Date() }
             content = .init(
-                title: phase == .speaking ? "正在听你说" : "正在聆听",
+                title: phase == .speaking ? "Listening to you" : "Listening",
                 primary: .symbol(name: "mic.fill", effect: .pulse), tone: .blue, priority: .normal,
-                secondary: .elapsed(startedAt: islandListeningStart ?? Date()))
+                secondary: .elapsed(startedAt: islandListeningStart ?? Date()), localizedLabels: true)
         }
         await island.submit(content)
     }

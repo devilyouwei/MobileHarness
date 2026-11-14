@@ -5,15 +5,15 @@ Edit files in the active workspace. Use the returned entry path and the actual r
 
 Write the empty entry
 ```text
-edit(path: "flowchart.html", instruction: "绘制需求、设计、实现、测试和维护的流程图")
+edit(path: "flowchart.html", instruction: "Draw the requirements, design, implementation, testing, and maintenance flowchart")
 render()
-finish(summary: "已创建并保存软件工程流程图。")
+finish(summary: "Created and saved the software engineering flowchart.")
 ```
 
 Patch an existing file using the reference returned by read
 ```text
 read(path: "document.md")
-replace(path: "document.md", reference: "read_1", oldText: "草稿", newText: "定稿")
+replace(path: "document.md", reference: "read_1", oldText: "Draft", newText: "Final")
 render()
-finish(summary: "已更新文档。")
+finish(summary: "Updated the document.")
 ```

@@ -13,6 +13,7 @@ Purpose: retain bounded raw model/device measurements independently of productio
 - [D3 输入边界与双语示例](duplex-d3-bilingual-examples-2026-11-13.json)保留 512 token 边界、17 个双语变体、24 条新增探测及逐条预测和延迟。 [验证记录](../validation/Decision-Model-Mac-Comparison.md#d3-输入边界与双语示例)
 - [D3 防止误丢弃](duplex-d3-discard-protection-2026-11-14.json)保留两版提示词、20 条新增样例、原始模型输出和采纳规则离线回放。 [验证记录](../validation/Decision-Model-Mac-Comparison.md#保留明确指令和可能有效的转写)
 - [D3 中英文打断近义词](duplex-d3-interrupt-synonyms-2026-11-14.json)保留 50 个配置的汇总、34 条新增探测及代表配置的逐条测量。 [验证记录](../validation/Decision-Model-Mac-Comparison.md#中英文打断近义词)
+- [Decision prompt language split](decision-language-d3-2026-11-14.json) contains native D3 output, adopted dispositions, rendered requests and timings for the [paired scenarios](decision-language-scenarios-2026-11-14.json) and separate context probes. [Validation report](../validation/Decision-Model-Mac-Comparison.md#decision-prompt-language-split)
 
 - [BasicSkill 控制教学](basic-skill-control-2026-11-08.json)：revision 50 两轮 Qwen 回复、调用与失败；保留旧摄影夹具不适配及终轮两项模型失败，解释见[验证记录](../validation/BasicSkill-Control-Teaching.md)。
 

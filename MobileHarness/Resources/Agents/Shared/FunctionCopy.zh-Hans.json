@@ -1,0 +1,781 @@
+{
+  "entries": {
+    "Agent.Communication.send": {
+      "description": "用已授权通信契约发送消息。",
+      "parameters": {}
+    },
+    "Agent.Task.finishTask": {
+      "description": "根据实际结果结束当前前台任务并记录摘要。",
+      "parameters": {
+        "summary": {
+          "description": "简短且真实的结果摘要。"
+        },
+        "continueDecision": {
+          "description": "任务结束后是否继续处理本次输入中的新目标。"
+        }
+      }
+    },
+    "Agent.Task.loadSkills": {
+      "description": "加载真实 Skill ID 及其依赖供后续请求使用，失败保留当前状态。",
+      "parameters": {
+        "skills": {
+          "description": "由实际 Skill ID 组成的 JSON 数组。"
+        }
+      }
+    },
+    "Agent.Task.releaseSkills": {
+      "description": "释放确认不再需要的非基础根 Skill，保留共享依赖和任务。",
+      "parameters": {
+        "skills": {
+          "description": "由实际 Skill ID 组成的 JSON 数组。"
+        }
+      }
+    },
+    "Agent.Task.sendMessage": {
+      "description": "将完整目标、补充、回答或停止请求发送给实际可委托的同伴。送达仅代表接收。",
+      "parameters": {
+        "agent_id": {
+          "description": "可委托目录中的实际 Agent ID。"
+        },
+        "text": {
+          "description": "用户目标、补充、回答或实际文本。"
+        }
+      }
+    },
+    "Agent.Task.startTask": {
+      "description": "建立可判定完成条件的前台目标，并持有必要的初始 Skill。",
+      "parameters": {
+        "description": {
+          "description": "可判定完成条件的目标说明。"
+        },
+        "skills": {
+          "description": "由实际 Skill ID 组成的 JSON 数组。"
+        }
+      }
+    },
+    "Agent.Writer.ask": {
+      "description": "向用户询问继续工作所需的必要信息。",
+      "parameters": {
+        "question": {
+          "description": "用户需回答的具体问题。"
+        }
+      }
+    },
+    "Agent.Writer.create": {
+      "description": "创建工作区、初始化空入口并进入编辑。独立回合调用。",
+      "parameters": {
+        "title": {
+          "description": "使用用户语言的非空显示标题。"
+        },
+        "entry": {
+          "description": "工作区相对入口文件路径，例如 flowchart.html。"
+        }
+      }
+    },
+    "Agent.Writer.enter": {
+      "description": "进入已经确认的工作区。切换时保留旧草稿，独立回合调用。",
+      "parameters": {
+        "workspaceID": {
+          "description": "真实工作区 ID。"
+        }
+      }
+    },
+    "Agent.Writer.finish": {
+      "description": "独立回合结束当前委托并报告真实结果。",
+      "parameters": {
+        "summary": {
+          "description": "简短且真实的结果摘要。"
+        },
+        "outcome": {
+          "description": "委托结果类型。使用当前声明的值。"
+        }
+      }
+    },
+    "Artifacts.Workspace.delete": {
+      "description": "仅按明确授权删除作品，使用本次搜索返回的准确 ID。",
+      "parameters": {
+        "workspaceID": {
+          "description": "真实工作区 ID。"
+        }
+      }
+    },
+    "Artifacts.Workspace.diff": {
+      "description": "检查当前工作区的变更。",
+      "parameters": {
+        "path": {
+          "description": "可选的确切相对路径。"
+        },
+        "savepoint": {
+          "description": "由 savepoint 返回的实际 ID。"
+        },
+        "offset": {
+          "description": "从零起算的变更文件偏移。"
+        }
+      }
+    },
+    "Artifacts.Workspace.edit": {
+      "description": "生成新文件或用实际读取引用编辑现有文件的指定范围。",
+      "parameters": {
+        "instruction": {
+          "description": "简短、具体的编辑要求。"
+        },
+        "reference": {
+          "description": "新鲜的 read_N 引用。新文件或空入口可省略。"
+        },
+        "title": {
+          "description": "新显示标题。省略保留原标题。"
+        },
+        "path": {
+          "description": "工作区相对文件路径。"
+        },
+        "start": {
+          "description": "读区中的绝对起始字符偏移。"
+        },
+        "end": {
+          "description": "读区中的绝对结束字符偏移，不含此位置。"
+        },
+        "contextReferences": {
+          "description": "相关文件的新鲜读取引用，以逗号分隔。"
+        }
+      }
+    },
+    "Artifacts.Workspace.list": {
+      "description": "列出当前工作区的文件。",
+      "parameters": {
+        "path": {
+          "description": "相对目录或文件前缀。省略时列出所有路径。"
+        }
+      }
+    },
+    "Artifacts.Workspace.move": {
+      "description": "移动当前工作区的文件。",
+      "parameters": {
+        "destination": {
+          "description": "未使用的工作区相对目标路径。"
+        },
+        "path": {
+          "description": "确切的工作区相对文件或目录路径。"
+        }
+      }
+    },
+    "Artifacts.Workspace.open": {
+      "description": "打开已保存作品供查看，不切换编辑目标。",
+      "parameters": {
+        "workspaceID": {
+          "description": "真实工作区 ID。"
+        }
+      }
+    },
+    "Artifacts.Workspace.read": {
+      "description": "读取当前工作区文件或指定范围，生成可用于编辑的真实引用。",
+      "parameters": {
+        "offset": {
+          "description": "从零起算的字符偏移。给出 line 时忽略。"
+        },
+        "limit": {
+          "description": "正整数，限制字符数或行数。默认 2500 字符或 60 行。"
+        },
+        "path": {
+          "description": "工作区相对文件路径。"
+        },
+        "line": {
+          "description": "从一开始的读取行号。省略时按字符读取。"
+        }
+      }
+    },
+    "Artifacts.Workspace.remove": {
+      "description": "移除当前工作区指定文件。",
+      "parameters": {
+        "path": {
+          "description": "工作区相对文件路径。"
+        },
+        "reference": {
+          "description": "本文件新鲜的 read_N 引用。"
+        }
+      }
+    },
+    "Artifacts.Workspace.removeTree": {
+      "description": "移除当前工作区指定子目录及其内容。",
+      "parameters": {
+        "path": {
+          "description": "工作区下确切的目录路径。"
+        }
+      }
+    },
+    "Artifacts.Workspace.rename": {
+      "description": "更新当前工作区的显示标题。",
+      "parameters": {
+        "title": {
+          "description": "使用用户语言的非空显示标题。"
+        }
+      }
+    },
+    "Artifacts.Workspace.render": {
+      "description": "渲染当前草稿并返回实际呈现或诊断结果。",
+      "parameters": {}
+    },
+    "Artifacts.Workspace.replace": {
+      "description": "使用实际读引用执行明确的精确替换。",
+      "parameters": {
+        "oldText": {
+          "description": "必须准确匹配一次的非空文本。"
+        },
+        "newText": {
+          "description": "准确替换文本。空字符串删除匹配内容。"
+        },
+        "path": {
+          "description": "工作区相对文件路径。"
+        },
+        "reference": {
+          "description": "本文件新鲜的 read_N 引用。"
+        }
+      }
+    },
+    "Artifacts.Workspace.restore": {
+      "description": "用实际保存点恢复草稿。",
+      "parameters": {
+        "savepoint": {
+          "description": "由 savepoint 返回的实际 ID。"
+        }
+      }
+    },
+    "Artifacts.Workspace.savepoint": {
+      "description": "为当前工作区建立保存点。",
+      "parameters": {}
+    },
+    "Artifacts.Workspace.search": {
+      "description": "搜索当前工作区的文件内容。",
+      "parameters": {
+        "query": {
+          "description": "非空且区分大小写的字面搜索。"
+        },
+        "path": {
+          "description": "工作区相对路径前缀。"
+        },
+        "offset": {
+          "description": "从零起算，用先前的 nextOffset 继续。"
+        }
+      }
+    },
+    "Artifacts.Workspace.searchWorkspaces": {
+      "description": "按标题或关键词分页搜索已保存作品。空查询用于浏览。",
+      "parameters": {
+        "query": {
+          "description": "标题、说明关键词或确切 workspace_N。空查询用于浏览。"
+        },
+        "before": {
+          "description": "上页返回的 nextBefore。首页省略。"
+        }
+      }
+    },
+    "Camera.Capture.cancelCapture": {
+      "description": "停止并等待当前拍照倒计时取消。保留已拍照片和正在录制的视频。",
+      "parameters": {}
+    },
+    "Camera.Capture.close": {
+      "description": "关闭拍摄窗口。存在待处置录像时先明确保存或忽略。",
+      "parameters": {}
+    },
+    "Camera.Capture.configure": {
+      "description": "仅更新提供的拍摄参数。待处理媒体会阻止切换模式，录像时闪光灯必须关闭。",
+      "parameters": {
+        "mode": {
+          "description": "照片或视频模式。"
+        },
+        "delaySeconds": {
+          "description": "本次拍摄倒计时秒数，零表示立即拍摄。"
+        },
+        "flash": {
+          "description": "闪光灯模式。"
+        },
+        "zoom": {
+          "description": "相机变焦倍率。"
+        },
+        "durationSeconds": {
+          "description": "自动结束录像的时间上限，单位为秒。"
+        }
+      }
+    },
+    "Camera.Capture.flip": {
+      "description": "按请求切换当前拍摄窗口所用镜头。",
+      "parameters": {
+        "facing": {
+          "description": "目标镜头方向。"
+        }
+      }
+    },
+    "Camera.Capture.loadPreviewImage": {
+      "description": "从当前相机会话加载指定的缓存图像供模型查看。",
+      "parameters": {
+        "previewID": {
+          "description": "实际拍摄或预览 State 返回的预览 ID。"
+        },
+        "previewIDs": {
+          "description": "包含一到五个互不相同的实际预览 ID 的 JSON 数组。"
+        }
+      }
+    },
+    "Camera.Capture.open": {
+      "description": "打开或恢复相机预览，不拍照。",
+      "parameters": {}
+    },
+    "Camera.Capture.retry": {
+      "description": "按用户明确意图重试当前失败的拍摄预览。",
+      "parameters": {}
+    },
+    "Camera.Capture.saveAllPhotos": {
+      "description": "保存当前相机会话中所有尚未保存的照片，并返回逐项实际结果。",
+      "parameters": {}
+    },
+    "Camera.Capture.savePhoto": {
+      "description": "将当前会话准确的照片原件保存到 App 相册，并从模型 State 卸载。缓存原件仍可查看；失败保留原状态，重复保存幂等。",
+      "parameters": {
+        "previewID": {
+          "description": "实际拍摄或预览 State 返回的预览 ID。"
+        }
+      }
+    },
+    "Camera.Capture.takePhoto": {
+      "description": "在已打开可见的相机窗口拍一张照片，返回实际 previewID 和图像证据。此调用不打开相机，也不保存相册。已知需要打开相机时在同一响应先发 openCamera。",
+      "parameters": {
+        "delaySeconds": {
+          "description": "本次拍摄倒计时秒数，零表示立即拍摄。"
+        }
+      }
+    },
+    "Camera.Capture.unloadPreviewImage": {
+      "description": "从模型 State 卸载指定预览，保留缓存中的原件。",
+      "parameters": {
+        "previewID": {
+          "description": "实际拍摄或预览 State 返回的预览 ID。"
+        }
+      }
+    },
+    "Camera.Perception.closeVision": {
+      "description": "关闭后台视觉识别并释放其控制。",
+      "parameters": {}
+    },
+    "Camera.Perception.flipVision": {
+      "description": "切换后台视觉使用的镜头。",
+      "parameters": {
+        "facing": {
+          "description": "目标镜头方向。"
+        }
+      }
+    },
+    "Camera.Perception.openVision": {
+      "description": "打开后台视觉识别和可用的姿态观察。不会打开拍摄窗口。",
+      "parameters": {}
+    },
+    "Camera.Perception.retryVision": {
+      "description": "重试失败的后台视觉识别。",
+      "parameters": {}
+    },
+    "Camera.Video.ignoreVideo": {
+      "description": "按明确授权丢弃待处置录像。",
+      "parameters": {
+        "recordingID": {
+          "description": "实际录像回执中的 ID。"
+        }
+      }
+    },
+    "Camera.Video.saveVideo": {
+      "description": "按明确授权将已就绪的录像保存到 App 相册。",
+      "parameters": {
+        "recordingID": {
+          "description": "实际录像回执中的 ID。"
+        }
+      }
+    },
+    "Camera.Video.startRecording": {
+      "description": "打开或恢复相机窗口并开始录像。默认等待录像停止且文件就绪后返回，期间暂停聆听。",
+      "parameters": {
+        "durationSeconds": {
+          "description": "自动结束录像的时间上限，单位为秒。"
+        },
+        "waitForCompletion": {
+          "description": "是否等待录制结束且文件准备完成。"
+        }
+      }
+    },
+    "Camera.Video.stopRecording": {
+      "description": "使用实际 recordingID 停止录像并准备待处置视频。",
+      "parameters": {
+        "recordingID": {
+          "description": "实际录像回执中的 ID。"
+        }
+      }
+    },
+    "History.Conversation.list": {
+      "description": "按偏移分页读取对话列表，先返回当前对话。",
+      "parameters": {
+        "offset": {
+          "description": "分页偏移。"
+        },
+        "limit": {
+          "description": "当页数量上限。"
+        }
+      }
+    },
+    "History.Conversation.read": {
+      "description": "按实际会话 ID 分页读取历史内容。",
+      "parameters": {
+        "id": {
+          "description": "对应业务的准确标识，使用 State 或实际返回值。"
+        },
+        "offset": {
+          "description": "分页偏移。"
+        },
+        "limit": {
+          "description": "当页数量上限。"
+        }
+      }
+    },
+    "NexArm.Gesture.celebrate": {
+      "description": "执行庆祝动作后归位。",
+      "parameters": {
+        "cycles": {
+          "description": "重复次数。"
+        },
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        },
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        }
+      }
+    },
+    "NexArm.Gesture.dance": {
+      "description": "执行舞蹈动作后归位。",
+      "parameters": {
+        "cycles": {
+          "description": "重复次数。"
+        },
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        },
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        }
+      }
+    },
+    "NexArm.Gesture.lookAround": {
+      "description": "左右张望后归位。",
+      "parameters": {
+        "cycles": {
+          "description": "重复次数。"
+        },
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        },
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        }
+      }
+    },
+    "NexArm.Gesture.nodHead": {
+      "description": "执行点头后归位。",
+      "parameters": {
+        "cycles": {
+          "description": "重复次数。"
+        },
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        },
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        }
+      }
+    },
+    "NexArm.Gesture.shakeHead": {
+      "description": "执行摇头后归位。",
+      "parameters": {
+        "cycles": {
+          "description": "重复次数。"
+        },
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        },
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        }
+      }
+    },
+    "NexArm.Gesture.tiltWrist": {
+      "description": "向指定方向歪头后归位。",
+      "parameters": {
+        "direction": {
+          "description": "动作方向，以当前目录获准值为准。"
+        },
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        },
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        }
+      }
+    },
+    "NexArm.Gesture.waveWrist": {
+      "description": "执行挥手后归位。",
+      "parameters": {
+        "count": {
+          "description": "执行次数。"
+        },
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        },
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        }
+      }
+    },
+    "NexArm.Motion.moveMotor": {
+      "description": "移动指定电机。绝对编码器计数和相对角度只能选一个。执行方检查真实位置和行程。",
+      "parameters": {
+        "motor": {
+          "description": "实际电机编号。"
+        },
+        "target": {
+          "description": "绝对编码器目标计数。"
+        },
+        "deltaDegrees": {
+          "description": "相对于当前位置的角度变化，单位为度。"
+        },
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        },
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        }
+      }
+    },
+    "NexArm.Motion.reset": {
+      "description": "将机械臂所有支持的轴归位，夹爪除外。",
+      "parameters": {
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        },
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        }
+      }
+    },
+    "NexArm.Motion.resetMotor": {
+      "description": "将指定电机归位。",
+      "parameters": {
+        "motor": {
+          "description": "实际电机编号。"
+        },
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        },
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        }
+      }
+    },
+    "NexArm.Motion.shakeBase": {
+      "description": "按指定次数摆动底座并返回归位位置。",
+      "parameters": {
+        "cycles": {
+          "description": "重复次数。"
+        },
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        },
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        }
+      }
+    },
+    "Speech.Listening.startListening": {
+      "description": "仅在用户明确要求时开启聆听。",
+      "parameters": {}
+    },
+    "Speech.Listening.stopListening": {
+      "description": "关闭聆听和麦克风采集。",
+      "parameters": {}
+    },
+    "System.Device.control": {
+      "description": "按所选操作控制蓝牙扫描、连接或断开等设备行为。执行结果以回执为准。",
+      "parameters": {
+        "operation": {
+          "description": "当前设备能力支持的操作。"
+        },
+        "id": {
+          "description": "对应业务的准确标识，使用 State 或实际返回值。"
+        },
+        "value": {
+          "description": "与该操作对应的值。"
+        },
+        "action": {
+          "description": "请求的既有操作名称。"
+        },
+        "fence": {
+          "description": "当前设备会话的实际围栏值。"
+        }
+      }
+    },
+    "System.Device.readStatus": {
+      "description": "只读查询当前蓝牙和设备连接事实。",
+      "parameters": {}
+    },
+    "System.ModelResources.cancel": {
+      "description": "取消真实 ID 对应的当前下载。",
+      "parameters": {
+        "id": {
+          "description": "对应业务的准确标识，使用 State 或实际返回值。"
+        }
+      }
+    },
+    "System.ModelResources.download": {
+      "description": "用确认的来源及蜂窝网络选择启动指定模型下载。",
+      "parameters": {
+        "id": {
+          "description": "对应业务的准确标识，使用 State 或实际返回值。"
+        },
+        "endpoint": {
+          "description": "确认的下载服务来源。"
+        },
+        "allowsCellular": {
+          "description": "是否允许使用蜂窝网络。"
+        }
+      }
+    },
+    "System.ModelResources.snapshotResources": {
+      "description": "查询模型制品、安装状态和当前传输进度。",
+      "parameters": {}
+    },
+    "System.Provider.readSettings": {
+      "description": "只读查询已确认的云端服务开关和当前模型。结果不包含密钥及 URL。",
+      "parameters": {}
+    },
+    "UI.Expression.express": {
+      "description": "执行一次表情演出并等待完成后恢复基础表情。",
+      "parameters": {
+        "emotion": {
+          "description": "当前目录支持的表情。"
+        }
+      }
+    },
+    "UI.Expression.setExpression": {
+      "description": "设置持续表情或清除为当前中性姿态。",
+      "parameters": {
+        "emotion": {
+          "description": "当前目录支持的表情。"
+        }
+      }
+    },
+    "UI.Island.setPresentation": {
+      "description": "调整指定灵动岛活动的展开状态。详情可展开，状态条保持独立。",
+      "parameters": {
+        "activityID": {
+          "description": "实际灵动岛活动 ID。"
+        },
+        "size": {
+          "description": "呈现尺寸，取自已声明值。"
+        }
+      }
+    },
+    "UI.Navigation.open": {
+      "description": "打开用户请求的 App 页面。",
+      "parameters": {
+        "destination": {
+          "description": "当前目录声明的页面目的地。"
+        }
+      }
+    },
+    "UI.Window.close": {
+      "description": "关闭指定窗口，依当前窗口的关闭规则处理未完成内容。",
+      "parameters": {
+        "windowID": {
+          "description": "State 或回执返回的实际窗口 ID。"
+        }
+      }
+    },
+    "UI.Window.focus": {
+      "description": "将现有窗口置于前台。",
+      "parameters": {
+        "windowID": {
+          "description": "State 或回执返回的实际窗口 ID。"
+        }
+      }
+    },
+    "UI.Window.maximize": {
+      "description": "最大化指定窗口。",
+      "parameters": {
+        "windowID": {
+          "description": "State 或回执返回的实际窗口 ID。"
+        }
+      }
+    },
+    "UI.Window.minimize": {
+      "description": "最小化指定窗口并保留其内容。",
+      "parameters": {
+        "windowID": {
+          "description": "State 或回执返回的实际窗口 ID。"
+        }
+      }
+    },
+    "UI.Window.move": {
+      "description": "在允许范围内移动指定窗口。",
+      "parameters": {
+        "windowID": {
+          "description": "State 或回执返回的实际窗口 ID。"
+        },
+        "x": {
+          "description": "横向位置的归一化比例。"
+        },
+        "y": {
+          "description": "纵向位置的归一化比例。"
+        }
+      }
+    },
+    "UI.Window.restore": {
+      "description": "恢复指定窗口。",
+      "parameters": {
+        "windowID": {
+          "description": "State 或回执返回的实际窗口 ID。"
+        }
+      }
+    },
+    "Web.Page.browse": {
+      "description": "在新窗口或指定窗口浏览 HTTP(S) 页面，返回真实页面信息。",
+      "parameters": {
+        "url": {
+          "description": "要浏览的完整 HTTP 或 HTTPS 地址。"
+        },
+        "windowID": {
+          "description": "State 或回执返回的实际窗口 ID。"
+        }
+      }
+    },
+    "Web.Page.inspect": {
+      "description": "读取现有网页窗口当前页面的标题和文本。",
+      "parameters": {
+        "windowID": {
+          "description": "State 或回执返回的实际窗口 ID。"
+        }
+      }
+    },
+    "Web.Page.navigate": {
+      "description": "在现有网页窗口执行历史导航、刷新或滚动。",
+      "parameters": {
+        "windowID": {
+          "description": "State 或回执返回的实际窗口 ID。"
+        },
+        "command": {
+          "description": "导航或滚动指令，使用当前目录中的取值。"
+        }
+      }
+    },
+    "Web.Page.snapshot": {
+      "description": "捕获现有网页窗口的当前可见区域。",
+      "parameters": {
+        "windowID": {
+          "description": "State 或回执返回的实际窗口 ID。"
+        }
+      }
+    }
+  }
+}

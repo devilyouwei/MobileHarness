@@ -95,12 +95,12 @@ public enum ProviderEditorError: LocalizedError {
     case name, url, duplicate, capacity, key, missingKey
     public var errorDescription: String? {
         switch self {
-        case .name: return "请输入名称（最多 128 字节）"
-        case .url: return "请输入有效的 HTTP 或 HTTPS 服务 URL"
-        case .duplicate: return "此 URL 已存在，请编辑已有 Provider"
-        case .capacity: return "最多可保存 32 个 Provider"
-        case .key: return "API Key 过长"
-        case .missingKey: return "请输入 API key"
+        case .name: return "Enter a name of at most 128 bytes."
+        case .url: return "Enter a valid HTTP or HTTPS service URL."
+        case .duplicate: return "This URL already exists. Edit the existing provider."
+        case .capacity: return "You can save up to 32 providers."
+        case .key: return "The API key is too long."
+        case .missingKey: return "Enter an API key."
         }
     }
 }

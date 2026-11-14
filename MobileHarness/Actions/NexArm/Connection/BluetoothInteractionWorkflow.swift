@@ -54,11 +54,11 @@ import UI
     }
     public func setMotorVelocity(id: Int, value: Double) {
         guard !closed else {
-            state.present(.error("设备交互已关闭"))
+            state.present(.error("Device controls are closed"))
             return
         }
         guard NexArmDeviceLimits.motorIDs.contains(id), value.isFinite, (-1...1).contains(value) else {
-            state.present(.error("电机操作参数无效"))
+            state.present(.error("Invalid motor controls"))
             return
         }
         motors[id] = value
@@ -91,27 +91,29 @@ import UI
     }
     private func submit(_ request: [String: String], priority: Bool = false) {
         guard !closed else {
-            state.present(.error("设备交互已关闭"))
+            state.present(.error("Device controls are closed"))
             return
         }
         var request = request
         request["fence"] = fence
         if ["stopScan", "disconnect", "forget"].contains(request["operation"] ?? "") {
             guard controlWorker == nil else {
-                state.present(.error("设备控制正在执行，请稍后重试"))
+                state.present(.error("Device controls are busy. Try again."))
                 return
             }
             controlWorker = Task {
                 defer { controlWorker = nil }
                 do { try await perform(request) } catch {
-                    if request["fence"] == fence { state.present(.error("设备操作失败：" + error.localizedDescription)) }
+                    if request["fence"] == fence {
+                        state.present(.error("Device operation failed: " + error.localizedDescription))
+                    }
                 }
             }
             return
         }
         if pending.contains(request) { return }
         guard pending.count < 16 else {
-            state.present(.error("设备操作过多，请稍后重试"))
+            state.present(.error("Too many device operations. Try again."))
             return
         }
         if priority { pending.insert(request, at: 0) } else { pending.append(request) }
@@ -134,7 +136,9 @@ import UI
                     break
                 }
                 do { try await perform(request) } catch {
-                    if request["fence"] == fence { state.present(.error("设备操作失败：" + error.localizedDescription)) }
+                    if request["fence"] == fence {
+                        state.present(.error("Device operation failed: " + error.localizedDescription))
+                    }
                 }
             }
         }

@@ -3,6 +3,7 @@ import AgentCore
 import Foundation
 import ModelKit
 import Testing
+import UI
 
 @testable import Agents
 
@@ -208,7 +209,7 @@ private func writerDefinitions() throws -> [ChatToolDefinition] {
         flowchart TD
         ```
         """,
-        markdown: true)
+        markdown: true, language: .simplifiedChinese)
     let pattern = try NSRegularExpression(pattern: #"data:image/svg\+xml;base64,([A-Za-z0-9+/=]+)"#)
     let html = rendered.html as NSString
     let images = pattern.matches(in: rendered.html, range: NSRange(location: 0, length: html.length))
@@ -218,7 +219,9 @@ private func writerDefinitions() throws -> [ChatToolDefinition] {
     }
     #expect(charts[0].contains("<svg") && charts[0].contains("需求分析"))
     #expect(charts[1].contains("<svg") && charts[1].contains("提交"))
-    #expect(rendered.diagnostics.contains("Mermaid 图表 2 无法渲染"))
+    #expect(rendered.diagnostics.contains("Could not render diagram 2"))
+    #expect(rendered.html.contains("无法渲染 Mermaid 图表 2"))
+    #expect(rendered.html.contains("alt=\"Mermaid 图表 1\""))
     #expect(rendered.html.contains("A[broken"))
     #expect(rendered.html.contains("<code class=\"language-text\">flowchart TD"))
     #expect(!rendered.html.contains("<script"))
@@ -464,7 +467,7 @@ private func writerFinishTools() throws -> WriterTools {
         _ = try await WriterWorkflow(model: model).run(goal: "Demo", scope: "run", tools: writerFinishTools())
         Issue.record("Expected exhausted recovery")
     } catch let failure as WriterRecoveryFailure {
-        #expect(failure.attempts == 3 && failure.phase == "控制请求")
+        #expect(failure.attempts == 3 && failure.phase == "Control request")
         #expect((failure.underlying as? WriterRetryModelError)?.chatFailure.networkCode == -1001)
     }
     #expect(await model.requests.count == 3)
@@ -765,7 +768,9 @@ private actor WriterRoundBoundaryProbe {
         requestProgress: { fact in await probe.add("start" + String(fact.number)) },
         roundCompleted: { fact, summary in
             await probe.add("report" + String(fact?.number ?? 0))
-            #expect(summary.contains("已准备编辑") || summary.contains("已更新文件") || summary.contains("已完成页面渲染检查"))
+            #expect(
+                summary.contains("The file is ready for editing") || summary.contains("File updated")
+                    || summary.contains("Page rendering checked"))
         }
     ).run(goal: "A heading", scope: "run", tools: tools)
     #expect(

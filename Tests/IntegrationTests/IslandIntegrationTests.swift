@@ -433,7 +433,7 @@ func photographerAndApplicationControlPublishOwnActivitiesWithoutAssistant() asy
     }
     ui.camera.present(.countdown(3))
     try await wait { ui.island.headerActivity?.owner.hasPrefix("photographer:") == true }
-    #expect(ui.island.headerActivity?.content.title == "拍照倒计时")
+    #expect(ui.island.headerActivity?.content.title == "Photo countdown")
     try await application.observeConnection(.init(availability: .available, phase: .connected, recovery: .idle))
     try await wait { ui.island.activities.contains { $0.owner.hasPrefix("applicationControl:") } }
     ui.camera.present(.countdown(nil))
@@ -466,8 +466,8 @@ func photographerAndApplicationControlPublishOwnActivitiesWithoutAssistant() asy
     let id = UUID().uuidString
     #expect(AssistantExecutionSession.inputDecisionContent(.enqueue, id: "enqueue") == nil)
     for (revision, decision, text) in [
-        (1, InputDisposition.discard, "已丢弃本次输入"),
-        (2, InputDisposition.interrupt, "已打断当前回复"),
+        (1, InputDisposition.discard, "Input discarded"),
+        (2, InputDisposition.interrupt, "Reply interrupted"),
     ] {
         let content = try #require(AssistantExecutionSession.inputDecisionContent(decision, id: String(revision)))
         let payload = String(decoding: try JSONEncoder().encode(content), as: UTF8.self)

@@ -233,6 +233,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         let capability: any ChatCapability
         let requestTaskID: String?
         let boundaryMessages: [ChatMessage]
+        let language: String
     }
     private var continuationRounds: [String: ContinuationRound] = [:]
     private var generationEpoch: UInt64 = 0
@@ -247,7 +248,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     private var modelCapabilities: CapabilityRegistry
     private let usesSkills: Bool
     private var requestCatalog: CapabilityRegistry?
-    private let promptTemplates: PromptTemplates
+    private let language: @Sendable () -> String
     private let prompt: @Sendable (CapabilityRegistry) throws -> String
     private var hostCancellationInProgress = false
     private var hostCancellationSession: String?
@@ -300,6 +301,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         let bindings: [String: String]
         let imageScopes: [String: String]
         let imageIDs: Set<String>
+        let language: String
         var queued = false
         var cancelled = false
         var publishing = false
@@ -390,7 +392,8 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             { _, _, _ in [] },
         context: AgentContextRepository<State>,
         capabilities: CapabilityRegistry? = nil,
-        prompt: (@Sendable (CapabilityRegistry) throws -> String)? = nil
+        prompt: (@Sendable (CapabilityRegistry) throws -> String)? = nil,
+        language: @escaping @Sendable () -> String = { "en" }
     ) throws {
         self.inputQueueStatus = inputQueueStatus
         self.fullDuplex = fullDuplex
@@ -440,7 +443,8 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         self.communicationPolicy = configuration.communication
         self.modelCapabilities = try AgentCommunicationAdapter.catalog(
             runtimeCapabilities, policy: configuration.communication)
-        self.promptTemplates = try AgentPrompts.load(named: State.configurationName)
+        _ = try AgentPrompts.load(named: State.configurationName)
+        self.language = language
         self.prompt = prompt ?? State.systemPrompt
         self.observations = observations
         self.conversations = conversations
@@ -1049,7 +1053,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         if let userText {
             guard userText.utf8.count <= 16_384 else { throw CommunicationError.invalidPayload }
             do {
-                _ = try await conversations.admitUserInput(id: input.id, user: userText, model: "尚未开始")
+                _ = try await conversations.admitUserInput(id: input.id, user: userText, model: "Not started")
                 if fullDuplex {
                     let evidence = AssistantInputCoordination(
                         source: input.metadata.source, capturedAt: String(input.metadata.capturedAt))
@@ -1334,6 +1338,16 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         begunRoundID = roundID
     }
     private func generate(_ text: String, input: AgentInput, using chat: any ChatCapability) async {
+        let selected =
+            continuationRounds[input.id]?.language
+            ?? pendingRounds.values.first { $0.input.id == input.id && $0.queued }?.language
+            ?? AgentPrompts.normalizedLanguage(language())
+        await AgentPrompts.$language.withValue(selected) {
+            await generateInLanguage(text, input: input, using: chat)
+        }
+    }
+
+    private func generateInLanguage(_ text: String, input: AgentInput, using chat: any ChatCapability) async {
         await publishInputQueue()
         defer {
             if continuationRounds[input.id] == nil && !pendingRounds.values.contains(where: { $0.input.id == input.id })
@@ -1360,6 +1374,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         generationFinishReason = nil
         var cancelledParkedRound = false
         do {
+            let promptTemplates = try AgentPrompts.load(named: State.configurationName)
             if let key = pendingRounds.first(where: { $0.value.input.id == input.id && $0.value.queued })?.key,
                 let parked = pendingRounds.removeValue(forKey: key)
             {
@@ -1608,7 +1623,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                 budget: budget, protectedSuffixCount: roundSuffixCount,
                 readyAt: Date(), capability: chat,
                 requestTaskID: requestTaskID,
-                boundaryMessages: boundaryMessages)
+                boundaryMessages: boundaryMessages, language: AgentPrompts.language)
             try await contextRepository.update { try $0.transitionWork(input.id, to: .continuation) }
             guard !cancelledAdmissions.contains(input.id), hostCancellationSession != input.sessionID else {
                 inputInteractions[input.id] = nil
@@ -1694,12 +1709,14 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                     current.interactionID == waiting.interactionID
                 {
                     let question = String(decoding: try JSONEncoder().encode(current.text), as: UTF8.self)
-                    block += try promptTemplates.render("writerQuestion", variables: ["question": question])
+                    block += try AgentPrompts.load(named: State.configurationName).render(
+                        "writerQuestion", variables: ["question": question])
                 }
                 guard block.utf8.count <= 16 * 1024 else { throw CommunicationError.capacityExceeded }
                 block += try Self.writerFacts(
                     from: decisionContext.state.taskViews ?? [:], dialog: decisionContext.state.history.current.id,
-                    budget: min(3_072, 16 * 1024 - block.utf8.count), templates: promptTemplates)
+                    budget: min(3_072, 16 * 1024 - block.utf8.count),
+                    templates: AgentPrompts.load(named: State.configurationName))
                 let system = try State.systemPrompt(
                     catalog, skills: decisionContext.state.skillState, communication: communicationPolicy)
                 stateMessages.removeAll { $0.role == .system }
@@ -1772,7 +1789,8 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                     catalog: requestCatalog, capabilities: modelCapabilities, skillIDs: requestSkillIDs,
                     coordinator: roundCoordinator, calls: roundCalls, receipt: roundReceipt, resultBytes: resultBytes,
                     deferred: deferredCommunications, finishReason: generationFinishReason,
-                    bindings: resourceBindings, imageScopes: imageScopes, imageIDs: ephemeralImageIDs)
+                    bindings: resourceBindings, imageScopes: imageScopes, imageIDs: ephemeralImageIDs,
+                    language: AgentPrompts.language)
                 try await publishPendingResults(roundID)
                 throw RoundSuspended()
             }
@@ -1932,7 +1950,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         return [
             .init(
                 role: .user,
-                content: try promptTemplates.render(
+                content: try AgentPrompts.load(named: State.configurationName).render(
                     "executionObservations", variables: ["data": String(decoding: data, as: UTF8.self)]))
         ]
     }
@@ -3185,7 +3203,9 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             }
         }
         let text = view.text.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
-        let summary = text.count == 2 && text[0].hasPrefix("工作区 workspace_") ? text[1] : view.text[...]
+        let hasWorkspacePrefix =
+            text.first.map { $0.hasPrefix("Workspace workspace_") || $0.hasPrefix("工作区 workspace_") } ?? false
+        let summary = text.count == 2 && hasWorkspacePrefix ? text[1] : view.text[...]
         let anchor = AgentInput(
             id: event.eventID, sessionID: input.sessionID, payload: input.payload, metadata: input.metadata)
         enqueueWriterNotice(

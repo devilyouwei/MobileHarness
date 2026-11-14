@@ -14,6 +14,8 @@
     @MainActor @Observable public final class ApplicationPresentation: ApplicationRootProviding {
         private let features: AgentContainer
         private let home: UIHomeContainer
+        private let language: @Sendable () -> AppLanguage
+        private let speechDiagnostic: SpeechDiagnosticState?
         public let runtimeLog: RuntimeLogState
         public let web: WebPageContainer
         public var onHomeVisibilityChanged: (@MainActor (Bool) -> Void)?
@@ -32,13 +34,23 @@
         private var startupFailure: (any Error)?
         public var startupIssue: String? { startupFailure.map { String(describing: $0) } }
         public init(
-            features: AgentContainer, home: UIHomeContainer, web: WebPageContainer, runtimeLog: RuntimeLogState
+            features: AgentContainer, home: UIHomeContainer, web: WebPageContainer, runtimeLog: RuntimeLogState,
+            speechDiagnostic: SpeechDiagnosticState? = nil,
+            language: @escaping @Sendable () -> AppLanguage = { .english }
         ) {
             self.features = features
             self.home = home
             self.web = web
             self.runtimeLog = runtimeLog
+            self.language = language
+            self.speechDiagnostic = speechDiagnostic
+            updateLanguage()
             features.onModelConfigurationChanged = { [weak self] in self?.onPreparationRequested?() }
+        }
+        public func updateLanguage() {
+            let selected = language()
+            island.updateLanguage(selected)
+            speechDiagnostic?.updateLanguage(selected)
         }
         @ObservationIgnored private var sessionPresentation: SessionPresentation?
         public var session: (any ApplicationSessionProviding)? {
@@ -70,15 +82,18 @@
             let controls = features.memory.history
             var destinations = [
                 AgentRecordDestination(
-                    id: "assistant", name: "My Assistant",
-                    summary: "对话、Task 摘要与完整请求记录"
+                    id: "assistant", name: language().text("My Assistant"),
+                    summary: language().text("Conversations, task summaries, and full model requests")
                 ) {
                     ConversationHistoryView(state: state, controls: controls)
                 }
             ]
             if let artifacts = features.writer.artifacts {
                 destinations.append(
-                    AgentRecordDestination(id: "writer", name: "My Writer", summary: "委托任务、对话与作品文件") {
+                    AgentRecordDestination(
+                        id: "writer", name: language().text("My Writer"),
+                        summary: language().text("Delegated tasks, conversations, and project files")
+                    ) {
                         WriterRecordsView(controls: self.features.writer, artifacts: artifacts)
                     })
             }

@@ -643,14 +643,18 @@ extension LiveRuntimeTests {
 }
 
 @Test(.actionCatalog) func bluetoothFailureIdentifiesNativeStep() {
-    #expect(BluetoothPresentation.failure(.timeout(.connecting)) == "建立蓝牙连接超时")
-    #expect(BluetoothPresentation.failure(.timeout(.notifications)) == "开启设备通知超时")
-    #expect(BluetoothPresentation.failure(.timeout(.response)) == "等待设备回复超时")
+    #expect(BluetoothPresentation.failure(.timeout(.connecting)) == "Bluetooth connection timed out")
+    #expect(BluetoothPresentation.failure(.timeout(.notifications)) == "Enabling notifications timed out")
+    #expect(BluetoothPresentation.failure(.timeout(.response)) == "Waiting for device response timed out")
     let native = NexArmBluetoothFailure(step: .writing, error: NSError(domain: "fixture.transport", code: 42))
     #expect(native == .native(step: .writing, domain: "fixture.transport", code: 42))
-    #expect(BluetoothPresentation.failure(native) == "发送设备指令失败（fixture.transport 42）")
-    #expect(BluetoothPresentation.failure(.incompatibleService(.services)) == "发现设备服务失败：蓝牙服务不兼容")
-    #expect(BluetoothPresentation.failure(.disconnectUnconfirmed) == "蓝牙断开尚未确认，请关闭系统蓝牙后重试")
+    #expect(BluetoothPresentation.failure(native) == "Sending device command failed (fixture.transport 42)")
+    #expect(
+        BluetoothPresentation.failure(.incompatibleService(.services))
+            == "Service discovery failed: incompatible Bluetooth service")
+    #expect(
+        BluetoothPresentation.failure(.disconnectUnconfirmed)
+            == "Bluetooth disconnection unconfirmed. Turn Bluetooth off, then retry.")
 }
 
 extension LiveRuntimeTests {
@@ -1606,9 +1610,13 @@ extension LiveRuntimeTests {
 
 @Test(.actionCatalog) func bluetoothResponseTimeoutRetainsQueryAndSeparatesNotificationBytesFromPayload() {
     let missing = NexArmBluetoothFailure.responseTimeout(command: 11, expectedBytes: 24, receivedBytes: 0)
-    #expect(BluetoothPresentation.failure(missing) == "读取机械臂位置回复超时（0x0B，期望载荷24字节，收到通知0字节）")
+    #expect(
+        BluetoothPresentation.failure(missing)
+            == "Arm position query timed out (0x0B, expected 24 payload bytes, received 0 notification bytes)")
     let unmatched = NexArmBluetoothFailure.responseTimeout(command: 7, expectedBytes: 24, receivedBytes: 30)
-    #expect(BluetoothPresentation.failure(unmatched) == "设备查询回复超时（0x07，期望载荷24字节，收到通知30字节）")
+    #expect(
+        BluetoothPresentation.failure(unmatched)
+            == "Device query timed out (0x07, expected 24 payload bytes, received 30 notification bytes)")
 }
 
 extension LiveRuntimeTests {
@@ -1999,7 +2007,7 @@ extension LiveRuntimeTests {
         try await until { workflow.state.recoveryStage == .waiting }
         let ids = (0..<5).map { _ in UUID().uuidString }
         for id in ids { for _ in 0..<40 { workflow.connect(id) } }
-        #expect(workflow.state.error == "正在恢复连接，请等待完成或先断开")
+        #expect(workflow.state.error == "Wait for recovery to finish or disconnect first.")
         #expect(await link.connects == 1)
         workflow.disconnect()
         await workflow.waitUntilIdle()
@@ -3308,8 +3316,8 @@ extension LiveRuntimeTests {
     let overflow = NexArmBluetoothFailure(step: .response, error: NexArmError.overflow)
     #expect(invalid == .protocolViolation(.invalidPacket))
     #expect(overflow == .protocolViolation(.receiveOverflow))
-    #expect(BluetoothPresentation.failure(invalid) == "蓝牙回包格式无效")
-    #expect(BluetoothPresentation.failure(overflow) == "蓝牙接收数据超过缓冲上限")
+    #expect(BluetoothPresentation.failure(invalid) == "Invalid Bluetooth response packet")
+    #expect(BluetoothPresentation.failure(overflow) == "Bluetooth receive buffer overflow")
     #expect(NexArmBluetoothFailure(step: .response, error: NexArmError.timeout) == .timeout(.response))
 }
 

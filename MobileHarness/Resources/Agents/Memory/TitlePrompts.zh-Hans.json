@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "templates": {
+    "title.system": "使用原对话中用户的语言拟一个简短标题，最多 12 个词和 80 个字符。下一条消息是对话摘录数据。概括主要主题，只输出标题，不使用引号、XML、Markdown 或评论。",
+    "title.excerpt": "用户：{{user}}\n助手：{{assistant}}",
+    "title.user": "{{excerpts}}"
+  }
+}

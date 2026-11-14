@@ -87,7 +87,7 @@ import Foundation
         else { return }
         if let prior = providerRequests[providerID] { discoveries[prior]?.cancel() }
         guard discoveries.count < 32 else {
-            state.modelErrors[providerID] = "同时处理的模型查询过多，请稍后重试"
+            state.modelErrors[providerID] = "Too many model lookups are running. Try again later."
             return
         }
         let id = UUID()
@@ -112,7 +112,9 @@ import Foundation
                     current.url == provider.url, current.key == provider.key
                 else { return }
                 self.state.modelCatalogs[providerID] = result
-                if result.isEmpty { self.state.modelErrors[providerID] = "此服务没有返回可识别的聊天模型" }
+                if result.isEmpty {
+                    self.state.modelErrors[providerID] = "This service returned no recognizable chat models."
+                }
             } catch {
                 guard let self, !Task.isCancelled, self.providerRequests[providerID] == id,
                     let current = self.state.providers.first(where: { $0.id == providerID }),
@@ -163,20 +165,20 @@ import Foundation
             let selected = previous.providers.first { $0.id == choice.providerID }
             let model = choice.model.trimmingCharacters(in: .whitespacesAndNewlines)
             guard choice.providerID == nil || (selected != nil && !model.isEmpty) else {
-                state.present(.error("请选择已保存的 Provider 和模型"))
+                state.present(.error("Select a saved provider and model."))
                 return false
             }
             switch brain {
             case .assistant:
                 guard choice.usesLocal || selected != nil else {
-                    state.present(.error("请选择 Provider"))
+                    state.present(.error("Select a provider."))
                     return false
                 }
                 Self.setAssistant(
                     &candidate, provider: choice.usesLocal ? nil : selected, model: choice.usesLocal ? "" : model)
             case .writer:
                 guard !choice.usesLocal else {
-                    state.present(.error("本地模型不支持 Writer 所需的原生工具调用"))
+                    state.present(.error("This local model lacks the native tools Writer needs."))
                     return false
                 }
                 candidate.writerProviderID = selected?.id
@@ -214,7 +216,7 @@ import Foundation
         do {
             try await operations.save(value)
             restored = true
-            if !operations.presentsResults { state.present(.notice("已保存模型配置")) }
+            if !operations.presentsResults { state.present(.notice("Model settings saved")) }
             return true
         } catch {
             if (error as? any SettingsFailurePresenting)?.wasPresented != true {

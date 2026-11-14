@@ -8,16 +8,16 @@ actor WriterIslandPresentation {
         case starting, running, waitingUser, paused, cancelling, completed, declined, failed, cancelled, interrupted
         var title: String {
             switch self {
-            case .starting: "准备创作"
-            case .running: "正在创作"
-            case .waitingUser: "等待补充"
-            case .paused: "已暂停"
-            case .cancelling: "正在取消"
-            case .completed: "已完成"
-            case .declined: "已拒绝"
-            case .failed: "执行失败"
-            case .cancelled: "已取消"
-            case .interrupted: "已中断"
+            case .starting: "Preparing to write"
+            case .running: "Writing"
+            case .waitingUser: "Waiting for input"
+            case .paused: "Paused"
+            case .cancelling: "Cancelling"
+            case .completed: "Completed"
+            case .declined: "Declined"
+            case .failed: "Failed"
+            case .cancelled: "Cancelled"
+            case .interrupted: "Interrupted"
             }
         }
         var terminal: Bool { [.completed, .declined, .failed, .cancelled, .interrupted].contains(self) }
@@ -30,8 +30,12 @@ actor WriterIslandPresentation {
     private var step = ""
     private var dismissal: Task<Void, Never>?
     private let terminalDuration: Duration
+    private let language: @Sendable () -> String
 
-    init(terminalDuration: Duration = .seconds(15)) { self.terminalDuration = terminalDuration }
+    init(terminalDuration: Duration = .seconds(15), language: @escaping @Sendable () -> String = { "en" }) {
+        self.terminalDuration = terminalDuration
+        self.language = language
+    }
     var lastFailure: String? { get async { await publication.lastFailure } }
     func bind(_ sender: @escaping Sender) async { await publication.bind(sender) }
     func start() async { await publication.start() }
@@ -41,7 +45,7 @@ actor WriterIslandPresentation {
         self.delegateID = delegateID
         self.goal = goal
         phase = .starting
-        step = "已接纳委托，正在准备。"
+        step = "Assignment accepted. Getting ready."
         await enqueue()
     }
     func update(delegateID: String, phase: Phase, step: String? = nil) async {
@@ -62,20 +66,26 @@ actor WriterIslandPresentation {
     private func enqueue() async {
         guard let delegateID else { return }
         await publication.submit(
-            Self.content(delegateID: delegateID, goal: goal, phase: phase, step: step))
+            Self.content(
+                delegateID: delegateID, goal: goal, phase: phase, step: step,
+                language: AppLanguage(preferredLanguage: language())))
     }
-    static func content(delegateID: String, goal: String, phase: Phase, step: String) -> IslandContent {
+    static func content(delegateID: String, goal: String, phase: Phase, step: String, language: AppLanguage = .english)
+        -> IslandContent
+    {
+        let title = language.text(phase.title)
+        let step = language.text(step)
         let stage = phase == .waitingUser || phase.terminal ? phase.rawValue : "active"
         return IslandContent(
             title: String(("Writer · " + goal).prefix(80)),
-            subtitle: phase.terminal || phase == .waitingUser ? String(step.prefix(160)) : phase.title,
+            subtitle: phase.terminal || phase == .waitingUser ? String(step.prefix(160)) : title,
             primary: .symbol(name: "pencil.and.outline"), tone: .purple,
             priority: phase == .waitingUser || phase.terminal ? .attention : .high,
             secondary: phase == .waitingUser || phase == .paused || phase.terminal ? nil : .loading,
             liveActivity: true, expansionID: delegateID + ":" + stage,
             detail: .init(
                 text: String(
-                    ("Writer · " + phase.title + " · " + String(goal.prefix(100)) + "\n" + String(step.prefix(180)))
+                    ("Writer · " + title + " · " + String(goal.prefix(100)) + "\n" + String(step.prefix(180)))
                         .prefix(320))))
     }
     func stop() async {

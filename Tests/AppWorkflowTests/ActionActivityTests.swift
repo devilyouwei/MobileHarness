@@ -63,31 +63,31 @@ private func activityRecord(
 
 @Test @MainActor func actionActivityShowsHonestCancellationAndCompletionSemantics() {
     let cancelling = ActionActivityItem(execution: activityRecord(phase: .cancelling))
-    #expect(cancelling.status == "正在取消")
+    #expect(cancelling.status == "Cancelling")
     #expect(cancelling.isActive)
     let setting = ActionActivityItem(
         execution: activityRecord(phase: .succeeded, semantics: .state, completion: .completed))
-    #expect(setting.status == "已设置")
+    #expect(setting.status == "Set")
     let start = ActionActivityItem(
         execution:
             activityRecord(
                 phase: .succeeded, semantics: .activityStart, completion: .activityStarted(UUID().uuidString)
             ))
-    #expect(start.status == "已启动")
+    #expect(start.status == "Started")
     let cancelled = ActionActivityItem(execution: activityRecord(phase: .cancelled))
-    #expect(cancelled.status == "已取消")
+    #expect(cancelled.status == "Cancelled")
     var beforeStart = activityRecord(phase: .cancelled)
     beforeStart.startedAt = nil
-    #expect(ActionActivityItem(execution: beforeStart).status == "执行前已取消")
+    #expect(ActionActivityItem(execution: beforeStart).status == "Cancelled before execution")
     let stop = ActionActivityItem(
         execution: activityRecord(
             phase: .succeeded, semantics: .activityStop, completion: .activityStopped(UUID().uuidString)))
-    #expect(stop.status == "已结束")
+    #expect(stop.status == "Ended")
     let failure = ActionActivityItem(
         execution: activityRecord(phase: .failed, failure: .init(rawValue: "feedbackTimeout")))
-    #expect(failure.status == "执行未完成")
+    #expect(failure.status == "Execution did not complete")
     #expect(failure.title == "NexArm.Gesture.dance")
-    #expect(setting.output == "已完成（无返回值）")
+    #expect(setting.output == "Completed (no return value)")
     #expect(start.output?.hasPrefix("activityStarted:") == true)
 }
 
@@ -157,10 +157,10 @@ extension RuntimeLogState {
             sessionID: UUID().uuidString, inputID: UUID().uuidString, channel: "Robot",
             semantics: .finite, phase: .failed,
             completion: .report(report)))
-    #expect(item.status == "部分完成 · 2项问题")
+    #expect(item.status == "Partially completed · 2 issues")
     #expect(item.issueDescriptions.count == 2)
     #expect(item.issueDescriptions[0].contains("1418"))
-    #expect(item.issueDescriptions[1].contains("未收到位置反馈"))
+    #expect(item.issueDescriptions[1].contains("No position feedback received"))
 }
 
 @Test @MainActor func singleHandlerFailurePreservesUnderlyingSpeechDescription() throws {
@@ -172,7 +172,7 @@ extension RuntimeLogState {
             sessionID: UUID().uuidString, inputID: UUID().uuidString, channel: "Speech",
             semantics: .finite, phase: .failed,
             completion: .report(report), failureDescription: "语音合成返回了无效音频"))
-    #expect(item.issueDescriptions == ["第1项：语音合成返回了无效音频"])
+    #expect(item.issueDescriptions == ["Item 1: 语音合成返回了无效音频"])
 }
 
 @Test @MainActor func unknownProviderFailureHasSafePresentationFallback() throws {
@@ -183,7 +183,7 @@ extension RuntimeLogState {
     ])
     let item = ActionActivityItem(
         execution: activityRecord(phase: .failed, completion: .report(report)))
-    #expect(item.issueDescriptions == ["第1项：执行失败"])
+    #expect(item.issueDescriptions == ["Item 1: Execution failed"])
 }
 
 @Test(arguments: [

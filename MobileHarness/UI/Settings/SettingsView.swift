@@ -4,15 +4,32 @@
     /// Native feature list. Route selection crosses the injected Agent intent interface.
     @MainActor
     public struct SettingsView: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let bluetooth: BluetoothSettingsState
         let navigate: (AppDestination) -> Void
-        public init(bluetooth: BluetoothSettingsState, navigate: @escaping (AppDestination) -> Void) {
+        let languagePreference: Binding<AppLanguagePreference>?
+        public init(
+            bluetooth: BluetoothSettingsState, languagePreference: Binding<AppLanguagePreference>? = nil,
+            navigate: @escaping (AppDestination) -> Void
+        ) {
             self.bluetooth = bluetooth
+            self.languagePreference = languagePreference
             self.navigate = navigate
         }
         public var body: some View {
             List {
-                Section("AI Models") {
+                if let languagePreference {
+                    Picker(selection: languagePreference) {
+                        Text(appCopy.text("System")).tag(AppLanguagePreference.system)
+                        Text(verbatim: "简体中文").tag(AppLanguagePreference.simplifiedChinese)
+                        Text(verbatim: "English").tag(AppLanguagePreference.english)
+                    } label: {
+                        Label(appCopy.text("App Language"), systemImage: "globe")
+                    }
+                    .accessibilityIdentifier("settings.appLanguage")
+                }
+                Section(appCopy.text("AI Models")) {
                     destination(
                         .recognition, title: "Speech Recognition", icon: "waveform",
                         identifier: "settings.recognition.open")
@@ -23,12 +40,12 @@
                     destination(
                         .vision, title: "Vision Recognition", icon: "viewfinder", identifier: "settings.vision.open")
                 }
-                Section("External Devices") {
+                Section(appCopy.text("External Devices")) {
                     destination(
                         .bluetooth, title: "Bluetooth", icon: "bluetooth",
                         identifier: "settings.bluetooth.open")
                 }
-                Section("User") {
+                Section(appCopy.text("User")) {
                     destination(.album, title: "Album", icon: "photo.on.rectangle", identifier: "settings.user.album")
                     destination(
                         .assistantHistory, title: "My Assistant", icon: "bubble.left.and.bubble.right",
@@ -36,11 +53,11 @@
                     destination(
                         .writerHistory, title: "My Writer", icon: "pencil.and.outline",
                         identifier: "settings.writer.records")
-                    Label("Memory", systemImage: "brain.head.profile")
+                    Label(appCopy.text("Memory"), systemImage: "brain.head.profile")
                         .accessibilityIdentifier("settings.user.memory")
                 }
             }
-            .navigationTitle("Settings").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(appCopy.text("Settings")).navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar).preferredColorScheme(.dark)
         }
         private func destination(_ page: AppDestination, title: String, icon: String, identifier: String) -> some View {
@@ -50,17 +67,19 @@
                 HStack {
                     if page == .bluetooth {
                         Label {
-                            Text(title)
+                            Text(appCopy.text(title))
                         } icon: {
                             BluetoothSymbol()
                                 .stroke(style: StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round))
                                 .frame(width: 18, height: 22)
                         }
                     } else {
-                        Label(title, systemImage: icon)
+                        Label(appCopy.text(title), systemImage: icon)
                     }
                     Spacer()
-                    if page == .bluetooth { Text(bluetooth.summary).foregroundStyle(.secondary).font(.subheadline) }
+                    if page == .bluetooth {
+                        Text(appCopy.text(bluetooth.summary)).foregroundStyle(.secondary).font(.subheadline)
+                    }
                     Image(systemName: "chevron.right").foregroundStyle(.secondary)
                 }
             }.accessibilityIdentifier(identifier)
@@ -83,6 +102,8 @@
 
     @MainActor
     public struct LanguageModelSettingsView: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         @State private var providerEditor: ProviderEditorDraft?
         @State private var deletingID: String?
         @State private var toast: SaveToast?
@@ -119,7 +140,7 @@
         }
         public var body: some View {
             Form {
-                Section("Cloud Providers") {
+                Section(appCopy.text("Cloud Providers")) {
                     ForEach(providers, id: \.id) { provider in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(provider.name).font(.body.weight(.medium)).lineLimit(1)
@@ -128,24 +149,24 @@
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button("删除", role: .destructive) { deletingID = provider.id }
-                            Button("编辑") {
+                            Button(appCopy.text("Delete"), role: .destructive) { deletingID = provider.id }
+                            Button(appCopy.text("Edit")) {
                                 providerEditor = ProviderEditorDraft(provider: provider, existing: providers)
                             }.tint(.blue)
                         }
                     }
-                    Button("添加 Provider", systemImage: "plus.circle") {
+                    Button(appCopy.text("Add Provider"), systemImage: "plus.circle") {
                         providerEditor = ProviderEditorDraft(provider: nil, existing: providers)
                     }.disabled(!restored || providers.count >= 32)
                 }
-                Section("Agents") {
+                Section(appCopy.text("Agents")) {
                     ForEach(AgentBrain.allCases) { brain in
                         Button {
                             navigate(brain)
                         } label: {
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(brain.title)
+                                    Text(appCopy.text(brain.title))
                                     if restored {
                                         Text(summary(brain)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                                     }
@@ -163,7 +184,7 @@
                     state: modelResources, controls: modelResourceControls, group: .language, includesDecision: true)
             }
             .disabled(settings.isSaving)
-            .navigationTitle("智能体大脑")
+            .navigationTitle(appCopy.text("Agent Brains"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
             // Keep native back navigation mounted; the App-owned save continues across navigation.
@@ -175,17 +196,19 @@
                             let succeeded = await save(.providers(providers))
                             if succeeded { providerDraft = nil }
                             toast = SaveToast(
-                                text: succeeded ? "保存成功" : (settings.error ?? "保存失败，请重试"),
+                                text: succeeded
+                                    ? appCopy.text("Saved successfully")
+                                    : (settings.error ?? appCopy.text("Could not save. Try again.")),
                                 succeeded: succeeded
                             )
                         }
                     } label: {
-                        Text("保存")
+                        Text(appCopy.text("Save"))
                             .opacity(settings.isSaving ? 0 : 1)
                             .overlay {
                                 ProgressView().opacity(settings.isSaving ? 1 : 0)
                             }
-                            .accessibilityLabel(settings.isSaving ? "正在保存" : "保存")
+                            .accessibilityLabel(settings.isSaving ? appCopy.text("Saving") : appCopy.text("Save"))
                     }
                     .disabled(!restored || settings.isSaving || providerDraft == nil)
                     .accessibilityIdentifier("settings.save")
@@ -203,17 +226,20 @@
                 }
             }
             .alert(
-                "删除 Provider？",
+                appCopy.text("Delete provider?"),
                 isPresented: Binding(get: { deletingID != nil }, set: { if !$0 { deletingID = nil } }),
                 presenting: deletingID
             ) { id in
-                Button("取消", role: .cancel) { deletingID = nil }
-                Button("删除", role: .destructive) {
+                Button(appCopy.text("Cancel"), role: .cancel) { deletingID = nil }
+                Button(appCopy.text("Delete"), role: .destructive) {
                     providerDraft = providers.filter { $0.id != id }
                     deletingID = nil
                 }
             } message: { _ in
-                Text("保存后，引用此 Provider 的 Assistant 切回本地，Writer 显示未配置，Decision 清除云端引用。")
+                Text(
+                    appCopy.text(
+                        "After saving, Assistant will switch to its local model, Writer will be unconfigured, and Decision will clear this cloud provider."
+                    ))
             }
             .overlay(alignment: .bottom) {
                 if let toast {
@@ -252,10 +278,10 @@
         private func summary(_ brain: AgentBrain) -> String {
             let choice = settings.brainDraft(brain)
             if choice.usesLocal {
-                return brain == .decision ? "本地 · D3 Decision" : "本地 · Gemma 4 E2B"
+                return brain == .decision ? appCopy.text("Local · D3 Decision") : appCopy.text("Local · Gemma 4 E2B")
             }
             guard let provider = settings.providers.first(where: { $0.id == choice.providerID }) else {
-                return "未配置"
+                return appCopy.text("Unconfigured")
             }
             return [provider.name, choice.model].filter { !$0.isEmpty }.joined(separator: " · ")
         }
@@ -263,6 +289,8 @@
 
     @MainActor
     public struct AgentBrainSettingsView: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         private enum Selection: Hashable {
             case local
             case cloud(String)
@@ -297,25 +325,25 @@
                 if let draft {
                     configuration(draft)
                     if let result { Text(result).foregroundStyle(.secondary) }
-                    if let error = settings.error { Text(error).foregroundStyle(.red) }
+                    if let error = settings.error { Text(appCopy.text(error)).foregroundStyle(.red) }
                 } else if let restoreError {
                     Text(restoreError).foregroundStyle(.red)
-                    Button("重新加载配置") { Task { await restore() } }
+                    Button(appCopy.text("Reload settings")) { Task { await restore() } }
                 } else {
                     ProgressView()
                 }
             }
             .disabled(settings.isSaving)
-            .navigationTitle(brain.title)
+            .navigationTitle(appCopy.text(brain.title))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(settings.isSaving ? "正在保存…" : "保存") {
+                    Button(settings.isSaving ? appCopy.text("Saving…") : appCopy.text("Save")) {
                         guard let draft else { return }
                         Task {
                             result = nil
-                            if await save(.brain(brain, draft)) { result = "保存成功" }
+                            if await save(.brain(brain, draft)) { result = appCopy.text("Saved successfully") }
                         }
                     }
                     .disabled(!canSave)
@@ -336,14 +364,16 @@
 
         @ViewBuilder private func configuration(_ choice: AgentBrainDraft) -> some View {
             Section {
-                Picker("Provider", selection: Binding(get: { selection }, set: select)) {
-                    if brain != .assistant { Text("未配置").tag(Selection.unconfigured) }
-                    Text(brain == .decision ? "本地 D3" : "本地 Gemma 4 E2B").tag(Selection.local)
-                        .disabled(
-                            brain == .writer
-                                || (brain == .decision && !choice.usesLocal
-                                    && !resources.installedGroups.contains(.decision))
-                        )
+                Picker(appCopy.text("Provider"), selection: Binding(get: { selection }, set: select)) {
+                    if brain != .assistant { Text(appCopy.text("Unconfigured")).tag(Selection.unconfigured) }
+                    Text(brain == .decision ? appCopy.text("Local D3") : appCopy.text("Local Gemma 4 E2B")).tag(
+                        Selection.local
+                    )
+                    .disabled(
+                        brain == .writer
+                            || (brain == .decision && !choice.usesLocal
+                                && !resources.installedGroups.contains(.decision))
+                    )
                     ForEach(settings.providers, id: \.id) { provider in
                         Text(provider.name).tag(Selection.cloud(provider.id))
                     }
@@ -353,7 +383,7 @@
                 if !choice.usesLocal, let id = choice.providerID { modelPicker(id) }
                 if brain == .writer, choice.providerID != nil {
                     Toggle(
-                        "深度思考",
+                        appCopy.text("Extended thinking"),
                         isOn: Binding(
                             get: { draft?.writerThinking ?? false },
                             set: {
@@ -368,13 +398,13 @@
             }
             if brain == .decision {
                 if choice.usesLocal {
-                    Section("云端备用") {
+                    Section(appCopy.text("Cloud fallback")) {
                         Picker(
-                            "Provider",
+                            appCopy.text("Provider"),
                             selection: Binding(
                                 get: { draft?.providerID }, set: setCloudProvider)
                         ) {
-                            Text("无备用").tag(String?.none)
+                            Text(appCopy.text("No fallback")).tag(String?.none)
                             ForEach(settings.providers, id: \.id) { provider in
                                 Text(provider.name).tag(Optional(provider.id))
                             }
@@ -384,7 +414,7 @@
                         if let id = choice.providerID { modelPicker(id) }
                     }
                 }
-                Section("最近决策路径") {
+                Section(appCopy.text("Latest decision route")) {
                     Text(resources.decisionStatus).foregroundStyle(.secondary)
                 }
             }
@@ -406,14 +436,18 @@
             switch brain {
             case .assistant:
                 return choice.usesLocal && !resources.installedGroups.contains(.language)
-                    ? "请在 Agent Brains 下载 Gemma 4 E2B。"
-                    : "对话协调模型，默认关闭思考；无法关闭时使用最低思考档位。"
+                    ? appCopy.text("Download Gemma 4 E2B in Agent Brains.")
+                    : appCopy.text("Thinking is off by default. If the model requires it, the lowest setting is used.")
             case .writer:
-                return "本地 Gemma 缺少 Writer 所需的原生工具调用。深度思考设置用于新建或续作委托。"
+                return appCopy.text(
+                    "Local Gemma lacks Writer’s native tools. Extended thinking applies to new or resumed assignments.")
             case .decision:
                 return !resources.installedGroups.contains(.decision)
-                    ? "可在 Agent Brains 下载 D3。云端模型需支持工具调用；不可用时保留输入并排队。"
-                    : "云端模型需支持工具调用。本地 D3 不可用时使用已保存的云端备用。"
+                    ? appCopy.text(
+                        "Download D3 in Agent Brains. Cloud models need tool support. If unavailable, input is kept and queued."
+                    )
+                    : appCopy.text(
+                        "Cloud models need tool support. If D3 is unavailable, Decision uses the saved cloud fallback.")
             }
         }
 
@@ -464,6 +498,8 @@
     /// Shared discovery and selection rendering for Agent Brains and Decision.
     @MainActor
     struct ProviderModelPicker: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         @Bindable var settings: SettingsState
         let controls: any SettingsControlling
         let providerID: String
@@ -471,8 +507,8 @@
         let identifier: String
         var body: some View {
             let values = settings.modelCatalogs[providerID] ?? []
-            Picker("模型", selection: $model) {
-                Text("请选择模型").tag("")
+            Picker(appCopy.text("Model"), selection: $model) {
+                Text(appCopy.text("Select a model")).tag("")
                 if !model.isEmpty && !values.contains(model) { Text(model).tag(model) }
                 ForEach(values, id: \.self) { Text($0).tag($0) }
             }
@@ -481,17 +517,19 @@
             if settings.loadingProviderIDs.contains(providerID) {
                 HStack {
                     ProgressView()
-                    Text("正在加载模型…").foregroundStyle(.secondary)
+                    Text(appCopy.text("Loading models…")).foregroundStyle(.secondary)
                 }
             } else if let error = settings.modelErrors[providerID] {
                 Text(error).font(.caption).foregroundStyle(.red)
-                Button("重新加载模型") { controls.loadModels(providerID: providerID) }
+                Button(appCopy.text("Reload models")) { controls.loadModels(providerID: providerID) }
             }
         }
     }
 
     @MainActor
     private struct ProviderEditorView: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         @Environment(\.dismiss) private var dismiss
         @State var draft: ProviderEditorDraft
         @State private var error: String?
@@ -510,21 +548,21 @@
                 Form {
                     Section {
                         HStack {
-                            TextField("名称", text: $draft.name)
+                            TextField(appCopy.text("Name"), text: $draft.name)
                                 .accessibilityIdentifier("settings.cloud.name")
-                            pasteButton("名称", text: $draft.name)
+                            pasteButton(appCopy.text("Name"), text: $draft.name)
                         }
                         HStack {
-                            TextField("URL（可选，默认 OpenAI）", text: $draft.url)
+                            TextField(appCopy.text("URL (optional, defaults to OpenAI)"), text: $draft.url)
                                 .keyboardType(.URL)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
-                                .accessibilityLabel("服务 URL，可选，留空使用 OpenAI")
+                                .accessibilityLabel(appCopy.text("Service URL. Leave blank to use OpenAI."))
                                 .accessibilityIdentifier("settings.cloud.url")
                             pasteButton("URL", text: $draft.url)
                         }
                         HStack {
-                            SecureField("API Key（可选）", text: $draft.key)
+                            SecureField(appCopy.text("API key (optional)"), text: $draft.key)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
                                 .privacySensitive()
@@ -532,16 +570,21 @@
                             pasteButton("Key", text: $draft.key)
                         }
                     } footer: {
-                        Text("URL 留空时使用 OpenAI 官方服务。确认后返回列表，点击页面上的保存应用配置。")
+                        Text(
+                            appCopy.text(
+                                "Leave the URL blank to use OpenAI. Confirm, then select Save on the provider list to apply the configuration."
+                            ))
                     }
-                    if let error { Section { Text(error).foregroundStyle(.red) } }
+                    if let error { Section { Text(appCopy.text(error)).foregroundStyle(.red) } }
                 }
-                .navigationTitle(draft.originalURL == nil ? "添加 Provider" : "编辑 Provider")
+                .navigationTitle(
+                    draft.originalURL == nil ? appCopy.text("Add Provider") : appCopy.text("Edit Provider")
+                )
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
+                    ToolbarItem(placement: .cancellationAction) { Button(appCopy.text("Cancel")) { dismiss() } }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("确认") {
+                        Button(appCopy.text("Confirm")) {
                             do {
                                 let value = try draft.validated(existing: existing)
                                 confirm(value)
@@ -560,7 +603,7 @@
                 }
             }
             .labelStyle(.iconOnly)
-            .accessibilityLabel("粘贴 \(title)")
+            .accessibilityLabel(appCopy.format("Paste %@", String(describing: title)))
         }
     }
 

@@ -12,19 +12,19 @@ speed/acceleration are native position-mode parameters, not degrees/s, seconds o
 
 ### Selection and examples (only when ready)
 resetMotor homes one axis(default1–5); resetArm excludes gripper. Gestures return home; moveMotor stays at target. Add no unrequested home. Robot serializes: emit EVERY unconditional step in ONE response, not just the first.
-“底座右转90度” → <moveMotor motor="1" deltaDegrees="90"/>
-“底座左转45度，速度400” → <moveMotor motor="1" deltaDegrees="-45" speed="400"/>
-“1号到3072计数” → <moveMotor motor="1" target="3072"/>
-“腕俯仰到1500计数” → <moveMotor motor="4" target="1500"/>
-“肘关节沿计数增加方向转22.5度” → <moveMotor motor="3" deltaDegrees="22.5"/>
-“只归位肩/腕滚转” → <resetMotor motor="2"/> / <resetMotor motor="5"/> respectively.
-“右转90，再左转45，最后归位” → <moveMotor motor="1" deltaDegrees="90"/><moveMotor motor="1" deltaDegrees="-45"/><resetArm/>
-“右转90、腕俯仰1500计数、点头两次、左转45、归位” → <moveMotor motor="1" deltaDegrees="90"/><moveMotor motor="4" target="1500"/><nodHead cycles="2"/><moveMotor motor="1" deltaDegrees="-45"/><resetArm/>
-“先说你好，再挥手” → <wait>你好。</wait><waveWrist count="1"/>
-“4号绝对90度” → clarify zero; “3号到900计数” → below motor3 minimum968; NO Action. “速度2000” → exceeds1400; NO Action.
+“Turn the base right 90 degrees” → <moveMotor motor="1" deltaDegrees="90"/>
+“Turn the base left 45 degrees at speed 400” → <moveMotor motor="1" deltaDegrees="-45" speed="400"/>
+“Move motor 1 to 3072 counts” → <moveMotor motor="1" target="3072"/>
+“Move wrist pitch to 1500 counts” → <moveMotor motor="4" target="1500"/>
+“Turn the elbow 22.5 degrees in increasing count direction” → <moveMotor motor="3" deltaDegrees="22.5"/>
+“Home only shoulder / wrist roll” → <resetMotor motor="2"/> / <resetMotor motor="5"/> respectively.
+“Turn right 90, left 45, then home” → <moveMotor motor="1" deltaDegrees="90"/><moveMotor motor="1" deltaDegrees="-45"/><resetArm/>
+“Right 90, wrist pitch to 1500 counts, nod twice, left 45, then home” → <moveMotor motor="1" deltaDegrees="90"/><moveMotor motor="4" target="1500"/><nodHead cycles="2"/><moveMotor motor="1" deltaDegrees="-45"/><resetArm/>
+“Say hello, then wave” → <wait>Hello.</wait><waveWrist count="1"/>
+“Motor 4 to absolute 90 degrees” → clarify zero; “Motor 3 to 900 counts” → below motor3 minimum968; NO Action. “Speed 2000” → exceeds1400; NO Action.
 
 ### Results
 Acceptance is not arrival. Report failures without retry/reset/reconnect/compensation. Cancellation cannot undo motion. No connection-test movements.
-“先右转30度，只有成功才点头；失败就停” → first response ONLY <moveMotor motor="1" deltaDegrees="30"/>. Emit the call, not a plan/success claim/nodHead. Failure → report, NO further motion. wait orders work, not success conditions. Successful void completion ends the decision; no automatic conditional continuation.
+“Turn right 30 degrees first. Nod only if it succeeds. Stop if it fails.” → first response ONLY <moveMotor motor="1" deltaDegrees="30"/>. Emit the call, not a plan/success claim/nodHead. Failure → report, NO further motion. wait orders work, not success conditions. Successful void completion ends the decision; no automatic conditional continuation.
 
 actions.robot.value separates connection/control availability, connection phase, jogging/tracking and native positionsCounts (motors 1–6, encoder counts). feedbackAgeSeconds is monotonic receipt age; feedbackFresh requires a connected session and age no greater than two seconds. Null is unknown. Stale positions are historical observations, never readiness or a target. Session identity and recovery machinery remain internal. actions.robot.motion.value.targetCounts and actions.robot.value.trackingTargetCounts are desired business positions, never measurements. State reads do not query or move the arm.

@@ -276,13 +276,15 @@ private func systemSnapshot(_ title: String) -> IslandSystemSnapshot {
     value.detailPrimary = .symbol(name: "scope")
     #expect(value.presentation(stale: false) == value)
     let stale = value.presentation(stale: true)
-    #expect(stale.title == "状态已过期" && stale.primary == .symbol(name: "pause.circle"))
+    #expect(stale.title == "Status expired" && stale.primary == .symbol(name: "pause.circle"))
     #expect(stale.secondary == nil && stale.startedAt == nil && stale.deadline == nil)
     #expect(!stale.hasStatus && stale.detailText != value.detailText && stale.detailPrimary == stale.primary)
     #expect(stale.endedAt == nil)  // Staleness is not proof that ActivityKit ended the activity.
     value.paused = true
-    #expect(value.presentation(stale: false).title == "已暂停更新")
+    #expect(value.presentation(stale: false).title == "Updates paused")
     value.endedAt = Date()
+    #expect(value.presentation(stale: false).title == "Activity ended")
+    value.language = "zh-Hans"
     #expect(value.presentation(stale: false).title == "活动已结束")
 }
 

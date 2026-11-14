@@ -1,0 +1,108 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "NSBluetoothAlwaysUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find and connect to the NexArm robot arm to send movements and read device status."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用于发现和连接 NexArm 机械臂，通过对话发送动作并读取设备状态。"
+          }
+        }
+      }
+    },
+    "NSCameraUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use the camera for live preview, on-device pose detection, and requested photos. When you ask to analyze a photo, it is sent to your configured model service."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "摄像头用于实时预览、设备端姿态识别及您请求的拍照；请求照片理解时，照片会发送给您配置的模型服务。"
+          }
+        }
+      }
+    },
+    "NSMicrophoneUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use the microphone to detect speech and transcribe it. The microphone turns off when you stop listening."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "麦克风用于检测并转写语音。您关闭聆听后，麦克风随即关闭。"
+          }
+        }
+      }
+    },
+    "NSSpeechRecognitionUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Convert spoken audio into text using on-device speech recognition."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用设备端语音识别将语音转换为文本。"
+          }
+        }
+      }
+    },
+    "NSPhotoLibraryAddUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add captured photos or videos to Photos when you ask to save them there."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅在您要求写入系统相册时添加拍摄的照片或视频。"
+          }
+        }
+      }
+    },
+    "NSLocalNetworkUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to your configured local-network model service to load model lists and send chat requests."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接您配置的局域网模型服务，用于加载模型列表和发送对话请求。"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

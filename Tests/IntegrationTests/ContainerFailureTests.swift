@@ -172,7 +172,8 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
     preparation.setActive(true)
     try await containerEventually { fixture.ui.home.notices.errorToast != nil }
     #expect(state.issues.count == 1)
-    #expect(fixture.ui.home.notices.visibleNotice?.text == "基础能力发生异常，请查看运行异常")
+    #expect(
+        fixture.ui.home.notices.visibleNotice?.text == "A required capability is unavailable. Check Runtime Issues.")
     #expect(state.issues.first?.message.contains("notReady") == true)
     #expect(channel.snapshot().records.first?.error as? ForegroundPreparation.ValidationError == .notReady)
     #expect(channel.snapshot().records.count == 1)
@@ -513,8 +514,8 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
     try await fixture.start(activity: activity)
     try await containerEventually { state.issues.count == 1 }
     let issue = try #require(state.issues.first)
-    #expect(issue.category == "模型连接异常")
-    #expect(issue.userMessage == "模型连接失败，请检查网络后重试")
+    #expect(issue.category == "Model connection failure")
+    #expect(issue.userMessage == "Could not reach the model. Check your connection and try again.")
     #expect(issue.context?.sessionID == "business" && issue.context?.inputID == "input")
     #expect(issue.context?.workerID == "worker" && issue.context?.roundID == "round")
     #expect(try await fixture.context.snapshot().revision == 0)
@@ -533,7 +534,7 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
     try await fixture.runtime.agent.observeFailure(event)
     try await containerEventually { state.issues.count == 1 }
     #expect(fixture.ui.home.notices.errorToast == nil)
-    #expect(state.issues.first?.category == "Agent 运行异常")
+    #expect(state.issues.first?.category == "Agent runtime failure")
     let processed = await fixture.runtime.agent.status().processedInputs
     try await fixture.runtime.agent.observeFailure(event)
     // Joining publication shutdown below also joins the duplicate delivery.
@@ -644,7 +645,7 @@ private func diagnosticInput(
     let raw = "agent.error: speech perception: Error Domain=SFSpeechErrorDomain Code=1 RecogRejected"
     workflow.recordFailure(title: "Output", source: "speechPerception", message: raw)
     try await containerEventually { state.issues.count == 1 }
-    #expect(fixture.ui.home.notices.visibleNotice?.text == "我没听清")
+    #expect(fixture.ui.home.notices.visibleNotice?.text == "I didn't catch that.")
     #expect(state.issues.first?.message == raw)
     #expect(fixture.ui.home.notices.errorToast?.message == raw)
     workflow.recordFailure(title: "Output", source: "assistant", message: "agent.error: Fixture failure")
@@ -669,7 +670,7 @@ private func diagnosticInput(
     pair.continuation.yield(.init(revision: 1, records: [issue], evictedCount: 0))
     let deadline = ContinuousClock.now.advanced(by: .seconds(2))
     while state.issues.isEmpty && ContinuousClock.now < deadline { await Task.yield() }
-    #expect(fixture.ui.home.notices.visibleNotice?.text == "我没听清")
+    #expect(fixture.ui.home.notices.visibleNotice?.text == "I didn't catch that.")
     #expect(fixture.ui.home.notices.visibleNotice?.id == "runtime:" + issue.id)
     #expect(state.issues.first?.message == raw && state.issues.first?.inputID == inputID)
     #expect(fixture.ui.home.notices.errorToast?.message == raw)
@@ -697,9 +698,9 @@ private func diagnosticInput(
     let deadline = ContinuousClock.now.advanced(by: .seconds(2))
     while state.issues.isEmpty && ContinuousClock.now < deadline { await Task.yield() }
     let issue = try #require(state.issues.first)
-    #expect(fixture.ui.home.notices.visibleNotice?.text == "模型调用了未声明的工具，本次回复已中止")
+    #expect(fixture.ui.home.notices.visibleNotice?.text == "The model called an unavailable tool. The reply stopped.")
     #expect(issue.message == detail && issue.message.count > 512)
-    #expect(issue.category == "模型响应异常" && issue.failureCode == fault.code)
+    #expect(issue.category == "Model response failure" && issue.failureCode == fault.code)
     #expect(issue.context?.sessionID == "session-1" && issue.context?.roundID == "round-1")
     #expect(issue.inputID == "input-1" && fixture.ui.home.notices.errorToast?.id == "runtime:" + record.id)
     fixture.ui.home.notices.dismissErrorToast(id: "runtime:" + record.id)

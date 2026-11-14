@@ -122,7 +122,7 @@
             let diagnosticState = diagnostics.speech
             self.diagnosticState = diagnosticState
             // Preparation is deferred to explicit voice admission; missing downloads do not block Settings/history.
-            progress("本地模型可在设置中下载")
+            progress("Download local models in Settings")
             try Task.checkCancellation()
             let state = home.conversation
             let native = try runtime.business.makeVoice(

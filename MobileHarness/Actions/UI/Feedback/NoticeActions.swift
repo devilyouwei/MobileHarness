@@ -2,7 +2,7 @@ import FunctionContracts
 
 extension UIActions {
     @Action(
-        domain: "UI", module: "Notice", title: "显示文字提示",
+        domain: "UI", module: "Notice", title: "Show text notice",
         doc:
             "Commit a transient centered text notice. Does not create an error record or task. Actual runtime errors have priority; host rejects stale scopes.",
         parameters: [
@@ -30,7 +30,7 @@ extension UIActions {
     }
 
     @Action(
-        domain: "UI", module: "Notice", title: "清除文字提示",
+        domain: "UI", module: "Notice", title: "Clear text notice",
         doc: "Clear only this producer/session's transient notice; never clears factual runtime errors or a task goal.",
         completion: "Matching notice removed and expiry cancelled.", timeout: .seconds(5))
     public static func dismissNotice(

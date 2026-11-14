@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "templates": {
+    "interrupted": "操作被打断且执行结果未经确认。不得假定效果已撤销。",
+    "unknownAlias": "该别名不在本次目录中。只使用当前别名，历史调用不授予权限。",
+    "invalidArguments": "使用本次目录声明的参数名称及必需值。",
+    "loadSkill": " 若需尚未加载的 Skill，先用已注册的 Skill 控制，等到结果提交，再查下一次目录。不要猜测别名。",
+    "notExecuted": "拒绝发生在执行之前，没有调用函数。",
+    "rejection": "{{reason}}：执行前拒绝 {{kind}} 别名「{{alias}}」。",
+    "missingCompletion": "缺少完成值"
+  }
+}

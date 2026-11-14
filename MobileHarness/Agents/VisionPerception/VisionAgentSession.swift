@@ -98,7 +98,7 @@ public enum VisionPipelineWorkflow {
                                 try Task.checkCancellation()
                                 if case .control(let value) = envelope.output, value.hasPrefix("agent.error:") {
                                     // Present before dispatch: a transport rejection must not hide the failure.
-                                    await status("姿态识别已停止，请重试", sessionID)
+                                    await status("Pose detection stopped. Try again.", sessionID)
                                 }
                                 let result = try await consumer.execute(envelope)
                                 if envelope.media != nil, !result.isCancellationOnly {
@@ -156,11 +156,11 @@ public enum VisionPipelineWorkflow {
                     guard reported != diagnostic.code else { continue }
                     reported = diagnostic.code
                     runtime.runtimeLogWorkflow.recordFailure(
-                        title: "视觉管线无进展", source: "visionPerception", message: diagnostic.detail,
+                        title: "Vision pipeline stalled", source: "visionPerception", message: diagnostic.detail,
                         failureCode: diagnostic.code,
                         context: .init(workerID: "visionPerception", sessionID: sessionID, inputID: health.inputID),
                         diagnostic: diagnostic)
-                    await status("姿态识别长时间无有效结果，请查看日志", sessionID)
+                    await status("Pose detection did not return results. Check the logs.", sessionID)
                 } else if reported != nil {
                     reported = nil
                     await status(nil, sessionID)

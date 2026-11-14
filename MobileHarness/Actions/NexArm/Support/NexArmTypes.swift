@@ -33,19 +33,19 @@ extension NexArmActions {
 extension NexArmActions {
     public enum NodHeadError: LocalizedError, Equatable, Sendable, ActionReportFailureProviding {
         case invalidRepetitions
-        public var errorDescription: String? { "点头次数必须是 1 到 3 的整数" }
+        public var errorDescription: String? { "Nod repetitions must be an integer from 1 to 3" }
         public var actionExecutionFailure: ActionFailure { .invalidArguments }
     }
 
     public enum ShakeHeadError: LocalizedError, Equatable, Sendable, ActionReportFailureProviding {
         case invalidRepetitions
-        public var errorDescription: String? { "摇头次数必须是 1 到 3 的整数" }
+        public var errorDescription: String? { "Head shake repetitions must be an integer from 1 to 3" }
         public var actionExecutionFailure: ActionFailure { .invalidArguments }
     }
 
     public enum WaveWristError: LocalizedError, Equatable, Sendable, ActionReportFailureProviding {
         case invalidRepetitions
-        public var errorDescription: String? { "挥手次数必须是 1 到 3 的整数" }
+        public var errorDescription: String? { "Wave repetitions must be an integer from 1 to 3" }
         public var actionExecutionFailure: ActionFailure { .invalidArguments }
     }
 
@@ -53,31 +53,31 @@ extension NexArmActions {
 
     public enum TiltWristError: LocalizedError, Equatable, Sendable, ActionReportFailureProviding {
         case invalidDirection
-        public var errorDescription: String? { "歪头方向必须是左或右" }
+        public var errorDescription: String? { "Head tilt direction must be left or right" }
         public var actionExecutionFailure: ActionFailure { .invalidArguments }
     }
 
     public enum LookAroundError: LocalizedError, Equatable, Sendable, ActionReportFailureProviding {
         case invalidRepetitions
-        public var errorDescription: String? { "张望次数必须是 1 到 3 的整数" }
+        public var errorDescription: String? { "Look-around repetitions must be an integer from 1 to 3" }
         public var actionExecutionFailure: ActionFailure { .invalidArguments }
     }
 
     public enum CelebrateError: LocalizedError, Equatable, Sendable, ActionReportFailureProviding {
         case invalidRepetitions
-        public var errorDescription: String? { "庆祝次数必须是 1 到 3 的整数" }
+        public var errorDescription: String? { "Celebration repetitions must be an integer from 1 to 3" }
         public var actionExecutionFailure: ActionFailure { .invalidArguments }
     }
 
     public enum DanceError: LocalizedError, Equatable, Sendable, ActionReportFailureProviding {
         case invalidRepetitions
-        public var errorDescription: String? { "跳舞次数必须是 1 到 3 的整数" }
+        public var errorDescription: String? { "Dance repetitions must be an integer from 1 to 3" }
         public var actionExecutionFailure: ActionFailure { .invalidArguments }
     }
 
     public enum ShakeError: LocalizedError, Equatable, Sendable, ActionReportFailureProviding {
         case invalidCycles
-        public var errorDescription: String? { "晃动次数必须是 1 到 3 的整数" }
+        public var errorDescription: String? { "Sway repetitions must be an integer from 1 to 3" }
         public var actionExecutionFailure: ActionFailure { .invalidArguments }
     }
 
@@ -97,6 +97,6 @@ extension NexArmActions {
     public enum AimError: LocalizedError, Equatable, Sendable, ActionExecutionFailureProviding {
         case invalidAngle
         public var executionFailureCode: ActionExecutionFailureCode { .invalidArguments }
-        public var errorDescription: String? { "跟踪目标角度无效" }
+        public var errorDescription: String? { "Invalid tracking target angle" }
     }
 }

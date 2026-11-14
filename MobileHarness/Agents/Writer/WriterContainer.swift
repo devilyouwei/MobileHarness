@@ -40,6 +40,8 @@ public struct WriterBackgroundExecution: Sendable {
     public private(set) var artifacts: (any WriterArtifactsControlling)?
     public func bindArtifacts(_ artifacts: (any WriterArtifactsControlling)?) { self.artifacts = artifacts }
     public private(set) var historyStore: WriterHistoryStore?
+    private var language: @Sendable () -> String = { "en" }
+    private var copy: AppLanguage { AppLanguage(preferredLanguage: language()) }
     public init() {}
     public func bindBackgroundExecution(_ start: @escaping WriterBackgroundExecution.Start) {
         startBackground = start
@@ -60,7 +62,7 @@ public struct WriterBackgroundExecution: Sendable {
     }
     func install(
         manager: AgentManager, output: OutputGateway, model: @escaping @Sendable () async throws -> ChatModel,
-        streaming: any ArtifactStreaming
+        streaming: any ArtifactStreaming, language: @escaping @Sendable () -> String
     ) throws {
         guard !closed, agent == nil, let historyStore, let executions, let communications else {
             throw WriterFailure.unavailable
@@ -68,7 +70,8 @@ public struct WriterBackgroundExecution: Sendable {
         agent = try WriterAgent(
             model: model, streaming: streaming, history: historyStore, executions: executions,
             communications: communications,
-            startBackground: startBackground)
+            startBackground: startBackground, language: language)
+        self.language = language
         self.manager = manager
         self.output = output
     }
@@ -153,16 +156,18 @@ extension WriterContainer: WriterRecordsControlling {
         let request = try await executions.request(id, agent: "writer")
         let rows = try await historyStore.requestPreviews(
             "writer/preflight_" + String(request.messageID), after: after, limit: 21)
-        return Self.messagePage(rows)
+        return messagePage(rows)
     }
-    private static func messagePage(_ rows: [WriterMessagePreview]) -> WriterRequestPage {
+    private func messagePage(_ rows: [WriterMessagePreview]) -> WriterRequestPage {
+        let copy = copy
         let items = rows.prefix(20).map { row in
             let label = WriterRequestNaming.summary(
-                phase: row.metadata["phase"] ?? "补充输入", path: row.metadata["path"], calls: row.toolCalls,
-                domain: row.metadata["controlDomain"])
+                phase: row.metadata["phase"] ?? "Follow-up input", path: row.metadata["path"], calls: row.toolCalls,
+                domain: row.metadata["controlDomain"], language: copy)
             return WriterRequestItem(
                 id: row.id, position: row.position, number: row.ordinal, delegateID: row.metadata["delegateID"] ?? "",
-                phase: row.metadata["phase"] ?? "补充输入", path: row.metadata["path"],
+                phase: copy.text(WriterRequestNaming.phase(row.metadata["phase"] ?? "Follow-up input")),
+                path: row.metadata["path"],
                 attempt: Int(row.metadata["attempt"] ?? "1") ?? 1, date: row.date,
                 state: WriterRequestNaming.state(
                     request: row.state, calls: row.toolCalls, pending: row.metadata["toolsPending"] == "true"),
@@ -202,13 +207,13 @@ extension WriterContainer: WriterRecordsControlling {
         guard !closed, let executions, let historyStore else { throw WriterFailure.unavailable }
         let record = try await executions.workspace(workspaceID, agent: "writer")
         let rows = try await historyStore.requestPreviews(record.workspaceID, after: after, limit: 21)
-        return Self.messagePage(rows)
+        return messagePage(rows)
     }
     public func requests(workspaceID: String, before: UInt64?) async throws -> WriterRequestPage {
         guard !closed, let historyStore else { throw WriterFailure.unavailable }
         guard WorkspaceID(rawValue: workspaceID) != nil else { throw RecordStorageError.invalidID }
         let rows = try await historyStore.requestPreviews(workspaceID, before: before, limit: 21)
-        return Self.messagePage(rows)
+        return messagePage(rows)
     }
     public func requestDetail(_ id: String) async throws -> WriterRequestDetails {
         guard !closed, let historyStore else { throw WriterFailure.unavailable }
@@ -225,17 +230,19 @@ extension WriterContainer: WriterRecordsControlling {
             WriterToolPreview(name: $0.name, argumentsJSON: $0.argumentsJSON, state: $0.state.rawValue)
         }
         let metadata = selected.producerMetadata
-        let phase = metadata?["phase"] ?? selected.decisionMetadata?.mode ?? (request == nil ? "输入" : "模型请求")
+        let phase =
+            metadata?["phase"] ?? selected.decisionMetadata?.mode ?? (request == nil ? "Input" : "Model request")
         let path = metadata?["path"]
         let summary = WriterRequestItem(
             id: id, position: selected.historyOrder, number: context.ordinal,
-            delegateID: selected.decisionMetadata?.delegateID ?? "", phase: phase, path: path,
+            delegateID: selected.decisionMetadata?.delegateID ?? "", phase: copy.text(WriterRequestNaming.phase(phase)),
+            path: path,
             attempt: Int(metadata?["attempt"] ?? "1") ?? 1, date: selected.date,
             state: WriterRequestNaming.state(request: selected.state.rawValue, calls: calls),
             title: request == nil
-                ? "用户输入"
+                ? copy.text("User input")
                 : WriterRequestNaming.summary(
-                    phase: phase, path: path, calls: calls, domain: metadata?["controlDomain"]),
+                    phase: phase, path: path, calls: calls, domain: metadata?["controlDomain"], language: copy),
             workspaceID: selected.decisionMetadata?.workspaceID)
         let finalization = turn.generationRounds?.first { $0.id == selected.id }.flatMap(Self.finalization)
         return .init(
@@ -292,54 +299,71 @@ enum WriterRequestNaming {
         if pending || calls.contains(where: { $0.state == "received" }) { return "executing" }
         return request
     }
-    static func summary(phase: String, path: String?, calls: [WriterToolPreview], domain: String? = nil) -> String {
+    static func phase(_ value: String) -> String {
+        switch value {
+        case "控制请求": "Control request"
+        case "文件内容请求": "File content request"
+        case "补充输入": "Follow-up input"
+        case "输入": "Input"
+        case "模型请求": "Model request"
+        default: value
+        }
+    }
+
+    static func summary(
+        phase: String, path: String?, calls: [WriterToolPreview], domain: String? = nil,
+        language: AppLanguage = .english
+    ) -> String {
         func file(_ path: String?) -> String {
-            guard let path, !path.isEmpty else { return "文件" }
+            guard let path, !path.isEmpty else { return language.text("File") }
             return path.count <= 40 ? path : (path as NSString).lastPathComponent
         }
-        if phase == "文件内容请求" { return "编写 " + file(path) }
+        if Self.phase(phase) == "File content request" { return language.text("Write ") + file(path) }
         var titles: [String] = []
         for call in calls {
             let args = (try? JSONDecoder().decode([String: String].self, from: Data(call.argumentsJSON.utf8))) ?? [:]
             let title: String
             switch call.name {
-            case "workspace.search": title = "搜索作品库"
-            case "workspace.create": title = "创建并进入工作区"
-            case "workspace.enter": title = "进入已有工作区"
-            case "workspace.open": title = "打开已有作品"
-            case "workspace.delete": title = "删除已有作品"
-            case "list": title = "查看工作区"
-            case "read": title = "读取 " + file(args["path"])
-            case "search": title = "查找文件内容"
+            case "workspace.search": title = language.text("Search the project library")
+            case "workspace.create": title = language.text("Create and open workspace")
+            case "workspace.enter": title = language.text("Open existing workspace")
+            case "workspace.open": title = language.text("Open existing project")
+            case "workspace.delete": title = language.text("Delete project")
+            case "list": title = language.text("List workspace")
+            case "read": title = language.text("Read ") + file(args["path"])
+            case "search": title = language.text("Search files")
             case "edit":
                 let instruction = args["instruction"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 let brief =
                     !instruction.isEmpty && instruction.count <= 40
                     && !instruction.contains(where: { "\n\r<>{}".contains($0) || $0.asciiValue == 96 })
-                title = brief ? instruction : (args["reference"] == nil ? "编写 " : "修改 ") + file(args["path"])
-            case "replace": title = "修改 " + file(args["path"])
-            case "move": title = "移动 " + file(args["path"])
-            case "remove", "removeTree": title = "删除 " + file(args["path"])
-            case "render": title = "渲染并检查页面"
+                title =
+                    brief
+                    ? instruction
+                    : (args["reference"] == nil ? language.text("Write ") : language.text("Edit ")) + file(args["path"])
+            case "replace": title = language.text("Edit ") + file(args["path"])
+            case "move": title = language.text("Move ") + file(args["path"])
+            case "remove", "removeTree": title = language.text("Delete ") + file(args["path"])
+            case "render": title = language.text("Render and check the page")
             case "finish":
-                title = domain == "library" ? "汇报作品库结果" : "保存作品"
-            case "ask": title = "等待补充信息"
-            case "rename": title = "修改作品名称"
-            case "savepoint": title = "保存编辑检查点"
-            case "restore": title = "恢复草稿"
-            case "diff": title = "检查文件差异"
-            default: title = "处理创作步骤"
+                title = domain == "library" ? language.text("Report library results") : language.text("Save project")
+            case "ask": title = language.text("Wait for more information")
+            case "rename": title = language.text("Rename project")
+            case "savepoint": title = language.text("Save draft checkpoint")
+            case "restore": title = language.text("Restore draft")
+            case "diff": title = language.text("Check file changes")
+            default: title = language.text("Process writing step")
             }
             if !titles.contains(title) {
                 titles.append(title)
             }
         }
-        guard let first = titles.first else { return "处理创作步骤" }
+        guard let first = titles.first else { return language.text("Process writing step") }
         let title =
             titles.count == 1
             ? first
-            : titles.prefix(2).joined(separator: "、")
-                + (titles.count > 2 ? "等\(titles.count)项操作" : "")
+            : titles.prefix(2).joined(separator: (language == .simplifiedChinese ? "、" : ", "))
+                + (titles.count > 2 ? language.format(" (%@ actions total)", String(titles.count)) : "")
         return title
     }
 }

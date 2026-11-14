@@ -16,7 +16,7 @@
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         Text(result).textSelection(.enabled)
-                        Button("再次验证") {
+                        Button("Validate again") {
                             guard !running, run < Int.max else { return }
                             running = true
                             run += 1

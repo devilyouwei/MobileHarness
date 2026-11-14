@@ -2,6 +2,8 @@
 
 ## Responsibilities and boundaries
 
+Built-in camera, device, voice and settings notices carry English source copy through their existing presentation ports. UI resolves the notices for the selected application language. Bluetooth transport evidence, audio recovery errors, and MOSS validation reports use English. Execution identifiers, structured results, and authorization checks retain their existing meanings.
+
 ActionsContainer is the single App-scoped execution root. It owns compiled function registration, immutable catalog metadata, effect-free input preparation, budgets/resources, actual execution, output validation and joined business/native cleanup. App constructs and manages it; Gateway invokes its neutral execution port. Agents owns authorization and supplies cognitive host callbacks through App-bound neutral interfaces.
 
 Domains, modules and individual actions remain extensible declarations and function composition. They have no container, lifecycle node or App registration. Stateful execution services are retained by the module root and composed through narrow interfaces. Registration establishes implementation availability, not Skill permission or device readiness. Actions imports neither AgentCore, Agents, Gateway nor App.

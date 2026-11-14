@@ -28,7 +28,8 @@ public actor WriterHistory {
     {
         let archive = try await store.readCurrent()
         let controls = archive.current.turns.flatMap { $0.modelRequests ?? [] }.filter {
-            $0.decisionMetadata?.delegateID == delegateID && $0.decisionMetadata?.mode == "控制请求"
+            $0.decisionMetadata?.delegateID == delegateID
+                && WriterRequestNaming.phase($0.decisionMetadata?.mode ?? "") == "Control request"
                 && (domain == nil || $0.producerMetadata?["controlDomain"] == domain)
         }
         guard let last = controls.last else { return [] }
@@ -207,7 +208,7 @@ public actor WriterHistory {
             call, for: owner,
             state: error == nil ? .completed : error is CancellationError ? .cancelled : .failed,
             output: output, error: error.map { String(describing: $0) },
-            failureDiagnostic: error.map { WriterDiagnostics.make($0, stage: "工具执行").storageValue })
+            failureDiagnostic: error.map { WriterDiagnostics.make($0, stage: "Tool execution").storageValue })
         try await store.checkpoint(inputID: owner)
         calls.removeValue(forKey: call)
     }
@@ -228,7 +229,7 @@ public actor WriterHistory {
     {
         let state: WriterRecord.State =
             error == nil ? .completed : error is CancellationError ? .cancelled : .failed
-        let failure = diagnostic ?? error.map { WriterDiagnostics.make($0, stage: "模型请求") }
+        let failure = diagnostic ?? error.map { WriterDiagnostics.make($0, stage: "Model request") }
         try await store.finish(
             id, state: state, reason: reasons.removeValue(forKey: id),
             error: failure.map(WriterDiagnostics.describe), failureDiagnostic: failure?.storageValue)

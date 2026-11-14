@@ -4,6 +4,8 @@
     /// First-run provider entry; persistence remains behind the existing settings controller.
     @MainActor
     struct WelcomeProviderView: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let settings: SettingsState
         let save: (String, String) async -> Bool
         let skip: () -> Void
@@ -19,24 +21,24 @@
                             Image(systemName: "sparkles")
                                 .font(.largeTitle).foregroundStyle(.tint)
                                 .accessibilityHidden(true)
-                            Text("连接你的 AI 服务").font(.title2.bold())
-                            Text("添加云端 LLM Provider，随后为 Assistant 和 Writer 分别选择模型。")
+                            Text(appCopy.text("Connect your AI service")).font(.title2.bold())
+                            Text(appCopy.text("Add a cloud LLM provider, then choose models for Assistant and Writer."))
                                 .foregroundStyle(.secondary)
                         }
                         .padding(.vertical, 12)
                     }
                     Section {
                         HStack {
-                            TextField("URL（可选，默认 OpenAI）", text: $url)
+                            TextField(appCopy.text("URL (optional, defaults to OpenAI)"), text: $url)
                                 .keyboardType(.URL)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
-                                .accessibilityLabel("服务 URL，可选，留空使用 OpenAI")
+                                .accessibilityLabel(appCopy.text("Service URL. Leave blank to use OpenAI."))
                                 .accessibilityIdentifier("welcome.provider.url")
                             pasteButton("URL", text: $url)
                         }
                         HStack {
-                            SecureField("API key", text: $key)
+                            SecureField(appCopy.text("API key"), text: $key)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
                                 .privacySensitive()
@@ -44,9 +46,12 @@
                             pasteButton("API key", text: $key)
                         }
                     } header: {
-                        Text("云端服务")
+                        Text(appCopy.text("Cloud service"))
                     } footer: {
-                        Text("URL 留空使用 https://api.openai.com/v1，也可填写兼容 OpenAI 的服务地址。API key 安全保存在设备钥匙串中。")
+                        Text(
+                            appCopy.text(
+                                "Leave the URL blank for https://api.openai.com/v1, or enter an OpenAI-compatible endpoint. Your API key is stored in the device keychain."
+                            ))
                     }
                     if let error {
                         Section { Text(error).foregroundStyle(.red) }
@@ -57,7 +62,7 @@
                             Task {
                                 error = nil
                                 if !(await save(url, key)) {
-                                    error = settings.error ?? "保存失败，请重试"
+                                    error = settings.error ?? appCopy.text("Could not save. Try again.")
                                 } else {
                                     key = ""
                                 }
@@ -65,8 +70,11 @@
                         } label: {
                             HStack {
                                 if settings.isSaving { ProgressView() }
-                                Text(settings.isSaving ? "正在保存…" : "保存并选择模型")
-                                    .frame(maxWidth: .infinity)
+                                Text(
+                                    settings.isSaving
+                                        ? appCopy.text("Saving…") : appCopy.text("Save and choose a model")
+                                )
+                                .frame(maxWidth: .infinity)
                             }
                         }
                         .disabled(key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -77,7 +85,7 @@
                 .navigationTitle("Welcome")
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("稍后设置", action: skip).disabled(settings.isSaving)
+                        Button(appCopy.text("Set up later"), action: skip).disabled(settings.isSaving)
                             .accessibilityIdentifier("welcome.provider.skip")
                     }
                 }
@@ -93,7 +101,7 @@
                 }
             }
             .labelStyle(.iconOnly)
-            .accessibilityLabel("粘贴 \(title)")
+            .accessibilityLabel(appCopy.format("Paste %@", String(describing: title)))
             .accessibilityIdentifier(title == "URL" ? "welcome.provider.pasteURL" : "welcome.provider.pasteKey")
         }
     }

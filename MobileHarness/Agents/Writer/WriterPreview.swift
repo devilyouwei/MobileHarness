@@ -54,12 +54,12 @@ actor WriterPreview {
                     failure = nil
                     if fields?["status"] == "preview", !(fields?["text"] ?? "").isEmpty, !reported {
                         reported = true
-                        await observed("初稿已显示，正在继续生成。")
+                        await observed("The draft is visible. Generation continues.")
                     }
                 } catch {
                     if Task.isCancelled { return }
                     failure = String(describing: error)
-                    await observed("预览暂不可用，文件生成继续。")
+                    await observed("Preview is unavailable. File generation continues.")
                     // No presentation retry loop. A later source change may retry.
                 }
                 if pending { try await Task.sleep(for: .milliseconds(750)) }

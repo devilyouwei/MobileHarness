@@ -9,9 +9,9 @@ public enum PhotoAlbumError: Error, Sendable, LocalizedError {
     case busy, unavailable, invalidRequest
     public var errorDescription: String? {
         switch self {
-        case .busy: "相册正在处理其他操作，请稍后再试"
-        case .unavailable: "媒体不可用"
-        case .invalidRequest: "媒体格式不支持或超过大小限制"
+        case .busy: "The album is busy. Try again."
+        case .unavailable: "Media unavailable"
+        case .invalidRequest: "The media format is unsupported or the file is too large."
         }
     }
 }
@@ -83,7 +83,7 @@ public actor PhotoAlbumService: PhotoAlbumCapability {
                         throw PhotoAlbumError.unavailable
                     #endif
                 } catch is CancellationError { throw CancellationError() } catch {
-                    failures.append("第\(index + 1)张：" + String(error.localizedDescription.prefix(160)))
+                    failures.append("Photo \(index + 1): " + String(error.localizedDescription.prefix(160)))
                 }
             }
             return .imported(count, failures)
@@ -120,7 +120,7 @@ public typealias PhotoAlbumInvocation = ActionRequestSlot<AlbumInput, AlbumReply
 public enum PhotoAlbumActions {
     public static func function(using album: (any PhotoAlbumCapability)?) -> ActionFunction {
         ActionFunction(
-            path: .init(domain: "Camera", module: "Album", function: "perform"), displayName: "管理 App 相册",
+            path: .init(domain: "Camera", module: "Album", function: "perform"), displayName: "Manage the app album",
             kind: .finite, completion: "completed", timeout: .seconds(120),
             handler: { invocation in
                 try ActionArguments(invocation.call.parameters).validateAllowedKeys([])

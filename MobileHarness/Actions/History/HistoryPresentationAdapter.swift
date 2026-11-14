@@ -52,7 +52,7 @@ public final class HistoryPresentationAdapter: HistoryPresentationCapability {
     }
     public func recordRefreshFailure(_ error: any Error) {
         guard state.isPresentationAvailable else { return }
-        state.present(.status("历史刷新失败：\(error)"))
+        state.present(.status("Could not refresh history: \(error)"))
     }
     public func showHistory(invocation: any FunctionInput) async throws {
         guard invocation.context.sessionID == sessionID else {
@@ -61,7 +61,7 @@ public final class HistoryPresentationAdapter: HistoryPresentationCapability {
         try Task.checkCancellation()
         let presentation = try await Self.listPresentation(store)
         try Task.checkCancellation()
-        let status = await store.lastCheckpointError.map { "当前会话尚未保存：" + $0 }
+        let status = await store.lastCheckpointError.map { "The current conversation is unsaved: " + $0 }
         try state.requirePresentation()
         state.present(presentation, status: status)
     }

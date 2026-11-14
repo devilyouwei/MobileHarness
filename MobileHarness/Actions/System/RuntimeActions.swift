@@ -5,6 +5,6 @@ extension SystemActions {
     @Action(
         domain: "System", module: "Runtime", title: "runtimeInfo")
     public static func runtimeInfo(_ invocation: any FunctionInput) async throws -> String {
-        "本地聊天与语音能力已配置"
+        "Local chat and speech capabilities are configured"
     }
 }

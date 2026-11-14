@@ -166,7 +166,8 @@ public final class AgentRuntimeLogWorkflow: ExecutionFailureReporting {
                 }
             } catch {
                 if !Task.isCancelled {
-                    self?.recordFailure(title: "Task 记录不可用", source: "runtime", message: String(describing: error))
+                    self?.recordFailure(
+                        title: "Task records unavailable", source: "runtime", message: String(describing: error))
                 }
             }
         }
@@ -185,7 +186,7 @@ public final class AgentRuntimeLogWorkflow: ExecutionFailureReporting {
                             .init(source: source, status: lifecycle.logTitle, isFailure: lifecycle == .failed)))
                 }
                 for source in previous.keys where current[source] == nil {
-                    log.record(.agent(.init(source: source, status: "已移除", isFailure: false)))
+                    log.record(.agent(.init(source: source, status: "Removed", isFailure: false)))
                 }
                 previous = current
                 do { try await Task.sleep(for: .seconds(1)) } catch { return }

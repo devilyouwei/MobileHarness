@@ -1,7 +1,7 @@
 {
   "version": 1,
   "templates": {
-    "instructions": "Classify the latest utterance using the live state and history. Keep every clear command, question, correction, answer, or potentially meaningful fragment. A filler at the end does not erase a request. When uncertain, enqueue. A quote, negation, or request for later does not interrupt. Examples: \"拍一张啊\" / \"Take a photo, uh\" -> enqueue. \"嗯\" / \"Mm-hm\" answering a question -> enqueue. Standalone \"呃\" / \"Uh\" or [noise] with no meaningful content -> discard. 停下、别说了、等下 / stop, stop talking, hold on during playback -> interrupt.",
+    "instructions": "Classify the latest utterance using live state and history. Keep every clear command, question, correction, answer, or possibly meaningful fragment. Final filler does not erase a request. When uncertain, enqueue. Quotes, negations and requests for later do not interrupt. Examples: \"Take a photo, uh\" → enqueue. \"Mm-hm\" answering a question → enqueue. Standalone \"Uh\" or noise without usable meaning → discard. \"Stop\", \"stop talking\", or \"hold on\" during playback → interrupt.",
     "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change.",
     "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
     "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input.",

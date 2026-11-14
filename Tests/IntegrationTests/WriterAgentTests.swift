@@ -311,13 +311,13 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
         if mode == 14, request == 5 { try await Task.sleep(for: .seconds(20)) }
         if mode == 15, request == 1 { try await Task.sleep(for: .seconds(20)) }
         guard mode == 7, request == 1 || request == 3 else { return }
-        let expected = request == 1 ? "第1轮" : "第3轮"
+        let expected = request == 1 ? "Round 1" : "Round 3"
         let deadline = ContinuousClock.now + .seconds(3)
         while await islandState.detailActivity?.content.detail?.text?.contains(expected) != true {
             guard ContinuousClock.now < deadline else { throw WriterFailure.incomplete }
             try await Task.sleep(for: .milliseconds(10))
         }
-        #expect(await islandState.detailActivity?.content.subtitle == "正在创作")
+        #expect(await islandState.detailActivity?.content.subtitle == "Writing")
     }
     let journal = WriterHistoryStore(
         records: try WriterRecordStore(repository: records.writerMessages, logs: records.logs))
@@ -479,7 +479,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     }
     if mode == 14 {
         #expect(sceneHidden && result.status == .failed)
-        #expect(resultText.contains("系统已结束 Writer 的后台执行"))
+        #expect(resultText.contains("The system ended Writer’s background execution"))
         let saved = try await records.writerExecutions.request(scope.id, agent: "writer")
         #expect(saved.status == "interrupted")
         let project = try await records.writerExecutions.workspace(saved.workspaceID, agent: "writer")
@@ -537,7 +537,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
         if mode == 6 {
             let diagnostic = try #require(try AgentTaskContent.decode(result).writerEvent?.failure)
             #expect(diagnostic.category == "modelTransport" && diagnostic.code == "writer.network.timeout")
-            #expect(diagnostic.stage == "控制请求" && diagnostic.details["networkCode"] == "-1001")
+            #expect(diagnostic.stage == "Control request" && diagnostic.details["networkCode"] == "-1001")
             #expect(diagnostic.details["model"] == "writer-fixture" && diagnostic.details["inputID"] != nil)
             #expect(diagnostic.details["elapsedSeconds"] != nil && diagnostic.details["providerStage"] == "stream")
             #expect(await failureOutput.values.last?.category == .modelTransport)
@@ -577,7 +577,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     #expect(result.status == .succeeded, "\(resultText)")
     if mode == 12 {
         #expect(sceneHidden)
-        #expect(resultText.contains("未进行页面视觉验证"))
+        #expect(resultText.contains("without visual verification"))
         #expect(await writer.status().lifecycle == .running)
         await writer.setSceneActive(true)
     }
@@ -1318,8 +1318,8 @@ private actor WriterRenderProbe {
         communications: reopened.agentMessages,
         logs: reopened.logs)
     let requestPage = try await controller.requests(workspaceID: task.id, after: 0)
-    #expect(requestPage.items.first?.title == "读取 index.html")
-    #expect(requestPage.items.first?.statusTitle == "已完成")
+    #expect(requestPage.items.first?.title == "Read index.html")
+    #expect(requestPage.items.first?.statusTitle == "Completed")
     let firstID = try #require(modelRequest.messageID)
     let firstDetail = try await controller.requestDetail(firstID)
     #expect(firstDetail.summary.number == requestPage.items.first?.number)
@@ -1539,7 +1539,7 @@ private actor WriterStartupProbe {
     let report = WriterDiagnostics.make(WriterCleanupFailure(primary: network, cleanup: storage), stage: "控制请求")
     #expect(report.category == "cleanup" && report.causes.count == 2)
     #expect(report.causes[0].code == "writer.network.timeout" && report.causes[0].details["networkCode"] == "-1001")
-    #expect(report.causes[1].category == "storage" && report.causes[1].stage == "清理")
+    #expect(report.causes[1].category == "storage" && report.causes[1].stage == "Cleanup")
     #expect(
         try JSONDecoder().decode(ModelFailureDiagnostic.self, from: JSONEncoder().encode(report))
             == report.storageValue)
@@ -1859,7 +1859,7 @@ private actor WriterBatchEffectProbe {
         records: try WriterRecordStore(repository: reopened.writerMessages, logs: reopened.logs))
     let control = try #require(
         try await restored.readCurrent().current.turns.flatMap { $0.modelRequests ?? [] }.first {
-            $0.decisionMetadata?.mode == "控制请求"
+            $0.decisionMetadata?.mode == "Control request"
         })
     #expect(control.toolCalls.count == 2)
     #expect(control.toolCalls.allSatisfy { $0.state == .failed })
@@ -2272,11 +2272,15 @@ private actor WriterPreviewProbe {
     let read = try call("read", ["path": "index.html"])
     let edit = try call("edit", ["path": "index.html", "instruction": "修改流程图布局"])
     let combined = WriterRequestNaming.summary(phase: "控制请求", path: nil, calls: [read, read, edit])
-    #expect(combined == "读取 index.html、修改流程图布局")
+    #expect(combined == "Read index.html, 修改流程图布局")
+    #expect(
+        WriterRequestNaming.summary(
+            phase: "Control request", path: nil, calls: [read, edit], language: .simplifiedChinese)
+            == "读取 index.html、修改流程图布局")
     let content = WriterRequestNaming.summary(phase: "文件内容请求", path: "styles/main.css", calls: [])
-    #expect(content == "编写 styles/main.css")
+    #expect(content == "Write styles/main.css")
     let source = try call("edit", ["path": "index.html", "instruction": "<html>code</html>"])
-    #expect(WriterRequestNaming.summary(phase: "控制请求", path: nil, calls: [source]) == "编写 index.html")
+    #expect(WriterRequestNaming.summary(phase: "控制请求", path: nil, calls: [source]) == "Write index.html")
     #expect(
         WriterRequestNaming.state(request: "completed", calls: [try call("read", state: "failed")])
             == "failed")
@@ -2677,7 +2681,7 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
         workspace: workspace,
         present: { id, _, entry, files, preview in
             await startup.mark()
-            if preview, files[entry]?.contains("正在准备创作") == true {
+            if preview, files[entry]?.contains("Preparing the draft") == true {
                 await startup.markPlaceholder()
             }
             if mode == "open-multiple-partial", id.rawValue != "workspace_1" { throw WindowError.capacity }

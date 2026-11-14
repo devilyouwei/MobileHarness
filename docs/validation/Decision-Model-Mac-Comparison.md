@@ -242,3 +242,30 @@ App 内的 D3 Edge 文本 Core AI 图固定为 **512 token**。计数涵盖 chat
 | 接入版，替换示例并压缩规则 | 80 | 0 | 7 | 20 | 306–338 | 65.58 ms |
 
 接入版将「停下、别说了、等下 / stop, stop talking, hold on」放到打断示例。立即停止或改变的条件继续由打断候选说明。长中文样例用满两条历史和追问时，接入版占 501 token，原版为 508 token，打断与入队同时扩写的版本为 563 token。接入版能处理测试里的英文 “Enough talking”，仍漏判单独的「别说了」「等下」和 “Hold on a second”。对应延后及空闲用例都入队。未做真机语音验收。 [配置和测量](../measurements/duplex-d3-interrupt-synonyms-2026-11-14.json)
+
+## Decision prompt language split
+
+2026-11-14, Apple M5 Mac, macOS 27.2.1 (26B131), Swift 6.4. The experiment used the installed D3 Edge BF16 Core AI graph with upstream revision `bee5e872f75b9c5d1405767bf244a6948b95c0af`. The graph SHA-256 was `ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78`.
+
+Each of 27 scenarios has English and Simplified Chinese versions with the same expected intent and playback, execution, and question state. Each language has 8 interrupt, 13 enqueue, and 6 discard cases. The two current prompt configurations load the bundled [English](../../MobileHarness/Resources/Agents/Assistant/InputDecision.json) and [Simplified Chinese](../../MobileHarness/Resources/Agents/Assistant/InputDecision.zh-Hans.json) resources at runtime. The pre-split baseline uses the archived `terse-example-cut` instruction with the current English request formatting and identical baseline candidate descriptions. All six combinations run through the Swift request renderer, real D3 and the application's adoption policy. The runner warms each prompt three times and measures native request submission through model cleanup. The times exclude ASR, playback, and any subsequent interruption cleanup. [Paired fixture](../measurements/decision-language-scenarios-2026-11-14.json)
+
+| Prompt | Input | Raw correct | Adopted correct | False discard raw → adopted | False interrupt raw → adopted | Missed interrupts raw → adopted | Native p50 / p95 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| English | English | 18/27 | 21/27 | 1 → 0 | 2 → 1 | 4 → 4 | 50.59 / 50.83 ms |
+| English | Chinese | 18/27 | 21/27 | 1 → 0 | 0 → 0 | 4 → 4 | 50.85 / 51.35 ms |
+| Chinese | English | 12/27 | 21/27 | 11 → 0 | 4 → 2 | 4 → 4 | 54.46 / 54.71 ms |
+| Chinese | Chinese | 18/27 | 23/27 | 7 → 0 | 1 → 1 | 3 → 3 | 54.66 / 55.45 ms |
+| Pre-split mixed | English | 16/27 | 20/27 | 1 → 0 | 2 → 1 | 4 → 4 | 50.87 / 51.11 ms |
+| Pre-split mixed | Chinese | 17/27 | 20/27 | 1 → 0 | 1 → 1 | 4 → 4 | 50.99 / 51.41 ms |
+
+With input and prompt languages matched, adoption accuracy was 44/54 against 40/54 for the pre-split mixed prompt. Raw accuracy was 36/54 against 33/54. The Chinese prompt recovered the short Chinese pause request “等一下。” and still missed “别说了。” in this history. The earlier four-input smoke test used a different history and selected interrupt for the same utterance with the Chinese prompt. English “Stop talking.” during playback was correctly interrupted by the English and mixed prompts. The Chinese prompt selected discard, which the app converted to enqueue. The Chinese prompt also interrupted both English deferred-action probes. [Per-request decisions, scores, and timings](../measurements/decision-language-d3-2026-11-14.json)
+
+There were no fallbacks across the 162 scored cases. Separate capacity probes filled both history messages and the pending question to 80 characters each. At five repeats of the test utterance, both split prompts accepted both input languages. The mixed baseline rejected the Chinese probe. At 25 repeats every configuration returned the native 512-token error, and the classifier retained the input as enqueue with no cloud fallback configured. The 18 probes are excluded from the accuracy table. The sample is synthetic and includes known difficult phrases. It provides no estimate of live transcription accuracy, iPhone latency, or cloud-provider performance.
+
+Run the repository script with a resource root containing `D3Edge/` and a fresh output path. The script reads the saved fixture and baseline from this repository and records the exact rendered instructions, candidate descriptions, and state for every call.
+
+```bash
+./scripts/evaluate-decision-language.sh "$D3_RESOURCE_ROOT" /tmp/decision-language-result.json
+```
+
+The native experiment, `./scripts/check.sh`, four iOS Simulator schemes in `./scripts/build-ios.sh`, and `git diff --check` passed. The measured requests were checked against the current source resources, baseline and fixture. The iOS build verifies packaging. The Decision experiment ran on the Mac.

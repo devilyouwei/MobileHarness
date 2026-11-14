@@ -3,7 +3,7 @@ import FunctionContracts
 
 extension CameraActions {
     @Action(
-        domain: "Camera", module: "Video", title: "开始录像",
+        domain: "Camera", module: "Video", title: "Start recording",
         doc:
             "Open or restore the Camera window and prepare video mode; record with audio, pausing listening. Default completion returns a ready file with mediaID, fileName, actual durationSeconds and stopReason. Limits: 600 seconds / 512 MiB.",
         parameters: [
@@ -32,7 +32,7 @@ extension CameraActions {
         return String(decoding: try JSONEncoder().encode(receipt), as: UTF8.self)
     }
     @Action(
-        domain: "Camera", module: "Video", title: "结束录像",
+        domain: "Camera", module: "Video", title: "Stop recording",
         doc:
             "Stop this recording and wait for file finalization. Returns ready clip; does not collect into the App album.",
         parameters: [.init("recordingID", description: "Actual recording ID from start or current facts.")],
@@ -45,7 +45,7 @@ extension CameraActions {
             decoding: try JSONEncoder().encode(await camera.stopRecording(id, invocation: invocation)), as: UTF8.self)
     }
     @Action(
-        domain: "Camera", module: "Video", title: "保存录像",
+        domain: "Camera", module: "Video", title: "Save recording",
         doc:
             "Explicitly collect the finalized current clip into the App album. Can retry failed file preparation on user request; never records again.",
         parameters: [.init("recordingID", description: "Actual current recording ID.")], timeout: .seconds(60))
@@ -57,7 +57,7 @@ extension CameraActions {
             decoding: try JSONEncoder().encode(await camera.saveVideo(id, invocation: invocation)), as: UTF8.self)
     }
     @Action(
-        domain: "Camera", module: "Video", title: "忽略录像",
+        domain: "Camera", module: "Video", title: "Discard recording",
         doc: "Discard the uncollected current clip after recording has finished; never deletes a saved album item.",
         parameters: [.init("recordingID", description: "Actual current recording ID.")], timeout: .seconds(30))
     public static func ignoreVideo(invocation: any FunctionInput, using camera: any CameraControlCapability)

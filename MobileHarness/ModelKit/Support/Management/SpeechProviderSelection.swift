@@ -5,12 +5,33 @@ import ModelKitRuntime
 /// Policy is shared by lightweight capability facades. Each operation chooses once;
 /// the selected concrete provider retains its own managed lease until finish/cancel.
 actor SpeechSelection {
+    static let appleRecognitionModels: [(locale: String, id: ModelID)] = [
+        ("en-US", ModelID("apple-recognition")),
+        ("zh-CN", ModelID("apple-recognition-zh-CN")),
+    ]
+    private let recognitionLocale: @Sendable () -> String
     private var recognitionEnabled = false
     private var synthesisEnabled = false
+    init(recognitionLocale: @escaping @Sendable () -> String = { "en-US" }) {
+        self.recognitionLocale = recognitionLocale
+    }
     func stateSnapshot() -> (recognition: Bool, synthesis: Bool) { (recognitionEnabled, synthesisEnabled) }
     func configure(recognition: Bool, synthesis: Bool) {
         recognitionEnabled = recognition
         synthesisEnabled = synthesis
+    }
+    func resolveRecognition(manager: ModelManager, locale: String = "auto") async throws -> ModelID {
+        let requested = locale == "auto" ? recognitionLocale() : locale
+        let system = Self.appleRecognitionModels.first { $0.locale == requested }?.id
+        let local = ModelID("nemotron-local")
+        let fallback = Self.appleRecognitionModels[0].id
+        let selected = try await resolve(
+            manager: manager, artifact: "nemotron", local: local, system: system ?? fallback,
+            capability: .recognition)
+        guard selected == local || system != nil else {
+            throw CapabilityError.invalidRequest("Unsupported Apple recognition locale")
+        }
+        return selected
     }
     func resolve(
         manager: ModelManager, artifact: String, local: ModelID, system: ModelID, capability: ProvidedCapability
@@ -37,9 +58,7 @@ actor SelectedRecognition: SpeechRecognitionCapability {
         self.selection = selection
     }
     func selected() async throws -> ModelID {
-        try await selection.resolve(
-            manager: manager, artifact: "nemotron", local: ModelID("nemotron-local"),
-            system: ModelID("apple-recognition"), capability: .recognition)
+        try await selection.resolveRecognition(manager: manager)
     }
     var availability: CapabilityAvailability {
         get async {
@@ -50,7 +69,8 @@ actor SelectedRecognition: SpeechRecognitionCapability {
     }
     func warmup() async throws { try await manager.warmup(selected()) }
     func transcribe(_ request: SpeechRecognitionRequest) async throws -> SpeechRecognitionSession {
-        let provider = try await manager.get(selected(), as: .recognition, load: false)
+        let id = try await selection.resolveRecognition(manager: manager, locale: request.locale)
+        let provider = try await manager.get(id, as: .recognition, load: false)
         return try await provider.transcribe(request)
     }
 }

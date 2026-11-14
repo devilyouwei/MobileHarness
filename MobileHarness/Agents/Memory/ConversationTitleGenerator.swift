@@ -10,7 +10,7 @@ public enum ConversationTitleGenerator {
         return (0..<amount).map { amount == 1 ? 0 : $0 * (count - 1) / (amount - 1) }
     }
     public static func summarize(
-        _ conversation: AssistantConversation, using chat: any ChatCapability,
+        _ conversation: AssistantConversation, using chat: any ChatCapability, language: String = "en",
         journal: @escaping @Sendable (AssistantModelRequest) async throws -> Void = { _ in },
         transport: @escaping @Sendable (String, ModelRequestLogUpdate) async throws -> Void = { _, _ in }
     ) async throws
@@ -19,7 +19,7 @@ public enum ConversationTitleGenerator {
         guard !conversation.turns.isEmpty else { throw AssistantHistoryError.emptyConversation }
         // Bounded excerpts cover the whole conversation, rather than only its final exchange.
         let selected = samplePositions(count: conversation.turns.count).map { conversation.turns[$0] }
-        let templates = try AgentPrompts.titleTemplates()
+        let templates = try AgentPrompts.titleTemplates(language: language)
         let excerpts = try selected.map {
             try templates.render(
                 "title.excerpt",

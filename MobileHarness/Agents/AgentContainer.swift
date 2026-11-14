@@ -99,6 +99,7 @@ import StorageFiles
         private let filesStorage: FilesContainer
         let bluetooth: any AgentDeviceAccess
         let camera: any AgentCameraAccess
+        private let language: @Sendable () -> String
         public init(
             containerFailures: ContainerFailureChannel,
             home: UIHomeContainer, settings: UISettingsContainer, modelResources: UIModelResourcesContainer,
@@ -112,7 +113,8 @@ import StorageFiles
             audio: AudioContainer,
             languageModels: any ModelLanguageProviding, speechModels: any ModelSpeechProviding,
             visionModels: any ModelVisionProviding, modelArtifacts: any ModelArtifactsManaging,
-            memoryPressure: @escaping @Sendable () async -> Void
+            memoryPressure: @escaping @Sendable () async -> Void,
+            language: @escaping @Sendable () -> String = { "en" }
         ) {
             self.containerFailures = containerFailures
             assistant = AssistantContainer(home: home)
@@ -146,6 +148,7 @@ import StorageFiles
             self.visionModels = visionModels
             self.modelArtifacts = modelArtifacts
             self.memoryPressure = memoryPressure
+            self.language = language
         }
         public let assistant: AssistantContainer
         public let applicationControl: ApplicationControlContainer
@@ -281,7 +284,7 @@ import StorageFiles
                         guard let cloud else { return (useLocal, nil) }
                         return (useLocal, { try await cloud().capability })
                     },
-                    report: { value in await reportDecision(value) })
+                    report: { value in await reportDecision(value) }, language: self.language)
                 self.inputDecisionService = service
                 return service
             }
@@ -299,12 +302,13 @@ import StorageFiles
                 resourceChanges: { [modelArtifacts] in try await modelArtifacts.observeArtifactChanges() },
                 summarizeTitle: { [weak self] conversation in
                     guard let self else { throw CancellationError() }
+                    let language = self.language()
                     let chat = try await self.makeHistoryChat()
                     try Task.checkCancellation()
                     let records = try self.repositories().assistantConversations
                     let logs = try self.repositories().logs
                     return try await ConversationTitleGenerator.summarize(
-                        conversation, using: chat,
+                        conversation, using: chat, language: language,
                         journal: { request in
                             try await records.saveAuxiliaryRequest(dialog: conversation.id, request: request)
                         },
@@ -317,7 +321,7 @@ import StorageFiles
                     guard let self else { throw CancellationError() }
                     return await self.applicationControl.modelName
                 },
-                chatProvider: { [languageModels] in languageModels })
+                chatProvider: { [languageModels] in languageModels }, language: language)
         }
         public func bindExecution(_ binding: AgentExecutionBinding, facilities: AgentGatewayCapabilities) throws {
             guard !lifecycle.isStopped else { throw AgentContainerError.stopped }
@@ -360,7 +364,7 @@ import StorageFiles
                 } onCancel: {
                     task.cancel()
                 }
-                progress("本地模型可在设置中下载")
+                progress("Download local models in Settings")
             } catch {
                 preparation = nil
                 throw error

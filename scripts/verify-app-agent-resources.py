@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Verify final app Agent declarations and prompt resources against source bytes."""
 import pathlib
+import json
+import re
 import sys
 import subprocess
 
@@ -43,6 +45,39 @@ if set(expected) != set(actual):
 for path, original in expected.items():
     if original.read_bytes() != actual[path].read_bytes():
         raise SystemExit(f'Stale Agent asset: {path}')
+for path, original in expected.items():
+    if '.zh-Hans.' in path.name or path.name == 'README.md':
+        continue
+    if path.suffix not in ('.json', '.md') or path.name in ('Agent.json', 'Skill.json', 'Catalog.json'):
+        continue
+    translated = path.with_name(f'{path.stem}.zh-Hans{path.suffix}')
+    if translated not in expected:
+        raise SystemExit(f'Missing Simplified Chinese prompt: {path}')
+    if path.suffix == '.md':
+        continue
+    source_templates = json.loads(original.read_text())['templates']
+    translated_templates = json.loads(expected[translated].read_text())['templates']
+    if source_templates.keys() != translated_templates.keys():
+        raise SystemExit(f'Template key mismatch: {path}')
+    for key, template in source_templates.items():
+        placeholders = r'\{\{([A-Za-z0-9_.]+)\}\}'
+        if set(re.findall(placeholders, template)) != set(re.findall(placeholders, translated_templates[key])):
+            raise SystemExit(f'Template placeholder mismatch: {path}:{key}')
+catalog = json.loads((bundle / 'Catalog.json').read_text())
+descriptions = json.loads((bundle / 'Agents/Shared/Descriptions.zh-Hans.json').read_text())['templates']
+functions = json.loads((bundle / 'Agents/Shared/FunctionCopy.zh-Hans.json').read_text())['entries']
+for path in catalog['agents'].values():
+    metadata = json.loads((bundle / path).read_text())
+    if not descriptions.get(f"agent.{metadata['id']}"):
+        raise SystemExit(f'Missing Chinese role description: {path}')
+for path in catalog['skills'].values():
+    metadata = json.loads((bundle / path).read_text())
+    key = metadata['id'].replace('-', '_')
+    if not descriptions.get(f'skill.{key}'):
+        raise SystemExit(f'Missing Chinese Skill description: {path}')
+    for binding in metadata['useActions']:
+        if not functions.get(binding['path'], {}).get('description'):
+            raise SystemExit(f"Missing Chinese function description: {binding['path']}")
 for name in ('InputProtocol.json', 'InputDecision.json', 'Prompts.json', 'Instructions.md'):
     if not (bundle / 'Agents/Assistant' / name).is_file():
         raise SystemExit(f'Missing Assistant prompt resource: {name}')

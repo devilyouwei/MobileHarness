@@ -117,6 +117,8 @@ Other external dependencies are native concurrency, media, inference, filesystem
 
 ## Default capability bindings
 
+The existing speech selector accepts a host-provided locale reader for automatic Apple recognition requests. English and Simplified Chinese use managed `en-US` and `zh-CN` Apple resources respectively. A session retains the lease it started with. Nemotron automatic language selection and synthesis locale handling remain independent from the application preference.
+
 | Capability | Selection |
 | --- | --- |
 | Chat | Gemma 4 E2B QAT on supported hardware, or explicitly configured Responses cloud |

@@ -9,7 +9,7 @@ import Synchronization
 public actor AppleSpeechRecognition: SpeechRecognitionCapability {
     private let resource: ModelResource<Locale>
     private let locale: String
-    public init(context: ModelContext, locale: String = "zh-CN") throws {
+    public init(context: ModelContext, locale: String = "en-US") throws {
         self.locale = locale
         resource = try context.resource {
             guard SpeechTranscriber.isAvailable,

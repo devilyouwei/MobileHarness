@@ -36,10 +36,11 @@ final class ApplicationActionAssembly {
     }
     func dependencies(
         storage: StorageContainer, model: ModelContainer, platform: PlatformContainer,
-        ui: UIContainer
+        ui: UIContainer, language: @escaping @Sendable () -> AppLanguage
     ) -> ActionsDependencies {
         ActionsDependencies(
             files: storage.files, cache: storage.cache, model: model, platform: platform, ui: ui,
+            presentationLanguage: language,
             workspaces: { try storage.database.workspaces },
             media: { try storage.database.media }, devices: { try storage.database.devices },
             makeCameraRuntime: { [weak self] in

@@ -114,6 +114,7 @@ func databaseTarget(_ name: String, dependencies: [Target.Dependency]) -> Target
 
 let package = Package(
     name: "HarnessKit",
+    defaultLocalization: "en",
     platforms: [.iOS("26.0"), .macOS("26.0")],
     products: [
         .library(
@@ -180,10 +181,12 @@ let package = Package(
                 "README.md", "Root/README.md", "Shared/README.md", "Camera/README.md", "Components/README.md",
                 "Conversation/README.md",
                 "Components/Island/README.md", "Components/RuntimeLog/README.md", "Components/Window/README.md",
+                "Components/Island/IslandStatus.xcstrings",
                 "Components/Web/README.md",
                 "Settings/README.md", "Diagnostics/README.md", "Components/Island/IslandActivityWidget.swift",
             ],
             resources: [
+                .process("Shared/Localizable.xcstrings"),
                 .process("Conversation/ListeningHalo.metal"),
                 .copy("Components/Web/MarkdownRenderHost.html"),
                 .copy("Components/Web/MarkdownRenderer.js"),

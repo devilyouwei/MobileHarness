@@ -261,7 +261,7 @@ func actionsAudioDetectionCancellationAndInterruptionJoinActualExecution() async
         if cancel {
             #expect(failure is CancellationError)
         } else {
-            #expect(failure.localizedDescription.contains("中断"))
+            #expect(failure.localizedDescription.contains("interrupted"))
         }
         #expect(audio.stopCount == 1)
         let nativeStop = try #require(audio.calls.firstIndex(of: "audio.stop"))
@@ -280,7 +280,7 @@ func actionsAudioDetectionCancellationAndInterruptionJoinActualExecution() async
     do {
         try await endpoint.run { permission = $0.permissionGranted }
         Issue.record("Denied permission must fail")
-    } catch { #expect(error.localizedDescription.contains("允许麦克风")) }
+    } catch { #expect(error.localizedDescription.contains("Allow microphone access")) }
     #expect(permission == false)
     #expect(!audio.calls.contains("factory.start"))
     #expect(!audio.calls.contains("capture.start"))

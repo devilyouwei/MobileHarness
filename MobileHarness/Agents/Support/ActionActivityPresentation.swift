@@ -6,12 +6,12 @@ private struct ActionActivityMapping {
     let execution: ActionExecutionRecord
     var output: String? {
         guard let completion = execution.completion else { return nil }
-        if case .completed = completion { return "已完成（无返回值）" }
+        if case .completed = completion { return "Completed (no return value)" }
         do {
             let response = try ToolResponse.response(completion, policy: .returning, callID: execution.id)
             return response.map { ActionExecutionRecord.logPreview($0.value, maximumUTF8Bytes: 16_384) }
         } catch {
-            return "执行结果无法编码"
+            return "Could not encode execution result"
         }
     }
     var report: ActionReport? {
@@ -26,7 +26,8 @@ private struct ActionActivityMapping {
                 return
                     [
                         report.failureDescription ?? execution.failureDescription
-                            ?? ($0 == .timedOut ? "动作执行超时，已结束并保留各步骤结果" : "动作执行失败")
+                            ?? ($0 == .timedOut
+                                ? "Action timed out; execution ended and step results were retained" : "Action failed")
                     ]
             } ?? []
         return executionIssues
@@ -34,52 +35,52 @@ private struct ActionActivityMapping {
                 guard entry.status == .failed, entry.code?.rawValue != "cancelled" else { return nil }
                 let reason: String
                 switch entry.code?.rawValue {
-                case "targetNotReached": reason = "稳定后仍未到位"
-                case "feedbackLost": reason = "未收到位置反馈"
-                case "disconnected": reason = "机械臂连接不可用"
-                case "sendingFailed": reason = "指令发送失败"
-                case "admissionFailed": reason = "执行通道准入失败"
-                case "feedbackFailed": reason = "位置反馈处理失败"
-                case "timedOut": reason = "执行超时"
-                case "invalidArguments": reason = "参数无效"
-                case "unavailable": reason = "当前不可执行"
-                case "resultCapacityExceeded": reason = "结果数量超出声明上限"
+                case "targetNotReached": reason = "Target not reached after settling"
+                case "feedbackLost": reason = "No position feedback received"
+                case "disconnected": reason = "Robot arm connection unavailable"
+                case "sendingFailed": reason = "Could not send command"
+                case "admissionFailed": reason = "Channel admission failed"
+                case "feedbackFailed": reason = "Could not process position feedback"
+                case "timedOut": reason = "Execution timed out"
+                case "invalidArguments": reason = "Invalid arguments"
+                case "unavailable": reason = "Execution unavailable"
+                case "resultCapacityExceeded": reason = "Result count exceeds the declared limit"
                 default:
                     if report.entries.count == 1, let detail = execution.failureDescription, !detail.isEmpty {
                         reason = detail
                     } else {
-                        reason = "执行失败"
+                        reason = "Execution failed"
                     }
                 }
                 let capturedReason = entry.details["failureDescription"] ?? reason
-                let motor = entry.details["motor"].map { " · \($0)号电机" } ?? ""
+                let motor = entry.details["motor"].map { " · Motor \($0)" } ?? ""
                 let position: String
                 if let target = entry.details["target"], let observed = entry.details["observed"] {
-                    position = "（目标 \(target)，反馈 \(observed)）"
+                    position = " (target \(target), observed \(observed))"
                 } else {
                     position = ""
                 }
-                return "第\(index + 1)项\(motor)：\(capturedReason)\(position)"
+                return "Item \(index + 1)\(motor): \(capturedReason)\(position)"
             }
     }
     var status: String {
         switch execution.phase {
-        case .queued: "等待执行"
-        case .running: "正在执行"
-        case .cancelling: "正在取消"
-        case .cancelled: execution.startedAt == nil ? "执行前已取消" : "已取消"
+        case .queued: "Queued"
+        case .running: "Running"
+        case .cancelling: "Cancelling"
+        case .cancelled: execution.startedAt == nil ? "Cancelled before execution" : "Cancelled"
         case .succeeded:
             switch execution.completion {
-            case .activityStarted: "已启动"
-            case .activityStopped: "已结束"
+            case .activityStarted: "Started"
+            case .activityStopped: "Ended"
             default:
-                execution.semantics == .state || execution.semantics == .activityUpdate ? "已设置" : "已完成"
+                execution.semantics == .state || execution.semantics == .activityUpdate ? "Set" : "Completed"
             }
         case .failed:
             if let report, report.hasFailures {
-                "\(report.status == .partialFailure ? "部分完成" : "执行失败") · \(report.entries.filter { $0.status == .failed }.count + (report.executionFailure == nil ? 0 : 1))项问题"
+                "\(report.status == .partialFailure ? "Partially completed" : "Execution failed") · \(report.entries.filter { $0.status == .failed }.count + (report.executionFailure == nil ? 0 : 1)) issues"
             } else {
-                execution.failureDescription ?? "执行未完成"
+                execution.failureDescription ?? "Execution did not complete"
             }
         }
     }
@@ -122,13 +123,13 @@ extension ActionExecutionRecord.Phase {
 extension SignalTraceRecord.Phase {
     var displayTitle: String {
         switch self {
-        case .delivering: "投递中"
-        case .accepted: "已接纳"
-        case .partial: "部分接纳"
-        case .rejected: "接纳失败"
-        case .suppressed: "已抑制"
-        case .dropped: "已丢弃"
-        case .unobserved: "无订阅者"
+        case .delivering: "Delivering"
+        case .accepted: "Accepted"
+        case .partial: "Partially accepted"
+        case .rejected: "Rejected"
+        case .suppressed: "Suppressed"
+        case .dropped: "Dropped"
+        case .unobserved: "No subscriber"
         }
     }
 }
@@ -136,22 +137,22 @@ extension SignalTraceRecord.Phase {
 extension AgentTaskSignal.Kind {
     var logTitle: String {
         switch self {
-        case .request: "委派任务"
-        case .input: "补充输入"
-        case .progress: "任务进度"
-        case .result: "任务结果"
-        case .cancel: "取消请求"
+        case .request: "Task delegation"
+        case .input: "Follow-up input"
+        case .progress: "Task progress"
+        case .result: "Task result"
+        case .cancel: "Cancellation request"
         }
     }
 }
 extension AgentLifecycle {
     var logTitle: String {
         switch self {
-        case .registered: "已注册"
-        case .running: "已运行"
-        case .paused: "已暂停"
-        case .stopped: "已停止"
-        case .failed: "运行失败"
+        case .registered: "Registered"
+        case .running: "Running"
+        case .paused: "Paused"
+        case .stopped: "Stopped"
+        case .failed: "Runtime failure"
         }
     }
 }

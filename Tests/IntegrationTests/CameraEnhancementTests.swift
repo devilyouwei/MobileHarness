@@ -256,7 +256,7 @@ private actor RecordingCameraFixture: CameraCapturing {
     let ready = try await session.stop(start.recordingID)
     #expect(ready.state == "ready" && ready.mediaID != nil)
     #expect(audio == ["pause", "resume"])
-    #expect(activities.contains("录制中") && activities.contains("正在收尾"))
+    #expect(activities.contains("Recording") && activities.contains("Finalizing"))
     #expect(try await store.albumPage().items.isEmpty)
     #expect(ui.camera.snapshot.recordedVideo != nil)
     let saved = try await session.save(start.recordingID)

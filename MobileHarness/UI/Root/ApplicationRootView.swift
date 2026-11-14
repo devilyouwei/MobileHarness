@@ -5,12 +5,18 @@
 
     @MainActor
     public struct ApplicationRootView: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         private let assembly: any ApplicationRootProviding
-        public init(services: any ApplicationRootProviding) { assembly = services }
+        private let languagePreference: Binding<AppLanguagePreference>?
+        public init(services: any ApplicationRootProviding, languagePreference: Binding<AppLanguagePreference>? = nil) {
+            assembly = services
+            self.languagePreference = languagePreference
+        }
         private var container: (any ApplicationSessionProviding)? { assembly.session }
         @Environment(\.scenePhase) private var scenePhase
         @State private var startupError: String?
-        @State private var startupStatus = "正在准备…"
+        @State private var startupStatus = "Preparing…"
         @State private var showsWelcome = false
         @State private var opensModelsAfterWelcome = false
         @State private var welcomeRestoreError: String?
@@ -116,16 +122,16 @@
                         }, skip: { showsWelcome = false })
                 }
                 .alert(
-                    "无法读取模型配置",
+                    appCopy.text("Could not load model settings"),
                     isPresented: Binding(
                         get: { welcomeRestoreError != nil },
                         set: { if !$0 { welcomeRestoreError = nil } }
                     )
                 ) {
-                    Button("重试") { Task { await prepareWelcome() } }
-                    Button("稍后", role: .cancel) {}
+                    Button(appCopy.text("Retry")) { Task { await prepareWelcome() } }
+                    Button(appCopy.text("Later"), role: .cancel) {}
                 } message: {
-                    Text(welcomeRestoreError ?? "请稍后重试")
+                    Text(welcomeRestoreError ?? appCopy.text("Try again later"))
                 }
                 .task {
                     await prepare()
@@ -154,7 +160,7 @@
                             }
                         })
                 } else {
-                    AnyView(Text("窗口内容不可用").foregroundStyle(.white))
+                    AnyView(Text(appCopy.text("Window content unavailable")).foregroundStyle(.white))
                 }
             }
             .ignoresSafeArea(.container)
@@ -163,7 +169,9 @@
         @ViewBuilder private func destinationView(_ destination: AppDestination) -> some View {
             switch destination {
             case .settings:
-                SettingsView(bluetooth: assembly.bluetoothState) { page in assembly.navigate(page) }
+                SettingsView(bluetooth: assembly.bluetoothState, languagePreference: languagePreference) { page in
+                    assembly.navigate(page)
+                }
             case .language:
                 LanguageModelSettingsView(
                     settings: assembly.settings, settingsControls: assembly.settingsControls,
@@ -192,7 +200,7 @@
                         record.makeView().environment(\.recordContextID, id).navigationContext(
                             .agentRecords, itemID: id)
                     } else {
-                        Text("记录服务暂不可用")
+                        Text(appCopy.text("Records are temporarily unavailable"))
                     }
                 }
             case .recognition, .synthesis, .vision:

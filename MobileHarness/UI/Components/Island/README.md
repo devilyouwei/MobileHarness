@@ -2,6 +2,8 @@
 
 ## 职责与接口
 
+Built-in activity labels opt into locale resolution; free-form content and user-provided details remain verbatim. The system snapshot carries an optional language code. The WidgetKit extension resolves its own paused, stale and ended labels through its bundled catalog, using English for snapshots without a language code.
+
 UIContainer持有唯一IslandState。上游提交UI自有IslandContent、身份/版本、图片引用和真实频带；组件拥有呈现状态、资源、布局、交互和两端回执，不执行相机、语音、Task或导航业务。依赖UI根的UIStateSnapshot及Shared机制；系统扩展只编译本目录的共享内容、指标和Widget入口。
 
 | 文件 | 职责 |

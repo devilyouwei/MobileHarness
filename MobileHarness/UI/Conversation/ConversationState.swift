@@ -68,7 +68,7 @@ public final class ConversationState {
     }
     public var showsModelRetry: Bool { !hasActiveInteraction && modelPreparation.showsRetry }
     public internal(set) var isReady = false
-    public internal(set) var voiceStatus = "按住双眼，开启聆听"
+    public internal(set) var voiceStatus = "Hold the eyes to start listening"
     public internal(set) var isVoiceActive = false { didSet { if !isVoiceActive { replyWaitingRequest = nil } } }
     public internal(set) var listeningAnimationID: String?
     /// Normalized content-space origin; latched by the renderer on each new listening generation.

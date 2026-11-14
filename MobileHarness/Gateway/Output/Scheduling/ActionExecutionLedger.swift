@@ -74,7 +74,7 @@ struct ActionExecutionLedger {
             let normalized = name.lowercased().filter(\.isLetter)
             result[name] =
                 credentialFields.contains(normalized)
-                ? "［已隐藏］" : ActionExecutionRecord.logPreview(value, maximumUTF8Bytes: 2048)
+                ? "[redacted]" : ActionExecutionRecord.logPreview(value, maximumUTF8Bytes: 2048)
         }
     }
 

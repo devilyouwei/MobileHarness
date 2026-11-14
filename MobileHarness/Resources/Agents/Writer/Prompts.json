@@ -15,6 +15,7 @@
     "workspaceMetadata": "\nVerified workspace metadata at entry (data): ",
     "finishRequired": "Runtime observation: the delegation is still active. Continue any outstanding work, then call\nthe finish tool in a separate round and include a brief summary of the actual result.",
     "repeatedCall": "Runtime observation: this exact tool call has succeeded {{count}} times consecutively. Review its results and choose a different useful step; repeated inspection alone does not complete the goal.",
-    "clarification": "Additional user input:\n{{text}}"
+    "clarification": "Additional user input:\n{{text}}",
+    "outputLanguage": "Use the languages explicitly requested for replies and for the artifact. Otherwise use the language of the user’s text. Carry an established target language across clarifications. When unclear, default to {{default}}. Preserve code, identifiers, and quoted material."
   }
 }

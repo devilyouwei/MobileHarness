@@ -285,7 +285,7 @@ enum IslandInteraction {
             let fresh = overlay == nil
             let changed =
                 fresh || placement != next || lastRevision != state.localRevision || lastGeneration != state.generation
-            statusBar.update(state: state.statusBar)
+            statusBar.update(state: state.statusBar, language: state.language)
             guard changed else {
                 state.localMounted()
                 return
@@ -462,6 +462,7 @@ enum IslandInteraction {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .environment(\.locale, state.language.locale)
         }
     }
 
@@ -500,6 +501,7 @@ enum IslandInteraction {
                 }
             )
             .preferredColorScheme(.dark)
+            .environment(\.locale, state.language.locale)
         }
         private func collapse() {
             do { try state.setExpanded(false) } catch { state.report(error) }
@@ -549,6 +551,8 @@ enum IslandInteraction {
     }
 
     public struct IslandExpandedView: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         public let primary: IslandIndicator
         public let detail: IslandDetail
         public let tone: IslandTone
@@ -588,7 +592,7 @@ enum IslandInteraction {
                     Button(action: onCollapse) {
                         Image(systemName: "chevron.up").font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(.secondary).frame(width: 44, height: 44).contentShape(Rectangle())
-                    }.buttonStyle(.plain).accessibilityLabel("收起详情")
+                    }.buttonStyle(.plain).accessibilityLabel(appCopy.text("Hide details"))
                 }
             }.accessibilityElement(children: .contain)
         }
@@ -599,6 +603,8 @@ enum IslandInteraction {
         }
     }
     private struct IslandThumbnailView: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let data: Data
         @State private var image: UIImage?
         var body: some View {
@@ -606,7 +612,7 @@ enum IslandInteraction {
                 if let image { Image(uiImage: image).resizable().scaledToFit() } else { Color.clear }
             }
             .clipShape(RoundedRectangle(cornerRadius: 8))
-            .accessibilityLabel("缩略图")
+            .accessibilityLabel(appCopy.text("Thumbnail"))
             .task(id: data) { image = UIImage(data: data) }
         }
     }

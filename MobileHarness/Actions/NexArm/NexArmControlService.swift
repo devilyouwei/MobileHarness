@@ -220,7 +220,9 @@ public final class NexArmControlService {
         guard !observing else { return }
         observing = true
         defer { observing = false }
-        do { try await restore() } catch { state.error = "设备记录读取失败：\(error.localizedDescription)" }
+        do { try await restore() } catch {
+            state.error = "Could not load device records: \(error.localizedDescription)"
+        }
         scheduleReconnect()
         for await value in link.updates {
             if Task.isCancelled { break }
@@ -287,7 +289,7 @@ public final class NexArmControlService {
                 guard mappingGeneration == generation, latestLinkSnapshot.revision == value.revision else { return }
                 if state.selected?.id == id {
                     state.selected = .init(
-                        id: id, name: BluetoothPresentation.deviceName(selected.name) ?? "未命名设备")
+                        id: id, name: BluetoothPresentation.deviceName(selected.name) ?? "Unnamed device")
                 }
             }
         } catch {
@@ -295,7 +297,7 @@ public final class NexArmControlService {
             state.error = error.localizedDescription
             state.nearby = []
         }
-        if discoveryVisible && value.discoveryLimitReached { state.notice = "附近设备较多，请靠近机械臂后重新搜索" }
+        if discoveryVisible && value.discoveryLimitReached { state.notice = "Move closer to the arm and scan again." }
         if controller != nil, operation == nil, cleanup == nil {
             if value.phase == .disconnecting || value.phase == .disconnected || value.queriesQuarantined {
                 requestRecovery(cause(for: value), snapshot: value)
@@ -378,7 +380,7 @@ public final class NexArmControlService {
     }
     public func connect(_ id: String) {
         guard recovery == nil, cleanup == nil else {
-            state.error = "正在恢复连接，请等待完成或先断开"
+            state.error = "Wait for recovery to finish or disconnect first."
             return
         }
         resetRecoveryBudget()
@@ -388,7 +390,7 @@ public final class NexArmControlService {
     }
     private func connect(_ id: String, automatically: Bool) {
         guard foreground, operation == nil, cleanup == nil, controller == nil else {
-            state.error = "连接操作正在进行，请等待结束"
+            state.error = "A connection operation is already in progress."
             return
         }
         guard
@@ -396,7 +398,7 @@ public final class NexArmControlService {
                 ?? (state.remembered?.id == id ? state.remembered : nil)
                 ?? (state.selected?.id == id ? state.selected : nil)
         else {
-            state.error = "设备已不在列表中，请重新搜索"
+            state.error = "The device is no longer in the list. Scan again."
             return
         }
         stopScan()
@@ -437,7 +439,7 @@ public final class NexArmControlService {
                 try Task.checkCancellation()
                 guard foreground, token == generation else { throw CancellationError() }
                 state.phase = .connected
-                state.notice = "已连接，正在监听机械臂反馈"
+                state.notice = "Connected and listening for arm feedback"
                 resetRecoveryBudget()
             } catch {
                 guard token == generation else { return }
@@ -534,7 +536,7 @@ public final class NexArmControlService {
                     state.error = nil
                     state.notice = nil
                     recoveryPending = false
-                } catch { state.error = "移除设备记录失败：\(error.localizedDescription)" }
+                } catch { state.error = "Could not remove device records: \(error.localizedDescription)" }
             }
         }
     }
@@ -600,7 +602,7 @@ public final class NexArmControlService {
         let identity = recoveryID
         recovery = Task { [self] in
             do { try await restore() } catch {
-                state.error = "设备记录读取失败：\(Self.message(error))"
+                state.error = "Could not load device records: \(Self.message(error))"
             }
             await suspension?.value
             await cleanup?.value
@@ -720,7 +722,7 @@ public final class NexArmControlService {
                     recoveryPending = true
                     recoveryStarted = nil
                     state.recoveryStage = .waitingForBluetooth
-                    state.notice = "等待蓝牙恢复后继续连接"
+                    state.notice = "Waiting for Bluetooth before reconnecting"
                     return
                 }
                 if let started = recoveryStarted,
@@ -731,7 +733,7 @@ public final class NexArmControlService {
                 }
                 let attempt = recoveryAttempts + 1
                 state.recoveryStage = .waiting
-                state.notice = "等待重新连接，第 \(attempt)/3 次"
+                state.notice = "Waiting to reconnect, attempt \(attempt)/3"
                 do { try await Task.sleep(for: NexArmBluetoothRecoveryPolicy.delay(attempt: attempt)) } catch {
                     return
                 }
@@ -748,7 +750,7 @@ public final class NexArmControlService {
                     resetRecoveryBudget()
                     state.recoveryStage = .idle
                     state.error = nil
-                    state.notice = "蓝牙连接已恢复；动作发送与执行尚未验证，中断动作未重放"
+                    state.notice = "Bluetooth is connected again. Interrupted actions were not retried."
                     return
                 }
                 let failure = connectionError ?? NexArmError.disconnected
@@ -778,8 +780,8 @@ public final class NexArmControlService {
         state.recoveryStage = .failed
         state.phase = .failed
         let description = error is BluetoothRecoveryError ? Self.message(error) : (state.error ?? Self.message(error))
-        state.error = "恢复未完成：\(description)"
-        state.notice = "请检查设备后手动重新连接"
+        state.error = "Bluetooth recovery failed: \(description)"
+        state.notice = "Check the device and reconnect."
     }
     public func waitUntilIdle() async {
         repeat {
@@ -808,7 +810,7 @@ public final class NexArmControlService {
         let snapshot = await link.status()
         guard token == generation else { return }
         guard let packet = snapshot.feedbackPacket else {
-            state.notice = "等待机械臂位置回包，可以继续手动控制"
+            state.notice = "Waiting for arm position feedback. Manual controls are available."
             return
         }
         do {

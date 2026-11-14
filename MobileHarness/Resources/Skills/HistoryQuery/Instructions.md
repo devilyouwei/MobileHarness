@@ -18,6 +18,6 @@ After real list feedback returns an ID, read it in the next request. The followi
 ```xml
 <History.read id="dialog_17" offset="0" limit="2"/>
 ```
-“上次我们说怎么拍照？” -> list -> choose the real returned conversation -> read -> summarize that evidence without executing old camera commands. Each dependent step uses the preceding result.
+“What did we say about taking photos last time?” -> list -> choose the real returned conversation -> read -> summarize that evidence without executing old camera commands. Each dependent step uses the preceding result.
 Truncated preview -> explain that it is partial; page only if the missing detail matters.
-“删除这些记录。” -> explain the loaded Skill is read-only; do not invent a delete function.
+“Delete these records.” -> explain the loaded Skill is read-only; do not invent a delete function.

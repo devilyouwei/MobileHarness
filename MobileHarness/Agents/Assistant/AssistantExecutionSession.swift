@@ -196,9 +196,9 @@ public actor AssistantExecutionSession {
         else { return nil }
         let status: String
         switch task.status {
-        case "waitingUser": status = "等待你的操作"
-        case "finishing": status = "正在结束"
-        default: status = "正在执行"
+        case "waitingUser": status = "Waiting for your action"
+        case "finishing": status = "Finishing"
+        default: status = "In progress"
         }
         return .init(
             title: String(task.goal.prefix(80)), subtitle: status,
@@ -228,15 +228,15 @@ public actor AssistantExecutionSession {
         switch disposition {
         case .enqueue: return nil
         case .discard:
-            title = "已丢弃本次输入"
+            title = "Input discarded"
             symbol = "minus.circle"
         case .interrupt:
-            title = "已打断当前回复"
+            title = "Reply interrupted"
             symbol = "stop.circle"
         }
         return .init(
             title: title, primary: .symbol(name: symbol), tone: .warning, priority: .attention,
-            liveActivity: false, expansionID: id, detail: .init(text: title))
+            liveActivity: false, expansionID: id, detail: .init(text: title), localizedLabels: true)
     }
 
     private func expireInputDecision(revision: UInt64) async {
@@ -255,7 +255,9 @@ public actor AssistantExecutionSession {
     }
 
     static var waitingContent: IslandContent {
-        .init(title: "正在思考", primary: .symbol(name: "sparkles"), priority: .low, secondary: .loading)
+        .init(
+            title: "Thinking", primary: .symbol(name: "sparkles"), priority: .low, secondary: .loading,
+            localizedLabels: true)
     }
     private func sendControl(_ control: AssistantSessionControl, sessionID: String) async throws {
         try await agent.receive(control.input(sessionID: sessionID))

@@ -4,7 +4,7 @@ import PlatformKit
 /// NexArm.Motion function ownership; current invocation paths remain compatible.
 extension NexArmActions {
     @Action(
-        domain: "NexArm", module: "Motion", title: "整臂归位",
+        domain: "NexArm", module: "Motion", title: "Home arm",
         doc:
             "Reset configured homes for motors1–5; never move the gripper.",
         parameters: [
@@ -37,7 +37,7 @@ extension NexArmActions {
     }
 
     @Action(
-        domain: "NexArm", module: "Motion", title: "底座晃动",
+        domain: "NexArm", module: "Motion", title: "Wiggle base",
         doc:
             "Perform the configured base-shaking gesture and return home.",
         parameters: [
@@ -71,7 +71,7 @@ extension NexArmActions {
     }
 
     @Action(
-        domain: "NexArm", module: "Motion", title: "单舵机运动",
+        domain: "NexArm", module: "Motion", title: "Move motor",
         doc:
             "Move one motor: absolute counts OR relative degrees from fresh feedback. No return home.",
         parameters: [
@@ -114,7 +114,7 @@ extension NexArmActions {
     ) async throws { try await motor(invocation: invocation, reset: false, using: perform) }
 
     @Action(
-        domain: "NexArm", module: "Motion", title: "单舵机归位",
+        domain: "NexArm", module: "Motion", title: "Home motor",
         doc:
             "Reset only the selected motor to its configured home; motor6 needs an explicitly configured home.",
         parameters: [

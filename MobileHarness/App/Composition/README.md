@@ -2,6 +2,8 @@
 
 ## Ownership and files
 
+`ApplicationLanguageSettings` keeps the application preference and resolved locale outside replaceable service roots. `ServiceFactories` binds a thread-safe snapshot reader to Agent requests and provides the corresponding Apple recognition locale to the ModelKit root.
+
 This directory constructs and connects public module interfaces, installs static lifecycle services and composes UI presentation. It contains no business request consumer, per-frame forwarding, function registration, role policy or domain schema conversion.
 
 | File | Responsibility |

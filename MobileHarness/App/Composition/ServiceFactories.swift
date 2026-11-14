@@ -27,10 +27,11 @@ import UI
         let ui: ApplicationPresentation
         let homePreparation: ForegroundPreparation
     }
-    static func make() -> Services {
+    static func make(language: @escaping @Sendable () -> AppLanguage = { .english }) -> Services {
         let root = URL.applicationSupportDirectory.appendingPathComponent("MobileHarness", isDirectory: true)
         let registry = ApplicationContainer(
             root: root, uiConfiguration: .init(settings: SettingsProviderAdapter.initial),
+            recognitionLocale: { language().speechRecognitionLocale },
             modelArtifacts: { try ArtifactServices.configuration(files: $0) })
         let containerFailures = registry.containerFailures()
         let storage = registry.storage()
@@ -44,7 +45,7 @@ import UI
         let actionAssembly = ApplicationActionAssembly(gateway: gateway)
         let actionHost = ActionsContainer.makeBusiness(
             dependencies: actionAssembly.dependencies(
-                storage: storage, model: model, platform: platform, ui: uiContainer),
+                storage: storage, model: model, platform: platform, ui: uiContainer, language: language),
             onFailure: { [containerFailures] failure in
                 containerFailures.report(
                     module: "actions", component: "container", operation: failure.operation,
@@ -78,7 +79,8 @@ import UI
                 facades: hosts.facades,
                 audio: platform.audio,
                 languageModels: model.language, speechModels: model.speech, visionModels: model.vision,
-                modelArtifacts: model.artifacts, memoryPressure: { await model.handleMemoryPressure() })
+                modelArtifacts: model.artifacts, memoryPressure: { await model.handleMemoryPressure() },
+                language: { language().rawValue })
         }
         let inspection = ApplicationStateInspection()
         // Root paths are compile-time declarations; duplicates indicate a composition defect.
@@ -165,7 +167,9 @@ import UI
             uiContainer: uiContainer, platform: platform, storage: storage, model: model,
             actions: actions, gateway: gateway, agents: agents, inspection: inspection, actionAssembly: actionAssembly,
             ui: ApplicationPresentation(
-                features: agents, home: home, web: uiContainer.web, runtimeLog: uiContainer.runtimeLog),
+                features: agents, home: home, web: uiContainer.web, runtimeLog: uiContainer.runtimeLog,
+                speechDiagnostic: uiContainer.diagnostics.speech,
+                language: language),
             homePreparation: homePreparation)
     }
 }

@@ -7,17 +7,17 @@ Manage saved works and choose the active editing workspace. Use the callable nam
 
 New work
 ```text
-workspace.create(title: "软件工程流程图", entry: "flowchart.html")
+workspace.create(title: "Software engineering flowchart", entry: "flowchart.html")
 ```
 
 Revise a saved work
 ```text
-workspace.search(query: "软件工程流程图")
+workspace.search(query: "Software engineering flowchart")
 workspace.enter(workspaceID: "workspace_2")
 ```
 
 Show a work by known ID
 ```text
 workspace.open(workspaceID: "workspace_3")
-finish(summary: "已打开银行家算法作品。")
+finish(summary: "Opened the banker’s algorithm project.")
 ```

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "templates": {
+    "allowedPairs": "\n允许的目标和 kind 组合：",
+    "rejection": "通信被拒绝：{{error}}。kind 可用值为 request、input、progress、result、cancel。创建委托使用 kind=request，指定 target，并在 content 中给出实际目标。",
+    "stopped": "任务已停止",
+    "cancelled": "任务已取消",
+    "completed": "任务已完成",
+    "opaqueEvidence": "不透明任务证据：{{bytes}} 字节"
+  }
+}

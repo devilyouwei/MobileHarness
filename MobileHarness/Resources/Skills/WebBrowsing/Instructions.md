@@ -27,7 +27,7 @@ To visit another URL in the same window, use its actual returned identity:
 ```
 Only after successful feedback confirms the requested page opened; no Task:
 ```xml
-已打开 B 站。
+Bilibili is open.
 ```
 User asks for the next screen of the currently open page:
 ```xml

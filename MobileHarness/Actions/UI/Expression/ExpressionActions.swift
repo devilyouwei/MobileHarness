@@ -5,7 +5,7 @@ import FunctionContracts
 extension UIActions {
     /// Trusted request progress; not a model-selected expression or animation receipt.
     @Action(
-        domain: "UI", module: "Expression", title: "请求等待", kind: .state,
+        domain: "UI", module: "Expression", title: "Request wait", kind: .state,
         completion: "Request waiting state is accepted; the animation loop is not joined.", timeout: .seconds(5))
     public static func setReplyWaiting(
         invocation: any FunctionInput,
@@ -23,7 +23,7 @@ extension UIActions {
     }
 
     @Action(
-        domain: "UI", module: "Expression", title: "表情演出",
+        domain: "UI", module: "Expression", title: "Perform expression",
         doc:
             "Perform one eye expression, awaiting its transition and return to the current base expression. Each call is a fresh performance. Does not change captions or speech.",
         parameters: [
@@ -61,7 +61,7 @@ extension UIActions {
     }
 
     @Action(
-        domain: "UI", module: "Expression", title: "设置持续表情",
+        domain: "UI", module: "Expression", title: "Set persistent expression",
         doc:
             "Set the persistent base eye expression until replaced, cleared or reset on new user speech. Completes on state acceptance, not animation completion. Repeating the same emotion is idempotent.",
         parameters: [
@@ -85,7 +85,7 @@ extension UIActions {
     }
 
     @Action(
-        domain: "UI", module: "Expression", title: "加载眼睛", kind: .state,
+        domain: "UI", module: "Expression", title: "Load eyes", kind: .state,
         completion: "Loading expression state is accepted; does not wait for model preparation or animation loops.",
         timeout: .seconds(5))
     public static func setLoading(

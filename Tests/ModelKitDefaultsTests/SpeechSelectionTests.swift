@@ -1,9 +1,26 @@
 import Foundation
 import ModelKit
 @_spi(ModelAssembly) import ModelKitRuntime
+import Synchronization
 import Testing
 
 @testable import ModelKitDefaults
+
+@Test func futureAppleRecognitionUsesTheNewLocaleAndRejectsUnsupportedRequests() async throws {
+    let manager = try ModelManager()
+    let locale = Mutex("en-US")
+    let selection = SpeechSelection(recognitionLocale: { locale.withLock { $0 } })
+    let english = try await selection.resolveRecognition(manager: manager)
+    locale.withLock { $0 = "zh-CN" }
+    let chinese = try await selection.resolveRecognition(manager: manager)
+    #expect(english.rawValue == "apple-recognition")
+    #expect(chinese.rawValue == "apple-recognition-zh-CN")
+    #expect(try await selection.resolveRecognition(manager: manager, locale: "en-US") == english)
+    await #expect(throws: CapabilityError.self) {
+        try await selection.resolveRecognition(manager: manager, locale: "de-DE")
+    }
+    await manager.shutdown()
+}
 
 /// Selection fixture; does not perform inference or download weights.
 private struct SelectionProvider: SpeechSynthesisCapability, SpeechRecognitionCapability, VoiceActivityCapability {

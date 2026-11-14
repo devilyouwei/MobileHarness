@@ -4,6 +4,8 @@
 
 ## 当前验收入口
 
+[Application localization](App-Localization.md) records automated, bundled-resource, and native Simulator evidence separately from device and model acceptance.
+
 [Assistant 执行轮次结算](Assistant-Channel-Settlement.md) 记录相机 ReACT 拆批证据和缓冲回归。
 
 [Writer 提示词与续写上下文](Writer-Resource-Organization.md) 记录模型请求、续写接纳、定向通信与资源打包的验证。
@@ -188,6 +190,7 @@ refactor, Agent-only model recording, current-file recovery and automated/build/
 
 - [D3 Edge Core AI](D3-Edge-CoreAI.md)：本机 Core AI/PyTorch/Swift 对照、全双工文本三分类、性能与实验性发布证据。
 - [Mac 本地 Decision 模型对照](Decision-Model-Mac-Comparison.md)记录 D3、Laya 和 UniMC 在同一组全双工样例上的分类错误与热调用时延。
+- [Decision prompt language split](Decision-Model-Mac-Comparison.md#decision-prompt-language-split) compares the current English and Chinese prompts with the pre-split mixed prompt using native D3 and the application adoption policy.
 - [小参数生成模型的 Core AI 对照](Decision-Model-Mac-Comparison.md#小参数生成模型的-core-ai-对照)记录 0.6B 至 1.54B 制品在 100 条中英全双工探测上的分类、延迟和提示词复测。
 
 [资源刷新过期误报](Resource-Refresh-Supersession.md)：保存成功快速离页后的迟到刷新、二次错误提示、失败保留和设备交付证据。

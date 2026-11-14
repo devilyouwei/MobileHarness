@@ -70,17 +70,18 @@ public enum SettingsProviderAdapter {
     public static func errorMessage(_ error: any Error) -> String? {
         if let query = error as? any ProviderRequestFailure {
             switch query.failureCode {
-            case "provider.configuration": return "配置无效，请检查 HTTP/HTTPS URL、Key 和模型选择"
-            case "provider.models": return "服务返回的模型列表无效或数量过多，请检查服务配置"
-            case "provider.persistence": return "本地配置读取或保存失败，可能已被修改，请重新启动后重试"
-            case "provider.rollback": return "配置应用和回滚失败，请重新启动后检查配置"
-            case "provider.busy": return "配置正在读取或保存，请稍后重试"
-            case "provider.selection", "provider.keychain": return "无法保存配置，请检查模型选择或设备钥匙串访问"
-            case "provider.application": return "模型配置应用失败，请检查配置后重试"
-            case "provider.cancelled": return "操作已取消"
-            case "provider.decisionRequired": return "请先在 Agent Brains 下载 D3 Decision 模型，再选择本地"
-            case "provider.capacity": return "模型查询请求过多，请稍后重试"
-            case "provider.request", "provider.expired": return "模型查询请求已失效，请重新查询"
+            case "provider.configuration": return "Invalid configuration. Check the URL, API key, and selected model."
+            case "provider.models": return "The service returned an invalid or oversized model list."
+            case "provider.persistence": return "Could not read or save settings. Restart the app and try again."
+            case "provider.rollback": return "Could not apply or restore settings. Restart the app and check them."
+            case "provider.busy": return "Settings are busy. Try again."
+            case "provider.selection", "provider.keychain":
+                return "Could not save settings. Check the model and keychain access."
+            case "provider.application": return "Could not apply model settings. Check settings and try again."
+            case "provider.cancelled": return "Operation cancelled"
+            case "provider.decisionRequired": return "Download D3 in Agent Brains before selecting the local model."
+            case "provider.capacity": return "Too many model requests. Try again."
+            case "provider.request", "provider.expired": return "The model lookup expired. Try again."
             default: break
             }
         }
@@ -96,8 +97,8 @@ public enum SettingsProviderAdapter {
             return nil
         }
         return status == 401 || status == 403
-            ? "Key 无效或没有访问权限，请检查后重试"
-            : "服务返回错误（\(status)），请检查 URL 后重试"
+            ? "The API key is invalid or lacks access."
+            : "Check the service URL and try again."
 
     }
 }
@@ -135,7 +136,7 @@ public enum SettingsProviderAdapter {
         if let failureCode {
             let message =
                 SettingsProviderAdapter.errorMessage(ProviderPresentationFailure(failureCode: failureCode))
-                ?? "无法连接服务，请检查 HTTP/HTTPS URL、Key 和网络后重试"
+                ?? "Could not reach the service. Check the URL, API key, and network."
             _ = state.presentFailure(message, revision: entry.revision)
             return
         }
@@ -157,7 +158,7 @@ public enum SettingsProviderAdapter {
         case .save:
             _ = try settings.result(id, sessionID: sessionID)
             try state.requirePresentation()
-            _ = state.presentNotice("已保存模型配置", revision: entry.revision)
+            _ = state.presentNotice("Model settings saved", revision: entry.revision)
         }
     }
 }

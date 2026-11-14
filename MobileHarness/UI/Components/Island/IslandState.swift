@@ -64,6 +64,13 @@ public struct IslandActivity: Identifiable, Equatable, Sendable {
         activities.sorted {
             $0.content.priority == $1.content.priority
                 ? $0.order > $1.order : $0.content.priority.order > $1.content.priority.order
+        }.map { activity in
+            guard activity.content.localizedLabels == true else { return activity }
+            var value = activity
+            value.content.title = language.text(value.content.title)
+            value.content.subtitle = language.text(value.content.subtitle)
+            if value.content.detail?.text == activity.content.title { value.content.detail?.text = value.content.title }
+            return value
         }
     }
     /// Detail and transient indicators have independent arbitration and lifetimes.
@@ -168,7 +175,7 @@ public struct IslandActivity: Identifiable, Equatable, Sendable {
         if !value {
             localDetached()
             if var paused = systemSnapshot() {
-                paused.subtitle = "已暂停更新 · 返回 App 查看"
+                paused.subtitle = "Updates paused · Open the app to view"
                 paused.paused = true
                 paused.startedAt = nil
                 paused.deadline = nil
@@ -338,6 +345,13 @@ public struct IslandActivity: Identifiable, Equatable, Sendable {
         systemPresentation?.submit(nil, refresh: true)
     }
     private func synchronizeSystemPresentation() { systemPresentation?.submit(systemSnapshot()) }
+    private(set) var language = AppLanguage.english
+    public func updateLanguage(_ language: AppLanguage) {
+        guard self.language != language else { return }
+        self.language = language
+        localChanged()
+        synchronizeSystemPresentation()
+    }
     private func systemSnapshot() -> IslandSystemSnapshot? {
         let eligible = ranked.filter { $0.content.liveActivity != false }
         let status = eligible.first { $0.content.detail == nil }
@@ -345,6 +359,7 @@ public struct IslandActivity: Identifiable, Equatable, Sendable {
         var snapshot = (detail ?? status).map {
             IslandSystemSnapshot(activity: $0, status: status, generation: generation, now: Date())
         }
+        snapshot?.language = language.rawValue
         if let override = attentionOverride, snapshot?.activityID == override.id {
             snapshot?.attentionID = override.token
         }

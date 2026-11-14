@@ -110,7 +110,7 @@ extension MossSpeechSynthesis {
     /// Exercise lazy Core ML kernels before conversation playback starts its first-audio timer.
     /// The synthetic PCM is consumed in memory and never sent to a speaker or Agent.
     public func warmup() async throws {
-        let session = try await synthesize(SpeechSynthesisRequest(text: "你好。", locale: "zh-CN"))
+        let session = try await synthesize(SpeechSynthesisRequest(text: "Hello.", locale: "en-US"))
         defer { session.cancel() }
         var hasAudio = false
         var finished = false

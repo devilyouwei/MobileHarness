@@ -4,8 +4,9 @@ public enum IslandError: String, Error, Sendable, LocalizedError {
     case unavailable, missing, capacity, stale, invalid, owner, interrupted, busy, systemControlled
     public var errorDescription: String? {
         switch self {
-        case .systemControlled: "灵动岛布局和动画由组件管理；仅支持 compact/expanded，展开需要详情内容。"
-        default: "灵动岛：" + rawValue
+        case .systemControlled:
+            "The island manages layout and animation. Only compact and expanded are supported. Expansion requires detail content."
+        default: "Island: " + rawValue
         }
     }
 }
@@ -111,11 +112,12 @@ public struct IslandContent: Equatable, Sendable, Codable {
     public var liveActivity: Bool?
     public var expansionID: String?
     public var detail: IslandDetail?
+    public var localizedLabels: Bool?
     public init(
         title: String, subtitle: String = "", primary: IslandIndicator, tone: IslandTone = .neutral,
         priority: IslandPriority = .background, secondary: IslandIndicator? = nil, startedAt: Date? = nil,
         deadline: Date? = nil,
-        liveActivity: Bool? = nil, expansionID: String? = nil, detail: IslandDetail? = nil
+        liveActivity: Bool? = nil, expansionID: String? = nil, detail: IslandDetail? = nil, localizedLabels: Bool? = nil
     ) {
         self.title = title
         self.subtitle = subtitle
@@ -128,6 +130,7 @@ public struct IslandContent: Equatable, Sendable, Codable {
         self.liveActivity = liveActivity
         self.expansionID = expansionID
         self.detail = detail?.normalized
+        self.localizedLabels = localizedLabels
     }
     public func validate() throws {
         guard !title.isEmpty, title.count <= 80, subtitle.count <= 160, primary.isValid,
@@ -140,7 +143,7 @@ public struct IslandContent: Equatable, Sendable, Codable {
     }
     private enum CodingKeys: String, CodingKey {
         case title, subtitle, primary, secondary, tone, priority, startedAt, deadline, liveActivity, expansionID,
-            detail
+            detail, localizedLabels
     }
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -155,6 +158,7 @@ public struct IslandContent: Equatable, Sendable, Codable {
         primary = try c.decode(IslandIndicator.self, forKey: .primary)
         secondary = try c.decodeIfPresent(IslandIndicator.self, forKey: .secondary)
         detail = try c.decodeIfPresent(IslandDetail.self, forKey: .detail)?.normalized
+        localizedLabels = try c.decodeIfPresent(Bool.self, forKey: .localizedLabels)
     }
     public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
@@ -169,6 +173,7 @@ public struct IslandContent: Equatable, Sendable, Codable {
         try c.encodeIfPresent(liveActivity, forKey: .liveActivity)
         try c.encodeIfPresent(expansionID, forKey: .expansionID)
         try c.encodeIfPresent(detail, forKey: .detail)
+        try c.encodeIfPresent(localizedLabels, forKey: .localizedLabels)
     }
 }
 
@@ -191,6 +196,7 @@ struct IslandSystemSnapshot: Codable, Hashable, Sendable {
     var detailPrimary: IslandIndicator?
     var detailTone: String?
     var hasStatus: Bool = true
+    var language: String? = nil
 
     func validatedPayload() throws -> Data {
         let data = try JSONEncoder().encode(self)
@@ -205,9 +211,21 @@ struct IslandSystemSnapshot: Codable, Hashable, Sendable {
     func presentation(stale: Bool) -> Self {
         guard stale || paused || endedAt != nil else { return self }
         var value = self
-        let message = endedAt != nil ? "活动已结束" : paused ? "已暂停更新" : "状态已过期"
+        let key = endedAt != nil ? "Activity ended" : paused ? "Updates paused" : "Status expired"
+        #if SWIFT_PACKAGE
+            let locale = AppLanguage(preferredLanguage: language)
+            let message = locale.text(key)
+            let open = locale.text("Open the app to view")
+        #else
+            let bundle = language.flatMap { Bundle.main.url(forResource: $0, withExtension: "lproj") }
+                .flatMap(Bundle.init(url:))
+            let message = bundle?.localizedString(forKey: key, value: key, table: "IslandStatus") ?? key
+            let open =
+                bundle?.localizedString(forKey: "Open the app to view", value: nil, table: "IslandStatus")
+                ?? "Open the app to view"
+        #endif
         value.title = message
-        value.subtitle = message + " · 打开 App 查看"
+        value.subtitle = message + " · " + open
         value.primary = .symbol(name: endedAt != nil ? "checkmark.circle" : "pause.circle")
         value.secondary = nil
         value.startedAt = nil

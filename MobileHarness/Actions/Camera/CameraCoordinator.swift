@@ -272,7 +272,7 @@
         public func pauseVisionForModelMaintenance() async {
             await stopPose()
             presentation.clearPose()
-            presentation.present(.visionMessage("姿态模型已停用，可在设置中重新下载"))
+            presentation.present(.visionMessage("Pose recognition is off. Download its model again in Settings."))
         }
 
         /// Opening rejects conflicting work; closing joins camera/photo cleanup before disposition and exit.
@@ -285,7 +285,7 @@
                 if let windows {
                     do {
                         _ = try await windows.present(
-                            content: .camera, title: "相机", icon: .emoji("📷"),
+                            content: .camera, title: "Camera", icon: .emoji("📷"),
                             sizing: .image(aspect: 3.0 / 4.0, controlsHeight: 0))
                     } catch let error as WindowError {
                         throw WindowExecutionFailure(error: error)
@@ -344,10 +344,10 @@
                     let choice = try await windows.ask(
                         item.id,
                         prompt: .init(
-                            title: "关闭前如何处理这段视频？",
+                            title: "What should happen to this video before closing?",
                             choices: [
-                                .init(id: "save", title: "保存"), .init(id: "discard", title: "忽略"),
-                                .init(id: "cancel", title: "取消"),
+                                .init(id: "save", title: "Save"), .init(id: "discard", title: "Discard"),
+                                .init(id: "cancel", title: "Cancel"),
                             ]))
                     switch choice {
                     case "save": _ = try await recordingSession.save(id)
@@ -499,12 +499,12 @@
                     gazeSequence = nil
                     previewRestart.invalidate()
                     presentation.present(.isVisible(false))
-                    presentation.present(.message("相机暂时被占用"))
+                    presentation.present(.message("Camera is busy"))
                 case .interruptionEnded:
                     reconcile()
                 case .failed:
                     failed = true
-                    presentation.present(.message("相机暂时不可用，请重试"))
+                    presentation.present(.message("Camera unavailable. Try again."))
                     reconcile()
                 }
             }
@@ -563,7 +563,7 @@
             let id = UUID().uuidString
             visionSession = id
             visionDisplayToken = presentation.token
-            presentation.present(.visionMessage("姿态识别准备中"))
+            presentation.present(.visionMessage("Preparing pose recognition"))
             let mirrored = state.facing == .front
             poseWorkID = UUID()
             poseTask = Task { [weak self] in await self?.runPose(sessionID: id, mirrored: mirrored) }
@@ -604,7 +604,7 @@
             } catch {
                 guard previewSession == sessionID else { return }
                 presentation.clearFrame()
-                presentation.present(.message("相机画面暂不可用，请重试"))
+                presentation.present(.message("Camera preview unavailable. Try again."))
                 log.error("Camera preview failed: \(String(describing: error), privacy: .private)")
             }
         }
@@ -617,7 +617,7 @@
                 presentation.clearPose()
                 presentation.present(.gaze(.zero))
                 gazeSequence = nil
-                presentation.present(.visionMessage("姿态识别暂不可用，请重试"))
+                presentation.present(.visionMessage("Pose recognition is unavailable. Try again."))
                 log.error("Pose pipeline failed: \(String(describing: error), privacy: .private)")
             }
         }
@@ -712,7 +712,7 @@
                         } catch {
                             self.recordCapture(.revoked, id: lease.id)
                             self.failed = true
-                            self.presentation.present(.message("相机控制已结束，请重试"))
+                            self.presentation.present(.message("The camera session ended. Try again."))
                             self.reconcile()
                             return
                         }
@@ -756,7 +756,7 @@
             recordCapture(.failed, id: lease.id)
             failed = true
             presentation.present(.isVisible(false))
-            presentation.present(.message("相机尚未确认停止，请重试"))
+            presentation.present(.message("The camera has yet to confirm that it stopped. Try again."))
             return false
         }
 
@@ -799,7 +799,7 @@
                         _ = await stopCapture()
                         await previewRestart.stop()
                         guard current == revision else { continue }
-                        presentation.present(.message("无法切换镜头，请重试"))
+                        presentation.present(.message("Could not switch cameras. Try again."))
                         return
                     }
                 }
@@ -819,7 +819,7 @@
                             if current == revision {
                                 if running { presentation.present(.facing(requestedFacing)) }
                                 presentation.present(.isVisible(running))
-                                presentation.present(.message(running ? nil : "相机暂时不可用，请重试"))
+                                presentation.present(.message(running ? nil : "Camera unavailable. Try again."))
                                 presentation.present(.needsSettings(false))
                                 if running {
                                     previewRestart.replace(
@@ -834,13 +834,14 @@
                                 presentation.present(
                                     .message(
                                         (error as? CameraError) == .unavailable
-                                            ? "此设备没有可用的摄像头" : "无法开启相机，请重试"))
+                                            ? "This device has no available camera."
+                                            : "Could not start the camera. Try again."))
                             }
                         }
                     } else {
                         _ = await stopCapture()
                         if current == revision {
-                            presentation.present(.message("请在设置中允许相机访问"))
+                            presentation.present(.message("Allow camera access in Settings."))
                             presentation.present(.needsSettings(true))
                         }
                     }

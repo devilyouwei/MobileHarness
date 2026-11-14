@@ -48,7 +48,7 @@ import UI
         guard !stopped else { throw CancellationError() }
         if let saved { return saved }
         guard !stopped, !changing, restoreWaiters < 32 else {
-            throw ResourceClientFailure("资源配置正在读取或保存，请稍后重试")
+            throw ResourceClientFailure("Model resource settings are busy. Try again.")
         }
         restoreWaiters += 1
         defer { restoreWaiters -= 1 }
@@ -62,7 +62,7 @@ import UI
     }
     public func saveSource(_ source: ModelResourceSourceDraft) async throws {
         guard !stopped, !changing, restoration == nil else {
-            throw ResourceClientFailure("资源配置正在读取或保存，请稍后重试")
+            throw ResourceClientFailure("Model resource settings are busy. Try again.")
         }
         changing = true
         defer { changing = false }

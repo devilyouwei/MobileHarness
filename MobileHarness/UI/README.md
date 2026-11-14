@@ -39,6 +39,8 @@ Root组合功能视图与公共组件，功能拥有自身状态和输入类型�
 
 ## 直接接口与数据流
 
+The host supplies the application locale and a binding for the language picker on the Settings landing page. UI resolves built-in copy through its English-source String Catalog. The system island receives the locale with its presentation snapshot. The app island re-renders built-in labels when the locale changes.
+
 根构造时创建稳定的子能力，不在首次回复或页面切换时补建：
 
 | 子能力 | 状态owner |

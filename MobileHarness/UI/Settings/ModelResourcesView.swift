@@ -3,6 +3,8 @@
 
     @MainActor
     public struct ModelResourcesView: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         @Bindable private var state: ModelResourcesState
         private let controls: any ModelResourcesControlling
         private let group: ModelResourceGroup
@@ -30,7 +32,8 @@
                 if group == .recognition || group == .synthesis {
                     Section {
                         Toggle(
-                            group == .recognition ? "使用自定义识别模型" : "使用自定义模型",
+                            group == .recognition
+                                ? appCopy.text("Use custom recognition model") : appCopy.text("Use custom model"),
                             isOn: Binding(
                                 get: { customEnabled },
                                 set: { value in Task { await controls.setCustomModel(group, enabled: value) } })
@@ -40,28 +43,31 @@
                     } footer: {
                         Text(
                             group == .recognition
-                                ? "开启前请先下载 Nemotron；关闭时使用 Apple 语音识别。"
-                                : "开启前请先下载 MOSS；关闭时使用 Apple 系统声音。")
+                                ? appCopy.text(
+                                    "Download Nemotron first. Turning this off uses Apple speech recognition.")
+                                : appCopy.text("Download MOSS first. Turning this off uses Apple system voices."))
                     }
                 }
                 ModelResourceSections(state: state, controls: controls, group: group)
             }
-            .navigationTitle(group.title)
+            .navigationTitle(appCopy.text(group.title))
             .navigationBarTitleDisplayMode(.inline)
             .alert(
-                "请先安装模型",
+                appCopy.text("Install the model first"),
                 isPresented: Binding(
                     get: { state.installationNotice != nil }, set: { if !$0 { state.installationNotice = nil } })
             ) {
-                Button("知道了", role: .cancel) { state.installationNotice = nil }
+                Button(appCopy.text("OK"), role: .cancel) { state.installationNotice = nil }
             } message: {
-                Text(state.installationNotice ?? "")
+                Text(appCopy.text(state.installationNotice ?? ""))
             }
         }
     }
 
     @MainActor
     struct ModelResourceSections: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         @Bindable var state: ModelResourcesState
         let controls: any ModelResourcesControlling
         let group: ModelResourceGroup
@@ -72,12 +78,12 @@
             progress < 0.001 ? "<0.1%" : String(format: "%.1f%%", progress * 100)
         }
         @ViewBuilder var body: some View {
-            Section(group == .language ? "本地模型下载" : "自定义模型") {
+            Section(group == .language ? appCopy.text("Local model downloads") : appCopy.text("Custom model")) {
                 if group != .vision {
-                    Picker("下载源", selection: $selectedSource) {
-                        Text("Hugging Face 官方").tag("official")
-                        Text("HF Mirror 中国镜像").tag("mirror")
-                        Text("自定义域名").tag("custom")
+                    Picker(appCopy.text("Download source"), selection: $selectedSource) {
+                        Text(appCopy.text("Official Hugging Face")).tag("official")
+                        Text(appCopy.text("HF Mirror (China)")).tag("mirror")
+                        Text(appCopy.text("Custom domain")).tag("custom")
                     }
                     .pickerStyle(.menu)
                     .disabled(state.saving || !state.hasRestored)
@@ -94,13 +100,13 @@
                             .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                             PasteButton(payloadType: String.self) { values in
                                 if let value = values.first { controls.editDownloadSource(value) }
-                            }.labelStyle(.iconOnly).accessibilityLabel("粘贴下载域名")
+                            }.labelStyle(.iconOnly).accessibilityLabel(appCopy.text("Paste download domain"))
                         }
                         .disabled(state.saving || !state.hasRestored)
                     }
                 }
                 if includesDecision {
-                    Button("保存下载设置") { Task { _ = await controls.saveDownloadSource() } }
+                    Button(appCopy.text("Save download settings")) { Task { _ = await controls.saveDownloadSource() } }
                         .disabled(state.saving || !state.hasRestored)
                         .accessibilityIdentifier("settings.brains.downloadSource.save")
                 }
@@ -110,36 +116,51 @@
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(alignment: .center, spacing: 16) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(item.name)
+                                Text(appCopy.text(item.name))
                                 if item.id == "silero" {
-                                    Text("下载后自动用于人声检测。")
-                                        .font(.caption).foregroundStyle(.secondary)
+                                    Text(
+                                        appCopy.text(
+                                            "Used automatically for voice activity detection after downloading.")
+                                    )
+                                    .font(.caption).foregroundStyle(.secondary)
                                 }
                                 Text(
-                                    "\(state.status(item)) · \(item.installed ? "" : "预计 ")\(ByteCountFormatter.string(fromByteCount: item.installed ? item.installedBytes : item.bytes, countStyle: .file))"
+                                    "\(appCopy.text(state.status(item))) · \(item.installed ? "" : appCopy.text("Estimated "))\(ByteCountFormatter.string(fromByteCount: item.installed ? item.installedBytes : item.bytes, countStyle: .file))"
                                 )
                                 .font(.caption).foregroundStyle(.secondary)
-                                Text("版本 \(item.revision.prefix(12)) · \(item.license)").font(.caption2)
+                                Text(
+                                    appCopy.format(
+                                        "Revision %@ · %@", String(describing: item.revision.prefix(12)),
+                                        String(describing: item.license))
+                                ).font(.caption2)
                                     .foregroundStyle(
                                         .secondary)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             VStack(alignment: .trailing, spacing: 0) {
                                 if state.isDownloading(item) {
-                                    Button(state.isCancelling(item.id) ? "正在取消…" : "取消下载") {
+                                    Button(
+                                        state.isCancelling(item.id)
+                                            ? appCopy.text("Cancelling…") : appCopy.text("Cancel download")
+                                    ) {
                                         Task { await controls.perform(item.id, operation: .cancel) }
                                     }.frame(minHeight: 44).disabled(state.isCancelling(item.id))
                                         .accessibilityIdentifier("settings.model.\(item.id).cancel")
                                 } else if !state.isBusy(item) {
                                     if !item.installed {
-                                        Button(item.failure == nil ? "下载" : "继续下载") {
+                                        Button(
+                                            item.failure == nil
+                                                ? appCopy.text("Download") : appCopy.text("Resume download")
+                                        ) {
                                             Task { await controls.perform(item.id, operation: .download) }
                                         }.frame(minHeight: 44).disabled(state.saving || !state.hasRestored)
                                             .accessibilityIdentifier("settings.model.\(item.id).download")
                                     }
                                     if item.installed || item.failure != nil {
-                                        Button("删除", role: .destructive) { removal = item }.frame(minHeight: 44)
-                                            .accessibilityIdentifier("settings.model.\(item.id).delete")
+                                        Button(appCopy.text("Delete"), role: .destructive) { removal = item }.frame(
+                                            minHeight: 44
+                                        )
+                                        .accessibilityIdentifier("settings.model.\(item.id).delete")
                                     }
                                 }
                             }.buttonStyle(.borderless)
@@ -150,7 +171,9 @@
                             if item.activity == .downloading && item.progress > 0 && !state.isCancelling(item.id) {
                                 HStack {
                                     ProgressView(value: item.progress)
-                                        .accessibilityLabel("\(item.name)下载进度")
+                                        .accessibilityLabel(
+                                            appCopy.format("Download progress for %@", String(describing: item.name))
+                                        )
                                         .accessibilityValue(percentage(item.progress))
                                     Text(percentage(item.progress))
                                         .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
@@ -161,23 +184,25 @@
                                     Text(
                                         item.activity == .downloading && item.progress == 0
                                             && !state.isCancelling(item.id)
-                                            ? "正在连接下载来源，等待数据…" : state.status(item)
+                                            ? appCopy.text("Connecting to the download source…")
+                                            : appCopy.text(state.status(item))
                                     ).font(.caption).foregroundStyle(.secondary)
                                 }
                             }
                         }
                         if !state.isBusy(item), let failure = item.failure {
-                            Text(failure).font(.caption).foregroundStyle(.red)
+                            Text(appCopy.text(failure)).font(.caption).foregroundStyle(.red)
                         }
                     }
                 }
             }
 
             .confirmationDialog(
-                "停止相关功能并删除模型？", isPresented: Binding(get: { removal != nil }, set: { if !$0 { removal = nil } })
+                appCopy.text("Stop related features and delete the model?"),
+                isPresented: Binding(get: { removal != nil }, set: { if !$0 { removal = nil } })
             ) {
                 if let item = removal {
-                    Button("停止并删除 \(item.name)", role: .destructive) {
+                    Button(appCopy.format("Stop and delete %@", String(describing: item.name)), role: .destructive) {
                         removal = nil
                         Task { await controls.perform(item.id, operation: .remove) }
                     }
@@ -185,14 +210,16 @@
             } message: {
                 Text(
                     removal?.id == "silero"
-                        ? "删除后将使用基础声音检测。"
+                        ? appCopy.text("Voice activity detection will switch to the basic detector.")
                         : group == .recognition || group == .synthesis
-                            ? "删除后将使用 Apple 语音，再次启用需重新下载。"
+                            ? appCopy.text("Speech will switch to Apple. Download the model again to re-enable it.")
                             : removal?.id == "d3-edge"
-                                ? "删除后 Decision 将使用已配置的云端备用；云端不可用时保留输入并排队。"
+                                ? appCopy.text(
+                                    "Decision will use the saved cloud fallback. If unavailable, it keeps and queues input."
+                                )
                                 : group == .language
-                                    ? "删除后需要使用云端大模型，或重新下载 Gemma 4 E2B 才能进行本地对话。"
-                                    : "删除后需要重新下载 YOLO 才能使用本地姿态识别。")
+                                    ? appCopy.text("Use a cloud model or download Gemma 4 E2B again for local chat.")
+                                    : appCopy.text("Download YOLO again to use local pose recognition."))
             }
             .task {
                 await controls.restore()
@@ -202,7 +229,7 @@
                     ? "official" : (state.source.endpoint == "https://hf-mirror.com" ? "mirror" : "custom")
             }
 
-            if let error = state.error { Section { Text(error).foregroundStyle(.red) } }
+            if let error = state.error { Section { Text(appCopy.text(error)).foregroundStyle(.red) } }
 
         }
     }

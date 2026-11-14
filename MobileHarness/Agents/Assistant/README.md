@@ -301,7 +301,7 @@ prepare 校验非空、至多 2000 UTF-8 字节的文本，生成唯一 audioID�
 
 ## 多源全双工输入与 Decision
 
-根装配启用 fullDuplex。AssistantInputDecision 仅分类已认证的 SpeechPerception final 与本地用户 input。英文规则和标签分别标记本会话播报、生成／执行和待答问题，历史最多保留最近一条已送模型的用户输入及对应回复，每条历史和关联追问最多保留末尾 80 字符。历史、关联追问和最新输入保留原语言并分别引用，最新输入保持完整。D3 依实验顺序读取 interrupt、discard、enqueue 的候选描述。每次分类读取一份已提交的 Decision 配置，包含本地模式与独立选择的云端模型工厂。云端采用相同规则，强制一次 classify_input 并校验唯一合法动作；本地选择 D3 时，缺失、加载、失败或超过512 token 使用同份配置的云端备用。云端未配置或失败时保守 enqueue。单个分类消费者，本地与云端各最多一个在途。热本地调用预算 250 ms，从输入进入分类队列起总预算 2 秒。迟到结果不修改已提交决定，后台清理由根加入。Chat worker 从开始准备单条分类的上下文计时，分类器返回最终决定时结束。Decision 日志耗时包括本地与云端回退过程，排除分类排队、后续入队、打断清理和反馈。分类器在各模型调用边界采集实际请求，结果携带已采集的本地和云端上下文及本地回退原因。本地推理超时或单次请求失败仅影响当次分类，旧请求收尾后可接纳下一次请求。准备失败由资源更新重置。
+根装配启用 fullDuplex。AssistantInputDecision 仅分类已认证的 SpeechPerception final 与本地用户 input。根据应用语言选择的规则和标签分别标记本会话播报、生成／执行和待答问题，历史最多保留最近一条已送模型的用户输入及对应回复，每条历史和关联追问最多保留末尾 80 字符。历史、关联追问和最新输入保留原语言并分别引用，最新输入保持完整。D3 依实验顺序读取 interrupt、discard、enqueue 的候选描述。每次分类读取一份已提交的 Decision 配置，包含本地模式与独立选择的云端模型工厂。云端采用相同规则，强制一次 classify_input 并校验唯一合法动作；本地选择 D3 时，缺失、加载、失败或超过512 token 使用同份配置的云端备用。云端未配置或失败时保守 enqueue。单个分类消费者，本地与云端各最多一个在途。热本地调用预算 250 ms，从输入进入分类队列起总预算 2 秒。迟到结果不修改已提交决定，后台清理由根加入。Chat worker 从开始准备单条分类的上下文计时，分类器返回最终决定时结束。Decision 日志耗时包括本地与云端回退过程，排除分类排队、后续入队、打断清理和反馈。分类器在各模型调用边界采集实际请求，结果携带已采集的本地和云端上下文及本地回退原因。本地推理超时或单次请求失败仅影响当次分类，旧请求收尾后可接纳下一次请求。准备失败由资源更新重置。
 
 `enqueue` 累积待处理输入。冻结批次时保留同会话已就绪项的原文、来源、时间和交互身份。`discard` 结束候选并触发短暂的灵动岛提示。采纳分类结果时，整句仅有已知噪声标记或无正文的标点／替换字符的非待答语音直接采用 `discard`。没有问题上下文的独立语气词可以采纳模型的 `discard`。手工输入、已绑定追问及可能有用的语音文本遇到模型 `discard` 时改为 `enqueue`，日志保存模型原始建议与采用原因。已验证的 Agent 消息直接入队。`interrupt` 先保留新输入，分类时没有活动回复或结果返回时回复已换代则只入队；同代打断进入[跨轮清理](#多-channel-输出与跨轮结算)。
 
@@ -319,6 +319,6 @@ AssistantExecutionSession 为 Decision 维护独立、可替换的灵动岛活�
 
 ## 请求文字的资源归属
 
-Prompts.json 维护主对话的执行证据、任务历史摘要前缀和 Writer 协作事实。InputProtocol.json 管理输入规则和时间线格式。InputDecision.json 管理英文分类规则、三种动作定义、中英文示例、输入模板与工具说明。打断示例使用「停下」「别说了」「等下」和相应英文短语，候选要求当前正在播报或执行且用户要求立刻停止或改变。其余示例覆盖带语气尾词的有效请求、简短作答、独立语气词和噪声。图片清单由 Shared/RequestContext.json 提供。
+`Prompts.json` owns execution evidence, task-history prefixes, Writer coordination and the reply-language default. `InputProtocol.json` owns input guidance and fixed timeline markers. `InputDecision.json` and its Simplified Chinese sibling own the classification instructions, three candidate descriptions, examples, input templates and cloud tool description. A classification snapshots the app language before preparing the local or cloud request. The shared request-context templates supply the image manifest.
 
 来源行识别从当前资源标签和排版生成，同时识别历史格式；形似来源行与辅助标题的用户正文仍缩进。模板缺失或渲染失败显式传播，不用硬编码正文补位。

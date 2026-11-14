@@ -3,10 +3,51 @@ import Agents
 import AppLifecycle
 import Foundation
 import Observation
+import Synchronization
+import UI
+
+@MainActor @Observable final class ApplicationLanguageSettings {
+    private static let key = "application.language"
+    private let defaults: UserDefaults
+    private let preferredLanguage: () -> String?
+    private let snapshot: Mutex<AppLanguage>
+    private(set) var preference: AppLanguagePreference
+    private(set) var language: AppLanguage
+
+    init(
+        defaults: UserDefaults = .standard,
+        preferredLanguage: @escaping () -> String? = { Locale.preferredLanguages.first }
+    ) {
+        self.defaults = defaults
+        self.preferredLanguage = preferredLanguage
+        let preference = AppLanguagePreference(storedValue: defaults.string(forKey: Self.key))
+        let language = preference.resolve(preferredLanguage: preferredLanguage())
+        self.preference = preference
+        self.language = language
+        snapshot = Mutex(language)
+    }
+
+    nonisolated func read() -> AppLanguage { snapshot.withLock { $0 } }
+
+    func select(_ preference: AppLanguagePreference) {
+        guard preference != self.preference else { return }
+        defaults.set(preference.rawValue, forKey: Self.key)
+        self.preference = preference
+        refresh()
+    }
+
+    func refresh() {
+        let resolved = preference.resolve(preferredLanguage: preferredLanguage())
+        guard language != resolved else { return }
+        snapshot.withLock { $0 = resolved }
+        language = resolved
+    }
+}
 
 @MainActor @Observable final class AppComposition {
     private var services: ServiceFactories.Services
-    private let writerBackground = WriterContinuedProcessing()
+    let languageSettings: ApplicationLanguageSettings
+    private let writerBackground: WriterContinuedProcessing
     private var owner: Result<ApplicationLifecycle, any Error>
     private var foreground = false
     private var replacement: Task<Void, Never>?
@@ -19,7 +60,10 @@ import Observation
     var features: ApplicationPresentation { services.ui }
 
     init() {
-        let created = ServiceFactories.make()
+        let languageSettings = ApplicationLanguageSettings()
+        self.languageSettings = languageSettings
+        writerBackground = WriterContinuedProcessing(language: languageSettings.read)
+        let created = ServiceFactories.make(language: languageSettings.read)
         services = created
         owner = Result { try ModuleRegistration.lifecycle(created) }
         connect()
@@ -76,6 +120,7 @@ import Observation
     }
     func setForeground(_ foreground: Bool) {
         self.foreground = foreground
+        if foreground { languageSettings.refresh() }
         do {
             let lifecycle = try owner.get()
             lifecycle.setForeground(foreground)
@@ -97,7 +142,7 @@ import Observation
                     try await services.storage.stop()
                 }
                 backgroundArtifactsPrepared = false
-                services = ServiceFactories.make()
+                services = ServiceFactories.make(language: languageSettings.read)
                 owner = Result { try ModuleRegistration.lifecycle(services) }
                 scopeID = UUID()
                 connect()

@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "templates": {
+    "section": "# 当前 ACTION 目录\n{{entries}}",
+    "channel": "通道 {{name}}",
+    "action": "操作 {{alias}}：",
+    "parameter": "  {{name}}：{{type}}，{{presence}}。{{description}} {{constraints}}"
+  }
+}

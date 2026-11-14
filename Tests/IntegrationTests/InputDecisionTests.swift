@@ -86,11 +86,11 @@ private actor TimeoutThenReadyDecision: ModelDecisionProviding {
     }
     let first = await classify("timeout")
     #expect(first.route == .cloud)
-    #expect(first.localFallback == "D3 超时")
+    #expect(first.localFallback == "D3 timed out")
     #expect(first.requests.count == 2)
     var next = await classify("retry-0")
     for index in 1...20 {
-        guard next.localFallback == "D3 上次请求仍在清理" else { break }
+        guard next.localFallback == "D3 is still cleaning up the previous request" else { break }
         try await Task.sleep(for: .milliseconds(10))
         next = await classify("retry-\(index)")
     }
@@ -180,7 +180,7 @@ func inputDecisionMalformedOrUnavailableCloudKeepsInput(kind: String) async thro
     let result = await service.classify(.init(input: input, text: "新的问题", running: true))
     #expect(result.adopted == .enqueue && result.modelResult == nil)
     #expect(result.route == .fallback && result.reason != nil)
-    if kind == "timeout" { #expect(result.reason == "分类超时") }
+    if kind == "timeout" { #expect(result.reason == "Classification timed out") }
     #expect(await cloud.requests.count <= 1)
     if kind == "timeout" { #expect(result.requests.count == 1) }
     await service.stop()
@@ -274,11 +274,11 @@ func inputDecisionProtectsPossibleSpeechCommandsFromModelDiscard(local: Bool) as
     #expect(snapshot.occupied && snapshot.protectsAnswer)
     let actions = request.candidates.compactMap { $0.split(separator: ":", maxSplits: 1).first }
     #expect(actions == ["interrupt", "discard", "enqueue"])
-    #expect(request.instructions.contains(#""拍一张啊" / "Take a photo, uh" -> enqueue"#))
-    #expect(request.instructions.contains(#""嗯" / "Mm-hm" answering a question -> enqueue"#))
-    #expect(request.instructions.contains(#""呃" / "Uh" or [noise] with no meaningful content -> discard"#))
-    #expect(request.instructions.contains("停下、别说了、等下 / stop, stop talking, hold on during playback -> interrupt"))
-    #expect(request.instructions.contains("A quote, negation, or request for later does not interrupt."))
+    #expect(request.instructions.contains(#""Take a photo, uh" → enqueue"#))
+    #expect(request.instructions.contains(#""Mm-hm" answering a question → enqueue"#))
+    #expect(request.instructions.contains(#""Uh" or noise without usable meaning → discard"#))
+    #expect(request.instructions.contains(#""hold on" during playback → interrupt"#))
+    #expect(request.instructions.contains("Quotes, negations and requests for later do not interrupt."))
     #expect(
         request.text.split(separator: "\n").map(String.init) == [
             "Playing=yes Running=no Awaiting answer=yes",

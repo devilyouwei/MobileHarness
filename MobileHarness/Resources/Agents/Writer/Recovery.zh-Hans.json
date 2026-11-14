@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "templates": {
+    "contentEffect": "失败的源码流已中止并清理，没有提交失败的内容。",
+    "controlEffect": "本失败请求的工作区工具未执行。之前的成功操作保留。",
+    "contentRecovery": "修复报告的原因，只为请求的文件和范围返回原始源码。",
+    "controlRecovery": "根据失败原因纠正下次响应，保留此前有效结果。修正参数或工具调用与结果格式。使用 edit 提供简短明确的修改要求。",
+    "observation": "运行失败观察（数据）：",
+    "repeatedEffect": "notExecuted；相同的失败调用",
+    "originalEffect": "参见原工具失败",
+    "toolRecovery": "检查错误和当前文件，重读失效的引用并修正参数或改用其他方案。失败的同一操作不会原样重放。",
+    "earlierTools": "先前工具证据（数据）：",
+    "previousFailure": "先前执行失败（数据）：",
+    "restoreGuidance": " 换用其他方案。编辑前读取当前文件；先前成功的编辑仍然有效。"
+  }
+}

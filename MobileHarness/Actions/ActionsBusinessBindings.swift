@@ -36,6 +36,7 @@
         let model: ModelContainer
         let platform: PlatformContainer
         let ui: UIContainer
+        let presentationLanguage: @Sendable () -> AppLanguage
         let workspaces: @Sendable () throws -> any WorkspaceRepository
         let media: @Sendable () throws -> any MediaRepository
         let devices: @Sendable () throws -> any DeviceRepository
@@ -44,6 +45,7 @@
         public init(
             files: FilesContainer, cache: CacheContainer = CacheContainer(), model: ModelContainer,
             platform: PlatformContainer, ui: UIContainer,
+            presentationLanguage: @escaping @Sendable () -> AppLanguage = { .english },
             workspaces: @escaping @Sendable () throws -> any WorkspaceRepository,
             media: @escaping @Sendable () throws -> any MediaRepository,
             devices: @escaping @Sendable () throws -> any DeviceRepository,
@@ -55,6 +57,7 @@
             self.model = model
             self.platform = platform
             self.ui = ui
+            self.presentationLanguage = presentationLanguage
             self.workspaces = workspaces
             self.media = media
             self.devices = devices

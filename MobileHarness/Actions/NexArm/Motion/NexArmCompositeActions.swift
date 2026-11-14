@@ -11,14 +11,14 @@ public enum NexArmGesture: Sendable, CaseIterable {
 
     public var displayName: String {
         switch self {
-        case .baseSway: "底座晃动"
-        case .nod: "点头"
-        case .shakeHead: "摇头"
-        case .wave: "挥手"
-        case .tiltLeft, .tiltRight: "歪头"
-        case .lookAround: "左右张望"
-        case .celebrate: "庆祝"
-        case .dance: "小舞蹈"
+        case .baseSway: "Base sway"
+        case .nod: "Nod"
+        case .shakeHead: "Shake head"
+        case .wave: "Wave"
+        case .tiltLeft, .tiltRight: "Tilt head"
+        case .lookAround: "Look around"
+        case .celebrate: "Celebrate"
+        case .dance: "Dance"
         }
     }
     /// Finite gesture intent. CMD8 geometry MUST be compiled by NexArmArmPlan before sending.

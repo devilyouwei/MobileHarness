@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "templates": {
+    "invalidParameters": "本阶段工具或参数无效，请使用当前工具规范。",
+    "noScreenshot": " 截图不可用，不得声称已检查画面。",
+    "workspaceID": "提供确切工作区 ID，例如 workspace_3。未知时用 workspace.search。",
+    "searchBeforeDelete": "使用本次委托的 workspace.search 结果中的作品 ID 来删除。",
+    "activeDelete": "先切到其他工作区，再删除当前作品。",
+    "emptyTitle": "请输入非空显示标题。",
+    "invalidEntry": "entry 必须是工作区相对路径，例如 flowchart.html 或 docs/flowchart.md。使用 edit 写入。",
+    "editExisting": "用 edit 创建或修改当前工作区入口文件。",
+    "enterExisting": "用 workspace.enter 和该 ID 回到原工作区。",
+    "pendingRequirements": "处理新接收的用户要求后才能发布。",
+    "editedExplanation": "已开始编辑，须完成渲染和发布流程。",
+    "uncertainPublication": "发布结果不确定，禁止重放。",
+    "alreadyActive": "该工作区已激活。已有读取引用和保存点继续有效。",
+    "switchRestored": "切换失败，已恢复之前的工作区。重新读取文件获取新引用。",
+    "previousWorkspace": "之前的草稿已保留。旧读取引用和保存点已失效。",
+    "unavailable": "工作区 {{workspaceID}} 不可用。用 workspace.search 查找现有作品。",
+    "alreadyCreated": "该委托已为此标题和入口创建工作区 {{workspaceID}}。",
+    "missingEntry": "missingFile：当前工作区存在。调用 edit(path: {{entry}}, instruction: …)，无需读取引用即可创建入口文件。"
+  }
+}

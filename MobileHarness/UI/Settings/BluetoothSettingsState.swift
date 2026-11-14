@@ -21,9 +21,9 @@ public enum BluetoothConnectionStatus: String, Equatable, Sendable {
     public var isConnecting: Bool { self == .connecting }
     public var title: String {
         switch self {
-        case .disconnected: "未连接"
-        case .connecting: "正在连接…"
-        case .connected: "已连接"
+        case .disconnected: "Disconnected"
+        case .connecting: "Connecting…"
+        case .connected: "Connected"
         }
     }
 }
@@ -53,16 +53,16 @@ public enum BluetoothArmAction: String, CaseIterable, Identifiable, Sendable {
     public var id: Self { self }
     public var title: String {
         switch self {
-        case .shakeBase: "底座晃动"
-        case .nod: "点头"
-        case .shakeHead: "摇头"
-        case .wave: "挥手"
-        case .tiltLeft: "向左歪头"
-        case .tiltRight: "向右歪头"
-        case .lookAround: "左右张望"
-        case .celebrate: "庆祝"
-        case .dance: "小舞蹈"
-        case .reset: "整臂归位"
+        case .shakeBase: "Wiggle base"
+        case .nod: "Nod"
+        case .shakeHead: "Shake head"
+        case .wave: "Wave"
+        case .tiltLeft: "Tilt head left"
+        case .tiltRight: "Tilt head right"
+        case .lookAround: "Look around"
+        case .celebrate: "Celebrate"
+        case .dance: "Dance"
+        case .reset: "Home the arm"
         }
     }
 }
@@ -71,13 +71,13 @@ public enum BluetoothRecoveryStage: String, CaseIterable, Sendable {
     case idle, cleaning, waiting, connecting, waitingForBluetooth, suspended, failed
     public var title: String {
         switch self {
-        case .idle: "无恢复任务"
-        case .cleaning: "正在清理旧连接"
-        case .waiting: "等待重新连接"
-        case .connecting: "正在重新连接"
-        case .waitingForBluetooth: "等待蓝牙恢复"
-        case .suspended: "恢复已暂停，返回前台后继续"
-        case .failed: "恢复未完成，需要处理"
+        case .idle: "No recovery in progress"
+        case .cleaning: "Closing the previous connection"
+        case .waiting: "Waiting to reconnect"
+        case .connecting: "Reconnecting"
+        case .waitingForBluetooth: "Waiting for Bluetooth"
+        case .suspended: "Recovery paused. Return to the app to continue."
+        case .failed: "Recovery needs attention"
         }
     }
     public var busy: Bool {

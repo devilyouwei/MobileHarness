@@ -83,6 +83,8 @@ Delete gates every referencing resource before host quiescence, drains/unloads, 
 
 Stable speech facades select before an operation; active inference failure does not switch provider. Custom recognition/synthesis default off. Local adapters never auto-download. Kokoro is not registered. Apple recognition combines transcriber/detector; ordinary silence timing uses external Silero/Energy rather than assumed native activity callbacks.
 
+Automatic Apple recognition reads the host locale at provider selection. Apple English and Simplified Chinese each use a registered managed resource. Availability, preparation, and transcription resolve through the same selector. Explicit recognition locales remain available through Nemotron when it is selected.
+
 ## Instance assembly and replacement
 
 Each ModelContainer owns one assembly task and its resource root/configuration. At most 32 callers join that instance; distinct roots never share a manager. Caller cancellation does not cancel shared assembly. Failure is retained without an alternate manager; shutdown stays terminal.

@@ -125,7 +125,8 @@ extension HistoryActions {
     public static func fullReadFunction(using reads: any HistoryFullReadCapability) -> ActionFunction {
         ActionFunction(
             path: .init(domain: "History", module: "Conversation", function: "readFull"),
-            displayName: "读取完整历史", kind: .finite, completion: "completed", timeout: .seconds(120),
+            displayName: "Read full conversation history", kind: .finite, completion: "completed",
+            timeout: .seconds(120),
             handler: { invocation in
                 try ActionArguments(invocation.call.parameters).validateAllowedKeys([])
                 guard let request = invocation.attachment as? HistoryReadInvocation else {

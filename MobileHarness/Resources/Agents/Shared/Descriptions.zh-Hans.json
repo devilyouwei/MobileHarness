@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "templates": {
+    "agent.applicationControl": "通过应用接口管理设置、服务提供方、模型资源、设备和诊断呈现。",
+    "agent.assistant": "负责用户对话、理解目标、协调可用能力并如实汇报结果。管理自己的前台目标并尊重其他 Agent 的私有上下文。",
+    "agent.memory": "管理历史请求、事务和会话标题，保留实际记录并返回明确结果。",
+    "agent.photographer": "管理相机、相册、拍摄、跟踪、预览处置和媒体生命周期。仅接收当前契约声明的请求。",
+    "agent.speechPerception": "管理聆听授权、麦克风、语音检测、转写和声源观测，并执行采集与播放生命周期规则。",
+    "agent.visionPerception": "处理已授权相机画面，生成姿态观测。观测不授予设备控制。",
+    "agent.writer": "负责创作和修改图示、HTML/CSS/JS 页面、Markdown 和文本文件，以及查找、打开或删除已有作品。用 task.send 转交用户目标、补充、回答和停止请求，附已知作品名或 workspace_N。Writer 决定是否开始、补充现有工作或询问。每次处理一个委托，报告接纳、进度、问题和真实结果。只按明确授权删除。已接纳工作可在原对话或聆听结束后继续。",
+    "skill.application_control": "管理 App 页面、设置、蓝牙、后台视觉和各类窗口。",
+    "skill.basic_skill": "查找并加载能力，维护前台目标和 Skill，协调委托并控制聆听。",
+    "skill.expression_interaction": "眼睛的临时、持续和组合表情。",
+    "skill.history_query": "只读查询以往助手对话。当前网页使用 web-browsing。",
+    "skill.photography": "拍照、录像、相机控制、保存照片及处理录像。跟踪使用 application-control。",
+    "skill.robot_interaction": "按准入条件和顺序执行机械臂动作，依据真实反馈报告。设置由 application-control 管理。",
+    "skill.web_browsing": "按站点或 HTTP/HTTPS 链接浏览、读取页面文字、浏览截图和滚动。无点击、登录、表单、播放控制或本地作品库能力。",
+    "skill.writer_file_editing": "检查和编辑当前 Writer 工作区文件。",
+    "skill.writer_workspace": "查找、选择、打开、创建或删除已保存工作区。"
+  }
+}

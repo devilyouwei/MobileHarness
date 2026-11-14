@@ -77,10 +77,12 @@ actor AssistantSpeechOutput: AgentSpeechOutput {
             content = nil
         } else if playing != nil {
             content = .init(
-                title: "正在说话", primary: .symbol(name: "speaker.wave.2.fill"),
-                tone: .blue, priority: .high, secondary: .spectrum)
+                title: "Speaking", primary: .symbol(name: "speaker.wave.2.fill"),
+                tone: .blue, priority: .high, secondary: .spectrum, localizedLabels: true)
         } else if active != nil {
-            content = .init(title: "正在合成语音", primary: .symbol(name: "waveform"), priority: .low, secondary: .loading)
+            content = .init(
+                title: "Synthesizing speech", primary: .symbol(name: "waveform"), priority: .low,
+                secondary: .loading, localizedLabels: true)
         } else {
             content = nil
         }

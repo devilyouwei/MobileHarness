@@ -1,6 +1,7 @@
 import Foundation
 import FunctionContracts
 import StorageCore
+import UI
 
 public protocol ArtifactCapability: Sendable {
     func perform(invocation: any FunctionInput) async throws -> String
@@ -26,6 +27,7 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
         var generation = 0
     }
     private let workspace: ArtifactWorkspace
+    private let language: @Sendable () -> AppLanguage
     private let present: Present
     private let prepare: @Sendable (WorkspaceID, Bool) async throws -> Void
     private let describe: @Sendable (WorkspaceID, String?, String?) async throws -> Void
@@ -49,6 +51,7 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
     private var cleanupFailure: (any Error)?
     public init(
         workspace: ArtifactWorkspace,
+        language: @escaping @Sendable () -> AppLanguage = { .english },
         prepare: @escaping @Sendable (WorkspaceID, Bool) async throws -> Void = { _, _ in },
         capture: @escaping @Sendable (WorkspaceID) async throws -> Data? = { _ in nil },
         describe: @escaping @Sendable (WorkspaceID, String?, String?) async throws -> Void = { _, _, _ in },
@@ -56,6 +59,7 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
     ) {
         self.prepare = prepare
         self.workspace = workspace
+        self.language = language
         self.present = present
         self.capture = capture
         self.describe = describe
@@ -117,7 +121,7 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
                 guard ArtifactFilePath.isEntry(entry) else {
                     throw ArtifactWorkspaceError.invalidPath
                 }
-                let title = args["title"] ?? checkpoint?.title ?? original?.title ?? "作品"
+                let title = args["title"] ?? checkpoint?.title ?? original?.title ?? language().text("Project")
                 guard !title.isEmpty else { throw ArtifactWorkspaceError.invalidTitle }
                 var draft = try checkpoint?.draft ?? ArtifactDraft(files: original?.files ?? [:])
                 if args["createWorkspace"] == "true", draft.files[entry] == nil {
@@ -134,9 +138,10 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
                 if command == "start" { try await prepare(id, false) }
                 var visible = draft.files
                 if visible[entry]?.isEmpty != false {
+                    let status = language().text("Preparing the draft…")
                     visible[entry] =
                         entry.hasSuffix(".html")
-                        ? "<!doctype html><meta charset=utf-8><h2>Writer</h2><p>正在准备创作…</p>" : "正在准备创作…"
+                        ? "<!doctype html><meta charset=utf-8><h2>Writer</h2><p>\(status)</p>" : status
                 }
                 let presentation = try await present(id, title, entry, visible, true)
                 try await describe(id, title, args["subtitle"])
@@ -372,7 +377,7 @@ public actor ArtifactService: ArtifactCapability, ArtifactStreaming {
             sessions[delegateID] = session
             return try encode([
                 "workspaceID": project.id.rawValue, "revision": project.revision.uuidString,
-                "summary": String((args["summary"] ?? "作品已保存").prefix(512)),
+                "summary": String((args["summary"] ?? language().text("Project saved")).prefix(512)),
                 "verification": session.verification,
             ])
         default: throw ArtifactWorkspaceError.invalidPath

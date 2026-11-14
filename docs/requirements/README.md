@@ -24,6 +24,7 @@
 
 | 需求 | 未实现范围 |
 | --- | --- |
+| [English and Simplified Chinese](App-Localization.md) | App language, user-facing copy, model prompts and speech language. |
 | [统一记录与记忆管理](Unified-Memory-Plan.md) | 后续以 MemorySkill 统一 Writer 记录、聊天记录和综合记忆，评估独立 Memory Agent；当前 History/Writing 暂不调整。 |
 | [State 公开寄存器与 useState](Resource-State-Plan.md) | 首批 camera/robot/task、作用域与每轮上下文已实施；真实模型/UI/物理验收及后续 Trigger/写入源治理另行跟进。 |
 | [Face 窗口与 App 内灵动岛](Face-Window-Island-Plan.md) | 通用窗口/拍照首版已安装真机；取景比例、双用途共享采集和可见层级镜头权限已实现并自动化验证，本轮真机验收及独立岛保留。 |

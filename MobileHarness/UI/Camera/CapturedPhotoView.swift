@@ -26,6 +26,8 @@ import Foundation
 
     /// Gallery rendering owns only bounded thumbnails and the current page/neighbors.
     @MainActor struct CameraGalleryView: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         @Bindable var camera: CameraState
         let controls: any CameraControlling
         @State private var selected: String?
@@ -60,7 +62,7 @@ import Foundation
                             Text("\(ids.count)").font(.caption.bold()).monospacedDigit().padding(6)
                                 .background(.black.opacity(0.75), in: Capsule()).offset(x: 6, y: -8)
                         }.frame(width: 86, height: 110)
-                    }.buttonStyle(.plain).accessibilityLabel("查看 \(ids.count) 张预览照片")
+                    }.buttonStyle(.plain).accessibilityLabel("View \(ids.count) photo previews")
                         .accessibilityIdentifier("camera.gallery.stack").padding(.trailing, 16).padding(.bottom, 154)
                 }
                 if selected != nil, let item {
@@ -72,22 +74,24 @@ import Foundation
                             } label: {
                                 Image(systemName: "chevron.left").frame(width: 44, height: 44)
                             }
-                            .disabled(index == 0).accessibilityLabel("上一张")
+                            .disabled(index == 0).accessibilityLabel(appCopy.text("Previous photo"))
                             Spacer(minLength: 0)
-                            Button(item.status == "saved" ? "已保存" : "保存") { controls.savePhoto(item.id) }
-                                .disabled(camera.photoBusy || camera.controlBusy || item.status == "saved")
+                            Button(item.status == "saved" ? appCopy.text("Saved") : appCopy.text("Save")) {
+                                controls.savePhoto(item.id)
+                            }
+                            .disabled(camera.photoBusy || camera.controlBusy || item.status == "saved")
                             Spacer(minLength: 0)
                             Button {
                                 page(1)
                             } label: {
                                 Image(systemName: "chevron.right").frame(width: 44, height: 44)
                             }
-                            .disabled(index == ids.count - 1).accessibilityLabel("下一张")
+                            .disabled(index == ids.count - 1).accessibilityLabel(appCopy.text("Next photo"))
                         }.font(.subheadline).buttonStyle(.plain)
                         HStack {
                             Text("\(index + 1) / \(ids.count) · \(item.id)").monospacedDigit()
                             Spacer()
-                            Button("返回拍摄") { selected = nil }
+                            Button(appCopy.text("Back to camera")) { selected = nil }
                         }.font(.caption)
                         ZStack {
                             if let image = pages[item.id] {
@@ -142,7 +146,7 @@ import Foundation
                         }
                     } catch {
                         guard !Task.isCancelled else { return }
-                        failure = "读取预览失败：" + error.localizedDescription
+                        failure = appCopy.text("Could not load preview: ") + error.localizedDescription
                     }
                 }
         }

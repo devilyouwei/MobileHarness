@@ -32,7 +32,8 @@ import UI
                 let context = invocation.context
                 bluetooth.manualFailureReporter = { failure in
                     await activity.recordFailure(
-                        title: "手动机械臂操作失败", source: origin.source, message: failure.message, failureCode: failure.code,
+                        title: "Manual robot arm operation failed", source: origin.source, message: failure.message,
+                        failureCode: failure.code,
                         context: .init(
                             workerID: failure.workerID, sessionID: origin.sessionID,
                             inputID: origin.inputID,
@@ -43,7 +44,8 @@ import UI
                     let delivery = await deliverActionResult(result)
                     if !delivery {
                         await activity.recordFailure(
-                            title: "设备结果反馈失败", source: origin.source, message: "原始执行失败已保留，反馈未被接收",
+                            title: "Could not deliver device result", source: origin.source,
+                            message: "The execution failure was retained; feedback was rejected",
                             failureCode: "device.feedback", context: nil)
                     }
                 }

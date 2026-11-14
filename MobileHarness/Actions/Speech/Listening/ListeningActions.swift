@@ -4,7 +4,7 @@ import FunctionContracts
 extension SpeechActions {
     /// SpeechPerception uses this fixed registered function; it is absent from model catalogs.
     @Action(
-        domain: "Speech", module: "Listening", title: "聆听状态",
+        domain: "Speech", module: "Listening", title: "Listening status",
         doc:
             "Apply trusted listening consent/pause revision and join admitted startup children. Feedback plays only on a new wake, never automatic pause/resume. Internal SpeechPerception only.",
         parameters: [
@@ -68,7 +68,7 @@ extension SpeechActions {
     {
         ActionFunction(
             path: .init(domain: "Speech", module: "Listening", function: "prepare"),
-            displayName: "准备聆听反馈", kind: .state, completion: "completed", timeout: .seconds(5),
+            displayName: "Prepare listening feedback", kind: .state, completion: "completed", timeout: .seconds(5),
             handler: { invocation in
                 let arguments = ActionArguments(invocation.call.parameters)
                 try arguments.validateAllowedKeys(["pressed"])
@@ -85,7 +85,7 @@ extension SpeechActions {
 // Public intent Actions never accept the internal policy revision or reply pause.
 extension SpeechActions {
     @Action(
-        domain: "Speech", module: "Listening", title: "打开聆听",
+        domain: "Speech", module: "Listening", title: "Start listening",
         doc:
             "Enable listening.",
         kind: .finite, completion: "Activated.",
@@ -101,7 +101,7 @@ extension SpeechActions {
     }
 
     @Action(
-        domain: "Speech", module: "Listening", title: "关闭聆听",
+        domain: "Speech", module: "Listening", title: "Stop listening",
         doc:
             "End conversation/listening.",
         kind: .finite, completion: "Capture stopped.",

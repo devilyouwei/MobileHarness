@@ -16,11 +16,17 @@ public final class SpeechDiagnosticState {
     @ObservationIgnored var presentationAdmission: UIPresentationAdmission?
     public var isPresentationAvailable: Bool { presentationAdmission.map { $0.started && !$0.stopped } ?? true }
 
-    public internal(set) var text = "你好，Hello world，欢迎使用本地语音助手。"
-    public internal(set) var report = "中英双语 · Core ML · MOSS Nano Beta · zh_1 / en_2"
+    private var sample = "Hello. Welcome to the local voice assistant."
+    public internal(set) var text = "Hello. Welcome to the local voice assistant."
+    public internal(set) var report = "Bilingual · Core ML · MOSS Nano Beta · zh_1 / en_2"
     public internal(set) var isRunning = false
     public internal(set) var isStopping = false
     public init() {}
+    public func updateLanguage(_ language: AppLanguage) {
+        let nextSample = language.text("Hello. Welcome to the local voice assistant.")
+        if text == sample { text = nextSample }
+        sample = nextSample
+    }
     public func presentRunning(_ value: Bool) {
         guard presentationAdmission?.acceptsRetained() ?? true else { return }
         isRunning = value

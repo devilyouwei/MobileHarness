@@ -174,20 +174,20 @@ extension HistoryTurn {
 
     public var decisionReport: String {
         switch coordination?.decision {
-        case "enqueue": "排队"
-        case "discard": "丢弃"
-        case "interrupt": "打断"
+        case "enqueue": "Queued"
+        case "discard": "Discarded"
+        case "interrupt": "Interrupted"
         case .some(let value): value
-        case nil: "未记录决策"
+        case nil: "No decision recorded"
         }
     }
     public var responseStatus: String {
         switch state {
-        case .generating: return "请求进行中，尚未记录回复。"
-        case .failed: return "请求失败，未记录回复。"
-        case .cancelled: return "请求已取消，未记录回复。"
-        case .interrupted: return "请求已中断，未记录回复。"
-        case .completed: return "请求已结束，未记录文本回复或工具调用。"
+        case .generating: return "The request is running. A reply has yet to be recorded."
+        case .failed: return "The request failed before recording a reply."
+        case .cancelled: return "The request was cancelled before recording a reply."
+        case .interrupted: return "The request was interrupted before recording a reply."
+        case .completed: return "The request ended with no recorded text or tool calls."
         }
     }
 
@@ -200,15 +200,16 @@ extension HistoryTurn {
     }
     public var firstTokenReport: String {
         guard modelRequestStartedAt != nil, firstTokenAt != nil, let delay = firstTokenLatency else {
-            return "首 token 耗时："
+            return "Time to first token: "
         }
-        return "首 token 耗时：\(String(format: "%.3f", delay)) 秒"
+        return "Time to first token: \(String(format: "%.3f", delay)) sec"
     }
     public var tokenReport: String {
-        guard let usage = tokenUsage else { return "Token 用量：" }
-        var report = "输入：\(usage.input) tokens · 生成：\(usage.generated) tokens · 总计：\(usage.total) tokens"
-        if let cached = usage.cachedInput { report += " · 缓存读取：\(cached) tokens" }
-        if let written = usage.cacheWriteInput { report += " · 缓存写入：\(written) tokens" }
+        guard let usage = tokenUsage else { return "Token usage: " }
+        var report =
+            "Input: \(usage.input) tokens · Generated: \(usage.generated) tokens · Total: \(usage.total) tokens"
+        if let cached = usage.cachedInput { report += " · Cache read: \(cached) tokens" }
+        if let written = usage.cacheWriteInput { report += " · Cache write: \(written) tokens" }
         return report
     }
 

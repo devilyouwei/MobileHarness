@@ -11,6 +11,7 @@ import UI
         private let pages: WebPageContainer
         private let windows: WindowState
         private let disk: DiskFileStore
+        private let language: @Sendable () -> AppLanguage
         private var bindings: [WorkspaceID: UUID] = [:]
         private var dismissed: Set<WorkspaceID> = []
         private var pendingOpen: Set<WorkspaceID> = []
@@ -79,7 +80,8 @@ import UI
                     log.error("Workspace preview restoration failed: \(reason, privacy: .private)")
                     if let window = bindings[id] {
                         restoreFailures.insert(id)
-                        windows.report(window, message: "作品预览恢复失败（\(reason)）")
+                        windows.report(
+                            window, message: language().format("Could not restore the project preview (%@)", reason))
                     }
                 }
             }
@@ -117,10 +119,14 @@ import UI
                 rendering.remove(id)
             }
         }
-        public init(pages: WebPageContainer, windows: WindowState, disk: DiskFileStore) {
+        public init(
+            pages: WebPageContainer, windows: WindowState, disk: DiskFileStore,
+            language: @escaping @Sendable () -> AppLanguage = { .english }
+        ) {
             self.pages = pages
             self.windows = windows
             self.disk = disk
+            self.language = language
         }
         public func present(
             id: WorkspaceID, title: String, entry: String, files: [String: String], preview: Bool,
@@ -204,7 +210,8 @@ import UI
             do {
                 var rendered = files
                 if ext != "html" {
-                    let document = try await ArtifactTextRendering.document(files[entry] ?? "", markdown: ext == "md")
+                    let document = try await ArtifactTextRendering.document(
+                        files[entry] ?? "", markdown: ext == "md", language: language())
                     rendered[target] = document.html
                     markupDiagnostics = document.diagnostics
                 } else if rendered[entry] == nil {
@@ -360,12 +367,13 @@ import UI
 
 /// Shared document output for a work window, history preview and PDF export.
 public enum ArtifactTextRendering {
-    @MainActor public static func document(_ text: String, markdown: Bool) async throws
+    @MainActor public static func document(_ text: String, markdown: Bool, language: AppLanguage = .english)
+        async throws
         -> (html: String, diagnostics: String)
     {
         let fragment: (html: String, diagnostics: String)
         if markdown {
-            fragment = try await WebPageContainer.renderMarkdown(text)
+            fragment = try await WebPageContainer.renderMarkdown(text, language: language)
         } else {
             let escaped = text.replacingOccurrences(of: "&", with: "&amp;")
                 .replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")

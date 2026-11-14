@@ -244,7 +244,7 @@ import UI
         }
         guard !isBusy(item) else { return }
         guard pending.count < 32 else {
-            state.present(.error("同时提交的模型操作过多，请稍后重试"))
+            state.present(.error("Too many model operations are running. Try again."))
             return
         }
         let command: Operation

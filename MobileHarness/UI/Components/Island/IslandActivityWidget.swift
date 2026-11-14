@@ -26,6 +26,7 @@ struct MobileHarnessLiveActivity: Widget {
             }
             .padding(15)
             .widgetURL(snapshot.navigationURL)
+            .environment(\.locale, Locale(identifier: snapshot.language ?? "en"))
         } dynamicIsland: { context in
             let snapshot = context.state.presentation(stale: context.isStale)
             return DynamicIsland {
@@ -124,13 +125,13 @@ private struct IslandActivityAccessory: View {
     private struct IslandActivityModesPreview: PreviewProvider {
         static let attributes = IslandActivityAttributes(sessionID: UUID())
         static let content = IslandSystemSnapshot(
-            generation: UUID(), activityID: UUID(), title: "拍摄照片", subtitle: "等待你的操作",
+            generation: UUID(), activityID: UUID(), title: "Taking a photo", subtitle: "Waiting for you",
             primary: .symbol(name: "camera"), tone: "blue", updatedAt: Date())
         static var previews: some View {
-            attributes.previewContext(content, viewKind: .dynamicIsland(.compact)).previewDisplayName("紧凑")
-            attributes.previewContext(content, viewKind: .dynamicIsland(.minimal)).previewDisplayName("最小")
-            attributes.previewContext(content, viewKind: .dynamicIsland(.expanded)).previewDisplayName("展开")
-            attributes.previewContext(content, viewKind: .content).previewDisplayName("锁屏")
+            attributes.previewContext(content, viewKind: .dynamicIsland(.compact)).previewDisplayName("Compact")
+            attributes.previewContext(content, viewKind: .dynamicIsland(.minimal)).previewDisplayName("Minimal")
+            attributes.previewContext(content, viewKind: .dynamicIsland(.expanded)).previewDisplayName("Expanded")
+            attributes.previewContext(content, viewKind: .content).previewDisplayName("Lock Screen")
         }
     }
 #endif

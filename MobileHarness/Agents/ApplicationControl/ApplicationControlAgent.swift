@@ -181,13 +181,13 @@ public actor ApplicationControlAgent: Agent {
     }
     static func connectionContent(_ state: ApplicationControlBluetoothState, temporary: Bool) -> IslandContent? {
         if state == .disconnected && !temporary { return nil }
-        let title = state == .connected ? "已连接" : state == .connecting ? "正在连接" : "未连接"
+        let title = state == .connected ? "Connected" : state == .connecting ? "Connecting" : "Disconnected"
         return .init(
-            title: "蓝牙", subtitle: title,
+            title: "Bluetooth", subtitle: title,
             primary: .symbol(
                 name: state == .connecting ? "antenna.radiowaves.left.and.right" : "dot.radiowaves.left.and.right"),
             tone: state == .disconnected ? .warning : .blue, priority: temporary ? .high : .background,
-            secondary: state == .connecting ? .loading : nil)
+            secondary: state == .connecting ? .loading : nil, localizedLabels: true)
     }
     public func observeConnection(_ facts: NexArmConnectionFacts) async throws {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
@@ -452,7 +452,7 @@ public actor ApplicationControlAgent: Agent {
                 id: "container:" + event.scopeID + ":" + event.id, title: event.module + "." + event.component,
                 source: event.module, message: event.operation + ": " + event.message, time: event.lastOccurred,
                 failureCode: "container.failure", context: .init(workerID: event.component, sessionID: event.scopeID),
-                userMessage: "基础能力发生异常，请查看运行异常", category: "容器异常")
+                userMessage: "A required capability is unavailable. Check Runtime Issues.", category: "Container issue")
         } else {
             guard let event = message.content(as: RuntimeFailureEvent.self) else {
                 throw CommunicationError.invalidPayload

@@ -19,15 +19,18 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
     public let manager = ContainerManager()
     private let root: URL
     private let uiConfiguration: UIConfiguration
+    private let recognitionLocale: @Sendable () -> String
     private let modelArtifacts: @Sendable (FilesContainer) async throws -> ModelArtifactConfiguration
     public init(
         root: URL, uiConfiguration: UIConfiguration = .init(),
+        recognitionLocale: @escaping @Sendable () -> String = { "en-US" },
         modelArtifacts: @escaping @Sendable (FilesContainer) async throws -> ModelArtifactConfiguration = { _ in
             throw CocoaError(.fileReadNoSuchFile)
         }
     ) {
         self.root = root
         self.uiConfiguration = uiConfiguration
+        self.recognitionLocale = recognitionLocale
         self.modelArtifacts = modelArtifacts
     }
     /// Structural projection only. Each independent SDK retains its own Failure definition.
@@ -152,7 +155,7 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
                     },
                     onFailure: self.containerFailures().sink(
                         module: "model",
-                        details: Self.failureDetails))
+                        details: Self.failureDetails), recognitionLocale: self.recognitionLocale)
             }
         }.cached
     }

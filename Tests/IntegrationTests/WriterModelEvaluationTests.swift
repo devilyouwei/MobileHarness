@@ -418,7 +418,7 @@ func writerRealModelWorkflowRegression() async throws {
                     let json = try? JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any]
                 else { return false }
                 let text = json["text"] as? String ?? ""
-                return !text.isEmpty && !text.contains("正在准备创作")
+                return !text.isEmpty && !text.contains("Preparing the draft")
             }), let at = Double(first["at"] ?? "") {
                 item["firstVisibleSeconds"] = at - start.timeIntervalSince1970
             }
@@ -625,7 +625,7 @@ private struct WriterPromptCase: Decodable {
             }
         }
         renders.append(row)
-        if preview, !fired, !(files[entry] ?? "").contains("正在准备创作"),
+        if preview, !fired, !(files[entry] ?? "").contains("Preparing the draft"),
             ["closeOnPreview", "minimizeOnPreview"].contains(hostEvent ?? ""), let window = windows.windows.first?.id
         {
             fired = true

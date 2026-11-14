@@ -3,6 +3,8 @@
     import WebKit
 
     public struct WebPageView: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         private let page: WebPageContainer
         private let subtitle: String?
         public init(page: WebPageContainer, subtitle: String? = nil) {
@@ -13,7 +15,7 @@
             VStack(spacing: 0) {
                 HStack {
                     Image(systemName: page.address.hasPrefix("file:") ? "doc.richtext" : "globe")
-                    Text(subtitle ?? (page.address.hasPrefix("file:") ? "本地作品" : page.address))
+                    Text(subtitle ?? (page.address.hasPrefix("file:") ? appCopy.text("Local project") : page.address))
                         .font(.caption).lineLimit(1).textSelection(.enabled)
                     Spacer()
                     if page.loading { ProgressView().controlSize(.small) }

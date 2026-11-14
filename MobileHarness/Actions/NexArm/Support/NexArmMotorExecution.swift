@@ -80,17 +80,17 @@ public enum NexArmExecutionError: LocalizedError, Sendable, Equatable, ActionRep
     }
     public var errorDescription: String? {
         switch self {
-        case .invalidArguments: "动作参数或执行计划无效"
-        case .unsupportedFirmware: "当前固件不支持此动作"
-        case .firmwareUnavailable: "尚未取得动作所需的固件信息"
-        case .admissionTimeout: "动作发送准入超时，指令未提交"
-        case .disconnected: "设备操作当前不可用"
-        case .busy: "机械臂正在处理上一项操作，请稍后重试"
-        case .resourceBusy: "电机控制资源正在被其他操作占用，请稍后重试"
-        case .resourceUnavailable(let reason): "电机控制资源不可用：\(reason)"
-        case .background: "请保持应用在前台后再控制机械臂"
-        case .feedbackTimeout: "动作等待位置反馈超时，执行未完成"
-        case .controlNotReady: "设备操作当前尚未就绪"
+        case .invalidArguments: "Invalid motion arguments or execution plan"
+        case .unsupportedFirmware: "The current firmware does not support this motion"
+        case .firmwareUnavailable: "Firmware information is unavailable for this motion"
+        case .admissionTimeout: "Motion admission timed out before command submission"
+        case .disconnected: "Device operation is unavailable"
+        case .busy: "The arm is completing another operation. Try again."
+        case .resourceBusy: "Another operation is using the motors. Try again."
+        case .resourceUnavailable(let reason): "Motor control resources unavailable: \(reason)"
+        case .background: "Bring the app to the foreground to control the arm"
+        case .feedbackTimeout: "Motion position feedback timed out before completion"
+        case .controlNotReady: "The device is not ready for this operation"
         }
     }
 }

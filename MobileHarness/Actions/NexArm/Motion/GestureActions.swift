@@ -4,7 +4,7 @@ import PlatformKit
 /// NexArm.Gesture function ownership; current invocation paths remain compatible.
 extension NexArmActions {
     @Action(
-        domain: "NexArm", module: "Gesture", title: "点头",
+        domain: "NexArm", module: "Gesture", title: "Nod",
         doc:
             "Nod using motor4, returning home; leave other motors untouched.",
         parameters: [
@@ -46,7 +46,7 @@ extension NexArmActions {
     }
 
     @Action(
-        domain: "NexArm", module: "Gesture", title: "摇头",
+        domain: "NexArm", module: "Gesture", title: "Shake head",
         doc:
             "Shake the head using motor5, returning home; leave other motors untouched.",
         parameters: [
@@ -88,7 +88,7 @@ extension NexArmActions {
     }
 
     @Action(
-        domain: "NexArm", module: "Gesture", title: "挥手",
+        domain: "NexArm", module: "Gesture", title: "Wave",
         doc:
             "Wave the wrist with the configured arm gesture, then return home.",
         parameters: [
@@ -129,7 +129,7 @@ extension NexArmActions {
     }
 
     @Action(
-        domain: "NexArm", module: "Gesture", title: "歪头",
+        domain: "NexArm", module: "Gesture", title: "Tilt head",
         doc:
             "Tilt the wrist in the requested direction and return home.",
         parameters: [
@@ -170,7 +170,7 @@ extension NexArmActions {
     }
 
     @Action(
-        domain: "NexArm", module: "Gesture", title: "左右张望",
+        domain: "NexArm", module: "Gesture", title: "Look around",
         doc:
             "Perform the configured arm look-around gesture and return home.",
         parameters: [
@@ -211,7 +211,7 @@ extension NexArmActions {
     }
 
     @Action(
-        domain: "NexArm", module: "Gesture", title: "庆祝",
+        domain: "NexArm", module: "Gesture", title: "Celebrate",
         doc:
             "Perform the configured celebration gesture and return home.",
         parameters: [
@@ -252,7 +252,7 @@ extension NexArmActions {
     }
 
     @Action(
-        domain: "NexArm", module: "Gesture", title: "跳舞",
+        domain: "NexArm", module: "Gesture", title: "Dance",
         doc:
             "Perform the configured arm dance and return home.",
         parameters: [

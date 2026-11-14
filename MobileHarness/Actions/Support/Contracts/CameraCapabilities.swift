@@ -159,14 +159,14 @@ public enum CameraControlError: Error, Equatable, Sendable, ActionExecutionFailu
     case lensNotOwned
     public var errorDescription: String? {
         switch self {
-        case .pendingVideo: "请先保存或忽略待处理的视频，再关闭相机。"
-        case .notForeground: "请回到应用前台再操作"
-        case .busy: "照片或相机操作正在执行，请稍后重试"
-        case .disabled: "相机尚未开启"
-        case .permissionDenied: "未获得所需权限，请在系统设置中允许"
-        case .unavailable: "相机或照片能力暂不可用"
-        case .lensNotOwned: "请使用当前最上层的相机画面切换镜头"
-        case .photoUnavailable: "这张照片不在当前相机会话缓存中，无法操作"
+        case .pendingVideo: "Save or discard the pending video before closing the camera."
+        case .notForeground: "Bring the app to the foreground and try again."
+        case .busy: "The camera is busy. Try again."
+        case .disabled: "The camera is off"
+        case .permissionDenied: "Allow the required access in System Settings."
+        case .unavailable: "The camera or photo library is unavailable."
+        case .lensNotOwned: "Switch cameras from the active camera view."
+        case .photoUnavailable: "This photo is unavailable in the current camera session."
         }
     }
     public var executionFailureCode: ActionExecutionFailureCode {

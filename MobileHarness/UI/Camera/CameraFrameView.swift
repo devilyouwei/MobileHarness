@@ -25,7 +25,7 @@
             }
             view.onFailure = { [weak state] _ in
                 state?.presentRendererFailure(
-                    "相机画面渲染不可用", generation: generation, surface: showsPose ? .perception : .capture)
+                    "Camera preview unavailable", generation: generation, surface: showsPose ? .perception : .capture)
             }
             view.update(
                 frame: state.videoFrame, pose: showsPose ? state.skeleton : nil, mirrored: state.facing == .front,

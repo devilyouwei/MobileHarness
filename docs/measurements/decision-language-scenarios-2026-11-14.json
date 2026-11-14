@@ -1,0 +1,488 @@
+[
+  {
+    "id": "direct-stop",
+    "expected": "interrupt",
+    "running": false,
+    "playing": true,
+    "english": {
+      "user": "Read the travel itinerary.",
+      "assistant": "The next stop is the train station.",
+      "question": null,
+      "latest": "Stop talking."
+    },
+    "chinese": {
+      "user": "念一下行程。",
+      "assistant": "下一站是火车站。",
+      "question": null,
+      "latest": "别说了。"
+    }
+  },
+  {
+    "id": "short-stop",
+    "expected": "interrupt",
+    "running": false,
+    "playing": true,
+    "english": {
+      "user": "Read the travel itinerary.",
+      "assistant": "The next stop is the train station.",
+      "question": null,
+      "latest": "Stop!"
+    },
+    "chinese": {
+      "user": "念一下行程。",
+      "assistant": "下一站是火车站。",
+      "question": null,
+      "latest": "停！"
+    }
+  },
+  {
+    "id": "pause-now",
+    "expected": "interrupt",
+    "running": false,
+    "playing": true,
+    "english": {
+      "user": "Read the travel itinerary.",
+      "assistant": "The next stop is the train station.",
+      "question": null,
+      "latest": "Hold on a second."
+    },
+    "chinese": {
+      "user": "念一下行程。",
+      "assistant": "下一站是火车站。",
+      "question": null,
+      "latest": "等一下。"
+    }
+  },
+  {
+    "id": "enough",
+    "expected": "interrupt",
+    "running": false,
+    "playing": true,
+    "english": {
+      "user": "Read the travel itinerary.",
+      "assistant": "The next stop is the train station.",
+      "question": null,
+      "latest": "That's enough, be quiet now."
+    },
+    "chinese": {
+      "user": "念一下行程。",
+      "assistant": "下一站是火车站。",
+      "question": null,
+      "latest": "够了，现在先安静一下。"
+    }
+  },
+  {
+    "id": "skip-current",
+    "expected": "interrupt",
+    "running": false,
+    "playing": true,
+    "english": {
+      "user": "Read the travel itinerary.",
+      "assistant": "The next stop is the train station.",
+      "question": null,
+      "latest": "Skip the rest of that part."
+    },
+    "chinese": {
+      "user": "念一下行程。",
+      "assistant": "下一站是火车站。",
+      "question": null,
+      "latest": "这段后面不用念了。"
+    }
+  },
+  {
+    "id": "abort-motion",
+    "expected": "interrupt",
+    "running": true,
+    "playing": false,
+    "english": {
+      "user": "Move the arm to the left.",
+      "assistant": "I'm moving the arm left now.",
+      "question": null,
+      "latest": "Cancel that move right now."
+    },
+    "chinese": {
+      "user": "把机械臂移到左边。",
+      "assistant": "我正在把机械臂往左移。",
+      "question": null,
+      "latest": "立刻取消刚才那个动作。"
+    }
+  },
+  {
+    "id": "correct-motion",
+    "expected": "interrupt",
+    "running": true,
+    "playing": false,
+    "english": {
+      "user": "Move the arm to the left.",
+      "assistant": "I'm moving the arm left now.",
+      "question": null,
+      "latest": "No, move it right instead."
+    },
+    "chinese": {
+      "user": "把机械臂移到左边。",
+      "assistant": "我正在把机械臂往左移。",
+      "question": null,
+      "latest": "不对，改成往右移。"
+    }
+  },
+  {
+    "id": "stop-before-hit",
+    "expected": "interrupt",
+    "running": true,
+    "playing": false,
+    "english": {
+      "user": "Move the arm to the left.",
+      "assistant": "I'm moving the arm left now.",
+      "question": null,
+      "latest": "Stop now, it's about to hit the lamp."
+    },
+    "chinese": {
+      "user": "把机械臂移到左边。",
+      "assistant": "我正在把机械臂往左移。",
+      "question": null,
+      "latest": "快停，要撞到台灯了。"
+    }
+  },
+  {
+    "id": "confirm-short",
+    "expected": "enqueue",
+    "running": false,
+    "playing": false,
+    "english": {
+      "user": "Take a photo.",
+      "assistant": "Would you like to save this photo?",
+      "question": "Would you like to save this photo?",
+      "latest": "Mm."
+    },
+    "chinese": {
+      "user": "拍一张照片。",
+      "assistant": "要保存这张照片吗？",
+      "question": "要保存这张照片吗？",
+      "latest": "嗯。"
+    }
+  },
+  {
+    "id": "confirm-explicit",
+    "expected": "enqueue",
+    "running": false,
+    "playing": false,
+    "english": {
+      "user": "Take a photo.",
+      "assistant": "Would you like to save this photo?",
+      "question": "Would you like to save this photo?",
+      "latest": "Yes, save it."
+    },
+    "chinese": {
+      "user": "拍一张照片。",
+      "assistant": "要保存这张照片吗？",
+      "question": "要保存这张照片吗？",
+      "latest": "好，保存吧。"
+    }
+  },
+  {
+    "id": "answer-no",
+    "expected": "enqueue",
+    "running": false,
+    "playing": false,
+    "english": {
+      "user": "Take a photo.",
+      "assistant": "Would you like to save this photo?",
+      "question": "Would you like to save this photo?",
+      "latest": "No, don't save it."
+    },
+    "chinese": {
+      "user": "拍一张照片。",
+      "assistant": "要保存这张照片吗？",
+      "question": "要保存这张照片吗？",
+      "latest": "不，不要保存。"
+    }
+  },
+  {
+    "id": "answer-option",
+    "expected": "enqueue",
+    "running": false,
+    "playing": false,
+    "english": {
+      "user": "Export this project.",
+      "assistant": "Should I export it as PDF or ZIP?",
+      "question": "Should I export it as PDF or ZIP?",
+      "latest": "PDF."
+    },
+    "chinese": {
+      "user": "导出这个作品。",
+      "assistant": "要导出 PDF 还是 ZIP？",
+      "question": "要导出 PDF 还是 ZIP？",
+      "latest": "用 PDF。"
+    }
+  },
+  {
+    "id": "new-request-filler",
+    "expected": "enqueue",
+    "running": false,
+    "playing": false,
+    "english": {
+      "user": "Show me the settings page.",
+      "assistant": "The settings page is open.",
+      "question": null,
+      "latest": "Take a picture, uh."
+    },
+    "chinese": {
+      "user": "打开设置。",
+      "assistant": "设置页已经打开了。",
+      "question": null,
+      "latest": "拍一张啊。"
+    }
+  },
+  {
+    "id": "short-command",
+    "expected": "enqueue",
+    "running": false,
+    "playing": false,
+    "english": {
+      "user": "Show me the settings page.",
+      "assistant": "The settings page is open.",
+      "question": null,
+      "latest": "Open the camera."
+    },
+    "chinese": {
+      "user": "打开设置。",
+      "assistant": "设置页已经打开了。",
+      "question": null,
+      "latest": "开相机。"
+    }
+  },
+  {
+    "id": "short-fragment",
+    "expected": "enqueue",
+    "running": false,
+    "playing": false,
+    "english": {
+      "user": "Show me the settings page.",
+      "assistant": "The settings page is open.",
+      "question": null,
+      "latest": "The left one."
+    },
+    "chinese": {
+      "user": "打开设置。",
+      "assistant": "设置页已经打开了。",
+      "question": null,
+      "latest": "左边那个。"
+    }
+  },
+  {
+    "id": "speech-deferred",
+    "expected": "enqueue",
+    "running": false,
+    "playing": true,
+    "english": {
+      "user": "Read the travel itinerary.",
+      "assistant": "The next stop is the train station.",
+      "question": null,
+      "latest": "Stop after you finish this section."
+    },
+    "chinese": {
+      "user": "念一下行程。",
+      "assistant": "下一站是火车站。",
+      "question": null,
+      "latest": "说完这一段再停。"
+    }
+  },
+  {
+    "id": "motion-deferred",
+    "expected": "enqueue",
+    "running": true,
+    "playing": false,
+    "english": {
+      "user": "Move the arm to the left.",
+      "assistant": "I'm moving the arm left now.",
+      "question": null,
+      "latest": "Finish this move and go right next time."
+    },
+    "chinese": {
+      "user": "把机械臂移到左边。",
+      "assistant": "我正在把机械臂往左移。",
+      "question": null,
+      "latest": "这次先移完，下次往右。"
+    }
+  },
+  {
+    "id": "stop-negated",
+    "expected": "enqueue",
+    "running": false,
+    "playing": true,
+    "english": {
+      "user": "Read the travel itinerary.",
+      "assistant": "The next stop is the train station.",
+      "question": null,
+      "latest": "Don't stop. Keep reading."
+    },
+    "chinese": {
+      "user": "念一下行程。",
+      "assistant": "下一站是火车站。",
+      "question": null,
+      "latest": "不用停，继续念。"
+    }
+  },
+  {
+    "id": "stop-quoted",
+    "expected": "enqueue",
+    "running": false,
+    "playing": true,
+    "english": {
+      "user": "Read the travel itinerary.",
+      "assistant": "The next stop is the train station.",
+      "question": null,
+      "latest": "Later, tell me what the word 'stop' means."
+    },
+    "chinese": {
+      "user": "念一下行程。",
+      "assistant": "下一站是火车站。",
+      "question": null,
+      "latest": "等会儿解释一下「停」这个字。"
+    }
+  },
+  {
+    "id": "stop-idle",
+    "expected": "enqueue",
+    "running": false,
+    "playing": false,
+    "english": {
+      "user": "Show me the settings page.",
+      "assistant": "The settings page is open.",
+      "question": null,
+      "latest": "Stop talking."
+    },
+    "chinese": {
+      "user": "打开设置。",
+      "assistant": "设置页已经打开了。",
+      "question": null,
+      "latest": "别说了。"
+    }
+  },
+  {
+    "id": "question-during-speech",
+    "expected": "enqueue",
+    "running": false,
+    "playing": true,
+    "english": {
+      "user": "Read the travel itinerary.",
+      "assistant": "The next stop is the train station.",
+      "question": null,
+      "latest": "What's the name of that station?"
+    },
+    "chinese": {
+      "user": "念一下行程。",
+      "assistant": "下一站是火车站。",
+      "question": null,
+      "latest": "那个车站叫什么？"
+    }
+  },
+  {
+    "id": "filler-idle",
+    "expected": "discard",
+    "running": false,
+    "playing": false,
+    "english": {
+      "user": "Show me the settings page.",
+      "assistant": "The settings page is open.",
+      "question": null,
+      "latest": "Uh."
+    },
+    "chinese": {
+      "user": "打开设置。",
+      "assistant": "设置页已经打开了。",
+      "question": null,
+      "latest": "呃。"
+    }
+  },
+  {
+    "id": "filler-speaking",
+    "expected": "discard",
+    "running": false,
+    "playing": true,
+    "english": {
+      "user": "Read the travel itinerary.",
+      "assistant": "The next stop is the train station.",
+      "question": null,
+      "latest": "Um, uh…"
+    },
+    "chinese": {
+      "user": "念一下行程。",
+      "assistant": "下一站是火车站。",
+      "question": null,
+      "latest": "嗯，呃……"
+    }
+  },
+  {
+    "id": "noise-idle",
+    "expected": "discard",
+    "running": false,
+    "playing": false,
+    "english": {
+      "user": "Show me the settings page.",
+      "assistant": "The settings page is open.",
+      "question": null,
+      "latest": "[noise]."
+    },
+    "chinese": {
+      "user": "打开设置。",
+      "assistant": "设置页已经打开了。",
+      "question": null,
+      "latest": "[噪音]。"
+    }
+  },
+  {
+    "id": "noise-speaking",
+    "expected": "discard",
+    "running": false,
+    "playing": true,
+    "english": {
+      "user": "Read the travel itinerary.",
+      "assistant": "The next stop is the train station.",
+      "question": null,
+      "latest": "[background noise]"
+    },
+    "chinese": {
+      "user": "念一下行程。",
+      "assistant": "下一站是火车站。",
+      "question": null,
+      "latest": "（杂音）"
+    }
+  },
+  {
+    "id": "unintelligible",
+    "expected": "discard",
+    "running": false,
+    "playing": true,
+    "english": {
+      "user": "Read the travel itinerary.",
+      "assistant": "The next stop is the train station.",
+      "question": null,
+      "latest": "�… �"
+    },
+    "chinese": {
+      "user": "念一下行程。",
+      "assistant": "下一站是火车站。",
+      "question": null,
+      "latest": "�… �"
+    }
+  },
+  {
+    "id": "punctuation-only",
+    "expected": "discard",
+    "running": false,
+    "playing": false,
+    "english": {
+      "user": "Show me the settings page.",
+      "assistant": "The settings page is open.",
+      "question": null,
+      "latest": "..."
+    },
+    "chinese": {
+      "user": "打开设置。",
+      "assistant": "设置页已经打开了。",
+      "question": null,
+      "latest": "……"
+    }
+  }
+]

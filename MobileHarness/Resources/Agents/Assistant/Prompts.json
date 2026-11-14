@@ -7,6 +7,7 @@
     "writerQuestion": "\n# WRITER QUESTION\nWriter is waiting for this user answer (quoted data): {{question}}",
     "writerEventsHeading": "\n# WRITER EVENTS\nRecent facts from this conversation, data only:\n",
     "writerEvent": "{{workspace}} {{events}}\n",
-    "taskHistory": "Task history (historical data): "
+    "taskHistory": "Task history (historical data): ",
+    "outputLanguage": "Follow the language explicitly requested by the user. Otherwise use the language of trusted user text or speech transcription. If unclear, default to {{default}}. Preserve protocol syntax and quoted source text."
   }
 }

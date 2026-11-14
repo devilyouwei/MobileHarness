@@ -301,6 +301,8 @@ The individual module designs above identify their public interfaces, direct rel
 
 ## Part III — Key Workflows
 
+The App persists the application language and supplies the same resolved preference to UI presentation, Agent request assembly and Apple speech selection. UI owns string lookup, Agents owns prompt selection, and ModelKit owns individual recognition sessions. The preference travels through existing composition ports without changing the Gateway or persisted conversation protocol.
+
 | Workflow family | Entry points |
 | --- | --- |
 | Root scope and observation | [Startup and lifecycle](#1-containerization-dependencies-startup-and-lifecycle) · [State reads](#6-state-ownership-state-machines-and-model-observations) · [Diagnostics](#20-diagnostics-ui-presentation-and-native-rendering) · [Cancellation and completion](#21-cross-module-cancellation-pressure-and-completion) |

@@ -1,12 +1,12 @@
 ## Photography: photo and video
 ### Facts and gates
-拍照/摄影/录像 uses the Camera window. 打开视觉/跟踪/跟随 uses application-control and Vision.open; photography never enables background vision.
+Taking photos and recording video uses the Camera window. Enabling vision or tracking uses application-control and Vision.open; photography never enables background vision.
 actions.camera supplies intent, busy, permission and preview facts. platform.vision.camera supplies actual running/phase/facing. Unknown is not ready. Flip only when asked and lensOwner=capture.
 BasicSkill owns Task selection/closure. use AGENT CONTEXT task. Standalone save/close/lens operations need no new Task. Only clean up if a matching Task was actually created. Explain busy or permission failures. retryCamera requires explicit user intent.
 ### Photo
 openCamera opens/restores a ready preview without taking a photo. takePhoto requires the visible camera and selects photo mode; it never opens/restores it. Emit known open, requested flip/settings, speech and capture steps in ONE response. Await feedback only for result-dependent choices.
-For a new photo, give one brief cue BETWEEN open and takePhoto. Separate wait groups order Camera and Speech Channels: `<wait><openCamera/></wait><wait>看镜头，现在开拍。</wait><takePhoto/>`. Omit open when already visible; if preparation was already spoken, omit the cue.
-takePhoto delaySeconds=0...30 overrides this shot only: 0 is immediate, omission uses current settings. Countdown needs no configureCamera or model timer. Capture once; await the actual previewID before “拍好了。” or evidence-based review/save/close/reshoot. Keep matching Task/previews.
+For a new photo, give one brief cue BETWEEN open and takePhoto. Separate wait groups order Camera and Speech Channels: `<wait><openCamera/></wait><wait>Look at the camera for the photo.</wait><takePhoto/>`. Omit open when already visible; if preparation was already spoken, omit the cue.
+takePhoto delaySeconds=0...30 overrides this shot only: 0 is immediate, omission uses current settings. Countdown needs no configureCamera or model timer. Capture once; await the actual previewID before “Photo taken.” or evidence-based review/save/close/reshoot. Keep matching Task/previews.
 savePhoto needs actual current previewID. “Save all” uses saveAllPhotos once, including unselected photos. Report App album successes/failures from receipts. alreadySaved/feedbackIssues never justify replaying committed saves. Partial failure retains failed previews/Task; await user intent.
 Explicit reshoot stays in the SAME Task/window; earlier photos remain reloadable until eviction/close. Saving never captures; cancellation cannot undo save. Close clears unwanted photos.
 ### Video
@@ -33,11 +33,11 @@ Open with requested back lens:
 ```
 Open → cue → photo, ONE response:
 ```xml
-<wait><openCamera/></wait><wait>看镜头，现在开拍。</wait><takePhoto/>
+<wait><openCamera/></wait><wait>Look at the camera for the photo.</wait><takePhoto/>
 ```
 Already open; give a cue:
 ```xml
-<wait>看镜头，现在开拍。</wait><takePhoto/>
+<wait>Look at the camera for the photo.</wait><takePhoto/>
 ```
 Already open/prepared:
 ```xml
@@ -49,7 +49,7 @@ Open + three-second countdown; cue already spoken:
 ```
 Open → cue → three-second countdown, ONE response:
 ```xml
-<wait><openCamera/></wait><wait>看镜头，三秒后拍照。</wait><takePhoto delaySeconds="3"/>
+<wait><openCamera/></wait><wait>Look at the camera for a photo in three seconds.</wait><takePhoto delaySeconds="3"/>
 ```
 Already open; explicitly requested immediate photo:
 ```xml
@@ -73,7 +73,7 @@ Requested reshoot; keep earlier photos:
 ```
 Saved, matching Task; keep Camera:
 ```xml
-照片已保存到 App 相册。<task.end summary="照片已保存到 App 相册"/>
+The photo is saved in the app album.<task.end summary="Photo saved in the app album"/>
 ```
 Discard requested:
 ```xml
@@ -81,20 +81,20 @@ Discard requested:
 ```
 Close succeeded and session cleared:
 ```xml
-相机已关闭。<task.end summary="相机已关闭，未保存照片已清空"/>
+The camera is closed.<task.end summary="Camera closed and unsaved photos cleared"/>
 ```
 Saved without a Task:
 ```xml
-照片已保存到 App 相册。
+The photo is saved in the app album.
 ```
 ### Video examples — each block is a separate response
 New recording with cue:
 ```xml
-<wait>开始录像，结束时请点停止按钮。</wait><startRecording/>
+<wait>Tap Stop when you are done recording.</wait><startRecording/>
 ```
 Ten seconds requested; no configureCamera:
 ```xml
-<wait>开始录制十秒视频。</wait><startRecording durationSeconds="10"/>
+<wait>Recording for ten seconds.</wait><startRecording durationSeconds="10"/>
 ```
 Already prepared:
 ```xml
@@ -102,7 +102,7 @@ Already prepared:
 ```
 After ready receipt; use actual duration:
 ```xml
-录像已结束，时长十秒。要保存到 App 相册，还是忽略？
+The ten-second recording is ready. Save it in the app album or discard it?
 ```
 Authorized save; use actual recordingID:
 ```xml
@@ -114,11 +114,11 @@ User authorizes ignore:
 ```
 Saved, matching Task; keep Camera:
 ```xml
-视频已保存到 App 相册。<task.end summary="视频已保存到 App 相册"/>
+The video is saved in the app album.<task.end summary="Video saved in the app album"/>
 ```
 Ignored, matching Task; keep Camera:
 ```xml
-视频已忽略。<task.end summary="视频已忽略"/>
+The video was discarded.<task.end summary="Video discarded"/>
 ```
 
 ### Preview images across turns

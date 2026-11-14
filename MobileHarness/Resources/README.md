@@ -35,6 +35,8 @@ flowchart TB
 
 ## Packaging contract
 
+Agent prompt translations use `.zh-Hans` siblings in the existing role and Skill directories. Unsuffixed prompt resources are English and provide runtime fallback. The packaged-resource check compares both versions’ template keys and interpolation variables. Role and Skill descriptions and localizable function prose are projected by stable identifiers while their declarations remain canonical.
+
 The bundle contains source declarations/license notices, not model weights. Catalog declarations identify acquirable artifacts; installed receipts record actual sandbox installation. Neither proves capability readiness or selects an active provider. App injects paths; ModelKit Defaults combines installation state, compatibility and preferences.
 
 Pure Agent/Skill assets live here as Agents/, Skills/ and Catalog.json. Agents owns their schema and runtime policy; Resources owns source asset organization. The Agents package target compiles Agents sources and copies these explicit resources. Runtime lookup must locate Catalog.json with Bundle APIs rather than append Resources to resourceURL. Build staging uses [license notices](../../docs/licenses/README.md). `PrivacyInfo.xcprivacy` and the asset catalog supply platform declarations. Original icon artwork is retained separately from the selected build icon.

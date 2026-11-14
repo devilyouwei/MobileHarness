@@ -10,10 +10,10 @@
             add(attachment)
         }
         private func assertRequestHasNoDelegationLink(_ app: XCUIApplication) {
-            XCTAssertTrue(app.navigationBars["请求详情"].waitForExistence(timeout: 10))
+            XCTAssertTrue(app.navigationBars["Request details"].waitForExistence(timeout: 10))
             XCTAssertTrue(app.staticTexts["writer.detail.overview"].waitForExistence(timeout: 10))
-            XCTAssertFalse(app.staticTexts["委托来源"].exists)
-            XCTAssertFalse(app.buttons["查看委托记录"].exists)
+            XCTAssertFalse(app.staticTexts["Assignment source"].exists)
+            XCTAssertFalse(app.buttons["View assignment"].exists)
         }
         private func openSettings(_ app: XCUIApplication) {
             let skip = app.buttons["welcome.provider.skip"]
@@ -28,6 +28,7 @@
         }
         func testDelegationWorkspaceSeparation() throws {
             let app = XCUIApplication(bundleIdentifier: "dev.mobileharness.app")
+            app.launchArguments += ["-application.language", "en"]
             app.launch()
             defer { app.terminate() }
             openSettings(app)
@@ -35,7 +36,7 @@
             XCTAssertTrue(app.buttons["writer.delegations"].waitForExistence(timeout: 15))
             capture("writer-separated-overview", app: app)
             app.buttons["writer.delegations"].tap()
-            XCTAssertTrue(app.navigationBars["委托记录"].waitForExistence(timeout: 10))
+            XCTAssertTrue(app.navigationBars["Assignments"].waitForExistence(timeout: 10))
             let delegations = app.buttons.matching(
                 NSPredicate(format: "identifier BEGINSWITH %@", "writer.delegation."))
             XCTAssertTrue(delegations.firstMatch.waitForExistence(timeout: 10))
@@ -47,10 +48,10 @@
             XCTAssertFalse(delegation.isHittable)
             for _ in 0..<25 where !delegation.isHittable { app.swipeUp() }
             XCTAssertTrue(delegation.isHittable, app.debugDescription)
-            XCTAssertFalse(app.buttons["加载更多"].exists)
+            XCTAssertFalse(app.buttons["Load more"].exists)
             delegation.tap()
-            XCTAssertTrue(app.staticTexts["原始输入"].waitForExistence(timeout: 10))
-            XCTAssertTrue(app.staticTexts["进入工作区前的消息"].exists)
+            XCTAssertTrue(app.staticTexts["Original input"].waitForExistence(timeout: 10))
+            XCTAssertTrue(app.staticTexts["Messages before entering the workspace"].exists)
             capture("writer-delegation-detail", app: app)
             let preflight = app.buttons.matching(
                 NSPredicate(format: "identifier BEGINSWITH %@", "writer.preflight.request.")
@@ -61,7 +62,7 @@
             preflight.tap()
             assertRequestHasNoDelegationLink(app)
             app.navigationBars.buttons.element(boundBy: 0).tap()
-            XCTAssertTrue(app.navigationBars["委托详情"].exists)
+            XCTAssertTrue(app.navigationBars["Assignment details"].exists)
             app.navigationBars.buttons.element(boundBy: 0).tap()
             app.navigationBars.buttons.element(boundBy: 0).tap()
             let workspace = app.buttons.matching(
@@ -70,18 +71,18 @@
             .firstMatch
             XCTAssertTrue(workspace.waitForExistence(timeout: 10))
             workspace.tap()
-            XCTAssertTrue(app.navigationBars["工作区"].waitForExistence(timeout: 10))
+            XCTAssertTrue(app.navigationBars["Workspace"].waitForExistence(timeout: 10))
             let messages = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "writer.request."))
             XCTAssertTrue(messages.firstMatch.waitForExistence(timeout: 10))
-            XCTAssertTrue(messages.firstMatch.label.contains("第40轮"), messages.firstMatch.label)
+            XCTAssertTrue(messages.firstMatch.label.contains("Round 40"), messages.firstMatch.label)
             let row = messages.matching(
-                NSPredicate(format: "label CONTAINS %@", "第1轮")
+                NSPredicate(format: "label CONTAINS %@", "Round 1")
             ).firstMatch
             XCTAssertFalse(row.isHittable)
             for _ in 0..<25 where !row.isHittable { app.swipeUp() }
             XCTAssertTrue(row.isHittable, app.debugDescription)
-            XCTAssertFalse(app.buttons["加载更多"].exists)
-            XCTAssertFalse(app.staticTexts["委托 1"].exists)
+            XCTAssertFalse(app.buttons["Load more"].exists)
+            XCTAssertFalse(app.staticTexts["Assignment 1"].exists)
             capture("writer-workspace-last-page", app: app)
             let identity = row.identifier
             row.tap()
@@ -89,11 +90,12 @@
             capture("writer-request-without-delegation-link", app: app)
             app.navigationBars.buttons.element(boundBy: 0).tap()
             XCTAssertTrue(app.buttons[identity].waitForExistence(timeout: 10))
-            XCTAssertFalse(app.buttons["加载更多"].exists)
+            XCTAssertFalse(app.buttons["Load more"].exists)
             capture("writer-pages-preserved-after-back", app: app)
         }
         func testWriterRecords() throws {
             let app = XCUIApplication(bundleIdentifier: "dev.mobileharness.app")
+            app.launchArguments += ["-application.language", "en"]
             app.launch()
             defer { app.terminate() }
             openSettings(app)
@@ -136,7 +138,7 @@
             XCTAssertTrue(app.buttons["writer.workspace.export"].exists)
             XCTAssertTrue(app.descendants(matching: .any)["writer.workspace.started"].exists)
             XCTAssertTrue(app.descendants(matching: .any)["writer.workspace.updated"].exists)
-            XCTAssertFalse(app.staticTexts["最新状态"].exists)
+            XCTAssertFalse(app.staticTexts["Latest status"].exists)
             capture("writer-task-header", app: app)
             app.buttons["writer.workspace.files"].tap()
             XCTAssertTrue(app.staticTexts["index.html"].waitForExistence(timeout: 15), app.debugDescription)
@@ -145,7 +147,9 @@
             XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 15), app.debugDescription)
             capture("writer-file-preview", app: app)
             app.navigationBars.buttons.element(boundBy: 0).tap()
-            for (label, name) in [("导出作品 PDF", "writer-pdf-share"), ("导出全部源文件（ZIP）", "writer-zip-share")] {
+            for (label, name) in [
+                ("Export project PDF", "writer-pdf-share"), ("Export all source files (ZIP)", "writer-zip-share"),
+            ] {
                 app.buttons[label].tap()
                 XCTAssertTrue(
                     app.collectionViews["activityCollectionView"].waitForExistence(timeout: 20), app.debugDescription)
@@ -158,7 +162,7 @@
             if !request.exists { app.swipeUp() }
             XCTAssertTrue(request.waitForExistence(timeout: 10), app.debugDescription)
             request.tap()
-            XCTAssertTrue(app.navigationBars["请求详情"].waitForExistence(timeout: 10))
+            XCTAssertTrue(app.navigationBars["Request details"].waitForExistence(timeout: 10))
             XCTAssertTrue(app.staticTexts["writer.detail.overview"].waitForExistence(timeout: 10))
             let metrics = app.buttons["writer.detail.generation"]
             for _ in 0..<20 where !metrics.isHittable { app.swipeUp() }
@@ -172,7 +176,7 @@
             app.navigationBars.buttons.element(boundBy: 0).tap()
             let candidates = app.buttons.matching(
                 NSPredicate(
-                    format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "writer.request.", "编写 index.html"))
+                    format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "writer.request.", "Write index.html"))
             var tried = Set<String>()
             var foundContent = false
             var capturedRows = false
@@ -188,7 +192,7 @@
                 }
                 tried.insert(identifier)
                 app.buttons[identifier].tap()
-                XCTAssertTrue(app.navigationBars["请求详情"].waitForExistence(timeout: 10))
+                XCTAssertTrue(app.navigationBars["Request details"].waitForExistence(timeout: 10))
                 if app.buttons["writer.request.content.toggle"].waitForExistence(timeout: 3) {
                     foundContent = true
                     break

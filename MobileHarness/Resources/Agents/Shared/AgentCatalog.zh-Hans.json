@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "templates": {
+    "heading": "# 可委托的 AGENT",
+    "entry": "Agent ID={{id}}；说明={{description}}"
+  }
+}

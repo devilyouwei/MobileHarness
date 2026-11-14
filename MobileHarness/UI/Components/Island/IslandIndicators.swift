@@ -99,7 +99,17 @@ enum IslandSpectrum {
                 .monospacedDigit().multilineTextAlignment(.center)
                 .lineLimit(1).minimumScaleFactor(0.75)
                 .frame(width: IslandCompactMetrics.timerWidth)
-                .accessibilityLabel("已用时间")
+                .accessibilityLabel(elapsedLabel)
         }
+        #if SWIFT_PACKAGE
+            @Environment(\.locale) private var locale
+            private var elapsedLabel: String { AppLanguage(preferredLanguage: locale.identifier).text("Elapsed time") }
+        #else
+            @Environment(\.locale) private var locale
+            private var elapsedLabel: String {
+                Bundle.main.url(forResource: locale.identifier, withExtension: "lproj").flatMap(Bundle.init(url:))?
+                    .localizedString(forKey: "Elapsed time", value: nil, table: "IslandStatus") ?? "Elapsed time"
+            }
+        #endif
     }
 #endif

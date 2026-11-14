@@ -13,7 +13,7 @@
         <true/>
     </dict>
     <key>NSLocalNetworkUsageDescription</key>
-    <string>连接您配置的局域网模型服务，用于加载模型列表和发送对话请求。</string>
+    <string>Connect to your configured local-network model service to load model lists and send chat requests.</string>
     <key>CADisableMinimumFrameDurationOnPhone</key>
     <true/>
 </dict>

@@ -1106,7 +1106,7 @@ extension LiveRuntimeTests {
             Issue.record("Expected invalid repetitions")
         } catch {
             #expect((error as? any ActionReportFailureProviding)?.actionExecutionFailure == .invalidArguments)
-            #expect(error.localizedDescription == "跳舞次数必须是 1 到 3 的整数")
+            #expect(error.localizedDescription == "Dance repetitions must be an integer from 1 to 3")
         }
     }
 }

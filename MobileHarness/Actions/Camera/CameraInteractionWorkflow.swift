@@ -51,7 +51,7 @@ import UI
     public func savePhoto(_ id: String) { submitPhoto(.savePhoto, id: id) }
     private func submitPhoto(_ operation: CameraInput.Operation, id: String) {
         guard let previewID = PreviewImageID(rawValue: id) else {
-            presentation.present(.photoMessage("照片引用无效"))
+            presentation.present(.photoMessage("Invalid photo reference"))
             return
         }
         submit(operation, previewID: previewID.rawValue)
@@ -69,9 +69,9 @@ import UI
         guard !stopped else { return }
         guard worker == nil else {
             if previewID != nil {
-                presentation.present(.photoMessage("照片操作正在执行，请稍后重试"))
+                presentation.present(.photoMessage("A photo operation is in progress. Try again."))
             } else {
-                presentation.present(.controlMessage("相机操作正在执行，请稍后重试"))
+                presentation.present(.controlMessage("A camera operation is in progress. Try again."))
             }
             return
         }
@@ -92,27 +92,28 @@ import UI
                         previewSession: previewSession))
             } catch {
                 if cancelledCountdown && error is CancellationError {
-                    presentation.present(.photoMessage("已取消倒计时"))
+                    presentation.present(.photoMessage("Countdown cancelled"))
                     return
                 }
                 let message = Self.message(for: error)
                 if operation == .savePhoto, let previewID, state.savedPreviewID == previewID {
-                    presentation.present(.photoMessage("已保存到 App 相册，后续请求未完成：" + message))
+                    presentation.present(.photoMessage("Saved in the app album. A follow-up step failed."))
                 } else if previewID != nil {
-                    presentation.present(.photoMessage("照片操作失败：" + message))
+                    presentation.present(.photoMessage("Photo operation failed. Try again."))
                 } else {
-                    presentation.present(.message("相机操作失败：" + message))
+                    presentation.present(
+                        .message(error is UIRequestError ? message : "Camera operation failed. Try again."))
                 }
             }
         }
     }
     private static func message(for error: any Error) -> String {
-        if error is CancellationError { return "操作已取消，请重试" }
+        if error is CancellationError { return "Operation cancelled. Try again." }
         guard let request = error as? UIRequestError else { return error.localizedDescription }
         switch request {
-        case .unavailable, .stale, .consumerEnded: return "请求因应用状态变化结束，请重试"
-        case .capacityExceeded: return "请求过多，请稍后重试"
-        case .duplicateConsumer: return "相机请求通道异常，请重新启动应用"
+        case .unavailable, .stale, .consumerEnded: return "The app changed state and ended the request. Try again."
+        case .capacityExceeded: return "Too many requests. Try again."
+        case .duplicateConsumer: return "Camera controls failed. Restart the app."
         }
     }
 }

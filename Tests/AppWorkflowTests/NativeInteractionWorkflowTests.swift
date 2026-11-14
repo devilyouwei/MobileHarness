@@ -181,7 +181,7 @@ import Testing
     await controls.waitUntilIdle()
     #expect(calls == 1)
     #expect(state.savedMediaID == id)
-    #expect(state.photoMessage?.hasPrefix("已保存到 App 相册") == true)
+    #expect(state.photoMessage?.hasPrefix("Saved in the app album") == true)
 }
 
 @Test(arguments: [UIRequestError.stale, .unavailable, .consumerEnded])
@@ -198,7 +198,7 @@ import Testing
         })
     controls.open()
     await controls.waitUntilIdle()
-    #expect(ui.camera.state.message == "相机操作失败：请求因应用状态变化结束，请重试")
+    #expect(ui.camera.state.message == "The app changed state and ended the request. Try again.")
     #expect(!ui.camera.state.controlBusy)
     controls.retry()
     await controls.waitUntilIdle()

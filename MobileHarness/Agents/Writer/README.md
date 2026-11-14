@@ -134,6 +134,8 @@ Writer 只构造简短目标/步骤、紫色图标、语义优先级和详情阶
 
 ## Bounded recovery
 
+Writer progress uses the delegation's prompt language. New request phases are recorded in English. The history adapter recognizes legacy phase labels when rebuilding control context and localizes the visible phase and tool summary for the application language when loading a record. Error stages and evidence remain in English for new records.
+
 WriterRecovery permits at most three attempts for a model request, with cancellable500ms/1000ms backoff. Transient transport/HTTP and recoverable response failures retry; authentication/configuration, TLS, cancellation, storage and cleanup failures do not blindly retry. Natural terminal responses enter the shared publication check; missing publication prerequisites receive runtime correction; failed tools and invalid batches have a bounded correction episode. Repeated successful calls receive advisory context at3/5/8 repetitions without imposing a total creative-step budget.
 
 Failed content generation joins abort before a fresh stream starts; no prefix is appended twice. Uncertain commit and abort failure stop without replay, preserving original and cleanup causes. Every actual attempt and paired tool outcome remains in SQLite. WriterRecoveryFailure retains phase, attempt count and last classified cause. Writer presents detailed recovery progress and sends one concise exception notice per delegation. Assistant never redelegates to implement retries.

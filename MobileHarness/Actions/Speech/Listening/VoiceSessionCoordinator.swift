@@ -53,7 +53,7 @@ import PlatformKit
                     try Task.checkCancellation()
                     guard !closed else { return }
                     guard fault.restart, restartPermitted, !attempted else {
-                        report(fault.message + "；请重新开启聆听")
+                        report(fault.message + ". Start listening again.")
                         continue
                     }
                     attempted = true
@@ -75,10 +75,10 @@ import PlatformKit
                     blocked = true
                     attempted = true
                     do { try await retire() } catch {
-                        report(fault.message + "；聆听清理失败：\(error)")
+                        report(fault.message + ". Listening cleanup failed: \(error)")
                     }
                     guard !closed else { return }
-                    report(fault.message + "；聆听恢复失败：\(error)，请重新开启聆听")
+                    report(fault.message + ". Could not resume listening: \(error). Start listening again.")
                 }
             }
         }
@@ -228,7 +228,7 @@ public enum VoiceReplyCancellation {
             await oldEvents?.value
             handlingTurn = true
             presentationPhase = .processing
-            state.present(.voiceStatus("录像中 · 聆听已暂停"))
+            state.present(.voiceStatus("Recording · Listening paused"))
         }
         public func endVideoAudio(resume: Bool) async throws {
             let previous = videoListeningGeneration
@@ -243,11 +243,11 @@ public enum VoiceReplyCancellation {
         }
         private var listeningStatus: String {
             let context = audio.captureContext
-            guard context.supportsFullDuplex else { return "受限聆听 · 回声消除不可用，播报期间暂停识别" }
+            guard context.supportsFullDuplex else { return "Limited listening · Recognition pauses while speaking" }
             switch context.echoCancellation {
-            case .systemInput: return "全双工聆听 · 系统回声消除"
-            case .voiceProcessing: return "全双工聆听 · 语音回声消除"
-            case .unknown, .unavailable: return "全双工聆听 · 可在回复时说话"
+            case .systemInput: return "Full-duplex listening · System echo cancellation"
+            case .voiceProcessing: return "Full-duplex listening · Voice echo cancellation"
+            case .unknown, .unavailable: return "Full-duplex listening · Speak during replies"
             }
         }
         private var hasPlaybackBarrier: Bool { playbackCount > 0 && !audio.captureContext.supportsFullDuplex }
@@ -280,7 +280,7 @@ public enum VoiceReplyCancellation {
             do { try runtime.endpoints.bindVoice(self) } catch {
                 started = false
                 presentationPhase = .failed
-                state.present(.voiceStatus("语音呈现接口已被占用"))
+                state.present(.voiceStatus("Voice display is busy"))
                 throw ActionHostError.scopeClosed
             }
             do {
@@ -334,7 +334,7 @@ public enum VoiceReplyCancellation {
             resetExpression()
             conversationPresentation.beginRecognitionScope()
             presentationPhase = .loading
-            state.present(.voiceStatus("正在唤醒…"))
+            state.present(.voiceStatus("Waking up…"))
             let wakeInterval = wakeTiming.beginInterval("Wake.Activation", id: wakeTiming.makeSignpostID())
             defer { wakeTiming.endInterval("Wake.Activation", wakeInterval) }
             do {
@@ -351,18 +351,22 @@ public enum VoiceReplyCancellation {
                 guard voiceGeneration == generation, !Task.isCancelled else { throw CancellationError() }
                 if presentationPhase == .loading {
                     presentationPhase = handlingTurn ? .processing : .listening
-                    state.present(.voiceStatus(handlingTurn ? "正在回复 · 聆听已暂停" : "正在聆听 · 停顿后自动识别"))
+                    state.present(
+                        .voiceStatus(handlingTurn ? "Replying · Listening paused" : "Listening · Pause to transcribe"))
                 }
                 try observeAudioEvents(generation: generation)
             } catch {
                 if voiceGeneration == generation {
                     let description: String
                     if let failure = error as? ListeningActivationFeedback.Failure {
-                        description = failure.actionReport.failureDescription ?? "聆听反馈未完成，请重试"
+                        description =
+                            failure.actionReport.failureDescription ?? "Listening feedback did not finish. Try again."
                     } else {
                         description = String(describing: error)
                     }
-                    stopVoice(message: error is CancellationError ? "语音已停止" : "无法开始语音：" + description)
+                    stopVoice(
+                        message: error is CancellationError
+                            ? "Voice stopped" : "Could not start voice input: " + description)
                 }
                 throw error
             }
@@ -377,13 +381,14 @@ public enum VoiceReplyCancellation {
                         guard !Task.isCancelled, let self, self.voiceGeneration == generation else { return }
                         self.captureFault(
                             event == .mediaServicesReset
-                                ? "系统音频服务已重置" : (event == .interrupted ? "音频被系统中断" : "音频设备已变化"),
+                                ? "System audio service reset"
+                                : (event == .interrupted ? "System interrupted audio" : "Audio device changed"),
                             restart: event == .mediaServicesReset)
                         return
                     }
                 } catch {
                     guard !Task.isCancelled, let self, self.voiceGeneration == generation else { return }
-                    self.captureFault("音频事件接入失败：\(error)")
+                    self.captureFault("Could not connect to audio events: \(error)")
                 }
             }
         }
@@ -401,7 +406,7 @@ public enum VoiceReplyCancellation {
             if case .unavailable(let reason) = await voiceActivity.availability {
                 throw CapabilityError.unavailable(reason)
             }
-            state.present(.voiceStatus("准备麦克风…"))
+            state.present(.voiceStatus("Preparing microphone…"))
             try await audio.requestPermissions()
             guard voiceGeneration == generation else { throw CancellationError() }
             try Task.checkCancellation()
@@ -466,24 +471,25 @@ public enum VoiceReplyCancellation {
                     else {
                         return
                     }
-                    await self.stopPerception(message: "录音已结束，请重新开始聆听")
+                    await self.stopPerception(message: "Recording ended. Start listening again.")
                 } catch is CancellationError {
                     guard !Task.isCancelled, let self, self.voiceGeneration == generation, self.captureEpoch == epoch
                     else { return }
-                    await self.stopPerception(message: "语音输入已停止，请重新开始聆听")
+                    await self.stopPerception(message: "Voice input stopped. Start listening again.")
                 } catch {
                     guard let self, self.voiceGeneration == generation, self.captureEpoch == epoch else { return }
                     let message: String
                     if let gap = error as? AudioCaptureDiscontinuity {
                         if gap.previousSampleRate != gap.actualSampleRate {
-                            message = "音频采样率发生变化，请按住重试"
+                            message = "Audio sample rate changed. Hold to retry."
                         } else {
-                            message = String(format: "音频采集时间异常：%.1f 毫秒，请按住重试", gap.gapSeconds * 1000)
+                            message = String(
+                                format: "Audio capture timing error (%.1f ms). Hold to retry.", gap.gapSeconds * 1000)
                         }
                     } else if error as? AudioIOError == .overflow {
-                        message = "录音缓冲区已满，请按住重试"
+                        message = "Recording buffer filled. Hold to retry."
                     } else {
-                        message = "录音中断：\(String(describing: error))"
+                        message = "Recording interrupted: \(String(describing: error))"
                     }
                     await self.stopPerception(message: message, restart: error as? AudioIOError != .interrupted)
                 }
@@ -540,8 +546,8 @@ public enum VoiceReplyCancellation {
             do {
                 try await speech?.stopListening(sessionID: runtime.interactionSessionID)
             } catch is CancellationError {} catch {
-                state.present(.listeningControlMessage("聆听停止上报失败：\(error)"))
-                record(state.listeningControlMessage ?? "聆听停止上报失败")
+                state.present(.listeningControlMessage("Could not report listening stop：\(error)"))
+                record(state.listeningControlMessage ?? "Could not report listening stop")
             }
         }
         private func cancelReplyWork() async {
@@ -553,8 +559,8 @@ public enum VoiceReplyCancellation {
                         await self.speechAudioStore?.cancel(sessionID: self.runtime.interactionSessionID)
                     })
             } catch is CancellationError {} catch {
-                state.present(.listeningControlMessage("回复停止失败：\(error)"))
-                record(state.listeningControlMessage ?? "回复停止失败")
+                state.present(.listeningControlMessage("Could not stop the reply：\(error)"))
+                record(state.listeningControlMessage ?? "Could not stop the reply")
             }
         }
 
@@ -580,7 +586,7 @@ public enum VoiceReplyCancellation {
                 }
                 let replacement = makeCaptureRecovery()
                 captureRecovery = replacement
-                replacement.request("重新开启聆听")
+                replacement.request("Start listening again")
                 await replacement.wait()
                 try Task.checkCancellation()
                 if replacement.blocked { throw SpeechActionError.listeningUnavailable }
@@ -616,7 +622,7 @@ public enum VoiceReplyCancellation {
             if !enabled {
                 if cancelReply { requestReplyCancellation() }
                 stopVoice(
-                    message: voiceGeneration == nil && cancelReply ? state.voiceStatus : "语音已停止",
+                    message: voiceGeneration == nil && cancelReply ? state.voiceStatus : "Voice stopped",
                     cancelReply: cancelReply)
                 await previousPause?.value
                 return
@@ -649,7 +655,7 @@ public enum VoiceReplyCancellation {
                     guard let self else { return }
                     do {
                         try await self.pauseListening(generation: generation, revision: revision)
-                    } catch is CancellationError {} catch { self.captureFault("聆听暂停异常：\(error)") }
+                    } catch is CancellationError {} catch { self.captureFault("Could not pause listening: \(error)") }
                 }
             } else if !hasPlaybackBarrier && !videoAudioHeld {
                 try await resumeListening(generation: generation)
@@ -677,7 +683,7 @@ public enum VoiceReplyCancellation {
             // across model latency so an already-enabled conversation can continue in the background.
             guard revision == listeningRevision, voiceGeneration == generation else { return }
             presentationPhase = .processing
-            state.present(.voiceStatus("正在回复 · 聆听已暂停"))
+            state.present(.voiceStatus("Replying · Listening paused"))
         }
 
         private func stopPerception(message: String, restart: Bool = true) async {
@@ -692,7 +698,7 @@ public enum VoiceReplyCancellation {
             state.present(.isVoiceActive(false))
             state.present(.listeningAnimationID(nil))
             presentationPhase = .failed
-            state.present(.voiceStatus(message + (restart ? " · 正在恢复聆听…" : " · 请重新开启聆听")))
+            state.present(.voiceStatus(restart ? "Resuming listening…" : "Listening stopped. Hold to try again."))
             record(message)
             captureRecovery.request(message, restart: restart)
         }
@@ -727,13 +733,13 @@ public enum VoiceReplyCancellation {
                 report: { [weak self] message in
                     self?.state.present(.isVoiceActive(false))
                     self?.state.present(.listeningAnimationID(nil))
-                    self?.state.present(.voiceStatus(message))
+                    self?.state.present(.voiceStatus("Listening stopped. Hold to try again."))
                     self?.presentationPhase = .failed
                     self?.record(message)
                 })
         }
 
-        public func stopVoice(message: String = "语音已停止") {
+        public func stopVoice(message: String = "Voice stopped") {
             stopVoice(message: message, cancelReply: true)
         }
 
@@ -754,7 +760,8 @@ public enum VoiceReplyCancellation {
             captureEpoch = nil
             microphone.invalidate()
             resetExpression()
-            presentationPhase = message == "语音已停止" || message == "已提交，语音已结束" ? .idle : .failed
+            presentationPhase =
+                message == "Voice stopped" || message == "Speech submitted and stopped" ? .idle : .failed
             state.present(.playbackSpectrum(AudioSpectrum.silence))
             state.present(.microphoneSpectrum(AudioSpectrum.silence))
             startupTask?.cancel()
@@ -785,7 +792,7 @@ public enum VoiceReplyCancellation {
                     do {
                         try await speech?.captureEnded(
                             revision: stoppedRevision, sessionID: runtime.interactionSessionID)
-                    } catch { record("采集结束上报失败：\(error)") }
+                    } catch { record("Could not report recording completion: \(error)") }
                 }
             }
             captureTask?.cancel()
@@ -798,7 +805,7 @@ public enum VoiceReplyCancellation {
 
         public func observeTranscript(_ text: String, sessionID: String) {
             guard accepts(session: sessionID) else { return }
-            record("你（语音）：\(text)")
+            record("User (voice): \(text)")
         }
         private func traceListening(_ point: String) {
             let value =
@@ -817,7 +824,8 @@ public enum VoiceReplyCancellation {
                 traceListening("resume.cancelled")
                 try Task.checkCancellation()
             } catch {
-                state.present(.voiceStatus("语音识别恢复失败：\(error)"))
+                record("Could not resume speech recognition: \(error)")
+                state.present(.voiceStatus("Listening stopped. Hold to try again."))
                 throw error
             }
             traceListening("resume.perceptionReturned")
@@ -830,7 +838,7 @@ public enum VoiceReplyCancellation {
             do { try await microphone.setEnabled(true) } catch is CancellationError {
                 throw CancellationError()
             } catch {
-                if voiceGeneration == generation { captureFault("麦克风恢复失败：\(error)") }
+                if voiceGeneration == generation { captureFault("Could not resume microphone capture: \(error)") }
                 throw error
             }
             guard canResume() else { return }
@@ -889,8 +897,8 @@ public enum VoiceReplyCancellation {
             } catch is CancellationError {
                 return CancellationError()
             } catch {
-                record("聆听恢复失败：\(error)")
-                captureFault("聆听恢复失败：\(error)")
+                record("Could not resume listening: \(error)")
+                captureFault("Could not resume listening: \(error)")
                 return error
             }
         }
@@ -960,9 +968,9 @@ public enum VoiceReplyCancellation {
                 await speechAudioStore?.cancel(inputID: envelope.inputID, source: envelope.source)
             }
             switch envelope.kind {
-            case .tool(let path): record("工具调用：\(path)")
+            case .tool(let path): record("Tool call: \(path)")
             case .control(let state):
-                record("状态：\(state)")
+                record("Status: \(state)")
             // Factual Agent errors are projected by the root failure observer, never copied into captions.
             case .other: break
             }

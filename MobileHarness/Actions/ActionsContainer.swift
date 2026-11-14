@@ -407,7 +407,7 @@ public struct ActionsStateSnapshot: Codable, Sendable {
                 actions: root, files: dependencies.files, cache: dependencies.cache,
                 workspaces: dependencies.workspaces,
                 model: dependencies.model, platform: dependencies.platform, ui: dependencies.ui,
-                photos: photos, bluetooth: bluetooth,
+                photos: photos, bluetooth: bluetooth, presentationLanguage: dependencies.presentationLanguage,
                 makeCameraRuntime: dependencies.makeCameraRuntime, connectVision: dependencies.connectVision)
             root.businessOwner = assembly
             root.cleanup = [

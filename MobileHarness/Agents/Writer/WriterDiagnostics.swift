@@ -19,20 +19,23 @@ enum WriterDiagnostics {
     ) -> WriterFailureDiagnostic {
         if depth < 4, let combined = error as? WriterCleanupFailure {
             return .init(
-                category: "cleanup", code: "writer.cleanup", stage: "清理", message: "创作失败，且清理未完全完成。",
+                category: "cleanup", code: "writer.cleanup", stage: "Cleanup",
+                message: "Writing failed and cleanup did not finish.",
                 details: details,
                 causes: [
                     make(combined.primary, stage: stage, details: details, request: request, depth: depth + 1),
-                    make(combined.cleanup, stage: "清理", depth: depth + 1),
+                    make(combined.cleanup, stage: "Cleanup", depth: depth + 1),
                 ])
         }
         if depth < 4, let model = error as? ModelFailure {
             let primary = make(model.underlying, stage: stage, details: details, request: request, depth: depth + 1)
             guard !model.cleanupErrors.isEmpty else { return primary }
             return .init(
-                category: "cleanup", code: "writer.model.cleanup", stage: "模型清理", message: "模型请求失败，且模型资源清理未完全完成。",
+                category: "cleanup", code: "writer.model.cleanup", stage: "Model cleanup",
+                message: "The model request failed and model cleanup did not finish.",
                 details: details,
-                causes: [primary] + model.cleanupErrors.prefix(4).map { make($0, stage: "模型清理", depth: depth + 1) })
+                causes: [primary]
+                    + model.cleanupErrors.prefix(4).map { make($0, stage: "Model cleanup", depth: depth + 1) })
         }
         if depth < 4, let exhausted = error as? WriterRecoveryFailure {
             let last = make(exhausted.underlying, stage: stage, details: details, request: request, depth: depth + 1)
@@ -43,7 +46,7 @@ enum WriterDiagnostics {
             evidence["recoveryExhausted"] = "true"
             return .init(
                 category: last.category, code: last.code, stage: last.stage,
-                message: last.message + " 已尝试\(exhausted.attempts)次恢复，仍未成功。",
+                message: last.message + " Recovery failed after \(exhausted.attempts) attempts.",
                 details: evidence, causes: [last])
         }
         if let request {
@@ -74,13 +77,13 @@ enum WriterDiagnostics {
                 let kind = failure.networkReason?.rawValue ?? "unknown"
                 let message: String
                 switch failure.networkReason {
-                case .timeout: message = "模型请求等待网络数据超时。"
-                case .dns: message = "无法解析模型服务地址。"
-                case .tls: message = "模型服务 TLS 连接或证书校验失败。"
-                case .offline: message = "网络不可用，模型请求未完成。"
-                case .connection: message = "模型服务连接失败或连接中断。"
-                case .cancelled: message = "底层网络请求被取消。"
-                default: message = "模型网络传输失败，底层原因未能进一步分类。"
+                case .timeout: message = "The model request timed out while waiting for network data."
+                case .dns: message = "Could not resolve the model service address."
+                case .tls: message = "The model service TLS connection or certificate verification failed."
+                case .offline: message = "The network was unavailable and the model request did not finish."
+                case .connection: message = "The connection to the model service failed or was interrupted."
+                case .cancelled: message = "The underlying network request was cancelled."
+                default: message = "Model network transport failed without a more specific cause."
                 }
                 return .init(
                     category: "modelTransport", code: "writer.network." + kind, stage: stage,
@@ -90,33 +93,34 @@ enum WriterDiagnostics {
                 let status = failure.statusCode.map(String.init) ?? "unknown"
                 return .init(
                     category: "modelHTTP", code: "writer.http.\(status)", stage: stage,
-                    message: (failure.statusCode.map { "模型服务返回 HTTP \($0)。" } ?? "模型服务返回 HTTP 错误，状态码未提供。")
+                    message: (failure.statusCode.map { "The model service returned HTTP \($0)." }
+                        ?? "The model service returned an HTTP error without a status code.")
                         + (failure.providerMessage.map { " " + $0 } ?? ""),
                     details: evidence)
             }
             if failure.reason == .providerFailure {
                 return .init(
                     category: "modelProvider", code: "writer.provider.failed", stage: stage,
-                    message: "模型服务报告执行失败。", details: evidence)
+                    message: "The model service reported an execution failure.", details: evidence)
             }
             return .init(
                 category: "modelResponse", code: "writer.model." + failure.reason.rawValue, stage: stage,
-                message: "模型响应未能通过协议校验。", details: evidence)
+                message: "The model response failed protocol validation.", details: evidence)
         }
         if let capability = error as? CapabilityError {
             evidence["capabilityReason"] = String((capability.errorDescription ?? "").prefix(512))
             return .init(
                 category: "configuration", code: "writer.model.capability", stage: stage,
-                message: "模型能力或请求配置不满足要求。", details: evidence)
+                message: "The model capability or request configuration is insufficient.", details: evidence)
         }
         if let storage = error as? StorageFailure {
             evidence["component"] = storage.component
             evidence["operation"] = storage.operation
             return .init(
                 category: "storage", code: "writer.storage." + storage.code.rawValue, stage: stage,
-                message: "作品或历史数据读写失败。", details: evidence,
+                message: "Could not read or write project or history data.", details: evidence,
                 causes: depth < 4
-                    ? storage.cleanupErrors.prefix(4).map { make($0, stage: "存储清理", depth: depth + 1) } : [])
+                    ? storage.cleanupErrors.prefix(4).map { make($0, stage: "Storage cleanup", depth: depth + 1) } : [])
         }
         if error is FileStorageError || error is DocumentStorageError || error is RecordStorageError
             || error is WriterHistoryError
@@ -125,38 +129,40 @@ enum WriterDiagnostics {
             evidence["storageCode"] = code
             return .init(
                 category: "storage", code: "writer.storage." + code, stage: stage,
-                message: "作品或历史存储操作失败：" + code, details: evidence)
+                message: "Project or history storage failed: " + code, details: evidence)
         }
         if let tool = error as? WriterToolFailure {
             evidence.merge(tool.context) { _, new in new }
             evidence["toolError"] = tool.description
             let toolStage: String
             switch tool.context["command"] {
-            case "start", "resume": toolStage = "工作区准备"
-            case "render": toolStage = "渲染"
-            case "finish": toolStage = "发布"
-            case "edit", "replace", "move", "remove", "removeTree", "restore": toolStage = "文件编辑"
-            case "read", "list", "search", "diff": toolStage = "文件读取"
+            case "start", "resume": toolStage = "Workspace preparation"
+            case "render": toolStage = "Rendering"
+            case "finish": toolStage = "Publishing"
+            case "edit", "replace", "move", "remove", "removeTree", "restore": toolStage = "File editing"
+            case "read", "list", "search", "diff": toolStage = "File reading"
             default: toolStage = stage
             }
             return .init(
                 category: "tool", code: "writer.tool.failed", stage: toolStage,
-                message: "作品工具执行失败：" + tool.description, details: evidence)
+                message: "Project tool execution failed: " + tool.description, details: evidence)
         }
         if error is WriterContentFormatFailure {
             return .init(
                 category: "modelResponse", code: "writer.content.markdownWrapper", stage: stage,
-                message: "源码响应包含 Markdown 外层代码围栏，已中止本次写入，未提交为源码。", details: evidence)
+                message:
+                    "The source response had an outer Markdown fence. The write was aborted without committing source.",
+                details: evidence)
         }
         if let value = error as? WriterFailure {
             let message: String
             switch value {
-            case .unsupportedModel: message = "所选模型不支持 Writer 所需的原生工具调用。"
-            case .incomplete: message = "模型响应未正常完成，草稿未被当作完整作品发布。"
-            case .capacity: message = "Writer 请求或上下文超过当前协议边界。"
-            case .invalidOutput: message = "模型输出不符合 Writer 协议。"
-            case .unavailable: message = "Writer 所需能力尚不可用。"
-            case .cancelled: message = "Writer 任务已取消。"
+            case .unsupportedModel: message = "The selected model does not support Writer’s native tools."
+            case .incomplete: message = "The model response ended early. The draft was kept unpublished."
+            case .capacity: message = "The Writer request or context exceeded its protocol limit."
+            case .invalidOutput: message = "Model output violated the Writer protocol."
+            case .unavailable: message = "A capability required by Writer is unavailable."
+            case .cancelled: message = "The Writer task was cancelled."
             }
             return .init(
                 category: value == .unsupportedModel ? "configuration" : "workflow",
@@ -165,12 +171,13 @@ enum WriterDiagnostics {
         if error is CancellationError {
             return .init(
                 category: "cancellation", code: "writer.cancelled", stage: stage,
-                message: "当前执行被取消或中断。", details: evidence)
+                message: "The operation was cancelled or interrupted.", details: evidence)
         }
         evidence["errorType"] = String(reflecting: type(of: error))
         return .init(
-            category: stage.contains("历史") ? "storage" : "runtime", code: "writer.runtime.failed",
-            stage: stage, message: "Writer 执行失败。", details: evidence)
+            category: stage.hasPrefix("History") || stage.contains("历史") ? "storage" : "runtime",
+            code: "writer.runtime.failed",
+            stage: stage, message: "Writer execution failed.", details: evidence)
     }
 
     static func describe(_ failure: WriterFailureDiagnostic) -> String {

@@ -50,6 +50,8 @@ import Foundation
 
     @MainActor
     public struct ConversationView: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         @Bindable var state: ConversationState
         @Bindable var notices: HomeNoticeState
         private let toggleVoice: () -> Void
@@ -111,9 +113,18 @@ import Foundation
                                 toggleVoice()
                             }
                         }
-                        .accessibilityLabel(state.isVoiceActive || state.isReplyActive ? "停止聆听与回复" : "开启聆听")
-                        .accessibilityValue(accessibilityState + "，表情：" + state.displayedExpression.rawValue)
-                        .accessibilityHint("按住双眼半秒开启聆听，松开后继续聆听。再次按住关闭录音。")
+                        .accessibilityLabel(
+                            state.isVoiceActive || state.isReplyActive
+                                ? appCopy.text("Stop listening and speaking") : appCopy.text("Start listening")
+                        )
+                        .accessibilityValue(
+                            accessibilityState + appCopy.text(", expression: ") + state.displayedExpression.rawValue
+                        )
+                        .accessibilityHint(
+                            appCopy.text(
+                                "Hold the eyes for half a second to start listening. Release to keep listening. Hold again to stop recording."
+                            )
+                        )
                         .accessibilityIdentifier("conversation.voiceHold")
                         .position(x: geometry.size.width / 2, y: geometry.size.height * 0.40)
 
@@ -122,7 +133,7 @@ import Foundation
                             text: state.liveTranscript, reduceMotion: reduceMotion, color: .cyan,
                             finalized: state.transcriptFinalized, generation: state.token
                         )
-                        .accessibilityLabel("用户输入：" + state.liveTranscript)
+                        .accessibilityLabel(appCopy.text("User input: ") + state.liveTranscript)
                         .allowsHitTesting(!state.liveTranscript.isEmpty)
                         .opacity(
                             ConversationCaptionVisibility.user(
@@ -142,8 +153,12 @@ import Foundation
 
                     VStack(spacing: 20) {
                         if state.queuedInputs + state.classifyingInputs > 0 {
-                            Text("排队 \(state.queuedInputs) · 决策中 \(state.classifyingInputs)")
-                                .font(.caption).foregroundStyle(.white.opacity(0.6))
+                            Text(
+                                appCopy.format(
+                                    "Queued %@ · Classifying %@", String(describing: state.queuedInputs),
+                                    String(describing: state.classifyingInputs))
+                            )
+                            .font(.caption).foregroundStyle(.white.opacity(0.6))
                         }
                         if let message = state.graphicsMessage {
                             Text(message).font(.caption).foregroundStyle(.white.opacity(0.6))
@@ -157,7 +172,7 @@ import Foundation
                                 text: state.assistantReply, reduceMotion: reduceMotion,
                                 color: Color(red: 0.83, green: 0.74, blue: 1), generation: state.token
                             )
-                            .accessibilityLabel("assistant 回复：" + state.assistantReply)
+                            .accessibilityLabel(appCopy.text("Assistant reply: ") + state.assistantReply)
                             .opacity(showsReply ? state.assistantReplyOpacity : 0)
                             .accessibilityHidden(!showsReply)
                             .allowsHitTesting(showsReply)
@@ -166,7 +181,7 @@ import Foundation
                             if !state.showsModelPreparation
                                 && (state.voicePhase == .failed || state.listeningControlMessage != nil)
                             {
-                                Text(state.listeningControlMessage ?? state.voiceStatus)
+                                Text(appCopy.text(state.listeningControlMessage ?? state.voiceStatus))
                                     .font(.callout).foregroundStyle(.white.opacity(0.72))
                                     .multilineTextAlignment(.center)
                             } else if !state.showsModelPreparation && !showsReply
@@ -190,16 +205,21 @@ import Foundation
                     .accessibilityHidden(presentationNotice != nil)
 
                     if let issue = presentationNotice {
+                        let noticeText =
+                            notices.errorToast == nil
+                            ? issue.text
+                            : appCopy.text(
+                                notices.errorToast?.userMessage ?? "Could not complete the request. Try again.")
                         (Text(
                             Image(
                                 systemName: issue.tone == .info ? "info.circle.fill" : "exclamationmark.triangle.fill"))
-                            + Text(" " + issue.text))
+                            + Text(" " + noticeText))
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(issue.tone == .info ? .cyan : .yellow)
                             .multilineTextAlignment(.center)
                             .lineLimit(3)
                             .frame(width: min(geometry.size.width - 56, 440), height: 56)
-                            .accessibilityLabel(issue.text)
+                            .accessibilityLabel(noticeText)
                             .accessibilityIdentifier("conversation.errorToast")
                             .allowsHitTesting(false)
                             .position(
@@ -232,22 +252,22 @@ import Foundation
         }
         private var hint: String {
             switch state.voicePhase {
-            case .idle: "按住，开启聆听"
-            case .loading: "正在唤醒"
-            case .listening: "我在听"
-            case .processing: "稍等片刻"
+            case .idle: appCopy.text("Hold to start listening")
+            case .loading: appCopy.text("Waking up")
+            case .listening: appCopy.text("I’m listening")
+            case .processing: appCopy.text("Please wait")
             case .speaking: ""
-            case .failed: "按住重试"
+            case .failed: appCopy.text("Hold to retry")
             }
         }
         private var accessibilityState: String {
             switch state.voicePhase {
-            case .idle: "录音已关闭"
-            case .loading: "正在加载模型"
-            case .listening: "正在聆听"
-            case .processing: "正在识别"
-            case .speaking: "正在朗读回复"
-            case .failed: state.voiceStatus
+            case .idle: appCopy.text("Recording off")
+            case .loading: appCopy.text("Loading models")
+            case .listening: appCopy.text("Listening")
+            case .processing: appCopy.text("Recognizing speech")
+            case .speaking: appCopy.text("Reading the reply aloud")
+            case .failed: appCopy.text(state.voiceStatus)
             }
         }
     }
@@ -255,6 +275,8 @@ import Foundation
     /// Startup eyes stay noninteractive until models are ready.
     @MainActor
     public struct ConversationStartupView: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let status: String
         let error: String?
         let retry: () -> Void
@@ -281,11 +303,11 @@ import Foundation
                     .position(x: geometry.size.width / 2, y: geometry.size.height * 0.40)
                     VStack(spacing: 16) {
                         if let error {
-                            Text("应用准备失败：" + error).font(.callout)
-                            Button("重新加载", action: retry)
+                            Text(appCopy.text("App preparation failed: ") + error).font(.callout)
+                            Button(appCopy.text("Reload"), action: retry)
                         } else {
                             ProgressView().tint(.white)
-                            Text(status).font(.subheadline)
+                            Text(appCopy.text(status)).font(.subheadline)
                         }
                     }
                     .foregroundStyle(.white.opacity(0.72))
@@ -302,14 +324,16 @@ import Foundation
 
     @MainActor
     struct HomeModelPreparationRetry: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let retry: () -> Void
         var body: some View {
             GeometryReader { geometry in
                 Button(action: retry) {
-                    Label("重试", systemImage: "arrow.clockwise")
+                    Label(appCopy.text("Retry"), systemImage: "arrow.clockwise")
                 }
                 .buttonStyle(.bordered)
-                .accessibilityLabel("重新加载模型")
+                .accessibilityLabel(appCopy.text("Reload models"))
                 .accessibilityIdentifier("home.models.retry")
                 .position(x: geometry.size.width / 2, y: geometry.size.height * 0.64)
             }

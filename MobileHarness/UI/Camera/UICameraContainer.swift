@@ -80,10 +80,10 @@ public enum CameraPreviewReadinessError: Error, Sendable, Equatable, CustomStrin
     case rendererFailed(String)
     public var description: String {
         switch self {
-        case .busy: return "相机首帧已有等待中的操作"
-        case .invalidTimeout: return "相机首帧等待时限须在0到10秒内"
-        case .timedOut: return "等待相机有效预览首帧超时，尚未开始拍摄"
-        case .rendererFailed(let message): return "相机预览失败：" + message
+        case .busy: return "Camera first-frame operation already pending"
+        case .invalidTimeout: return "Camera first-frame timeout must be between 0 and 10 seconds"
+        case .timedOut: return "Timed out waiting for a valid camera frame; capture did not start"
+        case .rendererFailed(let message): return "Camera preview failed: " + message
         }
     }
 }

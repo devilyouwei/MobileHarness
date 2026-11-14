@@ -62,6 +62,7 @@ public enum ArtifactArchive {
     @MainActor public final class ArtifactExportService: WriterArtifactsControlling {
         private let workspace: ArtifactWorkspace
         private let disk: DiskFileStore
+        private let language: @Sendable () -> AppLanguage
         private var worker: Task<URL, any Error>?
         private var prefix: String?
         private var closed = false
@@ -70,9 +71,13 @@ public enum ArtifactArchive {
         private var previewPrefix: String?
         private var previewBusy = false
         private var previewWorker: Task<WriterFilePreview, any Error>?
-        public init(workspace: ArtifactWorkspace, disk: DiskFileStore) {
+        public init(
+            workspace: ArtifactWorkspace, disk: DiskFileStore,
+            language: @escaping @Sendable () -> AppLanguage = { .english }
+        ) {
             self.workspace = workspace
             self.disk = disk
+            self.language = language
         }
         public func read(_ id: String) async throws -> WriterArtifactSnapshot {
             guard !closed, let uuid = WorkspaceID(rawValue: id) else { throw ArtifactWorkspaceError.invalidPath }
@@ -159,7 +164,7 @@ public enum ArtifactArchive {
         }
         private func previewHTML(_ source: String, ext: String) async throws -> String {
             if ext == "svg" { return "<!doctype html><meta charset=utf-8>" + source }
-            return try await ArtifactTextRendering.document(source, markdown: ext == "md").html
+            return try await ArtifactTextRendering.document(source, markdown: ext == "md", language: language()).html
         }
         public func closePreview() async throws {
             if let previewWorker {

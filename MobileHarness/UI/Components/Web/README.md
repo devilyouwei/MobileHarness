@@ -16,6 +16,8 @@ readAccessRoot 是宿主 URL，不从页面或模型字符串解释；先进行 
 
 ## 离线 Markdown
 
+The caller supplies the application language to the Markdown renderer. The WebKit host receives translated diagram labels as data. The preview escapes those labels, and the returned diagnostics use English.
+
 WebPageContainer.renderMarkdown 将调用方传入的 Markdown 交给一次性 WebKit 文档。该文档仅加载 UI Bundle 内固定版本的 markdown-it 和 Mermaid，Mermaid 只在遇到对应围栏时加载。宿主的内容安全策略和本地网络规则禁止外部资源。输入以 JavaScript 参数传入，文档源代码不会作为脚本执行。调用沿用单页原生加载和查询期限，转换完成、取消或失败即释放专用页面。
 
 Markdown 支持 CommonMark、表格和删除线。HTML 源码转义，链接限 HTTP(S)，图片语法显示替代文字。Mermaid 以严格模式顺序渲染，每文档最多渲染 16 张图，每张图源码最多 16 KiB，累计 SVG 最多 2 MiB。Mermaid 的 maxEdges 设置为 250。围栏内配置覆盖被拒绝。有效 SVG 作为独立图像嵌入静态 HTML，隔离 SVG 样式和行为。无效图保留代码块并带诊断，后续图继续转换。

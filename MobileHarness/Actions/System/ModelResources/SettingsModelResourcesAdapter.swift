@@ -6,7 +6,7 @@ import StorageCore
 import UI
 
 public enum SettingsModelResourcesAdapter {
-    nonisolated static let invalidSourceMessage = "请填写 HTTPS 域名，不包含路径、查询参数或账号密码"
+    nonisolated static let invalidSourceMessage = "Enter an HTTPS domain without a path, query, or credentials."
     public static func validatePreferences(_ draft: ModelResourcePreferences) throws -> ModelResourcePreferences {
         do {
             let source = try ModelDownloadSource(endpoint: draft.endpoint, allowsCellular: true)
@@ -21,13 +21,13 @@ public enum SettingsModelResourcesAdapter {
         let items = inventory.items.map { snapshot in
             let status: String
             switch snapshot.phase {
-            case .notInstalled: status = "未下载"
-            case .queued: status = "等待下载"
-            case .downloading: status = "正在下载"
-            case .verifying: status = "校验并安装"
-            case .installed: status = "已安装"
-            case .deleting: status = "正在删除"
-            case .failed: status = "失败，可重试或删除修复"
+            case .notInstalled: status = "Not installed"
+            case .queued: status = "Waiting to download"
+            case .downloading: status = "Downloading"
+            case .verifying: status = "Verifying and installing"
+            case .installed: status = "Installed"
+            case .deleting: status = "Deleting"
+            case .failed: status = "Failed. Retry or remove to repair."
             }
             return ModelResourceItem(
                 id: snapshot.id, name: snapshot.name, status: status,
@@ -37,18 +37,18 @@ public enum SettingsModelResourcesAdapter {
                 active: [.queued, .downloading, .verifying, .deleting].contains(snapshot.phase),
                 failure: snapshot.failure.map {
                     switch $0 {
-                    case "incompatible": return "模型版本已变更，请删除旧资源后重新下载"
-                    case "integrity": return "文件校验失败，请检查下载来源后重试"
-                    case "removal": return "删除未完成，模型文件仍保留，请重试删除"
+                    case "incompatible": return "The model version changed. Remove the old files and download again."
+                    case "integrity": return "File verification failed. Check the source and try again."
+                    case "removal": return "Deletion did not finish. The model files remain. Try again."
                     case "transferIndex":
                         return snapshot.phase == .installed
-                            ? "模型已安装，下载任务记录未能保存；无需重新下载"
-                            : "下载任务记录未能保存，请确认设备已解锁并重试"
+                            ? "The model is installed. The download record could not be saved."
+                            : "Could not save the download record. Unlock the device and try again."
                     default:
                         if $0.hasPrefix("network:") {
-                            return "网络传输中断，已保留完成的文件；可继续下载（\($0.dropFirst(8))）"
+                            return "Download interrupted. You can resume it."
                         }
-                        return "下载未完成，可继续下载或删除修复。错误：\($0.prefix(160))"
+                        return "Download did not finish. Resume or remove the files."
                     }
                 },
                 revision: snapshot.revision,

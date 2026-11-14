@@ -44,11 +44,11 @@ import FunctionContracts
                 do {
                     try Task.checkCancellation()
                     #if targetEnvironment(simulator)
-                        throw CapabilityError.unavailable("请使用 iOS 27 真机运行 MossValidation")
+                        throw CapabilityError.unavailable("Run MossValidation on a physical device with iOS 27")
                     #else
                         let clock = ContinuousClock()
                         let loadStart = clock.now
-                        state.presentReport("正在加载并预热本地模型…")
+                        state.presentReport("Loading and warming up the local model…")
                         try await load()
                         let loadTime = seconds(loadStart.duration(to: clock.now))
                         let start = clock.now
@@ -76,26 +76,29 @@ import FunctionContracts
                             }
                         }
                         try Task.checkCancellation()
-                        guard finished, !samples.isEmpty else { throw CapabilityError.unavailable("没有生成音频") }
+                        guard finished, !samples.isEmpty else {
+                            throw CapabilityError.unavailable("No audio was generated")
+                        }
                         let elapsed = seconds(start.duration(to: clock.now))
                         let duration = Double(samples.count) / 48_000
                         state.presentReport(
                             String(
-                                format: "加载及预热 %.2f 秒\n首段 PCM %.2f 秒\n总合成 %.2f 秒\n音频 %.2f 秒\n实时率 %.2f（越低越快）\n热状态：%@",
+                                format:
+                                    "Load and warm-up %.2f sec\nFirst PCM %.2f sec\nSynthesis %.2f sec\nAudio %.2f sec\nReal-time factor %.2f (lower is faster)\nThermal state: %@",
                                 loadTime,
                                 first ?? elapsed, elapsed, duration, elapsed / duration,
                                 String(describing: ProcessInfo.processInfo.thermalState)))
                         let automatic = ProcessInfo.processInfo.arguments.contains("-moss-autorun")
                         if !automatic || ProcessInfo.processInfo.arguments.contains("-moss-playback") {
                             try await play(samples)
-                            state.appendReport("\n扬声器播放完成（原生音频接口）")
+                            state.appendReport("\nSpeaker playback completed (native audio interface)")
                         }
                         saveAutomaticReport(state.report)
                     #endif
                 } catch is CancellationError {
-                    state.presentReport("已停止")
+                    state.presentReport("Stopped")
                 } catch {
-                    state.presentReport("验证失败：\(error)")
+                    state.presentReport("Validation failed: \(error)")
                     saveAutomaticReport(state.report)
                 }
             }
@@ -147,7 +150,9 @@ import FunctionContracts
                 { cleanupErrors.append(error) }
                 state.presentReport(
                     cleanupErrors.isEmpty
-                        ? "已停止并卸载" : "停止或卸载未完成：" + cleanupErrors.map { String(describing: $0) }.joined(separator: "; "))
+                        ? "Stopped and unloaded"
+                        : "Stop or unload incomplete: "
+                            + cleanupErrors.map { String(describing: $0) }.joined(separator: "; "))
                 state.presentStopping(false)
             }
         }

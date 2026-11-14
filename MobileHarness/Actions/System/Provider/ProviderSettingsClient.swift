@@ -30,7 +30,7 @@ public final class ProviderSettingsClient: SettingsOperating {
     }
     public func restore() async throws -> CloudSettingsDraft {
         guard !stopped else { throw CancellationError() }
-        guard !stopped, !changing, restoreWaiters < 32 else { throw WorkflowMessage("配置正在读取或保存，请稍后重试") }
+        guard !stopped, !changing, restoreWaiters < 32 else { throw WorkflowMessage("Settings are busy. Try again.") }
         if !needsRestore, let saved { return saved }
         restoreWaiters += 1
         defer { restoreWaiters -= 1 }
@@ -57,7 +57,7 @@ public final class ProviderSettingsClient: SettingsOperating {
         }
     }
     public func save(_ draft: CloudSettingsDraft) async throws {
-        guard !stopped, !changing, restoration == nil else { throw WorkflowMessage("配置正在读取或保存，请稍后重试") }
+        guard !stopped, !changing, restoration == nil else { throw WorkflowMessage("Settings are busy. Try again.") }
         changing = true
         defer { changing = false }
         do {
@@ -72,8 +72,8 @@ public final class ProviderSettingsClient: SettingsOperating {
     }
     private func message(_ error: any Error) -> String {
         if let message = provider.errorMessage(error) { return message }
-        if error is CancellationError { return "操作已取消" }
-        return "无法连接服务，请检查 HTTP/HTTPS URL、Key 和网络后重试"
+        if error is CancellationError { return "Operation cancelled" }
+        return "Could not reach the service. Check the URL, API key, and network."
     }
 }
 private struct WorkflowMessage: LocalizedError, SettingsFailurePresenting {

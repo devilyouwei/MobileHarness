@@ -157,7 +157,7 @@ final class HistoryMessageLoader {
         switch result {
         case .success(let turn): request.show(turn)
         case .failure(let failure):
-            if !(failure is CancellationError) { error = "读取失败：\(failure)" }
+            if !(failure is CancellationError) { error = "Could not load: \(failure)" }
         }
     }
     func cancel() {
@@ -241,7 +241,9 @@ public struct HistoryDecisionMetadata: Codable, Sendable {
     public let skills: [String: Int]
     public let catalogJSON: String
     public var summary: String {
-        (execution == nil ? "默认对话" : (execution == "background" ? "后台任务" : "前台任务") + " · " + (taskGoal ?? ""))
+        (execution == nil
+            ? "Default conversation"
+            : (execution == "background" ? "Background task" : "Foreground task") + " · " + (taskGoal ?? ""))
             + " · Skills: "
             + skills.keys.sorted().map { "\($0)@\(skills[$0] ?? 0)" }.joined(separator: ", ")
     }
@@ -449,7 +451,7 @@ public struct HistoryTaskCompression: Codable, Sendable, Identifiable {
     public let completedAt: Date
     public let sources: [HistorySourceReference]
     public var text: String {
-        [reportedSummary, failure.map { "失败：" + $0 }].compactMap { $0 }.joined(separator: "\n")
+        [reportedSummary, failure.map { "Failed: " + $0 }].compactMap { $0 }.joined(separator: "\n")
     }
 }
 

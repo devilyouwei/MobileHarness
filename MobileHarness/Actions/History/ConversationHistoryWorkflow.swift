@@ -1,5 +1,6 @@
 import Foundation
 import FunctionContracts
+import OSLog
 import PlatformKit
 import StorageChat
 import StorageCore
@@ -10,6 +11,7 @@ public enum HistoryImageLoadingError: Error { case invalidReference, busy }
 /// One root-owned history operation slot. Cancel keeps admission closed until cleanup finishes.
 @MainActor
 public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
+    private let log = Logger(subsystem: "dev.mobileharness", category: "history")
     public let state: any HistoryPresenting
     private let clearLogs: @MainActor (String?) async throws -> Void
     private let deleteArchive: @MainActor (String) async throws -> Void
@@ -76,7 +78,10 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
             state.present(.hasMoreArchives(state.archive?.past.count == HistoryPaging.pageSize))
             state.present(.archivePaging(.init()))
             loaded = true
-        } catch { state.present(.status("历史读取失败：\(error)")) }
+        } catch {
+            log.error("History load failed: \(String(describing: error), privacy: .private)")
+            state.present(.status("Could not load conversation history."))
+        }
     }
     public func loadConversation(_ id: String) async throws -> HistoryConversation {
         guard let recordID = BusinessRecordID(rawValue: id), recordID.kind == .dialog else {
@@ -147,7 +152,7 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
             if Task.isCancelled {
                 state.cancelArchivePage(ticket)
             } else {
-                state.finishArchivePage(ticket, error: "读取失败：\(error)")
+                state.finishArchivePage(ticket, error: "Could not load history: \(error)")
             }
         }
     }
@@ -179,8 +184,12 @@ public final class ConversationHistoryWorkflow: ConversationHistoryControlling {
                 task = nil
             }
             do { try await operation() } catch AssistantHistoryError.busy {
-                state.present(.status("正在回复或处理输入，请结束后再开始新对话。"))
-            } catch { state.present(.status("历史操作失败：\(error)")) }
+                state.present(
+                    .status("Wait for the current reply or input to finish before starting a new conversation."))
+            } catch {
+                log.error("History operation failed: \(String(describing: error), privacy: .private)")
+                state.present(.status("History operation failed. Try again."))
+            }
         }
     }
     public func shutdown() async {

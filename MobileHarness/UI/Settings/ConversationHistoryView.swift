@@ -35,6 +35,8 @@ import Foundation
 
     @MainActor
     private struct AgentConversationHistoryList: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         @Environment(\.recordContextID) private var recordContextID
         @Bindable var state: ConversationHistoryState
         let controls: any ConversationHistoryControlling
@@ -45,7 +47,7 @@ import Foundation
         var body: some View {
             List {
                 if let status = state.status {
-                    Section { Text(status).foregroundStyle(.secondary).textSelection(.enabled) }
+                    Section { Text(appCopy.text(status)).foregroundStyle(.secondary).textSelection(.enabled) }
                 }
                 Section {
                     if let current = state.archive?.current {
@@ -60,13 +62,15 @@ import Foundation
                             .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
                         }
 
-                        Button("New Conversation", systemImage: "square.and.pencil") { controls.startNew() }
-                            .disabled(state.isBusy || (current.turnCount ?? current.turns.count) == 0)
-                            .accessibilityIdentifier("history.new")
+                        Button(appCopy.text("New Conversation"), systemImage: "square.and.pencil") {
+                            controls.startNew()
+                        }
+                        .disabled(state.isBusy || (current.turnCount ?? current.turns.count) == 0)
+                        .accessibilityIdentifier("history.new")
                     } else if state.status == nil {
                         ProgressView("Loading conversations…")
                     } else {
-                        Button("Retry") { Task { await reload() } }
+                        Button(appCopy.text("Retry")) { Task { await reload() } }
                     }
                 } header: {
                     Text("Current Conversation")
@@ -86,7 +90,7 @@ import Foundation
                         }
                         .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
                         .swipeActions {
-                            Button("Delete", role: .destructive) { deleting = conversation }
+                            Button(appCopy.text("Delete"), role: .destructive) { deleting = conversation }
                         }
                         if conversation.summaryTitle == nil {
                             Button("Regenerate Title") { controls.summarize(conversation.id) }.disabled(state.isBusy)
@@ -102,9 +106,9 @@ import Foundation
                         ) { retry in await controls.loadMoreArchives(retry: retry) }
                     }
                 } header: {
-                    Text("Past Conversations")
+                    Text(appCopy.text("Past Conversations"))
                 } footer: {
-                    Text("History is stored only on this device.")
+                    Text(appCopy.text("History is stored only on this device."))
                 }
             }
             .navigationContext(
@@ -112,24 +116,30 @@ import Foundation
                 content: state.archive == nil ? state.status == nil ? .loading : .failed : .ready,
                 overlay: deleting != nil ? .deleteConfirmation : nil
             )
-            .navigationTitle(state.title)
+            .navigationTitle(appCopy.text(state.title))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("清空请求日志", systemImage: "trash") { clearingLogs = true }
+                    Button(appCopy.text("Clear request logs"), systemImage: "trash") { clearingLogs = true }
                 }
             }
-            .confirmationDialog("清空整个请求日志库？", isPresented: $clearingLogs, titleVisibility: .visible) {
-                Button("清空全部日志", role: .destructive) {
+            .confirmationDialog(
+                appCopy.text("Clear all request logs?"), isPresented: $clearingLogs, titleVisibility: .visible
+            ) {
+                Button(appCopy.text("Clear all logs"), role: .destructive) {
                     Task {
                         do { try await controls.clearRequestLogs(requestID: nil) } catch {
-                            state.present(.status("日志清空失败：\(error)"))
+                            state.present(
+                                .status(appCopy.format("Could not clear logs: %@", String(describing: error))))
                         }
                     }
                 }
             } message: {
-                Text("删除 Assistant 和 Writer 的全部请求日志；保留对话、消息及其他详情。")
+                Text(
+                    appCopy.text(
+                        "Deletes all Assistant and Writer request logs. Conversations, messages, and other details are kept."
+                    ))
             }
             .task {
                 guard initialLoad.begin() else { return }
@@ -143,8 +153,8 @@ import Foundation
                 isPresented: Binding(
                     get: { deleting != nil }, set: { if !$0 { deleting = nil } })
             ) {
-                Button("Cancel", role: .cancel) { deleting = nil }
-                Button("Delete", role: .destructive) {
+                Button(appCopy.text("Cancel"), role: .cancel) { deleting = nil }
+                Button(appCopy.text("Delete"), role: .destructive) {
                     if let selected = deleting { controls.delete(selected.id) }
                     deleting = nil
                 }
@@ -226,6 +236,8 @@ import Foundation
 
     @MainActor
     struct HistoryPagingFooter<Cursor: Hashable & Sendable>: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let cursor: Cursor
         let state: HistoryPageLoading<Cursor>
         var enabled = true
@@ -236,13 +248,13 @@ import Foundation
             VStack(spacing: 8) {
                 if let error = state.error {
                     Text(error).font(.footnote).textSelection(.enabled)
-                    Button("重试") {
+                    Button(appCopy.text("Retry")) {
                         retryRequested = true
                         retryID = UUID()
                     }
                     .disabled(!enabled || state.isLoading)
                 } else {
-                    ProgressView().accessibilityLabel("正在加载更多记录")
+                    ProgressView().accessibilityLabel(appCopy.text("Loading more records"))
                 }
             }
             .frame(maxWidth: .infinity).padding(.vertical, 8)
@@ -262,6 +274,8 @@ import Foundation
 
     @MainActor
     private struct ConversationHistoryDetail: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         private let seed: HistoryConversation
         @State private var loaded: HistoryConversation?
         @State private var initialLoad = HistoryInitialLoad()
@@ -289,7 +303,7 @@ import Foundation
                 if let error = loadError ?? messageLoader.error {
                     Section {
                         Text(error).font(.footnote).foregroundStyle(.secondary).textSelection(.enabled)
-                        Button("重试") { Task { await reload() } }.disabled(isRefreshing)
+                        Button(appCopy.text("Retry")) { Task { await reload() } }.disabled(isRefreshing)
                     }
                 }
                 Section {
@@ -340,7 +354,7 @@ import Foundation
             }
             .refreshable { await reload() }
             .overlay {
-                if loaded == nil && loadError == nil { ProgressView("加载对话…") }
+                if loaded == nil && loadError == nil { ProgressView(appCopy.text("Loading conversation…")) }
             }
             .onDisappear { messageLoader.cancel() }
             .onChange(of: scenePhase) { _, phase in if phase != .active { messageLoader.cancel() } }
@@ -374,8 +388,12 @@ import Foundation
                     VStack(alignment: .leading, spacing: 8) {
                         Text(verbatim: compression.goal).font(.headline).foregroundStyle(.blue)
                         HStack(spacing: 6) {
-                            Text("\(compression.status.rawValue) · \(sourceCount) 轮对话")
-                                .font(.caption).foregroundStyle(.secondary)
+                            Text(
+                                appCopy.format(
+                                    "%@ · %@ exchanges", String(describing: compression.status.rawValue),
+                                    String(describing: sourceCount))
+                            )
+                            .font(.caption).foregroundStyle(.secondary)
                             typeBadge("Task", color: .blue)
                         }
                         if !compression.text.isEmpty {
@@ -392,7 +410,7 @@ import Foundation
             .buttonStyle(.plain)
             .foregroundStyle(.primary)
             .accessibilityIdentifier("history.compression.\(compression.taskID)")
-            .accessibilityValue(expanded ? "已展开" : "已收起")
+            .accessibilityValue(expanded ? appCopy.text("Expanded") : appCopy.text("Collapsed"))
             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 20))
             .modifier(HistoryTimelineRowSeparator(leading: expanded && sourceCount > 0 ? 36 : -16))
         }
@@ -457,7 +475,7 @@ import Foundation
                 loadError = nil
                 initialLoad.finish(succeeded: true)
             } catch {
-                if !Task.isCancelled { loadError = "读取失败：\(error)" }
+                if !Task.isCancelled { loadError = appCopy.format("Could not load: %@", String(describing: error)) }
             }
         }
         private func loadPage(after: UInt64, retry: Bool) async {
@@ -498,7 +516,7 @@ import Foundation
                 if Task.isCancelled {
                     pageLoading.cancel(ticket)
                 } else {
-                    pageLoading.finish(ticket, error: "读取失败：\(error)")
+                    pageLoading.finish(ticket, error: appCopy.format("Could not load: %@", String(describing: error)))
                 }
             }
         }
@@ -512,7 +530,7 @@ import Foundation
             let active = taskLoading.values.filter(\.isLoading).count
             guard let ticket = taskLoading[id, default: .init()].begin(after: after, retry: retry) else { return }
             guard active < 16 else {
-                taskLoading[id]?.finish(ticket, error: "同时加载的任务过多，请重试。")
+                taskLoading[id]?.finish(ticket, error: appCopy.text("Too many tasks are loading. Try again."))
                 return
             }
             let worker = Task {
@@ -547,7 +565,8 @@ import Foundation
                 if Task.isCancelled {
                     taskLoading[id]?.cancel(ticket)
                 } else {
-                    taskLoading[id]?.finish(ticket, error: "读取失败：\(error)")
+                    taskLoading[id]?.finish(
+                        ticket, error: appCopy.format("Could not load: %@", String(describing: error)))
                 }
             }
         }
@@ -575,11 +594,13 @@ import Foundation
     }
 
     private struct HistoryJSONShareButton<Value: Encodable & Sendable>: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let value: Value
         let filename: String
         var body: some View {
             ShareLink(
-                "导出", item: HistoryJSONDocument(value: value, filename: filename),
+                appCopy.text("Export"), item: HistoryJSONDocument(value: value, filename: filename),
                 preview: SharePreview(filename))
         }
     }
@@ -597,6 +618,8 @@ import Foundation
 
     @MainActor
     private struct ConversationTurnDetail: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         @State private var turn: HistoryTurn
         let controls: any ConversationHistoryControlling
         @State private var clearingLog = false
@@ -630,18 +653,18 @@ import Foundation
                     ForEach(turn.toolCalls ?? []) { call in selectable(call.responseReport) }
                 }
                 if let evidence = turn.coordination {
-                    Section("输入决策") {
-                        Text("决策：" + turn.decisionReport)
-                        selectable("来源：" + evidence.source)
-                        selectable("采集时间标记：" + evidence.capturedAt)
-                        if let route = evidence.route { selectable("决策路径：" + route) }
+                    Section(appCopy.text("Input decision")) {
+                        Text(appCopy.text("Decision: ") + turn.decisionReport)
+                        selectable(appCopy.text("Source: ") + evidence.source)
+                        selectable(appCopy.text("Capture timestamp: ") + evidence.capturedAt)
+                        if let route = evidence.route { selectable(appCopy.text("Decision route: ") + route) }
                         if evidence.decision == "interrupt" {
-                            Text("打断是决策结果，不代表所有执行都已停止。")
+                            Text(appCopy.text("An interrupt decision can precede execution stopping."))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
-                        if let batch = evidence.batchID { selectable("批次主输入：" + batch) }
+                        if let batch = evidence.batchID { selectable(appCopy.text("Primary input: ") + batch) }
                         if let members = evidence.memberIDs, !members.isEmpty {
-                            DisclosureGroup("批次成员 · \(members.count)") {
+                            DisclosureGroup(appCopy.format("Batch members · %@", String(describing: members.count))) {
                                 ForEach(members, id: \.self) { selectable($0) }
                             }
                         }
@@ -715,21 +738,23 @@ import Foundation
                     }
                     Section {
                         if let clearFailure { Text(clearFailure).foregroundStyle(.red) }
-                        Button("清空此条请求日志", role: .destructive) { clearingLog = true }
+                        Button(appCopy.text("Clear this request log"), role: .destructive) { clearingLog = true }
                             .disabled(isClearingLog || turn.messageID?.hasPrefix("request_") != true)
                         if isClearingLog { ProgressView() }
                     }
                 }
             }
             .navigationContext(.turn, itemID: turn.id)
-            .navigationTitle("对话详情")
+            .navigationTitle(appCopy.text("Conversation details"))
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HistoryJSONShareButton(value: turn, filename: "\(turn.id).json")
                 }
             }
-            .confirmationDialog("清空此条请求日志？", isPresented: $clearingLog, titleVisibility: .visible) {
-                Button("清空日志", role: .destructive) {
+            .confirmationDialog(
+                appCopy.text("Clear this request log?"), isPresented: $clearingLog, titleVisibility: .visible
+            ) {
+                Button(appCopy.text("Clear log"), role: .destructive) {
                     Task {
                         guard !isClearingLog else { return }
                         isClearingLog = true
@@ -739,11 +764,11 @@ import Foundation
                             guard let id = turn.messageID else { throw HistoryDetailError.unavailable }
                             try await controls.clearRequestLogs(requestID: id)
                             turn = ConversationHistoryPresentation.clearingLogs(turn)
-                        } catch { clearFailure = "日志清空失败：\(error)" }
+                        } catch { clearFailure = appCopy.format("Could not clear logs: %@", String(describing: error)) }
                     }
                 }
             } message: {
-                Text("完整请求及日志内图片将被删除；其他详情保留。")
+                Text(appCopy.text("Deletes the full request and any images in the log. Other details are kept."))
             }
             .task(id: turn.decisionMetadata?.catalogJSON) {
                 guard let source = turn.decisionMetadata?.catalogJSON, source != catalogSource else { return }
@@ -829,7 +854,7 @@ import Foundation
         @ViewBuilder private var skillsInformation: some View {
             if let metadata = turn.decisionMetadata {
                 if metadata.skills.isEmpty {
-                    Text("None").foregroundStyle(.secondary)
+                    Text(appCopy.text("None")).foregroundStyle(.secondary)
                 } else {
                     HistorySkillFlowLayout(spacing: 8) {
                         ForEach(metadata.skills.keys.sorted(), id: \.self) { id in
@@ -848,7 +873,7 @@ import Foundation
         @ViewBuilder private var statesInformation: some View {
             if let states = turn.decisionMetadata?.states {
                 if states.isEmpty {
-                    Text("None").foregroundStyle(.secondary)
+                    Text(appCopy.text("None")).foregroundStyle(.secondary)
                 } else {
                     HistorySkillFlowLayout(spacing: 8) {
                         ForEach(states, id: \.self) { path in
@@ -982,6 +1007,8 @@ import Foundation
 
     @MainActor
     private struct HistoryImageThumbnail: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let reference: HistoryImageReference
         let turnID: String
         let controls: any ConversationHistoryControlling
@@ -1004,16 +1031,16 @@ import Foundation
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("查看记录中的图片")
+                    .accessibilityLabel(appCopy.text("View image from history"))
                     .accessibilityIdentifier("history.image.\(reference.id)")
                 } else if loading {
                     ProgressView().frame(width: 112, height: 84)
                 } else if expired {
-                    Label("图片已释放", systemImage: "photo")
+                    Label(appCopy.text("Image released"), systemImage: "photo")
                         .font(.caption).foregroundStyle(.secondary)
                         .frame(width: 112, height: 84)
                 } else if failed {
-                    Button("重试图片", systemImage: "arrow.clockwise") { retry += 1 }
+                    Button(appCopy.text("Retry image"), systemImage: "arrow.clockwise") { retry += 1 }
                         .frame(width: 112, height: 84)
                 }
             }
@@ -1044,7 +1071,7 @@ import Foundation
                 ZStack(alignment: .topTrailing) {
                     Color.black.ignoresSafeArea()
                     if let data { HistoryImagePreview(data: data) }
-                    Button("关闭", systemImage: "xmark") { inspecting = false }
+                    Button(appCopy.text("Close"), systemImage: "xmark") { inspecting = false }
                         .padding().foregroundStyle(.white)
                         .background(.black.opacity(0.65), in: Capsule()).padding()
                 }
@@ -1055,6 +1082,8 @@ import Foundation
 
     @MainActor
     struct HistoryImagePreview: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let data: Data
         @State private var image: UIImage?
         @State private var failed = false
@@ -1065,8 +1094,8 @@ import Foundation
                     Image(uiImage: image).resizable().scaledToFit()
                 } else if failed {
                     VStack {
-                        Text("图片无法打开")
-                        Button("重试", systemImage: "arrow.clockwise") { retry += 1 }
+                        Text(appCopy.text("Could not open image"))
+                        Button(appCopy.text("Retry"), systemImage: "arrow.clockwise") { retry += 1 }
                     }.foregroundStyle(.white)
                 } else {
                     ProgressView().tint(.white)

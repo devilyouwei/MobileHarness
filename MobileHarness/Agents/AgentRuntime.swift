@@ -114,7 +114,8 @@ import StorageFiles
             resourceChanges: @escaping @MainActor @Sendable () async throws -> AsyncStream<UInt64>,
             summarizeTitle: @escaping @Sendable (AssistantConversation) async throws -> String,
             modelName: @escaping @Sendable () async throws -> String = { "Unspecified model" },
-            chatProvider: @escaping @Sendable () async throws -> any ChatCapability
+            chatProvider: @escaping @Sendable () async throws -> any ChatCapability,
+            language: @escaping @Sendable () -> String
         ) throws -> AgentExecutionPreparation {
             try writerContainer.configureHistory(
                 messages: repositories.writerMessages, executions: repositories.writerExecutions,
@@ -200,7 +201,9 @@ import StorageFiles
                                 throw CommunicationError.unavailableTarget
                             }
                             _ = try await control(
-                                "task.end", ["summary": "用户开始新对话，结束当前目标。"], "assistant",
+                                "task.end",
+                                ["summary": "The user started a new conversation and ended the current goal."],
+                                "assistant",
                                 applicationControlSessionID, UUID().uuidString, nil)
                         }
                     }, context: memoryContext)
@@ -261,7 +264,8 @@ import StorageFiles
                         inputDecision: makeInputDecision(business), inputQueueStatus: business.inputQueueStatus,
                         modelName: modelName, assistantContainer: assistantContainer,
                         applicationControlContainer: applicationControlContainer, memoryContainer: memoryContainer,
-                        photographerContainer: photographerContainer, writerContainer: writerContainer)
+                        photographerContainer: photographerContainer, writerContainer: writerContainer,
+                        language: language)
                 }
             }
         }
@@ -279,7 +283,8 @@ import StorageFiles
             inputQueueStatus: @escaping @MainActor @Sendable (Int, Int) -> Void = { _, _ in },
             modelName: @escaping @Sendable () async throws -> String, assistantContainer: AssistantContainer,
             applicationControlContainer: ApplicationControlContainer, memoryContainer: MemoryContainer,
-            photographerContainer: PhotographerContainer, writerContainer: WriterContainer
+            photographerContainer: PhotographerContainer, writerContainer: WriterContainer,
+            language: @escaping @Sendable () -> String
         ) throws {
             self.contextScope = contextScope
             self.uiHome = home
@@ -304,7 +309,8 @@ import StorageFiles
                 throw WriterFailure.unavailable
             }
             writerContainer.bindArtifacts(business.writerArtifacts)
-            try writerContainer.install(manager: manager, output: gateway, model: writerModel, streaming: streaming)
+            try writerContainer.install(
+                manager: manager, output: gateway, model: writerModel, streaming: streaming, language: language)
             runtimeLogWorkflow = activity
             business.bindResources(resources, actions)
             business.bindDeferredFailure { result in
@@ -356,7 +362,7 @@ import StorageFiles
                 presentsReply: true, chatProvider: chatProvider, conversations: conversations,
                 communications: communications,
                 modelName: modelName,
-                context: assistantContext)
+                context: assistantContext, language: language)
             business.tasks.handler = { operation, arguments, source, session, input, decision in
                 try await main.controlTask(
                     operation, arguments: arguments, source: source, sessionID: session, inputID: input,
@@ -427,7 +433,7 @@ import StorageFiles
                             item,
                             event: .init(
                                 id: UUID().uuidString, time: task.updatedAt ?? task.date, title: task.status,
-                                detail: "前台任务 · Skills: " + task.skills.joined(separator: ",")))
+                                detail: "Foreground task · Skills: " + task.skills.joined(separator: ",")))
                     }
                     previous = previous.filter { id, _ in skills.tasks.contains { $0.id == id } }
                 }

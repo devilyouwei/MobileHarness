@@ -38,6 +38,7 @@ model_download.py 从生产 model-catalog.json 选择源，通过分页 Hub 元�
 | download-moss-tts-nano.py | MOSS-TTS-Nano 制品 |
 | download-yolo26-pose.py | pinned 官方 pose ZIP、安全校验及替换 |
 | test-kokoro.sh | 可选 Kokoro 适配检查 |
+| [evaluate-decision-language.sh](evaluate-decision-language.sh) | Runs the current English and Simplified Chinese Decision resources and the recorded mixed baseline against an installed D3 Edge artifact. Accepts a model resource root containing `D3Edge/` and a new JSON output path. See the [experiment report](../docs/validation/Decision-Model-Mac-Comparison.md#decision-prompt-language-split). |
 
 下载器与 App 安装路径分离；App 运行时资源获取由 ModelKit Management/Hub 及 Settings 工作流拥有。各 gate/模型根路径见 [Tests](../Tests/README.md) 与对应适配器 README，不在普通检查中隐式下载或执行真实模型。
 

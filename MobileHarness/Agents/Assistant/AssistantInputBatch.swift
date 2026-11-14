@@ -42,14 +42,14 @@ struct AssistantInputBatch {
         var sections = try ordered.map { message in
             let (source, content) = try Self.presentation(message)
             return try Self.bodyLines(content)
-                + (try AgentPrompts.text(
-                    "Assistant/InputProtocol", "sourceLine",
+                + (try AgentPrompts.inputMarker(
+                    "sourceLine",
                     ["source": source, "time": formatter.string(from: message.time)]))
         }
         if let interruptedIntentions, !interruptedIntentions.isEmpty {
             let entries = interruptedIntentions.map { "- " + Self.continuationLines($0) }
             sections.append(
-                (try AgentPrompts.text("Assistant/InputProtocol", "interruptedHeading")) + "\n"
+                (try AgentPrompts.inputMarker("interruptedHeading")) + "\n"
                     + entries.joined(separator: "\n"))
         }
         return sections.joined(separator: "\n\n")
@@ -60,27 +60,27 @@ struct AssistantInputBatch {
         case .user:
             let source =
                 message.channel == AgentID.speechPerception.rawValue
-                ? try AgentPrompts.text("Assistant/InputProtocol", "asr")
-                : try AgentPrompts.text("Assistant/InputProtocol", "user")
+                ? try AgentPrompts.inputMarker("asr")
+                : try AgentPrompts.inputMarker("user")
             return (source, message.content)
         case .agent:
             let name = String(message.channel.dropFirst("agent.".count))
             if name == AgentID.writer.rawValue {
-                return (try AgentPrompts.text("Assistant/InputProtocol", "writer"), message.content)
+                return (try AgentPrompts.inputMarker("writer"), message.content)
             }
             let validName = name.range(of: #"^[A-Za-z0-9_.-]+$"#, options: .regularExpression) != nil
             return (
                 validName
-                    ? try AgentPrompts.text("Assistant/InputProtocol", "namedAgent", ["name": name])
-                    : try AgentPrompts.text("Assistant/InputProtocol", "agent"), message.content
+                    ? try AgentPrompts.inputMarker("namedAgent", ["name": name])
+                    : try AgentPrompts.inputMarker("agent"), message.content
             )
         case .action:
             guard message.channel.hasPrefix("action."), message.channel != "action.tools" else {
-                return (try AgentPrompts.text("Assistant/InputProtocol", "action"), message.content)
+                return (try AgentPrompts.inputMarker("action"), message.content)
             }
             let name = message.channel.dropFirst("action.".count).components(separatedBy: .newlines).joined(
                 separator: " ")
-            return (try AgentPrompts.text("Assistant/InputProtocol", "action"), name + " " + message.content)
+            return (try AgentPrompts.inputMarker("action"), name + " " + message.content)
         }
     }
 
@@ -88,8 +88,8 @@ struct AssistantInputBatch {
     private static func bodyLines(_ value: String) throws -> String {
         try value.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: .newlines).map { line in
             if try isSourceLine(line)
-                || line == (try AgentPrompts.text("Assistant/InputProtocol", "interruptedHeading"))
-                || line == (try AgentPrompts.text("Assistant/InputProtocol", "toolsHeading"))
+                || line == (try AgentPrompts.inputMarker("interruptedHeading"))
+                || line == (try AgentPrompts.inputMarker("toolsHeading"))
             {
                 return "    " + line
             }
@@ -99,14 +99,13 @@ struct AssistantInputBatch {
 
     private static func isSourceLine(_ line: String) throws -> Bool {
         let labels = try ["user", "asr", "writer", "agent", "action"].map {
-            NSRegularExpression.escapedPattern(for: try AgentPrompts.text("Assistant/InputProtocol", $0))
+            NSRegularExpression.escapedPattern(for: try AgentPrompts.inputMarker($0))
         }
         let named = NSRegularExpression.escapedPattern(
-            for: try AgentPrompts.text("Assistant/InputProtocol", "namedAgent", ["name": "__NAME__"])
+            for: try AgentPrompts.inputMarker("namedAgent", ["name": "__NAME__"])
         )
         .replacingOccurrences(of: "__NAME__", with: "[^()]+")
-        let lineTemplate = try AgentPrompts.text(
-            "Assistant/InputProtocol", "sourceLine", ["source": "__SOURCE__", "time": "__TIME__"])
+        let lineTemplate = try AgentPrompts.inputMarker("sourceLine", ["source": "__SOURCE__", "time": "__TIME__"])
         let pattern =
             "^"
             + NSRegularExpression.escapedPattern(for: lineTemplate.trimmingCharacters(in: .newlines))
@@ -114,7 +113,7 @@ struct AssistantInputBatch {
             .replacingOccurrences(of: "__TIME__", with: "[0-9]{2}:[0-9]{2}:[0-9]{2}") + "$"
         return try line.range(of: pattern, options: .regularExpression) != nil
             || line.range(
-                of: try AgentPrompts.text("Assistant/InputProtocol", "legacySourcePattern"), options: .regularExpression
+                of: try AgentPrompts.inputMarker("legacySourcePattern"), options: .regularExpression
             ) != nil
 
     }
@@ -148,7 +147,7 @@ struct AssistantInputBatch {
             let text = attached.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
             if !text.isEmpty {
                 sections.append(
-                    (try AgentPrompts.text("Assistant/InputProtocol", "toolsHeading")) + "\n    "
+                    (try AgentPrompts.inputMarker("toolsHeading")) + "\n    "
                         + continuationLines(text))
             }
             attached.removeAll(keepingCapacity: true)

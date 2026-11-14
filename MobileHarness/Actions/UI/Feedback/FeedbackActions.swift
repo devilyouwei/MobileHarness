@@ -3,7 +3,7 @@ import FunctionContracts
 
 extension UIActions {
     @Action(
-        domain: "UI", module: "Feedback", title: "播放提示音",
+        domain: "UI", module: "Feedback", title: "Play cue sound",
         doc:
             "Play one bounded application cue and await actual native drain. Host controls audio admission; never replaces ongoing speech or recording.",
         parameters: [
@@ -29,7 +29,7 @@ extension UIActions {
     }
 
     @Action(
-        domain: "UI", module: "Feedback", title: "触觉反馈",
+        domain: "UI", module: "Feedback", title: "Haptic feedback",
         doc:
             "Issue a short bounded native haptic pattern. Completes after the requested pulses are issued; does not prove perceived strength. Unsupported hardware and overlap fail explicitly.",
         parameters: [

@@ -2,7 +2,7 @@ import FunctionContracts
 
 extension UIActions {
     @Action(
-        domain: "UI", module: "Light", title: "更新装饰光效",
+        domain: "UI", module: "Light", title: "Update accent light",
         doc:
             "Commit a temporary decorative halo. Enabled replays expansion from normalized origin; disabled clears this producer/session override and restores listening light. Never changes microphone, eyes or listening consent. Root owns expiry.",
         parameters: [

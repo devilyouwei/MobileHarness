@@ -133,33 +133,41 @@ extension PhotographerAgent {
     @MainActor static func cameraContent(_ camera: CameraPresentationSnapshot) -> IslandContent? {
         if let remaining = camera.countdown {
             return .init(
-                title: "拍照倒计时", subtitle: "\(remaining) 秒", primary: .symbol(name: "timer"), priority: .critical,
+                title: "Photo countdown", subtitle: "\(remaining) s", primary: .symbol(name: "timer"),
+                priority: .critical,
                 secondary: .progress(1 / Double(max(1, remaining))),
-                liveActivity: true)
+                liveActivity: true, localizedLabels: true)
         }
         if camera.photoBusy {
             return .init(
-                title: "正在处理照片", primary: .symbol(name: "camera.aperture"), priority: .critical, secondary: .loading)
+                title: "Processing photo", primary: .symbol(name: "camera.aperture"), priority: .critical,
+                secondary: .loading, localizedLabels: true)
         }
         let recording = camera.recording
         if recording.active {
-            let title = recording.phase == .starting ? "正在启动录像" : recording.phase == .finishing ? "录像正在收尾" : "正在录像"
+            let title =
+                recording.phase == .starting
+                ? "Starting recording" : recording.phase == .finishing ? "Finalizing the recording" : "Recording"
             return .init(
-                title: title, subtitle: "聆听已暂停", primary: .symbol(name: "video.fill"), tone: .recording,
+                title: title, subtitle: "Listening paused", primary: .symbol(name: "video.fill"), tone: .recording,
                 priority: .attention,
                 secondary: recording.phase == .recording
                     ? .symbol(name: "record.circle.fill", effect: .pulse) : .loading,
                 startedAt: recording.phase == .recording ? recording.startedAt : nil,
-                liveActivity: true)
+                liveActivity: true, localizedLabels: true)
         }
         if camera.recordedVideo != nil {
             return .init(
-                title: "录像待处置", subtitle: "打开相机保存或忽略", primary: .symbol(name: "video"), priority: .high)
+                title: "Recording ready", subtitle: "Open the camera to save or discard",
+                primary: .symbol(name: "video"),
+                priority: .high, localizedLabels: true)
         }
         #if os(iOS)
             if camera.capturedPhoto != nil {
                 return .init(
-                    title: "照片待保存", subtitle: "打开相机查看或保存", primary: .symbol(name: "photo"), priority: .high)
+                    title: "Photo ready to save", subtitle: "Open the camera to view or save",
+                    primary: .symbol(name: "photo"),
+                    priority: .high, localizedLabels: true)
             }
         #endif
         return nil

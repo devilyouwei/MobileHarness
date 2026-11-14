@@ -48,7 +48,10 @@ import UI
                 if error is CancellationError {
                     state.present(.phase(readiness.completed ? .finished : .stopped))
                 } else {
-                    state.present(.error("检测失败：" + error.localizedDescription))
+                    state.present(
+                        .error(
+                            state.snapshot.permissionGranted == false
+                                ? "Allow microphone access in Settings." : "Detection failed"))
                     state.present(.phase(.failed))
                 }
             }

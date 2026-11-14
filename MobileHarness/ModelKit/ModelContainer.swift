@@ -73,12 +73,13 @@ public struct ModelArtifactConfiguration: Sendable {
         resources: URL,
         prepareArtifacts: (@Sendable () async throws -> ModelArtifactConfiguration)? = nil,
         onFailure: @escaping @Sendable (String, String, any Error) -> Void = { _, _, _ in },
-        maximumPendingLocalChats: Int = 8
+        maximumPendingLocalChats: Int = 8,
+        recognitionLocale: @escaping @Sendable () -> String = { "en-US" }
     ) {
         let admission = InferenceAdmission(open: false)
         let scope = ModelScope(
             resources: resources, admission: admission, prepareArtifacts: prepareArtifacts, onFailure: onFailure,
-            maximumPendingLocalChats: maximumPendingLocalChats)
+            maximumPendingLocalChats: maximumPendingLocalChats, recognitionLocale: recognitionLocale)
         self.admission = admission
         self.scope = scope
         language = ModelLanguageContainer(scope: scope)
@@ -170,7 +171,7 @@ public struct ModelArtifactConfiguration: Sendable {
 private actor ModelScope {
     let resources: URL
     let admission: InferenceAdmission
-    let selection = SpeechSelection()
+    let selection: SpeechSelection
     let failure: @Sendable (String, String, any Error) -> Void
     private let prepareArtifacts: (@Sendable () async throws -> ModelArtifactConfiguration)?
     private var preparedManager: ModelManager?
@@ -190,10 +191,12 @@ private actor ModelScope {
     init(
         resources: URL, admission: InferenceAdmission,
         prepareArtifacts: (@Sendable () async throws -> ModelArtifactConfiguration)?,
-        onFailure: @escaping @Sendable (String, String, any Error) -> Void, maximumPendingLocalChats: Int
+        onFailure: @escaping @Sendable (String, String, any Error) -> Void, maximumPendingLocalChats: Int,
+        recognitionLocale: @escaping @Sendable () -> String
     ) {
         self.resources = resources
         self.admission = admission
+        selection = SpeechSelection(recognitionLocale: recognitionLocale)
         self.prepareArtifacts = prepareArtifacts
         failure = onFailure
         self.maximumPendingLocalChats = maximumPendingLocalChats
@@ -391,9 +394,7 @@ private actor ModelScope {
     func selectedSpeech(_ capability: ProvidedCapability, manager: ModelManager) async throws -> ModelID {
         switch capability {
         case .recognition:
-            return try await selection.resolve(
-                manager: manager, artifact: "nemotron", local: ModelID("nemotron-local"),
-                system: ModelID("apple-recognition"), capability: capability)
+            return try await selection.resolveRecognition(manager: manager)
         case .synthesis:
             return try await selection.resolve(
                 manager: manager, artifact: "moss-tts-nano", local: DefaultModelAssembly.mossNano,
@@ -553,7 +554,7 @@ public final class ModelSpeechContainer: ModelSpeechProviding, Sendable {
     public func unload(_ capability: ProvidedCapability) async throws {
         let ids: [String]
         switch capability {
-        case .recognition: ids = ["nemotron-local", "apple-recognition"]
+        case .recognition: ids = ["nemotron-local"] + SpeechSelection.appleRecognitionModels.map { $0.id.rawValue }
         case .synthesis: ids = ["moss-tts-nano", "apple-synthesis"]
         case .voiceActivity: ids = ["silero", "energy-vad"]
         default: throw CapabilityError.invalidRequest("Not a speech capability")

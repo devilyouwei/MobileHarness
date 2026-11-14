@@ -96,6 +96,7 @@ public actor AssistantInputDecision {
     public typealias Configuration = (useLocal: Bool, cloud: (@Sendable () async throws -> any ChatCapability)?)
     private let configuration: @Sendable () async throws -> Configuration
     private let report: @Sendable (String) async -> Void
+    private let language: @Sendable () -> String
     private let timeout: Duration
     private let localTimeout: Duration
     private var workers: [String: Task<Void, Never>] = [:]
@@ -112,45 +113,49 @@ public actor AssistantInputDecision {
         local: any ModelDecisionProviding,
         selection: @escaping @Sendable () async throws -> Bool,
         cloud: @escaping @Sendable () async throws -> any ChatCapability,
-        report: @escaping @Sendable (String) async -> Void = { _ in }
+        report: @escaping @Sendable (String) async -> Void = { _ in },
+        language: @escaping @Sendable () -> String = { "en" }
     ) {
-        self.init(local: local, configuration: { (try await selection(), cloud) }, report: report)
+        self.init(local: local, configuration: { (try await selection(), cloud) }, report: report, language: language)
     }
     public init(
         local: any ModelDecisionProviding,
         configuration: @escaping @Sendable () async throws -> Configuration,
-        report: @escaping @Sendable (String) async -> Void = { _ in }
+        report: @escaping @Sendable (String) async -> Void = { _ in },
+        language: @escaping @Sendable () -> String = { "en" }
     ) {
         self.init(
             local: local, configuration: configuration, timeout: .seconds(2), localTimeout: .milliseconds(250),
-            report: report)
+            report: report, language: language)
     }
 
     init(
         local: any ModelDecisionProviding,
         configuration: @escaping @Sendable () async throws -> Configuration,
         timeout: Duration, localTimeout: Duration,
-        report: @escaping @Sendable (String) async -> Void = { _ in }
+        report: @escaping @Sendable (String) async -> Void = { _ in },
+        language: @escaping @Sendable () -> String = { "en" }
     ) {
         self.local = local
         self.configuration = configuration
         self.report = report
+        self.language = language
         self.timeout = timeout
         self.localTimeout = localTimeout
     }
     public func resetLocalFailure() { localFailure = nil }
     public func quiesceLocal() async {
-        localFailure = "D3 资源正在释放"
+        localFailure = "D3 resources are being released"
         preparation?.cancel()
         cancel("local")
         await preparation?.value
         await workers["local"]?.value
-        do { try await local.unload() } catch { await report("D3 资源释放失败：\(error)") }
+        do { try await local.unload() } catch { await report("D3 resource release failed: \(error)") }
     }
     public func stop() async {
         stopped = true
         for timer in timers.values { timer.cancel() }
-        for waiter in waiters.values { waiter.resume(returning: .failed("分类已取消")) }
+        for waiter in waiters.values { waiter.resume(returning: .failed("Classification cancelled")) }
         waiters.removeAll()
         let active = Array(workers.values)
         for task in active { task.cancel() }
@@ -159,6 +164,12 @@ public actor AssistantInputDecision {
         await preparation?.value
     }
     public func classify(_ snapshot: InputDecisionSnapshot) async -> InputDecisionOutcome {
+        await AgentPrompts.$language.withValue(AgentPrompts.normalizedLanguage(language())) {
+            await classifyInput(snapshot)
+        }
+    }
+
+    private func classifyInput(_ snapshot: InputDecisionSnapshot) async -> InputDecisionOutcome {
         let requests = Mutex<[String]>([])
         var localFallback: String?
         func fallback(_ reason: String) -> InputDecisionOutcome {
@@ -166,37 +177,37 @@ public actor AssistantInputDecision {
                 route: .fallback, modelResult: nil, adopted: .enqueue, reason: reason,
                 requests: requests.withLock { $0 }, localFallback: localFallback)
         }
-        guard !stopped, !Task.isCancelled else { return fallback("分类已取消") }
+        guard !stopped, !Task.isCancelled else { return fallback("Classification cancelled") }
         let deadline = snapshot.receivedAt.advanced(by: timeout)
-        guard ContinuousClock.now < deadline else { return fallback("分类超时") }
+        guard ContinuousClock.now < deadline else { return fallback("Classification timed out") }
         let route: Configuration
         do { route = try await configuration() } catch {
-            await report("分类偏好读取失败，保留输入并排队：\(error)")
-            return fallback("分类配置读取失败")
+            await report("Could not read Decision settings; input retained and queued: \(error)")
+            return fallback("Could not read Decision settings")
         }
         let request: DecisionRequest
         do {
             request = try snapshot.request()
         } catch {
-            await report("分类请求准备失败，保留输入并排队：\(error)")
-            return fallback("分类请求准备失败")
+            await report("Could not prepare Decision request; input retained and queued: \(error)")
+            return fallback("Could not prepare Decision request")
         }
         if route.useLocal {
             localFallback = localFailure
         } else {
-            localFallback = "当前配置使用云端 Decision"
+            localFallback = "Configured for cloud Decision"
         }
         if route.useLocal, localFailure == nil {
             do {
                 let status = try await local.status()
                 if status == .ready {
-                    await report("本地 D3")
+                    await report("Local D3")
                     let local = local
                     let result = await race("local", until: min(deadline, .now.advanced(by: localTimeout))) {
                         try Task.checkCancellation()
                         requests.withLock {
                             $0.append(
-                                "本地 D3\n\nInstructions\n" + request.instructions
+                                "Local D3\n\nInstructions\n" + request.instructions
                                     + "\n\nCandidates\n" + request.candidates.joined(separator: "\n")
                                     + "\n\nInput\n" + request.text)
                         }
@@ -232,35 +243,37 @@ public actor AssistantInputDecision {
                         localFallback = reason
                     }
                 } else {
-                    localFallback = "D3 尚未就绪（\(status.rawValue)）"
+                    localFallback = "D3 is not ready (\(status.rawValue))"
                     if preparation == nil {
                         let local = local
                         preparation = Task {
                             do { try await local.warmup() } catch
                                 where !Task.isCancelled && !(error is CancellationError)
                             {
-                                self.localFailure = "D3 准备失败：\(error.localizedDescription)"
-                                await self.report("D3 准备失败，暂用云端：\(error)")
+                                self.localFailure = "D3 preparation failed: \(error.localizedDescription)"
+                                await self.report("D3 preparation failed; using cloud Decision: \(error)")
                             } catch {}
                             self.preparation = nil
                         }
                     }
                 }
             } catch {
-                localFallback = "D3 状态读取失败：\(error.localizedDescription)"
-                await report("D3 不可用，暂用云端：\(error)")
+                localFallback = "Could not read D3 status: \(error.localizedDescription)"
+                await report("D3 unavailable; using cloud Decision: \(error)")
             }
         }
-        guard !stopped, !Task.isCancelled else { return fallback("分类已取消") }
+        guard !stopped, !Task.isCancelled else { return fallback("Classification cancelled") }
         guard ContinuousClock.now < deadline else {
-            await report("分类超时，保留输入并排队")
-            return fallback("分类超时")
+            await report("Classification timed out; input retained and queued")
+            return fallback("Classification timed out")
         }
         guard let cloud = route.cloud else {
-            await report("Decision 云端未配置，保留输入并排队")
-            return fallback("Decision 云端未配置")
+            await report("Cloud Decision is unconfigured; input retained and queued")
+            return fallback("Cloud Decision is unconfigured")
         }
-        await report(route.useLocal ? "暂用云端 · Decision 独立配置" : "云端 · Decision 独立配置")
+        await report(
+            route.useLocal
+                ? "Cloud fallback · Dedicated Decision configuration" : "Cloud · Dedicated Decision configuration")
         let result = await race("cloud", until: deadline) {
             let model = try await cloud()
             guard await model.supportsToolCalls else {
@@ -293,7 +306,7 @@ public actor AssistantInputDecision {
             let tokenLimit = chat.maximumOutputTokens.map(String.init) ?? "default"
             requests.withLock {
                 $0.append(
-                    (["云端 Decision"] + messages + tools + [
+                    (["Cloud Decision"] + messages + tools + [
                         "tool_choice: \(chat.toolChoice)",
                         "maximum_output_tokens: \(tokenLimit)\ntemperature: \(chat.temperature)",
                     ]).joined(separator: "\n\n"))
@@ -340,9 +353,10 @@ public actor AssistantInputDecision {
                 action, route: .cloud, snapshot: snapshot, requests: requests.withLock { $0 },
                 localFallback: localFallback)
         }
-        await report("分类不可用，保留输入并排队")
-        if stopped || Task.isCancelled { return fallback("分类已取消") }
-        return fallback(ContinuousClock.now >= deadline ? "分类超时" : "模型未返回有效分类")
+        await report("Classification unavailable; input retained and queued")
+        if stopped || Task.isCancelled { return fallback("Classification cancelled") }
+        return fallback(
+            ContinuousClock.now >= deadline ? "Classification timed out" : "Model returned no valid classification")
     }
 
     private func outcome(
@@ -355,13 +369,15 @@ public actor AssistantInputDecision {
         switch (action, content) {
         case (_, .noise):
             adopted = .discard
-            reason = action == .discard ? nil : "语音转写只有噪声标记或无正文字符"
+            reason = action == .discard ? nil : "Transcript contains only noise markers or has no usable text"
         case (.discard, .possibleSpeech):
             adopted = .enqueue
-            reason = snapshot.protectsAnswer ? "保留当前交互的有效答复" : "保留可能有效的用户输入"
+            reason =
+                snapshot.protectsAnswer
+                ? "Retained a valid answer to the current interaction" : "Retained potentially useful input"
         case (.interrupt, _) where !snapshot.occupied:
             adopted = .enqueue
-            reason = "当前没有需要打断的回复"
+            reason = "No active reply to interrupt"
         default:
             adopted = action
             reason = nil
@@ -401,10 +417,10 @@ public actor AssistantInputDecision {
         _ key: String, until deadline: ContinuousClock.Instant,
         operation: @escaping @Sendable () async throws -> InputDisposition?
     ) async -> Attempt {
-        let model = key == "local" ? "D3" : "云端 Decision"
-        let timeout = Attempt.failed("\(model) 超时")
-        guard !stopped, !Task.isCancelled else { return .failed("分类已取消") }
-        guard workers[key] == nil else { return .failed("\(model) 上次请求仍在清理") }
+        let model = key == "local" ? "D3" : "Cloud Decision"
+        let timeout = Attempt.failed("\(model) timed out")
+        guard !stopped, !Task.isCancelled else { return .failed("Classification cancelled") }
+        guard workers[key] == nil else { return .failed("\(model) is still cleaning up the previous request") }
         guard ContinuousClock.now < deadline else { return timeout }
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
@@ -412,9 +428,11 @@ public actor AssistantInputDecision {
                 workers[key] = Task {
                     let result: Attempt
                     do {
-                        result = try await operation().map(Attempt.selected) ?? .failed("\(model) 未返回有效分类")
+                        result =
+                            try await operation().map(Attempt.selected)
+                            ?? .failed("\(model) returned no valid classification")
                     } catch {
-                        let reason = "\(model) 失败：\(error.localizedDescription)"
+                        let reason = "\(model) failed: \(error.localizedDescription)"
                         result = .failed(reason)
                         if !Task.isCancelled, !(error is CancellationError), ContinuousClock.now < deadline {
                             // Request failures can fall back without disabling the model for later inputs.
@@ -438,7 +456,7 @@ public actor AssistantInputDecision {
     }
     private func cancel(_ key: String) {
         workers[key]?.cancel()
-        resolve(key, result: .failed("分类已取消"))
+        resolve(key, result: .failed("Classification cancelled"))
     }
     private func resolve(_ key: String, result: Attempt) {
         timers.removeValue(forKey: key)?.cancel()

@@ -133,7 +133,7 @@ extension CameraActions {
 
 extension CameraActions {
     @Action(
-        domain: "Camera", module: "Capture", title: "设置拍摄",
+        domain: "Camera", module: "Capture", title: "Configure capture",
         doc:
             "Update only supplied capture settings. Omitted fields retain their current values. Unsupported hardware settings fail.",
         parameters: [
@@ -167,7 +167,7 @@ extension CameraActions {
         try await camera.configureCapture(settings, invocation: invocation)
     }
     @Action(
-        domain: "Camera", module: "Capture", title: "取消倒计时",
+        domain: "Camera", module: "Capture", title: "Cancel countdown",
         doc: "Cancel and join a pending photo countdown. Does not discard a captured photo or stop video.",
         parameters: [])
     public static func cancelCapture(invocation: any FunctionInput, using camera: any CameraControlCapability)
@@ -180,7 +180,7 @@ extension CameraActions {
 
 extension CameraActions {
     @Action(
-        domain: "Camera", module: "Capture", title: "加载预览图片",
+        domain: "Camera", module: "Capture", title: "Load preview image",
         doc:
             "Load up to five cached photos into multimodal State. Supply one previewID to append, or a JSON array previewIDs to replace selections. The latest photo fills a free slot. Use actual IDs from actions.camera.preview.",
         parameters: [
@@ -205,7 +205,7 @@ extension CameraActions {
         return try await camera.loadPreviewImage(id, invocation: invocation)
     }
     @Action(
-        domain: "Camera", module: "Capture", title: "卸载预览图片",
+        domain: "Camera", module: "Capture", title: "Unload preview image",
         doc:
             "Remove an explicit image selection without deleting cached bytes. The latest photo remains loaded automatically.",
         parameters: [.init("previewID", required: true, description: "Exact previewID from actions.camera.preview.")])

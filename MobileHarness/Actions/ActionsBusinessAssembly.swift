@@ -28,6 +28,7 @@
         let photos: MediaStore
         let bluetooth: BluetoothWorkflow
         let device: NexArmDeviceAdapter
+        private let presentationLanguage: @Sendable () -> AppLanguage
         lazy var facades = makeUIFacades()
         var stopInteractions: @MainActor () async -> Void = {}
         private let makeCameraRuntime: @MainActor () throws -> CameraRuntimeDependencies
@@ -37,6 +38,7 @@
             actions: ActionsContainer, files: FilesContainer, cache: CacheContainer,
             workspaces: @escaping @Sendable () throws -> any WorkspaceRepository, model: ModelContainer,
             platform: PlatformContainer, ui: UIContainer, photos: MediaStore, bluetooth: BluetoothWorkflow,
+            presentationLanguage: @escaping @Sendable () -> AppLanguage,
             makeCameraRuntime: @escaping @MainActor () throws -> CameraRuntimeDependencies,
             connectVision: @escaping @MainActor (String, Bool, any CameraOutputHandling) async throws -> Void
         ) {
@@ -50,6 +52,7 @@
             self.photos = photos
             self.bluetooth = bluetooth
             self.device = NexArmDeviceAdapter(bluetooth: bluetooth)
+            self.presentationLanguage = presentationLanguage
             self.makeCameraRuntime = makeCameraRuntime
             self.connectVision = connectVision
         }
@@ -171,11 +174,13 @@
             let island = IslandPresentationService(state: ui.island)
             let workspace = ArtifactWorkspace(
                 disk: try files.file(files.workspaces), catalog: try workspaces())
-            let exports = ArtifactExportService(workspace: workspace, disk: try files.file(files.workspaces))
+            let exports = ArtifactExportService(
+                workspace: workspace, disk: try files.file(files.workspaces), language: presentationLanguage)
             let artifactPresentation = ArtifactPresentation(
-                pages: ui.web, windows: ui.windows, disk: try files.file(files.workspaces))
+                pages: ui.web, windows: ui.windows, disk: try files.file(files.workspaces),
+                language: presentationLanguage)
             let artifacts = ArtifactService(
-                workspace: workspace,
+                workspace: workspace, language: presentationLanguage,
                 prepare: { id, deleting in try await artifactPresentation.prepare(id: id, deleting: deleting) },
                 capture: { id in try await artifactPresentation.snapshot(id: id) },
                 describe: { id, title, subtitle in

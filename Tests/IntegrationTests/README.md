@@ -6,6 +6,8 @@ WriterHistory 集成回归覆盖本轮 user/tool 输入快照和工具目录的 
 
 通过真实 Agent/Gateway/Action/Tool/Storage 接口和注入模型、设备及呈现端点验证跨模块契约。ActionCatalogFixture 在每个作用域安装相同不可变生产声明；并发、失败与完成使用显式 gate/反馈同步。常规用例不推理真实模型、不控制硬件；真实 provider 和串口验收必须单独启用。
 
+`DecisionLanguageEvaluationTests` runs the current Assistant Decision renderer and disposition policy with the real local D3 model. The [experiment runner](../../scripts/evaluate-decision-language.sh) enables it explicitly and writes a JSON report. Speech transcripts and playback states are fixtures.
+
 ## 当前覆盖
 
 BasicSkill 控制教学回归检查九个已注册别名均有独立效果说明，打包指令包含 Skill/Task/State 的区分与跨请求生效规则。已有 AgentTaskSkillTests 验证 Task 持有项的显式释放仍保留活动目标、非法释放原子拒绝、初始 Skill 接管及终态清理；资源教学不引入具体业务例子或业务 Skill ID。

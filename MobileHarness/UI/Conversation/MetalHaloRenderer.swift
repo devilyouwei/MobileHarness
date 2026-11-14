@@ -12,7 +12,8 @@
         static let prepared: Result<HaloPipeline, Error> = Result { try HaloPipeline() }
         private init() throws {
             guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
-                throw NSError(domain: "CompanionGraphics", code: 1, userInfo: [NSLocalizedDescriptionKey: "Metal 不可用"])
+                throw NSError(
+                    domain: "CompanionGraphics", code: 1, userInfo: [NSLocalizedDescriptionKey: "Metal is unavailable"])
             }
             let library = try device.makeDefaultLibrary(bundle: .module)
             let descriptor = MTLRenderPipelineDescriptor()
@@ -158,7 +159,7 @@
             // Drop this frame; never queue it.
             guard let command = context.queue.makeCommandBuffer() else {
                 slots.signal()
-                fail("无法创建光环渲染帧")
+                fail("Could not create halo render frame")
                 return
             }
             let pass = MTLRenderPassDescriptor()
@@ -168,7 +169,7 @@
             pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0)
             guard let encoder = command.makeRenderCommandEncoder(descriptor: pass) else {
                 slots.signal()
-                fail("无法创建光环渲染器")
+                fail("Could not create halo renderer")
                 return
             }
             var uniforms = HaloUniforms(
@@ -182,7 +183,9 @@
             encoder.endEncoding()
             command.present(update.drawable)
             command.addCompletedHandler { [weak self, slots] buffer in
-                if buffer.status == .error { self?.fail(buffer.error?.localizedDescription ?? "光环 GPU 执行失败") }
+                if buffer.status == .error {
+                    self?.fail(buffer.error?.localizedDescription ?? "Halo GPU execution failed")
+                }
                 slots.signal()
             }
             command.commit()

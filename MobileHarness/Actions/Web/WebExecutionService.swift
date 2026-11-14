@@ -84,7 +84,7 @@ public struct WebScreenshotImage: Sendable {
             let page = try createPage(id, windows.reference(for: id))
             let result = try await page.loadRemote(url)
             let title = result.title.trimmingCharacters(in: .whitespacesAndNewlines)
-            windows.setPresentation(id, title: title.isEmpty ? (url.host ?? "网页") : String(title.prefix(80)))
+            windows.setPresentation(id, title: title.isEmpty ? (url.host ?? "Web page") : String(title.prefix(80)))
             return try await receipt(
                 result, page: page, window: id, invocation: invocation, image: true, allowsHiddenImage: true)
 
@@ -147,7 +147,7 @@ public struct WebScreenshotImage: Sendable {
         }
         let id = UUID()
         operationWindowID = id
-        _ = try await windows.present(content: .web, title: "网页", icon: .emoji("🌐"), windowID: id)
+        _ = try await windows.present(content: .web, title: "Web page", icon: .emoji("🌐"), windowID: id)
         try Task.checkCancellation()
         return id
     }

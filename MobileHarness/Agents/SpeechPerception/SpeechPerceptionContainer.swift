@@ -52,7 +52,7 @@
         func startInteraction() async throws { try await interaction?.startInteraction() }
         func invalidate() {
             interaction?.invalidateStartup()
-            interaction?.lifecycle.stopVoice(message: "已进入后台，按住双眼重新开始")
+            interaction?.lifecycle.stopVoice(message: "App in background. Hold the eyes to start again.")
             interaction?.invalidateDetection()
         }
         func suspend() async { await interaction?.suspend() }

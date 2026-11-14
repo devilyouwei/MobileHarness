@@ -6,6 +6,27 @@ import Testing
 
 @testable import Agents
 
+@Test(.actionCatalog) func localizedPromptsPreserveTechnicalMarkersAndToolSchema() throws {
+    let english = try AgentPrompts.assistantInput()
+    #expect(english.contains("Take a photo."))
+    let config = try AgentConfigurations.load(named: "Assistant")
+    let skillIDs = try AgentConfigurations.baseSkills(named: "Assistant")
+    let englishRegistry = try AgentSkillLoader.registry(skillIDs, fixed: config.capabilities)
+    try AgentPrompts.$language.withValue("zh-Hans") {
+        let chinese = try AgentPrompts.assistantInput()
+        #expect(chinese.contains("拍张照片。"))
+        #expect(chinese.contains("User (ASR) ｜ 13:06:35"))
+        #expect(try AgentPrompts.inputMarker("asr") == "User (ASR)")
+        let localized = try AgentSkillLoader.registry(skillIDs, fixed: config.capabilities)
+        #expect(localized.actions.map(\.alias) == englishRegistry.actions.map(\.alias))
+        let source = try #require(englishRegistry.actions.first { $0.alias == "loadSkills" })
+        let translated = try #require(localized.actions.first { $0.alias == source.alias })
+        #expect(source.path == translated.path && source.requiredParameters == translated.requiredParameters)
+        #expect(source.documentation?.doc != translated.documentation?.doc)
+    }
+    #expect(try AgentPrompts.assistantInput() == english)
+}
+
 private func promptData(_ templates: [String: String]) throws -> Data {
     try JSONSerialization.data(withJSONObject: ["version": 1, "templates": templates])
 }
@@ -105,7 +126,7 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
     let output = try AgentPrompts.capabilityContext()
     #expect(system.hasPrefix(try output.protocolRules()))
     #expect(system.contains(try output.catalog(registry)))
-    #expect(system.contains("<wait>你好。</wait><express emotion=\"happy\"/>"))
+    #expect(system.contains("<wait>Hello.</wait><express emotion=\"happy\"/>"))
     #expect(!system.contains("Action takePhoto:"))
     #expect(system.contains("AVAILABLE SKILLS") && system.contains("photography"))
     #expect(system.contains(try AgentConfigurations.skillInstructions("basic-skill")))
@@ -261,7 +282,10 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
     let examples = try skillResponseExamples("expression-interaction")
     #expect(examples.count == 2)
     let emotions = UIActions.Emotion.allCases.filter { $0 != .clear }.map(\.rawValue)
-    let labels = ["闭眼", "微笑", "开心", "大笑", "思考", "惊讶", "难过", "喜爱", "生气", "害怕", "调皮"]
+    let labels = [
+        "Eyes closed", "Smiling", "Happy", "Laughing", "Thinking", "Surprised", "Sad", "Love", "Angry", "Scared",
+        "Playful",
+    ]
     for (index, example) in examples.enumerated() {
         var trace = GenerationTrace(
             capabilities: catalog, textMapping: AssistantAgent.mapText,
@@ -305,7 +329,7 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
                 #expect(group.count == 1 && speech.isEmpty && captions.isEmpty)
             } else {
                 #expect(group.count == 3 && speech.count == 1 && captions.count == 1)
-                #expect(speech.first?.parameters["text"] == "这是\(labels[step])。")
+                #expect(speech.first?.parameters["text"] == "\(labels[step]).")
                 #expect(captions.first?.parameters["text"] == speech.first?.parameters["text"])
             }
         }
@@ -545,7 +569,7 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
         AgentConfigurations.baseSkills(named: "Assistant") + ["photography"], fixed: config.capabilities)
     let examples = try skillResponseExamples("photography")
     var closures = 0
-    for (index, example) in examples.enumerated() where example.contains("相机已关闭。<task.end") {
+    for (index, example) in examples.enumerated() where example.contains("The camera is closed.<task.end") {
         #expect(index > 0 && examples[index - 1] == "<closeCamera/>")
         var close = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
         try close.append(examples[index - 1])
@@ -562,7 +586,7 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
         closures += 1
     }
     #expect(closures == 1)
-    #expect(examples.contains { $0.contains("照片已保存") && $0.contains("<task.end") })
+    #expect(examples.contains { $0.contains("The photo is saved") && $0.contains("<task.end") })
     let instructions = try AgentConfigurations.skillInstructions("photography")
     #expect(instructions.contains("finish that Task while retaining the Camera window"))
     #expect(!instructions.contains("Cancel or replacement waits for close"))
@@ -576,7 +600,7 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
         AgentConfigurations.baseSkills(named: "Assistant") + ["photography"], fixed: config.capabilities)
     let basic = try skillResponseExamples("basic-skill")
     let photo = try skillResponseExamples("photography")
-    for (examples, expected) in [(basic, "目标已完成。"), (photo, "照片已保存到 App 相册。")] {
+    for (examples, expected) in [(basic, "Goal completed."), (photo, "The photo is saved in the app album.")] {
         let standalone = try #require(examples.first { $0 == expected })
         var trace = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
         try trace.append(standalone)
@@ -584,13 +608,13 @@ private func skillResponseExamples(_ id: String) throws -> [String] {
         #expect(trace.parserError == nil)
         #expect(!trace.calls.contains { $0.actionPath.domain == "Agent" })
     }
-    let question = try #require(basic.first { $0.hasPrefix("还要继续") })
-    #expect(question.contains("实际任务目标"))
+    let question = try #require(basic.first { $0.hasPrefix("Should I continue") })
+    #expect(question.contains("new goal"))
     var clarification = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
     try clarification.append(question)
     clarification.finish()
     #expect(clarification.parserError == nil && !clarification.calls.contains { $0.actionPath.domain == "Agent" })
-    let replacement = try #require(basic.first { $0.contains("旧任务未完成") })
+    let replacement = try #require(basic.first { $0.contains("previous task is incomplete") })
     var closure = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
     try closure.append(replacement)
     closure.finish()
@@ -675,7 +699,7 @@ func businessSkillTeachingCannotFinishAnAbsentOrUnrelatedTask(skill: String) thr
     let catalog = try AgentSkillLoader.registry(
         AgentConfigurations.baseSkills(named: "Assistant") + ["photography"], fixed: config.capabilities)
     let examples = try skillResponseExamples("photography")
-    let terminal = try #require(examples.first { $0.contains("相机已关闭。<task.end") })
+    let terminal = try #require(examples.first { $0.contains("The camera is closed.<task.end") })
     var trace = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
     try trace.append(terminal)
     trace.finish()
@@ -712,9 +736,9 @@ func businessSkillTeachingCannotFinishAnAbsentOrUnrelatedTask(skill: String) thr
         })
     #expect(examples.contains { $0.contains("<saveVideo recordingID=") })
     #expect(examples.contains { $0.contains("<ignoreVideo recordingID=") })
-    #expect(examples.contains { $0.contains("视频已保存") && $0.contains("<task.end") })
-    #expect(examples.contains { $0.contains("视频已忽略") && $0.contains("<task.end") })
-    #expect(examples.contains { $0.contains("录像已结束") && !$0.contains("<startRecording") })
+    #expect(examples.contains { $0.contains("The video is saved") && $0.contains("<task.end") })
+    #expect(examples.contains { $0.contains("The video was discarded") && $0.contains("<task.end") })
+    #expect(examples.contains { $0.contains("recording is ready") && !$0.contains("<startRecording") })
 }
 
 @Test(.actionCatalog, arguments: ["web-browsing"])
@@ -804,7 +828,7 @@ func webSkillExamplesParseAgainstTheirEffectiveCatalogAndStayWithinBudget(skill:
         #expect(!prompt.contains("Agent ID=" + role + ";"))
     }
     #expect(prompt.contains("use task.start for work you own or send it directly to the peer using task.send"))
-    #expect(prompt.contains("Send a concise, self-contained account of what the user wants."))
+    #expect(prompt.contains("Send a concise, self-contained account of what the user wants in the user's language"))
     #expect(prompt.contains("task.send(agent_id,text)"))
     #expect(!prompt.contains("two distinct call protocols"))
 }

@@ -22,12 +22,14 @@
         case tooLarge, unavailable
         var errorDescription: String? {
             switch self {
-            case .tooLarge: "照片超过 32 MiB 限制"
-            case .unavailable: "无法读取所选照片"
+            case .tooLarge: "The photo exceeds 32 MiB"
+            case .unavailable: "Could not read the selected photo"
             }
         }
     }
     @MainActor public struct AlbumView: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         @Bindable private var album: UIAlbumContainer
         @State private var showsPicker = false
         @State private var selection: [PhotosPickerItem] = []
@@ -38,11 +40,12 @@
                 if !album.hasLoaded, album.loading { ProgressView().padding() }
                 if album.hasLoaded, album.items.isEmpty {
                     ContentUnavailableView(
-                        "相册暂无内容", systemImage: "photo.on.rectangle",
-                        description: Text("拍照或录像后保存到 App 相册，也可导入手机中的照片。"))
+                        appCopy.text("Your album is empty"), systemImage: "photo.on.rectangle",
+                        description: Text(
+                            appCopy.text("Save captured photos and videos here, or import photos from your device.")))
                 }
                 if let message = album.message {
-                    Text(message).font(.footnote).foregroundStyle(.secondary).padding()
+                    Text(appCopy.text(message)).font(.footnote).foregroundStyle(.secondary).padding()
                         .accessibilityIdentifier("album.status")
                 }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 3)], spacing: 3) {
@@ -52,19 +55,21 @@
                         } label: {
                             AlbumThumbnail(album: album, photo: photo)
                         }.buttonStyle(.plain).accessibilityLabel(
-                            (photo.mime == "video/quicktime" ? "视频，" : "照片，") + photo.date.formatted())
+                            (photo.mime == "video/quicktime" ? appCopy.text("Video, ") : appCopy.text("Photo, "))
+                                + photo.date.formatted())
                     }
                 }.padding(.horizontal, 3)
                 if album.next != nil {
-                    Button("加载更多") { Task { await album.loadMore() } }.disabled(album.loading).padding()
+                    Button(appCopy.text("Load more")) { Task { await album.loadMore() } }.disabled(album.loading)
+                        .padding()
                 }
                 if !album.hasLoaded, !album.loading {
-                    Button("重新加载") { Task { await album.loadMore(reset: true) } }.padding()
+                    Button(appCopy.text("Reload")) { Task { await album.loadMore(reset: true) } }.padding()
                 }
             }
-            .navigationTitle("相册").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(appCopy.text("Album")).navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                Button("导入", systemImage: "plus") { showsPicker = true }
+                Button(appCopy.text("Import"), systemImage: "plus") { showsPicker = true }
                     .disabled(album.busy).accessibilityIdentifier("album.import")
             }
             .photosPicker(
@@ -77,8 +82,8 @@
             )
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 4) {
-                    if album.busy { ProgressView("正在处理…") }
-                    Text("支持 JPEG、HEIC、PNG；Live Photo 仅导入静态照片")
+                    if album.busy { ProgressView(appCopy.text("Working…")) }
+                    Text(appCopy.text("Supports JPEG, HEIC, and PNG. Live Photos are imported as still photos."))
                         .font(.caption).foregroundStyle(.secondary)
                 }.frame(maxWidth: .infinity).padding(8).background(.bar)
             }
@@ -136,6 +141,8 @@
         }
     }
     @MainActor private struct AlbumDetailView: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let album: UIAlbumContainer
         let photo: AlbumPhoto
         @Environment(\.dismiss) private var dismiss
@@ -150,7 +157,9 @@
                 } else if let data {
                     AlbumZoomImage(data: data)
                 } else if let error {
-                    ContentUnavailableView("媒体不可用", systemImage: "exclamationmark.triangle", description: Text(error))
+                    ContentUnavailableView(
+                        appCopy.text("Media unavailable"), systemImage: "exclamationmark.triangle",
+                        description: Text(error))
                 } else {
                     ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -159,10 +168,12 @@
                     Text(message).font(.footnote).foregroundStyle(.secondary).padding(.horizontal)
                 }
                 HStack {
-                    Button("保存到手机相册", systemImage: "square.and.arrow.down") { album.export(photo.id) }
-                        .disabled(album.busy || (data == nil && video == nil)).accessibilityIdentifier("album.export")
+                    Button(appCopy.text("Save to Photos"), systemImage: "square.and.arrow.down") {
+                        album.export(photo.id)
+                    }
+                    .disabled(album.busy || (data == nil && video == nil)).accessibilityIdentifier("album.export")
                     Spacer()
-                    Button("删除", systemImage: "trash", role: .destructive) { confirmingDelete = true }
+                    Button(appCopy.text("Delete"), systemImage: "trash", role: .destructive) { confirmingDelete = true }
                         .disabled(album.busy).accessibilityIdentifier("album.delete")
                 }.padding()
             }
@@ -171,7 +182,8 @@
                 content: data != nil || video != nil ? .ready : error != nil ? .failed : .loading,
                 overlay: confirmingDelete ? .deleteConfirmation : nil
             )
-            .navigationTitle(photo.mime == "video/quicktime" ? "视频" : "照片").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(photo.mime == "video/quicktime" ? appCopy.text("Video") : appCopy.text("Photo"))
+            .navigationBarTitleDisplayMode(.inline)
             .task(id: photo.id) {
                 album.clearMessage()
                 do {
@@ -185,12 +197,17 @@
                 }
             }
             .confirmationDialog(
-                photo.mime == "video/quicktime" ? "从 App 相册删除这段视频？" : "从 App 相册删除这张照片？", isPresented: $confirmingDelete,
+                photo.mime == "video/quicktime"
+                    ? appCopy.text("Delete this video from the app album?")
+                    : appCopy.text("Delete this photo from the app album?"), isPresented: $confirmingDelete,
                 titleVisibility: .visible
             ) {
-                Button("删除", role: .destructive) { album.delete(photo.id) }
+                Button(appCopy.text("Delete"), role: .destructive) { album.delete(photo.id) }
             } message: {
-                Text("仅删除 App 内内容，不影响手机相册中的副本。关联聊天中的原图将不可用。")
+                Text(
+                    appCopy.text(
+                        "This removes the item from the app. Copies in Photos remain, and the original will be unavailable in related chats."
+                    ))
             }
             .onChange(of: album.items) { _, values in
                 if album.hasLoaded, !values.contains(where: { $0.id == photo.id }), !album.busy { dismiss() }
@@ -219,7 +236,7 @@
             let decoded = source.flatMap { CGImageSourceCreateThumbnailAtIndex($0, 0, options as CFDictionary) }
             guard let decoded else {
                 let label = UILabel(frame: scroll.bounds)
-                label.text = "无法解码照片，请返回后重试"
+                label.text = "Could not decode the photo. Go back and try again."
                 label.textAlignment = .center
                 label.autoresizingMask = [.flexibleWidth, .flexibleHeight]
                 scroll.addSubview(label)

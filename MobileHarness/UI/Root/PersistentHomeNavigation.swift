@@ -4,6 +4,8 @@
     /// Navigation covers the home surface without making it a navigation destination.
     @MainActor
     struct PersistentHomeNavigation<Destination: Hashable, Home: View, Page: View>: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         @Binding var path: [Destination]
         private let home: Home
         private let destination: (Destination) -> Page
@@ -48,7 +50,7 @@
             #if os(iOS)
                 Color.clear
                     .containerBackground(.clear, for: .navigation)
-                    .navigationTitle("首页").toolbar(.hidden, for: .navigationBar)
+                    .navigationTitle(appCopy.text("Home")).toolbar(.hidden, for: .navigationBar)
             #else
                 Color.clear
             #endif

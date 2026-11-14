@@ -2,6 +2,8 @@
 
 ## 职责与接口
 
+The App Language picker edits an injected preference binding independently of provider drafts or model settings. The selected locale refreshes the current view hierarchy. Resource labels and built-in status messages use the shared UI String Catalog, and provider names, model identifiers and stored history remain source data.
+
 本目录只拥有 UI 草稿、事实快照、历史展示及注入的请求接口，不依赖 Storage、Agents、Actions 或设备 SDK。业务集成执行保存、模型资源操作、连接及历史读取，并回传版本围栏下的 UI 值；导航和编辑本身不提交业务。
 
 ## 按功能归类

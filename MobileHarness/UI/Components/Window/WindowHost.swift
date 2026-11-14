@@ -249,6 +249,8 @@
     }
 
     @MainActor private struct WindowChrome: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let item: WindowPresentation
         let state: WindowState
         let content: AnyView
@@ -265,22 +267,25 @@
             VStack(spacing: 0) {
                 HStack(spacing: 0) {
                     if item.mode != .minimized {
-                        control("minus", color: .yellow, command: .minimize, label: "最小化")
+                        control("minus", color: .yellow, command: .minimize, label: appCopy.text("Minimize"))
                         control(
                             item.mode == .maximized ? "arrow.down.right.and.arrow.up.left" : "plus", color: .green,
                             command: item.mode == .maximized ? .restore : .maximize,
-                            label: item.mode == .maximized ? "还原" : "最大化")
+                            label: item.mode == .maximized ? appCopy.text("Restore") : appCopy.text("Maximize"))
                     } else {
                         WindowIconView(icon: item.icon).frame(width: 44).allowsHitTesting(false)
                     }
                     VStack(spacing: 0) {
-                        Text(item.title)
-                            .font(
-                                item.mode == .minimized
-                                    ? .system(size: state.cardTitleSize, weight: .semibold)
-                                    : .subheadline.weight(.semibold)
-                            )
-                            .lineLimit(1).truncationMode(.tail)
+                        Text(
+                            item.content == WindowContent.camera.rawValue || item.content == WindowContent.web.rawValue
+                                ? appCopy.text(item.title) : item.title
+                        )
+                        .font(
+                            item.mode == .minimized
+                                ? .system(size: state.cardTitleSize, weight: .semibold)
+                                : .subheadline.weight(.semibold)
+                        )
+                        .lineLimit(1).truncationMode(.tail)
                         if item.mode == .minimized, let activity = item.activity {
                             Text(activity).font(.caption2).lineLimit(1)
                         }
@@ -313,11 +318,14 @@
                     if item.mode != .minimized {
                         ZStack {
                             if item.phase == .opening || item.phase == .changing {
-                                ProgressView().controlSize(.mini).tint(.white).accessibilityLabel("窗口正在展开")
+                                ProgressView().controlSize(.mini).tint(.white).accessibilityLabel(
+                                    appCopy.text("Opening window"))
                             }
                         }.frame(width: 44).allowsHitTesting(false)
                     }
-                    control("xmark", color: item.mode == .minimized ? .white : .red, command: .close, label: "关闭")
+                    control(
+                        "xmark", color: item.mode == .minimized ? .white : .red, command: .close,
+                        label: appCopy.text("Close"))
                 }
                 .frame(height: item.mode == .minimized ? 48 : 52)
                 .background(
@@ -326,12 +334,14 @@
                         : Color.black.opacity(0.75))
                 if let prompt = item.prompt {
                     VStack(spacing: 8) {
-                        Text(prompt.title).font(.subheadline)
+                        Text(appCopy.text(prompt.title)).font(.subheadline)
                         HStack {
                             ForEach(prompt.choices) { choice in
-                                Button(choice.title) { state.answer(item.id, promptID: prompt.id, choice: choice.id) }
-                                    .frame(
-                                        minWidth: 44, minHeight: 44)
+                                Button(appCopy.text(choice.title)) {
+                                    state.answer(item.id, promptID: prompt.id, choice: choice.id)
+                                }
+                                .frame(
+                                    minWidth: 44, minHeight: 44)
                             }
                         }
                     }.padding(8).background(.black)

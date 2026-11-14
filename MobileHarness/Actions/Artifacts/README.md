@@ -44,6 +44,8 @@ read 返回内容、起始行、字符范围、文件版本和宿主引用。lim
 
 ## 预览与诊断
 
+The Actions assembly supplies the application language to artifact defaults, Markdown previews and document exports. Generated diagram labels follow that locale, and render replies preserve English diagnostics. Workspace source and names already entered by the author are passed through unchanged.
+
 编辑流约200ms保存可恢复草稿，append/complete不执行或等待页面重载。内部preview可以读取进行中的安全检查点，跳过相同/空入口快照，并禁用脚本；呈现节流、合并、加入由Writer拥有。显式render执行完整文件组合。修改使上次渲染资格失效；finish前置条件不足抛renderRequired，不与发布CAS冲突混淆。
 
 呈现返回结构化 status（preview/observed/errors/unavailable）、页面文本和诊断；服务补充草稿代次，终态保留验证状态。observed 只说明已取得页面观察，不证明视觉或任务语义正确；未知呈现器状态为 unverified。窗口隐藏/关闭返回 unavailable，不伪造成功截图。finish 拒绝已报告运行错误；Writer 决定修复、继续或明确报告验证限制。

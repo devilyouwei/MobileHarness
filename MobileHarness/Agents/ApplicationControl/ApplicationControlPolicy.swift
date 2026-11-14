@@ -48,34 +48,38 @@ enum ApplicationControlResourcePolicy {
 enum ApplicationControlFailurePolicy {
     static func userMessage(source: String, message: String, code: String? = nil) -> String? {
         switch code {
-        case "agent.model.tool.undeclaredName": return "模型调用了未声明的工具，本次回复已中止"
-        case "agent.model.tool.invalidArguments": return "模型返回的工具参数格式错误，本次回复已中止"
-        case "agent.model.tool.argumentsMismatch": return "模型返回的工具参数前后不一致，本次回复已中止"
+        case "agent.model.tool.undeclaredName": return "The model called an unavailable tool. The reply stopped."
+        case "agent.model.tool.invalidArguments": return "The model sent invalid tool arguments. The reply stopped."
+        case "agent.model.tool.argumentsMismatch":
+            return "The model sent inconsistent tool arguments. The reply stopped."
         case "agent.model.tool.invalidIdentity", "agent.model.tool.sequenceMismatch":
-            return "模型返回的工具调用信息不一致，本次回复已中止"
-        case "agent.model.transport": return "模型连接失败，请检查网络后重试"
-        case "agent.model.httpStatus", "agent.model.provider": return "模型服务请求失败，本次回复已中止"
-        case let code? where code.hasPrefix("agent.model."): return "模型响应格式异常，本次回复已中止"
-        case let code? where code.hasPrefix("agent.generation."): return "模型输出的指令格式异常，本次回复已中止"
+            return "The model sent inconsistent tool information. The reply stopped."
+        case "agent.model.transport": return "Could not reach the model. Check your connection and try again."
+        case "agent.model.httpStatus", "agent.model.provider": return "The model service failed. The reply stopped."
+        case let code? where code.hasPrefix("agent.model."):
+            return "The model returned an invalid response. The reply stopped."
+        case let code? where code.hasPrefix("agent.generation."):
+            return "The model returned an invalid command. The reply stopped."
         case "vision.pose.failed", "vision.pipeline.failed", "vision.input.failed":
-            return "姿态识别已停止，请查看日志后重试"
-        case "vision.presentation.failed": return "姿态绘制失败，请查看日志"
-        case "vision.pose.stalled": return "姿态推理长时间未返回，实时影像仍可用"
-        case "vision.pose.stale": return "姿态结果持续超时，请查看日志"
-        case "vision.input.stalled": return "姿态识别未收到相机帧，请查看日志"
-        case "agent.runtime.failed": return "对话处理失败，请查看日志"
-        case "agent.context.publication": return "对话上下文更新失败，本次回复已中止"
+            return "Pose recognition stopped. Try again."
+        case "vision.presentation.failed": return "Could not display pose results."
+        case "vision.pose.stalled": return "Pose recognition stalled. Live video is still available."
+        case "vision.pose.stale": return "Pose recognition keeps timing out."
+        case "vision.input.stalled": return "Pose recognition received no camera frames."
+        case "agent.runtime.failed": return "Could not continue the conversation."
+        case "agent.context.publication": return "Could not update the conversation. The reply was stopped."
         default:
-            return source == "speechPerception" && message.hasPrefix("agent.error: speech perception:") ? "我没听清" : nil
+            return source == "speechPerception" && message.hasPrefix("agent.error: speech perception:")
+                ? "I didn't catch that." : nil
         }
     }
     static func categoryTitle(_ category: AgentFailureDiagnostic.Category) -> String {
         switch category {
-        case .modelResponse: "模型响应异常"
-        case .modelTransport: "模型连接异常"
-        case .generation: "指令生成异常"
-        case .context: "上下文异常"
-        case .runtime: "Agent 运行异常"
+        case .modelResponse: "Model response failure"
+        case .modelTransport: "Model connection failure"
+        case .generation: "Generation failure"
+        case .context: "Context failure"
+        case .runtime: "Agent runtime failure"
         }
     }
 

@@ -97,13 +97,13 @@
             switch voiceState {
             case .processing:
                 phaseChanged(.processing)
-                state.presentVoiceStatus("正在识别 · 暂停接收新语句", clearMicrophone: true)
+                state.presentVoiceStatus("Recognizing speech · New input paused", clearMicrophone: true)
             case .hearing:
                 phaseChanged(.listening)
-                state.presentVoiceStatus("检测到语音 · 等待停顿")
+                state.presentVoiceStatus("Speech detected · Waiting for a pause")
             case .listening:
                 phaseChanged(.listening)
-                state.presentVoiceStatus("正在聆听 · 停顿后自动识别")
+                state.presentVoiceStatus("Listening · Recognition begins after a pause")
             }
         }
 

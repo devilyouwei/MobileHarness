@@ -115,7 +115,7 @@ import Testing
     while operations.admission == nil { await Task.yield() }
     let item = state.items[0]
     #expect(state.isDownloading(item))
-    #expect(state.status(item) == "正在提交下载…")
+    #expect(state.status(item) == "Starting download…")
     await workflow.perform("model", operation: .download)
     await workflow.perform("model", operation: .remove)
     #expect(operations.downloads == 1)
@@ -130,7 +130,7 @@ import Testing
     await workflow.perform("model", operation: .cancel)
     await workflow.perform("model", operation: .download)
     #expect(operations.cancellations == 1)
-    #expect(state.status(item) == "正在取消…")
+    #expect(state.status(item) == "Cancelling…")
     operations.cancellation?.resume()
     operations.cancellation = nil
     await cancel.value

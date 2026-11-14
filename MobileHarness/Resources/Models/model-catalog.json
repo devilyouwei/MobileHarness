@@ -3,7 +3,7 @@
   "packages": [
     {
       "id": "nemotron",
-      "name": "Nemotron 语音识别",
+      "name": "Nemotron Speech Recognition",
       "capability": "recognition",
       "directory": "Nemotron",
       "minimumOS": 18,
@@ -47,7 +47,7 @@
     },
     {
       "id": "silero",
-      "name": "Silero 语音检测",
+      "name": "Silero Voice Activity Detection",
       "capability": "voiceActivity",
       "directory": "Silero",
       "minimumOS": 27,
@@ -73,7 +73,7 @@
     },
     {
       "id": "gemma4-e2b",
-      "name": "Gemma 4 E2B 本地对话",
+      "name": "Gemma 4 E2B Local Chat",
       "capability": "chat",
       "directory": "Gemma4",
       "minimumOS": 27,
@@ -109,7 +109,7 @@
     },
     {
       "id": "moss-tts-nano",
-      "name": "MOSS 语音合成",
+      "name": "MOSS Speech Synthesis",
       "capability": "synthesis",
       "directory": "MossTTSNano",
       "minimumOS": 27,
@@ -152,7 +152,7 @@
     },
     {
       "id": "yolo26n-pose",
-      "name": "YOLO 姿态识别",
+      "name": "YOLO Pose Recognition",
       "capability": "pose",
       "directory": "YOLOPose",
       "minimumOS": 27,

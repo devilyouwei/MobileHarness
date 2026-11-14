@@ -445,7 +445,7 @@ if 'Canvas {' in (ROOT / 'MobileHarness/UI/Components/VoiceBars.swift').read_tex
     errors.append('Voice spectrum must use native retained layers, not Canvas')
 for source in (ROOT / 'MobileHarness/UI').rglob('*.swift'):
     content = source.read_text()
-    for imported in re.findall(r'\bimport\s+(\w+)', content):
+    for imported in re.findall(r'^\s*(?:@\w+(?:\([^\n]*\))?\s+)*import\s+(\w+)', content, re.MULTILINE):
         if imported not in allowed_ui | native_ui_imports.get(str(source.relative_to(ROOT / 'MobileHarness/UI')), set()):
             errors.append(f'Forbidden UI import {imported}: {source.relative_to(ROOT)}')
     if re.search(r'\b(?:VoiceSessionCoordinator|CameraCoordinator|ApplicationRuntime|AppContainer|AppAssembly|AssistantHistoryStore|FileDocumentStore|MemoryLeaseStore)\b', content):

@@ -276,7 +276,7 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     ] {
         #expect(!prompt.contains(text))
     }
-    #expect(prompt.contains("# 表情互动"))
+    #expect(prompt.contains("# Expression interaction"))
     var generator = AgentGenerator(
         capabilities: registry, textMapping: AssistantAgent.mapText, segmentation: try AssistantAgent.textSegmentation)
     let events = try generator.append("<wait>Hello.</wait><express emotion='smile'/>") + generator.finish()

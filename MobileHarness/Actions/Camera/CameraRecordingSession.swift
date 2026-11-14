@@ -59,7 +59,7 @@ import UI
         if phase == .recording { value.startedAt = Date() }
         if phase == .idle { value = .init() }
         presentation.present(.recording(value))
-        activity(phase == .recording ? "录制中" : phase == .finishing ? "正在收尾" : nil)
+        activity(phase == .recording ? "Recording" : phase == .finishing ? "Finalizing" : nil)
     }
     func start(duration: Int, invocation: any FunctionInput) async throws -> CameraVideoReceipt {
         guard (1...600).contains(duration) else {
@@ -108,7 +108,8 @@ import UI
                 return CameraVideoReceipt(recordingID: id, state: "recording")
             } catch {
                 phase(.failed)
-                presentation.present(.message("录像启动失败：" + recordingMessage(error)))
+                presentation.present(
+                    .message(recordingMessage(error, fallback: "Could not start recording. Try again.")))
                 let original = error
                 do { try await returnAudio() } catch {
                     throw CameraRecordingCleanupFailure(primary: original, cleanup: error)
@@ -141,7 +142,7 @@ import UI
         } catch {
             nativeID = nil
             phase(.failed, id: id)
-            presentation.present(.message("录像收尾失败：" + recordingMessage(error)))
+            presentation.present(.message(recordingMessage(error, fallback: "Could not finish recording.")))
             let original = error
             do { try await returnAudio() } catch {
                 throw CameraRecordingCleanupFailure(primary: original, cleanup: error)
@@ -167,7 +168,10 @@ import UI
         let file = try await photos.videoURL(mediaID, owner: selected.owner)
         presentation.present(.recordedVideo(.init(id: selected.id, file: file, duration: info.duration)))
         phase(.ready, id: selected.id)
-        presentation.present(.message(selected.movie.stopReason == "sizeLimit" ? "录像已达到文件大小上限，请保存或忽略" : nil))
+        presentation.present(
+            .message(
+                selected.movie.stopReason == "sizeLimit"
+                    ? "The recording reached the file size limit. Save or discard it." : nil))
         return CameraVideoReceipt(
             recordingID: selected.id, state: "ready", mediaID: mediaID,
             durationSeconds: info.duration, stopReason: selected.movie.stopReason, fileName: file.lastPathComponent)
@@ -230,7 +234,7 @@ import UI
         clip = nil
         presentation.present(.recordedVideo(nil))
         phase(.idle)
-        presentation.present(.photoMessage("视频已保存到 App 相册"))
+        presentation.present(.photoMessage("Video saved in the app album."))
         return receipt
     }
     func ignore(_ id: String) async throws -> CameraVideoReceipt {
@@ -244,15 +248,17 @@ import UI
         phase(.idle)
         return CameraVideoReceipt(recordingID: id, state: "ignored")
     }
-    private func recordingMessage(_ error: any Error) -> String {
+    private func recordingMessage(_ error: any Error, fallback: String) -> String {
         if let native = error as? PlatformError {
             switch native {
-            case .busy: return "麦克风被其他音频操作占用，请结束后重试"
-            case .unavailable, .stopped: return "相机或音频会话暂不可用，请重新开启"
+            case .busy: return "The microphone is in use. Stop other audio operations and try again."
+            case .unavailable, .stopped: return "Camera or audio session unavailable. Open the camera again."
             }
         }
-        if error as? CameraError == .permissionDenied { return "请在系统设置中允许相机和麦克风权限" }
-        return error.localizedDescription
+        if error as? CameraError == .permissionDenied {
+            return "Allow camera and microphone access in System Settings."
+        }
+        return fallback
     }
     private func removeTemporary(_ file: URL) throws {
         if FileManager.default.fileExists(atPath: file.path) { try FileManager.default.removeItem(at: file) }
@@ -262,7 +268,7 @@ import UI
 private struct CameraRecordingCleanupFailure: Error, LocalizedError {
     let primary: any Error
     let cleanup: any Error
-    var errorDescription: String? { primary.localizedDescription + "；清理失败：" + cleanup.localizedDescription }
+    var errorDescription: String? { primary.localizedDescription + "; cleanup failed: " + cleanup.localizedDescription }
 }
 
 /// Shared native configuration transaction for explicit settings and recording preparation.
@@ -309,7 +315,7 @@ private struct CameraRecordingCleanupFailure: Error, LocalizedError {
                     flash: CameraFlash(rawValue: previous.flash) ?? .off, zoom: previous.zoom)
             }
             do { try await cleanup.value } catch {
-                presentation.present(.message("拍摄设置恢复失败：" + error.localizedDescription))
+                presentation.present(.message("Could not restore capture settings."))
                 throw NativeCleanupFailure(errors: [original, error])
             }
             throw original

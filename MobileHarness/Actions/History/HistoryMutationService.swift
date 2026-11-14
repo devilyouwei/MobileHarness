@@ -31,7 +31,7 @@ public struct HistoryMutationService: HistoryMutationCapability {
             do {
                 try await generateTitle(archived.id)
                 await archiveChanged(nil)
-            } catch { await archiveChanged("标题生成失败：\(error)") }
+            } catch { await archiveChanged("Could not generate a title: \(error)") }
         }
         if !accepted {
             try await store.setTitle(nil, error: "Title worker busy; retry explicitly", for: archived.id)

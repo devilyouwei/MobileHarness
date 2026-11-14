@@ -10,6 +10,7 @@ public enum AgentConfigurations {
         var declarations: [ActionDeclaration]?
         var agents: [String: AgentConfiguration] = [:]
         var skills: [String: Skill] = [:]
+        var functionCopy: AgentFunctionCopy?
     }
     private static let cache = Cache()
     /// Install the production projection before loading any Agent or Skill registry.
@@ -154,7 +155,8 @@ public enum AgentConfigurations {
             data(path), expectedID: AgentID(rawValue: name.prefix(1).lowercased() + name.dropFirst()))
     }
     public static func publicDescription(named name: String) throws -> String {
-        try resource(named: name).description
+        let value = try resource(named: name)
+        return try localizedDescription("agent." + value.id, default: value.description)
     }
     /// Descriptions never add a task adapter or grant. Live availability remains State data.
     public static func delegationOverview(
@@ -173,7 +175,13 @@ public enum AgentConfigurations {
                 throw CommunicationError.unsupportedContract
             }
             entries.append(
-                try templates.render("entry", variables: ["id": value.id, "description": value.description]))
+                try templates.render(
+                    "entry",
+                    variables: [
+                        "id": value.id,
+                        "description": localizedDescription(
+                            "agent." + value.id, default: value.description),
+                    ]))
         }
         let result = entries.joined(separator: "\n")
         guard result.utf8.count <= 8192 else { throw AgentConfigurationError.invalidField("Agent discovery capacity") }
@@ -252,7 +260,10 @@ public enum AgentConfigurations {
         let perDescription = (4096 - overhead) / max(1, skills.count)
         let result = try skills.map { skill in
             var description = ""
-            for character in skill.description {
+            for character in try localizedDescription(
+                "skill." + skill.id.replacingOccurrences(of: "-", with: "_"),
+                default: skill.description)
+            {
                 guard description.utf8.count + String(character).utf8.count <= perDescription else { break }
                 description.append(character)
             }
@@ -260,6 +271,12 @@ public enum AgentConfigurations {
         }.joined(separator: "\n")
         guard result.utf8.count <= 4096 else { throw AgentConfigurationError.invalidField("Skill discovery capacity") }
         return result
+    }
+    private static func localizedDescription(_ key: String, default source: String) throws -> String {
+        guard AgentPrompts.language == "zh-Hans" else { return source }
+        do { return try AgentPrompts.text("Shared/Descriptions", key) } catch let error as CocoaError
+            where error.code == .fileReadNoSuchFile
+        { return source } catch PromptTemplateError.missingTemplate(_) { return source }
     }
     public static func identityInstructions(named name: String) throws -> String {
         guard let path = try catalog().agents[name] else { throw AgentConfigurationError.resourceMissing(name) }
@@ -291,7 +308,7 @@ public enum AgentConfigurations {
         return configuration
     }
     public static func registry(_ bindings: [Binding]) throws -> CapabilityRegistry {
-        let d = try declaration(bindings)
+        let d = try declaration(bindings, localize: AgentPrompts.language == "zh-Hans")
         let root: [String: Any] = [
             "version": 8, "id": "catalog", "category": "perception", "actions": d.actions, "tools": d.tools,
             "communication": ["inputs": [], "subscriptions": [], "publications": [], "sends": []],
@@ -299,7 +316,7 @@ public enum AgentConfigurations {
         let configuration = try AgentConfiguration(data: JSONSerialization.data(withJSONObject: root))
         return configuration.capabilities
     }
-    private static func declaration(_ bindings: [Binding]) throws -> (
+    private static func declaration(_ bindings: [Binding], localize: Bool = false) throws -> (
         actions: [String: [[String: Any]]], tools: [[String: Any]]
     ) {
         guard bindings.count <= 128, Set(bindings.map(\.path)).count == bindings.count else {
@@ -310,9 +327,10 @@ public enum AgentConfigurations {
         }
         var actions: [String: [[String: Any]]] = ["Speech": [], "Display": []]
         var tools: [[String: Any]] = []
+        let copy = localize ? try functionCopy() : nil
         for binding in bindings {
             guard
-                let declaration = binding.path == "Agent.Communication.send"
+                let canonical = binding.path == "Agent.Communication.send"
                     ? AgentTaskCommunication.sendDeclaration
                     : definitions.first(where: { $0.path.description == binding.path })
                         ?? WriterLocalTools.declarations.first(where: { $0.path.description == binding.path }),
@@ -320,6 +338,7 @@ public enum AgentConfigurations {
             else {
                 throw AgentConfigurationError.invalidField(binding.path)
             }
+            let declaration = copy.map { localized(canonical, copy: $0) } ?? canonical
             let definition = try declaration.actionObject(alias: binding.alias)
             if binding.callType == "action" {
                 guard let channel = binding.channel else { throw AgentConfigurationError.invalidField("channel") }
@@ -342,4 +361,40 @@ public enum AgentConfigurations {
         }
         return (actions, tools)
     }
+
+    private static func functionCopy() throws -> AgentFunctionCopy? {
+        if let value = cache.lock.withLock({ cache.functionCopy }) { return value }
+        do {
+            let copy = try JSONDecoder().decode(
+                AgentFunctionCopy.self, from: data("Agents/Shared/FunctionCopy.zh-Hans.json"))
+            cache.lock.withLock { cache.functionCopy = copy }
+            return copy
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile { return nil }
+    }
+
+    private static func localized(_ declaration: ActionDeclaration, copy: AgentFunctionCopy) -> ActionDeclaration {
+        guard let text = copy.entries[declaration.path.description] else { return declaration }
+        let parameters = declaration.parameters.map { parameter in
+            let translation = text.parameters[parameter.name]
+            return ActionParameter(
+                parameter.name, type: parameter.valueType, required: parameter.required,
+                description: translation?.description ?? parameter.description,
+                constraints: translation?.constraints ?? parameter.constraints, values: parameter.values)
+        }
+        return ActionDeclaration(path: declaration.path, doc: text.description, parameters: parameters)
+    }
+}
+
+private struct AgentFunctionCopy: Decodable {
+    struct Entry: Decodable {
+        struct Parameter: Decodable {
+            let description: String
+            let constraints: String?
+        }
+
+        let description: String
+        let parameters: [String: Parameter]
+    }
+
+    let entries: [String: Entry]
 }

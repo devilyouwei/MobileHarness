@@ -1333,7 +1333,7 @@ func speechRolesOwnIndependentIslandsAndJoinShutdown(initiallyUnavailable: Bool)
     }
     try await wait { state.activities.contains { $0.owner.hasPrefix("speechPerception:") } }
     let listening = try #require(state.activities.first { $0.owner.hasPrefix("speechPerception:") })
-    #expect(listening.content.title == "正在聆听")
+    #expect(listening.content.title == "Listening")
     try await perception.pause()
     try await wait { state.activities.isEmpty }
     try await perception.resume()

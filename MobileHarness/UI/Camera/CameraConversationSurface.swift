@@ -51,6 +51,8 @@
 
     @MainActor
     private struct CameraControlsOverlay: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let camera: CameraState
         let controls: any CameraControlling
         let blocksNewActions: Bool
@@ -64,8 +66,14 @@
                         Image(systemName: camera.perceptionEnabled ? "eye.fill" : "eye")
                             .frame(width: 48, height: 48)
                     }
-                    .accessibilityLabel(camera.perceptionEnabled ? "关闭视觉" : "打开视觉")
-                    .accessibilityValue(camera.perceptionEnabled ? (camera.isVisible ? "已开启" : "等待相机") : "已关闭")
+                    .accessibilityLabel(
+                        camera.perceptionEnabled ? appCopy.text("Turn off vision") : appCopy.text("Turn on vision")
+                    )
+                    .accessibilityValue(
+                        camera.perceptionEnabled
+                            ? (camera.isVisible ? appCopy.text("On") : appCopy.text("Waiting for camera"))
+                            : appCopy.text("Off")
+                    )
                     .accessibilityIdentifier("camera.toggle")
                     .disabled(camera.isBusy || camera.controlBusy || (blocksNewActions && !camera.perceptionEnabled))
                     if camera.perceptionEnabled {
@@ -75,7 +83,11 @@
                                     .frame(width: 48, height: 48)
                             }
                             .disabled(!camera.canSwitch(.perception))
-                            .accessibilityLabel(camera.facing == .front ? "切换到后置摄像头" : "切换到前置摄像头")
+                            .accessibilityLabel(
+                                camera.facing == .front
+                                    ? appCopy.text("Switch to the rear camera")
+                                    : appCopy.text("Switch to the front camera")
+                            )
                             .accessibilityIdentifier("camera.switch")
                         }
                         .font(.system(size: 18, weight: .medium))
@@ -84,7 +96,7 @@
                     Button(action: openSettings) {
                         Image(systemName: "gearshape").frame(width: 48, height: 48)
                     }
-                    .accessibilityLabel("设置")
+                    .accessibilityLabel(appCopy.text("Settings"))
                     .accessibilityIdentifier("app.settings")
                 }
                 .font(.system(size: 20, weight: .medium))
@@ -95,14 +107,14 @@
                     camera.perceptionEnabled
                 {
                     VStack(alignment: .trailing, spacing: 8) {
-                        Text(message).font(.footnote)
+                        Text(appCopy.text(message)).font(.footnote)
                             .multilineTextAlignment(.trailing)
                         if camera.needsSettings {
-                            Button("打开设置") {
+                            Button(appCopy.text("Open settings")) {
                                 if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                             }
                         } else {
-                            Button("重试", action: controls.retryPerception).disabled(
+                            Button(appCopy.text("Retry"), action: controls.retryPerception).disabled(
                                 blocksNewActions || camera.isBusy || camera.controlBusy)
                         }
                     }
@@ -120,6 +132,8 @@
     }
     @MainActor
     private struct CameraStatisticsOverlay: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let camera: CameraState
         @State private var statisticsExpanded = false
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -143,17 +157,35 @@
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(statisticsExpanded ? "收起性能数据" : "展开性能数据")
-                    .accessibilityValue(statisticsExpanded ? "已展开" : "已收起")
+                    .accessibilityLabel(
+                        statisticsExpanded
+                            ? appCopy.text("Hide performance metrics") : appCopy.text("Show performance metrics")
+                    )
+                    .accessibilityValue(statisticsExpanded ? appCopy.text("Expanded") : appCopy.text("Collapsed"))
                     .accessibilityIdentifier("camera.poseStatistics.toggle")
                     if statisticsExpanded {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("间隔 \(metric(statistics.detectionIntervalMilliseconds, suffix: "ms"))")
-                            Text("画面运动 \(statistics.imageMotion.map { String(format: "%.2f", $0) } ?? "—")")
-                            Text("等待 \(metric(statistics.queueMilliseconds, suffix: "ms"))")
-                            Text("推理 \(metric(statistics.inferenceMilliseconds, suffix: "ms"))")
-                            Text("总延迟 \(metric(statistics.totalMilliseconds, suffix: "ms"))")
-                            Text("跳过 \(statistics.replacements) 帧")
+                            Text(
+                                appCopy.format(
+                                    "Interval %@",
+                                    String(describing: metric(statistics.detectionIntervalMilliseconds, suffix: "ms"))))
+                            Text(
+                                appCopy.format(
+                                    "Image motion %@",
+                                    String(describing: statistics.imageMotion.map { String(format: "%.2f", $0) } ?? "—")
+                                ))
+                            Text(
+                                appCopy.format(
+                                    "Wait %@", String(describing: metric(statistics.queueMilliseconds, suffix: "ms"))))
+                            Text(
+                                appCopy.format(
+                                    "Inference %@",
+                                    String(describing: metric(statistics.inferenceMilliseconds, suffix: "ms"))))
+                            Text(
+                                appCopy.format(
+                                    "Total latency %@",
+                                    String(describing: metric(statistics.totalMilliseconds, suffix: "ms"))))
+                            Text(appCopy.format("Skipped %@ frames", String(describing: statistics.replacements)))
                         }
                         .padding(.horizontal, 8)
                         .padding(.bottom, 8)
@@ -176,6 +208,8 @@
     }
 
     @MainActor public struct CameraWindowContent<Preview: View>: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let camera: CameraState
         let controls: any CameraControlling
         let rendersPreview: Bool
@@ -204,8 +238,9 @@
                         VStack(spacing: 16) {
                             Text("\(count)").font(.system(size: 72, weight: .medium, design: .rounded))
                                 .monospacedDigit()
-                            Button("取消倒计时", action: controls.cancelCapture).padding(12).background(
-                                .black.opacity(0.6), in: Capsule())
+                            Button(appCopy.text("Cancel countdown"), action: controls.cancelCapture).padding(12)
+                                .background(
+                                    .black.opacity(0.6), in: Capsule())
                         }
                     }
                     if camera.isBusy || camera.recording.phase == .starting || camera.recording.phase == .finishing {
@@ -216,8 +251,9 @@
                         if let message = camera.controlMessage ?? camera.photoRendererFailure ?? camera.message
                             ?? camera.photoMessage
                         {
-                            Text(message).font(.caption).multilineTextAlignment(.center).padding(8).background(
-                                .black.opacity(0.6))
+                            Text(appCopy.text(message)).font(.caption).multilineTextAlignment(.center).padding(8)
+                                .background(
+                                    .black.opacity(0.6))
                         }
                     }
                     .overlay(alignment: .bottom) {
@@ -225,15 +261,15 @@
                             HStack(spacing: 8) {
                                 Circle().fill(.red).frame(width: 8, height: 8)
                                 Text(started, style: .timer).monospacedDigit()
-                                Text("聆听已暂停").font(.caption)
+                                Text(appCopy.text("Listening paused")).font(.caption)
                             }.padding(8).background(.black.opacity(0.65), in: Capsule()).padding(8).padding(
                                 .bottom, 140)
                         } else if let id = camera.recording.id,
                             camera.recording.phase == .ready || camera.recording.phase == .failed
                         {
                             HStack(spacing: 20) {
-                                Button("保存视频") { controls.saveVideo(id) }
-                                Button("忽略") { controls.ignoreVideo(id) }
+                                Button(appCopy.text("Save video")) { controls.saveVideo(id) }
+                                Button(appCopy.text("Discard")) { controls.ignoreVideo(id) }
                             }.padding(12).background(.black.opacity(0.75), in: Capsule())
                                 .disabled(camera.controlBusy).padding(8).padding(.bottom, 140)
                         }
@@ -241,7 +277,7 @@
                 VStack(spacing: 8) {
                     HStack(spacing: 16) {
                         ForEach(["photo", "video"], id: \.self) { mode in
-                            Button(mode == "photo" ? "照片" : "视频") {
+                            Button(mode == "photo" ? appCopy.text("Photo") : appCopy.text("Video")) {
                                 updateSettings {
                                     $0.mode = mode
                                     $0.flash = "off"
@@ -256,7 +292,7 @@
                     HStack(spacing: 24) {
                         Button(action: controls.switchCamera) {
                             Image(systemName: "arrow.triangle.2.circlepath.camera").frame(width: 48, height: 48)
-                        }.accessibilityLabel("切换镜头").disabled(!camera.canSwitchCamera)
+                        }.accessibilityLabel(appCopy.text("Switch camera")).disabled(!camera.canSwitchCamera)
                         shutter
                         Menu {
                             ForEach([1.0, 2.0, 3.0, 6.0].filter { $0 <= camera.settings.maximumZoom }, id: \.self) {
@@ -266,7 +302,7 @@
                         } label: {
                             Text(String(format: "%.1f×", camera.settings.zoom)).monospacedDigit().frame(
                                 width: 48, height: 48)
-                        }.accessibilityLabel("变焦").disabled(settingsLocked)
+                        }.accessibilityLabel(appCopy.text("Zoom")).disabled(settingsLocked)
                     }
                 }.buttonStyle(.plain).frame(height: 140).frame(maxWidth: .infinity)
                     .background(
@@ -293,38 +329,45 @@
         private var settingsMenu: some View {
             Menu {
                 if camera.settings.mode == "photo" {
-                    Menu("倒计时：\(camera.settings.delaySeconds) 秒") {
+                    Menu(appCopy.format("Countdown: %@ sec", String(camera.settings.delaySeconds))) {
                         ForEach([0, 3, 5, 10], id: \.self) { delay in
-                            Button(delay == 0 ? "立即拍摄" : "\(delay) 秒") { updateSettings { $0.delaySeconds = delay } }
+                            Button(delay == 0 ? appCopy.text("Shoot now") : appCopy.format("%@ sec", String(delay))) {
+                                updateSettings { $0.delaySeconds = delay }
+                            }
                         }
                     }
-                    Menu("闪光灯") {
+                    Menu(appCopy.text("Flash")) {
                         ForEach(camera.settings.supportedFlash, id: \.self) { flash in
-                            Button(flash == "off" ? "关闭" : flash == "on" ? "开启" : "自动") {
+                            Button(
+                                flash == "off"
+                                    ? appCopy.text("Off") : flash == "on" ? appCopy.text("On") : appCopy.text("Auto")
+                            ) {
                                 updateSettings { $0.flash = flash }
                             }
                         }
                     }
                 } else {
-                    Menu("最长录制：\(camera.settings.durationSeconds) 秒") {
+                    Menu(appCopy.format("Maximum recording: %@ sec", String(camera.settings.durationSeconds))) {
                         ForEach([10, 30, 60, 300, 600], id: \.self) { duration in
-                            Button("\(duration) 秒") { updateSettings { $0.durationSeconds = duration } }
+                            Button(appCopy.format("%@ sec", String(duration))) {
+                                updateSettings { $0.durationSeconds = duration }
+                            }
                         }
                     }
                 }
             } label: {
                 Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44)
-            }.accessibilityLabel("拍摄设置").disabled(settingsLocked)
+            }.accessibilityLabel(appCopy.text("Capture settings")).disabled(settingsLocked)
         }
         @ViewBuilder private var shutter: some View {
             if camera.recording.phase == .recording {
                 Button(action: controls.stopRecording) {
                     RoundedRectangle(cornerRadius: 5).fill(.red).frame(width: 28, height: 28)
                         .frame(width: 64, height: 64).overlay(Circle().stroke(.white, lineWidth: 2))
-                }.accessibilityLabel("停止录像").accessibilityIdentifier("camera.record.stop")
+                }.accessibilityLabel(appCopy.text("Stop recording")).accessibilityIdentifier("camera.record.stop")
                     .disabled(camera.controlBusy)
             } else if camera.countdown != nil {
-                Button("取消", action: controls.cancelCapture).frame(width: 64, height: 64)
+                Button(appCopy.text("Cancel"), action: controls.cancelCapture).frame(width: 64, height: 64)
             } else if camera.isEnabled && camera.isVisible {
                 Button {
                     if camera.settings.mode == "video" { controls.startRecording() } else { controls.takePhoto() }
@@ -333,14 +376,17 @@
                         5
                     )
                     .overlay(Circle().stroke(.white, lineWidth: 2))
-                }.accessibilityLabel(camera.settings.mode == "video" ? "开始录像" : "拍照")
-                    .accessibilityIdentifier("camera.capture").disabled(settingsLocked)
+                }.accessibilityLabel(
+                    camera.settings.mode == "video" ? appCopy.text("Start recording") : appCopy.text("Take photo")
+                )
+                .accessibilityIdentifier("camera.capture").disabled(settingsLocked)
             } else if camera.needsSettings {
-                Button("打开系统设置") {
+                Button(appCopy.text("Open System Settings")) {
                     if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                 }.frame(minHeight: 44)
             } else {
-                Button("开启相机", action: controls.open).frame(minHeight: 44).disabled(camera.controlBusy || camera.isBusy)
+                Button(appCopy.text("Start camera"), action: controls.open).frame(minHeight: 44).disabled(
+                    camera.controlBusy || camera.isBusy)
             }
         }
     }

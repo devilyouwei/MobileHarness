@@ -67,7 +67,7 @@ public final class RuntimeLogState: RuntimeLogWriting {
     public internal(set) var selectedTaskID: String?
     public private(set) var agentEvents: [AgentRuntimeLogItem] = []
     public private(set) var agentEventEvictions: UInt64 = 0
-    public internal(set) var selectedSource = "全部"
+    public internal(set) var selectedSource = "All"
     public internal(set) var selectedChannel: String?
     public internal(set) var selectedFilter: ExecutionLogFilter = .all
     public internal(set) var showsInternalActions = false
@@ -113,7 +113,7 @@ public final class RuntimeLogState: RuntimeLogWriting {
                     + agentEvents.map(\.source) + decisions.map(\.source))
         ).filter { !$0.isEmpty }.sorted()
     }
-    public func matchesSource(_ values: [String]) -> Bool { selectedSource == "全部" || values.contains(selectedSource) }
+    public func matchesSource(_ values: [String]) -> Bool { selectedSource == "All" || values.contains(selectedSource) }
     public func matchesStatus(active: Bool, success: Bool, failure: Bool) -> Bool {
         switch selectedFilter {
         case .all: true
@@ -276,9 +276,9 @@ public enum RuntimeLogEvent: Sendable {
 
 public struct DecisionLogItem: Identifiable, Sendable, Equatable {
     public enum Route: String, Sendable {
-        case local = "本地 D3"
-        case cloud = "云端 Decision"
-        case fallback = "回退"
+        case local = "Local D3"
+        case cloud = "Cloud Decision"
+        case fallback = "Fallback"
     }
     public enum Disposition: String, Sendable {
         case enqueue, discard, interrupt
@@ -322,10 +322,10 @@ public enum ExecutionLogTab: String, CaseIterable, Sendable {
     case decision = "Decision"
 }
 public enum ExecutionLogFilter: String, CaseIterable, Sendable {
-    case all = "全部"
-    case active = "进行中"
-    case succeeded = "成功"
-    case failed = "异常"
+    case all = "All"
+    case active = "In progress"
+    case succeeded = "Succeeded"
+    case failed = "Failed"
 }
 public struct TaskLogEvent: Identifiable, Equatable, Sendable {
     public let id: String
@@ -341,14 +341,14 @@ public struct TaskLogEvent: Identifiable, Equatable, Sendable {
 }
 public struct TaskLogItem: Identifiable, Equatable, Sendable {
     public enum Phase: String, Sendable {
-        case requested = "委派中"
-        case accepted = "已接纳"
-        case running = "进行中"
-        case waitingUser = "等待用户"
-        case cancelling = "取消请求已接纳"
-        case succeeded = "已完成"
-        case failed = "失败"
-        case cancelled = "已取消"
+        case requested = "Delegating"
+        case accepted = "Accepted"
+        case running = "In progress"
+        case waitingUser = "Waiting for user"
+        case cancelling = "Cancellation accepted"
+        case succeeded = "Completed"
+        case failed = "Failed"
+        case cancelled = "Cancelled"
     }
     public let id: String
     public let parentID: String?

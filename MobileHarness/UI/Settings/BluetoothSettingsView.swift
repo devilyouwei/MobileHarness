@@ -5,6 +5,8 @@ import Foundation
 
     @MainActor
     public struct BluetoothSettingsView: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         @Bindable var state: BluetoothSettingsState
         private let controls: any BluetoothControlling
         @State private var forgetting = false
@@ -23,13 +25,13 @@ import Foundation
             .navigationDestination(item: $deviceForDetail) { device in
                 BluetoothArmDetailView(state: state, controls: controls, device: device)
             }
-            .navigationTitle("蓝牙外设")
+            .navigationTitle(appCopy.text("Bluetooth devices"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
             .toolbar {
                 if state.connectionBusy, state.phase != .disconnecting {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("取消", action: controls.disconnect)
+                        Button(appCopy.text("Cancel"), action: controls.disconnect)
                             .accessibilityIdentifier("settings.bluetooth.cancelConnection")
                     }
                 }
@@ -37,33 +39,36 @@ import Foundation
             .preferredColorScheme(.dark)
             .task { controls.openPage() }
             .onDisappear { controls.closePage() }
-            .confirmationDialog("忽略这台机械臂？", isPresented: $forgetting, titleVisibility: .visible) {
-                Button("忽略设备", role: .destructive, action: controls.forget)
+            .confirmationDialog(
+                appCopy.text("Forget this robot arm?"), isPresented: $forgetting, titleVisibility: .visible
+            ) {
+                Button(appCopy.text("Forget device"), role: .destructive, action: controls.forget)
             } message: {
-                Text("将断开连接并忘记此设备。")
+                Text(appCopy.text("This disconnects and forgets the device."))
             }
         }
         @ViewBuilder private var availabilitySection: some View {
             Section {
-                LabeledContent("蓝牙", value: availabilityText)
-                LabeledContent("机械臂连接", value: state.connectionPresentation.title)
+                LabeledContent(appCopy.text("Bluetooth"), value: availabilityText)
+                LabeledContent(
+                    appCopy.text("Robot arm connection"), value: appCopy.text(state.connectionPresentation.title))
                 if state.availability == .denied {
-                    Button("前往系统设置允许蓝牙", action: controls.openSystemSettings)
+                    Button(appCopy.text("Allow Bluetooth in System Settings"), action: controls.openSystemSettings)
                         .accessibilityIdentifier("settings.bluetooth.permission")
                 }
             } footer: {
-                Text("自动重连上次设备；手动断开后不再重连。")
+                Text(appCopy.text("The last device reconnects automatically until manually disconnected."))
             }
         }
         @ViewBuilder private var myDevicesSection: some View {
             if let device = state.myDevice {
-                Section("我的设备") {
+                Section(appCopy.text("My devices")) {
                     deviceRow(device)
                     if state.isConnected(device.id) {
-                        Button("断开连接", action: controls.disconnect)
+                        Button(appCopy.text("Disconnect"), action: controls.disconnect)
                             .accessibilityIdentifier("settings.bluetooth.disconnect")
                     }
-                    Button("忽略此设备", role: .destructive) { forgetting = true }
+                    Button(appCopy.text("Forget this device"), role: .destructive) { forgetting = true }
                         .accessibilityIdentifier("settings.bluetooth.forget")
                 }
             }
@@ -78,7 +83,9 @@ import Foundation
                         if state.scanning { controls.stopScan() } else { controls.scan() }
                     } label: {
                         HStack {
-                            Text(state.scanning ? "停止搜索" : "搜索附近设备")
+                            Text(
+                                state.scanning ? appCopy.text("Stop scanning") : appCopy.text("Scan for nearby devices")
+                            )
                             Spacer()
                             if state.scanning { ProgressView() }
                         }
@@ -86,20 +93,20 @@ import Foundation
                     .disabled(!state.canScan)
                     .accessibilityIdentifier("settings.bluetooth.scan")
                     if state.otherDevices.isEmpty && !state.scanning {
-                        Text("暂未发现设备").foregroundStyle(.secondary)
+                        Text(appCopy.text("No devices found")).foregroundStyle(.secondary)
                     }
                 } header: {
-                    Text("附近设备")
+                    Text(appCopy.text("Nearby devices"))
                 }
             }
         }
         private var availabilityText: String {
             switch state.availability {
-            case .unknown: "正在检查"
-            case .available: "已开启"
-            case .poweredOff: "已关闭，请在控制中心开启"
-            case .denied: "未允许访问"
-            case .unsupported: "当前设备不支持"
+            case .unknown: appCopy.text("Checking")
+            case .available: appCopy.text("On")
+            case .poweredOff: appCopy.text("Off. Turn Bluetooth on in Control Center.")
+            case .denied: appCopy.text("Access denied")
+            case .unsupported: appCopy.text("Unsupported on this device")
             }
         }
         private func deviceRow(_ device: BluetoothDeviceRow) -> some View {
@@ -121,12 +128,12 @@ import Foundation
                     Text(device.name)
                         .foregroundStyle(state.rowIntent(for: device.id) == .unavailable ? Color.secondary : .primary)
                     if let message = state.currentMessage(for: device.id) {
-                        Text(message).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                        Text(appCopy.text(message)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                     }
                 }
                 Spacer()
                 if state.selected?.id == device.id && state.connectionBusy { ProgressView() }
-                Text(state.status(for: device.id)).font(.subheadline)
+                Text(appCopy.text(state.status(for: device.id))).font(.subheadline)
                     .foregroundStyle(state.hasConnectionIssue(device.id) ? Color.yellow : .secondary)
                 if state.isConnected(device.id) {
                     Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
@@ -138,6 +145,8 @@ import Foundation
 
     @MainActor
     private struct BluetoothArmDetailView: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         @Bindable var state: BluetoothSettingsState
         let controls: any BluetoothControlling
         let device: BluetoothDeviceRow
@@ -145,65 +154,70 @@ import Foundation
         private var canControl: Bool { state.canControl(device.id) }
         var body: some View {
             List {
-                Section("当前状态") {
-                    LabeledContent("连接") {
-                        Text(state.status(for: device.id))
+                Section(appCopy.text("Current status")) {
+                    LabeledContent(appCopy.text("Connection")) {
+                        Text(appCopy.text(state.status(for: device.id)))
                             .foregroundStyle(state.hasConnectionIssue(device.id) ? Color.yellow : .secondary)
                     }
                     if state.recoveryDeviceID == device.id, state.recoveryStage != .idle {
-                        LabeledContent("恢复", value: state.recoveryStage.title)
+                        LabeledContent(appCopy.text("Recovery"), value: appCopy.text(state.recoveryStage.title))
                         if state.recoveryAttempt > 0 {
-                            LabeledContent("已尝试", value: "\(state.recoveryAttempt)/3 次")
+                            LabeledContent(
+                                appCopy.text("Attempts"),
+                                value: appCopy.format("%@/3 attempts", String(describing: state.recoveryAttempt)))
                         }
                     }
-                    Button("重新连接") { controls.reconnect(device.id) }
+                    Button(appCopy.text("Reconnect")) { controls.reconnect(device.id) }
                         .disabled(state.connectionBusy || state.availability != .available)
                         .accessibilityIdentifier("settings.bluetooth.reconnect")
                     if state.recoveryDeviceID == device.id, state.recoveryStage.busy {
-                        Button("取消恢复 / 断开", action: controls.disconnect)
+                        Button(appCopy.text("Cancel recovery and disconnect"), action: controls.disconnect)
                             .accessibilityIdentifier("settings.bluetooth.cancelRecovery")
                     }
                 }
                 if let message = state.currentMessage(for: device.id) {
                     Section {
-                        Text(message).font(.subheadline).foregroundStyle(.red)
+                        Text(appCopy.text(message)).font(.subheadline).foregroundStyle(.red)
                             .textSelection(.enabled)
                             .accessibilityIdentifier("settings.bluetooth.currentError")
                     }
                 }
                 if connected {
-                    Section("设备反馈") {
+                    Section(appCopy.text("Device feedback")) {
                         if state.pose.count == 6 {
                             LabeledContent(
-                                "末端位置", value: "X \(state.pose[0]) · Y \(state.pose[1]) · Z \(state.pose[2]) mm")
+                                appCopy.text("End effector position"),
+                                value: "X \(state.pose[0]) · Y \(state.pose[1]) · Z \(state.pose[2]) mm")
                         }
                         if let sampledAt = state.sampledAt {
-                            LabeledContent("位置更新于") { Text(sampledAt, style: .time) }
+                            LabeledContent(appCopy.text("Position updated at")) { Text(sampledAt, style: .time) }
                         }
-                        Button("刷新位置") { Task { await controls.refreshDevice() } }
+                        Button(appCopy.text("Refresh position")) { Task { await controls.refreshDevice() } }
                             .disabled(state.connectionBusy)
                     }
                 }
-                Section("动作") {
+                Section(appCopy.text("Actions")) {
                     ForEach(BluetoothArmAction.allCases.filter { $0 != .reset }) { action in
                         Button {
                             controls.tryAction(action)
                         } label: {
                             HStack {
-                                Text(action.title)
+                                Text(appCopy.text(action.title))
                                 Spacer()
                                 Image(systemName: "play.circle.fill")
                             }
                         }
-                        .accessibilityLabel("试一试\(action.title)")
+                        .accessibilityLabel(appCopy.format("Try %@", String(describing: action.title)))
                         .accessibilityIdentifier("settings.bluetooth.action.\(action.rawValue)")
                     }
                 }
                 .disabled(!canControl)
                 Section {
-                    Button("整臂归位", systemImage: "arrow.counterclockwise") { controls.tryAction(.reset) }
-                        .disabled(!canControl)
-                        .accessibilityIdentifier("settings.bluetooth.reset")
+                    Button(appCopy.text("Home the arm"), systemImage: "arrow.counterclockwise") {
+                        controls.tryAction(.reset)
+                    }
+                    .disabled(!canControl)
+                    .accessibilityIdentifier("settings.bluetooth.reset")
                 }
                 Section {
                     ForEach(1...6, id: \.self) { id in
@@ -214,9 +228,9 @@ import Foundation
                         .disabled(!canControl)
                     }
                 } header: {
-                    Text("电机控制")
+                    Text(appCopy.text("Motor controls"))
                 } footer: {
-                    Text("滑动控制方向和速度，松手停止并保持当前位置。")
+                    Text(appCopy.text("Slide to control direction and speed. Release to stop and hold position."))
                 }
             }
             .buttonStyle(.borderless)
@@ -230,6 +244,8 @@ import Foundation
 
     @MainActor
     private struct BluetoothMotorSlider: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let id: Int
         let position: Int?
         let enabled: Bool
@@ -239,12 +255,14 @@ import Foundation
         var body: some View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text("电机 \(id)")
+                    Text(appCopy.format("Motor %@", String(describing: id)))
                     Spacer()
                     if touching {
                         Text("\(Int(abs(draft) * 100))%").monospacedDigit()
                     } else if let position {
-                        Text("上次位置 \(position)").foregroundStyle(.secondary).monospacedDigit()
+                        Text(appCopy.format("Last position %@", String(describing: position))).foregroundStyle(
+                            .secondary
+                        ).monospacedDigit()
                     }
                 }
                 GeometryReader { geometry in
@@ -272,7 +290,7 @@ import Foundation
                 }
                 .frame(height: 44)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("电机 \(id)方向与速度")
+                .accessibilityLabel(appCopy.format("Motor %@ direction and speed", String(describing: id)))
                 .accessibilityValue("\(Int(draft * 100))%")
                 .accessibilityIdentifier("settings.bluetooth.motor.\(id)")
                 HStack {

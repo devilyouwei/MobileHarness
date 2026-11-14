@@ -95,7 +95,7 @@ private enum DetectionFixtureError: LocalizedError {
     let workflow = AudioDetectionPresentation(state: state, endpoint: endpoint)
     await #expect(throws: (any Error).self) { try await workflow.run(readiness: AudioDetectionReadiness()) }
     #expect(state.snapshot.permissionGranted == false && state.phase == .failed)
-    #expect(state.error?.contains("请允许麦克风访问") == true)
+    #expect(state.error == "Allow microphone access in Settings.")
     endpoint.failure = nil
     let operation = Task { try await workflow.run(readiness: AudioDetectionReadiness()) }
     try await detectionWait { state.phase == .running }

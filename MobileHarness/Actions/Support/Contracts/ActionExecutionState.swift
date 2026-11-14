@@ -56,7 +56,7 @@ public struct ActionExecutionRecord: Identifiable, Equatable, Sendable {
     }
     /// Bound visible payloads by UTF-8 size without emitting a broken code point.
     public static func logPreview(_ value: String, maximumUTF8Bytes: Int) -> String {
-        let suffix = "…［已截断］"
+        let suffix = "…[truncated]"
         precondition(maximumUTF8Bytes >= suffix.utf8.count)
         guard value.utf8.count > maximumUTF8Bytes else { return value }
         var end = value.utf8.index(value.utf8.startIndex, offsetBy: maximumUTF8Bytes - suffix.utf8.count)

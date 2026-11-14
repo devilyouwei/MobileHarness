@@ -258,12 +258,12 @@ private func conversation(archived: Bool = false, title: String? = nil, user: St
     #expect(
         rows[0].toolCalls?.first?.responseReport
             == "Tool Call · inspect · completed\n\nArguments:\n{}\n\nResult:\nactual-result")
-    #expect(rows[0].firstTokenReport == "首 token 耗时：")
+    #expect(rows[0].firstTokenReport == "Time to first token: ")
     #expect(rows[1].user == "[tool]\nactual-result" && rows[1].isReACT == true)
     #expect(rows[1].raw == "observed" && rows[1].toolCalls?.isEmpty == true)
     #expect(rows[1].request.last?.role == .tool && rows[1].request.last?.toolCallID == "provider-call")
     #expect(rows[1].request[2].toolCalls?.first?.name == "inspect")
-    #expect(rows[1].firstTokenReport == "首 token 耗时：0.025 秒")
+    #expect(rows[1].firstTokenReport == "Time to first token: 0.025 sec")
     #expect(rows[1].toolDefinitions == ["definition"])
     let secondExport = try JSONDecoder().decode(
         HistoryTurn.self, from: ConversationHistoryPresentation.jsonData(rows[1]))
@@ -306,7 +306,7 @@ private func conversation(archived: Bool = false, title: String? = nil, user: St
     #expect(reports[1].contains(#"{"id":"dialog_1"}"#))
     #expect(reports[1].hasSuffix("Error:\nmissingConversation") && !reports[1].contains("Result:"))
     #expect(!reports[2].contains("Result:") && !reports[2].contains("Error:"))
-    #expect(turn.firstTokenReport == "首 token 耗时：0.125 秒")
+    #expect(turn.firstTokenReport == "Time to first token: 0.125 sec")
     let exported = try JSONDecoder().decode(HistoryTurn.self, from: ConversationHistoryPresentation.jsonData(turn))
     #expect(exported.response == "checking" && exported.toolCalls?.count == 3)
 }
@@ -413,7 +413,7 @@ private func historyFixture(extra: [String: Any]) throws -> HistoryConversation 
         ]
     ])
     let row = try #require(ConversationHistoryPresentation.turns(conversation).first)
-    #expect(row.firstTokenReport == "首 token 耗时：")
+    #expect(row.firstTokenReport == "Time to first token: ")
     #expect(!row.firstTokenReport.contains("3.000"))
 }
 
@@ -526,8 +526,8 @@ func historyFunctionCatalogRejectsCorruptSnapshotsRatherThanInventingEmptyGroups
         "tokenUsage": ["input": 12, "generated": 2, "total": 14, "cachedInput": 0, "cacheWriteInput": 4]
     ])
     let turn = try #require(snapshot.turns.first)
-    #expect(turn.tokenReport.contains("缓存读取：0 tokens"))
-    #expect(turn.tokenReport.contains("缓存写入：4 tokens"))
+    #expect(turn.tokenReport.contains("Cache read: 0 tokens"))
+    #expect(turn.tokenReport.contains("Cache write: 4 tokens"))
     let exported = try JSONDecoder().decode(HistoryTurn.self, from: ConversationHistoryPresentation.jsonData(turn))
     #expect(exported.tokenUsage?.cachedInput == 0 && exported.tokenUsage?.cacheWriteInput == 4)
     let older = try historyFixture(extra: ["tokenUsage": ["input": 12, "generated": 2, "total": 14]])
@@ -624,17 +624,19 @@ func historyFunctionCatalogRejectsCorruptSnapshotsRatherThanInventingEmptyGroups
         id: "request", date: Date(timeIntervalSince1970: 100), input: "", requestJSON: "[]",
         modelRequestStartedAt: nil, firstTokenLatency: nil, firstTokenAt: nil, response: "",
         toolCalls: [], tokenUsage: nil, state: .completed, finishReason: "stop", error: nil)
-    #expect(WriterRecordPresentation.firstToken(request) == "首 token 耗时：未知")
-    #expect(WriterRecordPresentation.requestDuration(request, at: Date()) == "总计耗时：未知")
+    #expect(WriterRecordPresentation.firstToken(request) == "Time to first token: Unknown")
+    #expect(WriterRecordPresentation.requestDuration(request, at: Date()) == "Total duration: Unknown")
     request.modelRequestCompletedAt = Date(timeIntervalSince1970: 102)
-    #expect(WriterRecordPresentation.requestDuration(request, at: Date()) == "总计耗时：2.000 秒")
+    #expect(WriterRecordPresentation.requestDuration(request, at: Date()) == "Total duration: 2.000 sec")
     let active = HistoryModelRequest(
         id: "active", date: Date(timeIntervalSince1970: 100), input: "", requestJSON: "[]",
         modelRequestStartedAt: Date(timeIntervalSince1970: 101), firstTokenLatency: 0.5,
         firstTokenAt: Date(timeIntervalSince1970: 101.5), response: "", toolCalls: [], tokenUsage: nil,
         state: .generating, finishReason: nil, error: nil)
-    #expect(WriterRecordPresentation.firstToken(active) == "首 token 耗时：0.500 秒")
-    #expect(WriterRecordPresentation.requestDuration(active, at: Date(timeIntervalSince1970: 103)) == "总计耗时：2.000 秒")
+    #expect(WriterRecordPresentation.firstToken(active) == "Time to first token: 0.500 sec")
+    #expect(
+        WriterRecordPresentation.requestDuration(active, at: Date(timeIntervalSince1970: 103))
+            == "Total duration: 2.000 sec")
 
 }
 
@@ -642,8 +644,8 @@ func historyFunctionCatalogRejectsCorruptSnapshotsRatherThanInventingEmptyGroups
     let request = WriterRequestItem(
         id: "request", position: 1, number: 12, delegateID: "run", phase: "control", path: nil,
         attempt: 2, date: Date(), state: "cancelled", title: "修改流程图布局")
-    #expect(request.displayTitle == "修改流程图布局（重试）")
-    #expect(request.statusTitle == "已取消")
+    #expect(request.displayTitle == "修改流程图布局 (retry)")
+    #expect(request.statusTitle == "Cancelled")
     #expect(request.number == 12)
 }
 
@@ -762,7 +764,7 @@ func writerFormattedPromptsKeepToolPairsAndSelectOnlyCurrentInput(_ json: String
     let input =
         #"[{"status":"draft edited; render before finish","beforeBytes":"0","firstChangedLine":"1","afterBytes":"5464","path":"index.html"}]"#
     let summary = WriterRecordPresentation.inputSummary(input, isTool: true)
-    #expect(summary == "index.html · 草稿已修改，待渲染\n0 → 5464 字节 · 首个变化行 1")
+    #expect(summary == "index.html · Draft changed, pending render\n0 → 5464 bytes · First changed line 1")
     #expect(WriterRecordPresentation.inputSummary(input, isTool: false) == input)
     #expect(WriterRecordPresentation.inputSummary(String(repeating: "字", count: 250), isTool: true).count == 241)
 }

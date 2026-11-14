@@ -35,11 +35,13 @@ extension DefaultModelAssembly {
                     context: context, artifacts: resources.appendingPathComponent("MossTTSNano"))
                 return ProvidedCapabilities(warmup: { try await model.warmup() }, synthesis: model)
             })
-        try await manager.register(
-            ModelRegistration(id: ModelID("apple-recognition"), capabilities: [.recognition]) { context in
-                let model = try AppleSpeechRecognition(context: context)
-                return ProvidedCapabilities(warmup: { try await model.warmup() }, recognition: model)
-            })
+        for (locale, id) in SpeechSelection.appleRecognitionModels {
+            try await manager.register(
+                ModelRegistration(id: id, capabilities: [.recognition]) { context in
+                    let model = try AppleSpeechRecognition(context: context, locale: locale)
+                    return ProvidedCapabilities(warmup: { try await model.warmup() }, recognition: model)
+                })
+        }
         try await manager.register(
             ModelRegistration(id: ModelID("apple-synthesis"), capabilities: [.synthesis]) { context in
                 ProvidedCapabilities(synthesis: try await AppleSpeechSynthesis(context: context))

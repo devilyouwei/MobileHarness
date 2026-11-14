@@ -45,13 +45,16 @@ import Actions
         }
         private var work: Work?
         private var submitting: String?
+        private let language: @Sendable () -> AppLanguage
+
+        init(language: @escaping @Sendable () -> AppLanguage = { .english }) { self.language = language }
 
         func start(
             expire: @escaping @Sendable () async -> Void, failed: @escaping @Sendable (String) async -> Void
         ) -> WriterBackgroundExecution? {
             guard UIApplication.shared.applicationState == .active else { return nil }
             guard work == nil, submitting == nil, let bundle = Bundle.main.bundleIdentifier else {
-                Task { await failed("Writer 后台执行请求不可用。") }
+                Task { await failed("Writer background execution is unavailable.") }
                 return nil
             }
             let id = bundle + ".writer." + UUID().uuidString
@@ -67,20 +70,22 @@ import Actions
                     })
             else {
                 work = nil
-                Task { await failed("Writer 后台任务标识未注册。") }
+                Task { await failed("The Writer background task identifier is not registered.") }
                 return nil
             }
             submitting = id
+            let copy = language()
             Task.detached { [self] in
                 let request = BGContinuedProcessingTaskRequest(
-                    identifier: id, title: "Writer 创作", subtitle: "正在处理作品")
+                    identifier: id, title: copy.text("Writer"), subtitle: copy.text("Working on your project"))
                 request.strategy = .fail
                 do {
                     try await BGTaskScheduler.shared.submitTaskRequest(request)
                     await submitted(id, failure: nil)
                 } catch {
                     let cause = error as NSError
-                    await submitted(id, failure: "Writer 后台执行未获批准（\(cause.domain) \(cause.code)）。")
+                    await submitted(
+                        id, failure: "Writer background execution was denied (\(cause.domain) \(cause.code)).")
                 }
             }
             return WriterBackgroundExecution(
@@ -129,7 +134,8 @@ import Actions
             guard let current = work, let task = current.task else { return }
             task.progress.totalUnitCount = -1
             task.progress.completedUnitCount = current.steps
-            task.updateTitle("Writer 创作", subtitle: "已完成 \(current.steps) 个创作步骤")
+            let copy = language()
+            task.updateTitle(copy.text("Writer"), subtitle: copy.format("Completed %lld steps", current.steps))
         }
 
         private func finish(_ id: String, success: Bool) {

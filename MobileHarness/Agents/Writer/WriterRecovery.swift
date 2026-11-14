@@ -46,7 +46,7 @@ enum WriterRecovery {
         try await Task.sleep(for: .milliseconds(attempt == 1 ? 500 : 1000))
     }
     static func requestFeedback(_ error: any Error, attempt: Int, content: Bool = false) throws -> String {
-        let failure = WriterDiagnostics.make(error, stage: content ? "文件内容请求" : "控制请求")
+        let failure = WriterDiagnostics.make(error, stage: content ? "File content request" : "Control request")
         let value: [String: String] = [
             "origin": "writer.runtime", "status": "failed", "code": failure.code,
             "message": failure.message, "category": failure.category, "stage": failure.stage,
@@ -63,7 +63,7 @@ enum WriterRecovery {
             + String(decoding: try JSONEncoder().encode(value), as: UTF8.self)
     }
     static func feedback(_ error: any Error, attempt: Int, repeated: Bool = false) throws -> String {
-        let failure = WriterDiagnostics.make(error, stage: "工具恢复")
+        let failure = WriterDiagnostics.make(error, stage: "Tool recovery")
         let value: [String: String] = [
             "status": "failed", "code": failure.code, "message": failure.message,
             "category": failure.category, "stage": failure.stage,

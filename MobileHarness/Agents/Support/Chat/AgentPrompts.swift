@@ -4,6 +4,11 @@ import Foundation
 /// Loads immutable templates and owns their cache in the Agents resource bundle.
 public final class AgentPrompts: @unchecked Sendable {
     public static let shared = AgentPrompts(read: AgentConfigurations.readAsset)
+    @TaskLocal static var language = "en"
+
+    static var defaultOutputLanguage: String { language == "zh-Hans" ? "Simplified Chinese" : "English" }
+
+    static func normalizedLanguage(_ language: String) -> String { language == "zh-Hans" ? language : "en" }
 
     private let read: @Sendable (String) throws -> Data
     private let lock = NSLock()
@@ -13,7 +18,22 @@ public final class AgentPrompts: @unchecked Sendable {
         self.read = read
     }
 
-    public func load(_ path: String) throws -> PromptTemplates {
+    public func load(_ path: String) throws -> PromptTemplates { try load(path, language: Self.language) }
+
+    public func load(_ path: String, language: String) throws -> PromptTemplates {
+        if Self.normalizedLanguage(language) == "zh-Hans" {
+            do { return try loadAsset(Self.translatedPath(path)) } catch let error as CocoaError
+                where error.code == .fileReadNoSuchFile
+            {}
+        }
+        return try loadAsset(path)
+    }
+
+    static func translatedPath(_ path: String) -> String {
+        (path as NSString).deletingPathExtension + ".zh-Hans." + (path as NSString).pathExtension
+    }
+
+    private func loadAsset(_ path: String) throws -> PromptTemplates {
         try lock.withLock {
             if let cached = cache[path] { return cached }
             let format: PromptTemplates.Format
@@ -48,6 +68,11 @@ public final class AgentPrompts: @unchecked Sendable {
         try text("Assistant/InputProtocol", "instructions")
     }
 
+    /// These strings also parse recorded input envelopes and must retain their canonical spelling.
+    static func inputMarker(_ key: String, _ variables: [String: String] = [:]) throws -> String {
+        try shared.load("Agents/Assistant/InputProtocol.json", language: "en").render(key, variables: variables)
+    }
+
     static func capabilityContext() throws -> CapabilityContextBuilder {
         let output = try shared.load("Agents/Shared/OutputProtocol.md")
         let catalog = try shared.load("Agents/Shared/ActionCatalog.json")
@@ -70,8 +95,8 @@ public final class AgentPrompts: @unchecked Sendable {
         try shared.load(AgentConfigurations.promptPath(named: role))
     }
 
-    static func titleTemplates() throws -> PromptTemplates {
-        try shared.load("Agents/Memory/TitlePrompts.json")
+    static func titleTemplates(language: String = "en") throws -> PromptTemplates {
+        try shared.load("Agents/Memory/TitlePrompts.json", language: language)
     }
 
     public static func load(named role: String) throws -> PromptTemplates {

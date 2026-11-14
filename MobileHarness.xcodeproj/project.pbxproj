@@ -59,6 +59,12 @@
 		"345A5A772A5C74A49492832A" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/UI/Components/Island/IslandIndicators.swift"; "sourceTree" = "SOURCE_ROOT"; };
 		"88D4DED461478092B2D3643C" = { "isa" = "PBXBuildFile"; "fileRef" = "345A5A772A5C74A49492832A"; };
 		"52628EE405041AD7C347AA3C" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/UI/Components/Island/IslandActivityAttributes.swift"; "sourceTree" = "SOURCE_ROOT"; };
+		"A18A00000000000000000001" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json.xcstrings"; "path" = "Config/InfoPlist.xcstrings"; "sourceTree" = "SOURCE_ROOT"; };
+		"A18A00000000000000000002" = { "isa" = "PBXBuildFile"; "fileRef" = "A18A00000000000000000001"; };
+		"A18A00000000000000000003" = { "isa" = "PBXBuildFile"; "fileRef" = "A18A00000000000000000001"; };
+		"A18A00000000000000000004" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.json.xcstrings"; "path" = "MobileHarness/UI/Components/Island/IslandStatus.xcstrings"; "sourceTree" = "SOURCE_ROOT"; };
+		"A18A00000000000000000005" = { "isa" = "PBXBuildFile"; "fileRef" = "A18A00000000000000000004"; };
+		"A18A00000000000000000006" = { "isa" = "PBXResourcesBuildPhase"; "buildActionMask" = "2147483647"; "files" = ("A18A00000000000000000005"); "runOnlyForDeploymentPostprocessing" = "0"; };
 		"A483BAA70E96FA2C3F2F56E5" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/UI/Components/Island/IslandActivityWidget.swift"; "sourceTree" = "SOURCE_ROOT"; };
 		"C1C871DCF0DB8FFB84B3485D" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "MobileHarness/UI/Components/Island/IslandSystemPresentation.swift"; "sourceTree" = "SOURCE_ROOT"; };
 		"22203036CED4F0818526F0FD" = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.plist.xml"; "path" = "Config/IslandInfo.plist"; "sourceTree" = "SOURCE_ROOT"; };
@@ -70,7 +76,7 @@
 		"C0FF376A445504F0CF9CE752" = { "isa" = "XCBuildConfiguration"; "baseConfigurationReference" = "DFBA7AADE0868074C2861C98"; "name" = "Debug"; "buildSettings" = { "PRODUCT_NAME" = "$(TARGET_NAME)"; "PRODUCT_BUNDLE_IDENTIFIER" = "dev.mobileharness.app.island"; "INFOPLIST_FILE" = "Config/IslandInfo.plist"; "GENERATE_INFOPLIST_FILE" = "YES"; "APPLICATION_EXTENSION_API_ONLY" = "YES"; "SKIP_INSTALL" = "YES"; "SUPPORTED_PLATFORMS" = "iphoneos iphonesimulator"; "SUPPORTS_MACCATALYST" = "NO"; "SWIFT_DEFAULT_ACTOR_ISOLATION" = "nonisolated"; "CODE_SIGN_ENTITLEMENTS" = ""; "INFOPLIST_KEY_CFBundleDisplayName" = "活动状态"; "INFOPLIST_KEY_UIApplicationSceneManifest_Generation" = "NO"; "INFOPLIST_KEY_UILaunchScreen_Generation" = "NO"; "LD_RUNPATH_SEARCH_PATHS" = ("$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks"); }; };
 		"4DB08C6C703CE40E9F7AFE37" = { "isa" = "XCBuildConfiguration"; "baseConfigurationReference" = "DFBA7AADE0868074C2861C98"; "name" = "Release"; "buildSettings" = { "PRODUCT_NAME" = "$(TARGET_NAME)"; "PRODUCT_BUNDLE_IDENTIFIER" = "dev.mobileharness.app.island"; "INFOPLIST_FILE" = "Config/IslandInfo.plist"; "GENERATE_INFOPLIST_FILE" = "YES"; "APPLICATION_EXTENSION_API_ONLY" = "YES"; "SKIP_INSTALL" = "YES"; "SUPPORTED_PLATFORMS" = "iphoneos iphonesimulator"; "SUPPORTS_MACCATALYST" = "NO"; "SWIFT_DEFAULT_ACTOR_ISOLATION" = "nonisolated"; "CODE_SIGN_ENTITLEMENTS" = ""; "INFOPLIST_KEY_CFBundleDisplayName" = "活动状态"; "INFOPLIST_KEY_UIApplicationSceneManifest_Generation" = "NO"; "INFOPLIST_KEY_UILaunchScreen_Generation" = "NO"; "LD_RUNPATH_SEARCH_PATHS" = ("$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks"); }; };
 		"EF211570B9812B625914F236" = { "isa" = "XCConfigurationList"; "buildConfigurations" = ("C0FF376A445504F0CF9CE752", "4DB08C6C703CE40E9F7AFE37"); "defaultConfigurationIsVisible" = "0"; "defaultConfigurationName" = "Release"; };
-		"D93172E3308AC5B2FA2D331B" = { "isa" = "PBXNativeTarget"; "name" = "MobileHarnessLiveActivity"; "productName" = "MobileHarnessLiveActivity"; "productType" = "com.apple.product-type.app-extension"; "productReference" = "C714D863F28709B388EDDF3F"; "buildConfigurationList" = "EF211570B9812B625914F236"; "buildPhases" = ("60E92522593550C465582D19", "1CB831BF4568BA99C47359C1"); "dependencies" = (); "buildRules" = (); };
+		"D93172E3308AC5B2FA2D331B" = { "isa" = "PBXNativeTarget"; "name" = "MobileHarnessLiveActivity"; "productName" = "MobileHarnessLiveActivity"; "productType" = "com.apple.product-type.app-extension"; "productReference" = "C714D863F28709B388EDDF3F"; "buildConfigurationList" = "EF211570B9812B625914F236"; "buildPhases" = ("60E92522593550C465582D19", "1CB831BF4568BA99C47359C1", "A18A00000000000000000006"); "dependencies" = (); "buildRules" = (); };
 		"259C3E93492587CF57FB805E" = { "isa" = "PBXContainerItemProxy"; "containerPortal" = "98F54143AB4E86B28C3AFEE0"; "proxyType" = "1"; "remoteGlobalIDString" = "D93172E3308AC5B2FA2D331B"; "remoteInfo" = "MobileHarnessLiveActivity"; };
 		"A5B39D34663101999B076943" = { "isa" = "PBXTargetDependency"; "target" = "D93172E3308AC5B2FA2D331B"; "targetProxy" = "259C3E93492587CF57FB805E"; };
 		"2619FFD46D2BDB1FA3671F3A" = { "isa" = "PBXBuildFile"; "fileRef" = "C714D863F28709B388EDDF3F"; "settings" = { "ATTRIBUTES" = ("RemoveHeadersOnCopy"); }; };
@@ -1293,8 +1299,8 @@
 			"isa" = "XCBuildConfiguration";
 			"buildSettings" = {
 				"SUPPORTED_PLATFORMS" = "iphonesimulator";
-				"INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription" = "用于发现和连接 NexArm 机械臂，通过对话发送动作并读取设备状态。";
-				"INFOPLIST_KEY_NSMicrophoneUsageDescription" = "持续录音用于检测说话片段并转换为文本，停止后立即关闭麦克风。允许联网识别时，录音可能发送至 Apple 处理。";
+				"INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription" = "Find and connect to the NexArm robot arm to send movements and read device status.";
+				"INFOPLIST_KEY_NSMicrophoneUsageDescription" = "Use the microphone to detect speech and transcribe it. The microphone turns off when you stop listening.";
 				"INFOPLIST_KEY_CFBundleDisplayName" = "Mobile Harness";
 				INFOPLIST_FILE = Config/AppInfo.plist;
 				"INFOPLIST_KEY_UILaunchScreen_Generation" = "YES";
@@ -1302,7 +1308,7 @@
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents" = "YES";
 				"INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad" = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				"SUPPORTS_MACCATALYST" = "NO";
-				"INFOPLIST_KEY_NSSpeechRecognitionUsageDescription" = "将说话片段转换为文本。允许联网识别时，录音可能发送至 Apple 的语音识别服务；关闭后仅使用设备支持的离线识别。";
+				"INFOPLIST_KEY_NSSpeechRecognitionUsageDescription" = "Convert spoken audio into text using on-device speech recognition.";
 				"PRODUCT_NAME" = "$(TARGET_NAME)";
 				"ASSETCATALOG_COMPILER_APPICON_NAME" = "AppIcon";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation" = "YES";
@@ -1314,8 +1320,8 @@
 			"isa" = "XCBuildConfiguration";
 			"buildSettings" = {
 				"SUPPORTED_PLATFORMS" = "iphonesimulator";
-				"INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription" = "用于发现和连接 NexArm 机械臂，通过对话发送动作并读取设备状态。";
-				"INFOPLIST_KEY_NSMicrophoneUsageDescription" = "持续录音用于检测说话片段并转换为文本，停止后立即关闭麦克风。允许联网识别时，录音可能发送至 Apple 处理。";
+				"INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription" = "Find and connect to the NexArm robot arm to send movements and read device status.";
+				"INFOPLIST_KEY_NSMicrophoneUsageDescription" = "Use the microphone to detect speech and transcribe it. The microphone turns off when you stop listening.";
 				"INFOPLIST_KEY_CFBundleDisplayName" = "Mobile Harness";
 				INFOPLIST_FILE = Config/AppInfo.plist;
 				"INFOPLIST_KEY_UILaunchScreen_Generation" = "YES";
@@ -1323,7 +1329,7 @@
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents" = "YES";
 				"INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad" = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				"SUPPORTS_MACCATALYST" = "NO";
-				"INFOPLIST_KEY_NSSpeechRecognitionUsageDescription" = "将说话片段转换为文本。允许联网识别时，录音可能发送至 Apple 的语音识别服务；关闭后仅使用设备支持的离线识别。";
+				"INFOPLIST_KEY_NSSpeechRecognitionUsageDescription" = "Convert spoken audio into text using on-device speech recognition.";
 				"PRODUCT_NAME" = "$(TARGET_NAME)";
 				"ASSETCATALOG_COMPILER_APPICON_NAME" = "AppIcon";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation" = "YES";
@@ -1345,7 +1351,7 @@
 		"B01400000000000000000008" = {
 			"isa" = "PBXResourcesBuildPhase";
 			"buildActionMask" = "2147483647";
-			"files" = ("C6D1514C8DC297687EAF454E", "A1C026000000000000000002");
+			"files" = ("C6D1514C8DC297687EAF454E", "A1C026000000000000000002", "A18A00000000000000000002");
 			"runOnlyForDeploymentPostprocessing" = "0";
 		};
 		"B01400000000000000000009" = {
@@ -1372,8 +1378,8 @@
 			"buildSettings" = {
                 "CODE_SIGN_ENTITLEMENTS" = "Config/MobileHarness.entitlements";
 				"SUPPORTED_PLATFORMS" = "iphoneos";
-				"INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription" = "用于发现和连接 NexArm 机械臂，通过对话发送动作并读取设备状态。";
-				"INFOPLIST_KEY_NSMicrophoneUsageDescription" = "持续录音用于检测说话片段并转换为文本，停止后立即关闭麦克风。允许联网识别时，录音可能发送至 Apple 处理。";
+				"INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription" = "Find and connect to the NexArm robot arm to send movements and read device status.";
+				"INFOPLIST_KEY_NSMicrophoneUsageDescription" = "Use the microphone to detect speech and transcribe it. The microphone turns off when you stop listening.";
 				"INFOPLIST_KEY_CFBundleDisplayName" = "Mobile Harness";
 				INFOPLIST_FILE = Config/AppInfo.plist;
 				"INFOPLIST_KEY_UILaunchScreen_Generation" = "YES";
@@ -1381,7 +1387,7 @@
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents" = "YES";
 				"INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad" = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				"SUPPORTS_MACCATALYST" = "NO";
-				"INFOPLIST_KEY_NSSpeechRecognitionUsageDescription" = "将说话片段转换为文本。允许联网识别时，录音可能发送至 Apple 的语音识别服务；关闭后仅使用设备支持的离线识别。";
+				"INFOPLIST_KEY_NSSpeechRecognitionUsageDescription" = "Convert spoken audio into text using on-device speech recognition.";
 				"PRODUCT_NAME" = "$(TARGET_NAME)";
 				"ASSETCATALOG_COMPILER_APPICON_NAME" = "AppIcon";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation" = "YES";
@@ -1431,7 +1437,7 @@
 		"0189424A5A60FED329FA868E" = {
 			"isa" = "PBXResourcesBuildPhase";
 			"buildActionMask" = "2147483647";
-			"files" = ("C6D1514C8DC297687EAF454E", "A1C026000000000000000002");
+			"files" = ("C6D1514C8DC297687EAF454E", "A1C026000000000000000002", "A18A00000000000000000003");
 			"runOnlyForDeploymentPostprocessing" = "0";
 		};
 		"38A007151ABE87CC01A5B6E9" = {
@@ -1459,8 +1465,8 @@
 			"buildSettings" = {
                 "CODE_SIGN_ENTITLEMENTS" = "Config/MobileHarness.entitlements";
 				"SUPPORTED_PLATFORMS" = "iphoneos";
-				"INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription" = "用于发现和连接 NexArm 机械臂，通过对话发送动作并读取设备状态。";
-				"INFOPLIST_KEY_NSMicrophoneUsageDescription" = "持续录音用于检测说话片段并转换为文本，停止后立即关闭麦克风。允许联网识别时，录音可能发送至 Apple 处理。";
+				"INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription" = "Find and connect to the NexArm robot arm to send movements and read device status.";
+				"INFOPLIST_KEY_NSMicrophoneUsageDescription" = "Use the microphone to detect speech and transcribe it. The microphone turns off when you stop listening.";
 				"INFOPLIST_KEY_CFBundleDisplayName" = "Mobile Harness";
 				INFOPLIST_FILE = Config/AppInfo.plist;
 				"INFOPLIST_KEY_UILaunchScreen_Generation" = "YES";
@@ -1468,7 +1474,7 @@
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents" = "YES";
 				"INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad" = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				"SUPPORTS_MACCATALYST" = "NO";
-				"INFOPLIST_KEY_NSSpeechRecognitionUsageDescription" = "将说话片段转换为文本。允许联网识别时，录音可能发送至 Apple 的语音识别服务；关闭后仅使用设备支持的离线识别。";
+				"INFOPLIST_KEY_NSSpeechRecognitionUsageDescription" = "Convert spoken audio into text using on-device speech recognition.";
 				"PRODUCT_NAME" = "$(TARGET_NAME)";
 				"ASSETCATALOG_COMPILER_APPICON_NAME" = "AppIcon";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation" = "YES";

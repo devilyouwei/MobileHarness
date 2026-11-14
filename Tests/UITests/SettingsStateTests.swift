@@ -2,6 +2,27 @@ import Testing
 
 @testable import UI
 
+@Test func applicationLanguageResolvesSystemFallbackAndRestoresOverrides() {
+    #expect(AppLanguagePreference(storedValue: nil).resolve(preferredLanguage: "zh-Hant-TW") == .simplifiedChinese)
+    #expect(AppLanguagePreference(storedValue: "unsupported").resolve(preferredLanguage: "es-MX") == .english)
+    #expect(AppLanguagePreference(storedValue: "en").resolve(preferredLanguage: "zh-CN") == .english)
+    #expect(AppLanguagePreference(storedValue: "zh-Hans").resolve(preferredLanguage: "en-GB") == .simplifiedChinese)
+    #expect(AppLanguage.english.speechRecognitionLocale == "en-US")
+    #expect(AppLanguage.simplifiedChinese.speechRecognitionLocale == "zh-CN")
+    #expect(AppLanguage.english.text("App Language") == "App Language")
+    #expect(AppLanguage.simplifiedChinese.text("App Language") == "应用语言")
+    #expect(AppLanguage.simplifiedChinese.text("Missing key fixture") == "Missing key fixture")
+}
+
+@Test @MainActor func speechSampleTracksLanguageWhilePreservingEdits() {
+    let state = SpeechDiagnosticState()
+    state.updateLanguage(.simplifiedChinese)
+    #expect(state.text == "你好，欢迎使用本地语音助手。")
+    state.text = "My test phrase"
+    state.updateLanguage(.english)
+    #expect(state.text == "My test phrase")
+}
+
 @Test @MainActor func providerFormEditsAdvanceRevisionWithoutExecutingOperations() {
     let state = SettingsState(initial: .init(enabled: false, url: "", key: "", model: "default"))
     let revision = state.revision

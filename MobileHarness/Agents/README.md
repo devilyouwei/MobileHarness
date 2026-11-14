@@ -152,6 +152,8 @@ Assistant 通过 task.start/task.end 管理前台任务，通过 task.send 向 W
 
 ## Prompt ownership and discovery
 
+The App supplies the default prompt language through the existing Agent root. The chat worker retains it in suspended and continued rounds, Writer retains it for the delegation, and Decision and title generation capture it when starting their requests. Request assembly selects matching natural-language instructions, examples and function descriptions. The model uses explicit requests and trusted user text to determine output language, with the application language as its fallback. Assistant recording and restoration share canonical source markers across both languages.
+
 Each role owns its public description in Resources/Agents/<Role>/Agent.json and its private model instructions in its own resource directory. Support validates resource schema v10 and projects the v8 compiled contract. Assistant assembles System protocols, its own identity, Skill instructions and a public peer directory filtered by the actual instance communication policy and the shared executable delegation adapter. AgentCore renders the supplied output templates. Writer owns its content-format templates. See [resource contracts](../Resources/Agents/README.md).
 
 Writer 运行以委托入口为身份，workspace 是可选编辑目标；前序与 workspace 消息保持同一请求链，界面分别查询。

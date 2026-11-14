@@ -162,40 +162,42 @@ extension AudioDetectionPresenting {
 
     @MainActor
     struct AudioDetectionSection: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         @Bindable var state: AudioDetectionState
         let requests: UIRequests<AudioDetectionInput, Void>
         @Environment(\.scenePhase) private var scenePhase
         var body: some View {
             Section {
-                Button(state.isActive ? "停止检测" : "开始检测") {
+                Button(state.isActive ? appCopy.text("Stop detection") : appCopy.text("Start detection")) {
                     submit(state.isActive ? .stop : .start)
                 }
                 .disabled(state.phase == .stopping)
                 .accessibilityIdentifier("settings.recognition.detect")
                 if state.phase != .idle {
-                    LabeledContent("采集方式", value: capture)
+                    LabeledContent(appCopy.text("Capture mode"), value: capture)
                         .accessibilityIdentifier("settings.recognition.capture")
                     if let fallback = state.snapshot.fallback {
                         Text(reason(fallback)).font(.caption).foregroundStyle(.secondary)
                     }
-                    LabeledContent("麦克风", value: input)
-                    LabeledContent("空间采集", value: support)
+                    LabeledContent(appCopy.text("Microphone"), value: input)
+                    LabeledContent(appCopy.text("Spatial capture"), value: support)
                     HStack {
                         Text(signal)
                         Spacer()
                         ProgressView(value: state.snapshot.level)
                             .frame(width: 90)
-                            .accessibilityLabel("声音强度")
+                            .accessibilityLabel(appCopy.text("Sound level"))
                     }
-                    LabeledContent("声源方向", value: direction)
+                    LabeledContent(appCopy.text("Sound direction"), value: direction)
                         .accessibilityIdentifier("settings.recognition.direction")
-                    if let error = state.error { Text(error).font(.caption).foregroundStyle(.red) }
+                    if let error = state.error { Text(appCopy.text(error)).font(.caption).foregroundStyle(.red) }
                     Text(status).font(.caption).foregroundStyle(.secondary)
                 }
             } header: {
-                Text("音频检测")
+                Text(appCopy.text("Audio detection"))
             } footer: {
-                Text("检测 10 秒。方向使用采集坐标，未校准。")
+                Text(appCopy.text("Detection lasts 10 seconds. Direction uses uncalibrated capture coordinates."))
             }
             .onDisappear { submit(.stop) }
             .onChange(of: scenePhase) { _, phase in if phase != .active { submit(.stop) } }
@@ -213,65 +215,66 @@ extension AudioDetectionPresenting {
         }
         private var capture: String {
             switch state.snapshot.capture {
-            case .waiting: "等待音频"
-            case .spatial: "空间采集 · 4 声道"
-            case .mono: "普通录音 · 单声道"
+            case .waiting: appCopy.text("Waiting for audio")
+            case .spatial: appCopy.text("Spatial capture · 4 channels")
+            case .mono: appCopy.text("Standard recording · Mono")
             }
         }
         private var input: String {
-            if state.snapshot.permissionGranted == false { return "未授权" }
+            if state.snapshot.permissionGranted == false { return appCopy.text("Permission denied") }
             switch state.snapshot.input {
-            case .unknown: return "等待检测"
-            case .builtInMicrophone: return "内置麦克风"
-            case .headset: return "耳机"
-            case .external: return "外接麦克风"
+            case .unknown: return appCopy.text("Waiting for detection")
+            case .builtInMicrophone: return appCopy.text("Built-in microphone")
+            case .headset: return appCopy.text("Headset")
+            case .external: return appCopy.text("External microphone")
             }
         }
         private var support: String {
             switch state.snapshot.support {
-            case .unknown: "尚未确认"
-            case .supported: "支持"
-            case .unsupported: "不支持"
-            case .inputUnavailable: "当前输入不支持"
+            case .unknown: appCopy.text("Unconfirmed")
+            case .supported: appCopy.text("Supported")
+            case .unsupported: appCopy.text("Unsupported")
+            case .inputUnavailable: appCopy.text("Input unsupported")
             }
         }
         private var signal: String {
             switch state.snapshot.signal {
-            case .waiting: "等待音频"
-            case .receiving: "音频正常"
-            case .noAudio: "无音频"
+            case .waiting: appCopy.text("Waiting for audio")
+            case .receiving: appCopy.text("Receiving audio")
+            case .noAudio: appCopy.text("No audio")
             }
         }
         private var direction: String {
-            if !state.isActive && state.snapshot.direction != .unavailable { return "检测已结束" }
+            if !state.isActive && state.snapshot.direction != .unavailable { return appCopy.text("Detection ended") }
             switch state.snapshot.direction {
             case .active:
                 if let azimuth = state.snapshot.azimuthDegrees, let elevation = state.snapshot.elevationDegrees {
-                    return String(format: "方位 %+.0f° · 俯仰 %+.0f°", azimuth, elevation)
+                    return appCopy.format("Azimuth %+.0f° · Elevation %+.0f°", azimuth, elevation)
                 }
-                return "等待更新"
-            case .waiting: return "等待更新"
-            case .inactive: return "安静"
-            case .uncertain: return "方向不确定"
-            case .unavailable: return "方向不可用"
+                return appCopy.text("Waiting for an update")
+            case .waiting: return appCopy.text("Waiting for an update")
+            case .inactive: return appCopy.text("Quiet")
+            case .uncertain: return appCopy.text("Direction uncertain")
+            case .unavailable: return appCopy.text("Direction unavailable")
             }
         }
         private func reason(_ fallback: AudioDetectionSnapshot.Fallback) -> String {
             switch fallback {
-            case .inputUnavailable: "当前麦克风不支持空间采集，使用普通录音。"
-            case .unsupported: "设备不支持空间采集，使用普通录音。"
-            case .startupFailed: "空间采集启动失败，改用普通录音。"
+            case .inputUnavailable:
+                appCopy.text("The microphone does not support spatial capture. Using standard recording.")
+            case .unsupported: appCopy.text("The device does not support spatial capture. Using standard recording.")
+            case .startupFailed: appCopy.text("Spatial capture failed to start. Using standard recording.")
             }
         }
         private var status: String {
             switch state.phase {
             case .idle: ""
-            case .preparing: "正在准备麦克风…"
-            case .running: "正在检测"
-            case .stopping: "正在停止…"
-            case .finished: "检测完成"
-            case .stopped: "已停止"
-            case .failed: "检测失败"
+            case .preparing: appCopy.text("Preparing microphone…")
+            case .running: appCopy.text("Detecting")
+            case .stopping: appCopy.text("Stopping…")
+            case .finished: appCopy.text("Detection completed")
+            case .stopped: appCopy.text("Stopped")
+            case .failed: appCopy.text("Detection failed")
             }
         }
     }

@@ -13,15 +13,15 @@ public struct BluetoothRecoveryPolicy {
 }
 
 public enum BluetoothRecoveryCause: String {
-    case disconnected = "连接意外断开"
-    case congestion = "发送持续阻塞"
-    case interrupted = "在途查询终止，旧连接已隔离"
-    case query = "查询超时，协议已隔离"
-    case transport = "设备通信异常"
-    case protocolFailure = "设备协议异常"
-    case power = "蓝牙暂不可用"
-    case resume = "恢复已记住的设备"
-    case manual = "手动重新连接"
+    case disconnected = "Connection lost"
+    case congestion = "Bluetooth transmission blocked"
+    case interrupted = "Device query stopped. The old connection was isolated."
+    case query = "Device query timed out. The old connection was isolated."
+    case transport = "Device communication failed"
+    case protocolFailure = "Device protocol failure"
+    case power = "Bluetooth is temporarily unavailable"
+    case resume = "Reconnecting to a remembered device"
+    case manual = "Reconnecting manually"
 }
 
 public typealias BluetoothRecoveryError = NexArmBluetoothRecoveryError
@@ -30,9 +30,9 @@ public typealias BluetoothRecoveryError = NexArmBluetoothRecoveryError
 enum BluetoothRecoveryPresentation {
     static func message(_ error: NexArmBluetoothRecoveryError) -> String {
         switch error {
-        case .notRetryable: "当前错误不支持自动恢复，请检查设备后手动重连"
-        case .episodeTimeout: "本轮恢复超过 2 分钟，请检查设备后手动重连"
-        case .disconnectUnconfirmed: "旧连接尚未确认关闭，已停止重连"
+        case .notRetryable: "Check the device and reconnect manually."
+        case .episodeTimeout: "Recovery timed out after two minutes. Check the device and reconnect manually."
+        case .disconnectUnconfirmed: "Reconnection stopped because the old connection is still unconfirmed."
         }
     }
 }

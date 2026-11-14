@@ -24,7 +24,8 @@ public struct NexArmBehaviorAdapter {
                     inputID: invocation.context.inputID, callID: invocation.executionID)
             ) { [activity] failure in
                 await activity.recordFailure(
-                    title: "NexArm.Tracking.aim", source: failure.origin?.source ?? "持续控制", message: failure.message,
+                    title: "NexArm.Tracking.aim", source: failure.origin?.source ?? "Continuous control",
+                    message: failure.message,
                     failureCode: failure.code,
                     context: .init(
                         workerID: failure.workerID, sessionID: failure.origin?.sessionID,

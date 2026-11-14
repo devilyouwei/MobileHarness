@@ -39,10 +39,10 @@ public enum ModelResourceGroup: String, Sendable, CaseIterable {
     case recognition, synthesis, language, vision, decision
     public var title: String {
         switch self {
-        case .recognition: "音频识别"
-        case .synthesis: "语音合成"
-        case .language: "大模型"
-        case .vision: "视觉识别"
+        case .recognition: "Speech Recognition"
+        case .synthesis: "Speech Synthesis"
+        case .language: "Language model"
+        case .vision: "Vision Recognition"
         case .decision: "Decision"
         }
     }
@@ -57,11 +57,11 @@ public enum ModelResourceGroup: String, Sendable, CaseIterable {
     }
     public var installationMessage: String {
         switch self {
-        case .recognition: "请先下载并安装 Nemotron 语音识别模型，再开启自定义识别模型。"
-        case .synthesis: "请先下载并安装 MOSS 语音合成模型，再开启自定义模型。"
-        case .language: "请先下载并安装 Gemma 4 E2B 大模型，再切换到本地模型。"
-        case .vision: "请先下载并安装 YOLO 姿态模型。"
-        case .decision: "请先下载 D3 Decision 模型，再选择本地。"
+        case .recognition: "Download and install Nemotron before enabling custom speech recognition."
+        case .synthesis: "Download and install MOSS before enabling the custom speech model."
+        case .language: "Download and install Gemma 4 E2B before switching to the local language model."
+        case .vision: "Download and install the YOLO pose model first."
+        case .decision: "Download D3 Decision before selecting the local model."
         }
     }
 }
@@ -122,7 +122,7 @@ public final class ModelResourcesState {
     @ObservationIgnored var presentationAdmission: UIPresentationAdmission?
     public var isPresentationAvailable: Bool { presentationAdmission.map { $0.started && !$0.stopped } ?? true }
 
-    public private(set) var decisionStatus = "尚无决策记录"
+    public private(set) var decisionStatus = "No decision recorded"
     public internal(set) var source = ModelResourceSourceDraft()
     public internal(set) var items: [ModelResourceItem] = []
     public internal(set) var installedGroups: Set<ModelResourceGroup> = []
@@ -176,10 +176,10 @@ public final class ModelResourcesState {
     }
     public func isCancelling(_ id: String) -> Bool { cancelling.contains(id) }
     public func status(_ item: ModelResourceItem) -> String {
-        if cancelling.contains(item.id) { return "正在取消…" }
-        if pending[item.id] == .remove { return "正在删除…" }
-        if pending[item.id] == .download && !item.active { return "正在提交下载…" }
-        if admitted.contains(item.id) && !item.active { return "正在下载，等待状态更新…" }
+        if cancelling.contains(item.id) { return "Cancelling…" }
+        if pending[item.id] == .remove { return "Deleting…" }
+        if pending[item.id] == .download && !item.active { return "Starting download…" }
+        if admitted.contains(item.id) && !item.active { return "Downloading. Waiting for an update…" }
         return item.status
     }
 

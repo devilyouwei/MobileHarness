@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "templates": {
+    "availableHeading": "# 可用 SKILL",
+    "loadedHeading": "# 已加载的 SKILL 说明",
+    "entry": "Skill ID={{id}}；说明={{description}}"
+  }
+}

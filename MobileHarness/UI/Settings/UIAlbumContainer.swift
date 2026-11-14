@@ -130,7 +130,7 @@ public enum AlbumReply: Sendable {
     public func clearMessage() { message = nil }
     private func mutate(_ value: AlbumInput) {
         guard mutation == nil else {
-            message = "相册正在处理其他操作"
+            message = "Another album operation is in progress."
             return
         }
         switch value {
@@ -152,20 +152,24 @@ public enum AlbumReply: Sendable {
                 switch reply {
                 case .imported(let count, let failures):
                     message =
-                        "已导入 \(count) 张"
-                        + (failures.isEmpty ? "" : "；失败 \(failures.count) 张：" + failures.joined(separator: "；"))
+                        "Imported \(count) photos"
+                        + (failures.isEmpty ? "" : " · \(failures.count) failed: " + failures.joined(separator: "；"))
                 case .deleted(let id, let cleanupIssue):
                     items.removeAll { $0.id == id }
-                    message = cleanupIssue.map { "已从 App 相册删除，文件清理待重试：" + $0 } ?? "已从 App 相册删除"
+                    message =
+                        cleanupIssue.map { "Removed from the app album. File cleanup needs a retry: " + $0 }
+                        ?? "Removed from the app album"
                 case .completed:
                     switch value {
-                    case .export: message = "已保存到手机相册"
-                    case .delete: message = "已从 App 相册删除"
+                    case .export: message = "Saved to Photos"
+                    case .delete: message = "Removed from the app album"
                     default: break
                     }
                 default: throw UIRequestError.stale
                 }
-            } catch is CancellationError { message = "操作已中断，请检查相册中的实际结果" } catch {
+            } catch is CancellationError {
+                message = "The operation was interrupted. Check the album for the result."
+            } catch {
                 message = error.localizedDescription
             }
             if case .export = value { return }

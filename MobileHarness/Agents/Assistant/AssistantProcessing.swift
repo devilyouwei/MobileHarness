@@ -60,6 +60,8 @@ public struct AssistantContextState: AgentChatContextState {
             try capabilityContext.protocolRules(),
             try AgentPrompts.assistantInput(),
             try AgentConfigurations.identityInstructions(named: configurationName),
+            try AgentPrompts.text(
+                "Assistant/Prompts", "outputLanguage", ["default": AgentPrompts.defaultOutputLanguage]),
             try AgentPrompts.skillCatalog().render("availableHeading"), try AgentConfigurations.skillOverview(),
             try AgentPrompts.agentCatalog().render("heading"), delegates,
             skillInstructions,
