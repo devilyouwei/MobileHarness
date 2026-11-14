@@ -122,55 +122,55 @@ Click any preview to view it at full size.
   <tr>
     <td align="center" valign="top" width="25%">
       <strong>Start listening</strong><br><br>
-      <a href="docs/imgs/start-listening-demo.gif"><img src="docs/imgs/start-listening-demo.gif" height="200" alt="Press and hold the companion's eyes to start listening"></a>
+      <a href="docs/imgs/start-listening-demo.gif"><img src="docs/imgs/start-listening-demo.gif" width="200" alt="Press and hold the companion's eyes to start listening"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>Everyday interaction</strong><br><br>
-      <a href="docs/imgs/everyday-voice-interaction.png"><img src="docs/imgs/everyday-voice-interaction.png" height="200" alt="Voice conversation with captions, expressive eyes and pose overlays"></a>
+      <a href="docs/imgs/everyday-voice-interaction.png"><img src="docs/imgs/everyday-voice-interaction.png" width="200" alt="Voice conversation with captions, expressive eyes and pose overlays"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>Multiple windows</strong><br><br>
-      <a href="docs/imgs/interactive-multiwindow.png"><img src="docs/imgs/interactive-multiwindow.png" height="200" alt="Multiple browser and Writer windows on the home screen"></a>
+      <a href="docs/imgs/interactive-multiwindow.png"><img src="docs/imgs/interactive-multiwindow.png" width="200" alt="Multiple browser and Writer windows on the home screen"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>Window control</strong><br><br>
-      <a href="docs/imgs/interactive-minimized-windows.png"><img src="docs/imgs/interactive-minimized-windows.png" height="200" alt="Browser and Writer windows minimized after a voice request"></a>
+      <a href="docs/imgs/interactive-minimized-windows.png"><img src="docs/imgs/interactive-minimized-windows.png" width="200" alt="Browser and Writer windows minimized after a voice request"></a>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top" width="25%">
       <strong>Web browsing</strong><br><br>
-      <a href="docs/imgs/web-browsing.png"><img src="docs/imgs/web-browsing.png" height="200" alt="Web search results shown in the in-app browser"></a>
+      <a href="docs/imgs/web-browsing.png"><img src="docs/imgs/web-browsing.png" width="200" alt="Web search results shown in the in-app browser"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>Photography</strong><br><br>
-      <a href="docs/imgs/photography-camera.png"><img src="docs/imgs/photography-camera.png" height="200" alt="Ongoing photography task with camera controls and recent-photo thumbnails"></a>
+      <a href="docs/imgs/photography-camera.png"><img src="docs/imgs/photography-camera.png" width="200" alt="Ongoing photography task with camera controls and recent-photo thumbnails"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>Photo album</strong><br><br>
-      <a href="docs/imgs/photography-album.png"><img src="docs/imgs/photography-album.png" height="200" alt="App album displaying a grid of saved photos"></a>
+      <a href="docs/imgs/photography-album.png"><img src="docs/imgs/photography-album.png" width="200" alt="App album displaying a grid of saved photos"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>Illustrated writing</strong><br><br>
-      <a href="docs/imgs/writer-illustrated-article.png"><img src="docs/imgs/writer-illustrated-article.png" height="200" alt="Writer article explaining the banker algorithm with tables and diagrams"></a>
+      <a href="docs/imgs/writer-illustrated-article.png"><img src="docs/imgs/writer-illustrated-article.png" width="200" alt="Writer article explaining the banker algorithm with tables and diagrams"></a>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top" width="25%">
       <strong>Visual diagrams</strong><br><br>
-      <a href="docs/imgs/writer-visual-flowchart.png"><img src="docs/imgs/writer-visual-flowchart.png" height="200" alt="Writer-created visual processing flowchart reopened from saved work"></a>
+      <a href="docs/imgs/writer-visual-flowchart.png"><img src="docs/imgs/writer-visual-flowchart.png" width="200" alt="Writer-created visual processing flowchart reopened from saved work"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>Drawing in progress</strong><br><br>
-      <a href="docs/imgs/writer-drawing-demo.gif"><img src="docs/imgs/writer-drawing-demo.gif" height="200" alt="A drawing taking shape in the Writer preview"></a>
+      <a href="docs/imgs/writer-drawing-demo.gif"><img src="docs/imgs/writer-drawing-demo.gif" width="200" alt="A drawing taking shape in the Writer preview"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>NexArm control</strong><br><br>
-      <a href="docs/imgs/nexarm-control-demo.gif"><img src="docs/imgs/nexarm-control-demo.gif" height="200" alt="Animated demonstration of a phone mounted on a NexArm robotic arm"></a>
+      <a href="docs/imgs/nexarm-control-demo.gif"><img src="docs/imgs/nexarm-control-demo.gif" width="200" alt="Animated demonstration of a phone mounted on a NexArm robotic arm"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>NexArm motion</strong><br><br>
-      <a href="docs/imgs/nexarm-motion-demo.gif"><img src="docs/imgs/nexarm-motion-demo.gif" height="200" alt="NexArm moving the mounted phone during an Assistant interaction"></a>
+      <a href="docs/imgs/nexarm-motion-demo.gif"><img src="docs/imgs/nexarm-motion-demo.gif" width="200" alt="NexArm moving the mounted phone during an Assistant interaction"></a>
     </td>
   </tr>
 </table>
