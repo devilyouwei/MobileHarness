@@ -63,14 +63,10 @@ private actor MeasuredD3: ModelDecisionProviding {
     }
 
     private let model: any ModelDecisionProviding
-    private let baselineInstructions: String?
     private var sample: Sample?
     nonisolated var availability: CapabilityAvailability { .available }
 
-    init(model: any ModelDecisionProviding, baselineInstructions: String?) {
-        self.model = model
-        self.baselineInstructions = baselineInstructions
-    }
+    init(model: any ModelDecisionProviding) { self.model = model }
     func load() async throws { try await model.load() }
     func warmup() async throws { try await model.warmup() }
     func warmup(reportLoading: @escaping @Sendable (Bool) async -> Void) async throws {
@@ -82,10 +78,7 @@ private actor MeasuredD3: ModelDecisionProviding {
         defer { sample = nil }
         return sample
     }
-    func decide(_ input: DecisionRequest) async throws -> InferenceSession<DecisionResult> {
-        let request = try DecisionRequest(
-            text: input.text, candidates: input.candidates, context: input.context,
-            instructions: baselineInstructions ?? input.instructions)
+    func decide(_ request: DecisionRequest) async throws -> InferenceSession<DecisionResult> {
         let start = ContinuousClock.now
         func makeSample(score: Double? = nil, error: String? = nil) -> Sample {
             let duration = start.duration(to: .now).components
@@ -129,26 +122,7 @@ private actor MeasuredD3: ModelDecisionProviding {
     let fixtures = repo.appendingPathComponent("docs/measurements/decision-language-scenarios-2026-11-14.json")
     let scenarios = try JSONDecoder().decode([DecisionLanguageScenario].self, from: Data(contentsOf: fixtures))
     try #require(scenarios.count > 1 && Set(scenarios.map(\.id)).count == scenarios.count)
-    let historicalPath = repo.appendingPathComponent("docs/measurements/duplex-d3-interrupt-synonyms-2026-11-14.json")
-    struct Historical: Decodable {
-        struct Variant: Decodable {
-            struct Question: Decodable {
-                let instructions: String
-                let criteria: [String: String]
-            }
-            let question: Question
-        }
-        let variants: [String: Variant]
-    }
-    let historical = try JSONDecoder().decode(Historical.self, from: Data(contentsOf: historicalPath))
-    let baseline = try #require(historical.variants["terse-example-cut"]?.question)
     let first = scenarios[0]
-    let firstSnapshot = first.english.snapshot(id: "warmup", scenario: first)
-    let current = try firstSnapshot.request()
-    for kind in [InputDisposition.interrupt, .discard, .enqueue] {
-        let meaning = try #require(baseline.criteria[kind.rawValue])
-        try #require(current.candidates.contains("\(kind.rawValue): \(meaning)"))
-    }
 
     let resources = URL(fileURLWithPath: try #require(env["D3_TEST_RESOURCES"]))
     let manifestURL = resources.appendingPathComponent("D3Edge/manifest.json")
@@ -161,12 +135,10 @@ private actor MeasuredD3: ModelDecisionProviding {
         try await model.warmup()
         var rows: [DecisionLanguageReport.Row] = []
         var probes: [DecisionLanguageReport.Row] = []
-        for prompt in ["en", "zh-Hans", "mixed-baseline"] {
-            let locale = prompt == "zh-Hans" ? "zh-Hans" : "en"
-            let measured = MeasuredD3(
-                model: model, baselineInstructions: prompt == "mixed-baseline" ? baseline.instructions : nil)
+        for prompt in ["en", "zh-Hans"] {
+            let measured = MeasuredD3(model: model)
             let classifier = AssistantInputDecision(
-                local: measured, configuration: { (true, nil) }, language: { locale })
+                local: measured, configuration: { (true, nil) }, language: { prompt })
             for _ in 0..<3 {
                 let warmup = await classifier.classify(first.english.snapshot(id: "warmup", scenario: first))
                 try #require(warmup.route == .local, Comment(rawValue: warmup.localFallback ?? "Native warm-up failed"))

@@ -1,13 +1,11 @@
 {
   "version": 1,
   "templates": {
-    "instructions": "Classify the latest utterance using live state and history. Keep every clear command, question, correction, answer, or possibly meaningful fragment. Final filler does not erase a request. When uncertain, enqueue. Quotes, negations and requests for later do not interrupt. Examples: \"Take a photo, uh\" → enqueue. \"Mm-hm\" answering a question → enqueue. Standalone \"Uh\" or noise without usable meaning → discard. \"Stop\", \"stop talking\", or \"hold on\" during playback → interrupt.",
-    "interrupt": "While the assistant is speaking or working, the user requests an immediate stop or change.",
-    "discard": "Drop only noise, unintelligible transcription with no usable meaning, or isolated fillers with no question to answer.",
-    "enqueue": "Keep any usable instruction, question, answer, correction, deferred request, or uncertain input.",
-    "input": "Playing={{playing}} Running={{running}} Awaiting answer={{awaitingAnswer}}\nHistory:\n{{history}}{{question}}Latest user transcript: {{input}}",
-    "history": "User: {{user}}\nAssistant: {{assistant}}\n",
-    "question": "Pending question: {{question}}\n",
+    "definitions": "Action definitions:\n1. Interrupt: The assistant is speaking or working and the user asks to stop immediately, correct what is underway, or explicitly switch tasks now. Quoted, negated or deferred requests to stop do not count as interruptions.\n2. Discard: Confirmed echo, noise, speech unrelated to the assistant, acknowledgements needing no response, a bare stop while idle, or a bare request to continue while the assistant is speaking.\n3. Queue for the next turn: Meaningful new requests, questions, additions or answers, including brief answers to a pending question and requests to do something later.",
+    "context": "【Conversation history】\n{{history}}\n\n【Buffered user input】\n{{buffer}}",
+    "history": "User: {{user}}\nAssistant: {{assistant}}",
+    "empty": "(empty)",
+    "latest": "Based on the conversation history above, decide what to do with the latest user input [{{input}}]: 1. Interrupt; 2. Discard; 3. Queue for the next turn.",
     "toolDescription": "Classify the current input only"
   }
 }

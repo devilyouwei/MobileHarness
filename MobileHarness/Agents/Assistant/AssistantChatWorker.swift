@@ -129,6 +129,20 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     public func bindInputInterruption(_ callback: @escaping @Sendable (String) async throws -> Void) {
         inputInterruption = callback
     }
+    private func decisionBuffer(before input: AgentInput) -> [String] {
+        guard let current = semanticMessages[input.id] else { return [] }
+        let activeRounds = Set(pendingRounds.values.map { $0.input.id })
+        let waiting = queue.inputs.filter { candidate in
+            candidate.sessionID == input.sessionID && candidate.id != activeInput?.id
+                && continuationRounds[candidate.id] == nil && !activeRounds.contains(candidate.id)
+        }
+        let members = waiting.flatMap { batchMembers[$0.id] ?? [$0] }
+        let priorUsers = members.compactMap { semanticMessages[$0.id] }.filter {
+            $0.senderRole == .user && $0.seq < current.seq
+        }
+        return priorUsers.sorted { $0.seq < $1.seq }.suffix(3).map(\.content)
+    }
+
     private func classifyPendingInputs() {
         guard decisionWorker == nil, let inputDecision else { return }
         decisionWorker = Task {
@@ -150,6 +164,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
                     history: history.flatMap {
                         AssistantHistoryProjection.decisionExchange(in: $0, before: queued.input.id)
                     },
+                    bufferedUserInputs: decisionBuffer(before: queued.input),
                     question: queued.question, receivedAt: queued.receivedAt)
                 let observedEpoch = generationEpoch
                 let decision = await inputDecision.classify(snapshot)

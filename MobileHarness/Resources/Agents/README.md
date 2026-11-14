@@ -22,7 +22,7 @@ Use the unsuffixed resource for English and a `.zh-Hans` sibling for Simplified 
 | `<AgentName>/Agent.json` | 必需。v10 身份、角色自有公开 description、通信权限和基础 Skill。 |
 | `Assistant/Instructions.md` | Assistant 自身的身份、用户沟通和如实汇报责任。业务流程归 Skill，共用协议提示词归 `Shared/`。 |
 | `Assistant/Prompts.json` | Assistant 主请求的执行证据、任务历史摘要及 Writer 协作事实模板。 |
-| `Assistant/InputDecision.json` and its Simplified Chinese sibling | Decision rules, fixed candidate IDs, localized examples and cloud tool prose. The user and assistant excerpts retain their original language. |
+| `Assistant/InputDecision.json` and its Simplified Chinese sibling | Localized Decision action definitions and templates for history, buffered user input and the latest-input question, plus cloud tool prose. Dialog text retains its original language. |
 | `Writer/Instructions.md` | Writer 私有共用身份，仅供自己的控制请求。 |
 | `Writer/Prompts.json` | Writer 作品库及编辑控制请求、补充输入和轮次模板。 |
 | `Writer/ContentPrompts.json` | 无工具内容请求的输出规则、文件格式、编辑上下文与重试模板。 |

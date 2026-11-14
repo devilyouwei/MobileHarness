@@ -5,7 +5,12 @@ import ModelKitDefaults
 import Synchronization
 import UI
 
-public enum InputDisposition: String, Codable, Sendable { case enqueue, discard, interrupt }
+public enum InputDisposition: String, Codable, Sendable {
+    case enqueue, discard, interrupt
+
+    fileprivate static let choiceOrder: [Self] = [.interrupt, .discard, .enqueue]
+    fileprivate static let choiceLabels = choiceOrder.indices.map { String($0 + 1) }
+}
 
 public struct InputDecisionOutcome: Sendable, Equatable {
     public enum Route: String, Sendable {
@@ -21,7 +26,7 @@ public struct InputDecisionOutcome: Sendable, Equatable {
     public let localFallback: String?
 }
 
-/// One pending input and at most one earlier user/assistant exchange from the current dialog.
+/// One pending input, one earlier exchange and a bounded excerpt of the same-session buffer.
 public struct InputDecisionSnapshot: Sendable {
     public struct Exchange: Sendable, Equatable {
         public let user: String
@@ -38,13 +43,14 @@ public struct InputDecisionSnapshot: Sendable {
     public let running: Bool
     public let playing: Bool?
     public let history: Exchange?
+    public let bufferedUserInputs: [String]
     public let question: String?
     public var occupied: Bool { running || playing == true }
     public var protectsAnswer: Bool { question != nil }
     public let receivedAt: ContinuousClock.Instant
     public init(
         input: AgentInput, text: String, running: Bool, playing: Bool? = nil, history: Exchange? = nil,
-        question: String? = nil,
+        bufferedUserInputs: [String] = [], question: String? = nil,
         receivedAt: ContinuousClock.Instant = .now
     ) {
         self.input = input
@@ -52,11 +58,25 @@ public struct InputDecisionSnapshot: Sendable {
         self.running = running
         self.playing = playing
         self.history = history
+        self.bufferedUserInputs = bufferedUserInputs.suffix(3).map { String($0.suffix(80)) }
         self.question = question.map { String($0.suffix(80)) }
         self.receivedAt = receivedAt
     }
 
-    func request() throws -> DecisionRequest {
+    struct Prompt: Sendable {
+        let state: String
+        let latest: String
+        let context: InferenceContext
+
+        var text: String { state + "\n\n" + latest }
+
+        func request() throws -> DecisionRequest {
+            try .init(
+                text: state, candidates: InputDisposition.choiceLabels, context: context, instructions: latest)
+        }
+    }
+
+    func prompt() throws -> Prompt {
         let owner = "Assistant/InputDecision"
         let encoder = JSONEncoder()
         encoder.outputFormatting = .withoutEscapingSlashes
@@ -66,24 +86,19 @@ public struct InputDecisionSnapshot: Sendable {
                 .replacingOccurrences(of: "\u{2028}", with: "\\u2028")
                 .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
         }
+        let empty = try AgentPrompts.text(owner, "empty")
         let historyText =
             try history.map {
                 try AgentPrompts.text(owner, "history", ["user": quote($0.user), "assistant": quote($0.assistant)])
-            } ?? ""
-        let questionText = try question.map { try AgentPrompts.text(owner, "question", ["question": quote($0)]) } ?? ""
-        return try DecisionRequest(
-            text: AgentPrompts.text(
-                owner, "input",
-                [
-                    "playing": playing.map { $0 ? "yes" : "no" } ?? "unknown",
-                    "running": running ? "yes" : "no", "awaitingAnswer": protectsAnswer ? "yes" : "unknown",
-                    "history": historyText, "question": questionText, "input": quote(text),
-                ]),
-            candidates: [InputDisposition.interrupt, .discard, .enqueue].map { action in
-                try "\(action.rawValue): \(AgentPrompts.text(owner, action.rawValue))"
-            },
-            context: .init(requestID: input.id + ".decision", scopeID: input.sessionID),
-            instructions: AgentPrompts.text(owner, "instructions"))
+            } ?? empty
+        let buffer = try bufferedUserInputs.map(quote).joined(separator: "\n")
+        let definitions = try AgentPrompts.text(owner, "definitions")
+        let context = try AgentPrompts.text(
+            owner, "context", ["history": historyText, "buffer": buffer.isEmpty ? empty : buffer])
+        let latest = try AgentPrompts.text(owner, "latest", ["input": String(quote(text).dropFirst().dropLast())])
+        return .init(
+            state: definitions + "\n\n" + context, latest: latest,
+            context: .init(requestID: input.id + ".decision", scopeID: input.sessionID))
     }
 }
 
@@ -186,9 +201,9 @@ public actor AssistantInputDecision {
             await report("Could not read Decision settings; input retained and queued: \(error)")
             return fallback("Could not read Decision settings")
         }
-        let request: DecisionRequest
+        let prompt: InputDecisionSnapshot.Prompt
         do {
-            request = try snapshot.request()
+            prompt = try snapshot.prompt()
         } catch {
             await report("Could not prepare Decision request; input retained and queued: \(error)")
             return fallback("Could not prepare Decision request")
@@ -206,11 +221,9 @@ public actor AssistantInputDecision {
                     let local = local
                     let result = await race("local", until: min(deadline, .now.advanced(by: localTimeout))) {
                         try Task.checkCancellation()
+                        let request = try prompt.request()
                         requests.withLock {
-                            $0.append(
-                                "Local D3\n\nInstructions\n" + request.instructions
-                                    + "\n\nCandidates\n" + request.candidates.joined(separator: "\n")
-                                    + "\n\nInput\n" + request.text)
+                            $0.append("Local D3\n\n" + prompt.text + "\n\nOptions\nA: 1\nB: 2\nC: 3")
                         }
                         let session = try await local.decide(request)
                         return try await withTaskCancellationHandler {
@@ -218,13 +231,11 @@ public actor AssistantInputDecision {
                             do {
                                 for try await value in session.events {
                                     guard result == nil, case .selected(let label, _) = value.decision,
-                                        let id = label.split(separator: ":", maxSplits: 1).first,
-                                        request.candidates.contains(label),
-                                        let action = InputDisposition(rawValue: String(id))
+                                        let index = request.candidates.firstIndex(of: label)
                                     else {
                                         throw CapabilityError.invalidRequest("Invalid Decision result")
                                     }
-                                    result = action
+                                    result = InputDisposition.choiceOrder[index]
                                 }
                                 await session.waitForCompletion()
                                 return result
@@ -293,12 +304,8 @@ public actor AssistantInputDecision {
                 ],
             ])
             let chat = try ChatRequest(
-                messages: [
-                    .init(
-                        role: .system, content: ([request.instructions] + request.candidates).joined(separator: "\n")),
-                    .init(role: .user, content: request.text),
-                ],
-                context: request.context, maximumOutputTokens: 128, temperature: 0,
+                messages: [.init(role: .user, content: prompt.text)],
+                context: prompt.context, maximumOutputTokens: 128, temperature: 0,
                 tools: [ChatToolDefinition(declaration: declaration)],
                 toolChoice: .required(name: "classify_input"))
             try Task.checkCancellation()

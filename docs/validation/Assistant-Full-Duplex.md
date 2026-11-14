@@ -275,3 +275,9 @@ Decision 页面独立选择本地 D3/云端，云端 Provider/模型沿用共享
 - 124 条 Mac 本地模型探测及采纳回放对照中，接入版的误丢弃维持 0，误打断从 8 降为 7，漏打断从 21 降为 20。 [实验方法与逐项结果](Decision-Model-Mac-Comparison.md#中英文打断近义词)
 - `./scripts/check.sh` 退出 0，1,152 项集成测试、228 项 LiveRuntimeTests 通过。相机 Metal 用例只有启动记录。四个 iOS 模拟器目标构建通过，应用包内提示词与源码逐字节一致。日志位于 `/tmp/mh-d3-synonyms-{check,ios}.log`。
 - 真机签名及资源校验通过。iPhone 17 Pro 已覆盖安装并启动 `0.1.0 (2026111402)`，设备清单核对构建号，安装序号 6900。真机包内 `InputDecision.json` 与源码逐字节一致，含中英文打断近义词。证据见 `/tmp/mh-d3-synonyms-device-{build.log,install.json,after.json,launch.json}`。
+
+## 2026-11-15 Decision 动作定义前置
+
+- 本地 D3 和云端工具共用四段业务提示，按动作定义、当前对话最近一轮历史、同会话待发送用户文本、最新一句三选一的顺序渲染。历史每方最多 80 字，缓冲最多三条且每条最多 80 字。D3 读取原生数字选项，云端保留强制分类工具。
+- 中英文顺序、上下文转义、旧轮投影、队列顺序、来源过滤、模型路由与采纳回归随 1,159 项 IntegrationTests 通过。全量检查在 AppWorkflow 阶段出现 Writer 声明注入缺失和网页截图用例失败，见 `/tmp/mh-history-buffer-check-final.log`。
+- `./scripts/build-ios.sh` 四个模拟器目标均通过。两份 Decision 提示词资源与模拟器包内文件逐字节一致。真机部署由用户自行测试。
