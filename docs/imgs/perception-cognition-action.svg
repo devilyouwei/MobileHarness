@@ -1,14 +1,36 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="640" height="350" viewBox="0 0 640 350" role="img" aria-labelledby="title description">
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="355" viewBox="0 0 640 355" role="img" aria-labelledby="title description">
   <title id="title">Perception → Cognition → Action feedback loop</title>
-  <desc id="description">Perception, Cognition and Action form a counterclockwise triangular loop. Each solid connecting arrow carries an Internal Signal. A dashed External Signal arrow enters Perception from outside the loop.</desc>
+  <desc id="description">Perception, Cognition and Action form a counterclockwise triangular loop. Each solid connecting arrow carries an Internal Signal. Three dashed External Signal arrows converge on Perception from different directions: audio from the microphone, vision from the camera, and motion from the accelerometer and gyroscope. These illustrate sensory modalities, not runtime transport APIs.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
     </marker>
   </defs>
-  <rect width="640" height="350" rx="16" fill="#ffffff"/>
+  <rect width="640" height="355" rx="16" fill="#ffffff"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, sans-serif" text-anchor="middle">
+    <g fill="#1e293b" font-size="16" font-weight="600">
+      <text x="190" y="25">Audio</text>
+      <text x="320" y="25">Vision</text>
+      <text x="450" y="25">Motion</text>
+    </g>
+    <g fill="#475569" font-size="12">
+      <text x="190" y="46">Microphone</text>
+      <text x="320" y="46">Camera</text>
+      <text x="450" y="46">Motion sensors</text>
+    </g>
+  </g>
+  <g fill="none" stroke="#64748b" stroke-width="2" stroke-dasharray="5 5" marker-end="url(#arrow)">
+    <path d="M 190 58 L 260 99"/>
+    <path d="M 320 58 V 93"/>
+    <path d="M 450 58 L 380 99"/>
+  </g>
+  <g font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12" fill="#475569" text-anchor="middle">
+    <text x="181" y="96">External Signal</text>
+    <text x="330" y="70" text-anchor="start">External Signal</text>
+    <text x="459" y="96">External Signal</text>
+  </g>
+  <g transform="translate(0 7)">
   <g fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)">
-    <path d="M 320 24 V 86" stroke-dasharray="5 5"/>
     <path d="M 262 138 L 160 266"/>
     <path d="M 214 292 H 426"/>
     <path d="M 480 266 L 378 138"/>
@@ -29,10 +51,10 @@
       <text x="502" y="292">Action</text>
     </g>
     <g fill="#475569" font-size="14">
-      <text x="338" y="51" text-anchor="start">External Signal</text>
       <text x="211" y="201">Internal Signal</text>
       <text x="429" y="201">Internal Signal</text>
       <text x="320" y="274">Internal Signal</text>
     </g>
+  </g>
   </g>
 </svg>

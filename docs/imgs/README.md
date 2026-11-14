@@ -5,7 +5,7 @@ This directory contains the conceptual diagrams and feature examples used by the
 | File | Purpose |
 | --- | --- |
 | [mobileharness-eyes.png](mobileharness-eyes.png) | Transparent blue open-eye / chevron-wink emblem stored at 80 pixels wide and displayed at 48 pixels wide immediately before the README title, with `style="vertical-align: 0.1em;"` to lift it relative to the text baseline in renderers that preserve inline styles. GitHub strips inline styles, so this adjustment does not guarantee alignment on GitHub. Generated with built-in ImageGen from the selected [eye concept](../../output/icon-concepts/mobile-eyes-wink-v4.png); [full prompt](../../output/icon-concepts/mobile-eyes-title-transparent-prompt.txt). |
-| [perception-cognition-action.svg](perception-cognition-action.svg) | Perception, Cognition and Action loop with external and internal Signals. |
+| [perception-cognition-action.svg](perception-cognition-action.svg) | Perception, Cognition and Action loop with three incoming External Signals: audio (microphone), vision (camera), and motion (motion sensors, such as the accelerometer and gyroscope). Straight dashed sensory inputs converge on Perception; solid Internal Signal arrows close the loop. Modalities are conceptual examples, not claims of implemented sensor integrations. |
 | [task-skill-capabilities.svg](task-skill-capabilities.svg) | Tasks and Skill declarations: Actions, States, Instructions and dependencies. |
 | [multi-agent-communication.svg](multi-agent-communication.svg) | Assistant and Writer delegation through Gateway. |
 | [start-listening-demo.gif](start-listening-demo.gif) | Pressing and holding the companion’s eyes to start listening. |
