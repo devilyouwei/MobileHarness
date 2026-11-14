@@ -118,8 +118,12 @@ For offline development and opt-in Mac/model tests, existing `scripts/download-*
 
 Click any preview to view it at full size.
 
-<table>
+<table width="100%">
   <tr>
+    <td align="center" valign="top" width="25%">
+      <strong>Start listening</strong><br><br>
+      <a href="docs/imgs/start-listening-demo.gif"><img src="docs/imgs/start-listening-demo.gif" height="200" alt="Press and hold the companion's eyes to start listening"></a>
+    </td>
     <td align="center" valign="top" width="25%">
       <strong>Everyday interaction</strong><br><br>
       <a href="docs/imgs/everyday-voice-interaction.png"><img src="docs/imgs/everyday-voice-interaction.png" height="200" alt="Voice conversation with captions, expressive eyes and pose overlays"></a>
@@ -129,15 +133,15 @@ Click any preview to view it at full size.
       <a href="docs/imgs/interactive-multiwindow.png"><img src="docs/imgs/interactive-multiwindow.png" height="200" alt="Multiple browser and Writer windows on the home screen"></a>
     </td>
     <td align="center" valign="top" width="25%">
-      <strong>Voice-controlled windows</strong><br><br>
+      <strong>Window control</strong><br><br>
       <a href="docs/imgs/interactive-minimized-windows.png"><img src="docs/imgs/interactive-minimized-windows.png" height="200" alt="Browser and Writer windows minimized after a voice request"></a>
     </td>
+  </tr>
+  <tr>
     <td align="center" valign="top" width="25%">
       <strong>Web browsing</strong><br><br>
       <a href="docs/imgs/web-browsing.png"><img src="docs/imgs/web-browsing.png" height="200" alt="Web search results shown in the in-app browser"></a>
     </td>
-  </tr>
-  <tr>
     <td align="center" valign="top" width="25%">
       <strong>Photography</strong><br><br>
       <a href="docs/imgs/photography-camera.png"><img src="docs/imgs/photography-camera.png" height="200" alt="Ongoing photography task with camera controls and recent-photo thumbnails"></a>
@@ -150,12 +154,12 @@ Click any preview to view it at full size.
       <strong>Illustrated writing</strong><br><br>
       <a href="docs/imgs/writer-illustrated-article.png"><img src="docs/imgs/writer-illustrated-article.png" height="200" alt="Writer article explaining the banker algorithm with tables and diagrams"></a>
     </td>
+  </tr>
+  <tr>
     <td align="center" valign="top" width="25%">
       <strong>Visual diagrams</strong><br><br>
       <a href="docs/imgs/writer-visual-flowchart.png"><img src="docs/imgs/writer-visual-flowchart.png" height="200" alt="Writer-created visual processing flowchart reopened from saved work"></a>
     </td>
-  </tr>
-  <tr>
     <td align="center" valign="top" width="25%">
       <strong>Drawing in progress</strong><br><br>
       <a href="docs/imgs/writer-drawing-demo.gif"><img src="docs/imgs/writer-drawing-demo.gif" height="200" alt="A drawing taking shape in the Writer preview"></a>
