@@ -1,4 +1,5 @@
 import Actions
+import AgentCore
 import Foundation
 import FunctionContracts
 import StorageChat
@@ -65,4 +66,72 @@ import Testing
             expecting: token,
             model: "fixture")
     }
+}
+
+@Test(.actionCatalog) func localToolProjectionRequiresItsDeclaredOwnerAndNativeProtocol() throws {
+    let binding = AgentConfigurations.Binding(
+        path: "Agent.Writer.ask", callType: "tool", alias: "ask", channel: nil)
+    let registry = try AgentConfigurations.registry([binding], owner: .writer)
+    #expect(registry.tools.map(\.path) == ["Agent.Writer.ask"])
+    #expect(registry.tools.first?.requiredParameters == ["question"])
+    #expect(throws: AgentConfigurationError.self) { try AgentConfigurations.registry([binding]) }
+    #expect(throws: AgentConfigurationError.self) {
+        try AgentConfigurations.registry([binding], owner: .assistant)
+    }
+    let action = AgentConfigurations.Binding(
+        path: binding.path, callType: "action", alias: "ask", channel: "Control")
+    #expect(throws: AgentConfigurationError.self) { try AgentConfigurations.registry([action], owner: .writer) }
+}
+
+@Test func injectedLocalCatalogRejectsDuplicateAndConflictingImplementations() throws {
+    let external = ActionDeclaration(path: .init(domain: "Fixture", module: "External", function: "read"), doc: "Read.")
+    let local = AgentLocalTool(
+        owner: .init(rawValue: "fixtureRole"),
+        declaration: .init(path: .init(domain: "Fixture", module: "Local", function: "ask"), doc: "Ask."))
+    let catalog = try AgentFunctionCatalog(declarations: [external], localTools: [local])
+    #expect(
+        try catalog.declaration(path: local.declaration.path.description, callType: "tool", owner: local.owner)
+            == local.declaration)
+    #expect(throws: AgentConfigurationError.self) {
+        try catalog.declaration(path: local.declaration.path.description, callType: "tool", owner: .assistant)
+    }
+    #expect(throws: AgentConfigurationError.self) {
+        try AgentFunctionCatalog(declarations: [external], localTools: [local, local])
+    }
+    #expect(throws: AgentConfigurationError.self) {
+        try AgentFunctionCatalog(declarations: [local.declaration], localTools: [local])
+    }
+    #expect(throws: AgentConfigurationError.self) {
+        try AgentFunctionCatalog(
+            declarations: [external], localTools: [.init(owner: .init(rawValue: ""), declaration: local.declaration)])
+    }
+}
+
+@Test(.actionCatalog) func localCatalogInstallationIsImmutableAndOrderIndependent() throws {
+    let before = try AgentConfigurations.load(named: "Writer").capabilities.tools.map(\.path)
+    try AgentConfigurations.installDeclarations(
+        CapabilityModules.declarations.reversed(), localTools: AgentContracts.localTools.reversed())
+    #expect(try AgentConfigurations.load(named: "Writer").capabilities.tools.map(\.path) == before)
+    #expect(throws: AgentConfigurationError.self) {
+        try AgentConfigurations.installDeclarations(CapabilityModules.declarations)
+    }
+    let changed = AgentContracts.localTools.map { AgentLocalTool(owner: .assistant, declaration: $0.declaration) }
+    #expect(throws: AgentConfigurationError.self) {
+        try AgentConfigurations.installDeclarations(CapabilityModules.declarations, localTools: changed)
+    }
+}
+
+@Test func capabilityCoverageRequiresExplicitExactLocalToolPaths() throws {
+    let path = "Fixture.Local.ask"
+    let capabilities = try CapabilityRegistry(internalTools: [.init(path: path, required: ["question"])])
+    let catalog = ActionCatalogSnapshot(revision: UUID(), entries: [])
+    #expect(throws: HarnessError.forbiddenTool) {
+        try CapabilityCoverage.validate(catalog: catalog, capabilities: [capabilities])
+    }
+    #expect(throws: HarnessError.forbiddenTool) {
+        try CapabilityCoverage.validate(
+            catalog: catalog, capabilities: [capabilities], locallyExecutedTools: ["Fixture.Local"])
+    }
+    try CapabilityCoverage.validate(catalog: catalog, capabilities: [capabilities], locallyExecutedTools: [path])
+    #expect(!capabilities.permits(ToolCall(id: "model", toolPath: path)))
 }

@@ -39,3 +39,13 @@ Actions的ConversationPresentation不再因识别轮次变化清空双方字幕�
 收尾审计补充：isVoiceActive=false目前也隐式resetCaptions，会使关闭／重建麦克风绕过Agent字幕政策。该联动一并移除，停止聆听只撤下等待指示并改变呈现门，字幕继续保留。UIHome.invalidate显式调用resetCaptions作为真实根生命周期清理；显式会话重置端口仍可整体清理。相应睡眠／根失效回归同步调整。
 
 本节实现及技术README已同步：双字幕由各自Agent在新人声起点显式切换，移除UI轮次／回复到期／聆听开关的交叉清理，保留根生命周期清理。完整自动化与四目标iOS构建通过；夹具修订、证据和未执行的真机验收见 [验证记录](../validation/Listening-Interruption-Recovery.md#2026-11-05-agent-自有字幕与人声起点)。
+
+## 2026-11-14 结束聆听清空字幕
+
+按本次用户要求，替代上文“停止聆听保留字幕”的开关策略：结束聆听立即清空 user 和 assistant 字幕，重新长按开启时保持空白，直到新的识别或回复内容到达。聆听仍启用时的识别、处理和播放阶段切换继续保留原有字幕行为。
+
+实施范围：`UI/Conversation/ConversationState.swift` 在 `isVoiceActive=false` 的统一状态入口调用既有 `resetCaptions`，同时清除定稿、等待和透明度状态；不增加模块、目录或跨模块接口。更新 `Tests/UITests/CaptionPresentationTests.swift` 覆盖关闭、重新开启、重复开关和根失效，更新 `UI/Conversation/README.md` 和 `UI/README.md` 的现行契约。执行 check.sh 和完整 Xcode 下的 build-ios.sh，将实际结果记录到对应验证文档；自动化不替代真机视觉验收。
+
+回归同步范围补充：`Tests/AppWorkflowTests/HomeEffectsTests.swift` 中停止聆听保留字幕的旧断言也改为双方为空；回复结束但聆听仍启用时的保留断言继续保留。
+
+本节代码、文档与三项字幕生命周期回归已完成；定向测试及四目标 iOS 构建通过，全量检查存在其他失败和中断，真机未验。详情见[验证记录](../validation/Listening-Interruption-Recovery.md#2026-11-14-结束聆听清空双方字幕)。

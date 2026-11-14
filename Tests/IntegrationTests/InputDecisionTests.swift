@@ -316,9 +316,9 @@ func inputDecisionProtectsPossibleSpeechCommandsFromModelDiscard(local: Bool) as
         turn("future", user: "之后的问题", reply: "之后的答复"),
     ]
     #expect(
-        AgentChatContextBuilder.decisionExchange(in: history, before: "latest")
+        AssistantHistoryProjection.decisionExchange(in: history, before: "latest")
             == .init(user: "帮我设个提醒", assistant: "明早八点可以吗？"))
-    #expect(AgentChatContextBuilder.decisionExchange(in: history, before: "other-dialog") == nil)
+    #expect(AssistantHistoryProjection.decisionExchange(in: history, before: "other-dialog") == nil)
     var batch = peer
     batch.memberIDs = ["peer", "member"]
     history.turns[2].coordination = batch
@@ -326,7 +326,7 @@ func inputDecisionProtectsPossibleSpeechCommandsFromModelDiscard(local: Bool) as
         turn("member", user: "刚才改成九点", reply: "", coordination: .init(source: "user", capturedAt: "1")),
         at: 3)
     #expect(
-        AgentChatContextBuilder.decisionExchange(in: history, before: "latest")
+        AssistantHistoryProjection.decisionExchange(in: history, before: "latest")
             == .init(user: "刚才改成九点", assistant: "我已存档"))
 }
 

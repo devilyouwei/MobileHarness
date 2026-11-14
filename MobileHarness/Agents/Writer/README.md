@@ -219,3 +219,7 @@ Resources/Agents/Writer/Agent.json.description 提供公开用途。Instructions
 Prompts.json 包含控制请求的目标、追问回答、追加要求、状态标签和轮次提示。ContentPrompts.json 管理无工具内容请求的系统规则、格式、重试和输入包装。Recovery.json 保存失败恢复和历史回放指引。WorkspaceFeedback.json 保存工作区操作反馈。Writer 本地工具描述与 ActionDeclaration 一起维护。
 
 Actions 的 edit 接纳回执返回 ArtifactEditPreparation，包含流身份、原始指令、已验证路径、选区或项目文件以及关联文件片段。Writer 从路径选择格式、检查外层代码围栏并记录请求路径，再用 ContentPrompts.json 呈现选区和上下文。模型失败后先清理旧流，重试从重新接纳的流获取准备值。资源读取错误直接传播，恢复、取消、清理和提交由 Writer 工作流管理。
+
+## Local tool declaration boundary
+
+WriterLocalTools owns the native ask/finish/enter/create declarations and WriterControlDomain selects the corresponding role-owned Skills. Root AgentContracts passes these declarations with owner=writer to AgentConfigurations during immutable catalog installation. Shared loading and registry projection require the matching owner and tool protocol; external/local declaration conflicts are rejected. CapabilityCoverage receives exact local-tool paths explicitly from composition and does not reference Writer implementation types. Writer remains the executor of these tools; catalog presence does not grant Gateway execution authority.

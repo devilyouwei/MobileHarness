@@ -42,7 +42,7 @@ import UI
         let camera = platform.vision.camera
         let model = registry.model()
         let gateway = registry.gateway()
-        let actionAssembly = ApplicationActionAssembly(gateway: gateway)
+        let actionAssembly = ApplicationActionAssembly(gateway: gateway, language: language)
         let actionHost = ActionsContainer.makeBusiness(
             dependencies: actionAssembly.dependencies(
                 storage: storage, model: model, platform: platform, ui: uiContainer, language: language),

@@ -257,3 +257,49 @@ extension RuntimeLogState {
     #expect(state.tasks.first?.events.count == 4)
     pair.continuation.finish()
 }
+
+@Test @MainActor func actionActivityLocalizesCopyWithoutTranslatingExecutionEvidence() throws {
+    let completed = activityRecord(phase: .succeeded, completion: .completed)
+    let translated = ActionActivityItem(execution: completed, language: .simplifiedChinese)
+    #expect(translated.status == "已完成")
+    #expect(translated.output == "已完成（无返回值）")
+    #expect(translated.title == completed.path.description)
+    let raw = activityRecord(phase: .succeeded, completion: .value("Completed"))
+    #expect(ActionActivityItem(execution: raw, language: .simplifiedChinese).output == "Completed")
+    let report = try ActionReport(entries: [
+        .init(
+            path: "move", status: .failed, code: .init(rawValue: "targetNotReached"),
+            details: ["motor": "2", "target": "90", "observed": "85"])
+    ])
+    let failed = activityRecord(phase: .failed, completion: .report(report))
+    let issue = ActionActivityItem(execution: failed, language: .simplifiedChinese)
+    #expect(issue.status == "执行失败 · 1 个问题")
+    #expect(issue.issueDescriptions == ["第 1 项 · 电机 2: 稳定后未到达目标位置（目标 90，观测 85）"])
+    var evidence = activityRecord(phase: .failed)
+    evidence.failureDescription = "Producer-owned diagnostic"
+    #expect(ActionActivityItem(execution: evidence, language: .simplifiedChinese).status == evidence.failureDescription)
+}
+
+@Test @MainActor func taskLogUsesInjectedPresentationLanguage() async throws {
+    let state = RuntimeLogState()
+    let workflow = AgentRuntimeLogWorkflow(log: state, language: { .simplifiedChinese })
+    let pair = AsyncStream<SignalTraceSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
+    workflow.startTasks(observe: { pair.stream })
+    let scope = AgentTaskScope(
+        id: UUID().uuidString, requester: .assistant, executor: .photographer,
+        sessionID: UUID().uuidString)
+    let signal = try AgentTaskSignal(kind: .request, scope: scope, businessContract: "fixture", data: Data())
+    let input = AgentInput(
+        id: UUID().uuidString, sessionID: scope.sessionID,
+        payload: .observation(try signal.message()), taskScope: scope)
+    var record = SignalTraceRecord(input: input, mode: .send, targets: [.photographer], summary: "")
+    record.phase = .accepted
+    pair.continuation.yield(.init(revision: 1, records: [record]))
+    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+    while state.tasks.isEmpty && ContinuousClock.now < deadline { await Task.yield() }
+    #expect(state.tasks.first?.events.first?.title == "任务委派 · 已接纳")
+    #expect(state.tasks.first?.phase == .accepted)
+    #expect(state.tasks.first?.executor == AgentID.photographer.rawValue)
+    pair.continuation.finish()
+    await workflow.shutdown()
+}

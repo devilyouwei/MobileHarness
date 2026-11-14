@@ -10,3 +10,5 @@ public struct AgentStatus: Sendable {
         self.processedInputs = processedInputs
     }
 }
+
+public enum AgentLifecycle: String, Sendable { case registered, running, paused, stopped, failed }

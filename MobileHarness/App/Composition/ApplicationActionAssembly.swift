@@ -14,15 +14,21 @@ final class ApplicationActionAssembly {
     weak var agents: AgentContainer?
     private let actionSnapshots = AsyncStream<ActionExecutionSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
     private var actionLog: Task<Void, Never>?
-    init(gateway: GatewayContainer) { self.gateway = gateway }
+    private let language: @Sendable () -> AppLanguage
+    init(gateway: GatewayContainer, language: @escaping @Sendable () -> AppLanguage) {
+        self.gateway = gateway
+        self.language = language
+    }
 
     func connectActionLog(to log: any RuntimeLogWriting) -> @Sendable (ActionExecutionSnapshot) -> Void {
         let (stream, continuation) = actionSnapshots
+        let language = language
         actionLog = Task {
             for await snapshot in stream {
                 log.record(
                     .actions(
-                        revision: snapshot.revision, records: snapshot.records.map(ActionActivityItem.init),
+                        revision: snapshot.revision,
+                        records: snapshot.records.map { ActionActivityItem(execution: $0, language: language()) },
                         evictedCount: snapshot.evictedCount))
             }
         }

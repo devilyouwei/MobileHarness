@@ -135,3 +135,9 @@ private actor TitleRequestJournal {
         try await persist(record)
     }
 }
+
+extension AgentPrompts {
+    static func titleTemplates(language: String = "en") throws -> PromptTemplates {
+        try shared.load("Agents/Memory/TitlePrompts.json", language: language)
+    }
+}

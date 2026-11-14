@@ -356,7 +356,7 @@ private func runNexArmAssistantMarkup(
     let motionBindings =
         try AgentConfigurations.skill("expression-interaction").useActions
         + AgentConfigurations.skill("robot-interaction").useActions
-    let assistant = try AgentChatWorker<AssistantContextState>(
+    let assistant = try AssistantChatWorker<AssistantContextState>(
         stateContext: try publicStateFixture(),
         chat: FixedTextChat(text: markup),
         context: try AgentContextRepository(

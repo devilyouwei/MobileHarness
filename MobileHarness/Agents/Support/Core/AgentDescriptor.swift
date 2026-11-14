@@ -1,3 +1,5 @@
+import Foundation
+
 /// Static role classification; it does not grant capabilities or select an execution policy.
 public enum AgentCategory: String, Codable, Sendable {
     case perception
@@ -25,4 +27,9 @@ public struct AgentDescriptor: Sendable {
         self.outputs = outputs
         self.capabilities = capabilities
     }
+}
+
+public struct AgentID: RawRepresentable, Hashable, Codable, Sendable {
+    public let rawValue: String
+    public init(rawValue: String) { self.rawValue = rawValue }
 }

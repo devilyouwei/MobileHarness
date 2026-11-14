@@ -437,3 +437,19 @@ private struct SpoofedPreferenceFailure: ModelResourcePreferencesCapability {
     let envelope = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
     #expect(envelope["version"] as? Int == 1)
 }
+
+@Test(arguments: ["zh", "zh-Hans-CN", "zh-Hant-TW", "zh_CN", "en-US", "fr-FR", ""])
+func resourceSourceDefaultsFollowSystemLanguageAndKeepSavedChoice(language: String) async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = try FileDocumentStore<ModelResourcePreferences>(
+        url: root.appendingPathComponent("source.json"), maximumBytes: 4096)
+    let service = ModelResourcePreferencesService(
+        store: { store }, validate: { $0 }, installed: { [] },
+        preferredLanguage: { language.isEmpty ? nil : language })
+    let expected = language.hasPrefix("zh") ? "https://hf-mirror.com" : "https://huggingface.co"
+    #expect(try await service.restoreSource().endpoint == expected)
+    let explicit = ModelResourcePreferences(endpoint: "https://custom.example")
+    _ = try await service.saveSource(explicit)
+    #expect(try await service.restoreSource() == explicit)
+}

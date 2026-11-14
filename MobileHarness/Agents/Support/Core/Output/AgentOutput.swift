@@ -46,3 +46,31 @@ public struct GenerationRoundResult: Codable, Equatable, Sendable {
         self.failure = failure.map { String($0.prefix(512)) }
     }
 }
+
+public enum OutputKind: String, Codable, Sendable {
+    case communication, scheduling, actionCall, toolCall, control
+}
+
+/// Agent call intent; Gateway translates it to an Actions request. source/input/session correlation is carried by OutputEnvelope.
+public struct ActionCall: Equatable, Sendable {
+    public let actionPath: ActionPath
+    public let channel: String
+    public let parameters: [String: String]
+
+    public init(actionPath: ActionPath, channel: String, parameters: [String: String] = [:]) {
+        self.actionPath = actionPath
+        self.channel = channel
+        self.parameters = parameters
+    }
+}
+
+public struct ToolCall: Equatable, Sendable {
+    public let id: String
+    public let toolPath: String
+    public let arguments: [String: String]
+    public init(id: String, toolPath: String, arguments: [String: String] = [:]) {
+        self.id = id
+        self.toolPath = toolPath
+        self.arguments = arguments
+    }
+}

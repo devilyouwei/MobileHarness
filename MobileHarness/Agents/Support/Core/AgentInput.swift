@@ -213,3 +213,8 @@ public struct InputMetadata: Sendable {
     }
     public var expired: Bool { deadline.map { ContinuousClock.now >= $0 } ?? false }
 }
+
+public enum InputKind: String, Codable, Sendable {
+    case communicationReceipt, text, event, toolResult, actionResult, roundResult, activityEvent, audio, image,
+        observation
+}

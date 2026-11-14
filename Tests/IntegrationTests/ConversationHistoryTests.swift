@@ -750,7 +750,7 @@ extension AssistantHistoryStore {
         return nil
     }
     #expect(ordered == ["A1", "B1", "A2"])
-    let rows = try AgentChatContextBuilder.request(
+    let rows = try AssistantHistoryProjection.request(
         system: "s", user: "next", conversation: current, templates: AgentPrompts.load(named: "Assistant"))
     #expect(rows.filter { $0.role == .assistant }.map(\.content) == ["A1 output", "B1 output", "A2 output"])
     let result =

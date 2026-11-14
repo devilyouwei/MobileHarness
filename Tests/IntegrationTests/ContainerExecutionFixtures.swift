@@ -122,7 +122,7 @@ extension OutputGateway {
     }
 }
 
-extension BehaviorCoverage {
+extension CapabilityCoverage {
     static func validate(actions: ActionRegistry, toolPaths: Set<String>, capabilities: [CapabilityRegistry]) throws {
         var entries = actions.bindings.map(fixtureDescriptor)
         for path in toolPaths {
@@ -134,7 +134,9 @@ extension BehaviorCoverage {
                     displayName: path, kind: .finite, protocols: [.tool], executionPolicy: .direct,
                     directResultPolicy: .returning))
         }
-        try validate(catalog: .init(revision: UUID(), entries: entries), capabilities: capabilities)
+        try validate(
+            catalog: .init(revision: UUID(), entries: entries), capabilities: capabilities,
+            locallyExecutedTools: AgentContracts.localToolPaths)
     }
 }
 

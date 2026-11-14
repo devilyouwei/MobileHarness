@@ -32,7 +32,7 @@ task.start 和 task.end 管理 Assistant 自己的前台任务。task.send 由�
 
 不接受公开 taskID、workspaceID、replaceCurrent、业务协议或内部通信 ID。后台发送只等待消息接纳。接收方忙碌时回报拒绝，保留当前工作。Writer 自行保存本地运行和工作区状态，Assistant 不读取 Writer 私有表。通信送达与业务完成分别处理。任务端口返回结构化 ActionCompletion；委派及发往 Writer 的补充与取消成功时使用 completed，异常仍走失败观察。前台控制由执行者返回所需业务值。前台结束提交失败时保留原目标。
 
-跨模块认证、接纳与完成时序见[总体委托流程](../../../README.md#assistant-agent-delegation)，调用方政策见 [Assistant](../../../Agents/Assistant/README.md#对其他-agent-的委托)，创作、通知和长期作品任务见 [Writer](../../../Agents/Writer/README.md)。
+跨模块认证、接纳与完成时序见[总体委托流程](../../../README.md#assistant-agent-delegation)，调用方政策见 [Assistant](../../../Agents/Assistant/README.md#delegation-and-peer-facts)，创作、通知和长期作品任务见 [Writer](../../../Agents/Writer/README.md)。
 
 start/send 的 canonical 教学明确二者为平级入口：调用方自己执行的前台目标用 start，目录内其他所有者的目标直接 send。同一目标没有 start 前置条件；独立前台目标仍可与后台工作并存。
 

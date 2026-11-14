@@ -1620,7 +1620,7 @@ func taskEntryRetainsConversationAndNativePairsUntilClosure(replacingWithinInput
     func projected(_ value: AssistantContextState) throws -> [ChatMessage] {
         let snapshot = AgentContext(agentID: .assistant, scopeID: UUID().uuidString, state: value)
         let decision = AgentDecisionContext(snapshot: snapshot, input: input)
-        return try AgentChatRequestBuilder<AssistantContextState>().build(state: decision, batch: decision.batch())
+        return try AssistantChatRequestBuilder<AssistantContextState>().build(state: decision, batch: decision.batch())
             .messages(system: "fixture", user: "保存当前照片")
     }
     let active = try projected(state)
@@ -1649,7 +1649,7 @@ func taskEntryRetainsConversationAndNativePairsUntilClosure(replacingWithinInput
     let context = try AgentContextRepository(
         agent: .assistant, scope: UUID().uuidString, state: AssistantContextState()
     )
-    let store = AgentChatHistoryContext.store(repository: context)
+    let store = AssistantHistoryContext.store(repository: context)
     let input = UUID().uuidString
     let request = UUID().uuidString
     let task = UUID().uuidString
@@ -1714,7 +1714,7 @@ func terminalTaskCompressionKeepsChronologyAndAllSourceEvidence(status: String) 
     #expect(state.history.current.taskCompressions.count == 1 && compression.sources.count == 2)
     #expect(compression.status.rawValue == status && compression.failure == skills.tasks[0].failure)
     #expect(try evidenceEncoder.encode(state.history.current.turns) == before)
-    let messages = try AgentChatContextBuilder.request(
+    let messages = try AssistantHistoryProjection.request(
         system: "system", user: "next", conversation: state.history.current,
         templates: AgentPrompts.load(named: "Assistant"))
     let texts = messages.map(\.content)
@@ -1973,7 +1973,7 @@ func queryActionAdmissionRenewsButParameterRejectionDoesNot(executionFails: Bool
     let context = try AgentContextRepository(
         agent: .assistant, scope: UUID().uuidString, state: AssistantContextState()
     )
-    let store = AgentChatHistoryContext.store(repository: context)
+    let store = AssistantHistoryContext.store(repository: context)
     let input = UUID().uuidString
     _ = try await store.begin(
         id: input, user: "hello", request: [], expecting: store.readCurrent().token, model: "stub")
@@ -2424,7 +2424,7 @@ func failedLifecycleCommitCanRetryWithoutDoubleReleaseOrCountdown(operation: Str
     let context = try AgentContextRepository(
         agent: .assistant, scope: UUID().uuidString, state: initial
     )
-    let store = AgentChatHistoryContext.store(repository: context)
+    let store = AssistantHistoryContext.store(repository: context)
     _ = try await store.begin(id: input, user: "保持任务", request: [], expecting: store.readCurrent().token, model: "stub")
     try await store.finish(input, state: .completed)
     let before = try lifecycleSnapshot(try #require(try await context.snapshot().state.skillState))

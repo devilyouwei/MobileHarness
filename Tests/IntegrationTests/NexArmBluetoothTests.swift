@@ -2732,7 +2732,7 @@ extension LiveRuntimeTests {
         let link = BluetoothArmFixture()
         let workflow = bluetoothTestWorkflow(link, file: file)
         let chat = BluetoothRecoveryChat()
-        let assistant = try AgentChatWorker<AssistantContextState>(
+        let assistant = try AssistantChatWorker<AssistantContextState>(
             stateContext: try publicStateFixture(),
             chat: chat,
             context: try AgentContextRepository(
@@ -3033,7 +3033,7 @@ extension LiveRuntimeTests {
         defer { try? FileManager.default.removeItem(at: file) }
         let link = BluetoothArmFixture()
         let workflow = bluetoothTestWorkflow(link, file: file)
-        let assistant = try AgentChatWorker<AssistantContextState>(
+        let assistant = try AssistantChatWorker<AssistantContextState>(
             stateContext: try publicStateFixture(),
             chat: BluetoothRecoveryChat(),
             context: try AgentContextRepository(

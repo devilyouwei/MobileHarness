@@ -201,3 +201,14 @@ struct AssistantInputBatch {
         return try AssistantInputBatch(messages: entries, interruptedIntentions: nil).text()
     }
 }
+
+extension AgentPrompts {
+    static func assistantInput() throws -> String {
+        try text("Assistant/InputProtocol", "instructions")
+    }
+
+    /// These strings also parse recorded input envelopes and must retain their canonical spelling.
+    static func inputMarker(_ key: String, _ variables: [String: String] = [:]) throws -> String {
+        try shared.load("Agents/Assistant/InputProtocol.json", language: "en").render(key, variables: variables)
+    }
+}

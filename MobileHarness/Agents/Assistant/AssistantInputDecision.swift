@@ -3,6 +3,7 @@ import Foundation
 import ModelKit
 import ModelKitDefaults
 import Synchronization
+import UI
 
 public enum InputDisposition: String, Codable, Sendable { case enqueue, discard, interrupt }
 
@@ -461,5 +462,31 @@ public actor AssistantInputDecision {
     private func resolve(_ key: String, result: Attempt) {
         timers.removeValue(forKey: key)?.cancel()
         waiters.removeValue(forKey: key)?.resume(returning: result)
+    }
+}
+
+extension InputDecisionOutcome {
+    func logItem(for snapshot: InputDecisionSnapshot, duration: Duration) -> DecisionLogItem {
+        let route: DecisionLogItem.Route =
+            switch self.route {
+            case .local: .local
+            case .cloud: .cloud
+            case .fallback: .fallback
+            }
+        return .init(
+            id: snapshot.input.id, source: AgentID.assistant.rawValue, inputText: snapshot.text, duration: duration,
+            route: route,
+            modelResult: modelResult.map(\.logDisposition), adoptedResult: adopted.logDisposition,
+            reason: reason, requests: requests, localFallback: localFallback)
+    }
+}
+
+extension InputDisposition {
+    fileprivate var logDisposition: DecisionLogItem.Disposition {
+        switch self {
+        case .enqueue: .enqueue
+        case .discard: .discard
+        case .interrupt: .interrupt
+        }
     }
 }

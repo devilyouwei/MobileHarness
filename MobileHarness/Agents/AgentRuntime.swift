@@ -128,7 +128,7 @@ import StorageFiles
                 tasks: repositories.assistantTasks, conversations: repositories.assistantConversations,
                 logs: repositories.logs)
             let applicationControlSessionID = UUID().uuidString
-            let activity = AgentRuntimeLogWorkflow(log: log)
+            let activity = AgentRuntimeLogWorkflow(log: log, language: { AppLanguage(preferredLanguage: language()) })
             let conversations = historyStore
             let request = AgentBusinessRequest(
                 sessionID: applicationControlSessionID,
@@ -209,7 +209,7 @@ import StorageFiles
                     }, context: memoryContext)
                 let execution = business.executor
                 let catalog = business.catalog
-                try BehaviorCoverage.validate(
+                try CapabilityCoverage.validate(
                     catalog: catalog,
                     capabilities: [
                         AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities),
@@ -221,7 +221,7 @@ import StorageFiles
                             AgentConfigurations.load(named: "Photographer").capabilities),
                         historyAgent.descriptor.capabilities, applicationControlAgent.descriptor.capabilities,
                         WriterAgent.capabilities(),
-                    ] + AgentConfigurations.skillRegistries())
+                    ] + AgentConfigurations.skillRegistries(), locallyExecutedTools: AgentContracts.localToolPaths)
                 let configuration = AgentGatewayConfiguration(
                     executor: execution, catalog: catalog, policy: policy, resources: business.resources,
                     signalSummary: { input in

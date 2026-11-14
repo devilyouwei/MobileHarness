@@ -1,4 +1,5 @@
 import Foundation
+@_exported import FunctionContracts
 
 /// Source identity is attached by the runtime, never accepted from model output.
 public struct OutputEnvelope: Sendable {
@@ -58,4 +59,11 @@ extension OutputEnvelope {
             taskScope: taskScope, failure: failure, media: media, executionAttachment: executionAttachment,
             resourceBindings: bindings)
     }
+}
+
+extension ExecutionOwner {
+    public init(agent: AgentID, incarnation: String, sessionID: String) {
+        self.init(endpoint: agent.rawValue, incarnation: incarnation, sessionID: sessionID)
+    }
+    public var agent: AgentID { AgentID(rawValue: endpoint) }
 }

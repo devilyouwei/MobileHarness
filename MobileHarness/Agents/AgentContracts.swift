@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import FunctionContracts
 import StorageCore
 
 /// Application Agent names; the framework only defines the identity value type.
@@ -14,6 +15,14 @@ extension AgentID {
 }
 /// Business communication schemas and freshness policy, assembled into the generic registry.
 public enum AgentContracts {
+    /// Role-owned local implementations are assembled here, never discovered by shared loaders.
+    public static var localTools: [AgentLocalTool] {
+        WriterLocalTools.declarations.map { AgentLocalTool(owner: .writer, declaration: $0) }
+    }
+    public static var localToolPaths: Set<String> {
+        Set(localTools.map { $0.declaration.path.description })
+    }
+
     public static var communication: CommunicationContracts {
         get throws {
             try CommunicationContracts(
@@ -59,5 +68,46 @@ public enum AgentContracts {
                 }
                 try value.validate()
             })
+    }
+}
+
+/// A native function implemented inside its owning role, outside Gateway execution.
+public struct AgentLocalTool: Equatable, Sendable {
+    public let owner: AgentID
+    public let declaration: ActionDeclaration
+    public init(owner: AgentID, declaration: ActionDeclaration) {
+        self.owner = owner
+        self.declaration = declaration
+    }
+}
+
+/// Immutable module-level schema contract; local declarations confer no execution permission.
+public struct AgentFunctionCatalog: Equatable, Sendable {
+    public let declarations: [ActionDeclaration]
+    public let localTools: [AgentLocalTool]
+    public init(declarations: [ActionDeclaration], localTools: [AgentLocalTool] = []) throws {
+        guard !declarations.isEmpty, declarations.count <= 256, localTools.count <= 128,
+            Set(declarations.map(\.path)).count == declarations.count,
+            Set(localTools.map { $0.declaration.path }).count == localTools.count,
+            Set(declarations.map(\.path)).isDisjoint(with: localTools.map { $0.declaration.path }),
+            localTools.allSatisfy({ ActionIdentifier.validName($0.owner.rawValue) })
+        else { throw AgentConfigurationError.invalidField("function declarations") }
+        for declaration in declarations { try declaration.validate() }
+        for tool in localTools { try tool.declaration.validate() }
+        self.declarations = declarations.sorted { $0.path.description < $1.path.description }
+        self.localTools = localTools.sorted { $0.declaration.path.description < $1.declaration.path.description }
+    }
+
+    func validateLocalTool(path: String, callType: String, owner: AgentID?) throws {
+        guard let local = localTools.first(where: { $0.declaration.path.description == path }) else { return }
+        guard callType == "tool", local.owner == owner else {
+            throw AgentConfigurationError.invalidField("local tool ownership: " + path)
+        }
+    }
+
+    func declaration(path: String, callType: String, owner: AgentID?) throws -> ActionDeclaration? {
+        try validateLocalTool(path: path, callType: callType, owner: owner)
+        return declarations.first { $0.path.description == path }
+            ?? localTools.first { $0.declaration.path.description == path }?.declaration
     }
 }

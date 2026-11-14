@@ -127,3 +127,5 @@ Memory接受用户的HistoryInput.clearLogs并转成内部History.Conversation.c
 History clear registration and invocation share one InternalTool declaration with optional requestID. Single-row requests carry request_N; the global form omits the parameter. Parameter validation remains strict and the result is handled internally without model generation.
 
 历史详情仅呈现持久化输入、响应与业务快照；Memory 不提供重新解析旧回复的执行预览接口。真实 Action 调度及执行结果仍由其既有 owner 持有。
+
+ConversationTitleGenerator owns the Memory title-template accessor alongside title inference. Shared AgentPrompts provides locale-aware loading/rendering without embedding the Memory resource path. Template content, language selection and failure propagation retain their existing contracts.

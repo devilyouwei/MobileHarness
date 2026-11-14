@@ -46,6 +46,17 @@
         }
       }
     },
+    " (target %@, observed %@)": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "（目标 %@，观测 %@）"
+          }
+        }
+      }
+    },
     " · %@ failed: ": {
       "extractionState": "extracted",
       "localizations": {
@@ -75,6 +86,17 @@
           "stringUnit": {
             "state": "translated",
             "value": " · 缓存写入：%@ tokens"
+          }
+        }
+      }
+    },
+    " · Motor %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · 电机 %@"
           }
         }
       }
@@ -130,6 +152,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ · %@ 轮对话"
+          }
+        }
+      }
+    },
+    "%@ · %lld issues": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · %lld 个问题"
           }
         }
       }
@@ -277,6 +310,17 @@
         }
       }
     },
+    "Accepted": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已接纳"
+          }
+        }
+      }
+    },
     "Access denied": {
       "extractionState": "extracted",
       "localizations": {
@@ -284,6 +328,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "未允许访问"
+          }
+        }
+      }
+    },
+    "Action failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "操作失败"
+          }
+        }
+      }
+    },
+    "Action timed out; execution ended and step results were retained": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "操作超时；执行已结束并保留步骤结果"
           }
         }
       }
@@ -1036,6 +1102,17 @@
         }
       }
     },
+    "Cancellation request": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消请求"
+          }
+        }
+      }
+    },
     "Cancelled": {
       "extractionState": "extracted",
       "localizations": {
@@ -1043,6 +1120,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "已取消"
+          }
+        }
+      }
+    },
+    "Cancelled before execution": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "执行前已取消"
+          }
+        }
+      }
+    },
+    "Cancelling": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消中"
           }
         }
       }
@@ -1120,6 +1219,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "蜂窝网络"
+          }
+        }
+      }
+    },
+    "Channel admission failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通道接纳失败"
           }
         }
       }
@@ -1399,6 +1509,17 @@
         }
       }
     },
+    "Completed (no return value)": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已完成（无返回值）"
+          }
+        }
+      }
+    },
     "Confirm": {
       "extractionState": "extracted",
       "localizations": {
@@ -1641,6 +1762,17 @@
         }
       }
     },
+    "Could not encode execution result": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法编码执行结果"
+          }
+        }
+      }
+    },
     "Could not finish recording.": {
       "extractionState": "extracted",
       "localizations": {
@@ -1703,6 +1835,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "图片无法打开"
+          }
+        }
+      }
+    },
+    "Could not process position feedback": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法处理位置反馈"
           }
         }
       }
@@ -1824,6 +1967,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "保存失败，请重试"
+          }
+        }
+      }
+    },
+    "Could not send command": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法发送指令"
           }
         }
       }
@@ -2231,6 +2385,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "删除未完成，模型文件仍保留，请重试删除"
+          }
+        }
+      }
+    },
+    "Delivering": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "投递中"
           }
         }
       }
@@ -2719,6 +2884,17 @@
         }
       }
     },
+    "Dropped": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已丢弃"
+          }
+        }
+      }
+    },
     "Duplicate speech request": {
       "extractionState": "manual",
       "localizations": {
@@ -2807,6 +2983,17 @@
         }
       }
     },
+    "Ended": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已结束"
+          }
+        }
+      }
+    },
     "Enter an HTTPS domain without a path, query, or credentials.": {
       "extractionState": "extracted",
       "localizations": {
@@ -2836,6 +3023,61 @@
           "stringUnit": {
             "state": "translated",
             "value": "错误代码"
+          }
+        }
+      }
+    },
+    "Execution Log": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "执行日志"
+          }
+        }
+      }
+    },
+    "Execution did not complete": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "执行未完成"
+          }
+        }
+      }
+    },
+    "Execution failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "执行失败"
+          }
+        }
+      }
+    },
+    "Execution timed out": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "执行超时"
+          }
+        }
+      }
+    },
+    "Execution unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "执行不可用"
           }
         }
       }
@@ -3577,6 +3819,17 @@
         }
       }
     },
+    "Hugging Face": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hugging Face"
+          }
+        }
+      }
+    },
     "I didn't catch that.": {
       "extractionState": "extracted",
       "localizations": {
@@ -3775,6 +4028,17 @@
         }
       }
     },
+    "Invalid arguments": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参数无效"
+          }
+        }
+      }
+    },
     "Invalid configuration. Check the URL, API key, and selected model.": {
       "extractionState": "extracted",
       "localizations": {
@@ -3804,6 +4068,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "语音数据格式无效"
+          }
+        }
+      }
+    },
+    "Item %lld%@: %@%@": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 项%@: %@%@"
           }
         }
       }
@@ -4622,6 +4897,17 @@
         }
       }
     },
+    "No position feedback received": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未收到位置反馈"
+          }
+        }
+      }
+    },
     "No project directory yet": {
       "extractionState": "extracted",
       "localizations": {
@@ -4651,6 +4937,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "暂无已保存对话"
+          }
+        }
+      }
+    },
+    "No subscriber": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无订阅者"
           }
         }
       }
@@ -4728,17 +5025,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "已关闭，请在控制中心开启"
-          }
-        }
-      }
-    },
-    "Official Hugging Face": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hugging Face 官方"
           }
         }
       }
@@ -4937,6 +5223,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "已完成页面渲染检查"
+          }
+        }
+      }
+    },
+    "Partially accepted": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "部分接纳"
+          }
+        }
+      }
+    },
+    "Partially completed": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "部分完成"
           }
         }
       }
@@ -5777,6 +6085,28 @@
         }
       }
     },
+    "Registered": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已注册"
+          }
+        }
+      }
+    },
+    "Rejected": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已拒绝"
+          }
+        }
+      }
+    },
     "Related cause %@": {
       "extractionState": "extracted",
       "localizations": {
@@ -5817,6 +6147,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "重新加载配置"
+          }
+        }
+      }
+    },
+    "Removed": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已移除"
           }
         }
       }
@@ -6041,6 +6382,17 @@
         }
       }
     },
+    "Result count exceeds the declared limit": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "结果数量超过声明上限"
+          }
+        }
+      }
+    },
     "Resume download": {
       "extractionState": "extracted",
       "localizations": {
@@ -6107,6 +6459,17 @@
         }
       }
     },
+    "Robot arm connection unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "机械臂连接不可用"
+          }
+        }
+      }
+    },
     "Round %@": {
       "extractionState": "extracted",
       "localizations": {
@@ -6151,6 +6514,17 @@
         }
       }
     },
+    "Runtime failure": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "运行时故障"
+          }
+        }
+      }
+    },
     "Save": {
       "extractionState": "extracted",
       "localizations": {
@@ -6191,17 +6565,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "拍照或录像后保存到 App 相册，也可导入手机中的照片。"
-          }
-        }
-      }
-    },
-    "Save download settings": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "保存下载设置"
           }
         }
       }
@@ -6466,6 +6829,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "服务 URL，可选，留空使用 OpenAI"
+          }
+        }
+      }
+    },
+    "Set": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已设置"
           }
         }
       }
@@ -6844,6 +7218,17 @@
         }
       }
     },
+    "Started": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已开始"
+          }
+        }
+      }
+    },
     "Started at": {
       "extractionState": "extracted",
       "localizations": {
@@ -7053,6 +7438,17 @@
         }
       }
     },
+    "Suppressed": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已抑制"
+          }
+        }
+      }
+    },
     "Switch camera": {
       "extractionState": "extracted",
       "localizations": {
@@ -7163,6 +7559,17 @@
         }
       }
     },
+    "Target not reached after settling": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "稳定后未到达目标位置"
+          }
+        }
+      }
+    },
     "Task": {
       "extractionState": "extracted",
       "localizations": {
@@ -7170,6 +7577,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "任务"
+          }
+        }
+      }
+    },
+    "Task delegation": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "任务委派"
+          }
+        }
+      }
+    },
+    "Task progress": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "任务进度"
+          }
+        }
+      }
+    },
+    "Task records unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "任务记录不可用"
+          }
+        }
+      }
+    },
+    "Task result": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "任务结果"
           }
         }
       }

@@ -5,7 +5,7 @@ import StorageCache
 import UI
 
 /// Assistant-owned FIFO producer; playback and other Actions run independently.
-actor AssistantSpeechOutput: AgentSpeechOutput {
+actor AssistantSpeechOutput: AssistantSpeechProducing {
     struct Snapshot: Sendable {
         let installed: Bool
         let queued: Int
@@ -273,3 +273,16 @@ actor AssistantSpeechOutput: AgentSpeechOutput {
 public enum SpeechValidationError: Error, Equatable, Sendable { case invalidRequest }
 public enum SpeechSynthesisError: Error, Equatable, Sendable { case invalidOutput }
 private enum AssistantSpeechFailureContext { @TaskLocal static var audioID: String? }
+
+/// A role-owned text-to-audio boundary. Admission reserves a handle, not audible completion.
+public protocol AssistantSpeechProducing: Sendable {
+    func isPlaying(sessionID: String) async -> Bool?
+    func prepare(text: String, input: AgentInput) async throws -> String
+    func cancel(audioID: String, input: AgentInput) async throws
+    func cancel(input: AgentInput) async
+    func stop() async
+}
+
+extension AssistantSpeechProducing {
+    public func isPlaying(sessionID: String) async -> Bool? { nil }
+}

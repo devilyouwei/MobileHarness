@@ -57,7 +57,7 @@ import Testing
     #expect(activity.notice == nil)
 }
 
-@Test @MainActor func noticeVisibilityRestoresRetainedBottomCaptionsAndSleepRetainsBoth() {
+@Test @MainActor func noticeVisibilityRestoresRetainedBottomCaptionsAndSleepClearsBoth() {
     let state = ConversationState()
     state.isVoiceActive = true
     state.liveTranscript = "用户说话"
@@ -69,7 +69,7 @@ import Testing
     #expect(ConversationCaptionVisibility.reply(hasNotice: false))
     #expect(ConversationCaptionVisibility.user(isListening: true, finalized: true, hasNotice: true))
     state.isVoiceActive = false
-    #expect(state.liveTranscript == "用户说话" && state.assistantReply == "正在回复" && !state.transcriptFinalized)
+    #expect(state.liveTranscript.isEmpty && state.assistantReply.isEmpty && !state.transcriptFinalized)
     #expect(state.displayedExpression == .closed)
 }
 
@@ -94,7 +94,7 @@ import Testing
     effects.replyDidFinish()
     state.isVoiceActive = false
     effects.replyDidBegin()
-    #expect(state.assistantReply == "关闭时的字幕")
+    #expect(state.assistantReply.isEmpty)
     state.resetCaptions()
     #expect(state.assistantReply.isEmpty && state.liveTranscript.isEmpty)
     effects.stop()

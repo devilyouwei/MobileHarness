@@ -850,7 +850,7 @@ if 'camera.shutdown()' in assembly or 'bluetooth.setForeground(' in assembly:
 app_scene = (ROOT / 'MobileHarness/App/Composition/AppComposition.swift').read_text()
 if 'actions.setCameraVisible(' in app_scene:
     errors.append('Home navigation must not control camera window capture')
-agent_gateway = (ROOT / 'MobileHarness/Agents/Support/AgentGatewayBindings.swift').read_text()
+agent_gateway = (ROOT / 'MobileHarness/Agents/Support/AgentGatewayAssembly.swift').read_text()
 if 'GatewayContainer' in agent_gateway or '.configureExecution(' in agent_gateway:
     errors.append('Agents must not configure Gateway roots')
 bluetooth_binding = (ROOT / 'MobileHarness/App/Composition/ServiceFactories.swift').read_text()
@@ -1040,15 +1040,22 @@ for layer, allowed in {
         if imports - source_allowed:
             errors.append(f'Forbidden Support/{layer} imports {sorted(imports - source_allowed)}: {source.relative_to(ROOT)}')
 
+# Shared Chat consumes neutral model/communication values, never a role's conversation schema.
 for source in (support / 'Chat').glob('*.swift'):
-    if re.search(r'\b(?:AssistantContextState|AssistantContextBuilder|PhotographerAgent|MemoryAgent|ApplicationControlAgent|CameraStateObservation)\b', source.read_text()):
+    if re.search(r'\b(?:Assistant\w*|Writer\w*|InputDecision\w*|InputDisposition|PhotographerAgent|MemoryAgent|ApplicationControlAgent|CameraStateObservation)\b', source.read_text()):
         errors.append(f'Shared Chat must not interpret a concrete role schema: {source.name}')
+for name in ('AgentConfigurations.swift', 'CapabilityCoverage.swift', 'RuntimeLogProjection.swift'):
+    if re.search(r'\b(?:WriterLocalTools|InputDecision\w*|InputDisposition)\b', (support / name).read_text()):
+        errors.append(f'Shared mechanism must receive role declarations/presentation externally: {name}')
+for name in ('AgentHostBindings.swift', 'AgentGatewayPorts.swift'):
+    if not (ROOT / 'MobileHarness/Agents' / name).is_file() or (support / name).exists():
+        errors.append(f'Module composition contract must belong to Agents root: {name}')
 
 # Core owns generic contracts, never built-in application Agents or speech policy.
 core_dependencies = [next(iter(d.values()))[0] for d in targets['AgentCore'].get('dependencies', [])]
 if core_dependencies != ['FunctionContracts']:
     errors.append('AgentCore may consume neutral function values only, without execution or business implementations')
-core_identity = (ROOT / 'MobileHarness/Agents/Support/Core/AgentID.swift').read_text()
+core_identity = (ROOT / 'MobileHarness/Agents/Support/Core/AgentDescriptor.swift').read_text()
 if 'public static let' in core_identity:
     errors.append('Concrete application Agent identities belong to Agents')
 core_prompt = (ROOT / 'MobileHarness/Agents/Support/Core/Capability/CapabilityContextBuilder.swift').read_text()
@@ -1405,7 +1412,7 @@ for source in (ROOT / 'MobileHarness').rglob('*.swift'):
 context_repository = (ROOT / 'MobileHarness/Agents/Support/Context/AgentContextRepository.swift').read_text()
 if 'installPublicProjection' in context_repository:
     raise SystemExit('Private AgentContext must not be registered in public State.')
-for relative in ('Agents/Assistant/AssistantProcessing.swift', 'Agents/Support/Chat/AgentChatWorker.swift'):
+for relative in ('Agents/Assistant/AssistantProcessing.swift', 'Agents/Assistant/AssistantChatWorker.swift'):
     text = (ROOT / 'MobileHarness' / relative).read_text()
     if any(label in text for label in ('Task transition result (data)', 'Runtime camera facts (data', 'Current task and Skill state (data')):
         raise SystemExit(f'{relative}: Retired synthetic state-user injection must not return.')
@@ -1754,7 +1761,7 @@ for owner, names in {
 for retired in ('AgentApplicationUI.swift', 'InteractionServices.swift', 'ApplicationSignals.swift'):
     if list((ROOT / 'MobileHarness/Agents').rglob(retired)):
         raise SystemExit(f'Retired Support implementation remains: {retired}')
-chat_worker = (ROOT / 'MobileHarness/Agents/Support/Chat/AgentChatWorker.swift').read_text()
+chat_worker = (ROOT / 'MobileHarness/Agents/Assistant/AssistantChatWorker.swift').read_text()
 assistant_state = (ROOT / 'MobileHarness/Agents/Assistant/AssistantProcessing.swift').read_text()
 memory_agent = (ROOT / 'MobileHarness/Agents/Memory/MemoryAgent.swift').read_text()
 if not all((
@@ -1768,7 +1775,7 @@ print('Support ownership, retired policies and fixed Memory commit confirmation 
 
 # Shared mechanisms never decode concrete role business schemas or construct the application graph.
 for source in support.glob('*.swift'):
-    if source.name not in {'AgentConfigurations.swift', 'AgentSkillLoader.swift', 'AgentUIRequests.swift', 'AgentInputMetrics.swift', 'ContainerFailureChannel.swift', 'AgentContainerLifecycle.swift', 'ActionActivityPresentation.swift', 'AgentRuntimeLogWorkflow.swift', 'ActionDispatcher.swift', 'AgentBusinessPorts.swift', 'AgentGatewayBindings.swift', 'BehaviorCoverage.swift', 'ExecutionRouter.swift', 'GatewayProjections.swift', 'IndependentOutputWorkflow.swift', 'InputGateway.swift', 'OutputExecutionResult.swift', 'OutputGateway.swift', 'OutputValidator.swift', 'ToolDispatcher.swift'}:
+    if source.name not in {'AgentConfigurations.swift', 'AgentSkillLoader.swift', 'AgentUIRequests.swift', 'AgentInputMetrics.swift', 'ContainerFailureChannel.swift', 'AgentContainerLifecycle.swift', 'RuntimeLogProjection.swift', 'AgentRuntimeLogWorkflow.swift', 'ActionDispatcher.swift', 'AgentGatewayAssembly.swift', 'CapabilityCoverage.swift', 'ExecutionRouter.swift', 'GatewayProjections.swift', 'IndependentOutputWorkflow.swift', 'InputGateway.swift', 'OutputExecutionResult.swift', 'OutputGateway.swift', 'ToolDispatcher.swift'}:
         raise SystemExit(f'Concrete assembly in Agent Support: {source.relative_to(ROOT)}')
 for source in list((support / 'Chat').glob('*.swift')) + [(support / 'Communication/AgentTasks.swift')]:
     if re.search(r'\b(?:AssistantSessionControl|PhotographerCameraIntent|MemoryHistoryIntent|AppInteractionIntent|ModelResourceIntent|ProviderSettingsIntent|ProviderDiscoveryIntent)\b', source.read_text()):

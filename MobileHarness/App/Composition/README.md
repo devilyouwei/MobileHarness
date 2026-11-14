@@ -116,3 +116,5 @@ ApplicationActionAssembly 传递 Decision 配置读取、分类状态与队列�
 Assistant 会话使用角色自身的 UI.Island 权限发布 Decision 反馈。App 继续装配通用 Gateway 与 UI 渲染端口。
 
 ApplicationActionAssembly 将 ActionsBusinessBindings.readWebScreenshot 直接透传给 AgentBusinessBindings。Actions.Web 拥有当前截图，AgentRuntime 注册 actions.web.screenshot，App 不存储、压缩或解读图片；原 Camera readPhoto 网页桥接已删除。
+
+ApplicationActionAssembly receives the existing selected-language reader from ServiceFactories and passes its current value into ActionActivityItem projection for each execution snapshot. The language preference remains App-owned; projection does not rewrite canonical identities, business return values or producer diagnostic evidence.

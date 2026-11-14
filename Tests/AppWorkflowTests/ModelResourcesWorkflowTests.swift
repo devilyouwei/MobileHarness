@@ -93,3 +93,35 @@ import Testing
     #expect(values.allSatisfy { $0.endpoint == "https://example.invalid" })
     #expect(fixture.restores == 1)
 }
+
+@MainActor @Test(.timeLimit(.minutes(1)))
+func changingSourceLeavesAdmittedDownloadSnapshotUnchanged() async throws {
+    var saved = ModelResourceSourceDraft()
+    var endpoints: [String] = []
+    var admission: CheckedContinuation<Void, Never>?
+    let started = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let client = ModelResourcesClient(
+        read: { _ in .init(items: []) }, restore: { saved },
+        save: {
+            saved = $0
+            return $0
+        },
+        download: { _, source in
+            if endpoints.isEmpty {
+                await withCheckedContinuation {
+                    admission = $0
+                    started.continuation.yield(())
+                }
+            }
+            endpoints.append(source.endpoint)
+        }, cancel: { _ in }, remove: { _ in })
+    var events = started.stream.makeAsyncIterator()
+    let first = Task { try await client.download("first") }
+    await events.next()
+    try await client.saveSource(.init(endpoint: "https://hf-mirror.com"))
+    admission?.resume()
+    try await first.value
+    try await client.download("second")
+    #expect(endpoints == ["https://huggingface.co", "https://hf-mirror.com"])
+    await client.shutdown()
+}

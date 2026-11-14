@@ -601,7 +601,7 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
     let repository = try AgentContextRepository(
         agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState()
     )
-    let store = AgentChatHistoryContext.store(repository: repository)
+    let store = AssistantHistoryContext.store(repository: repository)
     let agent = try AssistantAgent(stateContext: try publicStateFixture(), conversations: store, context: repository)
     try await agent.start()
     let input = UUID().uuidString

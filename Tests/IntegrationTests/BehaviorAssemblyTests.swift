@@ -116,7 +116,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     #expect(await assembly.tools.handler(for: "Artifacts.Workspace.open") != nil)
     #expect(await assembly.tools.handler(for: "Artifacts.Workspace.read") != nil)
     #expect(await assembly.tools.handler(for: "Artifacts.Workspace.perform") == nil)
-    try BehaviorCoverage.validate(
+    try CapabilityCoverage.validate(
         actions: assembly.actions, toolPaths: assembly.toolPaths,
         capabilities: [
             AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities),
@@ -159,7 +159,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     let permissions = try CapabilityRegistry(internalTools: [InternalTool(path: "Missing.Control.tool")])
     #expect(throws: HarnessError.forbiddenTool) {
         let assembly = try BehaviorAssembly(actionModules: [], toolModules: [])
-        try BehaviorCoverage.validate(
+        try CapabilityCoverage.validate(
             actions: assembly.actions, toolPaths: assembly.toolPaths, capabilities: [permissions])
     }
 }

@@ -7,7 +7,7 @@ public enum AgentConfigurations {
     private final class Cache: @unchecked Sendable {
         let lock = NSLock()
         var assets: [String: Data] = [:]
-        var declarations: [ActionDeclaration]?
+        var functions: AgentFunctionCatalog?
         var agents: [String: AgentConfiguration] = [:]
         var skills: [String: Skill] = [:]
         var functionCopy: AgentFunctionCopy?
@@ -15,23 +15,25 @@ public enum AgentConfigurations {
     private static let cache = Cache()
     /// Install the production projection before loading any Agent or Skill registry.
     /// Identical reinstallation is harmless; replacement cannot mutate cached/in-flight catalogs.
-    public static func installDeclarations(_ declarations: [ActionDeclaration]) throws {
-        guard !declarations.isEmpty, declarations.count <= 256,
-            Set(declarations.map(\.path)).count == declarations.count
-        else {
-            throw AgentConfigurationError.invalidField("function declarations")
-        }
-        for declaration in declarations { try declaration.validate() }
-        let sorted = declarations.sorted { $0.path.description < $1.path.description }
+    public static func installDeclarations(
+        _ declarations: [ActionDeclaration], localTools: [AgentLocalTool] = []
+    ) throws {
+        let catalog = try AgentFunctionCatalog(declarations: declarations, localTools: localTools)
         try cache.lock.withLock {
-            if let installed = cache.declarations {
-                guard installed == sorted else {
+            if let installed = cache.functions {
+                guard installed == catalog else {
                     throw AgentConfigurationError.invalidField("catalog already installed")
                 }
             } else {
-                cache.declarations = sorted
+                cache.functions = catalog
             }
         }
+    }
+    private static func installedCatalog() throws -> AgentFunctionCatalog {
+        guard let catalog = cache.lock.withLock({ cache.functions }) else {
+            throw AgentConfigurationError.resourceMissing("injected Action declarations")
+        }
+        return catalog
     }
     public struct Binding: Codable, Sendable, Equatable {
         public let path: String
@@ -81,9 +83,6 @@ public enum AgentConfigurations {
             guard version == 3, revision > 0, owner.map({ ActionIdentifier.validName($0) }) ?? true,
                 dependencies.count <= 16,
                 useActions.count <= 128, Set(useActions.map(\.path)).count == useActions.count,
-                useActions.allSatisfy({ binding in
-                    !WriterLocalTools.contains(binding.path) || (owner == "writer" && binding.callType == "tool")
-                }),
                 useStates.count <= 16, Set(useStates).count == useStates.count,
                 useStates.allSatisfy({
                     !$0.isEmpty && $0.utf8.count <= 256 && $0.split(separator: ".").count >= 2 && !$0.hasPrefix(".")
@@ -235,12 +234,20 @@ public enum AgentConfigurations {
         guard let path = try catalog().skills[id] else { throw AgentConfigurationError.resourceMissing(id) }
         let value = try JSONDecoder().decode(Skill.self, from: data(path))
         guard value.id == id else { throw AgentConfigurationError.invalidFormat }
+        let functions = try installedCatalog()
+        for binding in value.useActions {
+            try functions.validateLocalTool(
+                path: binding.path, callType: binding.callType, owner: value.owner.map(AgentID.init(rawValue:)))
+        }
         cache.lock.withLock { cache.skills[id] = value }
         return value
     }
     /// Independent catalogs for implementation coverage; Skills need not all compose together.
     public static func skillRegistries() throws -> [CapabilityRegistry] {
-        try catalog().skills.keys.sorted().map { try registry(skill($0).useActions) }
+        try catalog().skills.keys.sorted().map {
+            let selected = try skill($0)
+            return try registry(selected.useActions, owner: selected.owner.map(AgentID.init(rawValue:)))
+        }
     }
     public static func baseSkills(named name: String) throws -> [String] {
         try resource(named: name).baseSkills
@@ -295,7 +302,7 @@ public enum AgentConfigurations {
         }
         let owner = AgentID(rawValue: metadata.id)
         let expanded = try AgentSkillLoader.expand(metadata.baseSkills, owner: owner)
-        let generated = try declaration(AgentSkillLoader.bindings(expanded, owner: owner))
+        let generated = try declaration(AgentSkillLoader.bindings(expanded, owner: owner), owner: owner)
         root.removeValue(forKey: "baseSkills")
         root.removeValue(forKey: "description")
         root["version"] = 8
@@ -307,8 +314,8 @@ public enum AgentConfigurations {
         cache.lock.withLock { cache.agents[name] = configuration }
         return configuration
     }
-    public static func registry(_ bindings: [Binding]) throws -> CapabilityRegistry {
-        let d = try declaration(bindings, localize: AgentPrompts.language == "zh-Hans")
+    public static func registry(_ bindings: [Binding], owner: AgentID? = nil) throws -> CapabilityRegistry {
+        let d = try declaration(bindings, owner: owner, localize: AgentPrompts.language == "zh-Hans")
         let root: [String: Any] = [
             "version": 8, "id": "catalog", "category": "perception", "actions": d.actions, "tools": d.tools,
             "communication": ["inputs": [], "subscriptions": [], "publications": [], "sends": []],
@@ -316,25 +323,24 @@ public enum AgentConfigurations {
         let configuration = try AgentConfiguration(data: JSONSerialization.data(withJSONObject: root))
         return configuration.capabilities
     }
-    private static func declaration(_ bindings: [Binding], localize: Bool = false) throws -> (
+    private static func declaration(_ bindings: [Binding], owner: AgentID? = nil, localize: Bool = false) throws -> (
         actions: [String: [[String: Any]]], tools: [[String: Any]]
     ) {
         guard bindings.count <= 128, Set(bindings.map(\.path)).count == bindings.count else {
             throw GenerationError.duplicateAlias
         }
-        guard let definitions = cache.lock.withLock({ cache.declarations }) else {
-            throw AgentConfigurationError.resourceMissing("injected Action declarations")
-        }
+        let functions = try installedCatalog()
         var actions: [String: [[String: Any]]] = ["Speech": [], "Display": []]
         var tools: [[String: Any]] = []
         let copy = localize ? try functionCopy() : nil
         for binding in bindings {
-            guard
-                let canonical = binding.path == "Agent.Communication.send"
-                    ? AgentTaskCommunication.sendDeclaration
-                    : definitions.first(where: { $0.path.description == binding.path })
-                        ?? WriterLocalTools.declarations.first(where: { $0.path.description == binding.path }),
-                ["action", "tool"].contains(binding.callType)
+            let selected: ActionDeclaration?
+            if binding.path == "Agent.Communication.send" {
+                selected = AgentTaskCommunication.sendDeclaration
+            } else {
+                selected = try functions.declaration(path: binding.path, callType: binding.callType, owner: owner)
+            }
+            guard let canonical = selected, ["action", "tool"].contains(binding.callType)
             else {
                 throw AgentConfigurationError.invalidField(binding.path)
             }

@@ -5,7 +5,7 @@ import StorageCore
 @testable import Agents
 
 /// Tests inspect the text-to-handle boundary without running a model or device.
-actor SpeechRequestProbe: AgentSpeechOutput {
+actor SpeechRequestProbe: AssistantSpeechProducing {
     var requests: [String: String] = [:]
     var beforePrepare: (@Sendable () async throws -> Void)?
     var prepared: (@Sendable (String, String) async -> Void)?
@@ -36,9 +36,9 @@ actor SpeechRequestProbe: AgentSpeechOutput {
     func restored(_ outputs: [AgentOutput]) -> [AgentOutput] { outputs.map(restored) }
 }
 private protocol FixtureSpeechBindable: Sendable {
-    func bindSpeechOutput(_ value: any AgentSpeechOutput) async throws
+    func bindSpeechOutput(_ value: any AssistantSpeechProducing) async throws
 }
-extension AgentChatWorker: FixtureSpeechBindable {}
+extension AssistantChatWorker: FixtureSpeechBindable {}
 func bindSpeechRequests(_ agent: any Agent) async throws -> SpeechRequestProbe {
     let probe = SpeechRequestProbe()
     guard let target = agent as? any FixtureSpeechBindable else { throw HarnessError.unsupportedInput }

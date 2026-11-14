@@ -12,3 +12,9 @@
 Physical-device permission dialogs, Lock Screen and Dynamic Island presentation, microphone recognition in both Apple locales, Nemotron automatic recognition, and real-model cross-language Assistant and Writer behavior require separate device and model acceptance.
 
 The later [Decision language comparison](Decision-Model-Mac-Comparison.md#decision-prompt-language-split) runs the current Swift classifier with both prompt locales and the prior mixed prompt on the same bilingual scenarios. It records both raw classifications and adopted dispositions.
+
+## Execution Log title and download-source copy (2026-11-14)
+
+The Execution Log panel title and entry accessibility label now resolve the environment locale through AppLanguage. English displays Execution Log; Chinese displays 执行日志. The shared download-source label displays Hugging Face in both languages without Official/官方.
+
+The focused `applicationLanguageResolvesSystemFallbackAndRestoresOverrides` test passed, including both titles and both source labels. Final `scripts/build-ios.sh` passed all four targets and bundle checks. Swift formatting, catalog parsing and `git diff --check` passed. `scripts/check.sh` was attempted but blocked at manifest inspection by sandbox writes to compiler caches; this follow-up does not claim a full-suite pass. Logs: `/tmp/mobileharness-title-tests.log`, `/tmp/mobileharness-title-ios.log`, `/tmp/mobileharness-title-check.log`. No new native UI interaction acceptance was performed.

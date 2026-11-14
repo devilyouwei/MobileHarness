@@ -6,13 +6,13 @@
 
 <p align="center">Apple-native · Bio-inspired · Embodied Agent · Full-duplex · Multimodal · Multi-Agent · Mobile Agent</p>
 
-MobileHarness is a bio-inspired, multimodal agentic app that turns your phone into an embodied agent capable of serving as a robot’s brain and controlling its movements. Built around a **Perception → Cognition → Action** loop, it coordinates the phone's hardware and sensors, such as its camera, microphone and speaker, so Agents can perceive the world, understand users, reason, converse and act. You can now use MobileHarness to connect your iPhone to a **NexArm** robotic arm and control it to carry out grounded tasks.
+MobileHarness is a bio-inspired agentic app that makes your smartphone an embodied agent capable of serving as a robot’s brain and controlling its movements. Built around a **Perception → Cognition → Action** agent loop, it coordinates the phone's hardware and sensors, such as its camera, microphone and speaker, so Agents can perceive the world, understand users, reason, converse and act. You can now use **MobileHarness** to connect your iPhone to a **NexArm** robotic arm and control it to carry out grounded tasks.
 
 <p align="center">
   <img src="docs/imgs/perception-cognition-action.svg" alt="Perception, Cognition and Action form a counterclockwise loop connected by Internal Signals. A dashed External Signal arrow enters Perception from outside the loop.">
 </p>
 
-In MobileHarness, _every input is a Signal; every output is an Action_. Signals carry information through the **Perception → Cognition → Action** loop. External Signals bring observations from the world and user interactions into perception; Internal Signals connect the three stages, carrying interpreted information, intent and feedback. Native inputs reach their responsible Agents through typed ports, while Gateway coordinates inter-Agent communication and Action execution. Agents interpret inputs, decide what to do and act through the phone's capabilities; actual outcomes feed back into the loop. The goal is human-like interaction: _receiving multi-channel Signal input while producing multi-channel Action output_.
+In MobileHarness, _every input is a Signal; every output is an Action_. Signals carry information through the **Perception → Cognition → Action** loop. External Signals bring observations from the world and user interactions into perceptions. Internal Signals connect the three stages, carrying interpreted information, intent and feedback. **Gateway** is the Signal highway, carrying processed information between Agents. Agents interpret Signals, decide what to do and take Actions; the outcomes return as Signals to close the loop. Human interaction is full-duplex—_receiving multi-channel Signal input while producing multi-channel Action output_—and this is the pattern that informs our design.
 
 <p align="center">
   <img src="docs/imgs/task-skill-capabilities.svg" alt="An Agent manages a Task and loads Skills. Each Skill declares Actions, read-only States, Instructions and dependencies on other Skills.">
@@ -87,7 +87,7 @@ On an audio route with active echo cancellation, the Assistant keeps listening w
 
 The current frontend has no text-entry field. Native and model failures are reported explicitly. An active inference request stays with its selected provider.
 
-Model downloads use an explicit official Hugging Face, HF-Mirror or custom HTTPS source; YOLO retains its declared ZIP source. Production revisions remain pinned. Background transfer and resume depend on the OS and server; force-quit does not guarantee continued transfer. See [model resources](MobileHarness/Resources/Models/README.md) and the [Hub adapter](MobileHarness/ModelKit/Support/Management/HuggingFace/README.md) for acquisition, compatibility and recovery details.
+Model downloads use an explicit Hugging Face, HF-Mirror or custom HTTPS source; YOLO retains its declared ZIP source. Production revisions remain pinned. Background transfer and resume depend on the OS and server; force-quit does not guarantee continued transfer. See [model resources](MobileHarness/Resources/Models/README.md) and the [Hub adapter](MobileHarness/ModelKit/Support/Management/HuggingFace/README.md) for acquisition, compatibility and recovery details.
 
 For offline development and opt-in Mac/model tests, existing `scripts/download-*.py` wrappers provision ignored local artifacts; Hugging Face wrappers accept `--endpoint`. Gemma Mac tests use a separate decoder profile. For voice experiments and acceptance procedures, see [Voice](docs/validation/Voice.md) and [MOSS validation](docs/validation/Moss-Validation.md).
 

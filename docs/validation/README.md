@@ -194,3 +194,9 @@ refactor, Agent-only model recording, current-file recovery and automated/build/
 - [小参数生成模型的 Core AI 对照](Decision-Model-Mac-Comparison.md#小参数生成模型的-core-ai-对照)记录 0.6B 至 1.54B 制品在 100 条中英全双工探测上的分类、延迟和提示词复测。
 
 [资源刷新过期误报](Resource-Refresh-Supersession.md)：保存成功快速离页后的迟到刷新、二次错误提示、失败保留和设备交付证据。
+
+- [Agents Support consolidation](Agents-Support-Cleanup.md): source ownership, localization regression coverage, reference checks and required build/test outcomes.
+
+[Agents responsibility boundaries](Agents-Responsibility-Boundaries.md) records role/shared/root ownership regressions and the remaining Metal Toolchain build blocker.
+
+- [模型下载源](Model-Download-Source.md)：系统语言默认、源快照隔离与构建验证。

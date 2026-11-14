@@ -347,20 +347,29 @@ import Testing
     await root.stop()
 }
 
-@Test @MainActor func listeningToggleRetainsOwnedCaptionsUntilRootInvalidation() async throws {
+@Test @MainActor func listeningToggleClearsBothCaptionsAndReopensEmpty() async throws {
     let root = UIContainer()
     try root.start()
     try root.setForeground(true)
     let state = root.home.conversation
-    state.isVoiceActive = true
-    state.presentTranscript("retained user")
-    state.finishUserTranscript()
-    state.appendReply("retained reply")
-    state.isVoiceActive = false
-    #expect(state.liveTranscript == "retained user" && state.transcriptFinalized)
-    #expect(state.assistantReply == "retained reply")
-    state.isVoiceActive = true
-    #expect(state.liveTranscript == "retained user" && state.assistantReply == "retained reply")
+    for _ in 0..<2 {
+        #expect(state.present(.isVoiceActive(true)))
+        #expect(state.liveTranscript.isEmpty && state.assistantReply.isEmpty)
+        state.presentTranscript("previous user")
+        state.finishUserTranscript()
+        state.appendReply("previous reply")
+        state.presentReplyWaiting(true, requestID: "waiting")
+        state.assistantReplyOpacity = 0.5
+        #expect(state.present(.isVoiceActive(false)))
+        #expect(state.liveTranscript.isEmpty && !state.transcriptFinalized)
+        #expect(state.assistantReply.isEmpty && state.assistantReplyOpacity == 1)
+        #expect(state.replyWaitingRequest == nil)
+    }
+    #expect(state.present(.isVoiceActive(true)))
+    #expect(state.liveTranscript.isEmpty && state.assistantReply.isEmpty)
+    state.presentTranscript("new user")
+    state.appendReply("new reply")
+    #expect(state.liveTranscript == "new user" && state.assistantReply == "new reply")
     root.invalidate()
     #expect(state.liveTranscript.isEmpty && !state.transcriptFinalized && state.assistantReply.isEmpty)
     await root.stop()

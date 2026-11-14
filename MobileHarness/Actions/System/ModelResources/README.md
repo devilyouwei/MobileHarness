@@ -47,3 +47,5 @@ D3 Decision 和 Gemma 在 Agent Brains 共用下载源，分别由模型资源�
 下载设置保留旧 useLocalDecision 字段供 [Provider 设置](../Provider/README.md) 在升级时读取，保存下载设置时保持旧值。当前 Decision 主来源及备用由 Provider 设置拥有。删除或缺少 D3 时按已提交备用配置处理。
 
 ResourcePresentationAdapter 在校验根接纳与会话后，将小于当前 refreshGeneration 的有效刷新/错误呈现视为已被替代并正常结束；不写 UI、不 acknowledge，不触发二次失败。当前序号仍应用实际快照或错误；无效/未来序号、外来会话和根关闭继续拒绝。Provider 保存事务不受页面刷新替代影响。
+
+未存储偏好时，ModelResourcePreferencesService 按系统首选语言初始化下载源：zh（含简繁体）为 HF Mirror (China)，其他语言为 Hugging Face。已保存 endpoint 优先于系统语言。语言读取可注入，独立于应用界面语言。下载前提交当前源，ModelResourcesClient 将源值传入下载请求；后续偏好编辑不修改在途任务。

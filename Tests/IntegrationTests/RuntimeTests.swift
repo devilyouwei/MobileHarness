@@ -75,7 +75,7 @@ import Testing
     }
     try OutputValidator.validate(.scheduling(.beginWait), descriptor: descriptor)
     let restricted = AgentDescriptor(
-        category: .cognition, id: .assistant, name: "restricted", inputs: [.text], outputs: [.text])
+        category: .cognition, id: .assistant, name: "restricted", inputs: [.text], outputs: [])
     #expect(throws: HarnessError.forbiddenOutput) {
         try OutputValidator.validate(.control("start"), descriptor: restricted)
     }

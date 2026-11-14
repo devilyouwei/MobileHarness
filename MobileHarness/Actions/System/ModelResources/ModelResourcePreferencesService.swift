@@ -57,15 +57,18 @@ public actor ModelResourcePreferencesService: ModelResourcePreferencesCapability
     private let validate: @Sendable (ModelResourcePreferences) async throws -> ModelResourcePreferences
     private let installed: @Sendable () async throws -> Set<String>
     private var store: (any DocumentStore<ModelResourcePreferences>)?
+    private let preferredLanguage: @Sendable () -> String?
     private var changing = false
     public init(
         store: @escaping @Sendable () throws -> any DocumentStore<ModelResourcePreferences>,
         validate: @escaping @Sendable (ModelResourcePreferences) async throws -> ModelResourcePreferences,
-        installed: @escaping @Sendable () async throws -> Set<String>
+        installed: @escaping @Sendable () async throws -> Set<String>,
+        preferredLanguage: @escaping @Sendable () -> String? = { Locale.preferredLanguages.first }
     ) {
         makeStore = store
         self.validate = validate
         self.installed = installed
+        self.preferredLanguage = preferredLanguage
     }
     private func persistence() throws -> any DocumentStore<ModelResourcePreferences> {
         if let store { return store }
@@ -82,7 +85,12 @@ public actor ModelResourcePreferencesService: ModelResourcePreferencesCapability
         defer { changing = false }
         try Task.checkCancellation()
         let record = try await persistence().load()
-        let value = record?.value ?? ModelResourcePreferences()
+        let language = preferredLanguage()?.lowercased().replacingOccurrences(of: "_", with: "-")
+        let isChinese = language == "zh" || language?.hasPrefix("zh-") == true
+        let value =
+            record?.value
+            ?? ModelResourcePreferences(
+                endpoint: isChinese ? "https://hf-mirror.com" : "https://huggingface.co")
         var valid = try await validate(value)
         let ids = try await installed()
         if !ResourceModelGroup.recognition.isInstalled(in: ids) { valid.useCustomRecognition = false }

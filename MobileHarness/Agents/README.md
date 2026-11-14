@@ -36,6 +36,20 @@ App binds camera/device/voice and maintenance collaboration through neutral port
 
 cognition 表示认知职责；perception 包括感知预处理、快速响应及确定性执行。类别不等于是否调用模型，不授予权限，也不自动改变调度、队列、模型选择或持久化。通信收窄和轮次有效能力投影保留原类别。
 
+## Root source ownership
+
+| File | Module-level responsibility |
+| --- | --- |
+| [AgentContainer.swift](AgentContainer.swift) | Public module root, role capability ownership, lifecycle and root state. |
+| [AgentRuntime.swift](AgentRuntime.swift) | Concrete role composition, single-use preparation/binding and runtime joins. |
+| [AgentContracts.swift](AgentContracts.swift) | Production identities, communication assembly and immutable external/local function catalog contracts. |
+| [AgentRepositories.swift](AgentRepositories.swift) | Explicit repository dependencies supplied at composition. |
+| [AgentFailure.swift](AgentFailure.swift) | Module-level structured failure and admission errors. |
+| [AgentHostBindings.swift](AgentHostBindings.swift) | App-bound host request/binding contracts spanning role coordination. |
+| [AgentGatewayPorts.swift](AgentGatewayPorts.swift) | Public cognitive Gateway configuration, capability and scoped observation contracts. |
+
+Support owns reusable adapters and mechanisms, including Gateway assembly and observation open/close. Assistant owns AssistantChatWorker, its history/state schema, Decision policy and presentation; shared Chat owns neutral model driving/recording/message projection only. Root composition installs Writer-owned local native declarations with their owner identities. Shared configuration and coverage do not discover Writer implementations.
+
 ## Roles and internal structure
 
 | Owner | Inputs and collaboration |
@@ -92,7 +106,7 @@ After Gateway admission, Skill permissions are not queried again. Revocation exp
 
 Assistant sends a persisted, authenticated message through scheduled `task.send(agent_id,text)`. The receiver decides whether to start, update or stop work and owns execution, cleanup and outcomes. Delivery only acknowledges the message. See [the cross-module sequence](../README.md#assistant-agent-delegation).
 
-Writer is the current public creative executor. It owns its control/content model workflow, local task/workspace selection, input checkpoints, Island feedback and durable completion delivery. Ordinary progress stays in Writer presentation; Gateway direct calls reach Actions.Artifacts for deterministic file work. WriterContainer exposes records to UI and joins role-owned workers. Recovery, progress/reply policy, persistent terminal notifications and task-specific limits belong to [Writer](Writer/README.md), with shared consumers in [Chat](Support/Chat/README.md). They are not implicit capabilities of every Agent or Gateway transport.
+Writer is the current public creative executor. It owns its control/content model workflow, local task/workspace selection, input checkpoints, Island feedback and durable completion delivery. Ordinary progress stays in Writer presentation; Gateway direct calls reach Actions.Artifacts for deterministic file work. WriterContainer exposes records to UI and joins role-owned workers. Recovery, progress/reply policy, persistent terminal notifications and task-specific limits belong to [Writer](Writer/README.md), with conversational feedback consumption in [Assistant](Assistant/README.md#delegation-and-peer-facts). They are not implicit capabilities of every Agent or Gateway transport.
 
 Writer's admitted edits continue through an injected ArtifactStreaming port rather than per-chunk Gateway calls. Cancel/pause/stop revoke that continuation and join model, preview and Actions release before finishing or resuming the run. Gateway tool completion only acknowledges its finite operation; it does not end the creative task. The detailed contract belongs to [Writer](Writer/README.md) and its direct execution counterpart [Artifacts](../Actions/Artifacts/README.md#执行与续写生命周期).
 
@@ -138,7 +152,7 @@ Agent task presentation belongs to the executing role: Writer publishes its crea
 
 SpeechPerception owns recognition-caption onset. Full-duplex Assistant preserves its reply caption until a real new reply begins; final ASR alone enters Decision. Perception consent/capture lifecycle remains independent of LLM generation and output execution.
 
-各角色均通过自己绑定的 Gateway consumer 调用内部灵动岛工具：SpeechPerception 拥有聆听/识别，Assistant 的语音子能力拥有合成/真实播放，Photographer 沿既有相机输入处理摄影，ApplicationControl 沿连接输入处理蓝牙提示；Assistant 同时管理自身任务、推理等待和语音输出。Actions 不设集中 UI 状态观察器代发。内部调用结果（含异常）由所属执行者处理，只有显式 LLM 调用反馈能触发 ReACT；共享机制见 [Support/Chat](Support/Chat/README.md)。
+各角色均通过自己绑定的 Gateway consumer 调用内部灵动岛工具：SpeechPerception 拥有聆听/识别，Assistant 的语音子能力拥有合成/真实播放，Photographer 沿既有相机输入处理摄影，ApplicationControl 沿连接输入处理蓝牙提示；Assistant 同时管理自身任务、推理等待和语音输出。Actions 不设集中 UI 状态观察器代发。内部调用结果（含异常）由所属执行者处理，只有显式 LLM 调用反馈能触发 ReACT；Assistant 结果来源与续轮规则见 [Assistant](Assistant/README.md#results-history-and-continuation)。
 
 Skill-selected State can carry immutable images. Camera preview policy stays in Actions; shared Context/Chat handles scope reset, request assembly, budget protection and metadata-only audit. New user input retains images; a new dialog releases explicit selections through the owner callback.
 
@@ -167,3 +181,5 @@ Assistant/Writer 的排队与请求准备不创建 message；模型实际开始�
 Decision 使用独立于 Assistant 和 Writer 的已提交配置。每次分类从注入的配置读取本地模式及可选云端工厂，在同一次分类内使用该快照。Actions 负责按 Decision 绑定创建固定模型句柄。未配置或失败时保守入队，详情见 [Assistant](Assistant/README.md)。
 
 AgentRuntime 通过 AgentBusinessBindings.readWebScreenshot 将 Actions 的当前网页图片注册为 actions.web.screenshot；WebBrowsing 选择后进入共享多模态 State。Agents 不拥有网页截图缓存、压缩或媒体回查，Assistant 不再从 Web feedback 附图。
+
+Runtime log projection resolves app-owned status and issue copy through UI.AppLanguage using the App-supplied language reader. The shared adapters preserve canonical function identity, raw result values and producer diagnostics. File ownership and bounded presentation delivery are documented in [Support](Support/README.md).

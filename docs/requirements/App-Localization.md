@@ -19,3 +19,7 @@ For Decision, run an opt-in local D3 experiment through the production request r
 ## Remaining coverage
 
 On device, verify system permissions and Live Activity presentation, Apple recognition in both locales, and Nemotron automatic recognition. Run the Assistant and Writer cross-language flows with the configured real models. The local D3 smoke test still misses one sample of a Chinese stop request with English prompts, also reproduced on the previous configuration.
+
+## Execution Log 标题修正（2026-11-14）
+
+RuntimeLogView 的面板标题和首页入口 accessibility label 通过环境 locale 与 AppLanguage 解析；共享字符串目录增加 Execution Log → 执行日志。应用语言切换后标题随视图刷新，日志数据、筛选和导航状态保持原有契约。更新 RuntimeLog README，并在已有语言测试验证中英标题。

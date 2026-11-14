@@ -107,7 +107,7 @@ flowchart LR
  Renderer --> Failure[Explicit template or size error]
 ```
 
-Role assets are described by [shared Chat](../../Chat/README.md#请求提示词与快照). Templates change model instructions; grants and executable call validation remain code/configuration contracts.
+Role assets are described by [shared Chat](../../Chat/README.md#templates-and-localization). Templates change model instructions; grants and executable call validation remain code/configuration contracts.
 
 <a id="streaming-tts-latency"></a>
 

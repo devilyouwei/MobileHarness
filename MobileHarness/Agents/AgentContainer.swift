@@ -248,7 +248,7 @@ import StorageFiles
             executionPreparationStarted = true
             try Task.checkCancellation()
             _ = try repositories()
-            try AgentConfigurations.installDeclarations(declarations)
+            try AgentConfigurations.installDeclarations(declarations, localTools: AgentContracts.localTools)
             let maintenance = AgentMaintenancePorts(
                 artifacts: { [weak self] in
                     guard let self else { throw CancellationError() }

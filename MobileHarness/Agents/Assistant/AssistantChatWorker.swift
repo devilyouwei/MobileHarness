@@ -7,7 +7,7 @@ import StorageCore
 import StorageTasks
 import UI
 
-private struct AgentChatRoundFailure: Error, CustomStringConvertible {
+private struct AssistantChatRoundFailure: Error, CustomStringConvertible {
     let cause: any Error
     let cleanup: String
     var description: String {
@@ -17,7 +17,7 @@ private struct AgentChatRoundFailure: Error, CustomStringConvertible {
 }
 
 /// Model-backed assistant; concrete model selection belongs exclusively to the composition root.
-public actor AgentChatWorker<State: AgentChatContextState>: Agent {
+public actor AssistantChatWorker<State: AssistantChatState>: Agent {
 
     // MARK: - Interface
 
@@ -28,8 +28,8 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
 
     // MARK: - State and dependencies
 
-    private(set) var speechOutput: (any AgentSpeechOutput)?
-    public func bindSpeechOutput(_ value: any AgentSpeechOutput) throws {
+    private(set) var speechOutput: (any AssistantSpeechProducing)?
+    public func bindSpeechOutput(_ value: any AssistantSpeechProducing) throws {
         guard speechOutput == nil, worker == nil, lifecycle != .stopped else { throw HarnessError.invalidTransition }
         speechOutput = value
     }
@@ -43,7 +43,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     private var taskControlInProgress = false
     private let inputAdmission = AgentAdmissionGate(capacity: 32)
     private let contextRepository: AgentContextRepository<State>
-    private let contextBuilder = AgentChatRequestBuilder<State>()
+    private let contextBuilder = AssistantChatRequestBuilder<State>()
 
     private var resultInbox = ActionResultInbox()
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
@@ -148,7 +148,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                 let snapshot = InputDecisionSnapshot(
                     input: queued.input, text: queued.text, running: running, playing: playing,
                     history: history.flatMap {
-                        AgentChatContextBuilder.decisionExchange(in: $0, before: queued.input.id)
+                        AssistantHistoryProjection.decisionExchange(in: $0, before: queued.input.id)
                     },
                     question: queued.question, receivedAt: queued.receivedAt)
                 let observedEpoch = generationEpoch
@@ -263,7 +263,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     private var outputSequence: UInt64 = 0
     private let conversations: AssistantHistoryStore
     private let observations:
-        @Sendable ([AgentChatObservation], AgentInput, any ChatCapability) async throws -> [ChatMessage]
+        @Sendable ([AssistantChatObservation], AgentInput, any ChatCapability) async throws -> [ChatMessage]
     private let modelName: @Sendable () async throws -> String
     private var generationFinishReason: String?
     private struct RoundCall {
@@ -375,7 +375,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
 
     public init(
         stateContext: AgentStateContext? = nil,
-        speechOutput: (any AgentSpeechOutput)? = nil,
+        speechOutput: (any AssistantSpeechProducing)? = nil,
         inputDecision: AssistantInputDecision? = nil, fullDuplex: Bool = false,
         decisionLog: (@MainActor @Sendable (InputDecisionSnapshot, InputDecisionOutcome, Duration) -> Void)? = nil,
         inputQueueStatus: @escaping @Sendable (Int, Int) async -> Void = { _, _ in },
@@ -388,7 +388,8 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
         communications: (any AgentMessageRepository)? = nil,
         modelName: @escaping @Sendable () async throws -> String = { "Unspecified model" },
         observations:
-            @escaping @Sendable ([AgentChatObservation], AgentInput, any ChatCapability) async throws -> [ChatMessage] =
+            @escaping @Sendable ([AssistantChatObservation], AgentInput, any ChatCapability) async throws ->
+            [ChatMessage] =
             { _, _, _ in [] },
         context: AgentContextRepository<State>,
         capabilities: CapabilityRegistry? = nil,
@@ -488,7 +489,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     public func start() async throws {
         guard lifecycle == .registered else { throw HarnessError.invalidTransition }
         _ = try await contextRepository.snapshot()
-        try await AgentChatHistoryContext.attach(repository: contextRepository, store: conversations)
+        try await AssistantHistoryContext.attach(repository: contextRepository, store: conversations)
         _ = try await conversations.readCurrent()
         if usesSkills {
             let fixedCapabilities = descriptor.capabilities
@@ -1474,7 +1475,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                         }
                     }.sorted { $0.date < $1.date }
                 for invocation in intervening {
-                    messages += try AgentChatContextBuilder.messages(for: invocation, templates: promptTemplates)
+                    messages += try AssistantHistoryProjection.messages(for: invocation, templates: promptTemplates)
                 }
                 messages += mergedResults[input.id] ?? []
                 let addsBatch = fullDuplex && (batchMembers[input.id]?.count ?? 0) > 1 && messages.last?.content != text
@@ -1815,7 +1816,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
             guard let previous = generationError, roundCalls.allSatisfy({ $0.result != nil }) else {
                 throw CapabilityError.invalidRequest(failure)
             }
-            generationError = AgentChatRoundFailure(cause: previous, cleanup: failure)
+            generationError = AssistantChatRoundFailure(cause: previous, cleanup: failure)
         }
         let deferred = deferredCommunications
         deferredCommunications.removeAll()
@@ -1916,7 +1917,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
                     guard !isInternalRuntimeCall(call), let result = call.result, result.requiresReasoning else {
                         return nil
                     }
-                    return AgentChatObservation(path: call.path, result: result)
+                    return AssistantChatObservation(path: call.path, result: result)
                 }, input, chat)
         } catch {
             try Task.checkCancellation()
@@ -2667,7 +2668,7 @@ public actor AgentChatWorker<State: AgentChatContextState>: Agent {
     }
 
     private func emitFailure(_ error: any Error, for input: AgentInput, detail: String? = nil) {
-        let cause = (error as? AgentChatRoundFailure)?.cause ?? error
+        let cause = (error as? AssistantChatRoundFailure)?.cause ?? error
         let diagnostic: AgentFailureDiagnostic
         if let model = cause as? any ChatFailureProviding {
             let cause = model.chatFailure

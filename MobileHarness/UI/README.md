@@ -107,7 +107,7 @@ Island 是多来源 App 状态的通用呈现中心：业务拥有事实和内�
 
 ui.web 按 windowID 提供网页与作品的被动会话摘要；ui.windows跨创建者提供全部窗口。两者保持各自状态所有权，公开读取不创建页面或执行脚本。
 
-Conversation字幕槽只执行各自业务拥有者显式提交的更新／清理，不因回复结束或聆听开关丢弃文字。根失效通过UIHomeContainer显式清理两个槽；具体呈现与所有权边界见 [Conversation](Conversation/README.md)。
+Conversation字幕槽接收各自业务拥有者显式提交的更新／清理，不因回复结束丢弃文字；结束聆听清空双方字幕，重新开启保持空白直到新内容到达。根失效通过UIHomeContainer显式清理两个槽；具体呈现与所有权边界见 [Conversation](Conversation/README.md)。
 
 Web 的连续本地预览在受控读取根内复用原生表面和文档，以隔离宿主 DOM 更新保持滚动、缩放及触控；完整本地导航提供视口恢复和过渡覆盖。调用方拥有快照文件与根授权，UI 不感知作品任务。具体更新、取消和失败契约见 [Web](Components/Web/README.md)。
 

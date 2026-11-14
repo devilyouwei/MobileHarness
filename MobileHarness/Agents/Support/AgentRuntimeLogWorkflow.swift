@@ -5,6 +5,7 @@ import UI
 /// Root-owned projections of Agent and Task state and delivery of failure evidence.
 @MainActor
 public final class AgentRuntimeLogWorkflow: ExecutionFailureReporting {
+    private let language: @Sendable () -> AppLanguage
     private let log: (any RuntimeLogWriting)?
     private var taskObservation: Task<Void, Never>?
     private var agentObservation: Task<Void, Never>?
@@ -12,7 +13,12 @@ public final class AgentRuntimeLogWorkflow: ExecutionFailureReporting {
     private let failureEvents = AsyncStream<RuntimeFailureEvent>.makeStream(bufferingPolicy: .bufferingOldest(100))
     private var failureDelivery: Task<Void, Never>?
     public private(set) var rejectedFailureEvents: UInt64 = 0
-    public init(log: (any RuntimeLogWriting)? = nil) { self.log = log }
+    public init(
+        log: (any RuntimeLogWriting)? = nil, language: @escaping @Sendable () -> AppLanguage = { .english }
+    ) {
+        self.log = log
+        self.language = language
+    }
     deinit {
         taskObservation?.cancel()
         agentObservation?.cancel()
@@ -156,24 +162,29 @@ public final class AgentRuntimeLogWorkflow: ExecutionFailureReporting {
                             title: signal.kind == .request ? (signal.goal ?? text) : "", phase: phase)
                         value.execution = signal.scope.execution.rawValue
                         value.skills = signal.requestedSkills ?? []
+                        let selectedLanguage = self?.language() ?? .english
                         log.record(
                             .task(
                                 value,
                                 .init(
                                     id: record.id, time: record.time,
-                                    title: signal.kind.logTitle + " · " + record.phase.displayTitle, detail: text)))
+                                    title: signal.kind.logTitle(language: selectedLanguage) + " · "
+                                        + record.phase.displayTitle(language: selectedLanguage),
+                                    detail: text)))
                     }
                 }
             } catch {
                 if !Task.isCancelled {
                     self?.recordFailure(
-                        title: "Task records unavailable", source: "runtime", message: String(describing: error))
+                        title: self?.language().text("Task records unavailable") ?? "Task records unavailable",
+                        source: "runtime", message: String(describing: error))
                 }
             }
         }
     }
     public func startAgents(statuses: @escaping @Sendable () async -> [(String, AgentLifecycle)]) {
         guard agentObservation == nil, let log else { return }
+        let language = language
         agentObservation = Task {
             var previous: [String: AgentLifecycle] = [:]
             while !Task.isCancelled {
@@ -183,10 +194,12 @@ public final class AgentRuntimeLogWorkflow: ExecutionFailureReporting {
                 for (source, lifecycle) in values where previous[source] != lifecycle {
                     log.record(
                         .agent(
-                            .init(source: source, status: lifecycle.logTitle, isFailure: lifecycle == .failed)))
+                            .init(
+                                source: source, status: lifecycle.logTitle(language: language()),
+                                isFailure: lifecycle == .failed)))
                 }
                 for source in previous.keys where current[source] == nil {
-                    log.record(.agent(.init(source: source, status: "Removed", isFailure: false)))
+                    log.record(.agent(.init(source: source, status: language().text("Removed"), isFailure: false)))
                 }
                 previous = current
                 do { try await Task.sleep(for: .seconds(1)) } catch { return }

@@ -66,7 +66,7 @@ enum WriterControlDomain: String {
     }
 
     func registry() throws -> CapabilityRegistry {
-        try AgentConfigurations.registry(AgentSkillLoader.bindings(skillIDs(), owner: .writer))
+        try AgentConfigurations.registry(AgentSkillLoader.bindings(skillIDs(), owner: .writer), owner: .writer)
     }
 
     func definitions(_ registry: CapabilityRegistry) throws -> [ChatToolDefinition] {

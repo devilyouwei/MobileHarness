@@ -234,7 +234,7 @@ import Testing
     private func serialAssistant(
         _ markup: String, workflow: BluetoothWorkflow, expected: ActionExecutionRecord.Phase
     ) async throws {
-        let assistant = try AgentChatWorker<AssistantContextState>(
+        let assistant = try AssistantChatWorker<AssistantContextState>(
             stateContext: try publicStateFixture(),
             chat: FixedTextChat(text: markup),
             context: try AgentContextRepository(

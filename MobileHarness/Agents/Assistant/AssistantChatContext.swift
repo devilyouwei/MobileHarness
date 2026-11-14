@@ -5,12 +5,12 @@ import StorageChat
 import StorageCore
 
 /// Generic lifecycle intent, independent of any role's communication contract.
-public enum AgentChatSessionControl: Sendable, Equatable { case interrupt, close }
+public enum AssistantChatControl: Sendable, Equatable { case interrupt, close }
 
 /// Role-owned business schema exposes only the fields needed by the shared Chat adapter.
-public protocol AgentChatContextState: AgentTaskContextState {
+public protocol AssistantChatState: AgentTaskContextState {
     static var supportsSkills: Bool { get }
-    static func sessionControl(_ message: AgentMessage) throws -> AgentChatSessionControl?
+    static func sessionControl(_ message: AgentMessage) throws -> AssistantChatControl?
     static var agentID: AgentID { get }
     static var configurationName: String { get }
     static var acceptsDirectedUserInput: Bool { get }
@@ -34,8 +34,8 @@ public protocol AgentChatContextState: AgentTaskContextState {
 }
 
 /// Transactional projection of the Agent-owned authoritative history.
-public enum AgentChatHistoryContext {
-    public static func attach<State: AgentChatContextState>(
+public enum AssistantHistoryContext {
+    public static func attach<State: AssistantChatState>(
         repository: AgentContextRepository<State>, store: AssistantHistoryStore
     ) async throws {
         if await store.contextIdentity == repository.scopeID { return }
@@ -45,7 +45,7 @@ public enum AgentChatHistoryContext {
             commit: { history in try await commit(history, to: repository) })
     }
 
-    public static func commit<State: AgentChatContextState>(
+    public static func commit<State: AssistantChatState>(
         _ history: AssistantArchive, to repository: AgentContextRepository<State>
     ) async throws {
         try await repository.update {
@@ -78,7 +78,7 @@ public enum AgentChatHistoryContext {
         }
     }
 
-    public static func store<State: AgentChatContextState>(
+    public static func store<State: AssistantChatState>(
         repository: AgentContextRepository<State>
     ) -> AssistantHistoryStore {
         AssistantHistoryStore(
@@ -88,8 +88,8 @@ public enum AgentChatHistoryContext {
     }
 }
 
-extension AgentChatContextState {
-    public static func sessionControl(_ message: AgentMessage) throws -> AgentChatSessionControl? { nil }
+extension AssistantChatState {
+    public static func sessionControl(_ message: AgentMessage) throws -> AssistantChatControl? { nil }
     public static func systemPrompt(_ capabilities: CapabilityRegistry, skills: AgentTaskSkillState?) throws -> String {
         try systemPrompt(capabilities) + (try skills?.instructions() ?? "")
     }
@@ -111,7 +111,7 @@ extension AgentChatContextState {
     public static func buildChatMessages(system: String, user: String, conversation: AssistantConversation)
         throws -> [ChatMessage]
     {
-        try AgentChatContextBuilder.request(
+        try AssistantHistoryProjection.request(
             system: system, user: user, conversation: conversation,
             templates: AgentPrompts.load(named: configurationName))
     }
@@ -120,12 +120,12 @@ extension AgentChatContextState {
     public static func validateCommunication(_ signal: AgentTaskSignal, state: Self) throws {}
 }
 
-public struct AgentChatObservation: Sendable {
+public struct AssistantChatObservation: Sendable {
     public let path: String
     public let result: ToolResult
 }
 
-extension AgentChatContextState {
+extension AssistantChatState {
     public func validateChatState() throws {
         try validateTaskState()
         guard history.version == 4
@@ -146,7 +146,7 @@ extension AgentChatContextState {
     }
 }
 
-extension AgentChatContextState {
+extension AssistantChatState {
     /// Host terminal facts and model-reported summary are committed with their source index.
     public mutating func reconcileTaskCompressions() {
         guard let skills = skillState else { return }

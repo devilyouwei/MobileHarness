@@ -2,90 +2,105 @@
 
 ## Ownership and compilation
 
-Support owns reusable cognitive input/execution correlation, authorization, routing, result projection, failures, configuration, Chat, Context and communication. Role-private schema interpretation remains in the owning role. Core compiles as AgentCore, depending only on FunctionContracts. Other sources compile as Agents and import Gateway public APIs plus selected foundation capabilities, without Actions/CallRuntime/ExecutionRuntime.
+Support owns reusable cognitive authorization, input/execution correlation, routing, result projection, failures, configuration, Chat, Context and communication. Role-private schemas and business policy stay in the role directory. Core compiles independently as AgentCore with FunctionContracts; other sources compile as Agents and use Gateway public APIs and selected foundations, without Actions, CallRuntime or ExecutionRuntime implementations.
 
-## Components and relationships
+Module-wide [host bindings](../AgentHostBindings.swift) and [Gateway ports](../AgentGatewayPorts.swift) belong to the Agents root. Support implements their reusable adapters. Assistant owns its [conversation orchestration](../Assistant/README.md), history selection, speech port and Decision presentation.
+
+## Root files
+
+| File | Responsibility |
+| --- | --- |
+| [RuntimeLogProjection.swift](RuntimeLogProjection.swift) | Passive execution/Agent/Task log projection and localized app-owned copy. |
+| [ActionDispatcher.swift](ActionDispatcher.swift) | Scheduled Action admission, channel ordering, finish and cancellation barriers. |
+| [ToolDispatcher.swift](ToolDispatcher.swift) | Direct Tool calls, fresh execution attachments and correlated feedback or internal completion. |
+| [ExecutionRouter.swift](ExecutionRouter.swift) | OutputValidator permission checks and side-effect-free output classification. |
+| [OutputExecutionResult.swift](OutputExecutionResult.swift) | Cognitive execution outcome, direct response and UI transaction result values. |
+| [InputGateway.swift](InputGateway.swift) | Bound role endpoints, semantic communication checks, receipts and result delivery. |
+| [OutputGateway.swift](OutputGateway.swift) | Producer identity, frozen capabilities, Task authorization, dispatch, execution scope retirement and failure ownership. |
+| [GatewayProjections.swift](GatewayProjections.swift) | Cognitive-to-neutral invocation/envelope and neutral-to-cognitive outcome conversion. |
+| [AgentGatewayAssembly.swift](AgentGatewayAssembly.swift) | Gateway assembly, scoped observation lifecycle and Action feedback adapters. |
+| [CapabilityCoverage.swift](CapabilityCoverage.swift) | Startup implementation coverage using explicitly supplied local-tool paths. |
+| [AgentConfigurations.swift](AgentConfigurations.swift) | Validated packaged role declarations, public descriptions and function catalogs. |
+| [AgentSkillLoader.swift](AgentSkillLoader.swift) | Skill dependency expansion, owner checks, function binding and teaching. |
+| [AgentContainerLifecycle.swift](AgentContainerLifecycle.swift) | Coalesced startup/transition/cleanup/shutdown, revision fencing and retained failure. |
+| [AgentUIRequests.swift](AgentUIRequests.swift) | Long-lived ordinary/control consumers, cancellation/deadlines and original reply completion. |
+| [IndependentOutputWorkflow.swift](IndependentOutputWorkflow.swift) | Bounded independent communication/round consumers and shared Island publication transport. |
+| [AgentRuntimeLogWorkflow.swift](AgentRuntimeLogWorkflow.swift) | Root-owned Agent/Task observations and bounded failure delivery. |
+| [ContainerFailureChannel.swift](ContainerFailureChannel.swift) | Bounded failure journal, classification/suppression and delivery without recursive reporting. |
+| [AgentInputMetrics.swift](AgentInputMetrics.swift) | Opt-in content-free timing and rejection diagnostics. |
+
+## Subdirectories
 
 | Area | Responsibility |
 | --- | --- |
-| InputGateway / OutputGateway | Real role/incarnation binding, semantic communication policy, frozen decision/Skill catalogs, Task grants, round/result ownership and explicit scope cancellation. |
-| ActionDispatcher / ToolDispatcher / ExecutionRouter | Cognitive output translation, protocol-specific dispatch and authorized submission to injected neutral Gateway facilities. No raw handlers or function registry. |
-| BehaviorCoverage / OutputValidator | Catalog coverage and cognitive request validation. |
-| AgentGatewayBindings / AgentBusinessPorts / GatewayProjections | App-bound neutral hosts, generic observation scopes and immutable catalog. GatewayProjections owns all cognitive-to-neutral call/envelope and outcome conversion in one place. |
-| AgentRuntimeLogWorkflow / ActionActivityPresentation | Passive Agent/Task log projection and bounded failure delivery, plus an adapter that projects scheduler snapshots into canonical function names, argument previews and actual completion text. |
-| AgentContainerLifecycle | Coalesced startup/transition/cleanup/shutdown tasks, revision fencing and preserved failure. |
-| AgentUIRequests | Long-lived ordinary/control consumers, request cancellation, processing identity and original reply completion. |
-| ContainerFailureChannel / AgentInputMetrics | Bounded failure evidence/delivery and optional content-free input diagnostics. |
-| [Chat](Chat/README.md) | Inference requests, parsing, result barriers, history and continuation. |
-| [Context](Context/README.md) | Private transactional Task/Skill state and read-only actual-container context readers. |
-| [Communication](Communication/README.md) | Role message values and fixed-task admission. |
-| [Core](Core/README.md) | Cognitive identities, input/output, lifecycle, parsing and generic role runtime. |
+| [Chat](Chat/README.md) | Model driving, recording, neutral message/result projection and templates. |
+| [Context](Context/README.md) | Private transactional Task/Skill state and read-only container context collection. |
+| [Communication](Communication/README.md) | Cross-role business values, typed messages and fixed-task admission. |
+| [Core](Core/README.md) | Independent cognitive identity/input/output, parsing and generic runtime contracts. |
 
-## Authorization, execution and Signal flow
+The [audit inventory](../../../docs/requirements/technical/Agents-Support-Cleanup.md#source-inventory) records file-level responsibility; the [ownership plan](../../../docs/requirements/technical/Agents-Responsibility-Boundaries.md) records the separation rationale. The current contracts are maintained here and in the owning directory READMEs.
 
-Roles own direct input consumers and produce OutputEnvelope with local processing identity. OutputGateway authenticates the actual producer, decision catalog and Task scope; ActionCall goes through ChannelScheduler and ToolCall through DirectExecutionDispatcher. Catalog executionPolicy metadata does not currently switch those routes. Gateway does not repeat these policy checks. Agents revokes authorization by cancelling the matching execution scope.
+## Interfaces and flow
 
-InputGateway registers neutral endpoints and applies communication contracts before sending opaque payloads through SignalTransport. Semantic role/receiver checks stay here. Results retain original causal evidence and are projected back to Agent ActionResult; history, Task advancement and continuation are cognitive decisions. Observation/diagnostic scopes use generic Gateway facilities and independent cleanup without creating another Actions root.
+```mermaid
+flowchart LR
+    Roles["Role-owned consumers"] --> Support
+    App["App-bound host ports"] --> Support
+    Support --> Gateway["Gateway public capabilities"]
+    Support --> Foundations["Model / storage / UI capabilities"]
+    Support --> Core["AgentCore"]
+```
 
-## Lifetime, bounds and failures
+```mermaid
+flowchart LR
+    Input["InputGateway / direct input"] --> Role["Role policy"]
+    Role --> Context["Context / Chat"] --> Output["OutputGateway"]
+    Output --> Policy["Validation / routing"] --> Dispatch["Action / Tool / communication"]
+    Dispatch --> Projection["Neutral Gateway invocation"]
+    Results["Gateway outcomes"] --> Input
+    Results --> Logs["Passive localized presentation"]
+```
 
-AgentContainerLifecycle holds at most one startup, transition, cleanup and shutdown worker, coalesces concurrent calls, and joins cleanup after failed/cancelled startup. Invalidation closes admission before asynchronous transitions; revisions prevent late foreground reopen. A transition/cleanup failure remains visible on later stop.
+Roles produce OutputEnvelope with local processing identity. OutputGateway authenticates producer/incarnation, frozen decision/Skill catalog and Task scope. ActionCall uses ChannelScheduler; ToolCall uses DirectExecutionDispatcher. Catalog executionPolicy metadata does not switch these routes. Gateway does not repeat cognitive authorization. Revocation explicitly cancels the matching execution scope.
 
-consumeUI has one ordinary and one control consumer, joining both on exit and closing only the matching token. Its per-request deadline is 120 seconds. AgentUIExecution bounds active requests to 64 and retained outputs per request to 64; outputs are delivered to their owning transaction or stream, never both.
+InputGateway registers neutral endpoints. Broadcast requires exact subscription; directed messages and runtime feedback require declared inputs. OutputGateway constructs broadcast metadata from registered contracts. Gateway transports opaque payloads under its own endpoint/envelope/capacity/scope checks. Action/Tool completion values have no observation-byte quota; trusted identity, Task permissions and result consistency remain mandatory. Model context selection is separate.
 
-ContainerFailureChannel retains 128 records and at most 64 pending deliveries, evicting oldest with explicit counters. One worker records delivery failure without recursive reporting; eight observers each retain a latest snapshot. Stop cancels/joins delivery before ending observations. OutputGateway owns cognitive execution-failure classification; Gateway owns neutral execution/outbox evidence. Pure cancellation remains distinct from real/mixed failure.
+AgentGatewayAssembly receives SignalTransport and GatewayAdmission, prepares communication and a neutral GatewayConfiguration, then binds returned execution/observation capabilities. App alone configures GatewayContainer. No adapter searches or configures an upstream root. Camera/device ports exclude scene, root shutdown and native idle-join controls.
 
-Role shutdown cancels only owned work and never shuts down a borrowed global scheduler/transport. App retains terminal and cleanup ports through downstream root shutdown, then unbinds. No shared adapter searches a container or directly operates a device. See [Agents](../README.md) and the [overall design](../../README.md).
+## Lifetime, capacity and failures
 
-Assistant reads the owning ApplicationControl Business facts through agents.applicationcontrol on the unified State read path. AgentBusinessPorts carries no generic environment/result reader into Actions. Specific query submission still uses the frozen catalog and neutral Gateway interfaces; result observations retain their actual call correlation.
+AgentContainerLifecycle retains at most one startup, transition, cleanup and shutdown worker. Concurrent calls coalesce; failed/cancelled startup joins cleanup. Admission closes before invalidation transitions, revisions fence stale foreground reopening and transition/cleanup failure remains observable on later stop.
 
-## Reflexive health evidence
+consumeUI defaults to one ordinary worker, supports at most four explicitly selected concurrent workers, and retains one separate control worker/slot. Requests carry cancellation handles and a 120-second deadline. Shutdown cancels/joins every child and closes only the matching consumer token. AgentUIExecution bounds active requests and retained outputs per request to 64 each; outputs belong to their transaction or stream, never both.
 
-AgentContainerLifecycle retains actual execution/cleanup failure independently from ordinary unavailable/stopped/cancelled controls. ContainerFailureRecord retains first occurrence alongside the existing latest occurrence and repeat count; publication/suppression remains unchanged. This journal is historical evidence, not a second authority for current domain health. Current role snapshots read their owned status/context directly.
+Communication output is consumed independently of round barriers through a 16-item queue with at most four concurrent deliveries. Other output uses a 256-item bounded queue. Overflow fails explicitly and closure cancels/joins consumers. Communication produced after a model round can obtain a receipt without deadlocking the Action's round join.
 
-Assistant-specific State selection lives in AssistantStateBindings, outside shared Support. AgentStateContext enforces registration/session/size contracts and assembles typed multimodal snapshots from selected owners. App injects the complete State inspector for ordinary facts and a Camera-owned scoped preview snapshot/reset port for ephemeral images; shared Support owns request assembly, not Camera selection policy.
+ContainerFailureChannel retains 128 records, 64 pending deliveries and eight latest-snapshot observers. Oldest eviction has explicit counters. One worker preserves delivery failure without recursive reporting; stop joins delivery before closing observers. First/latest occurrence and repeat count are historical evidence, not current health authority. NativeFailureClassification handles model/platform lifecycle admission failures; suppression retains evidence and cleanup failures stay publishable. OutputGateway classifies cognitive execution failures; Gateway owns neutral execution/outbox evidence. Pure cancellation is distinct from mixed or real failure.
 
-AgentGatewayAssembly accepts SignalTransport and GatewayAdmission capabilities, prepares AgentManager/InputGateway and result conversion, and exposes GatewayConfiguration. App calls GatewayContainer.configureExecution; bind accepts returned capabilities and observation access to construct OutputGateway. No Agent assembly receives or configures the Gateway root. AgentCameraAccess/AgentDeviceAccess exclude scene foreground, shutdown and native idle joins.
+AgentRuntimeLogWorkflow bounds pending failure events to 100 with explicit rejection accounting, and joins observation/delivery workers on shutdown. Role shutdown stops only owned work, never borrowed global scheduling/transport. App retains terminal and cleanup bindings until downstream roots have stopped.
 
-NativeFailureClassification handles model and platform lifecycle admission failures in the failure channel. Suppression retains original journal evidence; cleanup failures remain publishable. sink accepts module identity and structural error details without a separate caller-owned publication predicate.
+## Task authorization and internal completion
 
-AgentUIRequests keeps the default single ordinary worker; callers can explicitly select at most4 concurrent workers, used by independent windows. Each request retains its cancellation handle and deadline; group shutdown cancels and joins all children. The separate control stream remains one worker and one outstanding slot.
+GatewayOutputConsumer.executeInternal requires the registered role's internalTools and no roundID. Agents checks permission, Gateway checks admission/resources and Actions executes. Actual results return only to the internal caller, without InputGateway ToolResult feedback. execute and executeReturning retain protocol feedback and call identity.
 
-通信输出在轮次之外独立消费（16项队列、最多4项并发），其他输出经256项有界队列送入原轮次屏障；溢出明确失败，关闭取消并加入所有消费者。调度 Action 在模型轮次结束后生成的通信仍可经 Gateway 获取回执，不能被等待该 Action 的轮次屏障阻塞。
+Task retirement is bound to the registered executor. OutputGateway closes grant admission, joins or cancels existing work according to terminal status, then revokes the admission generation. InputGateway records successful local retirement for diagnostics. Already missing grants from cleanup/restart can converge without fabricating an active grant.
 
-Skill 文档必须显式给出 useInstructions；任务 scope 的 execution 是必需字段。不补全旧文档/旧信封缺失字段；当前可选观测和原生 ToolResult 的无 Action completion 值不属于兼容分支。
+Writer may request execution authorization after admitting a new ordinary message. The port authenticates message/session/both incarnations; failed business admission rolls back that grant. Progress/terminal events retain the bound scope. Writer owns its durable settlement worker and joins it during pause/stop; user notification has an independent worker. OutputGateway depends only on AgentMessageRepository for durable communication, without Task/workspace ownership APIs.
 
-## Agent-owned Island publication
+## Shared Island transport
 
-IndependentOutputWorkflow.swift also owns AgentIslandPublication, the shared transport mechanism used by role-owned presentation adapters. It accepts neutral IslandContent or an end intent, retains one immutable in-flight command and one replaceable latest pending command, and uses a stable activity/session identity with monotonically increasing revisions. Gateway execution remains producer-bound; model-visible tools and prompts are unchanged. Failed publication retains bounded evidence and retries the latest state every500ms independently of creative work and peer reporting. Stop closes admission, cancels and joins the worker, then joins one final registered end call before producer retirement; Gateway supplies the call deadline and cleanup failure remains observable. Roles own business phases and terminal fencing; UI owns selection, layout and animation.
+IndependentOutputWorkflow also owns AgentIslandPublication. Roles provide IslandContent or an end intent. One immutable in-flight command and one replaceable latest pending command use stable activity/session identity and increasing revisions. Failed publication retains bounded evidence and retries latest state every 500 ms. Stop closes admission, cancels/joins the worker, then joins the final registered end call before producer retirement; Gateway supplies its deadline and cleanup failure remains visible.
 
-InputGateway 按投递方式分别校验。广播要求精确订阅，定向消息和运行时反馈要求 inputs。OutputGateway 使用契约注册的主题构造广播元数据。
+Shared permissions/bind helpers own internal-tool declarations, trusted identity and result checking. Content, timing, terminal fences and response handling remain role-owned. SpeechPerception, Assistant, Photographer and ApplicationControl do not publish for each other. App-bound audio callbacks report actual audioID start/end facts only. UI owns selection/layout/animation.
 
-InputGateway accepts complete Action/Tool value completions without an observation-byte quota; trusted source/session identity, task permissions and result status consistency remain mandatory. Per-agent model context selection is separate from result delivery.
+## State, configuration and localization
 
-执行日志将 UI.Caption.print、UI.Caption.beginReplyTurn 等呈现路径归入 UI 内部动作过滤器，真实失败仍可见。权限、调度和实际执行由各自入口校验。
+Assistant-specific State selection stays in AssistantStateBindings. Shared Context enforces exact-path/session/size contracts and multimodal assembly. App injects complete State inspection and scoped camera preview/reset. AgentBusinessBindings.readWebScreenshot supplies scoped current web images; producers own image lifetimes. Context/Chat select attachments through Skills and do not recover media from Action receipts. There is no generic Actions environment/result reader.
 
-GatewayOutputConsumer区分模型/Agent协议反馈与内部完成结果。executeInternal只接受本注册角色
-声明的 internalTools 且 roundID 为空。Agents 校验内部调用权限，Gateway 校验接纳与资源许可，Actions 执行实际操作。真实完成或失败仅返回内部调用方，不向 InputGateway 递送 ToolResult。execute与executeReturning保持原有
-协议反馈，配对的模型工具结果仍按调用身份回到Agent。内部灵动岛呈现使用executeInternal。
+AgentConfigurations validates Catalog-indexed v10 resources (category, description, identity, communication and baseSkills), then projects AgentCore v8 configuration. Public descriptions are role-owned and limited to 2,048 UTF-8 bytes each; the delegation overview is limited to 8,192 bytes and uses the actual communication adapter and caller permissions. It never loads peer private instructions. Runtime availability comes from State. Category is preserved by effective-capability projection; temporary registry-only configuration explicitly uses perception without registering a role or inventing category policy.
 
-GatewayOutputConsumer 的退休端口绑定注册执行者的身份。OutputGateway 先封住任务授权的新执行，按终态加入或取消现有调用，再按接纳代际撤销授权。成功撤权后，InputGateway 写入本地任务诊断记录供状态观察。已有生命周期清理或进程重启留下的缺失授权可以收敛。Writer 的持久收尾 worker 持有调用并负责暂停和停止时加入，用户通知由另一个 worker 独立投递。
+AgentSkillLoader expands dependencies, binds functions and reads required useInstructions. Root AgentContracts supplies role-owned local native declarations and owner identities to the immutable AgentFunctionCatalog installed in AgentConfigurations. Shared loading checks the declared owner and native protocol before caching or exposing a Skill. Registry construction checks the owner again; absent/wrong owners and Action bindings for local Tools fail. External/local path collisions, duplicate declarations and conflicting reinstallation fail. CapabilityCoverage excludes only exact locally executed paths explicitly supplied by root composition, bounded to 128 paths; the exemption grants no execution permission. Owner-restricted Skills are visible/loadable only under the matching trusted role identity; shared discovery lists ownerless Skills. Writer composes its private Skills locally. Local role tools use the same validated parameter declarations and their explicit local coverage declarations. Task scope execution is required; missing legacy required fields are not fabricated.
 
-Writer 接纳新的普通消息后，可通过绑定的 GatewayOutputConsumer 申请执行授权。端口核对消息身份、会话和双方实例；业务接纳失败时撤回该次申请。进度与终态保留已绑定的执行范围。
+RuntimeLogProjection accepts AppLanguage; production App composition supplies the existing selected-language reader. AgentRuntime supplies the same selection to AgentRuntimeLogWorkflow. UI.Shared owns English-keyed translated copy and format strings. Canonical paths, raw business values, protocol strings and producer diagnostics remain unchanged. Projection captures language when the record is created; retained records are evidence, not a live retranslation store.
 
-默认内部动作过滤同时覆盖识别字幕/封口、回复字幕、等待态、语音状态和灵动岛呈现，不把这些
-成功的运行时维护调用混入业务记录；用户打开内部动作后可查看。失败仍沿现有诊断策略可见。
-
-AgentIslandPublication.permissions和bind(consumer:source:)只复用内部工具声明、可信身份接入及结果检查。内容、时机和终态仍在角色目录；成功/错误/异常在调用者自己的发布循环处理。SpeechPerception/Assistant/Photographer/ApplicationControl复用相同机制，互不代发。App绑定的播放事实回调只报告实际audioID开始/结束，不包含角色展示策略。
-
-OutputGateway binds only AgentMessageRepository for durable Agent communication. Task/workspace ownership APIs are not exposed through this dependency.
-
-## Agent 公开元数据
-
-AgentConfigurations 校验 Catalog 索引的 v10 Agent 资源（category、description、身份、通信和 baseSkills），再投影为 AgentCore v8 的函数/通信配置。公开 description 由各角色维护，单条最多 2048 UTF-8 字节。delegationOverview 与任务执行共用 Communication/AgentTaskMessaging 的真实适配和调用者权限；总目录最多 8192 字节，超限或无效配置明确失败。它只组装公开介绍，不加载同伴私有指令；模型上下文采用当前实例的通信策略，实时可用性由 State 提供。
-
-AgentSkillLoader 共享依赖展开、函数绑定和教学读取。Skill 可声明 owner 限定运行时 Agent ID。共享发现仅列出无 owner 的 Skill，共享 Task/Skill 加载按同一规则校验根 Skill 和依赖。Agent 基础目录按可信配置身份解析；Writer 以自己的身份组合各控制域的 Skill。共享目录也解析 Writer 专属的 Agent.Writer 工具声明，校验 Skill 所有者并为其生成同样的模型参数。Gateway 覆盖检查只要求外部执行入口，本地工具由 Writer 消费。
-
-角色类别从资源进入 AgentConfiguration，再由各角色构造 AgentDescriptor；OutputGateway 复制轮次有效能力时保留 category。只编译函数的 registry 临时配置显式携带 perception 以满足 schema，不注册角色，也不生成分类策略。
-
-AgentBusinessBindings.readWebScreenshot 提供按 scope 读取当前网页图像的中立窄端口。共享 Context/Chat 负责按 Skill 选择与逐请求附件投影，生产者负责单槽图片生命周期；不从 Action 回执回查媒体。
+The default internal-action filter covers transcript/reply captions, reply waiting, voice/listening state and Island presentation. Successful runtime maintenance is hidden unless requested; real failures remain visible under existing diagnostic policy. Presentation filtering never changes authorization or execution.

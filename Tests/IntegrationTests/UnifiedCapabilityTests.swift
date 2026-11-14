@@ -97,7 +97,7 @@ private actor UnifiedFixtureLog {
         InternalAction(domain: "Fixture", module: "Query", function: "read", channel: "main")
     ])
     #expect(throws: HarnessError.forbiddenFunction) {
-        try BehaviorCoverage.validate(
+        try CapabilityCoverage.validate(
             actions: ActionRegistry(modules: [module.actions]),
             toolPaths: [path.description], capabilities: [permissions])
     }

@@ -81,7 +81,7 @@
             Section(group == .language ? appCopy.text("Local model downloads") : appCopy.text("Custom model")) {
                 if group != .vision {
                     Picker(appCopy.text("Download source"), selection: $selectedSource) {
-                        Text(appCopy.text("Official Hugging Face")).tag("official")
+                        Text(appCopy.text("Hugging Face")).tag("official")
                         Text(appCopy.text("HF Mirror (China)")).tag("mirror")
                         Text(appCopy.text("Custom domain")).tag("custom")
                     }
@@ -104,11 +104,6 @@
                         }
                         .disabled(state.saving || !state.hasRestored)
                     }
-                }
-                if includesDecision {
-                    Button(appCopy.text("Save download settings")) { Task { _ = await controls.saveDownloadSource() } }
-                        .disabled(state.saving || !state.hasRestored)
-                        .accessibilityIdentifier("settings.brains.downloadSource.save")
                 }
                 let modelIDs =
                     includesDecision ? group.modelIDs.union(ModelResourceGroup.decision.modelIDs) : group.modelIDs

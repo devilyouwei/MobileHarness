@@ -64,15 +64,6 @@ public final class AgentPrompts: @unchecked Sendable {
         try shared.render("Agents/" + owner + ".json", template: key, variables: variables)
     }
 
-    static func assistantInput() throws -> String {
-        try text("Assistant/InputProtocol", "instructions")
-    }
-
-    /// These strings also parse recorded input envelopes and must retain their canonical spelling.
-    static func inputMarker(_ key: String, _ variables: [String: String] = [:]) throws -> String {
-        try shared.load("Agents/Assistant/InputProtocol.json", language: "en").render(key, variables: variables)
-    }
-
     static func capabilityContext() throws -> CapabilityContextBuilder {
         let output = try shared.load("Agents/Shared/OutputProtocol.md")
         let catalog = try shared.load("Agents/Shared/ActionCatalog.json")
@@ -93,10 +84,6 @@ public final class AgentPrompts: @unchecked Sendable {
 
     static func roleTemplates(named role: String) throws -> PromptTemplates {
         try shared.load(AgentConfigurations.promptPath(named: role))
-    }
-
-    static func titleTemplates(language: String = "en") throws -> PromptTemplates {
-        try shared.load("Agents/Memory/TitlePrompts.json", language: language)
     }
 
     public static func load(named role: String) throws -> PromptTemplates {

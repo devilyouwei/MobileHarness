@@ -1071,7 +1071,7 @@ extension LiveRuntimeTests {
 }
 
 /// A separate role deliberately uses the shared default and declares no host-control schema.
-private struct ControlAgnosticChatState: AgentChatContextState {
+private struct ControlAgnosticChatState: AssistantChatState {
     static let agentID = AgentID(rawValue: "controlAgnostic")
     static let configurationName = "ControlAgnostic"
     static func preprocess(_ input: AgentInput, state: Self) throws -> SignalDisposition { .enqueue(priority: 0) }

@@ -90,7 +90,7 @@ func bindFixtureCommunications(_ agent: any Agent, port: AgentMessaging) throws 
 }
 
 func fixtureOutputs(_ agent: any Agent) -> AsyncStream<OutputEnvelope> { FixtureCommunicationStreams.outputs(agent) }
-extension AgentChatWorker {
+extension AssistantChatWorker {
     func bind(_ port: AgentMessaging) throws {
         if speechOutput == nil { try bindSpeechOutput(SpeechRequestProbe()) }
         try FixtureCommunicationStreams.bind(self, port: port)
@@ -104,8 +104,8 @@ extension VisionPerceptionAgent {
 }
 
 /// Explicit synthetic native-call role; its fixture catalog is independent of production Skill loading.
-struct FixtureNativeChatState: AgentChatContextState {
-    static func sessionControl(_ message: AgentMessage) throws -> AgentChatSessionControl? {
+struct FixtureNativeChatState: AssistantChatState {
+    static func sessionControl(_ message: AgentMessage) throws -> AssistantChatControl? {
         try AssistantContextState.sessionControl(message)
     }
     static let agentID = AgentID.assistant
@@ -137,7 +137,7 @@ struct FixtureNativeChatState: AgentChatContextState {
     mutating func recoverInterruptedWork() { recoverChatState() }
 }
 
-typealias FixtureNativeAgent = AgentChatWorker<FixtureNativeChatState>
+typealias FixtureNativeAgent = AssistantChatWorker<FixtureNativeChatState>
 
 func fixtureRuntimeTool() throws -> ToolRegistration {
     let definition = try JSONDecoder().decode(

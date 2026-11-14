@@ -6,6 +6,8 @@ import Foundation
     /// Compact multi-channel status with a read-only execution history sheet.
     @MainActor
     public struct RuntimeLogView: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         @Bindable private var state: RuntimeLogState
         @State private var taskPath: [String] = []
         public init(state: RuntimeLogState) {
@@ -78,7 +80,7 @@ import Foundation
                         }
                         .buttonStyle(.plain)
                         .modifier(ActionPanelGlass())
-                        .accessibilityLabel("Execution Log")
+                        .accessibilityLabel(appCopy.text("Execution Log"))
                         .accessibilityIdentifier("conversation.actions.history")
                     }
                 }
@@ -121,7 +123,7 @@ import Foundation
                         List { logRows }
                     }
                     .navigationDestination(for: String.self) { taskDetail($0) }
-                    .navigationTitle("Execution Log")
+                    .navigationTitle(appCopy.text("Execution Log"))
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {

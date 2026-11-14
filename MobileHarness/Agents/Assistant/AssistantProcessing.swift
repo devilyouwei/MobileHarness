@@ -7,9 +7,9 @@ import StorageTasks
 
 // MARK: - State
 
-public struct AssistantContextState: AgentChatContextState {
+public struct AssistantContextState: AssistantChatState {
     public static let supportsSkills = true
-    public static func sessionControl(_ message: AgentMessage) throws -> AgentChatSessionControl? {
+    public static func sessionControl(_ message: AgentMessage) throws -> AssistantChatControl? {
         guard message.contract == AssistantSessionControl.contract else { return nil }
         guard let control = message.assistantControl else { throw CommunicationError.invalidPayload }
         return control == .cancelSession ? .close : .interrupt
@@ -17,14 +17,14 @@ public struct AssistantContextState: AgentChatContextState {
     public static func buildChatMessages(system: String, user: String, conversation: AssistantConversation)
         throws -> [ChatMessage]
     {
-        try AgentChatContextBuilder.request(
+        try AssistantHistoryProjection.request(
             system: system, user: user, conversation: conversation, nativeHistory: true,
             templates: AgentPrompts.load(named: configurationName))
     }
     public static let agentID = AgentID.assistant
     public static let configurationName = "Assistant"
     public static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {
-        return try AgentChatWorker<Self>.runtimeCapabilities(capabilities).adding(internalTools: [
+        return try AssistantChatWorker<Self>.runtimeCapabilities(capabilities).adding(internalTools: [
             .init(path: "UI.Island.present", required: ["activityID", "revision", "content"]),
             .init(path: "UI.Island.end", required: ["activityID", "revision"]),
         ])
@@ -127,8 +127,6 @@ public struct AssistantContextBuilder: ContextBuilder {
     }
 }
 
-public typealias AssistantHistoryContext = AgentChatHistoryContext
-
 // MARK: - History projection
 
 /// Metadata-only UI projection. Exact capability requests and native pairs are retained in modelRequests.
@@ -165,6 +163,6 @@ public enum AssistantConversationStorage {
                 try await repository.update { $0.state.history = history }
             },
             contextLoad: { try await repository.snapshot().state.history },
-            contextCommit: { history in try await AgentChatHistoryContext.commit(history, to: repository) })
+            contextCommit: { history in try await AssistantHistoryContext.commit(history, to: repository) })
     }
 }

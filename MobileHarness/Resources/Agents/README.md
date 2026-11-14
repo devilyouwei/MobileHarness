@@ -80,7 +80,7 @@ Skill.json 声明 path、callType、alias，以及 Action 的 channel。具体�
 
 `Shared/OutputProtocol.md` 固定描述 XML Action、Channel／wait 调度和 Skill 加载后的目录更新时机。`Shared/ActionCatalog.json` 定义有效目录中的具体 Channel 标题、Action 别名和参数行排版。`Assistant/InputProtocol.json` 将模型读取规则与时间线的标签、排版及历史格式识别放在同一资源中。共享提示词随 Agents Bundle 分发。Agents 加载资源，AgentCore 读取输出协议并渲染当前 Action 目录。`Assistant/Instructions.md` 维护角色职责、回应风格与语音、字幕、表情呈现。Task、Skill、聆听控制和执行反馈由 BasicSkill 教学维护。Photography 维护自己的业务流程与分轮示例。
 
-单段提示词使用 UTF-8 Markdown 或 TXT，加载为 `body`。多个具名模板共用一个 JSON 文件，包含 `version` 和 `templates`，版本为 1，最多 64 项，每项最多 16 KiB。三种格式都使用 `{{name}}` 插入变量，变量集合须与该模板完全一致。插入值按字面输出。资源、单段正文、单次渲染和 Assistant system 输出均最多 64 KiB。加载与卸载见 [AgentPrompts](../../Agents/Support/Chat/README.md#请求提示词与快照)。
+单段提示词使用 UTF-8 Markdown 或 TXT，加载为 `body`。多个具名模板共用一个 JSON 文件，包含 `version` 和 `templates`，版本为 1，最多 64 项，每项最多 16 KiB。三种格式都使用 `{{name}}` 插入变量，变量集合须与该模板完全一致。插入值按字面输出。资源、单段正文、单次渲染和 Assistant system 输出均最多 64 KiB。加载与卸载见 [AgentPrompts](../../Agents/Support/Chat/README.md#templates-and-localization)。
 
 Assistant 当前模板契约：
 
