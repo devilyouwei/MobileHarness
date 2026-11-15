@@ -26,7 +26,7 @@ In MobileHarness, _every input is a Signal; every output is an Action_. Signals 
   <img src="docs/imgs/multi-agent-communication.svg" alt="Assistant delegates a goal and sends follow-up input to Writer through Gateway. Writer returns progress, questions and completion or failure while each Agent retains its own context and responsibilities.">
 </p>
 
-**Multi-Agent collaboration** lets specialized Agents exchange messages and delegate work through **Gateway**, within their declared communication permissions. For example, **Assistant** can relay a request to write an illustrated article to **Writer**, which decides whether to take it on and owns the creation workflow, context and workspace. Assistant remains available for conversation and can relay follow-ups or a request to stop. Writer reports acceptance, selected milestones, questions and the final outcome. Message delivery, task acceptance and task completion each have their own confirmation. [Technical design](MobileHarness/README.md#assistant-agent-delegation)
+**Multi-Agent collaboration** lets specialized Agents exchange messages and delegate work through **Gateway**, within their declared communication permissions. For example, **Assistant** can relay a request to write an illustrated article to **Writer**, which decides whether to take it on and owns the creation workflow, context and workspace. Assistant remains available for conversation and can relay follow-ups or a request to stop. Writer reports acceptance, selected milestones, questions and the final outcome. Message delivery, task acceptance and task completion each have their own confirmation.
 
 Biological inspiration runs throughout MobileHarness. **Agents** resemble specialized parts of the human brain, processing observations and **Signals** through capabilities such as speech recognition, visual pose detection and reasoning. **Gateway** provides nervous-system coordination for Agent communication and execution. **UI**, **PlatformKit**, **ModelKit** and **Storage** provide independent presentation, native I/O, inference and storage capabilities; **App** assembles the modules and owns their lifetimes.
 
@@ -104,73 +104,71 @@ For offline development and opt-in Mac/model tests, existing `scripts/download-*
 
 ## Features
 
-| Feature | What you can do today |
-| --- | --- |
-| **Everyday interaction** | Have multi-turn voice conversations with the Assistant, with live captions, spoken replies and expressive eyes and gaze. |
-| **Full-duplex voice interaction** | On supported audio routes, speak while the Assistant is thinking or replying. The configured Decision model can queue a follow-up or confirm an interruption. [Technical design](MobileHarness/README.md#assistant-full-duplex-interaction) |
-| **Interactive UI** | Interact with generated pages, charts and small tools, manage content windows, and follow task progress in the in-app Island. |
-| **NexArm robotic-arm control** | Control a **NexArm** by voice, move individual joints, perform gestures such as nodding and waving, and aim using visual pose tracking. |
-| **Intelligent photography and album** | Take photos and videos by voice or on-screen controls, adjust countdown, flash and zoom, and use NexArm for pose-driven aiming. Browse, replay, export and delete saved photos and videos in the app album. |
-| **Writer text and visual authoring** | Create articles, illustrated layouts, diagrams and interactive content. Preview results as they develop, refine them through conversation, and reopen or export saved work. |
-| **Web browsing** | Ask the Assistant to open and read web pages, inspect page content and navigate in an in-app browser. |
+| Feature                               | What you can do today                                                                                                                                                                                                                       |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Everyday interaction**              | Have multi-turn voice conversations with the Assistant, with live captions, spoken replies and expressive eyes and gaze.                                                                                                                    |
+| **Full-duplex voice interaction**     | On supported audio routes, speak while the Assistant is thinking or replying. The configured Decision model can queue a follow-up or confirm an interruption. [Technical design](MobileHarness/README.md#assistant-full-duplex-interaction) |
+| **Interactive UI**                    | Interact with generated pages, charts and small tools, manage content windows, and follow task progress in the in-app Island.                                                                                                               |
+| **NexArm robotic-arm control**        | Control a **NexArm** by voice, move individual joints, perform gestures such as nodding and waving, and aim using visual pose tracking.                                                                                                     |
+| **Intelligent photography and album** | Take photos and videos by voice or on-screen controls, adjust countdown, flash and zoom, and use NexArm for pose-driven aiming. Browse, replay, export and delete saved photos and videos in the app album.                                 |
+| **Writer text and visual authoring**  | Create articles, illustrated layouts, diagrams and interactive content. Preview results as they develop, refine them through conversation, and reopen or export saved work.                                                                 |
+| **Web browsing**                      | Ask the Assistant to open and read web pages, inspect page content and navigate in an in-app browser.                                                                                                                                       |
 
 ## Examples
-
-Click any preview to view it at full size.
 
 <table width="100%">
   <tr>
     <td align="center" valign="top" width="25%">
       <strong>Start listening</strong><br><br>
-      <a href="docs/imgs/start-listening-demo.gif"><img src="docs/imgs/start-listening-demo.gif" width="200" alt="Press and hold the companion's eyes to start listening"></a>
+      <a href="docs/imgs/start-listening-demo.gif"><img src="docs/imgs/start-listening-demo.gif" width="150" alt="Press and hold the companion's eyes to start listening"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>Everyday interaction</strong><br><br>
-      <a href="docs/imgs/everyday-voice-interaction.png"><img src="docs/imgs/everyday-voice-interaction.png" width="200" alt="Voice conversation with captions, expressive eyes and pose overlays"></a>
+      <a href="docs/imgs/everyday-voice-interaction.png"><img src="docs/imgs/everyday-voice-interaction.png" width="150" alt="Voice conversation with captions, expressive eyes and pose overlays"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>Multiple windows</strong><br><br>
-      <a href="docs/imgs/interactive-multiwindow.png"><img src="docs/imgs/interactive-multiwindow.png" width="200" alt="Multiple browser and Writer windows on the home screen"></a>
+      <a href="docs/imgs/interactive-multiwindow.png"><img src="docs/imgs/interactive-multiwindow.png" width="150" alt="Multiple browser and Writer windows on the home screen"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>Window control</strong><br><br>
-      <a href="docs/imgs/interactive-minimized-windows.png"><img src="docs/imgs/interactive-minimized-windows.png" width="200" alt="Browser and Writer windows minimized after a voice request"></a>
+      <a href="docs/imgs/interactive-minimized-windows.png"><img src="docs/imgs/interactive-minimized-windows.png" width="150" alt="Browser and Writer windows minimized after a voice request"></a>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top" width="25%">
       <strong>Web browsing</strong><br><br>
-      <a href="docs/imgs/web-browsing.png"><img src="docs/imgs/web-browsing.png" width="200" alt="Web search results shown in the in-app browser"></a>
+      <a href="docs/imgs/web-browsing.png"><img src="docs/imgs/web-browsing.png" width="150" alt="Web search results shown in the in-app browser"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>Photography</strong><br><br>
-      <a href="docs/imgs/photography-camera.png"><img src="docs/imgs/photography-camera.png" width="200" alt="Ongoing photography task with camera controls and recent-photo thumbnails"></a>
+      <a href="docs/imgs/photography-camera.png"><img src="docs/imgs/photography-camera.png" width="150" alt="Ongoing photography task with camera controls and recent-photo thumbnails"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>Photo album</strong><br><br>
-      <a href="docs/imgs/photography-album.png"><img src="docs/imgs/photography-album.png" width="200" alt="App album displaying a grid of saved photos"></a>
+      <a href="docs/imgs/photography-album.png"><img src="docs/imgs/photography-album.png" width="150" alt="App album displaying a grid of saved photos"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>Illustrated writing</strong><br><br>
-      <a href="docs/imgs/writer-illustrated-article.png"><img src="docs/imgs/writer-illustrated-article.png" width="200" alt="Writer article explaining the banker algorithm with tables and diagrams"></a>
+      <a href="docs/imgs/writer-illustrated-article.png"><img src="docs/imgs/writer-illustrated-article.png" width="150" alt="Writer article explaining the banker algorithm with tables and diagrams"></a>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top" width="25%">
       <strong>Visual diagrams</strong><br><br>
-      <a href="docs/imgs/writer-visual-flowchart.png"><img src="docs/imgs/writer-visual-flowchart.png" width="200" alt="Writer-created visual processing flowchart reopened from saved work"></a>
+      <a href="docs/imgs/writer-visual-flowchart.png"><img src="docs/imgs/writer-visual-flowchart.png" width="150" alt="Writer-created visual processing flowchart reopened from saved work"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>Drawing in progress</strong><br><br>
-      <a href="docs/imgs/writer-drawing-demo.gif"><img src="docs/imgs/writer-drawing-demo.gif" width="200" alt="A drawing taking shape in the Writer preview"></a>
+      <a href="docs/imgs/writer-drawing-demo.gif"><img src="docs/imgs/writer-drawing-demo.gif" width="150" alt="A drawing taking shape in the Writer preview"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>NexArm control</strong><br><br>
-      <a href="docs/imgs/nexarm-control-demo.gif"><img src="docs/imgs/nexarm-control-demo.gif" width="200" alt="Animated demonstration of a phone mounted on a NexArm robotic arm"></a>
+      <a href="docs/imgs/nexarm-control-demo.gif"><img src="docs/imgs/nexarm-control-demo.gif" width="150" alt="Animated demonstration of a phone mounted on a NexArm robotic arm"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>NexArm motion</strong><br><br>
-      <a href="docs/imgs/nexarm-motion-demo.gif"><img src="docs/imgs/nexarm-motion-demo.gif" width="200" alt="NexArm moving the mounted phone during an Assistant interaction"></a>
+      <a href="docs/imgs/nexarm-motion-demo.gif"><img src="docs/imgs/nexarm-motion-demo.gif" width="150" alt="NexArm moving the mounted phone during an Assistant interaction"></a>
     </td>
   </tr>
 </table>
@@ -183,18 +181,18 @@ Click any preview to view it at full size.
 
 ## Documentation
 
-| Entry                                                                    | Purpose                                                                        |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| [Documentation index](docs/README.md)                                     | Document categories and ownership.                                             |
-| [Pending requirements](docs/requirements/README.md)                       | Unimplemented technical, product and combined requirements.                    |
-| [Completed requirements](docs/completed/README.md)                       | Whole requirements archived after their original delivery scope is complete.   |
-| [Product scope](docs/Product-Scope.md) / [Concepts](docs/Concepts.md)       | Delivered product scope, biological analogy and architectural vocabulary.      |
-| [Public architecture](docs/Architecture.md)                               | Public system explanation and retained architecture context.                   |
-| [Technical design](MobileHarness/README.md)                               | Current framework, module boundaries, target map and complete technical flows. |
+| Entry                                                                      | Purpose                                                                        |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [Documentation index](docs/README.md)                                      | Document categories and ownership.                                             |
+| [Pending requirements](docs/requirements/README.md)                        | Unimplemented technical, product and combined requirements.                    |
+| [Completed requirements](docs/completed/README.md)                         | Whole requirements archived after their original delivery scope is complete.   |
+| [Product scope](docs/Product-Scope.md) / [Concepts](docs/Concepts.md)      | Delivered product scope, biological analogy and architectural vocabulary.      |
+| [Public architecture](docs/Architecture.md)                                | Public system explanation and retained architecture context.                   |
+| [Technical design](MobileHarness/README.md)                                | Current framework, module boundaries, target map and complete technical flows. |
 | [Module READMEs](MobileHarness/README.md#part-ii--module-responsibilities) | Current local interfaces, algorithms, lifecycle, bounds and failure contracts. |
-| [Roadmap](docs/Roadmap.md)                                                | Pending work and proposed directions.                                          |
-| [Change log](docs/history/Change-Log.md) / [ADRs](docs/adr/README.md)              | Changes, decisions and supersession.                                           |
-| [Validation](docs/README.md#experiments-tests-and-acceptance)             | Recorded experiments, tests, native/device observations and measurements.      |
+| [Roadmap](docs/Roadmap.md)                                                 | Pending work and proposed directions.                                          |
+| [Change log](docs/history/Change-Log.md) / [ADRs](docs/adr/README.md)      | Changes, decisions and supersession.                                           |
+| [Validation](docs/README.md#experiments-tests-and-acceptance)              | Recorded experiments, tests, native/device observations and measurements.      |
 
 This root README introduces the project and its concepts. Source READMEs define current implementation; docs holds requirements, plans, decisions, history and validation. The [original Word design](docs/Technical_Design.docx) remains preserved.
 
@@ -217,6 +215,5 @@ Do not commit or post credentials, signing settings, model weights, recordings o
 MobileHarness is source-available under the standard [PolyForm Noncommercial License 1.0.0](LICENSE). Noncommercial use, modification and redistribution are permitted under its terms. The license also expressly permits use by specified charitable, educational, public research, public safety or health, environmental protection and government organizations, regardless of funding source or resulting funding obligations. Uses outside the license's permitted purposes require separate authorization from the relevant rights holders; contact the [project owner](https://github.com/devilyouwei) for commercial licensing. This is a source-available license, not an OSI-approved open-source license.
 
 Required Notice: Copyright (c) 2026 devilyouwei (https://github.com/devilyouwei)
-
 
 MobileHarness builds on Apple frameworks, CoreAI, Gemma 4 E2B, Nemotron, Silero, MOSS-TTS-Nano and Ultralytics YOLO. Kokoro remains an optional adapter/test integration rather than the production default. Dependencies and model artifacts retain their own redistribution conditions; the configured YOLO26 pose artifact declares AGPL-3.0. See [license notices](docs/licenses/README.md) and [resource profiles](MobileHarness/Resources/Models/README.md).

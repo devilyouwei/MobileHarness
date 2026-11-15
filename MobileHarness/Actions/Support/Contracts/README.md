@@ -85,3 +85,5 @@ ArtifactFilePath 统一 Writer 创建与 Artifacts 文件操作的路径校验�
 ProviderSettings 的 decisionUsesLocal、decisionProviderID 和 decisionModel 通过私有设置端口共同传输。Decision 云端绑定共享 Provider 稳定身份和凭据，nil ID 与空模型表示云端未配置。旧文档的 nil 模式在恢复时由 Provider 设置服务解析为有效模式。
 
 CameraControlCapability 不承担网页图片读取；Actions.Web 通过同一 MultimodalContextSnapshot 契约提供当前截图，不暴露历史媒体加载接口。
+
+ProviderSettings 的 writerUsesLocal 显式区分 Writer 本地选择与未配置；Decision 模式及本地 ID 与云端 Provider/Model 在使用时互斥。字段只描述私有配置，安装验证及运行策略归 Provider 服务与 Agent。

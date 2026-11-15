@@ -203,9 +203,6 @@ import Foundation
                         if let reason = decision.reason {
                             Text(reason).foregroundStyle(.secondary)
                         }
-                        if let localFallback = decision.localFallback {
-                            Text(localFallback).foregroundStyle(.secondary)
-                        }
                         DisclosureGroup {
                             Text(
                                 decision.requests.isEmpty

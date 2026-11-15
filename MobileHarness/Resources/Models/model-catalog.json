@@ -73,7 +73,7 @@
     },
     {
       "id": "gemma4-e2b",
-      "name": "Gemma 4 E2B Local Chat",
+      "name": "Gemma 4 E2B",
       "capability": "chat",
       "directory": "Gemma4",
       "minimumOS": 27,
@@ -172,7 +172,7 @@
     },
     {
       "id": "d3-edge",
-      "name": "D3 Decision",
+      "name": "D3 Edge",
       "capability": "decision",
       "directory": "D3Edge",
       "minimumOS": 27,

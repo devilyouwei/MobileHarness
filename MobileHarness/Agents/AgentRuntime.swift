@@ -345,14 +345,14 @@ import StorageFiles
             try stateContext.registerMedia(
                 "actions.web.screenshot", read: business.readWebScreenshot, reset: { _ in })
             let speechOutput = AssistantSpeechOutput()
-            let decisionLog: (@MainActor @Sendable (InputDecisionSnapshot, InputDecisionOutcome, Duration) -> Void)?
-            if let log {
-                decisionLog = { @MainActor snapshot, decision, duration in
-                    guard !Task.isCancelled else { return }
-                    log.record(.decision(decision.logItem(for: snapshot, duration: duration)))
+            let decisionLog: @MainActor @Sendable (InputDecisionSnapshot, InputDecisionOutcome, Duration) -> Void = {
+                [weak home] snapshot, decision, duration in
+                guard !Task.isCancelled else { return }
+                log?.record(.decision(decision.logItem(for: snapshot, duration: duration)))
+                if let issue = decision.failureIssue(for: snapshot, language: language()) {
+                    log?.record(.issue(issue))
+                    home?.notices.offerToast(issue, placement: .toast)
                 }
-            } else {
-                decisionLog = nil
             }
             let main = try AssistantAgent(
                 stateContext: stateContext, speechOutput: speechOutput, inputDecision: inputDecision, fullDuplex: true,

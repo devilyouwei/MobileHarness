@@ -61,7 +61,7 @@ public enum ModelResourceGroup: String, Sendable, CaseIterable {
         case .synthesis: "Download and install MOSS before enabling the custom speech model."
         case .language: "Download and install Gemma 4 E2B before switching to the local language model."
         case .vision: "Download and install the YOLO pose model first."
-        case .decision: "Download D3 Decision before selecting the local model."
+        case .decision: "Download D3 Edge or D3 Lite before selecting the local model."
         }
     }
 }

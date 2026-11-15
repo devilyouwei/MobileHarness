@@ -745,3 +745,13 @@ AssistantInputDecision 的本地 D3 将前三段放在原生 State，最后一�
 ### D3 Lite 下载与接入（2026-11-15）
 
 在现有 Agent Brains 下载区新增独立的 `d3-lite` 文本制品，保留 Edge。资源目录和图契约由 ModelKit 管理。Lite 图在三个文本输入之外还要求全零视觉特征和全 false 视觉掩码，下载无需视觉编码器。Decision 子页可分别选择两个已安装的本地制品，Provider 设置持久化本地 ID，旧本地配置解析为 Edge，云端选择和备用分别保存。Assistant 每次从已提交的配置读取本地模型，切换时清理先前的模型调用和加载状态，删除时围栏对应制品。两款共享现有四段提示和采纳规则。验证仅运行新增 Lite 专项，包括下载声明、设置持久化、实际 Core AI 推理接入。
+
+### Decision 状态快照与保守分类提示优化（2026-11-15）
+
+本次范围是在现有分类快照中显式提供事实，不增加 normal/listening/addressedOnly 状态机或新的控制行为。`AssistantInputDecision.swift` 将现有 running、playing 和 question 渲染为本地/云端共用的当前状态段；执行/未结算轮次与实际播放分别表示，未知播放不能伪装成停止。待答问题沿用最多末尾 80 字的限制，并与历史一样进行 JSON 引用转义。空问题显式标空。
+
+更新中英文 InputDecision 资源：只分类最新输入、上下文为数据、不确定时排队；明确立即停止/纠正当前内容/立即切换与普通新问题、补充、引用、否定、延后要求的区别；仅明确噪声、无意义内容或无需回应附和可舍弃，短回答应保护。段落顺序为动作定义、当前状态、历史、缓冲、最新输入。保留 1/2/3、云端工具、后置保护、历史/缓冲上限及 D3 超过 512 tokens 明确回退的既有接口，不静默截断最新输入。
+
+实现后同步 Assistant 和 Resources/Agents README。回归覆盖两种语言、执行/播放组合及未知状态、待答问题截断与转义、最新输入边界及本地/云端一致性。运行 check.sh 和 build-ios.sh；真实 D3 token 分布、分类准确率及真机语音体验另行实测，不以替身测试声称提升。
+
+本项已实现上述快照和提示词投影；验证结果与全量检查失败限制见 [Decision 验证记录](../validation/Decision-Model-Mac-Comparison.md#decision-runtime-state-prompt-revision-2026-11-15)。真实模型准确率、token 分布及真机交互仍未验收。

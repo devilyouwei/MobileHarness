@@ -377,6 +377,9 @@ Photo countdown regression coverage validates the optional 0…30-second Action 
 
 语音路由回归覆盖同主题的 ASR 片段与最终契约隔离、最终文本接纳时的任务归属、连续识别及受限路线播放准入。语音感知测试验证本地识别字幕与失败恢复，实际原生音频验收单列。
 
+Decision 选定模型回归覆盖本地失败不调用云端、云端失败不调用本地、超时后清理与重试、错误入队和取消不提示；Provider 用真实配置文档验证 Writer 本地与未配置的区别，以及遗留 Decision 云端引用不执行并在本地保存时清除。模型调用为替身，不代表实际模型准确率。
+
+
 ## Apple system Decision comparison
 
 `AppleDecisionEvaluationTests.swift` adds an opt-in real AppleChat experiment. It verifies and reuses the archived D3 Edge/Lite system/user requests (100 rows) and separately renders 54 language-matched current-prompt cases. Generated A/B/C or 1/2/3 answers are parsed strictly; no tools, adoption protection, retries or model fallback participate. Three warmups per condition precede sequential requests with temperature 0 and 16 output tokens. Each request has a 60-second generation timeout with joined provider cleanup. Reports retain exact prompts, raw output/errors, source hashes, native token usage, first-text/total latency and 250/500 ms budget counts. Accuracy includes invalid/error requests; latency percentiles use completed non-error requests. Archived D3 times are not same-host reruns.

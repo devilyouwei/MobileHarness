@@ -35,7 +35,7 @@ ChatTiming is one mutex-protected caller sampler per request. Providers sample m
 
 ## Consecutive user message boundaries
 
-Cloud serialization preserves every original message boundary. Gemma fits an inference-only subset to its local window, preserving selected message boundaries and the complete current input; ChatRequest.messages remains unchanged. Providers retain their existing wire/token representation, input bounds and explicit unsupported-input failures. Role-order compatibility remains provider/model-specific.
+Cloud serialization preserves every original message boundary. For no-tool text, Gemma fits an inference-only subset to its local window, preserving selected message boundaries and the complete current input; ChatRequest.messages remains unchanged. Providers retain their existing wire/token representation, input bounds and explicit unsupported-input failures. Role-order compatibility remains provider/model-specific.
 
 ## Request validation bounds
 
@@ -79,7 +79,7 @@ ChatFailureDiagnostic carries safe provider HTTP fields and network classificati
 
 The Responses adapter retains each active SSE frame without a cumulative stream/line/frame output-size ceiling. Large text deltas use Unicode-safe event chunks and the existing bounded backpressured queue. Provider output defaults remain unchanged; recovery belongs to the consuming Agent.
 
-ChatRequest.toolChoice 默认为 automatic；required(name:) 要求工具已声明。云端编码强制命名函数并禁用并行工具调用；调用方仍必须验证真实返回。
+ChatRequest.toolChoice 默认为 automatic；required(name:) 要求工具已声明。云端编码强制命名函数并禁用并行工具调用；调用方仍必须验证真实返回。Gemma 将声明、调用和配对结果映射为原生工具模板，required 名称同时进入指令和完成校验；有工具时保留完整上下文，超限显式失败。
 
 ChatRequest.onDispatch 是中立的实际开始回调。OpenAI 在请求校验/资源准备成功后、HTTP 发送前调用，Gemma 在实际 generate 前调用；回调失败阻止推理。业务方拥有历史提交，ModelKit 不导入 Storage。
 

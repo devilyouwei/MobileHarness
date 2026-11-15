@@ -28,6 +28,8 @@ public actor Gemma4Chat: ChatCapability {
         }
         return .available
     }
+    public var supportsToolCalls: Bool { true }
+
     public func warmup() async throws {
         let session = try await chat(
             ChatRequest(messages: [.init(role: .user, content: "Hi")], maximumOutputTokens: 1, temperature: 0))
@@ -42,7 +44,10 @@ public actor Gemma4Chat: ChatCapability {
         do {
             let prepared = try await GemmaContextBudget.prepare(request, contextLimit: lease.model.contextLimit) {
                 messages in
-                await lease.model.tokenize(
+                if GemmaToolProtocol.enabled(request) {
+                    return await lease.model.tokenizePrompt(try GemmaToolProtocol.render(request))
+                }
+                return await lease.model.tokenize(
                     messages.map { GemmaLanguageTurn(role: $0.role.rawValue, content: $0.content) })
             }
             let tokens = prepared.tokens
@@ -50,7 +55,7 @@ public actor Gemma4Chat: ChatCapability {
             try Task.checkCancellation()
             let control = InferenceTaskControl()
             let pair = InferenceSession<ChatEvent>.make(
-                context: request.context, limits: try StreamLimits(capacity: 4096, maximumEventBytes: 4096),
+                context: request.context, limits: try StreamLimits(capacity: 4096, maximumEventBytes: 2_097_152),
                 estimatedBytes: { $0.estimatedBytes },
                 onTermination: { reason in
                     if case .finished = reason { return }
@@ -64,21 +69,41 @@ public actor Gemma4Chat: ChatCapability {
                     try Task.checkCancellation()
                     try await request.onDispatch?()
                     request.timing?.start()
+                    let toolMode = GemmaToolProtocol.enabled(request)
+                    let output = GemmaToolOutputBuffer()
                     let generation = try await lease.model.generate(
                         tokens: tokens, maximumTokens: maximumTokens, temperature: request.temperature,
                         stopTokens: []
                     ) { delta in
-                        request.timing?.recordText(delta)
-                        try emitter.yield(.text(delta))
+                        if toolMode {
+                            try output.append(delta)
+                        } else {
+                            request.timing?.recordText(delta)
+                            try emitter.yield(.text(delta))
+                        }
                     }
                     try Task.checkCancellation()
+                    var hasCalls = false
+                    if toolMode {
+                        let parsed = try GemmaToolProtocol.parse(
+                            output.text, request: request, stopped: generation.stopped)
+                        hasCalls = !parsed.calls.isEmpty
+                        if !parsed.text.isEmpty {
+                            request.timing?.recordText(parsed.text)
+                            try emitter.yield(.text(parsed.text))
+                        }
+                        for call in parsed.calls {
+                            request.timing?.recordToolArguments(call.argumentsJSON)
+                            try emitter.yield(.toolCall(call))
+                        }
+                    }
                     await resource.release(lease.id)
                     try emitter.yield(
                         .usage(
                             try ChatTokenUsage(
                                 input: tokens.count, generated: generation.generatedTokens,
                                 total: tokens.count + generation.generatedTokens)))
-                    try emitter.yield(.finished(generation.stopped ? .stop : .lengthLimit))
+                    try emitter.yield(.finished(hasCalls ? .toolCalls : (generation.stopped ? .stop : .lengthLimit)))
                     emitter.finish()
                 } catch {
                     await resource.release(lease.id)
@@ -98,17 +123,19 @@ public actor Gemma4Chat: ChatCapability {
         guard request.messages.allSatisfy({ $0.images?.isEmpty ?? true }) else {
             throw CapabilityError.invalidRequest("Local image understanding is unavailable")
         }
-        guard request.tools.isEmpty,
-            request.messages.allSatisfy({ $0.role != .tool && $0.toolCalls.isEmpty && $0.toolCallID == nil })
-        else {
-            throw CapabilityError.invalidRequest("Local native tool calls are unavailable")
-        }
         guard request.messages.count <= 64,
             request.messages.reduce(0, { $0 + $1.content.utf8.count }) <= 65536
         else {
             throw CapabilityError.invalidRequest(
                 "Gemma4 source request exceeds 64 messages or 64 KiB"
             )
+        }
+        if GemmaToolProtocol.enabled(request) {
+            guard let last = request.messages.last(where: { $0.role != .system }),
+                last.role == .tool || (last.role == .user && hasText(last))
+            else { throw GemmaToolProtocol.failure("expected user input or tool result") }
+            _ = try GemmaToolProtocol.render(request)
+            return
         }
         // Identify the current turn before filtering: an empty user must never fall back to an older input.
         guard let current = request.messages.last(where: { $0.role != .system }), current.role == .user else {
@@ -154,6 +181,16 @@ enum GemmaContextBudget {
         try Gemma4Chat.validate(request)
         guard (2...Self.contextLimit).contains(contextLimit) else {
             throw CapabilityError.invalidRequest("Invalid local backend context limit: \(contextLimit)")
+        }
+        if GemmaToolProtocol.enabled(request) {
+            // Never prune protocol dependencies, system instructions or declarations.
+            let tokens = try await encode(request.messages, tokenize: tokenize)
+            let maximum = min(request.maximumOutputTokens ?? Self.defaultOutputTokens, contextLimit - tokens.count)
+            guard !tokens.isEmpty, maximum > 0 else {
+                throw GemmaToolProtocol.failure(
+                    "complete tool prompt leaves no generation space in the local \(contextLimit)-token window")
+            }
+            return Prepared(messages: request.messages, tokens: tokens, maximumOutputTokens: maximum)
         }
         let normalized = Gemma4Chat.renderedMessages(request)
         var history = Array(normalized.suffix(maximumMessages))

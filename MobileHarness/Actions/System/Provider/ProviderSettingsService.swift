@@ -5,6 +5,7 @@ import StorageFiles
 
 public enum ProviderSettingsError: LocalizedError, Sendable, ActionExecutionFailureProviding {
     case invalidSelection, invalidConfiguration, persistence, busy, application, cancelled, decisionRequired
+    case languageRequired
     case keychain(Int32)
     case rollback(primary: String, secondary: String)
     public var executionFailureCode: ActionExecutionFailureCode {
@@ -17,6 +18,7 @@ public enum ProviderSettingsError: LocalizedError, Sendable, ActionExecutionFail
         case .application: value = "provider.application"
         case .cancelled: value = "provider.cancelled"
         case .decisionRequired: value = "provider.decisionRequired"
+        case .languageRequired: value = "provider.languageRequired"
         case .keychain: value = "provider.keychain"
         case .rollback: value = "provider.rollback"
         }
@@ -70,7 +72,7 @@ public final class ProviderSettingsService {
         return try await restore()
     }
     public static func decisionConfiguration(_ value: ProviderSettings) throws -> ProviderSettings {
-        guard let selected = value.decisionProviderID,
+        guard value.decisionUsesLocal != true, let selected = value.decisionProviderID,
             let provider = value.providers.first(where: { $0.id == selected }),
             !value.decisionModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         else { throw ProviderSettingsError.invalidSelection }
@@ -80,9 +82,10 @@ public final class ProviderSettingsService {
     }
     public func writerConfiguration() async throws -> ProviderSettings {
         let value = try await restore()
-        guard let selected = value.writerProviderID else {
+        if value.writerUsesLocal {
             return ProviderSettings(enabled: false, url: "", key: "", model: "")
         }
+        guard let selected = value.writerProviderID else { throw ProviderSettingsError.invalidSelection }
         guard let provider = value.providers.first(where: { $0.id == selected }),
             !value.writerModel.isEmpty
         else { throw ProviderSettingsError.invalidSelection }
@@ -93,6 +96,7 @@ public final class ProviderSettingsService {
     private let store: any ProviderSettingsPersistence
     private let runtime: ProviderSettingsRuntime
     private let legacyDecision: @Sendable () async throws -> Bool
+    private let isLanguageInstalled: @Sendable () async throws -> Bool
     private let isDecisionInstalled: @Sendable (String) async throws -> Bool
     private var inheritedDecision = false
     private var saved: ProviderSettings?
@@ -103,12 +107,14 @@ public final class ProviderSettingsService {
     public init(
         store: any ProviderSettingsPersistence, runtime: ProviderSettingsRuntime,
         legacyDecision: @escaping @Sendable () async throws -> Bool = { false },
-        isDecisionInstalled: @escaping @Sendable (String) async throws -> Bool = { _ in false }
+        isDecisionInstalled: @escaping @Sendable (String) async throws -> Bool = { _ in false },
+        isLanguageInstalled: @escaping @Sendable () async throws -> Bool = { false }
     ) {
         self.store = store
         self.runtime = runtime
         self.legacyDecision = legacyDecision
         self.isDecisionInstalled = isDecisionInstalled
+        self.isLanguageInstalled = isLanguageInstalled
     }
     public func summary() throws -> String {
         guard restored else { throw ProviderSettingsError.busy }
@@ -155,6 +161,10 @@ public final class ProviderSettingsService {
             var value = value
             value.decisionUsesLocal = value.decisionUsesLocal ?? current.decisionUsesLocal
             value.decisionLocalModelID = value.decisionLocalModelID ?? current.decisionLocalModelID
+            if value.decisionUsesLocal == true {
+                value.decisionProviderID = nil
+                value.decisionModel = ""
+            }
             let localID = value.resolvedDecisionLocalModelID
             guard ["d3-edge", "d3-lite"].contains(localID) else { throw ProviderSettingsError.invalidSelection }
             if value.decisionUsesLocal == true,
@@ -163,6 +173,10 @@ public final class ProviderSettingsService {
             {
                 throw ProviderSettingsError.decisionRequired
             }
+            if (!value.enabled && current.enabled) || (value.writerUsesLocal && !current.writerUsesLocal) {
+                guard try await isLanguageInstalled() else { throw ProviderSettingsError.languageRequired }
+            }
+            if value.writerUsesLocal && value.writerProviderID != nil { throw ProviderSettingsError.invalidSelection }
             if value.enabled, value.model.isEmpty { throw ProviderSettingsError.invalidSelection }
             let assistantChanged =
                 !restored || value.enabled != current.enabled

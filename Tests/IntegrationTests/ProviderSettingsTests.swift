@@ -478,14 +478,13 @@ func settingsContainerRunsInItsAgentWithPrivateStagingAndActualPresentation() as
     #expect(!String(decoding: try Data(contentsOf: url), as: UTF8.self).contains("fixture-writer-key"))
 }
 
-@Test(.actionCatalog) @MainActor func writerLocalSelectionDoesNotInheritAssistantCloud() async throws {
+@Test(.actionCatalog) @MainActor func writerUnconfiguredSelectionDoesNotInheritAssistantCloud() async throws {
     let fixture = ProviderTransactionFixture()
     let service = fixture.service()
     _ = try await service.restore()
     let value = ProviderSettings(enabled: true, url: "https://assistant.test/v1", key: "fixture", model: "assistant")
     _ = try await service.save(value)
-    let writer = try await service.writerConfiguration()
-    #expect(!writer.enabled && writer.url.isEmpty && writer.key.isEmpty && writer.model.isEmpty)
+    await #expect(throws: ProviderSettingsError.self) { _ = try await service.writerConfiguration() }
     #expect(try await service.restore().model == "assistant")
 }
 
@@ -539,7 +538,7 @@ func settingsContainerRunsInItsAgentWithPrivateStagingAndActualPresentation() as
     let settings = ProviderSettings(
         enabled: true, url: "https://assistant.invalid/v1", key: "assistant-fixture-secret", model: "assistant-model",
         providers: [provider], writerProviderID: provider.id, writerModel: "writer-model",
-        decisionProviderID: provider.id, decisionModel: "decision-model", decisionUsesLocal: true)
+        decisionProviderID: provider.id, decisionModel: "decision-model", decisionUsesLocal: false)
     try await store.save(settings)
     let reopened = makeStore()
     #expect(try await reopened.load() == settings)
@@ -654,4 +653,71 @@ func settingsContainerRunsInItsAgentWithPrivateStagingAndActualPresentation() as
     #expect(reopened.decisionUsesLocal == true && reopened.resolvedDecisionLocalModelID == "d3-lite")
     let inventory = ModelResourceInventory(items: [.init(id: "d3-lite", name: "D3 Lite", bytes: 1, phase: .installed)])
     #expect(inventory.installedGroups.contains(.decision))
+}
+
+@Test @MainActor func localModelSelectionRequiresInstalledArtifactBeforePersistence() async throws {
+    let fixture = ProviderTransactionFixture()
+    let initial = ProviderSettings(enabled: true, url: "https://assistant.test", key: "fixture", model: "assistant")
+    fixture.value = initial
+    let runtime = ProviderSettingsRuntime(initial: initial, prepare: { _ in {} }, beginChange: {}, endChange: {})
+    let missing = ProviderSettingsService(store: fixture, runtime: runtime)
+    _ = try await missing.restore()
+    fixture.events.removeAll()
+    let writerLocal = ProviderSettings(
+        enabled: true, url: initial.url, key: initial.key, model: initial.model, writerUsesLocal: true)
+    await #expect(throws: ProviderSettingsError.self) { _ = try await missing.save(writerLocal) }
+    await #expect(throws: ProviderSettingsError.self) {
+        _ = try await missing.save(.init(enabled: false, url: initial.url, key: initial.key, model: initial.model))
+    }
+    #expect(fixture.events.isEmpty && fixture.value == initial)
+    let installed = ProviderSettingsService(store: fixture, runtime: runtime, isLanguageInstalled: { true })
+    _ = try await installed.restore()
+    _ = try await installed.save(writerLocal)
+    let reopened = ProviderSettingsService(store: fixture, runtime: runtime)
+    #expect(try await reopened.restore().writerUsesLocal)
+    let selected = try await reopened.writerConfiguration()
+    #expect(!selected.enabled && selected.url.isEmpty && selected.key.isEmpty)
+    #expect(try await reopened.restore().model == "assistant")
+}
+
+@Test @MainActor func writerLocalModePersistsSeparatelyFromUnconfigured() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let url = root.appendingPathComponent("settings.json")
+    let credentials = ProviderCredentialFixture()
+    func store() -> ProviderSettingsStore {
+        ProviderSettingsStore(
+            credentials: credentials, document: { try FileDocumentStore<UserSettingsDocument>(url: url) })
+    }
+    let initial = ProviderSettings(enabled: false, url: "https://example.invalid", key: "", model: "")
+    let runtime = ProviderSettingsRuntime(initial: initial, prepare: { _ in {} }, beginChange: {}, endChange: {})
+    let service = ProviderSettingsService(store: store(), runtime: runtime, isLanguageInstalled: { true })
+    #expect(try await service.restore().writerUsesLocal == false)
+    let local = ProviderSettings(enabled: false, url: initial.url, key: "", model: "", writerUsesLocal: true)
+    _ = try await service.save(local)
+    let reopened = ProviderSettingsService(store: store(), runtime: runtime)
+    #expect(try await reopened.restore().writerUsesLocal)
+    #expect(try await reopened.writerConfiguration().enabled == false)
+    _ = try await reopened.save(initial)
+    let unconfigured = ProviderSettingsService(store: store(), runtime: runtime)
+    #expect(try await unconfigured.restore().writerUsesLocal == false)
+    await #expect(throws: ProviderSettingsError.self) { _ = try await unconfigured.writerConfiguration() }
+}
+
+@Test @MainActor func localDecisionIgnoresAndClearsLegacyCloudFallback() async throws {
+    let fixture = ProviderTransactionFixture()
+    let provider = ProviderSettings(
+        enabled: false, url: "https://decision.test", key: "fixture", model: "", id: "cloud")
+    let old = ProviderSettings(
+        enabled: false, url: provider.url, key: "", model: "", providers: [provider],
+        decisionProviderID: provider.id, decisionModel: "old-fallback", decisionUsesLocal: true)
+    fixture.value = old
+    let service = ProviderSettingsService(
+        store: fixture, runtime: .init(initial: old, prepare: { _ in {} }, beginChange: {}, endChange: {}))
+    let restored = try await service.restore()
+    #expect(restored.decisionUsesLocal == true)
+    await #expect(throws: ProviderSettingsError.self) { _ = try await service.decisionConfiguration() }
+    let saved = try await service.save(restored)
+    #expect(saved.decisionProviderID == nil && saved.decisionModel.isEmpty)
+    #expect(fixture.value?.decisionProviderID == nil && fixture.value?.decisionModel.isEmpty == true)
 }

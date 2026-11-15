@@ -223,3 +223,5 @@ Actions 的 edit 接纳回执返回 ArtifactEditPreparation，包含流身份、
 ## Local tool declaration boundary
 
 WriterLocalTools owns the native ask/finish/enter/create declarations and WriterControlDomain selects the corresponding role-owned Skills. Root AgentContracts passes these declarations with owner=writer to AgentConfigurations during immutable catalog installation. Shared loading and registry projection require the matching owner and tool protocol; external/local declaration conflicts are rejected. CapabilityCoverage receives exact local-tool paths explicitly from composition and does not reference Writer implementation types. Writer remains the executor of these tools; catalog presence does not grant Gateway execution authority.
+
+Writer 模型由显式本地/云端选择决定：本地使用 Gemma，云端使用所选 Provider/Model；未配置报错。Gemma 提供原生工具适配；完整工具声明与历史超出本地窗口时明确失败，不自动选择云端。其他缺少原生工具的模型仍沿 unsupportedModel 路径结束。

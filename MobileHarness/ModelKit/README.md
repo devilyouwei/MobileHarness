@@ -128,7 +128,7 @@ The existing speech selector accepts a host-provided locale reader for automatic
 | Synthesis | Enabled, installed and available MOSS Nano; otherwise Apple PCM TTS |
 | Voice activity | Installed and available Silero; otherwise Energy, independent of ASR preference |
 | Pose | YOLO26n-Pose |
-| Decision | D3 Edge when its local artifact and platform are available. Agents selects and executes the optional cloud fallback. |
+| Decision | D3 Edge/Lite when the selected artifact and platform are available. Agents owns the exclusive local or cloud selection and enqueues with an error notice on failure; ModelKit never switches providers. |
 
 Custom ASR/TTS switches default off and are independent. Kokoro is an explicitly provisioned optional provider without Defaults registration. Selection occurs before admission; failure during active inference never switches provider. Local inference never initiates artifact downloads. The simulator local-chat binding reports unavailable; the Gemma package's native framework requirements still apply at compilation.
 
@@ -136,7 +136,7 @@ Custom ASR/TTS switches default off and are independent. Kokoro is an explicitly
 
 App owns one ModelContainer with four stable child ports. Each root owns an independent manager and speech selection. Consumers acquire stable typed handles; acquisition, resource residency and capability availability are distinct. Management owns registration/construction state and injects validated loading limits; Core owns resource residency and lease mechanics. One active inference per resource rejects overlap. Loading coalesces bounded waiters; unload drains active leases, shutdown cancels/joins and is terminal. Memory-pressure releaseWhenIdle evicts eligible idle resources.
 
-InferenceSession has one consumer and explicit event-count/byte limits. Core's default is 64 events/4096 estimated bytes per event; each provider declares its own bounds. Gemma uses 4096 events/4096 bytes; OpenAI uses 128 events with producer backpressure and no single-event byte ceiling. Normal completion drains accepted events; failure/cancellation suppresses buffered delivery. InferenceTaskControl owns one worker's cancellation state; providers join cleanup and release leases after native work exits. OpenAI separately owns HTTP cancellation.
+InferenceSession has one consumer and explicit event-count/byte limits. Core's default is 64 events/4096 estimated bytes per event; each provider declares its own bounds. Gemma uses 4096 events/2097152 bytes with a separate 256 KiB tool-generation buffer; OpenAI uses 128 events with producer backpressure and no single-event byte ceiling. Normal completion drains accepted events; failure/cancellation suppresses buffered delivery. InferenceTaskControl owns one worker's cancellation state; providers join cleanup and release leases after native work exits. OpenAI separately owns HTTP cancellation.
 
 Artifacts have an independent schema-v2 catalog, bounded transfer state, validated installed receipts, safe publication/deletion and resource maintenance fences. The host supplies persistence/download adapters. Configuration, admission, native execution and cleanup failures remain observable; consumers choose recovery and presentation.
 
@@ -179,7 +179,7 @@ LLM 中立失败诊断向消费者提供原因/协议阶段及安全标识；具
 
 语言／视觉共享 ModelResourceControlling 的 load、warmup、unload、status；语音按类别提供同名操作，状态对应所选后端、卸载覆盖同类本地与系统后端。子能力不暴露注册、manager 或根关闭权限；首次准备和后台恢复共用一个实例级准备任务。查询元信息不加载权重。关闭推理不终止后台制品传输；根 stop 先加入推理，再关闭制品，最后终止 manager，Storage 随后关闭。取消与生命周期拒绝不升级为故障；真实调用失败及流失败由所属子能力通过注入的中立回调上报给宿主。
 
-[Gemma4](Language/LLM/Gemma4/README.md) owns context fitting and local engine timing.
+[Gemma4](Language/LLM/Gemma4/README.md) owns context fitting, local engine timing and OpenAI-style native tool adaptation. Tool requests preserve complete instructions/declarations/history and fail explicitly if the local window cannot fit them; tool execution remains caller-owned.
 
 模型根生命周期和配置拒绝完整报告原始 Error；生命周期拒绝和取消由宿主区分记录／广播，不丢弃底层错误信息。
 
@@ -214,5 +214,7 @@ ModelLanguageProviding.chatModel(configuration:) 返回固定配置的轻量 Cha
 language.decision 是稳定子端口，使用独立 D3 资源，不占用主 Chat 的串行队列。ModelKitD3 依赖基础契约、CoreAI 图执行和 Tokenizers，注册 d3-edge 和 d3-lite，默认端口为 Edge，也可按模型 ID 获取 Lite；模型管理提供候选读出及各制品的资源生命周期。云端分类由调用方通过不可变 ChatModel 请求，ChatToolChoice.required 只约束一次命名工具选择，不执行工具。
 
 Chat 的可选 onDispatch 回调报告实际 HTTP/本地推理开始边界，供上层原子持久化请求；详见 [LLM](Language/LLM/README.md)。
+
+Immutable ChatModel bindings forward tool/image capability queries to the capability selected by their frozen configuration. Local lookup is load:false, so querying Gemma tools does not load weights; cloud bindings reuse the root cache. Changing the default Assistant selection does not change a retained Writer/local binding. Capability query failure returns false; chat execution still reports its original error.
 
 Apple system chat is available as the standalone ModelKitAppleLLM provider, depending only on ModelKit and system FoundationModels. It does not change default assembly or own system weight files. Its text-only request, bounds and native cleanup contract are described in [Apple LLM](Language/LLM/Apple/README.md).

@@ -108,3 +108,20 @@ import Testing
     #expect(state.presentRestored(draft, revision: revision))
     #expect(!state.writerThinking && state.selectedModel == "assistant")
 }
+
+@Test @MainActor func decisionErrorToastUsesGlobalSurfaceAndLocalizedCopy() {
+    let notices = HomeNoticeState()
+    let key = "The selected Decision model timed out. Input queued."
+    let message = AppLanguage.simplifiedChinese.text(key)
+    #expect(message == "所选决策模型超时，消息已入队。")
+    notices.offerToast(
+        .init(id: "decision", title: "Decision", source: "assistant", message: key, userMessage: message),
+        placement: .toast)
+    #expect(notices.transientToast?.text == message)
+    #expect(notices.transientToast?.tone == .error)
+    #expect(notices.visibleNotice == nil)
+    notices.dismissCaptionErrorToast()
+    #expect(notices.transientToast?.text == message)
+    notices.dismissErrorToast(id: "decision")
+    #expect(notices.transientToast == nil)
+}

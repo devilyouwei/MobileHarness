@@ -114,3 +114,55 @@ Settings 首页分区/入口/标题及蓝牙状态摘要英文化；User顺序�
 Settings 命名提交后合并 `origin/main` 的 `b06dfda6`；三个当前设计 README 冲突保留远程 Edge/Lite 契约和本地 Agent Models 命名。随后恢复拉取前已有的 Decision 提示、README 和本地签名修改，三个文档冲突保留两侧内容，并将 Assistant 当前设计的提示段数对齐为 State 四段、总计五段。原有修改保持未提交。
 
 恢复后的工作区 `scripts/build-ios.sh` 四目标与脚本资源校验通过；`git diff --check`、冲突状态及中英文名称核对通过。`scripts/check.sh` 边界检查、8 项 Python 测试和严格格式检查通过，Swift 构建阶段达到 240 秒上限，验证进程组被终止（exit 124），未取得全量测试完成结果。日志为 `/tmp/mobileharness-pull-build.log` 和 `/tmp/mobileharness-pull-check.log`。未重新安装真机，先前安装包不包含此次远程合并。
+
+## Selected-model execution and bilingual settings (2026-11-15)
+
+Decision 执行只使用已选本地 D3 Edge/Lite 或云端 Provider/Model。失败显示带输入身份的中英文全局错误 Toast 并以 enqueue 兜底；取消不提示。全局错误不被助手字幕更新清除，沿用原有单槽、去重、到期与根停止清理。旧云端备用引用不执行，本地保存时清空；Cloud fallback 页面区块及日志字段已移除，资源删除提示同步更新。
+
+三个模型子页均采用 Provider → Model；云端 Provider 选择后发现模型，本地候选按制品身份校验安装。未下载时显示先下载错误，保存事务拒绝新的未安装选择。Writer 显式本地模式独立持久化，旧未配置值不再隐式选择本地；Gemma 不支持 Writer 原生工具时仍明确失败，不伪称具备该能力。
+
+验证结果：
+
+- 最终 `scripts/build-ios.sh` 四目标全部 BUILD SUCCEEDED；Agent/Skill、Live Activity、中英文资源校验通过。另读取构建后的中文 Localizable.strings，确认 Decision 超时、未下载提示和旧备用文案清理。
+- 独立回归 39 项通过（IntegrationTests 35、AppWorkflowTests 3、UITests 1）：模型失败不跨 Provider、配置失败/取消、超时后重试、原采纳保护、Edge/Lite 路由、Writer 本地模式文件保存恢复、旧备用清理、未安装资源拒绝、角色独立提交及中文全局 Toast。全量中失败的 D3 Lite、机械臂跟踪、多来源轮次用例也在该次独立运行通过；不能据此抹除全量失败。
+- `scripts/check.sh` 边界检查、8 项 Python 测试与严格格式检查通过。全量 IntegrationTests 的 D3 Lite 路由、slowTrackingDispatchExecutesOnlyTheNewestPendingTarget 与 multiSourceActionResultsAndUserInputShareOneRequestAfterSettlement 出现并发断言失败；AppWorkflowTests 报既有 `resourceMissing("injected Action declarations")` 的 Writer/Web 夹具失败后持续无输出，主动终止其子进程以继续后续阶段。原生运行时阶段执行期间达到 480 秒总上限，进程组终止（exit 124）；全量检查未通过，后续阶段未完整完成。
+- 首轮专项测试的超时重试断言错误地将正常采纳保护 reason 当作错误；修正为检查独立 failure 后通过。增量开发期间另一轮编译读取旧 UI 接口而失败，最终重新编译验证通过；未为通过检查更改生产超时或取消语义。
+- 本次维护文档的相对路径、双语目录及 `git diff --check` 通过。未运行真实模型准确率、原生 UI 点击或真机验收；未重新安装真机，之前设备中的包不包含本次变更。
+
+本机临时日志：`/tmp/mobileharness-exclusive-model-regression.log`、`/tmp/mobileharness-exclusive-model-ios-verified.log`、`/tmp/mobileharness-exclusive-model-check.log`。测试使用替身模型、显式 fixture 凭据与临时配置文件，不代表云端服务或物理设备验收。
+
+## Local Gemma native tools (2026-11-15)
+
+Scope: OpenAI-style neutral tool declarations, assistant calls and paired results are adapted to Gemma 4 native tokens. The provider validates complete output before publishing calls, rejects malformed/unknown/truncated calls, and preserves the complete tool prompt within the existing local window. English/Chinese Writer settings now describe tool support and context limits.
+
+Protocol basis: Google Gemma 4 E2B canonical chat template and function-calling documentation; OpenAI function-calling guide supplies the neutral declaration/call/result contract. No cloud request or credential is involved in these tests.
+
+- Initial focused `swift test --filter Gemma`: Gemma suite passed (27 reported tests including one opt-in real-weight test skipped). Final regression adds an opt-in real call/result continuation test; results recorded below.
+- Native Gemma and application compiled for generic iOS device with signing disabled (`/tmp/gemma-tools-device-build.log`). This is compilation, not installation or physical-device acceptance.
+- Real-model inference was not run: the paired Gemma artifacts are absent at the workspace model path and HARNESS_GEMMA4_ROOT is not configured. Weight-free tests do not establish model selection accuracy, Writer task success or device performance. The existing iOS 1024/macOS 4096 context bounds still apply; large Writer prompts can fail admission.
+
+Final evidence:
+
+- `swift test --filter 'Gemma4Tests|ModelKitDefaultsTests'` exited 0: 28 Gemma tests and 14 default-assembly tests reported passing, including five opt-in native-weight tests skipped (two Gemma, three D3). The fixed local ChatModel retains tool support and local image capability after default cloud selection changes; capability queries create no artifact directory. Log: `/tmp/gemma-tools-integration-tests.log`.
+- `scripts/build-ios.sh` exited 0 for all four targets; application Agent/Island and English/Chinese resource verification passed. Final device application build with signing disabled exited 0. Logs: `/tmp/gemma-tools-ios-final.log`, `/tmp/gemma-tools-device-final.log`.
+- Final boundary validation, changed-file strict Swift format lint and `git diff --check` passed. The standalone boundary check first failed with sandbox cache access under Command Line Tools, then passed using full Xcode and cache access (`/tmp/gemma-tools-boundaries-final.log`). No production code was changed to bypass checks.
+- `scripts/check.sh` exited 1. Boundary checks, Python 8 tests and whole-tree strict formatting passed. The initial default-assembly assertions still assumed local tools=false; those assertions and the fixed-model capability forwarding were corrected and the final 14-test default suite passed. Other failures remain: IntegrationTests reported 6 issues in D3 route/discard and slow tracking expectations; AppWorkflowTests reported missing injected Action declarations in Writer/Web fixtures, then stalled and its helper was terminated to allow later stages. NativePresentationTests logged six passes and started cameraRenewedFrameSurvivesThePreviousDeadline without a suite completion result, so that suite is not counted as passing. LiveRuntimeTests completed with 228 tests passing; plist checks passed. Full log: `/tmp/gemma-tools-check.log`.
+
+No real Gemma inference, native settings click-through, device installation or physical-device acceptance is claimed by this change.
+
+### Physical-device installation (2026-11-15)
+
+At the user's request, the latest working-tree app was signed, installed on the paired iPhone 17 Pro (iPhone18,1) and launched successfully. Bundle: `dev.mobileharness.app`; installation sequence: 7068. The first signed build lacked a development team on the Live Activity extension; rerunning with the existing team supplied as a build argument succeeded, without changing the signing project file. This supersedes the earlier no-installation statement for this revision; it does not establish real Gemma tool-call accuracy or UI acceptance.
+
+Logs: `/tmp/mobileharness-local-tools-device-signed.log`, `/tmp/mobileharness-local-tools-device-install.log`, `/tmp/mobileharness-local-tools-device-launch.log`.
+
+## Canonical model names and purpose badges (2026-11-15)
+
+The model catalog now supplies Gemma 4 E2B, D3 Edge and D3 Lite. The Agent Models overview uses Cloud Providers & Models / Agent Models / Local Models, with Chinese translations 云端服务与模型 / 智能体模型 / 本地模型. Local rows display blue Chat/对话 or orange Decision/决策 text badges beneath the model name. Selection summaries and installation copy use the same names. Package IDs, revisions, directories and installation receipts remain unchanged.
+
+Read the built simulator application's model-catalog.json and English/Chinese Localizable.strings: all three catalog names, the three section labels and both badge labels matched; obsolete Local Chat, D3 Decision, Cloud Providers and Local model downloads keys were absent. The UI is compiled for both simulator architectures. Native visual/click-through acceptance was not performed: the available computer-use controller rejected Simulator by name and path and could not launch it. Build/resource validation does not substitute for screenshot acceptance.
+
+- `scripts/build-ios.sh` completed all four targets successfully; Agent/Island and English/Chinese resource checks passed. The signed physical-device application build also succeeded. Logs: `/tmp/mobileharness-model-names-ios.log`, `/tmp/mobileharness-model-names-device-build.log`.
+- Installed successfully on iPhone 17 Pro, bundle `dev.mobileharness.app`, installation sequence 7076. The first install lost the device connection; retry succeeded. Launch initially timed out and then explicitly failed because the phone was locked. Installation is confirmed; successful launch and visual acceptance are not claimed. Logs: `/tmp/mobileharness-model-names-install.log`, `/tmp/mobileharness-model-names-install-retry.log`, `/tmp/mobileharness-model-names-launch.log`, `/tmp/mobileharness-model-names-launch-retry.log`.
+- `scripts/check.sh` boundary checks, Python 8 tests and strict formatting passed. IntegrationTests reported 18 issues in 1168 tests, including Decision routing/timeouts and speech lifecycle assertions. AppWorkflowTests reported missing injected Action declarations plus log/Toast expectations and then stalled; its helper was terminated to allow subsequent stages. NativePresentationTests passed ten cases, then started webNativeLoadsLocalJavaScriptAndCapturesVisiblePixels without a suite completion record; that suite is not counted as passing. Full log: `/tmp/mobileharness-model-names-check.log`.
+- LiveRuntimeTests completed with 228 tests passing; final plist validation passed. The full check exited 1 because of the failures/incomplete suites above. `git diff --check` passed.

@@ -80,6 +80,8 @@ public enum SettingsProviderAdapter {
             case "provider.application": return "Could not apply model settings. Check settings and try again."
             case "provider.cancelled": return "Operation cancelled"
             case "provider.decisionRequired": return "Download D3 in Agent Models before selecting the local model."
+            case "provider.languageRequired":
+                return "Download Gemma 4 E2B in Agent Models before selecting the local model."
             case "provider.capacity": return "Too many model requests. Try again."
             case "provider.request", "provider.expired": return "The model lookup expired. Try again."
             default: break
@@ -151,7 +153,7 @@ public enum SettingsProviderAdapter {
                     providers: value.providers.map {
                         .init(enabled: false, url: $0.url, key: $0.key, model: $0.model, name: $0.name, id: $0.id)
                     }, writerProviderID: value.writerProviderID, writerModel: value.writerModel,
-                    writerThinking: value.writerThinking,
+                    writerThinking: value.writerThinking, writerUsesLocal: value.writerUsesLocal,
                     decisionProviderID: value.decisionProviderID, decisionModel: value.decisionModel,
                     decisionUsesLocal: value.decisionUsesLocal == true,
                     decisionLocalModelID: value.resolvedDecisionLocalModelID),

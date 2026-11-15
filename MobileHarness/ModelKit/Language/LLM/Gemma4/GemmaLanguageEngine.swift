@@ -94,6 +94,10 @@ public actor GemmaLanguageEngine {
         tokenizer.encode(text: Self.render(messages))
     }
 
+    func tokenizePrompt(_ prompt: String) -> [Int] {
+        tokenizer.encode(text: prompt)
+    }
+
     public static func render(_ messages: [GemmaLanguageTurn]) -> String {
         "<bos>"
             + messages.map {
@@ -121,7 +125,7 @@ public actor GemmaLanguageEngine {
             try Task.checkCancellation()
             try await engine.reset()
             let stopIDs = Set(
-                ["<eos>", "<turn|>"].compactMap { tokenizer.convertTokenToId($0) } + stopTokens)
+                ["<eos>", "<turn|>", "<|tool_response>"].compactMap { tokenizer.convertTokenToId($0) } + stopTokens)
             let stream = try await engine.generate(
                 with: tokens.map(Int32.init), samplingConfiguration: SamplingConfiguration(temperature: temperature),
                 inferenceOptions: InferenceOptions(maxTokens: maximumTokens))

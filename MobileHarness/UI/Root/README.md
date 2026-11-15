@@ -43,3 +43,5 @@ Root 在首页底部挂载 [RuntimeLog](../Components/RuntimeLog/README.md)，�
 Root 在常驻导航容器外层渲染通用 transientToast，首页与设置/历史页均可见，不受助手字幕抑制；提示内容、单槽替换及到期归 Conversation/HomeEffects，Root 不判断业务输入。
 
 Root 向 Agent Models 和子页注入共享 Settings 与模型资源接口。总页 Provider 草稿随 Agent Models 路径保留，离开该路径清理；子页草稿由各自页面持有。根只组合接口和导航。
+
+全局 transientToast 覆盖层按 HomeNotice.tone 选择提示或错误图标；错误通知选择 toast 位置后，在设置页面与助手回复显示期间仍可见，根不解析 Decision 业务。

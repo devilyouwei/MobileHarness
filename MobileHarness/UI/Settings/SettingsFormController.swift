@@ -19,7 +19,7 @@ import Foundation
             enabled: state.isEnabled, url: state.url.trimmingCharacters(in: .whitespacesAndNewlines),
             key: state.key.trimmingCharacters(in: .whitespacesAndNewlines), model: state.selectedModel,
             providers: state.providers, writerProviderID: state.writerProviderID, writerModel: state.writerModel,
-            writerThinking: state.writerThinking,
+            writerThinking: state.writerThinking, writerUsesLocal: state.writerUsesLocal,
             decisionProviderID: state.decisionProviderID, decisionModel: state.decisionModel,
             decisionUsesLocal: state.decisionUsesLocal, decisionLocalModelID: state.decisionLocalModelID)
     }
@@ -37,6 +37,7 @@ import Foundation
             state.writerProviderID = value.writerProviderID
             state.writerModel = value.writerModel
             state.writerThinking = value.writerThinking
+            state.writerUsesLocal = value.writerUsesLocal
             state.providers =
                 value.providers.isEmpty && value.enabled && !value.url.isEmpty
                 ? [.init(enabled: false, url: value.url, key: value.key, model: value.model)] : value.providers
@@ -165,7 +166,7 @@ import Foundation
         case .brain(let brain, let choice):
             let selected = previous.providers.first { $0.id == choice.providerID }
             let model = choice.model.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard choice.providerID == nil || (selected != nil && !model.isEmpty) else {
+            guard choice.usesLocal || choice.providerID == nil || (selected != nil && !model.isEmpty) else {
                 state.present(.error("Select a saved provider and model."))
                 return false
             }
@@ -178,18 +179,15 @@ import Foundation
                 Self.setAssistant(
                     &candidate, provider: choice.usesLocal ? nil : selected, model: choice.usesLocal ? "" : model)
             case .writer:
-                guard !choice.usesLocal else {
-                    state.present(.error("This local model lacks the native tools Writer needs."))
-                    return false
-                }
-                candidate.writerProviderID = selected?.id
-                candidate.writerModel = selected == nil ? "" : model
+                candidate.writerUsesLocal = choice.usesLocal
+                candidate.writerProviderID = choice.usesLocal ? nil : selected?.id
+                candidate.writerModel = choice.usesLocal || selected == nil ? "" : model
                 candidate.writerThinking = choice.writerThinking
             case .decision:
                 candidate.decisionUsesLocal = choice.usesLocal
                 candidate.decisionLocalModelID = choice.decisionLocalModelID
-                candidate.decisionProviderID = selected?.id
-                candidate.decisionModel = selected == nil ? "" : model
+                candidate.decisionProviderID = choice.usesLocal ? nil : selected?.id
+                candidate.decisionModel = choice.usesLocal || selected == nil ? "" : model
             }
         }
         guard await save(candidate) else { return false }

@@ -123,3 +123,5 @@ loading双眼采用同拓扑睁眼轮廓，独立父图层由 Core Animation 按
 用户字幕由 SpeechPerception 驱动，回复字幕由 Assistant 对话工作器驱动。Decision 结果由 Assistant 会话发布到通用灵动岛。
 
 HomeNotice 的 placement 区分字幕槽提示和独立 toast；transientToast 不受助手字幕或错误 notice 抑制，交给 Root 渲染。两者复用一个最新提示槽，替换取消旧计时任务，到期/根关闭清理，不形成队列。
+
+HomeNoticeState 的错误呈现可选择字幕或全局 Toast 位置，默认字幕；全局错误通过 transientToast 投影，优先于普通 Toast，保留原有单错误槽、去重、到期和根停止清理，不被助手字幕遮蔽。位置是通用 UI 值，角色错误分类由生产者拥有。

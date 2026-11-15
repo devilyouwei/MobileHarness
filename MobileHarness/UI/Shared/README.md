@@ -42,3 +42,7 @@ A request owns one cancellation callback bound to its Agent-owned processing tas
 The shared localization catalog includes Agent and execution-log status, completion and formatted issue copy. Agents supplies AppLanguage at projection time; raw business values and original diagnostic strings are not catalog keys. Format strings keep item numbers, motor identity and target/observed values as arguments.
 
 模型设置文案使用 Agent Models／智能体模型及 Models／模型；Assistant／助手、Writer／创作助手、Decision／决策复用角色名称翻译，下载提示中的页面名称与当前语言一致。
+
+模型选择、未下载提示与 Decision 的类型化失败文案覆盖英语和简体中文；原始诊断留日志，Toast 使用本地化用户消息。
+
+模型设置分区采用 Cloud Providers & Models／云端服务与模型、Agent Models／智能体模型、Local Models／本地模型；Chat／对话和 Decision／决策为独立用途标签。Gemma 4 E2B、D3 Edge、D3 Lite 保留模型原名，中英文不添加用途后缀。

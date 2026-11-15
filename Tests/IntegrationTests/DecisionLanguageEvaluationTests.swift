@@ -41,7 +41,6 @@ private struct DecisionLanguageReport: Encodable {
         let adopted: InputDisposition
         let route: String
         let reason: String?
-        let localFallback: String?
         let measurement: MeasuredD3.Sample?
     }
     let host: String
@@ -141,7 +140,7 @@ private actor MeasuredD3: ModelDecisionProviding {
                 local: measured, configuration: { (true, nil) }, language: { prompt })
             for _ in 0..<3 {
                 let warmup = await classifier.classify(first.english.snapshot(id: "warmup", scenario: first))
-                try #require(warmup.route == .local, Comment(rawValue: warmup.localFallback ?? "Native warm-up failed"))
+                try #require(warmup.route == .local, Comment(rawValue: warmup.reason ?? "Native warm-up failed"))
                 _ = await measured.takeSample()
             }
             func evaluate(
@@ -152,7 +151,7 @@ private actor MeasuredD3: ModelDecisionProviding {
                 return .init(
                     caseID: scenario.id, inputLanguage: inputLanguage, prompt: prompt, expected: scenario.expected,
                     model: value.modelResult, adopted: value.adopted, route: value.route.rawValue, reason: value.reason,
-                    localFallback: value.localFallback, measurement: await measured.takeSample())
+                    measurement: await measured.takeSample())
             }
             for scenario in scenarios {
                 rows.append(await evaluate(scenario.english, scenario: scenario, inputLanguage: "en"))

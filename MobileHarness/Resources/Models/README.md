@@ -50,3 +50,5 @@ Production declarations and explicit developer provisioning.
 [Parent design](../README.md)
 
 Decision 固定 Edge 和 Lite 的发布版本，分别安装到 D3Edge 和 D3Lite。Lite 仅下载文本决策图。目录只随包分发声明与下载信息，不含权重。图、tokenizer、manifest、配置和许可证一并校验安装，下载不切换业务偏好。
+
+模型目录的显示名使用 Gemma 4 E2B、D3 Edge、D3 Lite，不附加 Local Chat 或 Decision 用途后缀；用途由 UI 独立标签呈现。模型 ID、目录、版本与下载校验身份不随显示名变化。

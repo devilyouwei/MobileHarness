@@ -289,6 +289,20 @@ The native experiment, `./scripts/check.sh`, four iOS Simulator schemes in `./sc
 
 [两款制品的 SHA-256、实际提示、逐条分数和复现脚本](../measurements/duplex-d3-lite-edge-coreai-2026-11-15.json)。
 
+## Decision runtime-state prompt revision (2026-11-15)
+
+This revision adds existing execution/settlement, tri-state playback and bounded pending-question facts to the shared local/cloud prompt. English and Simplified Chinese instructions protect brief answers, distinguish immediate correction from ordinary additions, and prefer enqueue under uncertainty. Latest input and the pending question use quoted, escaped data. This is a snapshot projection, not a conversation-mode state machine; adoption and interruption cleanup remain unchanged.
+
+Validation on the local Mac:
+
+- `scripts/build-ios.sh`: all four Simulator schemes passed; packaged Agent/Skill, Live Activity and English/Simplified Chinese resources passed verification.
+- Focused `swift test --skip-build --filter 'decisionPrompt|inputDecision|readyD3|slowTrackingDispatchExecutesOnlyTheNewestPendingTarget'`: 13 tests passed, including both prompt languages, all execution/playback combinations (unknown included), bounded/escaped question data, cloud/local prompt agreement, fallback and adoption protections.
+- `scripts/check.sh`: architecture boundaries, seven Python tests and strict formatting passed. Full concurrent IntegrationTests reported a failure in `slowTrackingDispatchExecutesOnlyTheNewestPendingTarget`; its focused rerun passed, which does not erase the original failure. AppWorkflowTests reported Writer/Web failures involving `resourceMissing("injected Action declarations")`; that process then produced no new output for over three minutes while consuming CPU and was terminated. The complete check exited 1. Its subsequent isolated LiveRuntimeTests phase passed all 228 tests, and project/privacy/entitlement/plist validation passed; these do not erase the earlier failures.
+- The initial sandboxed check could not write the Swift module cache; validation was restarted with cache access. No production source was changed to accommodate validation failures.
+
+Logs: `/tmp/mobileharness-decision-check.log`, `/tmp/mobileharness-decision-focused.log`, `/tmp/mobileharness-decision-ios.log` (local ephemeral evidence). Real D3/cloud accuracy, tokenizer capacity distribution and physical-device speech behavior were not measured for this revision. Earlier model scores in this document belong to their recorded prompts and do not establish improvement for this revision. The fixed 512-token rejection/fallback contract remains in effect.
+
+
 ## Apple system model Decision comparison (2026-11-15)
 
 使用新增 [Swift 实验测试](../../Tests/IntegrationTests/AppleDecisionEvaluationTests.swift)，通过 `ModelKitAppleLLM.AppleChat` 调用 `SystemLanguageModel.default`。实验目标依赖 Apple provider，ModelKit 不依赖 Agents 或其他业务模块。未修改生产 Decision 路由、提示词或模型选择。
@@ -325,4 +339,4 @@ The native experiment, `./scripts/check.sh`, four iOS Simulator schemes in `./sc
 
 在另一台设备上启用 Apple Intelligence、等待系统模型就绪并安装 Xcode 27+ 后，先 `git pull --ff-only`，再按测试说明运行到一个不存在的新 JSON 路径。美行身份本身不保证 `.available`，仍以测试入口的实际可用性为准。
 
-本次提交仅包含 Apple 接入与实验改动。154 条请求中的 100 条冻结基线可直接复现；54 条 current 请求按运行时 checkout 的 renderer/资源重新生成。本机 report 保存了当时其他未提交 Decision 修改生成的快照，另一台机器的 current 请求可能不同；比较时必须核对请求及 sourceSHA256，不能假定这 54 条与报告字节相同。
+用户随后要求一并提交当前工作区的代码、文档和测试，包含生成这份快照的 Decision renderer/资源修改；本地 DEVELOPMENT_TEAM 签名设置留在工作区。154 条请求中的 100 条冻结基线可直接复现；54 条 current 请求按运行时 checkout 的 renderer/资源重新生成。复跑时仍须核对请求及 sourceSHA256，以识别后续代码或提示词变化。

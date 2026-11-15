@@ -74,3 +74,35 @@ Settings 首页保留原有分区顺序及模型入口顺序，界面标题/分�
 验证：核对中英文目录键、三个模型顺序、原子符号与旧文案引用，运行 `scripts/check.sh`、完整 Xcode 可用时运行 `scripts/build-ios.sh`；自动化与原生界面验收分别记录。
 
 合并远程 D3 Lite 支持时，保留远程 Edge/Lite 模型身份、资源与选择流程，同时保留本节 Agent Models 命名与 atom 图标。冲突涉及 Settings、ModelResources 及总体技术 README；下载与安装提示继续采用中英文新页面名，模型选择接口不回退。
+
+## 2026-11-15 单一模型选择与 Decision 入队兜底
+
+需求：三个 Agent Models 子页统一采用 Provider → Model 两级选择；Provider 包括 Local 和已保存云端服务，选云端后发现其模型，再选择 Model。Assistant/Writer 本地候选为 Gemma 4 E2B，Decision 为 D3 Edge/Lite。未安装候选允许点击并明确提示先下载，不改变草稿；保存端再次按制品身份校验，失败不提交。Writer 增加显式本地模式字段，区分旧未配置值；旧配置默认未启用 Writer 本地。现有 Gemma 的 Writer 原生工具能力限制继续明确失败，不增加模型能力或隐式切换。
+
+Decision 仅执行所选模型，本地和云端互斥；移除 UI 的 Cloud fallback 及运行时云端备用路径。旧文档本地模式下残留云端选择不再执行；保存本地选择清空云端引用。配置失败、资源不可用、准备中、超时、无效输出及推理失败均以 enqueue 兜底，并显示中英文错误 Toast；取消/停止不显示错误 Toast。保留原始失败诊断、输入归属与后置采纳保护。本地准备工作仍归根拥有，超时取消并加入实际工作后才释放；每个引擎至多一个在途 worker，清理未结束时拒绝新调用，无 UI 生命周期转移。
+
+修改范围：AssistantInputDecision 的独占选择和类型化失败；AgentRuntime 将有效失败投影到已有 Toast/日志；ActionsBusinessAssembly 只交付选中的模型工厂；ProviderSettingsService/Store/Contracts 与 ApplicationControl/UI 适配传递 writerUsesLocal 并校验安装；SettingsState/FormController/View 统一两级选择与本地错误；Shared String Catalog 增加中英文文案；RuntimeLog 移除已无意义的 localFallback 展示字段。同步 Assistant、Agents、Provider、Contracts、Actions、Settings、Shared、RuntimeLog 和整体设计的真实契约，保留历史验证记录。
+
+验证覆盖本地失败不调用云端、云端失败不调用本地、取消不提示、明确失败提示及入队、Edge/Lite 成功、Writer 本地保存恢复与未配置区别、未安装资源拒绝及回滚、Provider 选择和模型发现的迟到结果围栏。运行 check.sh、build-ios.sh；自动化替身与真实模型/原生界面验收分别记录。保留已有未提交改动，不新增目录。
+
+呈现细化：现有 offerToast 默认显示在首页字幕区，可能被正在显示的助手回复遮住。为确保 Decision 错误实际以 Toast 展示，HomeNoticeState 增加通用错误呈现位置参数（默认保留字幕行为），Decision 使用 toast 位置；Root 复用已有全局 transientToast 覆盖层并按 tone 显示错误图标。沿用单槽替换、去重、8 秒到期和根停止清理，不增加 Task 或独立队列。同步 UI/Conversation、Root 技术文档，并测试错误在全局 Toast 中呈现及清理。
+
+单一模型执行、三页 Provider/Model 选择、Writer 本地模式持久化、未下载校验及中英文全局错误 Toast 已实现。构建/专项回归与全量检查限制见 [验证记录](../../validation/Provider-Management.md#selected-model-execution-and-bilingual-settings-2026-11-15)；实际模型与原生界面/真机验收未执行。
+
+## 2026-11-15 本地 Gemma OpenAI 风格工具协议
+
+意图：在既有 ModelKitGemma4 目录实现 OpenAI 中立 tools/function、assistant.toolCalls、tool_call_id 的 Gemma 4 原生模板适配，不引入 HTTP 服务或云端调用。声明、参数、结果遵循 Google 官方 Gemma 4 工具标记；调用 ID 由适配器生成，结果按 ID 映射回函数名。工具请求完整保留 system、定义和调用/结果配对，按真实 tokenizer 计费；超出 iOS 1024/macOS 4096 窗口明确失败，不截断协议或回退模型。纯文本诊断路径沿用原有裁剪契约。
+
+Gemma4Chat 负责能力声明、请求校验、工具输出有界缓冲、完成校验和中立事件；GemmaLanguageEngine 负责原始模板编码、在工具响应起始标记停止并维持取消/释放语义；同目录工具适配器负责嵌套对象/数组/字符串/数值解析、拒绝重复键、未知函数、无效/截断输出及 required 工具违约。完整生成成功并校验全部调用后才发布工具事件；错误不执行工具。工具结果仍由调用方执行后回传，ModelKit 不拥有业务执行。更新 Writer/UI 双语能力说明以及 ModelKit/LLM/Gemma4/Writer 和总体设计。新增无权重协议、往返、失败和上下文回归；真实权重与设备验收单独记录。运行 check.sh、build-ios.sh。
+
+集成核对补充：ModelContainer.ConfiguredChat 的固定配置包装器不能再以 configuration != nil 推断工具能力。由 ModelScope 按该包装器冻结的配置解析轻量 capability（本地 get(load:false)，云端沿既有缓存），异步转发 supportsToolCalls/supportsImages；不得借用会变化的 Assistant 默认选择。Tests/ModelKitDefaultsTests 验证本地、云端及独立根的实际能力、固定本地选择不随默认配置变化，并保留无权重加载断言。同步 ModelKit 和默认装配测试文档。
+
+本地工具模板、解析/结果回传、固定配置能力透传和双语说明已实现；专项回归与 iOS 构建通过。真实权重工具选择质量及设备验收待执行；全量测试的失败与未完成套件保留于 [验证记录](../../validation/Provider-Management.md#local-gemma-native-tools-2026-11-15)。
+
+## 2026-11-15 模型原名与用途标签
+
+Agent Models 总页三分区依次改为 Cloud Providers & Models（云端服务与模型）、Agent Models（智能体模型）、Local Models（本地模型）。Resources/Models/model-catalog.json 的显示名统一为 Gemma 4 E2B、D3 Edge、D3 Lite；UI/Settings 的选择摘要、候选和安装提示同步使用原名，移除模型名称中的 Local Chat、Decision 后缀。保留模型 ID、制品目录、版本、下载与选择语义。
+
+ModelResourceSections 的本地模型条目在名称下方显示用途胶囊：Gemma 为蓝色 Chat（对话），D3 Edge/Lite 为橙色 Decision（决策）。文字标签同时表达用途，不仅靠颜色；标签使用可缩放字体并保留模型标题换行空间。仅涉及显示与现有模型 ID 的 UI 分类，不引入业务依赖或新目录。同步 Settings、Shared、模型资源 README 及相关当前设计；验证中英文名称、分区、标签与布局，执行 check.sh/build-ios.sh，记录原生检查与自动化结果。
+
+模型原名、三分区及双色中英文用途标签已实现，构建产物核对和四目标构建通过；新版已安装到 iPhone 17 Pro，手机锁定导致自动启动未成功。原生视觉验收限制、全量测试失败及运行时通过结果见 [验证记录](../../validation/Provider-Management.md#canonical-model-names-and-purpose-badges-2026-11-15)。

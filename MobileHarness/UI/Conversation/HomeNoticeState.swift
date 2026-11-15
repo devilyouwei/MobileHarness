@@ -10,7 +10,7 @@ public final class HomeNoticeState {
 
     public internal(set) var notice: HomeNotice?
     public var visibleNotice: HomeNotice? {
-        if let errorToast {
+        if let errorToast, errorToastPlacement == .caption {
             return HomeNotice(
                 id: errorToast.id,
                 text: errorToast.userMessage ?? errorToast.message.replacingOccurrences(of: "agent.error: ", with: ""),
@@ -18,13 +18,25 @@ public final class HomeNoticeState {
         }
         return notice?.placement == .caption ? notice : nil
     }
-    public var transientToast: HomeNotice? { notice?.placement == .toast ? notice : nil }
+    public var transientToast: HomeNotice? {
+        if let errorToast, errorToastPlacement == .toast {
+            return HomeNotice(
+                id: errorToast.id, text: errorToast.userMessage ?? errorToast.message,
+                tone: .error, placement: .toast)
+        }
+        return notice?.placement == .toast ? notice : nil
+    }
+    private var errorToastPlacement: HomeNotice.Placement = .caption
     public private(set) var errorToast: ExecutionIssue?
     @ObservationIgnored var toastDuration = Duration.seconds(8)
     @ObservationIgnored private var toastExpiry: Task<Void, Never>?
     private var toastKeys: [String] = []
+    public func dismissCaptionErrorToast() {
+        guard errorToastPlacement == .caption else { return }
+        errorToast = nil
+    }
     public func dismissErrorToast(id: String) { if errorToast?.id == id { errorToast = nil } }
-    public func offerToast(_ issue: ExecutionIssue, now: Date = Date()) {
+    public func offerToast(_ issue: ExecutionIssue, now: Date = Date(), placement: HomeNotice.Placement = .caption) {
         // Stale and repeated evidence remains available in the log.
         guard presentationAdmission?.active ?? true, issue.context?.callID == nil,
             (-5...15).contains(now.timeIntervalSince(issue.time))
@@ -34,6 +46,7 @@ public final class HomeNoticeState {
         toastKeys.append(key)
         toastKeys = Array(toastKeys.suffix(100))
         errorToast = issue
+        errorToastPlacement = placement
         let previous = toastExpiry
         previous?.cancel()
         toastExpiry = Task { [weak self] in

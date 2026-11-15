@@ -16,6 +16,7 @@ public struct UserSettingsDocument: Codable, Sendable {
     var writerProviderID: String? = nil
     var writerModel: String = ""
     var writerThinking: Bool? = nil
+    var writerUsesLocal: Bool? = nil
     var decisionProviderID: String? = nil
     var decisionModel: String? = nil
     var decisionUsesLocal: Bool? = nil
@@ -72,6 +73,7 @@ public actor ProviderSettingsStore: ProviderSettingsPersistence {
                         providers: others, name: $0.name, id: $0.id,
                         writerProviderID: snapshot.value.writerProviderID, writerModel: snapshot.value.writerModel,
                         writerThinking: snapshot.value.writerThinking ?? false,
+                        writerUsesLocal: snapshot.value.writerUsesLocal ?? false,
                         decisionProviderID: snapshot.value.decisionProviderID,
                         decisionModel: snapshot.value.decisionModel ?? "",
                         decisionUsesLocal: snapshot.value.decisionUsesLocal,
@@ -118,6 +120,7 @@ public actor ProviderSettingsStore: ProviderSettingsPersistence {
             document.writerProviderID = value?.writerProviderID
             document.writerModel = value?.writerModel ?? ""
             document.writerThinking = value?.writerThinking
+            document.writerUsesLocal = value?.writerUsesLocal
             document.decisionProviderID = value?.decisionProviderID
             document.decisionModel = value?.decisionModel ?? ""
             document.decisionUsesLocal = value?.decisionUsesLocal

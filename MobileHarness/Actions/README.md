@@ -155,3 +155,5 @@ ActionsBusinessBindings 为每次 Decision 分类提供一份已提交的配置�
 Decision 瞬时反馈由 Assistant 通过已有 UI.Island 工具发布。Actions 只执行通用活动发布及结束。
 
 WebExecutionService 拥有单槽当前网页截图，经 ActionsBusinessBindings.readWebScreenshot 对外提供 scope 隔离的多模态快照。App 透传至 Agents；Actions 不依赖 Agent 或 Resources。截图不写入 MediaStore，Actions 树中的 actions.web.screenshot 只投影元数据，详细生命周期见 [Web](Web/README.md)。
+
+Provider 设置事务按制品身份校验新增本地模型选择，分别保存 Writer 本地模式与 Decision 的独占选择。组合端只暴露所选 Decision 模型的工厂，不提供本地失败后的云端备用。详见 [Provider](System/Provider/README.md)。

@@ -77,8 +77,17 @@
         private func percentage(_ progress: Double) -> String {
             progress < 0.001 ? "<0.1%" : String(format: "%.1f%%", progress * 100)
         }
+        private func modelKindBadge(_ title: String, color: Color) -> some View {
+            Text(appCopy.text(title))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(color)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(color.opacity(0.15), in: Capsule())
+        }
+
         @ViewBuilder var body: some View {
-            Section(group == .language ? appCopy.text("Local model downloads") : appCopy.text("Custom model")) {
+            Section(group == .language ? appCopy.text("Local Models") : appCopy.text("Custom model")) {
                 if group != .vision {
                     Picker(appCopy.text("Download source"), selection: $selectedSource) {
                         Text(appCopy.text("Hugging Face")).tag("official")
@@ -112,6 +121,11 @@
                         HStack(alignment: .center, spacing: 16) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(appCopy.text(item.name))
+                                if ModelResourceGroup.language.modelIDs.contains(item.id) {
+                                    modelKindBadge("Chat", color: .blue)
+                                } else if ModelResourceGroup.decision.modelIDs.contains(item.id) {
+                                    modelKindBadge("Decision", color: .orange)
+                                }
                                 if item.id == "silero" {
                                     Text(
                                         appCopy.text(
@@ -210,7 +224,7 @@
                             ? appCopy.text("Speech will switch to Apple. Download the model again to re-enable it.")
                             : removal.map { ModelResourceGroup.decision.modelIDs.contains($0.id) } == true
                                 ? appCopy.text(
-                                    "Decision will use the saved cloud fallback. If unavailable, it keeps and queues input."
+                                    "If this is the selected Decision model, classification will fail and input will be queued until it is downloaded again or another model is selected."
                                 )
                                 : group == .language
                                     ? appCopy.text("Use a cloud model or download Gemma 4 E2B again for local chat.")

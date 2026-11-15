@@ -57,13 +57,25 @@ import Testing
     try await first.setForeground(true)
     try await second.setForeground(true)
     let port = first.language
-    #expect(await !port.supportsToolCalls)
+    let fixedLocal = try await port.chatModel(configuration: nil)
+    #if targetEnvironment(simulator)
+        let localTools = false
+    #else
+        let localTools = true
+    #endif
+    #expect(await port.supportsToolCalls == localTools)
+    #expect(await !port.supportsImages)
     try await port.configure(
         .init(baseURL: URL(string: "https://models.example.invalid/v1")!, apiKey: "", model: "fixture"))
     #expect(await port.supportsToolCalls)
-    #expect(await !second.language.supportsToolCalls)
+    #expect(await port.supportsImages)
+    #expect(await fixedLocal.capability.supportsToolCalls == localTools)
+    #expect(await !fixedLocal.capability.supportsImages)
+    #expect(await second.language.supportsToolCalls == localTools)
+    #expect(await !second.language.supportsImages)
     try await port.configure(nil)
-    #expect(await !port.supportsToolCalls)
+    #expect(await port.supportsToolCalls == localTools)
+    #expect(await !port.supportsImages)
     #expect(!FileManager.default.fileExists(atPath: path.path))
     try await first.stop()
     try await second.stop()

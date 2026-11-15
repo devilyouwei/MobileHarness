@@ -19,3 +19,7 @@ The exact prompt regression preserves every consecutive-user turn. Existing alte
 ✅ 回归覆盖失败历史中的空assistant／空白消息、末尾system移除、空当前输入不可回退旧user、无当前user及具体错误原因。
 
 ✅ 回归覆盖iOS 1024／macOS 4096及模型更小窗口解析、1024内长system与历史裁剪、输出预算和当前输入超限拒绝。
+
+## Native tools
+
+GemmaToolProtocolTests covers neutral declarations to native syntax, nested argument values and Unicode, generated call IDs and paired result continuation, multiple calls, split-marker buffering, malformed/undeclared/duplicate/truncated calls, required-tool violations, reserved tokens, nesting/output bounds, and complete tool-history budget preservation. These are deterministic weight-free tests, not proof of real model quality or device support.

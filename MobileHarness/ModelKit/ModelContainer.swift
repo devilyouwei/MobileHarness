@@ -353,7 +353,10 @@ private actor ModelScope {
         return id
     }
     func selectedChat() async throws -> any ChatCapability {
-        if let cloudChat { return try await cloud(cloudChat) }
+        try await chatCapability(configuration: cloudChat)
+    }
+    func chatCapability(configuration: OpenAIChatConfiguration?) async throws -> any ChatCapability {
+        if let configuration { return try await cloud(configuration) }
         return try await perform("language", "localChat") { try await $0.get(.chat, load: false) }
     }
     func chat(_ request: ChatRequest, configuration: OpenAIChatConfiguration?) async throws -> InferenceSession<
@@ -451,8 +454,12 @@ private struct ConfiguredChat: ChatCapability {
     let scope: ModelScope
     let configuration: OpenAIChatConfiguration?
     var availability: CapabilityAvailability { .available }
-    var supportsToolCalls: Bool { configuration != nil }
-    var supportsImages: Bool { configuration != nil }
+    var supportsToolCalls: Bool {
+        get async { (try? await scope.chatCapability(configuration: configuration).supportsToolCalls) ?? false }
+    }
+    var supportsImages: Bool {
+        get async { (try? await scope.chatCapability(configuration: configuration).supportsImages) ?? false }
+    }
     func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
         try await scope.chat(request, configuration: configuration)
     }

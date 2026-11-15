@@ -16,3 +16,5 @@ ChatExecutionTests exercises root-owned local FIFO (one active/eight pending), o
 D3NativeTests is explicitly opt-in via D3_TEST_RESOURCES. It performs real Swift tokenizer/Core AI inference against a locally supplied published fixture, compares selection/score and rejects oversized input. Ordinary default tests remain artifact-free; native results are recorded separately in docs/validation.
 
 显式启用的 D3 业务探测记录8条中文输入的期望与实际标签，汇报探索性准确率；该测试通过只说明原生执行成功，不将错误分类视为业务验收通过。
+
+Default local Gemma and cloud capabilities both advertise tools. Configuration isolation uses their distinct image support; a fixed local ChatModel retains local tool/image capabilities after the default selection changes. Queries remain artifact-free and do not issue HTTP requests.

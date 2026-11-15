@@ -174,3 +174,5 @@ HomeEffects 回归覆盖独立 toast 与保留字幕、错误 notice 共存，�
 SettingsInteractionTests 覆盖 Decision 选择、保存、恢复、独立模型保留、Provider 删除清理及共享发现缓存；页面原生布局需另行验收。
 
 WebWorkspaceTests 覆盖网页单槽截图的替换、scope 隔离、被动读取、窗口生命周期、准备失败、忙拒绝、取消加入和页面变化后的迟到结果；通过真实 AgentStateContext 与 ChatRequest 投影验证 Skill 选择、跨输入替换、无图片模型及完整请求日志留证。页面用替身，不代表真实 WebKit 截图验收。
+
+SettingsInteractionTests 覆盖 Writer 显式本地模式的保存恢复、角色独立提交以及 Decision 本地保存清除云端备用引用；资源安装资格由 Provider 事务的独立测试验证。

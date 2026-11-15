@@ -239,14 +239,10 @@ import Foundation
                 }
             }
             .onChange(of: state.assistantReply) { _, text in
-                if !text.isEmpty, let issue = notices.errorToast {
-                    notices.dismissErrorToast(id: issue.id)
-                }
+                if !text.isEmpty { notices.dismissCaptionErrorToast() }
             }
             .onChange(of: state.liveTranscript) { _, text in
-                if !text.isEmpty && !state.transcriptFinalized, let issue = notices.errorToast {
-                    notices.dismissErrorToast(id: issue.id)
-                }
+                if !text.isEmpty && !state.transcriptFinalized { notices.dismissCaptionErrorToast() }
             }
             .preferredColorScheme(.dark)
         }

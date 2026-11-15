@@ -133,6 +133,12 @@
                     return try await manager.artifactSnapshots().contains {
                         $0.artifact.id == id && $0.phase == .installed
                     }
+                },
+                isLanguageInstalled: {
+                    let manager = try await request.maintenance.artifacts()
+                    return try await manager.artifactSnapshots().contains {
+                        $0.artifact.id == "gemma4-e2b" && $0.phase == .installed
+                    }
                 })
             let providerSettings = ProviderSettingsRequests(service: providerService)
             let discovery = ProviderDiscoveryRequests(discover: SettingsProviderAdapter.discoverModels)
@@ -275,7 +281,7 @@
                 decisionConfiguration: { [model] in
                     let saved = try await providerService.decisionSnapshot()
                     let localID = saved.decisionUsesLocal == true ? saved.resolvedDecisionLocalModelID : nil
-                    guard saved.decisionProviderID != nil else { return (localID, nil) }
+                    guard localID == nil, saved.decisionProviderID != nil else { return (localID, nil) }
                     return (
                         localID,
                         {

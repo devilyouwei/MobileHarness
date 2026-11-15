@@ -183,3 +183,5 @@ Decision 使用独立于 Assistant 和 Writer 的已提交配置。每次分类�
 AgentRuntime 通过 AgentBusinessBindings.readWebScreenshot 将 Actions 的当前网页图片注册为 actions.web.screenshot；WebBrowsing 选择后进入共享多模态 State。Agents 不拥有网页截图缓存、压缩或媒体回查，Assistant 不再从 Web feedback 附图。
 
 Runtime log projection resolves app-owned status and issue copy through UI.AppLanguage using the App-supplied language reader. The shared adapters preserve canonical function identity, raw result values and producer diagnostics. File ownership and bounded presentation delivery are documented in [Support](Support/README.md).
+
+Decision 的当前独占模型失败由 Assistant 生成类型化呈现值；AgentRuntime 将其投影为带输入身份的本地化错误 Toast 和日志。取消与过期输入不提示。模型选择与入队兜底契约见 [Assistant](Assistant/README.md#full-duplex-input-and-decision)。

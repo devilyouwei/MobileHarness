@@ -293,12 +293,11 @@ public struct DecisionLogItem: Identifiable, Sendable, Equatable {
     public let adoptedResult: Disposition
     public let reason: String?
     public let requests: [String]
-    public let localFallback: String?
 
     public init(
         id: String, source: String, inputText: String, time: Date = .now, duration: Duration, route: Route,
         modelResult: Disposition?,
-        adoptedResult: Disposition, reason: String? = nil, requests: [String], localFallback: String? = nil
+        adoptedResult: Disposition, reason: String? = nil, requests: [String]
     ) {
         self.id = id
         self.source = String(source.prefix(64))
@@ -310,7 +309,6 @@ public struct DecisionLogItem: Identifiable, Sendable, Equatable {
         self.adoptedResult = adoptedResult
         self.reason = reason.map { String($0.prefix(256)) }
         self.requests = requests
-        self.localFallback = localFallback.map { String($0.prefix(256)) }
     }
 }
 

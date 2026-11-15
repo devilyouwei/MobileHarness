@@ -24,7 +24,16 @@ public struct InputDecisionOutcome: Sendable, Equatable {
     public let adopted: InputDisposition
     public let reason: String?
     public let requests: [String]
-    public let localFallback: String?
+    public enum Failure: String, Sendable {
+        case settings = "Could not read Decision settings. Input queued."
+        case request = "Could not prepare the Decision request. Input queued."
+        case unavailable =
+            "The selected Decision model is unavailable. Download it in Agent Models or check its provider. Input queued."
+        case notReady = "The selected Decision model is not ready. Input queued."
+        case timedOut = "The selected Decision model timed out. Input queued."
+        case model = "The selected Decision model failed or returned an invalid result. Input queued."
+    }
+    public var failure: Failure? = nil
 }
 
 /// One pending input, one earlier exchange and a bounded excerpt of the same-session buffer.
@@ -94,11 +103,18 @@ public struct InputDecisionSnapshot: Sendable {
             } ?? empty
         let buffer = try bufferedUserInputs.map(quote).joined(separator: "\n")
         let definitions = try AgentPrompts.text(owner, "definitions")
+        let state = try AgentPrompts.text(
+            owner, "state",
+            [
+                "running": AgentPrompts.text(owner, running ? "yes" : "no"),
+                "playing": AgentPrompts.text(owner, playing.map { $0 ? "yes" : "no" } ?? "unknown"),
+                "question": question.map(quote) ?? empty,
+            ])
         let context = try AgentPrompts.text(
             owner, "context", ["history": historyText, "buffer": buffer.isEmpty ? empty : buffer])
-        let latest = try AgentPrompts.text(owner, "latest", ["input": String(quote(text).dropFirst().dropLast())])
+        let latest = try AgentPrompts.text(owner, "latest", ["input": quote(text)])
         return .init(
-            state: definitions + "\n\n" + context, latest: latest,
+            state: definitions + "\n\n" + state + "\n\n" + context, latest: latest,
             context: .init(requestID: input.id + ".decision", scopeID: input.sessionID))
     }
 }
@@ -124,7 +140,7 @@ public actor AssistantInputDecision {
     private var timers: [String: Task<Void, Never>] = [:]
     private enum Attempt: Sendable {
         case selected(InputDisposition)
-        case failed(String)
+        case failed(String, InputDecisionOutcome.Failure = .model)
     }
     private var waiters: [String: CheckedContinuation<Attempt, Never>] = [:]
     private var localFailure: String?
@@ -195,18 +211,22 @@ public actor AssistantInputDecision {
         await workers["local"]?.value
     }
 
-    private func selectLocal(_ id: String?) async {
-        guard id != activeLocalID, !switchingLocal else { return }
+    private func selectLocal(_ id: String?) async -> String? {
+        guard !switchingLocal else { return "Decision model is still switching" }
+        guard id != activeLocalID else { return nil }
         switchingLocal = true
         defer { switchingLocal = false }
         if let previous = activeLocalID, let model = localModel(previous), !localMaintenance.contains(previous) {
             await joinLocal()
             if !localMaintenance.contains(previous) {
-                do { try await model.unload() } catch { await report("D3 resource release failed: \(error)") }
+                do { try await model.unload() } catch {
+                    return "Could not release previous Decision model: \(error.localizedDescription)"
+                }
             }
         }
         activeLocalID = id
         localFailure = nil
+        return nil
     }
     public func stop() async {
         stopped = true
@@ -227,48 +247,57 @@ public actor AssistantInputDecision {
 
     private func classifyInput(_ snapshot: InputDecisionSnapshot) async -> InputDecisionOutcome {
         let requests = Mutex<[String]>([])
-        var localFallback: String?
-        func fallback(_ reason: String) -> InputDecisionOutcome {
+        var localFailureReason: String?
+        var localFailureKind: InputDecisionOutcome.Failure = .model
+        func fallback(_ reason: String, failure: InputDecisionOutcome.Failure? = nil) -> InputDecisionOutcome {
             .init(
                 route: .fallback, modelResult: nil, adopted: .enqueue, reason: reason,
-                requests: requests.withLock { $0 }, localFallback: localFallback)
+                requests: requests.withLock { $0 }, failure: failure)
         }
         guard !stopped, !Task.isCancelled else { return fallback("Classification cancelled") }
         let deadline = snapshot.receivedAt.advanced(by: timeout)
-        guard ContinuousClock.now < deadline else { return fallback("Classification timed out") }
+        guard ContinuousClock.now < deadline else { return fallback("Classification timed out", failure: .timedOut) }
         let route: SelectedConfiguration
         do { route = try await configuration() } catch {
-            await report("Could not read Decision settings; input retained and queued: \(error)")
-            return fallback("Could not read Decision settings")
+            guard !stopped, !Task.isCancelled, !(error is CancellationError) else {
+                return fallback("Classification cancelled")
+            }
+            await reportFailure(.settings)
+            return fallback("Could not read Decision settings: \(error.localizedDescription)", failure: .settings)
         }
         let prompt: InputDecisionSnapshot.Prompt
         do {
             prompt = try snapshot.prompt()
         } catch {
-            await report("Could not prepare Decision request; input retained and queued: \(error)")
-            return fallback("Could not prepare Decision request")
+            await reportFailure(.request)
+            return fallback("Could not prepare Decision request: \(error.localizedDescription)", failure: .request)
         }
-        await selectLocal(route.localID)
+        if let reason = await selectLocal(route.localID) {
+            guard !stopped, !Task.isCancelled else { return fallback("Classification cancelled") }
+            await reportFailure(.model)
+            return fallback(reason, failure: .model)
+        }
         let modelName = route.localID == "d3-lite" ? "D3 Lite" : "D3"
         let modelRoute: InputDecisionOutcome.Route = route.localID == "d3-lite" ? .lite : .local
         if let id = route.localID {
-            localFallback = localFailure
+            localFailureReason = localFailure
             if switchingLocal || activeLocalID != id || localMaintenance.contains(id) {
-                localFallback = "D3 resources are being released"
+                localFailureReason = "D3 resources are being released"
+                localFailureKind = .notReady
             } else if localModel(id) == nil {
-                localFallback = "Selected local Decision model is unavailable"
+                localFailureReason = "Selected local Decision model is unavailable"
+                localFailureKind = .unavailable
             }
-        } else {
-            localFallback = "Configured for cloud Decision"
         }
-        if let id = route.localID, let local = localModel(id), localFallback == nil, !stopped, !Task.isCancelled {
+        if let id = route.localID, let local = localModel(id), localFailureReason == nil, !stopped, !Task.isCancelled {
             do {
                 let status = try await local.status()
                 if localMaintenance.contains(id) || activeLocalID != id || switchingLocal || stopped || Task.isCancelled
                 {
-                    localFallback = "D3 resources are being released"
+                    localFailureReason = "D3 resources are being released"
+                    localFailureKind = .notReady
                 } else if status == .ready {
-                    await report("Local \(modelName)")
+                    await report(AppLanguage(preferredLanguage: language()).format("Local · %@", modelName))
                     let result = await race("local", until: min(deadline, .now.advanced(by: localTimeout))) {
                         try Task.checkCancellation()
                         let request = try prompt.request()
@@ -302,40 +331,44 @@ public actor AssistantInputDecision {
                     case .selected(let action):
                         return outcome(
                             action, route: modelRoute, snapshot: snapshot, requests: requests.withLock { $0 })
-                    case .failed(let reason):
-                        localFallback = reason
+                    case .failed(let reason, let failure):
+                        localFailureReason = reason
+                        localFailureKind = failure
                     }
                 } else {
-                    localFallback = "\(modelName) is not ready (\(status.rawValue))"
+                    localFailureReason = "\(modelName) is not ready (\(status.rawValue))"
+                    localFailureKind = .notReady
                     if preparation == nil {
                         preparation = Task {
                             do { try await local.warmup() } catch
                                 where !Task.isCancelled && !(error is CancellationError)
                             {
                                 self.localFailure = "D3 preparation failed: \(error.localizedDescription)"
-                                await self.report("D3 preparation failed; using cloud Decision: \(error)")
+                                await self.reportFailure(.model)
                             } catch {}
                             self.preparation = nil
                         }
                     }
                 }
             } catch {
-                localFallback = "Could not read D3 status: \(error.localizedDescription)"
-                await report("D3 unavailable; using cloud Decision: \(error)")
+                localFailureReason = "Could not read D3 status: \(error.localizedDescription)"
             }
         }
         guard !stopped, !Task.isCancelled else { return fallback("Classification cancelled") }
+        if route.localID != nil {
+            let reason = localFailureReason ?? "Selected local Decision model is unavailable"
+            await reportFailure(localFailureKind)
+            return fallback(reason, failure: localFailureKind)
+        }
         guard ContinuousClock.now < deadline else {
-            await report("Classification timed out; input retained and queued")
-            return fallback("Classification timed out")
+            await reportFailure(.timedOut)
+            return fallback("Classification timed out", failure: .timedOut)
         }
         guard let cloud = route.cloud else {
-            await report("Cloud Decision is unconfigured; input retained and queued")
-            return fallback("Cloud Decision is unconfigured")
+            await reportFailure(.unavailable)
+            return fallback("Cloud Decision is unconfigured", failure: .unavailable)
         }
-        await report(
-            route.localID != nil
-                ? "Cloud fallback · Dedicated Decision configuration" : "Cloud · Dedicated Decision configuration")
+        await report(AppLanguage(preferredLanguage: language()).text("Cloud · Selected Decision model"))
         let result = await race("cloud", until: deadline) {
             let model = try await cloud()
             guard await model.supportsToolCalls else {
@@ -408,18 +441,23 @@ public actor AssistantInputDecision {
         }
         if case .selected(let action) = result {
             return outcome(
-                action, route: .cloud, snapshot: snapshot, requests: requests.withLock { $0 },
-                localFallback: localFallback)
+                action, route: .cloud, snapshot: snapshot, requests: requests.withLock { $0 })
         }
-        await report("Classification unavailable; input retained and queued")
         if stopped || Task.isCancelled { return fallback("Classification cancelled") }
-        return fallback(
-            ContinuousClock.now >= deadline ? "Classification timed out" : "Model returned no valid classification")
+        if case .failed(let reason, let failure) = result {
+            await reportFailure(failure)
+            return fallback(reason, failure: failure)
+        }
+        return fallback("Model returned no valid classification", failure: .model)
+    }
+
+    private func reportFailure(_ failure: InputDecisionOutcome.Failure) async {
+        await report(AppLanguage(preferredLanguage: language()).text(failure.rawValue))
     }
 
     private func outcome(
         _ action: InputDisposition, route: InputDecisionOutcome.Route, snapshot: InputDecisionSnapshot,
-        requests: [String], localFallback: String? = nil
+        requests: [String]
     ) -> InputDecisionOutcome {
         let content = Self.transcriptContent(snapshot)
         let adopted: InputDisposition
@@ -442,7 +480,7 @@ public actor AssistantInputDecision {
         }
         return .init(
             route: route, modelResult: action, adopted: adopted, reason: reason,
-            requests: requests, localFallback: localFallback)
+            requests: requests)
     }
 
     private static func transcriptContent(_ snapshot: InputDecisionSnapshot) -> TranscriptContent {
@@ -476,7 +514,7 @@ public actor AssistantInputDecision {
         operation: @escaping @Sendable () async throws -> InputDisposition?
     ) async -> Attempt {
         let model = key == "local" ? "D3" : "Cloud Decision"
-        let timeout = Attempt.failed("\(model) timed out")
+        let timeout = Attempt.failed("\(model) timed out", .timedOut)
         guard !stopped, !Task.isCancelled else { return .failed("Classification cancelled") }
         guard workers[key] == nil else { return .failed("\(model) is still cleaning up the previous request") }
         guard ContinuousClock.now < deadline else { return timeout }
@@ -492,10 +530,6 @@ public actor AssistantInputDecision {
                     } catch {
                         let reason = "\(model) failed: \(error.localizedDescription)"
                         result = .failed(reason)
-                        if !Task.isCancelled, !(error is CancellationError), ContinuousClock.now < deadline {
-                            // Request failures can fall back without disabling the model for later inputs.
-                            await self.report(reason)
-                        }
                     }
                     if !Task.isCancelled {
                         self.resolve(key, result: ContinuousClock.now < deadline ? result : timeout)
@@ -523,6 +557,15 @@ public actor AssistantInputDecision {
 }
 
 extension InputDecisionOutcome {
+    func failureIssue(for snapshot: InputDecisionSnapshot, language: String) -> ExecutionIssue? {
+        guard let failure else { return nil }
+        let copy = AppLanguage(preferredLanguage: language)
+        return ExecutionIssue(
+            id: snapshot.input.id + ".decision", title: copy.text("Decision"), source: "assistant.decision",
+            message: reason ?? failure.rawValue, failureCode: "decision.classification",
+            inputID: snapshot.input.id, userMessage: copy.text(failure.rawValue))
+    }
+
     func logItem(for snapshot: InputDecisionSnapshot, duration: Duration) -> DecisionLogItem {
         let route: DecisionLogItem.Route =
             switch self.route {
@@ -534,7 +577,7 @@ extension InputDecisionOutcome {
             id: snapshot.input.id, source: AgentID.assistant.rawValue, inputText: snapshot.text, duration: duration,
             route: route,
             modelResult: modelResult.map(\.logDisposition), adoptedResult: adopted.logDisposition,
-            reason: reason, requests: requests, localFallback: localFallback)
+            reason: reason, requests: requests)
     }
 }
 

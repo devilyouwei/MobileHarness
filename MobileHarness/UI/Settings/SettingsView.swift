@@ -140,7 +140,7 @@
         }
         public var body: some View {
             Form {
-                Section(appCopy.text("Cloud Providers")) {
+                Section(appCopy.text("Cloud Providers & Models")) {
                     ForEach(providers, id: \.id) { provider in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(provider.name).font(.body.weight(.medium)).lineLimit(1)
@@ -159,7 +159,7 @@
                         providerEditor = ProviderEditorDraft(provider: nil, existing: providers)
                     }.disabled(!restored || providers.count >= 32)
                 }
-                Section(appCopy.text("Models")) {
+                Section(appCopy.text("Agent Models")) {
                     ForEach(AgentBrain.allCases) { brain in
                         Button {
                             navigate(brain)
@@ -280,7 +280,7 @@
             if choice.usesLocal {
                 if brain == .decision {
                     return choice.decisionLocalModelID == "d3-lite"
-                        ? appCopy.text("Local · D3 Lite") : appCopy.text("Local · D3 Decision")
+                        ? appCopy.text("Local · D3 Lite") : appCopy.text("Local · D3 Edge")
                 }
                 return appCopy.text("Local · Gemma 4 E2B")
             }
@@ -297,7 +297,6 @@
         private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         private enum Selection: Hashable {
             case local
-            case localDecision(String)
             case cloud(String)
             case unconfigured
         }
@@ -310,6 +309,7 @@
         private let save: (BrainSettingsChange) async -> Bool
         @State private var draft: AgentBrainDraft?
         @State private var result: String?
+        @State private var selectionError: String?
         @State private var restoreError: String?
 
         public init(
@@ -329,10 +329,11 @@
             Form {
                 if let draft {
                     configuration(draft)
+                    if let selectionError { Text(appCopy.text(selectionError)).foregroundStyle(.red) }
                     if let result { Text(result).foregroundStyle(.secondary) }
                     if let error = settings.error { Text(appCopy.text(error)).foregroundStyle(.red) }
                 } else if let restoreError {
-                    Text(restoreError).foregroundStyle(.red)
+                    Text(appCopy.text(restoreError)).foregroundStyle(.red)
                     Button(appCopy.text("Reload settings")) { Task { await restore() } }
                 } else {
                     ProgressView()
@@ -348,6 +349,7 @@
                         guard let draft else { return }
                         Task {
                             result = nil
+                            guard validateLocalSelection(draft) else { return }
                             if await save(.brain(brain, draft)) { result = appCopy.text("Saved successfully") }
                         }
                     }
@@ -356,36 +358,45 @@
                 }
             }
             .task { await restore() }
-            .task {
-                if brain != .writer { await resourceControls.restore() }
-            }
+            .task { await resourceControls.restore() }
             .onDisappear { controls.cancelDiscovery() }
         }
 
         private var canSave: Bool {
             guard !settings.isSaving, let draft, draft != settings.brainDraft(brain) else { return false }
-            return draft.providerID == nil || !draft.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return draft.usesLocal || draft.providerID == nil
+                || !draft.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
 
         @ViewBuilder private func configuration(_ choice: AgentBrainDraft) -> some View {
             Section {
                 Picker(appCopy.text("Provider"), selection: Binding(get: { selection }, set: select)) {
                     if brain != .assistant { Text(appCopy.text("Unconfigured")).tag(Selection.unconfigured) }
-                    if brain == .decision {
-                        Text(appCopy.text("Local D3")).tag(Selection.localDecision("d3-edge"))
-                            .disabled(!canSelectDecision("d3-edge", choice: choice))
-                        Text(appCopy.text("Local D3 Lite")).tag(Selection.localDecision("d3-lite"))
-                            .disabled(!canSelectDecision("d3-lite", choice: choice))
-                    } else {
-                        Text(appCopy.text("Local Gemma 4 E2B")).tag(Selection.local).disabled(brain == .writer)
-                    }
+                    Text(appCopy.text("Local")).tag(Selection.local)
                     ForEach(settings.providers, id: \.id) { provider in
                         Text(provider.name).tag(Selection.cloud(provider.id))
                     }
                 }
                 .pickerStyle(.menu)
                 .accessibilityIdentifier("settings.\(brain.rawValue).provider")
-                if !choice.usesLocal, let id = choice.providerID { modelPicker(id) }
+                if choice.usesLocal {
+                    Picker(
+                        appCopy.text("Model"),
+                        selection: Binding(
+                            get: { localModelID(choice) }, set: selectLocalModel)
+                    ) {
+                        if brain == .decision {
+                            Text("D3 Edge").tag("d3-edge")
+                            Text("D3 Lite").tag("d3-lite")
+                        } else {
+                            Text("Gemma 4 E2B").tag("gemma4-e2b")
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .accessibilityIdentifier("settings.\(brain.rawValue).model")
+                } else if let id = choice.providerID {
+                    modelPicker(id)
+                }
                 if brain == .writer, choice.providerID != nil {
                     Toggle(
                         appCopy.text("Extended thinking"),
@@ -402,23 +413,6 @@
                 Text(details(choice))
             }
             if brain == .decision {
-                if choice.usesLocal {
-                    Section(appCopy.text("Cloud fallback")) {
-                        Picker(
-                            appCopy.text("Provider"),
-                            selection: Binding(
-                                get: { draft?.providerID }, set: setCloudProvider)
-                        ) {
-                            Text(appCopy.text("No fallback")).tag(String?.none)
-                            ForEach(settings.providers, id: \.id) { provider in
-                                Text(provider.name).tag(Optional(provider.id))
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .accessibilityIdentifier("settings.decision.fallback.provider")
-                        if let id = choice.providerID { modelPicker(id) }
-                    }
-                }
                 Section(appCopy.text("Latest decision route")) {
                     Text(resources.decisionStatus).foregroundStyle(.secondary)
                 }
@@ -445,41 +439,53 @@
                     : appCopy.text("Thinking is off by default. If the model requires it, the lowest setting is used.")
             case .writer:
                 return appCopy.text(
-                    "Local Gemma lacks Writer’s native tools. Extended thinking applies to new or resumed assignments.")
+                    "Local Gemma supports tool calls within its context limit. Extended thinking applies to cloud models on new or resumed assignments."
+                )
             case .decision:
-                return !resources.installedGroups.contains(.decision)
-                    ? appCopy.text(
-                        "Download D3 in Agent Models. Cloud models need tool support. If unavailable, input is kept and queued."
-                    )
-                    : appCopy.text(
-                        "Cloud models need tool support. If D3 is unavailable, Decision uses the saved cloud fallback.")
+                return appCopy.text(
+                    "Only the selected model is used. If it fails, an error is shown and input is queued.")
             }
         }
 
-        private func canSelectDecision(_ id: String, choice: AgentBrainDraft) -> Bool {
-            (choice.usesLocal && choice.decisionLocalModelID == id)
-                || resources.items.contains { $0.id == id && $0.installed }
+        private func localModelID(_ choice: AgentBrainDraft) -> String {
+            brain == .decision ? choice.decisionLocalModelID : "gemma4-e2b"
+        }
+
+        private func validateLocalSelection(_ choice: AgentBrainDraft) -> Bool {
+            guard choice.usesLocal else { return true }
+            guard resources.items.contains(where: { $0.id == localModelID(choice) && $0.installed }) else {
+                selectionError = "This local model is not downloaded. Download it in Agent Models first."
+                return false
+            }
+            selectionError = nil
+            return true
+        }
+
+        private func selectLocalModel(_ id: String) {
+            guard var choice = draft else { return }
+            choice.decisionLocalModelID = id
+            guard validateLocalSelection(choice) else { return }
+            draft = choice
+            result = nil
         }
 
         private var selection: Selection {
             guard let draft else { return .unconfigured }
-            if draft.usesLocal { return brain == .decision ? .localDecision(draft.decisionLocalModelID) : .local }
+            if draft.usesLocal { return .local }
             return draft.providerID.map(Selection.cloud) ?? .unconfigured
         }
         private func select(_ selection: Selection) {
             switch selection {
             case .local:
-                guard brain == .assistant else { return }
                 draft?.usesLocal = true
                 setCloudProvider(nil)
-            case .localDecision(let id):
-                guard brain == .decision, let draft, canSelectDecision(id, choice: draft) else { return }
-                self.draft?.usesLocal = true
-                self.draft?.decisionLocalModelID = id
+                if let draft { _ = validateLocalSelection(draft) }
             case .cloud(let id):
+                selectionError = nil
                 draft?.usesLocal = false
                 setCloudProvider(id)
             case .unconfigured:
+                selectionError = nil
                 draft?.usesLocal = false
                 setCloudProvider(nil)
             }
@@ -498,8 +504,14 @@
             do {
                 try await controls.restore()
                 try Task.checkCancellation()
-                if draft == nil { draft = settings.brainDraft(brain) }
-                if let id = draft?.providerID { controls.loadModels(providerID: id) }
+                if draft == nil {
+                    draft = settings.brainDraft(brain)
+                    if draft?.usesLocal == true {
+                        draft?.providerID = nil
+                        draft?.model = ""
+                    }
+                }
+                if draft?.usesLocal == false, let id = draft?.providerID { controls.loadModels(providerID: id) }
                 restoreError = nil
             } catch {
                 if !Task.isCancelled { restoreError = error.localizedDescription }
@@ -532,7 +544,7 @@
                     Text(appCopy.text("Loading models…")).foregroundStyle(.secondary)
                 }
             } else if let error = settings.modelErrors[providerID] {
-                Text(error).font(.caption).foregroundStyle(.red)
+                Text(appCopy.text(error)).font(.caption).foregroundStyle(.red)
                 Button(appCopy.text("Reload models")) { controls.loadModels(providerID: providerID) }
             }
         }

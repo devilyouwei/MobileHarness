@@ -197,10 +197,14 @@ private enum WelcomeFixtureError: Error { case failed }
     var writer = state.brainDraft(.writer)
     writer.writerThinking = true
     #expect(await controls.save(.brain(.decision, decision)))
-    #expect(fixture.stored.decisionUsesLocal && fixture.stored.decisionModel == "fallback-model")
+    #expect(
+        fixture.stored.decisionUsesLocal && fixture.stored.decisionModel.isEmpty
+            && fixture.stored.decisionProviderID == nil)
     #expect(fixture.stored.model == "assistant-model" && !fixture.stored.writerThinking)
     #expect(await controls.save(.brain(.writer, writer)))
     #expect(fixture.stored.writerThinking && fixture.stored.decisionUsesLocal)
+    decision.providerID = nil
+    decision.model = ""
     #expect(state.brainDraft(.decision) == decision)
 
     fixture.failsSave = true
@@ -354,4 +358,22 @@ private enum WelcomeFixtureError: Error { case failed }
     #expect(fixture.stored.decisionProviderID == nil && fixture.stored.decisionModel.isEmpty)
     await controls.shutdown()
     await restarted.shutdown()
+}
+
+@Test @MainActor func writerLocalSelectionSurvivesFormRestoreWithoutAssistantChange() async throws {
+    let fixture = WelcomeSettingsFixture()
+    fixture.stored = .init(enabled: true, url: "https://assistant.test/v1", key: "fixture", model: "assistant")
+    let state = SettingsState(initial: fixture.stored)
+    let controls = SettingsFormController(state: state, operations: fixture, defaultModel: "default")
+    try await controls.restore()
+    var choice = state.brainDraft(.writer)
+    choice.usesLocal = true
+    #expect(await controls.save(.brain(.writer, choice)))
+    #expect(fixture.stored.writerUsesLocal && fixture.stored.writerProviderID == nil)
+    #expect(fixture.stored.enabled && fixture.stored.model == "assistant")
+    let reopened = SettingsState(initial: fixture.stored)
+    #expect(reopened.brainDraft(.writer).usesLocal)
+    choice.usesLocal = false
+    #expect(await controls.save(.brain(.writer, choice)))
+    #expect(!fixture.stored.writerUsesLocal && fixture.stored.writerProviderID == nil)
 }

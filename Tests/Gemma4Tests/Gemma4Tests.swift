@@ -320,7 +320,7 @@ func localWindowBudgetsExplicitGenerationIncludingTemplate(_ requested: Int) asy
     release.continuation.finish()
 }
 
-@Test func localWindowCannotHideUnsupportedImagesOrToolsInPrunedHistory() async throws {
+@Test func localWindowRejectsImagesAndPreservesToolHistory() async throws {
     guard #available(iOS 27, macOS 27, *) else { return }
     let image = try ChatImage(id: "fixture", data: Data([1]))
     var messages: [ChatMessage] = [.init(role: .user, content: "old image", images: [image])]
@@ -337,10 +337,9 @@ func localWindowBudgetsExplicitGenerationIncludingTemplate(_ requested: Int) asy
         .init(role: .tool, content: "result", toolCallID: "call1"),
         .init(role: .user, content: "current"),
     ])
-    await #expect(throws: CapabilityError.self) {
-        _ = try await GemmaContextBudget.prepare(toolRequest) { _ in
-            Issue.record("Unsupported native tool history must reject before tokenization")
-            return [1]
-        }
+    let prepared = try await GemmaContextBudget.prepare(toolRequest) { messages in
+        #expect(messages == toolRequest.messages)
+        return [1]
     }
+    #expect(prepared.messages == toolRequest.messages)
 }

@@ -188,7 +188,7 @@ extension ApplicationControlAgent {
                         providers: draft.providers.map {
                             .init(enabled: false, url: $0.url, key: $0.key, model: $0.model, name: $0.name, id: $0.id)
                         }, writerProviderID: draft.writerProviderID, writerModel: draft.writerModel,
-                        writerThinking: draft.writerThinking,
+                        writerThinking: draft.writerThinking, writerUsesLocal: draft.writerUsesLocal,
                         decisionProviderID: draft.decisionProviderID, decisionModel: draft.decisionModel,
                         decisionUsesLocal: draft.decisionUsesLocal, decisionLocalModelID: draft.decisionLocalModelID),
                     sessionID: sessionID)
@@ -212,7 +212,7 @@ extension ApplicationControlAgent {
                         providers: stored.providers.map {
                             .init(enabled: false, url: $0.url, key: $0.key, model: $0.model, name: $0.name, id: $0.id)
                         }, writerProviderID: stored.writerProviderID, writerModel: stored.writerModel,
-                        writerThinking: stored.writerThinking,
+                        writerThinking: stored.writerThinking, writerUsesLocal: stored.writerUsesLocal,
                         decisionProviderID: stored.decisionProviderID, decisionModel: stored.decisionModel,
                         decisionUsesLocal: stored.decisionUsesLocal == true,
                         decisionLocalModelID: stored.resolvedDecisionLocalModelID))

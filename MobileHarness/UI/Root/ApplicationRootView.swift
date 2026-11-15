@@ -65,16 +65,19 @@
                 }
                 .overlay(alignment: .top) {
                     if let notice = container?.homeNotices.transientToast {
-                        Label(notice.text, systemImage: "info.circle.fill")
-                            .font(.subheadline)
-                            .foregroundStyle(.primary)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-                            .padding(.horizontal, 24)
-                            .padding(.top, 60)
-                            .accessibilityIdentifier("application.transientToast")
-                            .allowsHitTesting(false)
+                        Label(
+                            notice.text,
+                            systemImage: notice.tone == .error ? "exclamationmark.triangle.fill" : "info.circle.fill"
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                        .padding(.horizontal, 24)
+                        .padding(.top, 60)
+                        .accessibilityIdentifier("application.transientToast")
+                        .allowsHitTesting(false)
                     }
                 }
                 .environment(\.navigationContext, assembly.navigation)

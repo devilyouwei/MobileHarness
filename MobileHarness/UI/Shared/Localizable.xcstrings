@@ -2,6 +2,39 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "Chat": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "对话"
+          }
+        }
+      }
+    },
+    "Local Models": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地模型"
+          }
+        }
+      }
+    },
+    "Cloud Providers & Models": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "云端服务与模型"
+          }
+        }
+      }
+    },
     "\n%@ files": {
       "extractionState": "extracted",
       "localizations": {
@@ -1432,39 +1465,6 @@
         }
       }
     },
-    "Cloud Providers": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "云端服务"
-          }
-        }
-      }
-    },
-    "Cloud fallback": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "云端备用"
-          }
-        }
-      }
-    },
-    "Cloud models need tool support. If D3 is unavailable, Decision uses the saved cloud fallback.": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "云端模型需支持工具调用。本地 D3 不可用时使用已保存的云端备用。"
-          }
-        }
-      }
-    },
     "Cloud service": {
       "extractionState": "extracted",
       "localizations": {
@@ -2180,17 +2180,6 @@
         }
       }
     },
-    "Decision will use the saved cloud fallback. If unavailable, it keeps and queues input.": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "删除后 Decision 将使用已配置的云端备用；云端不可用时保留输入并排队。"
-          }
-        }
-      }
-    },
     "Decision: ": {
       "extractionState": "extracted",
       "localizations": {
@@ -2642,13 +2631,13 @@
         }
       }
     },
-    "Download D3 Decision before selecting the local model.": {
+    "Download D3 Edge or D3 Lite before selecting the local model.": {
       "extractionState": "extracted",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "请先下载 D3 Decision 模型，再选择本地。"
+            "value": "请先下载 D3 Edge 或 D3 Lite 模型，再选择本地。"
           }
         }
       }
@@ -2659,18 +2648,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "请先在“智能体模型”下载 D3 Decision 模型，再选择本地"
-          }
-        }
-      }
-    },
-    "Download D3 in Agent Models. Cloud models need tool support. If unavailable, input is kept and queued.": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "可在“智能体模型”下载 D3。云端模型需支持工具调用；不可用时保留输入并排队。"
+            "value": "请先在“智能体模型”下载 D3 Edge 或 D3 Lite，再选择本地"
           }
         }
       }
@@ -3533,13 +3511,13 @@
         }
       }
     },
-    "Gemma 4 E2B Local Chat": {
+    "Gemma 4 E2B": {
       "extractionState": "extracted",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gemma 4 E2B 本地对话"
+            "value": "Gemma 4 E2B"
           }
         }
       }
@@ -4347,24 +4325,13 @@
         }
       }
     },
-    "Local Gemma lacks Writer’s native tools. Extended thinking applies to new or resumed assignments.": {
+    "Local Gemma supports tool calls within its context limit. Extended thinking applies to cloud models on new or resumed assignments.": {
       "extractionState": "extracted",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "本地 Gemma 缺少 Writer 所需的原生工具调用。深度思考设置用于新建或续作委托。"
-          }
-        }
-      }
-    },
-    "Local model downloads": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "本地模型下载"
+            "value": "本地 Gemma 支持上下文容量内的工具调用。深度思考设置用于云端模型的新建或续作委托。"
           }
         }
       }
@@ -4380,13 +4347,13 @@
         }
       }
     },
-    "Local · D3 Decision": {
+    "Local · D3 Edge": {
       "extractionState": "extracted",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "本地 · D3 Decision"
+            "value": "本地 · D3 Edge"
           }
         }
       }
@@ -4882,17 +4849,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "暂未发现设备"
-          }
-        }
-      }
-    },
-    "No fallback": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无备用"
           }
         }
       }
@@ -8219,17 +8175,6 @@
         }
       }
     },
-    "This local model lacks the native tools Writer needs.": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "本地模型不支持 Writer 所需的原生工具调用"
-          }
-        }
-      }
-    },
     "This photo is unavailable in the current camera session.": {
       "extractionState": "manual",
       "localizations": {
@@ -9513,6 +9458,138 @@
           "stringUnit": {
             "state": "translated",
             "value": "变焦"
+          }
+        }
+      }
+    },
+    "Local · %@": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地 · %@"
+          }
+        }
+      }
+    },
+    "Cloud · Selected Decision model": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "云端 · 已选决策模型"
+          }
+        }
+      }
+    },
+    "Only the selected model is used. If it fails, an error is shown and input is queued.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅使用所选模型。失败时显示错误提示，并将消息入队。"
+          }
+        }
+      }
+    },
+    "This local model is not downloaded. Download it in Agent Models first.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此本地模型尚未下载，请先在“智能体模型”中下载。"
+          }
+        }
+      }
+    },
+    "Download Gemma 4 E2B in Agent Models before selecting the local model.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先在“智能体模型”中下载 Gemma 4 E2B，再选择本地模型。"
+          }
+        }
+      }
+    },
+    "Could not read Decision settings. Input queued.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取决策模型设置，消息已入队。"
+          }
+        }
+      }
+    },
+    "Could not prepare the Decision request. Input queued.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法准备决策请求，消息已入队。"
+          }
+        }
+      }
+    },
+    "The selected Decision model is unavailable. Download it in Agent Models or check its provider. Input queued.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所选决策模型不可用，请在“智能体模型”中下载或检查其服务商。消息已入队。"
+          }
+        }
+      }
+    },
+    "The selected Decision model is not ready. Input queued.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所选决策模型尚未就绪，消息已入队。"
+          }
+        }
+      }
+    },
+    "The selected Decision model timed out. Input queued.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所选决策模型超时，消息已入队。"
+          }
+        }
+      }
+    },
+    "The selected Decision model failed or returned an invalid result. Input queued.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所选决策模型执行失败或返回了无效结果，消息已入队。"
+          }
+        }
+      }
+    },
+    "If this is the selected Decision model, classification will fail and input will be queued until it is downloaded again or another model is selected.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "若此模型是当前所选决策模型，删除后决策会报错并将消息入队，直到重新下载或选择其他模型。"
           }
         }
       }

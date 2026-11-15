@@ -7,6 +7,7 @@ public struct CloudSettingsDraft: Sendable, Equatable {
     public var decisionModel: String
     public var decisionUsesLocal: Bool
     public var decisionLocalModelID: String
+    public var writerUsesLocal: Bool
     public var writerProviderID: String?
     public var writerModel: String
     public var writerThinking: Bool
@@ -19,6 +20,7 @@ public struct CloudSettingsDraft: Sendable, Equatable {
     public init(
         enabled: Bool, url: String, key: String, model: String, providers: [CloudSettingsDraft] = [], name: String = "",
         id: String? = nil, writerProviderID: String? = nil, writerModel: String = "", writerThinking: Bool = false,
+        writerUsesLocal: Bool = false,
         decisionProviderID: String? = nil, decisionModel: String = "", decisionUsesLocal: Bool = false,
         decisionLocalModelID: String = "d3-edge"
     ) {
@@ -30,6 +32,7 @@ public struct CloudSettingsDraft: Sendable, Equatable {
         self.writerProviderID = writerProviderID
         self.writerModel = writerModel
         self.writerThinking = writerThinking
+        self.writerUsesLocal = writerUsesLocal
         self.name = name.isEmpty ? (URL(string: url)?.host ?? "Provider") : name
         self.providers = providers
         self.enabled = enabled
@@ -155,6 +158,7 @@ public final class SettingsState {
     public var decisionUsesLocal = false { didSet { if oldValue != decisionUsesLocal { revision += 1 } } }
     public var writerProviderID: String? { didSet { if oldValue != writerProviderID { revision += 1 } } }
     public var writerModel = "" { didSet { if oldValue != writerModel { revision += 1 } } }
+    public var writerUsesLocal = false { didSet { if oldValue != writerUsesLocal { revision += 1 } } }
     public var writerThinking = false { didSet { if oldValue != writerThinking { revision += 1 } } }
     public init(initial: CloudSettingsDraft) {
         decisionProviderID = initial.decisionProviderID
@@ -164,6 +168,7 @@ public final class SettingsState {
         writerProviderID = initial.writerProviderID
         writerModel = initial.writerModel
         writerThinking = initial.writerThinking
+        writerUsesLocal = initial.writerUsesLocal
         providers = initial.providers
         isEnabled = initial.enabled
         url = initial.url
@@ -180,7 +185,9 @@ public final class SettingsState {
                 providerID: assistantProviderID, model: isEnabled ? selectedModel : "", usesLocal: !isEnabled,
                 writerThinking: false)
         case .writer:
-            .init(providerID: writerProviderID, model: writerModel, usesLocal: false, writerThinking: writerThinking)
+            .init(
+                providerID: writerProviderID, model: writerModel, usesLocal: writerUsesLocal,
+                writerThinking: writerThinking)
         case .decision:
             .init(
                 providerID: decisionProviderID, model: decisionModel, usesLocal: decisionUsesLocal,
@@ -259,6 +266,7 @@ public final class SettingsState {
         writerProviderID = value.writerProviderID
         writerModel = value.writerModel
         writerThinking = value.writerThinking
+        writerUsesLocal = value.writerUsesLocal
         providers = value.providers
         isEnabled = value.enabled
         url = value.url
@@ -327,6 +335,7 @@ public protocol SettingsPresenting: UIPresentationAccess {
     var writerProviderID: String? { get set }
     var writerModel: String { get set }
     var writerThinking: Bool { get set }
+    var writerUsesLocal: Bool { get set }
     var isEnabled: Bool { get }
     var url: String { get }
     var key: String { get }
