@@ -200,3 +200,5 @@ refactor, Agent-only model recording, current-file recovery and automated/build/
 [Agents responsibility boundaries](Agents-Responsibility-Boundaries.md) records role/shared/root ownership regressions and the remaining Metal Toolchain build blocker.
 
 - [模型下载源](Model-Download-Source.md)：系统语言默认、源快照隔离与构建验证。
+- [本地 Core AI LLM 的 Decision 输出格式对照](Decision-Local-LLM-Output-Formats.md)记录五个制品在候选打分、完整单词、完整数字和 Tool Call 的结果及 500 ms 预算。
+- [本地 Core AI Decision 中英文数字提示词对照](Decision-Local-LLM-Bilingual-Digits.md)记录 5 个通用 LLM 的中英文提示运行，以及 D3 原生 Choice、整段原文和旧提示的同批对照，另记录删去动作定义的复测。每组 100 条，逐条预算 500 ms。

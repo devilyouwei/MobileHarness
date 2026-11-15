@@ -14,6 +14,7 @@
             case float16([Float16])
             case float32([Float])
             case int32([Int32])
+            case bool([Bool])
         }
 
         let storage: Storage
@@ -36,12 +37,18 @@
             return TensorValue(storage: .int32(scalars), shape: shape)
         }
 
+        public static func bool(_ scalars: [Bool], shape: [Int]) -> TensorValue {
+            precondition(scalars.count == shape.reduce(1, *), "scalar count must match shape")
+            return TensorValue(storage: .bool(scalars), shape: shape)
+        }
+
         /// Converting accessor: the scalars as Float, row-major.
         public func floats() -> [Float] {
             switch storage {
             case .float16(let v): return v.map(Float.init)
             case .float32(let v): return v
             case .int32(let v): return v.map(Float.init)
+            case .bool(let v): return v.map { $0 ? 1 : 0 }
             }
         }
     }
@@ -59,6 +66,7 @@
             case (.float16(let v), .float32): fill(&array, with: v.map(Float.init))
             case (.float32(let v), .float32): fill(&array, with: v)
             case (.int32(let v), .int32): fill(&array, with: v)
+            case (.bool(let v), .bool): fill(&array, with: v)
             default:
                 throw CoreAIGraphError.dtypeMismatch(
                     input: inputName, expected: "\(descriptor.scalarType)")
@@ -77,6 +85,8 @@
                 self.init(storage: .float32(read(array, Float.self, count)), shape: shape)
             case .int32:
                 self.init(storage: .int32(read(array, Int32.self, count)), shape: shape)
+            case .bool:
+                self.init(storage: .bool(read(array, Bool.self, count)), shape: shape)
             default:
                 throw CoreAIGraphError.unsupportedScalarType("\(array.scalarType)")
             }

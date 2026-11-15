@@ -64,3 +64,10 @@ Writer 的 2026-11-08 双模型实验保留 [原始基线](writer-prompt-2026-11
 - [Writer 记录分页检查](writer-pagination-2026-11-08-checks.json)：分页边界、页面状态回归、完整检查与四目标 iOS 构建；非真机交互验收。
 
 - [task_7 脱敏诊断](writer-task7-2026-11-08-diagnosis.json)：真实两次请求、30 条记录与十段显示的逐行复现；原库留在本机。
+- [全双工本地 LLM 输出格式对照](duplex-llm-output-formats-coreai-2026-11-14.json)保留 24 组完整运行、逐条结果及复现脚本。方法见[验证记录](../validation/Decision-Local-LLM-Output-Formats.md)。
+- [全双工本地 LLM 中英文数字提示词对照](duplex-llm-bilingual-digits-coreai-2026-11-14.json)保留 10 组完整运行、逐条数字输出及复现脚本。方法见[验证记录](../validation/Decision-Local-LLM-Bilingual-Digits.md)。
+
+- [D3 Edge 中英文数字提示词对照](duplex-d3-bilingual-digits-coreai-2026-11-14.json)保留 5 组共 500 次原生 Choice、逐条得分及复现脚本。方法见[验证记录](../validation/Decision-Local-LLM-Bilingual-Digits.md#d3-edge-同批对照)。
+- [全双工本地 Decision 去掉动作定义的对照](duplex-local-no-action-definitions-coreai-2026-11-14.json)保留 14 组简化提示、D3 旧提示对照、逐条结果及与有定义版本的差值。方法见[验证记录](../validation/Decision-Local-LLM-Bilingual-Digits.md#去掉动作定义的对照)。
+- [历史对话与缓冲区提示词对照](duplex-history-buffer-prompt-coreai-2026-11-14.json)保留 36 条用例在 D3 与 Qwen2.5 的中英文实际提示及逐条读出。方法见[验证记录](../validation/Decision-Local-LLM-Bilingual-Digits.md#历史对话与缓冲区格式复测)。
+- [D3 Lite 与 Edge 的四段提示对照](duplex-d3-lite-edge-coreai-2026-11-15.json)保留当前中英文提示和旧短中文提示共 200 条原生分类，方法见[验证记录](../validation/Decision-Model-Mac-Comparison.md#d3-lite-与-edge-的四段提示对照)。

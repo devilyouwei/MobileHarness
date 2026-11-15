@@ -269,3 +269,22 @@ Run the repository script with a resource root containing `D3Edge/` and a fresh 
 ```
 
 The native experiment, `./scripts/check.sh`, four iOS Simulator schemes in `./scripts/build-ios.sh`, and `git diff --check` passed. The measured requests were checked against the current source resources, baseline and fixture. The iOS build verifies packaging. The Decision experiment ran on the Mac.
+
+## D3 Lite 与 Edge 的四段提示对照
+
+2026-11-15，M5 Mac、macOS 27.2.1。读取 App 提交 `f9dc3a5f` 的两份 Decision 资源，依次渲染动作定义、最近一轮历史、缓冲区用户输入和引用最新一句的问句。两款模型均通过 Core AI 原生 Choice 为 A/B/C 打分，对应打断、舍弃、入队。报告原始分类，Assistant 的采纳保护不参与。Lite 使用公开 BF16 固定 512 token 图及空视觉张量，仅走文本。两款图均核对发布版本和 SHA-256。
+
+当前提示中英文各 36 条，包含 28 条空缓冲历史夹具及 8 条各带一条缓冲输入的合成探测。旧短中文提示对照使用相同的 28 条历史夹具。每组预热三次，逐条测量包含模板、编码、Core AI 推理和读出。500 ms 用于统计超限，所有组继续跑完。耗时不含首次装载和 ASR。
+
+| 模型 · 提示 | 正确 | 误丢弃 | 误打断 | 漏打断 | p95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Edge · 当前中文 | 13/36 | 4 | 19 | 0 | 71.21 |
+| Lite · 当前中文 | 18/36 | 14 | 2 | 6 | 178.13 |
+| Edge · 当前英文 | 9/36 | 2 | 25 | 0 | 62.82 |
+| Lite · 当前英文 | 19/36 | 2 | 6 | 4 | 171.52 |
+| Edge · 旧短中文 | 19/28 | 0 | 4 | 2 | 56.24 |
+| Lite · 旧短中文 | 14/28 | 2 | 10 | 0 | 154.49 |
+
+当前英文提示下，Lite 命中 13/15 次应入队、5/9 次应打断和 1/12 次应舍弃。Edge 命中全部 9 次应打断，额外误打断 25 次，两种语言均未选过入队。旧短提示下 Edge 的总分更高，因此排名取决于提示结构。六组共 200 条热态推理全部低于 500 ms，Lite 最慢 190.74 ms。首次运行的 Lite 默认自动编译遇到磁盘空间不足，CPU-only 探测未通过有限分数检查。清理可再生成的旧 Core AI 编译缓存后，两款均以默认配置完成，分进程运行。无 App 源码变化和真机测量。
+
+[两款制品的 SHA-256、实际提示、逐条分数和复现脚本](../measurements/duplex-d3-lite-edge-coreai-2026-11-15.json)。

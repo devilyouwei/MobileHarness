@@ -15,6 +15,7 @@ public enum InputDisposition: String, Codable, Sendable {
 public struct InputDecisionOutcome: Sendable, Equatable {
     public enum Route: String, Sendable {
         case local = "local:d3-edge"
+        case lite = "local:d3-lite"
         case cloud = "cloud:decision"
         case fallback = "enqueue:fallback"
     }
@@ -108,9 +109,13 @@ public actor AssistantInputDecision {
         case possibleSpeech, filler, noise
     }
 
-    private let local: any ModelDecisionProviding
+    private let localModel: @Sendable (String) -> (any ModelDecisionProviding)?
+    private var activeLocalID: String?
+    private var localMaintenance: Set<String> = []
+    private var switchingLocal = false
     public typealias Configuration = (useLocal: Bool, cloud: (@Sendable () async throws -> any ChatCapability)?)
-    private let configuration: @Sendable () async throws -> Configuration
+    typealias SelectedConfiguration = (localID: String?, cloud: (@Sendable () async throws -> any ChatCapability)?)
+    private let configuration: @Sendable () async throws -> SelectedConfiguration
     private let report: @Sendable (String) async -> Void
     private let language: @Sendable () -> String
     private let timeout: Duration
@@ -152,21 +157,56 @@ public actor AssistantInputDecision {
         report: @escaping @Sendable (String) async -> Void = { _ in },
         language: @escaping @Sendable () -> String = { "en" }
     ) {
-        self.local = local
-        self.configuration = configuration
+        self.init(
+            localModel: { _ in local },
+            selectedConfiguration: {
+                let result = try await configuration()
+                return (result.useLocal ? "d3-edge" : nil, result.cloud)
+            }, timeout: timeout, localTimeout: localTimeout, report: report, language: language)
+    }
+
+    init(
+        localModel: @escaping @Sendable (String) -> (any ModelDecisionProviding)?,
+        selectedConfiguration: @escaping @Sendable () async throws -> SelectedConfiguration,
+        timeout: Duration = .seconds(2), localTimeout: Duration = .milliseconds(250),
+        report: @escaping @Sendable (String) async -> Void = { _ in },
+        language: @escaping @Sendable () -> String = { "en" }
+    ) {
+        self.localModel = localModel
+        self.configuration = selectedConfiguration
         self.report = report
         self.language = language
         self.timeout = timeout
         self.localTimeout = localTimeout
     }
+
     public func resetLocalFailure() { localFailure = nil }
-    public func quiesceLocal() async {
-        localFailure = "D3 resources are being released"
+    func quiesceLocal(_ id: String) async {
+        guard activeLocalID == id else { return }
+        localMaintenance.insert(id)
+        defer { localMaintenance.remove(id) }
+        await joinLocal()
+    }
+
+    private func joinLocal() async {
         preparation?.cancel()
         cancel("local")
         await preparation?.value
         await workers["local"]?.value
-        do { try await local.unload() } catch { await report("D3 resource release failed: \(error)") }
+    }
+
+    private func selectLocal(_ id: String?) async {
+        guard id != activeLocalID, !switchingLocal else { return }
+        switchingLocal = true
+        defer { switchingLocal = false }
+        if let previous = activeLocalID, let model = localModel(previous), !localMaintenance.contains(previous) {
+            await joinLocal()
+            if !localMaintenance.contains(previous) {
+                do { try await model.unload() } catch { await report("D3 resource release failed: \(error)") }
+            }
+        }
+        activeLocalID = id
+        localFailure = nil
     }
     public func stop() async {
         stopped = true
@@ -196,7 +236,7 @@ public actor AssistantInputDecision {
         guard !stopped, !Task.isCancelled else { return fallback("Classification cancelled") }
         let deadline = snapshot.receivedAt.advanced(by: timeout)
         guard ContinuousClock.now < deadline else { return fallback("Classification timed out") }
-        let route: Configuration
+        let route: SelectedConfiguration
         do { route = try await configuration() } catch {
             await report("Could not read Decision settings; input retained and queued: \(error)")
             return fallback("Could not read Decision settings")
@@ -208,22 +248,32 @@ public actor AssistantInputDecision {
             await report("Could not prepare Decision request; input retained and queued: \(error)")
             return fallback("Could not prepare Decision request")
         }
-        if route.useLocal {
+        await selectLocal(route.localID)
+        let modelName = route.localID == "d3-lite" ? "D3 Lite" : "D3"
+        let modelRoute: InputDecisionOutcome.Route = route.localID == "d3-lite" ? .lite : .local
+        if let id = route.localID {
             localFallback = localFailure
+            if switchingLocal || activeLocalID != id || localMaintenance.contains(id) {
+                localFallback = "D3 resources are being released"
+            } else if localModel(id) == nil {
+                localFallback = "Selected local Decision model is unavailable"
+            }
         } else {
             localFallback = "Configured for cloud Decision"
         }
-        if route.useLocal, localFailure == nil {
+        if let id = route.localID, let local = localModel(id), localFallback == nil, !stopped, !Task.isCancelled {
             do {
                 let status = try await local.status()
-                if status == .ready {
-                    await report("Local D3")
-                    let local = local
+                if localMaintenance.contains(id) || activeLocalID != id || switchingLocal || stopped || Task.isCancelled
+                {
+                    localFallback = "D3 resources are being released"
+                } else if status == .ready {
+                    await report("Local \(modelName)")
                     let result = await race("local", until: min(deadline, .now.advanced(by: localTimeout))) {
                         try Task.checkCancellation()
                         let request = try prompt.request()
                         requests.withLock {
-                            $0.append("Local D3\n\n" + prompt.text + "\n\nOptions\nA: 1\nB: 2\nC: 3")
+                            $0.append("Local \(modelName)\n\n" + prompt.text + "\n\nOptions\nA: 1\nB: 2\nC: 3")
                         }
                         let session = try await local.decide(request)
                         return try await withTaskCancellationHandler {
@@ -250,14 +300,14 @@ public actor AssistantInputDecision {
                     }
                     switch result {
                     case .selected(let action):
-                        return outcome(action, route: .local, snapshot: snapshot, requests: requests.withLock { $0 })
+                        return outcome(
+                            action, route: modelRoute, snapshot: snapshot, requests: requests.withLock { $0 })
                     case .failed(let reason):
                         localFallback = reason
                     }
                 } else {
-                    localFallback = "D3 is not ready (\(status.rawValue))"
+                    localFallback = "\(modelName) is not ready (\(status.rawValue))"
                     if preparation == nil {
-                        let local = local
                         preparation = Task {
                             do { try await local.warmup() } catch
                                 where !Task.isCancelled && !(error is CancellationError)
@@ -284,7 +334,7 @@ public actor AssistantInputDecision {
             return fallback("Cloud Decision is unconfigured")
         }
         await report(
-            route.useLocal
+            route.localID != nil
                 ? "Cloud fallback · Dedicated Decision configuration" : "Cloud · Dedicated Decision configuration")
         let result = await race("cloud", until: deadline) {
             let model = try await cloud()
@@ -476,7 +526,7 @@ extension InputDecisionOutcome {
     func logItem(for snapshot: InputDecisionSnapshot, duration: Duration) -> DecisionLogItem {
         let route: DecisionLogItem.Route =
             switch self.route {
-            case .local: .local
+            case .local, .lite: .local
             case .cloud: .cloud
             case .fallback: .fallback
             }

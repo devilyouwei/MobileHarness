@@ -78,4 +78,4 @@ Writer配置的writerThinking是独立选择，默认false；可选持久覆盖�
 
 首次 Welcome 使用同一 SettingsOperating 保存完整 Provider 配置，沿 ApplicationControl/Gateway 请求与现有 ProviderSettingsService/ProviderSettingsStore 事务写入。仅新增 Provider 且尚未选择角色模型时保持既有本地配置；密钥仍经 credentialID 引用保存到钥匙串。Welcome 不引入新的凭据仓库、发现端点或模型默认策略。
 
-Decision 在同一 Provider 设置文档提交 decisionUsesLocal、decisionProviderID 和 decisionModel。旧文档缺少模式字段时读取下载设置的历史模式，首次保存写入有效值。首次选择本地 D3 校验安装，既有本地模式可在制品缺失时保留。每次分类从一份已提交快照取得模式与可选云端工厂。进行中的保存继续提供上一次成功提交的快照。工厂按稳定 ID 解析 Provider 并使用 Decision 模型和最低思考。保存校验模型最长 512 字节，Provider 引用有效且有模型，清空引用时清空模型。
+Decision 在同一 Provider 设置文档提交 decisionUsesLocal、decisionLocalModelID、decisionProviderID 和 decisionModel。旧文档缺少模式字段时读取下载设置的历史模式，旧本地选择默认映射到 Edge。首次启用本地或切换 Edge/Lite 时校验目标制品已安装，已选制品缺失时保留偏好。每次分类从一份已提交快照取得模式与可选云端工厂。进行中的保存继续提供上一次成功提交的快照。工厂按稳定 ID 解析 Provider 并使用 Decision 模型和最低思考。保存校验模型最长 512 字节，Provider 引用有效且有模型，清空引用时清空模型。

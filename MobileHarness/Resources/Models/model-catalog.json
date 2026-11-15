@@ -211,6 +211,50 @@
         "NOTICE",
         "LICENSE"
       ]
+    },
+    {
+      "id": "d3-lite",
+      "name": "D3 Lite",
+      "capability": "decision",
+      "directory": "D3Lite",
+      "minimumOS": 27,
+      "requiresPhysicalDevice": true,
+      "deviceRequirement": null,
+      "license": "Apache-2.0",
+      "estimatedBytes": 1533698749,
+      "source": {
+        "kind": "huggingface",
+        "repoId": "ahmedandaloes/d3-lite-CoreAI",
+        "revision": "e7879e3b76d399df29ce4b454573ae1aa1bed189",
+        "allowPatterns": [
+          "decision.aimodel/**",
+          "manifest.json",
+          "decision_config.json",
+          "tokenizer.json",
+          "tokenizer_config.json",
+          "vocab.json",
+          "merges.txt",
+          "chat_template.jinja",
+          "NOTICE",
+          "LICENSE",
+          "config.json"
+        ]
+      },
+      "requiredFiles": [
+        "decision.aimodel/main.mlirb",
+        "decision.aimodel/main.hash",
+        "decision.aimodel/metadata.json",
+        "manifest.json",
+        "decision_config.json",
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "vocab.json",
+        "merges.txt",
+        "chat_template.jinja",
+        "NOTICE",
+        "LICENSE",
+        "config.json"
+      ]
     }
   ]
 }

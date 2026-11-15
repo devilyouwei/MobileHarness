@@ -108,3 +108,9 @@ Settings 首页分区/入口/标题及蓝牙状态摘要英文化；User顺序�
 用户要求安装到真机。当前工作区以 MobileHarness / Debug 构建到 `build/DeviceDerivedData`，使用主应用已有开发团队作为命令行 DEVELOPMENT_TEAM，使 Live Activity 扩展使用同一团队；未修改仓库签名配置。构建 BUILD SUCCEEDED，正常权限下 `codesign --verify --deep --strict` 与 73 项 Agent/Skill、Live Activity、中英文资源校验通过。
 
 `devicectl device install app` 成功覆盖安装到已配对 iPhone 17 Pro，bundle ID 为 `dev.mobileharness.app`，未卸载或清除应用数据。启动被锁屏拒绝（CoreDevice 10002，FBS Locked），因此安装成功不代表已完成启动或 Settings 原生视觉验收。构建日志为 `/tmp/mobileharness-settings-device-build.log`。
+
+### 2026-11-15 拉取远程 D3 Lite 后验证
+
+Settings 命名提交后合并 `origin/main` 的 `b06dfda6`；三个当前设计 README 冲突保留远程 Edge/Lite 契约和本地 Agent Models 命名。随后恢复拉取前已有的 Decision 提示、README 和本地签名修改，三个文档冲突保留两侧内容，并将 Assistant 当前设计的提示段数对齐为 State 四段、总计五段。原有修改保持未提交。
+
+恢复后的工作区 `scripts/build-ios.sh` 四目标与脚本资源校验通过；`git diff --check`、冲突状态及中英文名称核对通过。`scripts/check.sh` 边界检查、8 项 Python 测试和严格格式检查通过，Swift 构建阶段达到 240 秒上限，验证进程组被终止（exit 124），未取得全量测试完成结果。日志为 `/tmp/mobileharness-pull-build.log` 和 `/tmp/mobileharness-pull-check.log`。未重新安装真机，先前安装包不包含此次远程合并。

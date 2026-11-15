@@ -72,3 +72,5 @@ Settings 首页保留原有分区顺序及模型入口顺序，界面标题/分�
 涉及 `UI/Settings/SettingsView.swift`、`UI/Shared/Localizable.xcstrings` 和 `Actions/System/Provider/SettingsProviderAdapter.swift`：同步下载说明与安装校验提示中的页面名称，中英文均指向对应语言的页面标题。只调整呈现，不改变角色身份、导航标识、保存事务、模型选择或下载流程。同步 Settings、Shared、Root、UI、Provider、ModelResources 及总体技术 README 中的当前页面名称；跨模块接口与所有权不变。
 
 验证：核对中英文目录键、三个模型顺序、原子符号与旧文案引用，运行 `scripts/check.sh`、完整 Xcode 可用时运行 `scripts/build-ios.sh`；自动化与原生界面验收分别记录。
+
+合并远程 D3 Lite 支持时，保留远程 Edge/Lite 模型身份、资源与选择流程，同时保留本节 Agent Models 命名与 atom 图标。冲突涉及 Settings、ModelResources 及总体技术 README；下载与安装提示继续采用中英文新页面名，模型选择接口不回退。

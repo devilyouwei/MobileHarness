@@ -151,4 +151,4 @@ HF 只使用当前传输计划和完成文件；不从 .hub-snapshot 搬迁旧 S
 
 SerialChat forwards full native calls through the existing 128-event queued session without a single-event byte ceiling. Local pending-request bounds and cancellation/cleanup FIFO are independent of argument size; backend capability and token-window errors remain explicit.
 
-The default assembly registers d3-edge as decision with retained resource ownership and artifact ID d3-edge. D3Edge contains graph, manifest and tokenizer; removal joins the decision provider lease before deleting files.
+The default assembly registers d3-edge and d3-lite as decision providers with independent retained resources and matching artifact IDs. D3Edge and D3Lite contain their respective graphs, manifests and tokenizers. Removing a package fences and joins its provider before deleting files.

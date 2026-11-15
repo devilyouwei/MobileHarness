@@ -208,7 +208,7 @@
                         ? appCopy.text("Voice activity detection will switch to the basic detector.")
                         : group == .recognition || group == .synthesis
                             ? appCopy.text("Speech will switch to Apple. Download the model again to re-enable it.")
-                            : removal?.id == "d3-edge"
+                            : removal.map { ModelResourceGroup.decision.modelIDs.contains($0.id) } == true
                                 ? appCopy.text(
                                     "Decision will use the saved cloud fallback. If unavailable, it keeps and queues input."
                                 )

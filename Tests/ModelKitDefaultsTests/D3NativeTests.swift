@@ -87,3 +87,44 @@ import Testing
     print("D3 duplex exploratory accuracy: \(correct)/\(cases.count); not held-out acceptance")
     try await root.stop()
 }
+
+@Test(.enabled(if: ProcessInfo.processInfo.environment["D3_LITE_TEST_RESOURCES"] != nil))
+@MainActor func d3LiteNativeDecisionRunsTextGraphAndRejectsOversizedInput() async throws {
+    guard #available(macOS 27, iOS 27, *) else { return }
+    let path = try #require(ProcessInfo.processInfo.environment["D3_LITE_TEST_RESOURCES"])
+    let root = ModelContainer(resources: URL(fileURLWithPath: path))
+    try await root.start()
+    do {
+        try await root.setForeground(true)
+        let lite = try #require(root.language.decisionModel("d3-lite"))
+        #expect(await lite.availability == .available)
+        let request = try DecisionRequest(
+            text: "The customer was charged twice for a single order.",
+            candidates: ["billing: Payments and invoices", "shipping: Delivery", "account: Login"],
+            instructions: "Which team should handle this?")
+        let session = try await lite.decide(request)
+        let values = try await session.withCleanup {
+            var values: [DecisionResult] = []
+            for try await result in session.events { values.append(result) }
+            return values
+        }
+        try #require(values.count == 1)
+        guard case .selected(let label, let score) = values[0].decision else {
+            throw CapabilityError.invalidRequest("D3 Lite did not select a candidate")
+        }
+        #expect(label == request.candidates[0])
+        #expect(score?.isFinite == true)
+        let oversized = try DecisionRequest(
+            text: String(repeating: "hello ", count: 1000), candidates: ["keep", "drop"])
+        await #expect(throws: CapabilityError.self) {
+            let rejected = try await lite.decide(oversized)
+            try await rejected.withCleanup {
+                for try await _ in rejected.events {}
+            }
+        }
+    } catch {
+        try await root.stop()
+        throw error
+    }
+    try await root.stop()
+}

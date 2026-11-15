@@ -93,7 +93,7 @@ public final class ProviderSettingsService {
     private let store: any ProviderSettingsPersistence
     private let runtime: ProviderSettingsRuntime
     private let legacyDecision: @Sendable () async throws -> Bool
-    private let isDecisionInstalled: @Sendable () async throws -> Bool
+    private let isDecisionInstalled: @Sendable (String) async throws -> Bool
     private var inheritedDecision = false
     private var saved: ProviderSettings?
     private var restored = false
@@ -103,7 +103,7 @@ public final class ProviderSettingsService {
     public init(
         store: any ProviderSettingsPersistence, runtime: ProviderSettingsRuntime,
         legacyDecision: @escaping @Sendable () async throws -> Bool = { false },
-        isDecisionInstalled: @escaping @Sendable () async throws -> Bool = { false }
+        isDecisionInstalled: @escaping @Sendable (String) async throws -> Bool = { _ in false }
     ) {
         self.store = store
         self.runtime = runtime
@@ -154,8 +154,12 @@ public final class ProviderSettingsService {
             let current = resolved(previous)
             var value = value
             value.decisionUsesLocal = value.decisionUsesLocal ?? current.decisionUsesLocal
-            if value.decisionUsesLocal == true, current.decisionUsesLocal != true,
-                try await !isDecisionInstalled()
+            value.decisionLocalModelID = value.decisionLocalModelID ?? current.decisionLocalModelID
+            let localID = value.resolvedDecisionLocalModelID
+            guard ["d3-edge", "d3-lite"].contains(localID) else { throw ProviderSettingsError.invalidSelection }
+            if value.decisionUsesLocal == true,
+                current.decisionUsesLocal != true || localID != current.resolvedDecisionLocalModelID,
+                try await !isDecisionInstalled(localID)
             {
                 throw ProviderSettingsError.decisionRequired
             }

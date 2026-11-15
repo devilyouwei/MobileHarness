@@ -228,8 +228,8 @@ import StorageFiles
             return languageModels
         }
         private func quiesceForModelRemoval(_ id: String) async {
-            if id == "d3-edge" {
-                await inputDecisionService?.quiesceLocal()
+            if id == "d3-edge" || id == "d3-lite" {
+                await inputDecisionService?.quiesceLocal(id)
             } else if id == "yolo26n-pose" {
                 await camera.pauseVisionForModelMaintenance()
             } else {
@@ -276,13 +276,14 @@ import StorageFiles
             let makeDecision: @MainActor (AgentBusinessBindings) -> AssistantInputDecision = { business in
                 let configuration = business.decisionConfiguration
                 let reportDecision = business.decisionStatus
+                let models = self.languageModels
                 let service = AssistantInputDecision(
-                    local: self.languageModels.decision,
-                    configuration: {
-                        guard let configuration else { return (false, nil) }
-                        let (useLocal, cloud) = try await configuration()
-                        guard let cloud else { return (useLocal, nil) }
-                        return (useLocal, { try await cloud().capability })
+                    localModel: { models.decisionModel($0) },
+                    selectedConfiguration: {
+                        guard let configuration else { return (nil, nil) }
+                        let (localID, cloud) = try await configuration()
+                        guard let cloud else { return (localID, nil) }
+                        return (localID, { try await cloud().capability })
                     },
                     report: { value in await reportDecision(value) }, language: self.language)
                 self.inputDecisionService = service

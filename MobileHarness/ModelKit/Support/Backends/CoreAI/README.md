@@ -6,7 +6,7 @@ ModelKitCoreAI owns GraphModel, TensorValue and CoreAIGraphError through public 
 
 ## Interfaces and lifecycle
 
-GraphModel actor loads a local AIModel, validates a named stateless function and exposes named tensor input/output. TensorValue owns copied scalar values, names/shapes/type validation. Recurrent state is rejected; callers own preprocessing and the resource lease. CoreAI types are conditionally available where the platform framework exists and require OS 27.
+GraphModel actor loads a local AIModel, validates a named stateless function and exposes named tensor input/output. TensorValue owns copied scalar values, names/shapes/type validation, and native Boolean masks. Recurrent state is rejected; callers own preprocessing and the resource lease. CoreAI types are conditionally available where the platform framework exists and require OS 27.
 
 ComputeUnits expresses public specialization preferences; cpuOnly restricts the allowed set. Graph loading, tensor mismatches and native allocation/execution failures propagate explicitly. Native references are actor-isolated; run awaits the native API, so callers enforce operation admission through their resource lease. Cancellation is cooperative; native work is not forcibly interrupted.
 

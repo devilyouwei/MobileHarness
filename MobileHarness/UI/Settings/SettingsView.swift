@@ -278,7 +278,11 @@
         private func summary(_ brain: AgentBrain) -> String {
             let choice = settings.brainDraft(brain)
             if choice.usesLocal {
-                return brain == .decision ? appCopy.text("Local · D3 Decision") : appCopy.text("Local · Gemma 4 E2B")
+                if brain == .decision {
+                    return choice.decisionLocalModelID == "d3-lite"
+                        ? appCopy.text("Local · D3 Lite") : appCopy.text("Local · D3 Decision")
+                }
+                return appCopy.text("Local · Gemma 4 E2B")
             }
             guard let provider = settings.providers.first(where: { $0.id == choice.providerID }) else {
                 return appCopy.text("Unconfigured")
@@ -293,6 +297,7 @@
         private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         private enum Selection: Hashable {
             case local
+            case localDecision(String)
             case cloud(String)
             case unconfigured
         }
@@ -366,14 +371,14 @@
             Section {
                 Picker(appCopy.text("Provider"), selection: Binding(get: { selection }, set: select)) {
                     if brain != .assistant { Text(appCopy.text("Unconfigured")).tag(Selection.unconfigured) }
-                    Text(brain == .decision ? appCopy.text("Local D3") : appCopy.text("Local Gemma 4 E2B")).tag(
-                        Selection.local
-                    )
-                    .disabled(
-                        brain == .writer
-                            || (brain == .decision && !choice.usesLocal
-                                && !resources.installedGroups.contains(.decision))
-                    )
+                    if brain == .decision {
+                        Text(appCopy.text("Local D3")).tag(Selection.localDecision("d3-edge"))
+                            .disabled(!canSelectDecision("d3-edge", choice: choice))
+                        Text(appCopy.text("Local D3 Lite")).tag(Selection.localDecision("d3-lite"))
+                            .disabled(!canSelectDecision("d3-lite", choice: choice))
+                    } else {
+                        Text(appCopy.text("Local Gemma 4 E2B")).tag(Selection.local).disabled(brain == .writer)
+                    }
                     ForEach(settings.providers, id: \.id) { provider in
                         Text(provider.name).tag(Selection.cloud(provider.id))
                     }
@@ -451,19 +456,26 @@
             }
         }
 
+        private func canSelectDecision(_ id: String, choice: AgentBrainDraft) -> Bool {
+            (choice.usesLocal && choice.decisionLocalModelID == id)
+                || resources.items.contains { $0.id == id && $0.installed }
+        }
+
         private var selection: Selection {
             guard let draft else { return .unconfigured }
-            if draft.usesLocal { return .local }
+            if draft.usesLocal { return brain == .decision ? .localDecision(draft.decisionLocalModelID) : .local }
             return draft.providerID.map(Selection.cloud) ?? .unconfigured
         }
         private func select(_ selection: Selection) {
             switch selection {
             case .local:
-                guard brain != .writer else { return }
-                guard brain != .decision || draft?.usesLocal == true || resources.installedGroups.contains(.decision)
-                else { return }
+                guard brain == .assistant else { return }
                 draft?.usesLocal = true
-                if brain == .assistant { setCloudProvider(nil) }
+                setCloudProvider(nil)
+            case .localDecision(let id):
+                guard brain == .decision, let draft, canSelectDecision(id, choice: draft) else { return }
+                self.draft?.usesLocal = true
+                self.draft?.decisionLocalModelID = id
             case .cloud(let id):
                 draft?.usesLocal = false
                 setCloudProvider(id)

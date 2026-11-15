@@ -12,10 +12,15 @@ public protocol ModelResourceControlling: Sendable {
 }
 public protocol ModelLanguageProviding: ChatCapability, ModelResourceControlling {
     var decision: any ModelDecisionProviding { get }
+    func decisionModel(_ id: String) -> (any ModelDecisionProviding)?
     func configure(_ configuration: OpenAIChatConfiguration?) async throws
     func chatModel(configuration: OpenAIChatConfiguration?) async throws -> ChatModel
 }
 extension ModelLanguageProviding {
+    public func decisionModel(_ id: String) -> (any ModelDecisionProviding)? {
+        id == "d3-edge" ? decision : nil
+    }
+
     public func chatModel(configuration: OpenAIChatConfiguration?) async throws -> ChatModel {
         throw CapabilityError.unavailable("Configured chat is not supported by this host")
     }
@@ -465,6 +470,13 @@ public final class ModelLanguageContainer: ModelLanguageProviding, Sendable {
         self.decision = ModelDecisionContainer(scope: scope)
     }
     public let decision: any ModelDecisionProviding
+    public func decisionModel(_ id: String) -> (any ModelDecisionProviding)? {
+        switch id {
+        case "d3-edge": decision
+        case "d3-lite": ModelDecisionContainer(scope: scope, id: ModelID(id))
+        default: nil
+        }
+    }
     public var availability: CapabilityAvailability {
         get async {
             do { return await (try await scope.selectedChat()).availability } catch {
@@ -898,28 +910,32 @@ public final class ModelDecisionContainer: ModelDecisionProviding, Sendable {
         try await scope.stateSnapshot("decision", capabilities: [.decision])
     }
     private let scope: ModelScope
-    fileprivate init(scope: ModelScope) { self.scope = scope }
+    private let id: ModelID
+    fileprivate init(scope: ModelScope, id: ModelID = ModelID("d3-edge")) {
+        self.scope = scope
+        self.id = id
+    }
     public var availability: CapabilityAvailability {
         get async {
             do {
                 return try await scope.perform("decision", "availability", inference: false) {
-                    try await $0.get(.decision).availability
+                    try await $0.availability(self.id, for: .decision)
                 }
             } catch { return .unavailable(reason: String(describing: error)) }
         }
     }
     public func decide(_ request: DecisionRequest) async throws -> InferenceSession<DecisionResult> {
-        try await scope.perform("decision", "decide") { try await $0.get(.decision).decide(request) }
+        try await scope.perform("decision", "decide") { try await $0.get(self.id, as: .decision).decide(request) }
     }
     public func warmup() async throws { try await warmup(reportLoading: { _ in }) }
     public func warmup(reportLoading: @escaping @Sendable (Bool) async -> Void) async throws {
-        try await scope.perform("decision", "warmup") { try await $0.warmup(.decision, reportLoading: reportLoading) }
+        try await scope.perform("decision", "warmup") { try await $0.warmup(self.id, reportLoading: reportLoading) }
     }
-    public func load() async throws { try await scope.perform("decision", "load") { try await $0.load(.decision) } }
+    public func load() async throws { try await scope.perform("decision", "load") { try await $0.load(self.id) } }
     public func unload() async throws {
-        try await scope.perform("decision", "unload", inference: false) { try await $0.unload(.decision) }
+        try await scope.perform("decision", "unload", inference: false) { try await $0.unload(self.id) }
     }
     public func status() async throws -> ModelState {
-        try await scope.perform("decision", "status", inference: false) { try await $0.status(.decision) }
+        try await scope.perform("decision", "status", inference: false) { try await $0.status(self.id) }
     }
 }
