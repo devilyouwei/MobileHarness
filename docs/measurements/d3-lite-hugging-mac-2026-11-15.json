@@ -1,0 +1,435 @@
+{
+  "fixture": "docs/measurements/decision-language-scenarios-2026-11-14.json",
+  "results": [
+    {
+      "model": "d3-lite",
+      "mode": "jev",
+      "segments": [
+        {
+          "language": "en",
+          "offset": 0,
+          "exitCode": 0,
+          "warmup": [
+            {
+              "elapsedMS": 183.477625,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 113.097333,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 114.226417,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            }
+          ],
+          "rows": [
+            {
+              "elapsedMS": 114.552833,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 114.322375,
+              "expected": "interrupt",
+              "id": "short-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 114.251333,
+              "expected": "interrupt",
+              "id": "pause-now",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 114.716167,
+              "expected": "interrupt",
+              "id": "enough",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 114.632917,
+              "expected": "interrupt",
+              "id": "skip-current",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 113.829875,
+              "expected": "interrupt",
+              "id": "abort-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 113.15275,
+              "expected": "interrupt",
+              "id": "correct-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 113.722667,
+              "expected": "interrupt",
+              "id": "stop-before-hit",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 113.67225,
+              "expected": "enqueue",
+              "id": "confirm-short",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 114.362,
+              "expected": "enqueue",
+              "id": "confirm-explicit",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 113.88925,
+              "expected": "enqueue",
+              "id": "answer-no",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 114.239625,
+              "expected": "enqueue",
+              "id": "answer-option",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 114.112958,
+              "expected": "enqueue",
+              "id": "new-request-filler",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 113.758708,
+              "expected": "enqueue",
+              "id": "short-command",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 114.299417,
+              "expected": "enqueue",
+              "id": "short-fragment",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 114.463792,
+              "expected": "enqueue",
+              "id": "speech-deferred",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 114.131209,
+              "expected": "enqueue",
+              "id": "motion-deferred",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 114.498583,
+              "expected": "enqueue",
+              "id": "stop-negated",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 114.318958,
+              "expected": "enqueue",
+              "id": "stop-quoted",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 114.02975,
+              "expected": "enqueue",
+              "id": "stop-idle",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 114.136125,
+              "expected": "enqueue",
+              "id": "question-during-speech",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 114.377666,
+              "expected": "discard",
+              "id": "filler-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 114.111625,
+              "expected": "discard",
+              "id": "filler-speaking",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 113.959125,
+              "expected": "discard",
+              "id": "noise-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 114.485208,
+              "expected": "discard",
+              "id": "noise-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 113.721583,
+              "expected": "discard",
+              "id": "unintelligible",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 113.796375,
+              "expected": "discard",
+              "id": "punctuation-only",
+              "prediction": "enqueue"
+            }
+          ]
+        },
+        {
+          "language": "zh-Hans",
+          "offset": 0,
+          "exitCode": 0,
+          "warmup": [
+            {
+              "elapsedMS": 158.419584,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 115.905875,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 117.291125,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            }
+          ],
+          "rows": [
+            {
+              "elapsedMS": 117.451708,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 117.585083,
+              "expected": "interrupt",
+              "id": "short-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 117.13875,
+              "expected": "interrupt",
+              "id": "pause-now",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 117.285542,
+              "expected": "interrupt",
+              "id": "enough",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 117.477667,
+              "expected": "interrupt",
+              "id": "skip-current",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 118.057375,
+              "expected": "interrupt",
+              "id": "abort-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 117.823375,
+              "expected": "interrupt",
+              "id": "correct-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 117.743833,
+              "expected": "interrupt",
+              "id": "stop-before-hit",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 117.589958,
+              "expected": "enqueue",
+              "id": "confirm-short",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 117.719292,
+              "expected": "enqueue",
+              "id": "confirm-explicit",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 117.308333,
+              "expected": "enqueue",
+              "id": "answer-no",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 116.843292,
+              "expected": "enqueue",
+              "id": "answer-option",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 117.2595,
+              "expected": "enqueue",
+              "id": "new-request-filler",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 117.2825,
+              "expected": "enqueue",
+              "id": "short-command",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 117.414875,
+              "expected": "enqueue",
+              "id": "short-fragment",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 117.130792,
+              "expected": "enqueue",
+              "id": "speech-deferred",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 117.436125,
+              "expected": "enqueue",
+              "id": "motion-deferred",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 117.489625,
+              "expected": "enqueue",
+              "id": "stop-negated",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 117.438833,
+              "expected": "enqueue",
+              "id": "stop-quoted",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 117.31875,
+              "expected": "enqueue",
+              "id": "stop-idle",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 117.829333,
+              "expected": "enqueue",
+              "id": "question-during-speech",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 117.398125,
+              "expected": "discard",
+              "id": "filler-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 117.506334,
+              "expected": "discard",
+              "id": "filler-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 117.5845,
+              "expected": "discard",
+              "id": "noise-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 117.174333,
+              "expected": "discard",
+              "id": "noise-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 117.889333,
+              "expected": "discard",
+              "id": "unintelligible",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 117.397416,
+              "expected": "discard",
+              "id": "punctuation-only",
+              "prediction": "discard"
+            }
+          ]
+        }
+      ],
+      "summary": {
+        "en": {
+          "count": 27,
+          "valid": 27,
+          "correct": 21,
+          "p95ValidMS": 114.632917,
+          "correctWithinBudget": 21,
+          "correctWithin500MS": 21,
+          "budgetMS": 250,
+          "falseInterrupt": 4,
+          "falseDiscard": 0,
+          "missedInterrupt": 0,
+          "failures": {}
+        },
+        "zh-Hans": {
+          "count": 27,
+          "valid": 27,
+          "correct": 20,
+          "p95ValidMS": 117.889333,
+          "correctWithinBudget": 20,
+          "correctWithin500MS": 20,
+          "budgetMS": 250,
+          "falseInterrupt": 3,
+          "falseDiscard": 4,
+          "missedInterrupt": 1,
+          "failures": {}
+        },
+        "all": {
+          "count": 54,
+          "valid": 54,
+          "correct": 41,
+          "p95ValidMS": 117.829333,
+          "correctWithinBudget": 41,
+          "correctWithin500MS": 41,
+          "budgetMS": 250,
+          "falseInterrupt": 7,
+          "falseDiscard": 4,
+          "missedInterrupt": 1,
+          "failures": {}
+        }
+      }
+    }
+  ],
+  "artifact": {
+    "repo_id": "hugging-mac/d3-lite-CoreAI",
+    "revision": "863963d371d5af6784bf726fb85a508c08751d65",
+    "graph_sha256": "c9117d0cfdbd6fae885bda3011c222afd4ac5871a3c58ce6d65ecd525de658ea"
+  }
+}

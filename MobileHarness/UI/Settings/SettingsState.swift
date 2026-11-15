@@ -75,11 +75,11 @@ enum LocalLanguageModel: String, CaseIterable {
 
     func benchmark(for brain: AgentBrain) -> LocalModelBenchmark? {
         // Measured production protocols on matched English and Chinese fixtures (54 requests per model).
-        // Source: docs/measurements/decision-protocols-local-2026-11-15.json
+        // Sources: docs/measurements/decision-protocols-local-2026-11-15.json and d3-lite-hugging-mac-2026-11-15.json.
         switch (brain, self) {
         case (.decision, .apple): .init(correct: 31, total: 54, p95Milliseconds: 305.21)
         case (.decision, .edge): .init(correct: 21, total: 54, p95Milliseconds: 53.34)
-        case (.decision, .lite): .init(correct: 38, total: 54, p95Milliseconds: 117.67)
+        case (.decision, .lite): .init(correct: 41, total: 54, p95Milliseconds: 117.83)
         case (.decision, .gemma): .init(correct: 32, total: 54, p95Milliseconds: 10203.26)
         default: nil
         }

@@ -79,3 +79,5 @@ Writer 的 2026-11-08 双模型实验保留 [原始基线](writer-prompt-2026-11
 - [Gemma 4 E2B M5 Decision 对照](decision-gemma4-m5-2026-11-15.json)保留同一组 54 条中英文样例的两种请求格式、108 条真实生成、预热、各阶段计时及源文件哈希。生产路径提供设置页评分，格式指令内联组仅用于诊断。 [验证报告](../validation/Decision-Model-Mac-Comparison.md#gemma-4-e2b-decision-comparison)
 - [Qwen Flash Decision 三协议对照的云端组](decision-protocols-cloud-2026-11-15.json)保存两款 Flash 模型的 Tool 和纯文本 216 条同构用例结果、延迟和错误分类。 [验证报告](../validation/Decision-Model-Mac-Comparison.md#assistant-decision-protocol-benchmark)
 - [Assistant Decision 三协议本地组](decision-protocols-local-2026-11-15.json)保存 D3 Edge、D3 Lite、Apple 和 Gemma 共 270 条实测、模式分组及预热记录。 [验证报告](../validation/Decision-Model-Mac-Comparison.md#assistant-decision-protocol-benchmark)
+
+[D3 Lite hugging-mac report](d3-lite-hugging-mac-2026-11-15.json) records the 54 matched bilingual JEV requests for the App's replacement artifact, with its release revision and graph hash.

@@ -39,8 +39,8 @@
     "directory": "D3Lite",
     "declaration": {
       "kind": "huggingface",
-      "repoId": "ahmedandaloes/d3-lite-CoreAI",
-      "revision": "e7879e3b76d399df29ce4b454573ae1aa1bed189",
+      "repoId": "hugging-mac/d3-lite-CoreAI",
+      "revision": "863963d371d5af6784bf726fb85a508c08751d65",
       "allowPatterns": [
         "decision.aimodel/**",
         "manifest.json",
@@ -71,7 +71,7 @@
       "config.json"
     ],
     "graph": "decision.aimodel",
-    "graphSHA256": "0d78fc50e846cb26e68621c7944534af9bbc2642a33156b26db75e6770172a40"
+    "graphSHA256": "c9117d0cfdbd6fae885bda3011c222afd4ac5871a3c58ce6d65ecd525de658ea"
   },
   "qwen2.5-1.5b": {
     "directory": "Qwen2.5-1.5B",

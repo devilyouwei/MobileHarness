@@ -95,8 +95,8 @@ class SourceCatalogTests(unittest.TestCase):
         from model_download import load_config
         config = load_config('d3-lite')
         self.assertEqual(config['directory'], 'D3Lite')
-        self.assertEqual(config['declaration']['repoId'], 'ahmedandaloes/d3-lite-CoreAI')
-        self.assertEqual(config['declaration']['revision'], 'e7879e3b76d399df29ce4b454573ae1aa1bed189')
+        self.assertEqual(config['declaration']['repoId'], 'hugging-mac/d3-lite-CoreAI')
+        self.assertEqual(config['declaration']['revision'], '863963d371d5af6784bf726fb85a508c08751d65')
         self.assertIn('decision.aimodel/**', config['declaration']['allowPatterns'])
         self.assertIn('decision.aimodel/main.mlirb', config['requiredFiles'])
         self.assertFalse(any('vision' in item for item in config['declaration']['allowPatterns']))

@@ -221,11 +221,11 @@
       "requiresPhysicalDevice": true,
       "deviceRequirement": null,
       "license": "Apache-2.0",
-      "estimatedBytes": 1533698749,
+      "estimatedBytes": 1533706202,
       "source": {
         "kind": "huggingface",
-        "repoId": "ahmedandaloes/d3-lite-CoreAI",
-        "revision": "e7879e3b76d399df29ce4b454573ae1aa1bed189",
+        "repoId": "hugging-mac/d3-lite-CoreAI",
+        "revision": "863963d371d5af6784bf726fb85a508c08751d65",
         "allowPatterns": [
           "decision.aimodel/**",
           "manifest.json",

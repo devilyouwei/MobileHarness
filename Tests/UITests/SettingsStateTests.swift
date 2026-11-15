@@ -137,7 +137,7 @@ import Testing
 }
 
 @Test func localModelRecommendationsUseRoleSpecificMeasurements() {
-    #expect(LocalLanguageModel.lite.benchmark(for: .decision)?.halfStars == 7)
+    #expect(LocalLanguageModel.lite.benchmark(for: .decision)?.halfStars == 8)
     #expect(LocalLanguageModel.edge.benchmark(for: .decision)?.halfStars == 5)
     #expect(LocalLanguageModel.apple.benchmark(for: .decision)?.halfStars == 5)
     #expect(LocalLanguageModel.gemma.benchmark(for: .decision)?.halfStars == 5)

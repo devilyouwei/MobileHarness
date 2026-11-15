@@ -53,17 +53,13 @@ async def run_d3(root, graph, cases):
     manifest = json.loads((root / "manifest.json").read_text())
     config = json.loads((root / "decision_config.json").read_text())
     capacity = manifest["sequence_length"]
-    if capacity != 512 or config["format_id"] != "d3-code-readout-v1" or config["codes"][:3] != ["A", "B", "C"]:
+    inputs = {"input_ids", "attention_mask", "position_ids"}
+    if (capacity != 512 or manifest.get("modality") != "text" or set(manifest["inputs"]) != inputs
+            or config["format_id"] != "d3-code-readout-v1" or config["codes"][:3] != ["A", "B", "C"]):
         raise ValueError("Unsupported D3 Choice contract")
     tokenizer = AutoTokenizer.from_pretrained(root, local_files_only=True)
     model = await AIModel.load(graph, SpecializationOptions.default())
     function = model.load_function(manifest["function"])
-    visual = {}
-    if "visual_embeddings" in manifest["inputs"]:
-        visual = dict(
-            visual_embeddings=NDArray(np.zeros((1, capacity, manifest["hidden_size"]), dtype=np.float32)),
-            visual_mask=NDArray(np.zeros((1, capacity, 1), dtype=np.bool_)),
-        )
 
     async def predict(case):
         start = time.perf_counter()
@@ -87,7 +83,7 @@ async def run_d3(root, graph, cases):
             "position_ids": positions,
         }
         values = {key: NDArray(np.asarray(data, dtype=np.int32)) for key, data in tensors.items()}
-        readout = (await function(values | visual))[manifest["output"]].numpy()
+        readout = (await function(values))[manifest["output"]].numpy()
         if readout.shape != (1, 255) or not np.isfinite(readout).all():
             raise ValueError(f"{case['id']}: Invalid D3 readout")
         scores = readout[0, :3]

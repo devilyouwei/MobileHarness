@@ -800,3 +800,11 @@ AssistantChatWorker 按会话在内存暂存继续聆听的语音及其原始输
 AssistantInputDecision 负责携带最新拼接语音、候选限制与采纳理由，InputDecision 中英文资源保留原提示词段落顺序。AssistantDecisionProtocol 在 JEV 的候选、Tool 的 action 枚举和 Text 的数字输出中使用相同分类。运行日志展示第四类，灵动岛沿用现有打断/舍弃反馈。更新 Assistant 和总体技术设计，回归测试覆盖暂存不派发、噪声舍弃、合并再分类与释放。原三分类 benchmark 保留为历史结果。
 
 Decision 的中英文动作定义将不确定时的默认选择写入第 3 项「排队」。该定义由文字三分类和语音四分类共用，通过 JEV、Tool 和 Text 发送。沿用原有动作编号与提示结构，语音仅在明确未说完时选第 4 项。此次调整只涉及提示资源和提示回归，VAD 继续依据同会话回复活动及打断标记切换收句阈值。
+
+### 替换 D3 Lite 下载制品
+
+App 的 `d3-lite` 目录与选择 ID 保持稳定，下载来源固定为 `hugging-mac/d3-lite-CoreAI` 的发布提交 `863963d371d5af6784bf726fb85a508c08751d65`。ModelKit 统一 Lite 和 Edge 的 512-token 三输入纯文本图契约。旧 Lite 的安装收据因 revision 变化而提示不兼容，用户通过现有 Agent Models 删除旧模型、重新下载，避免移动端同时保留两份大图。下载期沿用现有 Decision 排队兜底。下载目录继续与 UI 和设置解耦。
+
+更新生产目录、模型加载器、独立 Mac 基准的当前制品配置、下载声明及原生模型测试。历史原始跑分单独保留。通过公开 Hub 获取当前下载清单并核对真实图，验收 Mac 上 App 同款模型端口的预热和四候选推理。真机首次加载单独验收。
+
+新版采用相同 54 条中英文样例复测。更新 Decision 偏好的 Lite Mac 推荐值和对应自动化断言，保留旧版本分数的历史证据。

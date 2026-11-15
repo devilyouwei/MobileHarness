@@ -13,7 +13,7 @@
 
 - `models.json` 固定 Hugging Face revision、文本图路径、必需文件和 SHA-256。
 - `fixtures.json` 保存合成输入和预期动作。现行提示组是迁移时的快照。
-- `benchmark.py` 负责下载、编码、执行、计分和 JSON 输出。D3 Lite 文本路径只绑定全零视觉张量。
+- `benchmark.py` 负责下载、编码、执行、计分和 JSON 输出。D3 Edge 与 Lite 文本路径共用三输入接口。旧版 Lite 本机制品可运行 `benchmark.py download d3-lite --force` 更新，归档报告保留当时的制品版本。
 - `DecisionDecoder.swift` 是独立包的 Qwen 解码执行器。每条请求重置上下文，预热三次。
 - `.local/` 存储权重、虚拟环境和本次输出，受 Git 忽略。
 

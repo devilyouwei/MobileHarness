@@ -98,9 +98,13 @@ import Testing
         try await root.setForeground(true)
         let lite = try #require(root.language.decisionModel("d3-lite"))
         #expect(await lite.availability == .available)
+        try await lite.warmup()
+        #expect(try await lite.status() == .ready)
         let request = try DecisionRequest(
             text: "The customer was charged twice for a single order.",
-            candidates: ["billing: Payments and invoices", "shipping: Delivery", "account: Login"],
+            candidates: [
+                "billing: Payments and invoices", "shipping: Delivery", "account: Login", "wishlist: Saved items",
+            ],
             instructions: "Which team should handle this?")
         let session = try await lite.decide(request)
         let values = try await session.withCleanup {
