@@ -358,7 +358,7 @@ import StorageFiles
                 stateContext: stateContext, speechOutput: speechOutput, inputDecision: inputDecision, fullDuplex: true,
                 decisionLog: decisionLog,
                 inputQueueStatus: { ready, deciding in await inputQueueStatus(ready, deciding) },
-                uiHome: home, uiSessionID: applicationControlSessionID,
+                uiHome: home, uiSessionID: applicationControlSessionID, speechSessionID: interactionSessionID,
                 presentsReply: true, chatProvider: chatProvider, conversations: conversations,
                 communications: communications,
                 modelName: modelName,
@@ -464,10 +464,11 @@ import StorageFiles
                 playbackChanged: { [interaction] id, active in
                     await interaction.speech?.playbackChanged(audioID: id, active: active)
                 },
-                makePerception: { [interactionSessionID, uiHome, contextScope] in
+                makePerception: { [interactionSessionID, uiHome, contextScope, assistant = interaction.agent] in
                     try SpeechPerceptionAgent(
                         recognition: $0, vad: $1, sessionID: $2, interactionSessionID: interactionSessionID,
                         residentListening: true, uiHome: uiHome, microphoneInput: $3, microphoneSpectrum: $4,
+                        speechEndpointActivity: { await assistant.speechEndpointActivity(acknowledging: $0) },
                         context: try Self.context(
                             .speechPerception, SpeechPerceptionContextState(), scope: contextScope))
                 })

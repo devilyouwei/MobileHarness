@@ -118,6 +118,12 @@
                     return Set(
                         try await manager.artifactSnapshots().filter { $0.phase == .installed }.map { $0.artifact.id })
                 })
+            let language = model.language
+            let appleAvailable: @Sendable () async -> Bool = {
+                guard let model = try? await language.localChatModel("apple-system") else { return false }
+                if case .available = await model.capability.availability { return true }
+                return false
+            }
             let providerService = ProviderSettingsService(
                 store: ProviderSettingsStore(
                     credentials: SettingsCredentialAdapter(),
@@ -139,7 +145,7 @@
                     return try await manager.artifactSnapshots().contains {
                         $0.artifact.id == "gemma4-e2b" && $0.phase == .installed
                     }
-                })
+                }, isAppleAvailable: appleAvailable)
             let providerSettings = ProviderSettingsRequests(service: providerService)
             let discovery = ProviderDiscoveryRequests(discover: SettingsProviderAdapter.discoverModels)
             let providerPresentation = ProviderPresentationAdapter(
@@ -173,7 +179,8 @@
                 }, titlePositions: request.titlePositions)
             let resourceAdapter = ModelResourceCapabilityAdapter(
                 artifacts: request.maintenance.artifacts,
-                quiesce: request.maintenance.quiesce, bindSpeech: request.maintenance.bindSpeech)
+                quiesce: request.maintenance.quiesce, bindSpeech: request.maintenance.bindSpeech,
+                systemChatAvailable: appleAvailable)
             let album = PhotoAlbumService(
                 photos: photos, export: { [platform] data in try await platform.vision.savePhoto(data) },
                 exportVideo: { [platform] file in try await platform.vision.saveVideo(file) })

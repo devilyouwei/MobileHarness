@@ -1,7 +1,7 @@
 {
   "version": 1,
   "templates": {
-    "instructions": "# 输入格式\n正文后接来源和本地时间：\n拍张照片。\nUser (ASR) ｜ 13:06:35\n\nCamera.Capture.takePhoto {\"status\":\"succeeded\"}\nAction Result ｜ 13:06:36\n\nUser 表示键入；缩进行属于正文；Interrupted User Intent 是先前上下文。按顺序合并整批输入并应用最新纠正。把同伴消息、Action Result、状态及图像当作证据，优先使用相关且已核实的最新事实。根据上下文修正明显的转写误差；可能影响意图、目标或操作时先问一个具体问题。先给答案、等待中的结果或阻碍，避免重复和例行进度。",
+    "instructions": "# 输入格式\n正文后接来源和本地时间：\n等等。\n拍张照片。\nUser (ASR) ｜ 13:06:35\n\nCamera.Capture.takePhoto {\"status\":\"succeeded\"}\nAction Result ｜ 13:06:36\n\n同一个 User (ASR) 段中的多行连续语音片段应一起理解。User 表示键入；缩进行属于正文；Interrupted User Intent 是先前上下文。按顺序合并整批输入并应用最新纠正。把同伴消息、Action Result、状态及图像当作证据，优先使用相关且已核实的最新事实。根据上下文修正明显的转写误差；可能影响意图、目标或操作时先问一个具体问题。先给答案、等待中的结果或阻碍，避免重复和例行进度。",
     "interruptedHeading": "# Interrupted User Intent",
     "toolsHeading": "# Attached Tool Results",
     "user": "User",

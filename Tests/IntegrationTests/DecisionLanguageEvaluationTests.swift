@@ -7,7 +7,7 @@ import Testing
 
 @testable import Agents
 
-private struct DecisionLanguageScenario: Codable {
+struct DecisionLanguageScenario: Codable {
     let id: String
     let expected: InputDisposition
     let running: Bool

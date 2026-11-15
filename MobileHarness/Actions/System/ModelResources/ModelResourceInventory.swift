@@ -51,10 +51,12 @@ public struct ModelResourceInventory: Codable, Sendable, Equatable {
     public static let maximumBytes = 65_536
     public let version: Int
     public let items: [ModelResourceFact]
+    public let appleSystemAvailable: Bool?
     public let installedGroups: Set<ResourceModelGroup>
-    public init(items: [ModelResourceFact]) {
+    public init(items: [ModelResourceFact], appleSystemAvailable: Bool? = nil) {
         version = 1
         self.items = items
+        self.appleSystemAvailable = appleSystemAvailable
         let ids = Set(items.filter { $0.phase == .installed }.map(\.id))
         installedGroups = Set(ResourceModelGroup.allCases.filter { $0.isInstalled(in: ids) })
     }
@@ -87,11 +89,16 @@ public struct ModelResourceInventory: Codable, Sendable, Equatable {
         try Task.checkCancellation()
         let items = try await capability.snapshotResources()
         try Task.checkCancellation()
-        let value = Self(items: items)
+        let value = await Self(items: items, appleSystemAvailable: capability.appleSystemAvailable())
         try value.validate()
         return value
     }
 }
 public protocol ModelResourceInventoryCapability: Sendable {
     func snapshotResources() async throws -> [ModelResourceFact]
+    func appleSystemAvailable() async -> Bool
+}
+
+extension ModelResourceInventoryCapability {
+    public func appleSystemAvailable() async -> Bool { false }
 }

@@ -124,7 +124,10 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         let receivedAt = ContinuousClock.now
     }
     private var decisionPending: [PendingInputDecision] = []
+    private var continuingSpeech: [String: [PendingInputDecision]] = [:]
     private var decisionWorker: Task<Void, Never>?
+    private let speechSessionID: String?
+    private var speechInterruptionID: UUID?
     private var inputInterruption: (@Sendable (String) async throws -> Void)?
     public func bindInputInterruption(_ callback: @escaping @Sendable (String) async throws -> Void) {
         inputInterruption = callback
@@ -154,18 +157,22 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
                 let history = await contextRepository.residentSnapshot()?.state.history.current
                 guard !Task.isCancelled, lifecycle != .stopped else { return }
                 guard decisionPending.first?.input.id == queued.input.id else { continue }
-                let running =
-                    activeInput?.sessionID == queued.input.sessionID
-                    || pendingRounds.values.contains {
-                        $0.input.sessionID == queued.input.sessionID && !$0.cancelled
+                let speech: Bool =
+                    if fullDuplex, case .transcript(_, final: true)? = queued.input.payload.perception { true } else {
+                        false
                     }
+                let held = speech ? continuingSpeech[queued.input.sessionID, default: []] : []
+                let transcript = (held.map(\.text) + [queued.text]).joined(separator: "\n")
                 let snapshot = InputDecisionSnapshot(
-                    input: queued.input, text: queued.text, running: running, playing: playing,
+                    input: queued.input, text: transcript, running: hasReplyWork(sessionID: queued.input.sessionID),
+                    playing: playing,
                     history: history.flatMap {
                         AssistantHistoryProjection.decisionExchange(in: $0, before: queued.input.id)
                     },
                     bufferedUserInputs: decisionBuffer(before: queued.input),
-                    question: queued.question, receivedAt: queued.receivedAt)
+                    question: queued.question, receivedAt: queued.receivedAt, allowsContinueListening: speech,
+                    canHoldTranscript: held.count < 3 && transcript.utf8.count <= 640
+                        && continuingSpeech.values.reduce(0, { $0 + $1.count }) < capacity - 1)
                 let observedEpoch = generationEpoch
                 let decision = await inputDecision.classify(snapshot)
                 let duration = startedAt.duration(to: .now)
@@ -182,6 +189,13 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
                     }
                     guard decisionPending.first?.input.id == input.id, lifecycle != .stopped else { continue }
                     decisionPending.removeFirst()
+                    if disposition == .continueListening {
+                        continuingSpeech[input.sessionID, default: []].append(queued)
+                        await publishInputQueue()
+                        drain()
+                        if !Task.isCancelled { await decisionLog?(snapshot, decision, duration) }
+                        continue
+                    }
                     if disposition == .discard {
                         try await contextRepository.update { try $0.transitionWork(input.id, to: .completed) }
                         try await conversations.finish(input.id, state: .completed, reason: "decision.discard")
@@ -199,9 +213,15 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
                         continue
                     }
                     try queue.admit(input, disposition: .enqueue(priority: 0))
+                    if !held.isEmpty {
+                        continuingSpeech[input.sessionID] = nil
+                        // Batch selection expects the representative first. Rendering orders by capture time.
+                        batchMembers[input.id] = [input] + held.map(\.input)
+                    }
                     blockedSessions.remove(input.sessionID)
                     replyInputs.insert(input.id)
                     if disposition == .interrupt, observedEpoch == generationEpoch, let inputInterruption {
+                        if input.sessionID == speechSessionID { speechInterruptionID = UUID() }
                         try await inputInterruption(input.sessionID)
                         if lifecycle == .running, !Task.isCancelled {
                             await inputDecisionFeedback?(.interrupt, input.id)
@@ -221,6 +241,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
                         }
                         try await conversations.finish(
                             input.id, state: .failed, error: "Input decision admission failed")
+                        try await finishBatch(input, failure: "Input decision admission failed")
                     } catch { emit(.control("agent.historyError: \(error)"), for: input) }
                     coordination[input.id] = nil
                     semanticMessages[input.id] = nil
@@ -394,7 +415,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         inputDecision: AssistantInputDecision? = nil, fullDuplex: Bool = false,
         decisionLog: (@MainActor @Sendable (InputDecisionSnapshot, InputDecisionOutcome, Duration) -> Void)? = nil,
         inputQueueStatus: @escaping @Sendable (Int, Int) async -> Void = { _, _ in },
-        uiHome: UIHomeContainer? = nil, uiSessionID: String? = nil,
+        uiHome: UIHomeContainer? = nil, uiSessionID: String? = nil, speechSessionID: String? = nil,
         capacity: Int = 32, presentsReply: Bool = false,
         outputCapacity: Int = 256, chat: (any ChatCapability)? = nil,
         chatProvider: (@Sendable () async throws -> any ChatCapability)? = nil,
@@ -418,6 +439,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         self.speechOutput = speechOutput
         self.uiHome = uiHome
         self.uiSessionID = uiSessionID
+        self.speechSessionID = speechSessionID
         guard uiHome == nil || uiSessionID != nil else { throw CommunicationError.invalidPayload }
         guard (1...8191).contains(capacity), (1...8192).contains(outputCapacity) else {
             throw CommunicationError.invalidPayload
@@ -570,11 +592,13 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         let parked = pendingRounds
         var seen: Set<String> = []
         let pending =
-            (queue.inputs + decisionPending.map(\.input) + parked.values.map(\.input)
+            (queue.inputs + decisionPending.map(\.input) + continuingSpeech.values.flatMap { $0.map(\.input) }
+            + parked.values.map(\.input)
             + batchMembers.values.flatMap { $0 }).filter {
                 $0.id != current?.id && seen.insert($0.id).inserted
             }
         decisionPending.removeAll()
+        continuingSpeech.removeAll()
         pendingRounds.removeAll()
         settlementAdmissions.removeAll()
         batchMembers.removeAll()
@@ -631,8 +655,9 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         decisionWorker?.cancel()
         await inputDecision?.stop()
         await decisionWorker?.value
-        let classifying = decisionPending.map(\.input)
+        let classifying = decisionPending.map(\.input) + continuingSpeech.values.flatMap { $0.map(\.input) }
         decisionPending.removeAll()
+        continuingSpeech.removeAll()
 
         await stopUIInputs()
         lifecycle = .stopped
@@ -854,7 +879,10 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             switch control {
             case .interrupt, .close:
                 let closesSession = control == .close
-                if closesSession { writerNotices.removeAll { $0.input.sessionID == input.sessionID } }
+                if closesSession {
+                    writerNotices.removeAll { $0.input.sessionID == input.sessionID }
+                    if input.sessionID == speechSessionID { speechInterruptionID = nil }
+                }
                 guard !hostCancellationInProgress else { throw HarnessError.invalidTransition }
                 hostCancellationInProgress = true
                 hostCancellationSession = input.sessionID
@@ -913,9 +941,11 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
                     closesSession && candidate.sessionID == input.sessionID && candidate.id != cancelledActive?.id
                         && !pendingRounds.values.contains(where: { $0.input.id == candidate.id })
                 }
+                let held = closesSession ? continuingSpeech.removeValue(forKey: input.sessionID) ?? [] : []
                 if closesSession { decisionPending.removeAll { $0.input.sessionID == input.sessionID } }
+                let cancelledInputs = cancelledQueued + held.map(\.input)
                 try await prepareSignal(input)
-                for pending in cancelledQueued {
+                for pending in cancelledInputs {
                     replyInputs.remove(pending.id)
                     continuationRounds[pending.id] = nil
                     if pending.id != activeInput?.id {
@@ -929,7 +959,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
                         } catch AssistantHistoryError.missingTurn {} catch { throw error }
                     }
                 }
-                for pending in cancelledQueued {
+                for pending in cancelledInputs {
                     queue.remove(id: pending.id)
                     try await finishBatch(pending, cancelled: true)
                 }
@@ -1003,11 +1033,14 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
                     && !pendingRounds.values.contains { $0.input.id == pending.id })
         }
         let waitingMembers = ordinary.flatMap { batchMembers[$0.id] ?? [$0] }
-        guard waitingMembers.count + decisionPending.count + admitting < capacity else { throw HarnessError.queueFull }
+        let held = continuingSpeech.values.flatMap { $0.map(\.input) }
+        guard waitingMembers.count + decisionPending.count + held.count + admitting < capacity else {
+            throw HarnessError.queueFull
+        }
         if fullDuplex {
             let live = try await contextRepository.snapshot().work.values.filter { !$0.state.terminal }
             guard live.count + admitting < 64 else { throw HarnessError.queueFull }
-            let queued = waitingMembers + decisionPending.map(\.input)
+            let queued = waitingMembers + decisionPending.map(\.input) + held
             guard
                 queued.reduce(
                     0,
@@ -1608,6 +1641,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             semanticMessages[member.id] = nil
             semanticAttachments[member.id] = nil
             if member.id == input.id { continue }
+            inputInteractions[member.id] = nil
             replyInputs.remove(member.id)
             try await contextRepository.update { context in
                 if context.work[member.id]?.state.terminal == false {
@@ -3414,6 +3448,25 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     }
 
     // MARK: - Observability
+
+    private func hasReplyWork(sessionID: String) -> Bool {
+        activeInput?.sessionID == sessionID
+            || pendingRounds.values.contains { $0.input.sessionID == sessionID && !$0.cancelled }
+    }
+
+    func hasActiveReply(sessionID: String) async -> Bool {
+        guard lifecycle == .running else { return false }
+        if hasReplyWork(sessionID: sessionID) { return true }
+        let playing = await speechOutput?.isPlaying(sessionID: sessionID)
+        return lifecycle == .running && (hasReplyWork(sessionID: sessionID) || playing == true)
+    }
+
+    func speechEndpointActivity(acknowledging id: UUID?) async -> (replyActive: Bool, interruptionID: UUID?) {
+        if let id, id == speechInterruptionID { speechInterruptionID = nil }
+        guard let speechSessionID, lifecycle == .running else { return (false, nil) }
+        let active = await hasActiveReply(sessionID: speechSessionID)
+        return (active, speechInterruptionID)
+    }
 
     public func status() -> AgentStatus {
         AgentStatus(lifecycle: lifecycle, queuedInputs: queue.count + decisionPending.count, processedInputs: processed)

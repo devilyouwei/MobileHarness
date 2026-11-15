@@ -602,23 +602,6 @@ private struct SoundRecognition: SpeechRecognitionCapability {
             })
     }
 }
-private actor SoundEndpointSession: VoiceActivitySession {
-    private var position: Int64 = 0
-    func process(_ frame: AudioFrame) throws -> [VoiceActivityScore] {
-        defer { position += Int64(frame.sampleCount) }
-        return [
-            try VoiceActivityScore(
-                startSample: position, sampleCount: frame.sampleCount, probability: position == 0 ? 1 : 0)
-        ]
-    }
-    func finish() -> [VoiceActivityScore] { [] }
-    func reset() { position = 0 }
-    func cancel() {}
-}
-private struct SoundEndpoint: VoiceActivityCapability {
-    var availability: CapabilityAvailability { .available }
-    func detectVoiceActivity(format: AudioFormat) -> any VoiceActivitySession { SoundEndpointSession() }
-}
 
 extension LiveRuntimeTests {
     @Test(.actionCatalog) func soundSourceReplyGateClearsDirectionAndResumeStartsANewWindow() async throws {
@@ -626,7 +609,7 @@ extension LiveRuntimeTests {
         let values = SoundPublications()
         let finals = SoundPublications()
         let speech = try SpeechPerceptionAgent(
-            recognition: SoundRecognition(), vad: SoundEndpoint(), sessionID: session,
+            recognition: SoundRecognition(), vad: EndpointVAD(), sessionID: session,
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
                 state: SpeechPerceptionContextState())

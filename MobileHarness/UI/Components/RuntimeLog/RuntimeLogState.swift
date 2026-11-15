@@ -282,6 +282,7 @@ public struct DecisionLogItem: Identifiable, Sendable, Equatable {
     }
     public enum Disposition: String, Sendable {
         case enqueue, discard, interrupt
+        case continueListening = "continue_listening"
     }
     public let id: String
     public let source: String

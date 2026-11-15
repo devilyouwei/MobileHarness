@@ -721,3 +721,25 @@ func settingsContainerRunsInItsAgentWithPrivateStagingAndActualPresentation() as
     #expect(saved.decisionProviderID == nil && saved.decisionModel.isEmpty)
     #expect(fixture.value?.decisionProviderID == nil && fixture.value?.decisionModel.isEmpty == true)
 }
+
+@Test @MainActor func modelSettingsGateAppleAvailabilityForAssistantAndDecision() async throws {
+    let fixture = ProviderTransactionFixture()
+    let initial = try #require(fixture.value)
+    let runtime = ProviderSettingsRuntime(
+        initial: initial, prepare: { _ in {} }, beginChange: {}, endChange: {})
+    let unavailable = ProviderSettingsService(store: fixture, runtime: runtime, isAppleAvailable: { false })
+    _ = try await unavailable.restore()
+    let choice = ProviderSettings(
+        enabled: false, url: initial.url, key: initial.key, model: initial.model, decisionUsesLocal: true,
+        decisionLocalModelID: "apple-system", assistantLocalModelID: "apple-system")
+    do {
+        _ = try await unavailable.save(choice)
+        Issue.record("Saved an unavailable Apple model")
+    } catch ProviderSettingsError.appleUnavailable {}
+    #expect(fixture.value == initial)
+    let available = ProviderSettingsService(store: fixture, runtime: runtime, isAppleAvailable: { true })
+    _ = try await available.restore()
+    _ = try await available.save(choice)
+    #expect(fixture.value?.assistantLocalModelID == "apple-system")
+    #expect(fixture.value?.resolvedDecisionLocalModelID == "apple-system")
+}

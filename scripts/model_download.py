@@ -12,7 +12,9 @@ from urllib.request import urlopen
 from pathlib import Path
 import subprocess
 
-MODELS = Path(__file__).resolve().parents[1] / "MobileHarness/Resources/Models"
+REPOSITORY = Path(__file__).resolve().parents[1]
+MODELS = REPOSITORY / "MobileHarness/Resources/Models"
+GEMMA_TESTS = REPOSITORY / "Tests/Gemma4Tests"
 
 
 def file_hash(path):
@@ -29,7 +31,7 @@ def load_config(profile, platform=None):
     if platform not in (None, "ios", "macos") or (platform == "macos" and profile not in ("nemotron", "gemma4-e2b")):
         raise ValueError("Unsupported platform")
     if platform == "macos" and profile == "gemma4-e2b":
-        return json.loads((MODELS / "gemma4-e2b-macos.download.json").read_text())
+        return json.loads((GEMMA_TESTS / "gemma4-e2b-macos.download.json").read_text())
     if profile not in PRODUCTION:
         return json.loads((MODELS / (profile + ".download.json")).read_text())
     catalog = json.loads((MODELS / "model-catalog.json").read_text())
@@ -105,27 +107,34 @@ def main(profile, variants=None):
     args = parser.parse_args()
     if variants:
         profile = variants[args.size]
-    endpoint = urlsplit(args.endpoint if "://" in args.endpoint else "https://" + args.endpoint)
+    try:
+        config = load_config(profile, args.platform)
+        root = GEMMA_TESTS / ".local" if (profile, args.platform) == ("gemma4-e2b", "macos") else MODELS
+        provision(config, root / config["directory"], args.endpoint, args.force)
+    except ValueError as error:
+        parser.error(str(error))
+
+
+def provision(config, destination, endpoint="https://huggingface.co", force=False):
+    """Resolve and verify files for one explicitly selected development profile."""
+    endpoint = urlsplit(endpoint if "://" in endpoint else "https://" + endpoint)
     if endpoint.scheme != "https" or not endpoint.hostname or endpoint.path not in ("", "/") or endpoint.username or endpoint.password or endpoint.query or endpoint.fragment:
-        parser.error("Endpoint must be an HTTPS domain without credentials/path/query")
+        raise ValueError("Endpoint must be an HTTPS domain without credentials/path/query")
+
     def resolve(url):
         source = urlsplit(url)
         return urlunsplit(("https", endpoint.netloc, source.path, source.query, source.fragment)) if source.hostname == "huggingface.co" else url
-    try:
-        config = load_config(profile, args.platform)
-    except ValueError as error:
-        parser.error(str(error))
+
     if "declaration" in config:
         source = config["declaration"]
         if source["kind"] == "huggingface":
             config = resolve_hub(config, "https://" + endpoint.netloc)
         else:
             config["archive"] = {"url": source["url"], "sha256": source.get("sha256")}
-    files, suffix = config.get("files", []), ""
-    destination = MODELS / (config["directory"] + suffix)
+    files = config.get("files", [])
 
     if "archive" in config:
-        fetch_archive(config, destination, args.force)
+        fetch_archive(config, destination, force)
         print(destination)
         return
 
@@ -134,7 +143,7 @@ def main(profile, variants=None):
         if not target.resolve().is_relative_to(destination.resolve()):
             raise ValueError("Download path escapes model directory")
         expected_hash = config.get("sha256", {}).get(relative)
-        if target.is_file() and not args.force:
+        if target.is_file() and not force:
             size_matches = relative not in config.get("fileSizes", {}) or target.stat().st_size == config["fileSizes"][relative]
             if size_matches and (not expected_hash or file_hash(target) == expected_hash):
                 return

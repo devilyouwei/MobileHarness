@@ -33,7 +33,7 @@ flowchart LR
 | Support/Management | Generic registration/lifecycle/artifacts in ModelKitRuntime; model registration and selection in ModelKitDefaults; disjoint explicit source lists |
 | Support/Management/HuggingFace | Injected download adapter; ModelKitHub |
 | Support/Speech/Apple | PCMCodec shared by Apple ASR/TTS in ModelKitAppleSpeech |
-| Language/LLM/Apple, Gemma4, OpenAI | Concrete system/local/cloud chat adapters; [Apple](Language/LLM/Apple/README.md) is the optional ModelKitAppleLLM product |
+| Language/LLM/Apple, Gemma4, OpenAI | Concrete system/local/cloud chat adapters; [Apple](Language/LLM/Apple/README.md) is the standalone ModelKitAppleLLM product |
 | Speech/ASR, TTS, VAD provider directories | Concrete speech algorithms/native services |
 | Vision/YOLO | YOLO image layout, graph execution, tensor reading and pose decoding |
 
@@ -83,6 +83,7 @@ flowchart TD
  ModelKitDefaults -->|device / macOS| ModelKitGemma4
  ModelKitDefaults --> ModelKitD3
  ModelKitDefaults --> ModelKitOpenAI
+ ModelKitDefaults --> ModelKitAppleLLM
  ModelKitDefaults --> ModelKitAppleSpeech
  ModelKitDefaults --> ModelKitNemotron
  ModelKitDefaults --> ModelKitMossNano
@@ -123,7 +124,7 @@ The existing speech selector accepts a host-provided locale reader for automatic
 
 | Capability | Selection |
 | --- | --- |
-| Chat | Gemma 4 E2B QAT on supported hardware, or explicitly configured Responses cloud |
+| Chat | Gemma 4 E2B QAT on supported hardware, Apple system chat when available, or explicitly configured Responses cloud |
 | Recognition | Enabled, installed and available Nemotron; otherwise Apple SpeechAnalyzer |
 | Synthesis | Enabled, installed and available MOSS Nano; otherwise Apple PCM TTS |
 | Voice activity | Installed and available Silero; otherwise Energy, independent of ASR preference |
@@ -217,4 +218,4 @@ Chat 的可选 onDispatch 回调报告实际 HTTP/本地推理开始边界，供
 
 Immutable ChatModel bindings forward tool/image capability queries to the capability selected by their frozen configuration. Local lookup is load:false, so querying Gemma tools does not load weights; cloud bindings reuse the root cache. Changing the default Assistant selection does not change a retained Writer/local binding. Capability query failure returns false; chat execution still reports its original error.
 
-Apple system chat is available as the standalone ModelKitAppleLLM provider, depending only on ModelKit and system FoundationModels. It does not change default assembly or own system weight files. Its text-only request, bounds and native cleanup contract are described in [Apple LLM](Language/LLM/Apple/README.md).
+ModelKitDefaults registers apple-system as a named Chat model backed by the standalone ModelKitAppleLLM provider. The system manages the weights and provides the availability state. ModelScope serializes Chat separately per local model ID. The app-facing Apple binding maps prior tool call and result records into dialogue text and combines system messages as instructions before submitting a text-only request. Its text-only request, bounds and native cleanup contract are described in [Apple LLM](Language/LLM/Apple/README.md).

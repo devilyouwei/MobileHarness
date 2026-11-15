@@ -39,12 +39,19 @@ struct AssistantInputBatch {
         let ordered = messages.sorted { left, right in
             left.time == right.time ? left.seq < right.seq : left.time < right.time
         }
-        var sections = try ordered.map { message in
+        var sections: [String] = []
+        var speechLines: [String] = []
+        for (index, message) in ordered.enumerated() {
             let (source, content) = try Self.presentation(message)
-            return try Self.bodyLines(content)
-                + (try AgentPrompts.inputMarker(
-                    "sourceLine",
-                    ["source": source, "time": formatter.string(from: message.time)]))
+            let body = try Self.bodyLines(content)
+            if Self.isASR(message) {
+                speechLines.append(body)
+                if index + 1 < ordered.count, Self.isASR(ordered[index + 1]) { continue }
+            }
+            let sourceLine = try AgentPrompts.inputMarker(
+                "sourceLine", ["source": source, "time": formatter.string(from: message.time)])
+            sections.append((speechLines.isEmpty ? body : speechLines.joined(separator: "\n")) + sourceLine)
+            speechLines.removeAll(keepingCapacity: true)
         }
         if let interruptedIntentions, !interruptedIntentions.isEmpty {
             let entries = interruptedIntentions.map { "- " + Self.continuationLines($0) }
@@ -55,11 +62,15 @@ struct AssistantInputBatch {
         return sections.joined(separator: "\n\n")
     }
 
+    private static func isASR(_ message: AssistantInputMessage) -> Bool {
+        message.senderRole == .user && message.channel == AgentID.speechPerception.rawValue
+    }
+
     private static func presentation(_ message: AssistantInputMessage) throws -> (source: String, content: String) {
         switch message.senderRole {
         case .user:
             let source =
-                message.channel == AgentID.speechPerception.rawValue
+                isASR(message)
                 ? try AgentPrompts.inputMarker("asr")
                 : try AgentPrompts.inputMarker("user")
             return (source, message.content)

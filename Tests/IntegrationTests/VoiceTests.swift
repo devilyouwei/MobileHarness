@@ -441,37 +441,58 @@ func expressionPreservesSemanticIdentifier(_ emotion: UIActions.Emotion) async t
     #expect(await probe.spokenText.isEmpty)
 }
 
-private struct EndpointVAD: VoiceActivityCapability {
+struct EndpointVAD: VoiceActivityCapability {
     var availability: CapabilityAvailability { .available }
     func detectVoiceActivity(format: ModelKit.AudioFormat) -> any VoiceActivitySession { EndpointVADSession() }
 }
+
 private actor EndpointVADSession: VoiceActivitySession {
     private var position: Int64 = 0
+    private var pending = 0
     func process(_ frame: ModelKit.AudioFrame) throws -> [VoiceActivityScore] {
-        defer { position += Int64(frame.sampleCount) }
-        return [
-            try VoiceActivityScore(
-                startSample: position, sampleCount: frame.sampleCount, probability: position == 0 ? 1 : 0)
-        ]
+        pending += frame.sampleCount
+        var scores: [VoiceActivityScore] = []
+        while pending >= 512 {
+            scores.append(
+                try VoiceActivityScore(
+                    startSample: position, sampleCount: 512, probability: position < 1536 ? 1 : 0))
+            position += 512
+            pending -= 512
+        }
+        return scores
     }
     func finish() -> [VoiceActivityScore] { [] }
-    func reset() { position = 0 }
+    func reset() {
+        position = 0
+        pending = 0
+    }
     func cancel() {}
 }
 
-@Test(.actionCatalog, .timeLimit(.minutes(1))) func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: ["idle", "active", "interrupted"])
+func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop(profile: String) async throws {
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
         configurations: AgentConfigurations.all())
     let session = UUID().uuidString
     let manager = AgentManager()
     let assistant = ObservationRecorder(id: "assistant")
+    let interruptionID: UUID? = profile == "interrupted" ? UUID() : nil
+    let activity = Mutex((pending: interruptionID, acknowledgements: [UUID]()))
+    let context = try AgentContextRepository(
+        agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString, state: SpeechPerceptionContextState())
     let speech = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "你好", includeFinal: true), vad: EndpointVAD(), sessionID: session,
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
-            state: SpeechPerceptionContextState())
-    )
+        speechEndpointActivity: { id in
+            activity.withLock { state in
+                if let id, id == state.pending {
+                    state.pending = nil
+                    state.acknowledgements.append(id)
+                }
+                return (profile != "idle", state.pending)
+            }
+        },
+        context: context)
     try await manager.register(assistant, sessionID: session)
     await assistant.start()
     try await manager.register(speech, sessionID: session)
@@ -507,7 +528,8 @@ private actor EndpointVADSession: VoiceActivitySession {
     let first = try syntheticAudioInput(
         samples: Data(repeating: 0, count: 1536 * 4), sampleRate: 16000, sequence: 0, timestamp: 0)
     let second = try syntheticAudioInput(
-        samples: Data(repeating: 0, count: 12800 * 4), sampleRate: 16000, sequence: 1, timestamp: 0.096)
+        samples: Data(repeating: 0, count: 16 * 512 * 4), sampleRate: 16000,
+        sequence: 1, timestamp: 0.096)
     _ = try await processMicrophoneFixture(
         AgentInput(
             id: UUID().uuidString,
@@ -520,6 +542,14 @@ private actor EndpointVADSession: VoiceActivitySession {
             sessionID: session, payload: .audio(second),
             metadata: InputMetadata(
                 payload: .audio(second), source: "phone.microphone", rootID: UUID().uuidString)), using: speech)
+    if profile != "active" {
+        #expect(try await context.snapshot().state.phase == "speaking")
+        let remaining = try syntheticAudioInput(
+            samples: Data(repeating: 0, count: 9 * 512 * 4), sampleRate: 16000, sequence: 2, timestamp: 0.608)
+        try await processMicrophoneFixture(
+            .init(id: UUID().uuidString, sessionID: session, payload: .audio(remaining)), using: speech)
+    }
+    #expect(activity.withLock { $0.acknowledgements } == [interruptionID].compactMap { $0 })
     for _ in 0..<10000 {
         if await assistant.inputs.contains(where: {
             if case .transcript(_, final: true)? = $0.payload.perception { return true }
@@ -759,7 +789,7 @@ private actor EndpointVADSession: VoiceActivitySession {
             sequence: UInt64(position), timestamp: Double(position) / 16000)
     }
     _ = policy.consume(try frame(1536), probability: 1, threshold: 0.5)
-    for _ in 0..<13 { _ = policy.consume(try frame(1024), probability: 0, threshold: 0.5) }
+    for _ in 0..<25 { _ = policy.consume(try frame(1024), probability: 0, threshold: 0.5) }
     let padding = policy.streamEvents.reduce(0) { total, event in
         if case .audio(let frames) = event { return total + frames.reduce(0) { $0 + $1.sampleCount } }
         return total
@@ -771,6 +801,30 @@ private actor EndpointVADSession: VoiceActivitySession {
             if case .end(.silence) = $0 { return true }
             return false
         })
+}
+
+@Test(arguments: [false, true])
+func speechBoundaryUsesCurrentEndpointDuringSilence(initiallyShort: Bool) throws {
+    var policy = SpeechBoundaryPolicy()
+    let format = try ModelKit.AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32)
+    let frame = try ModelKit.AudioFrame(
+        data: Data(repeating: 0, count: 512 * 4), format: format, sequence: 0, timestamp: 0)
+
+    for _ in 0..<3 {
+        _ = policy.consume(frame, probability: 1, threshold: 0.5, useShortEndpoint: initiallyShort)
+    }
+    for _ in 0..<15 {
+        #expect(policy.consume(frame, probability: 0, threshold: 0.5, useShortEndpoint: initiallyShort) == nil)
+    }
+    let afterChange = policy.consume(frame, probability: 0, threshold: 0.5, useShortEndpoint: !initiallyShort)
+    if initiallyShort {
+        #expect(afterChange == nil)
+        for _ in 0..<8 { #expect(policy.consume(frame, probability: 0, threshold: 0.5) == nil) }
+        #expect(policy.consume(frame, probability: 0, threshold: 0.5) == .silence)
+    } else {
+        #expect(afterChange == .silence)
+    }
+    #expect(!policy.isSpeaking)
 }
 
 private actor NativeRateVADProbe: VoiceActivityCapability, VoiceActivitySession {
@@ -1128,22 +1182,33 @@ private actor ColdVoiceActivity: VoiceActivityCapability, VoiceActivitySession {
     nonisolated let gate = ColdVoiceGate()
     nonisolated let caughtUp = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     private var position: Int64 = 0
+    private var pending = Data()
     func detectVoiceActivity(format: ModelKit.AudioFormat) async throws -> any VoiceActivitySession {
         try await gate.wait()
         return self
     }
     func process(_ frame: ModelKit.AudioFrame) throws -> [VoiceActivityScore] {
-        let probability: Float = frame.data.withUnsafeBytes {
-            $0.loadUnaligned(as: Float.self) > 0 ? 1 : 0
+        let windowBytes = 512 * MemoryLayout<Float>.size
+        pending.append(frame.data)
+        var scores: [VoiceActivityScore] = []
+        var offset = 0
+        while pending.count - offset >= windowBytes {
+            let probability: Float = pending.withUnsafeBytes {
+                $0.loadUnaligned(fromByteOffset: offset, as: Float.self) > 0 ? 1 : 0
+            }
+            scores.append(try VoiceActivityScore(startSample: position, sampleCount: 512, probability: probability))
+            offset += windowBytes
+            position += 512
         }
-        let score = try VoiceActivityScore(
-            startSample: position, sampleCount: frame.sampleCount, probability: probability)
-        position += Int64(frame.sampleCount)
+        pending.removeFirst(offset)
         if position == 128_000 { caughtUp.continuation.yield(()) }
-        return [score]
+        return scores
     }
     func finish() -> [VoiceActivityScore] { [] }
-    func reset() { position = 0 }
+    func reset() {
+        position = 0
+        pending.removeAll()
+    }
     func cancel() {}
 }
 

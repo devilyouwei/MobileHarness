@@ -410,7 +410,7 @@ let package = Package(
             dependencies: [
                 "ModelKit", "ModelKitRuntime", "ModelKitNemotron", "ModelKitSilero",
                 "ModelKitMossNano", "ModelKitYOLOPose", "ModelKitOpenAI", "ModelKitAppleSpeech",
-                "ModelKitEnergy", "ModelKitD3",
+                "ModelKitEnergy", "ModelKitD3", "ModelKitAppleLLM",
             ] + localChatDependencies,
             path: "MobileHarness/ModelKit",
             exclude: [
@@ -522,7 +522,7 @@ let package = Package(
             path: "MobileHarness/ModelKit/Language/LLM/Gemma4", exclude: ["README.md"]),
         .testTarget(
             name: "Gemma4Tests", dependencies: ["StorageCore", "ModelKit", "ModelKitGemma4"],
-            exclude: ["README.md"]),
+            exclude: ["README.md", "gemma4-e2b-macos.download.json"]),
         .testTarget(
             name: "AgentModelEvaluationTests",
             dependencies: ["StorageCore", "AgentCore", "Agents", "ModelKit", "ModelKitGemma4"],

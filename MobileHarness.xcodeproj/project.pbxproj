@@ -137,6 +137,7 @@
 		103B45E69B4A1FAAF078DB52 /* MobileHarness/Actions/NexArm/NexArmControlService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/NexArm/NexArmControlService.swift; sourceTree = SOURCE_ROOT; };
 		1054ADAB5969C7BA6F3CB6B3 /* MobileHarness/Resources/Agents/Memory/Agent.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Resources/Agents/Memory/Agent.json; sourceTree = SOURCE_ROOT; };
 		1069E96BA3E9EAC9B07A4423 /* MobileHarness/Actions/System/Provider/ProviderSettingsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/System/Provider/ProviderSettingsService.swift; sourceTree = SOURCE_ROOT; };
+		EF8C15F7E78CB777F3B3C350 /* MobileHarness/Agents/Assistant/AssistantDecisionProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Assistant/AssistantDecisionProtocol.swift; sourceTree = SOURCE_ROOT; };
 		108EA0410652EAC3804B4996 /* MobileHarness/Agents/Assistant/AssistantInputDecision.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Assistant/AssistantInputDecision.swift; sourceTree = SOURCE_ROOT; };
 		10A83A8D0F1D2A0CF45E891D /* MobileHarness/Gateway/Output/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/Gateway/Output/README.md; sourceTree = SOURCE_ROOT; };
 		116C0F1467639C0ACB510302 /* MobileHarness/UI/Camera/CameraState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/UI/Camera/CameraState.swift; sourceTree = SOURCE_ROOT; };
@@ -1572,6 +1573,7 @@
 				1A5F5762F4CAA2F3AEF36325 /* MobileHarness/Agents/Assistant/AssistantContainer.swift */,
 				28A42F0E4DAD2653C05F5E5F /* MobileHarness/Agents/Assistant/AssistantGenerationTransport.swift */,
 				30C2B5A7A1F14E4C8E3BF999 /* MobileHarness/Agents/Assistant/AssistantInputBatch.swift */,
+				EF8C15F7E78CB777F3B3C350 /* MobileHarness/Agents/Assistant/AssistantDecisionProtocol.swift */,
 				108EA0410652EAC3804B4996 /* MobileHarness/Agents/Assistant/AssistantInputDecision.swift */,
 				42338EE6EFCC909EA15C3429 /* MobileHarness/Agents/Assistant/AssistantExecutionSession.swift */,
 				7CC1BF2314BD5B8F1351B687 /* MobileHarness/Agents/Assistant/AssistantProcessing.swift */,

@@ -73,3 +73,9 @@ Writer 的 2026-11-08 双模型实验保留 [原始基线](writer-prompt-2026-11
 - [D3 Lite 与 Edge 的四段提示对照](duplex-d3-lite-edge-coreai-2026-11-15.json)保留当前中英文提示和旧短中文提示共 200 条原生分类，方法见[验证记录](../validation/Decision-Model-Mac-Comparison.md#d3-lite-与-edge-的四段提示对照)。
 
 - [Apple system Decision experiment attempt](decision-apple-system-2026-11-15.json): 154 prepared requests, exact archived baseline predictions, current renderer output, hashes and host availability. This run is blocked (`deviceNotEligible`), with zero measured Apple requests; it contains no Apple accuracy or latency result.
+
+- [Apple 系统模型 M5 Decision 完整复跑](decision-apple-system-m5-2026-11-15.json)保留 Apple 154 条真实生成、Edge/Lite 同机各 154 条原生读出、冻结预测核对及复现代码。 [验证报告](../validation/Decision-Model-Mac-Comparison.md#m5-mac-完整复跑)
+
+- [Gemma 4 E2B M5 Decision 对照](decision-gemma4-m5-2026-11-15.json)保留同一组 54 条中英文样例的两种请求格式、108 条真实生成、预热、各阶段计时及源文件哈希。生产路径提供设置页评分，格式指令内联组仅用于诊断。 [验证报告](../validation/Decision-Model-Mac-Comparison.md#gemma-4-e2b-decision-comparison)
+- [Qwen Flash Decision 三协议对照的云端组](decision-protocols-cloud-2026-11-15.json)保存两款 Flash 模型的 Tool 和纯文本 216 条同构用例结果、延迟和错误分类。 [验证报告](../validation/Decision-Model-Mac-Comparison.md#assistant-decision-protocol-benchmark)
+- [Assistant Decision 三协议本地组](decision-protocols-local-2026-11-15.json)保存 D3 Edge、D3 Lite、Apple 和 Gemma 共 270 条实测、模式分组及预热记录。 [验证报告](../validation/Decision-Model-Mac-Comparison.md#assistant-decision-protocol-benchmark)

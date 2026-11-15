@@ -1,0 +1,1628 @@
+{
+  "fixture": "docs/measurements/decision-language-scenarios-2026-11-14.json",
+  "results": [
+    {
+      "model": "qwen3.7-flash",
+      "mode": "tool",
+      "segments": [
+        {
+          "language": "en",
+          "offset": 0,
+          "exitCode": 0,
+          "warmup": [
+            {
+              "elapsedMS": 704.4875,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            }
+          ],
+          "rows": [
+            {
+              "elapsedMS": 499.410667,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 729.41275,
+              "expected": "interrupt",
+              "id": "short-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 699.6065,
+              "expected": "interrupt",
+              "id": "pause-now",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 679.401416,
+              "expected": "interrupt",
+              "id": "enough",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 999.047167,
+              "expected": "interrupt",
+              "id": "skip-current",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 559.830708,
+              "expected": "interrupt",
+              "id": "abort-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 579.778333,
+              "expected": "interrupt",
+              "id": "correct-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 549.429,
+              "expected": "interrupt",
+              "id": "stop-before-hit",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 779.862334,
+              "error": "Invalid classification tool call",
+              "expected": "enqueue",
+              "id": "confirm-short"
+            },
+            {
+              "elapsedMS": 700.898333,
+              "error": "Invalid classification tool call",
+              "expected": "enqueue",
+              "id": "confirm-explicit"
+            },
+            {
+              "elapsedMS": 547.710375,
+              "expected": "enqueue",
+              "id": "answer-no",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 559.865541,
+              "error": "Invalid classification tool call",
+              "expected": "enqueue",
+              "id": "answer-option"
+            },
+            {
+              "elapsedMS": 849.542917,
+              "error": "Invalid classification tool call",
+              "expected": "enqueue",
+              "id": "new-request-filler"
+            },
+            {
+              "elapsedMS": 969.763959,
+              "expected": "enqueue",
+              "id": "short-command",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 669.789167,
+              "error": "Invalid classification tool call",
+              "expected": "enqueue",
+              "id": "short-fragment"
+            },
+            {
+              "elapsedMS": 789.034875,
+              "error": "Invalid classification tool call",
+              "expected": "enqueue",
+              "id": "speech-deferred"
+            },
+            {
+              "elapsedMS": 779.355291,
+              "error": "Invalid classification tool call",
+              "expected": "enqueue",
+              "id": "motion-deferred"
+            },
+            {
+              "elapsedMS": 620.73775,
+              "error": "Invalid classification tool call",
+              "expected": "enqueue",
+              "id": "stop-negated"
+            },
+            {
+              "elapsedMS": 628.539042,
+              "expected": "enqueue",
+              "id": "stop-quoted",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 830.359916,
+              "expected": "enqueue",
+              "id": "stop-idle",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 658.796584,
+              "expected": "enqueue",
+              "id": "question-during-speech",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 739.513208,
+              "expected": "discard",
+              "id": "filler-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 619.4765,
+              "expected": "discard",
+              "id": "filler-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 629.653667,
+              "expected": "discard",
+              "id": "noise-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 530.01925,
+              "expected": "discard",
+              "id": "noise-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 540.162125,
+              "expected": "discard",
+              "id": "unintelligible",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 619.078875,
+              "expected": "discard",
+              "id": "punctuation-only",
+              "prediction": "discard"
+            }
+          ]
+        },
+        {
+          "language": "zh-Hans",
+          "offset": 0,
+          "exitCode": 0,
+          "warmup": [
+            {
+              "elapsedMS": 697.151834,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            }
+          ],
+          "rows": [
+            {
+              "elapsedMS": 899.357792,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 699.519667,
+              "expected": "interrupt",
+              "id": "short-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 619.055041,
+              "expected": "interrupt",
+              "id": "pause-now",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 1380.069209,
+              "expected": "interrupt",
+              "id": "enough",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 819.695083,
+              "expected": "interrupt",
+              "id": "skip-current",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 629.972959,
+              "expected": "interrupt",
+              "id": "abort-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 628.971,
+              "expected": "interrupt",
+              "id": "correct-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 619.169208,
+              "expected": "interrupt",
+              "id": "stop-before-hit",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 619.100334,
+              "expected": "enqueue",
+              "id": "confirm-short",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 600.898416,
+              "expected": "enqueue",
+              "id": "confirm-explicit",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 539.090583,
+              "expected": "enqueue",
+              "id": "answer-no",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 540.368083,
+              "expected": "enqueue",
+              "id": "answer-option",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 498.992417,
+              "expected": "enqueue",
+              "id": "new-request-filler",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 799.55975,
+              "expected": "enqueue",
+              "id": "short-command",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 599.219708,
+              "expected": "enqueue",
+              "id": "short-fragment",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 469.28525,
+              "expected": "enqueue",
+              "id": "speech-deferred",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 779.923625,
+              "expected": "enqueue",
+              "id": "motion-deferred",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 459.326583,
+              "expected": "enqueue",
+              "id": "stop-negated",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 699.908292,
+              "expected": "enqueue",
+              "id": "stop-quoted",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 558.802417,
+              "expected": "enqueue",
+              "id": "stop-idle",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 539.873375,
+              "expected": "enqueue",
+              "id": "question-during-speech",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 480.076125,
+              "expected": "discard",
+              "id": "filler-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 549.668333,
+              "expected": "discard",
+              "id": "filler-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 600.152375,
+              "expected": "discard",
+              "id": "noise-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 668.354833,
+              "expected": "discard",
+              "id": "noise-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 519.163291,
+              "expected": "discard",
+              "id": "unintelligible",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 789.845625,
+              "expected": "discard",
+              "id": "punctuation-only",
+              "prediction": "discard"
+            }
+          ]
+        }
+      ],
+      "summary": {
+        "en": {
+          "count": 27,
+          "valid": 19,
+          "correct": 18,
+          "p95ValidMS": 999.047167,
+          "correctWithinBudget": 18,
+          "correctWithin500MS": 1,
+          "budgetMS": 2000,
+          "falseInterrupt": 1,
+          "falseDiscard": 0,
+          "missedInterrupt": 0,
+          "failures": {
+            "Invalid classification tool call": 8
+          }
+        },
+        "zh-Hans": {
+          "count": 27,
+          "valid": 27,
+          "correct": 23,
+          "p95ValidMS": 899.357792,
+          "correctWithinBudget": 23,
+          "correctWithin500MS": 2,
+          "budgetMS": 2000,
+          "falseInterrupt": 2,
+          "falseDiscard": 2,
+          "missedInterrupt": 0,
+          "failures": {}
+        },
+        "all": {
+          "count": 54,
+          "valid": 46,
+          "correct": 41,
+          "p95ValidMS": 969.763959,
+          "correctWithinBudget": 41,
+          "correctWithin500MS": 3,
+          "budgetMS": 2000,
+          "falseInterrupt": 3,
+          "falseDiscard": 2,
+          "missedInterrupt": 0,
+          "failures": {
+            "Invalid classification tool call": 8
+          }
+        }
+      }
+    },
+    {
+      "model": "qwen3.7-flash",
+      "mode": "text",
+      "segments": [
+        {
+          "language": "en",
+          "offset": 0,
+          "exitCode": 0,
+          "warmup": [
+            {
+              "elapsedMS": 859.626042,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            }
+          ],
+          "rows": [
+            {
+              "elapsedMS": 329.230292,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 309.713167,
+              "expected": "interrupt",
+              "id": "short-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 529.934291,
+              "expected": "interrupt",
+              "id": "pause-now",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 790.496833,
+              "expected": "interrupt",
+              "id": "enough",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 387.959833,
+              "expected": "interrupt",
+              "id": "skip-current",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 979.167292,
+              "expected": "interrupt",
+              "id": "abort-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 1050.735084,
+              "expected": "interrupt",
+              "id": "correct-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 548.729792,
+              "expected": "interrupt",
+              "id": "stop-before-hit",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 561.101333,
+              "expected": "enqueue",
+              "id": "confirm-short",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 299.18875,
+              "expected": "enqueue",
+              "id": "confirm-explicit",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 418.320458,
+              "expected": "enqueue",
+              "id": "answer-no",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 407.2885,
+              "expected": "enqueue",
+              "id": "answer-option",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 410.813584,
+              "expected": "enqueue",
+              "id": "new-request-filler",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 649.652542,
+              "expected": "enqueue",
+              "id": "short-command",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 1399.221375,
+              "expected": "enqueue",
+              "id": "short-fragment",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 439.806334,
+              "expected": "enqueue",
+              "id": "speech-deferred",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 328.967333,
+              "expected": "enqueue",
+              "id": "motion-deferred",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 410.251042,
+              "expected": "enqueue",
+              "id": "stop-negated",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 619.418958,
+              "expected": "enqueue",
+              "id": "stop-quoted",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 399.371375,
+              "expected": "enqueue",
+              "id": "stop-idle",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 578.872167,
+              "expected": "enqueue",
+              "id": "question-during-speech",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 340.752042,
+              "expected": "discard",
+              "id": "filler-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 298.169166,
+              "expected": "discard",
+              "id": "filler-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 439.425666,
+              "expected": "discard",
+              "id": "noise-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 389.971458,
+              "expected": "discard",
+              "id": "noise-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 705.327583,
+              "expected": "discard",
+              "id": "unintelligible",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 523.711041,
+              "expected": "discard",
+              "id": "punctuation-only",
+              "prediction": "enqueue"
+            }
+          ]
+        },
+        {
+          "language": "zh-Hans",
+          "offset": 0,
+          "exitCode": 0,
+          "warmup": [
+            {
+              "elapsedMS": 2254.969167,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            }
+          ],
+          "rows": [
+            {
+              "elapsedMS": 499.115583,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 1339.209458,
+              "expected": "interrupt",
+              "id": "short-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 460.071708,
+              "expected": "interrupt",
+              "id": "pause-now",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 410.493167,
+              "expected": "interrupt",
+              "id": "enough",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 358.056375,
+              "expected": "interrupt",
+              "id": "skip-current",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 498.573208,
+              "expected": "interrupt",
+              "id": "abort-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 459.476167,
+              "expected": "interrupt",
+              "id": "correct-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 649.880417,
+              "expected": "interrupt",
+              "id": "stop-before-hit",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 480.317292,
+              "expected": "enqueue",
+              "id": "confirm-short",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 369.076333,
+              "expected": "enqueue",
+              "id": "confirm-explicit",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 338.194917,
+              "expected": "enqueue",
+              "id": "answer-no",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 330.90775,
+              "expected": "enqueue",
+              "id": "answer-option",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 358.502667,
+              "expected": "enqueue",
+              "id": "new-request-filler",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 469.733375,
+              "expected": "enqueue",
+              "id": "short-command",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 839.983708,
+              "expected": "enqueue",
+              "id": "short-fragment",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 638.325709,
+              "expected": "enqueue",
+              "id": "speech-deferred",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 379.967833,
+              "expected": "enqueue",
+              "id": "motion-deferred",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 478.869791,
+              "expected": "enqueue",
+              "id": "stop-negated",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 849.402792,
+              "expected": "enqueue",
+              "id": "stop-quoted",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 670.222834,
+              "expected": "enqueue",
+              "id": "stop-idle",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 510.300083,
+              "expected": "enqueue",
+              "id": "question-during-speech",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 418.517375,
+              "expected": "discard",
+              "id": "filler-idle",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 612.425833,
+              "expected": "discard",
+              "id": "filler-speaking",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 395.771667,
+              "expected": "discard",
+              "id": "noise-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 409.639542,
+              "expected": "discard",
+              "id": "noise-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 330.51425,
+              "expected": "discard",
+              "id": "unintelligible",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 348.807917,
+              "expected": "discard",
+              "id": "punctuation-only",
+              "prediction": "enqueue"
+            }
+          ]
+        }
+      ],
+      "summary": {
+        "en": {
+          "count": 27,
+          "valid": 27,
+          "correct": 26,
+          "p95ValidMS": 1050.735084,
+          "correctWithinBudget": 26,
+          "correctWithin500MS": 15,
+          "budgetMS": 2000,
+          "falseInterrupt": 0,
+          "falseDiscard": 0,
+          "missedInterrupt": 0,
+          "failures": {}
+        },
+        "zh-Hans": {
+          "count": 27,
+          "valid": 27,
+          "correct": 22,
+          "p95ValidMS": 849.402792,
+          "correctWithinBudget": 22,
+          "correctWithin500MS": 17,
+          "budgetMS": 2000,
+          "falseInterrupt": 2,
+          "falseDiscard": 0,
+          "missedInterrupt": 0,
+          "failures": {}
+        },
+        "all": {
+          "count": 54,
+          "valid": 54,
+          "correct": 48,
+          "p95ValidMS": 1050.735084,
+          "correctWithinBudget": 48,
+          "correctWithin500MS": 32,
+          "budgetMS": 2000,
+          "falseInterrupt": 2,
+          "falseDiscard": 0,
+          "missedInterrupt": 0,
+          "failures": {}
+        }
+      }
+    },
+    {
+      "model": "qwen3.8-flash",
+      "mode": "tool",
+      "segments": [
+        {
+          "language": "en",
+          "offset": 0,
+          "exitCode": 0,
+          "warmup": [
+            {
+              "elapsedMS": 1098.673167,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            }
+          ],
+          "rows": [
+            {
+              "elapsedMS": 856.298166,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 637.933875,
+              "expected": "interrupt",
+              "id": "short-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 552.26175,
+              "error": "Invalid classification tool call",
+              "expected": "interrupt",
+              "id": "pause-now"
+            },
+            {
+              "elapsedMS": 616.618042,
+              "expected": "interrupt",
+              "id": "enough",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 731.722167,
+              "expected": "interrupt",
+              "id": "skip-current",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 656.944875,
+              "expected": "interrupt",
+              "id": "abort-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 701.049208,
+              "expected": "interrupt",
+              "id": "correct-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 937.672,
+              "expected": "interrupt",
+              "id": "stop-before-hit",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 569.6025,
+              "expected": "enqueue",
+              "id": "confirm-short",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 959.623166,
+              "expected": "enqueue",
+              "id": "confirm-explicit",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 758.969542,
+              "expected": "enqueue",
+              "id": "answer-no",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 659.702209,
+              "expected": "enqueue",
+              "id": "answer-option",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 849.841958,
+              "expected": "enqueue",
+              "id": "new-request-filler",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 1109.078166,
+              "expected": "enqueue",
+              "id": "short-command",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 647.619708,
+              "expected": "enqueue",
+              "id": "short-fragment",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 1140.902292,
+              "expected": "enqueue",
+              "id": "speech-deferred",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 629.814125,
+              "expected": "enqueue",
+              "id": "motion-deferred",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 608.72975,
+              "expected": "enqueue",
+              "id": "stop-negated",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 637.435375,
+              "expected": "enqueue",
+              "id": "stop-quoted",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 1578.937291,
+              "expected": "enqueue",
+              "id": "stop-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 630.811875,
+              "expected": "enqueue",
+              "id": "question-during-speech",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 566.504958,
+              "expected": "discard",
+              "id": "filler-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 670.684375,
+              "expected": "discard",
+              "id": "filler-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 13068.398625,
+              "error": "provider:transport:0:",
+              "expected": "discard",
+              "id": "noise-idle"
+            },
+            {
+              "elapsedMS": 688.357084,
+              "expected": "discard",
+              "id": "noise-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 560.147834,
+              "expected": "discard",
+              "id": "unintelligible",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 728.691042,
+              "expected": "discard",
+              "id": "punctuation-only",
+              "prediction": "discard"
+            }
+          ]
+        },
+        {
+          "language": "zh-Hans",
+          "offset": 0,
+          "exitCode": 0,
+          "warmup": [
+            {
+              "elapsedMS": 958.062167,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            }
+          ],
+          "rows": [
+            {
+              "elapsedMS": 857.105458,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 1628.0932090000001,
+              "expected": "interrupt",
+              "id": "short-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 688.167833,
+              "expected": "interrupt",
+              "id": "pause-now",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 729.507292,
+              "expected": "interrupt",
+              "id": "enough",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 858.683458,
+              "expected": "interrupt",
+              "id": "skip-current",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 659.22075,
+              "expected": "interrupt",
+              "id": "abort-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 657.865792,
+              "expected": "interrupt",
+              "id": "correct-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 888.964833,
+              "expected": "interrupt",
+              "id": "stop-before-hit",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 902.534333,
+              "expected": "enqueue",
+              "id": "confirm-short",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 656.3515,
+              "expected": "enqueue",
+              "id": "confirm-explicit",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 788.883459,
+              "expected": "enqueue",
+              "id": "answer-no",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 958.418167,
+              "expected": "enqueue",
+              "id": "answer-option",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 740.358416,
+              "expected": "enqueue",
+              "id": "new-request-filler",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 879.479625,
+              "expected": "enqueue",
+              "id": "short-command",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 567.071292,
+              "expected": "enqueue",
+              "id": "short-fragment",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 660.605458,
+              "expected": "enqueue",
+              "id": "speech-deferred",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 749.512625,
+              "expected": "enqueue",
+              "id": "motion-deferred",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 587.879333,
+              "expected": "enqueue",
+              "id": "stop-negated",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 849.462334,
+              "expected": "enqueue",
+              "id": "stop-quoted",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 628.08125,
+              "expected": "enqueue",
+              "id": "stop-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 699.694958,
+              "expected": "enqueue",
+              "id": "question-during-speech",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 535.505209,
+              "expected": "discard",
+              "id": "filler-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 773.670709,
+              "expected": "discard",
+              "id": "filler-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 657.61825,
+              "expected": "discard",
+              "id": "noise-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 630.02475,
+              "expected": "discard",
+              "id": "noise-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 657.351791,
+              "expected": "discard",
+              "id": "unintelligible",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 858.827041,
+              "expected": "discard",
+              "id": "punctuation-only",
+              "prediction": "discard"
+            }
+          ]
+        }
+      ],
+      "summary": {
+        "en": {
+          "count": 27,
+          "valid": 25,
+          "correct": 22,
+          "p95ValidMS": 1140.902292,
+          "correctWithinBudget": 22,
+          "correctWithin500MS": 0,
+          "budgetMS": 2000,
+          "falseInterrupt": 0,
+          "falseDiscard": 2,
+          "missedInterrupt": 2,
+          "failures": {
+            "Invalid classification tool call": 1,
+            "provider:transport:0:": 1
+          }
+        },
+        "zh-Hans": {
+          "count": 27,
+          "valid": 27,
+          "correct": 25,
+          "p95ValidMS": 958.418167,
+          "correctWithinBudget": 25,
+          "correctWithin500MS": 0,
+          "budgetMS": 2000,
+          "falseInterrupt": 0,
+          "falseDiscard": 2,
+          "missedInterrupt": 1,
+          "failures": {}
+        },
+        "all": {
+          "count": 54,
+          "valid": 52,
+          "correct": 47,
+          "p95ValidMS": 1140.902292,
+          "correctWithinBudget": 47,
+          "correctWithin500MS": 0,
+          "budgetMS": 2000,
+          "falseInterrupt": 0,
+          "falseDiscard": 4,
+          "missedInterrupt": 3,
+          "failures": {
+            "Invalid classification tool call": 1,
+            "provider:transport:0:": 1
+          }
+        }
+      }
+    },
+    {
+      "model": "qwen3.8-flash",
+      "mode": "text",
+      "segments": [
+        {
+          "language": "en",
+          "offset": 0,
+          "exitCode": 0,
+          "warmup": [
+            {
+              "elapsedMS": 839.005833,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            }
+          ],
+          "rows": [
+            {
+              "elapsedMS": 418.422,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 419.468208,
+              "expected": "interrupt",
+              "id": "short-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 382.137625,
+              "expected": "interrupt",
+              "id": "pause-now",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 1133.952875,
+              "expected": "interrupt",
+              "id": "enough",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 647.955833,
+              "expected": "interrupt",
+              "id": "skip-current",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 591.249791,
+              "expected": "interrupt",
+              "id": "abort-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 587.679125,
+              "expected": "interrupt",
+              "id": "correct-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 528.749,
+              "expected": "interrupt",
+              "id": "stop-before-hit",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 519.294375,
+              "expected": "enqueue",
+              "id": "confirm-short",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 680.083917,
+              "expected": "enqueue",
+              "id": "confirm-explicit",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 616.436583,
+              "expected": "enqueue",
+              "id": "answer-no",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 557.687791,
+              "expected": "enqueue",
+              "id": "answer-option",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 647.140083,
+              "expected": "enqueue",
+              "id": "new-request-filler",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 468.008834,
+              "expected": "enqueue",
+              "id": "short-command",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 521.088917,
+              "expected": "enqueue",
+              "id": "short-fragment",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 486.964125,
+              "expected": "enqueue",
+              "id": "speech-deferred",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 399.4405,
+              "expected": "enqueue",
+              "id": "motion-deferred",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 567.628333,
+              "expected": "enqueue",
+              "id": "stop-negated",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 520.293334,
+              "expected": "enqueue",
+              "id": "stop-quoted",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 662.451958,
+              "expected": "enqueue",
+              "id": "stop-idle",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 621.805125,
+              "expected": "enqueue",
+              "id": "question-during-speech",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 445.3715,
+              "expected": "discard",
+              "id": "filler-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 705.626209,
+              "expected": "discard",
+              "id": "filler-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 490.706875,
+              "expected": "discard",
+              "id": "noise-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 708.652916,
+              "expected": "discard",
+              "id": "noise-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 529.577,
+              "expected": "discard",
+              "id": "unintelligible",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 868.647,
+              "expected": "discard",
+              "id": "punctuation-only",
+              "prediction": "discard"
+            }
+          ]
+        },
+        {
+          "language": "zh-Hans",
+          "offset": 0,
+          "exitCode": 0,
+          "warmup": [
+            {
+              "elapsedMS": 667.497833,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            }
+          ],
+          "rows": [
+            {
+              "elapsedMS": 447.672959,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 425.887583,
+              "expected": "interrupt",
+              "id": "short-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 479.235375,
+              "expected": "interrupt",
+              "id": "pause-now",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 660.138584,
+              "expected": "interrupt",
+              "id": "enough",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 757.99,
+              "expected": "interrupt",
+              "id": "skip-current",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 580.489917,
+              "expected": "interrupt",
+              "id": "abort-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 888.0065,
+              "expected": "interrupt",
+              "id": "correct-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 511.25675,
+              "expected": "interrupt",
+              "id": "stop-before-hit",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 447.591792,
+              "expected": "enqueue",
+              "id": "confirm-short",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 549.369333,
+              "expected": "enqueue",
+              "id": "confirm-explicit",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 479.073125,
+              "expected": "enqueue",
+              "id": "answer-no",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 569.190708,
+              "expected": "enqueue",
+              "id": "answer-option",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 877.775166,
+              "expected": "enqueue",
+              "id": "new-request-filler",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 780.283958,
+              "expected": "enqueue",
+              "id": "short-command",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 598.977458,
+              "expected": "enqueue",
+              "id": "short-fragment",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 559.731584,
+              "expected": "enqueue",
+              "id": "speech-deferred",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 559.150208,
+              "expected": "enqueue",
+              "id": "motion-deferred",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 539.186916,
+              "expected": "enqueue",
+              "id": "stop-negated",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 798.195375,
+              "expected": "enqueue",
+              "id": "stop-quoted",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 680.261375,
+              "expected": "enqueue",
+              "id": "stop-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 1528.209208,
+              "expected": "enqueue",
+              "id": "question-during-speech",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 639.114458,
+              "expected": "discard",
+              "id": "filler-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 467.609042,
+              "expected": "discard",
+              "id": "filler-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 558.713375,
+              "expected": "discard",
+              "id": "noise-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 609.460417,
+              "expected": "discard",
+              "id": "noise-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 582.484541,
+              "expected": "discard",
+              "id": "unintelligible",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 715.807667,
+              "expected": "discard",
+              "id": "punctuation-only",
+              "prediction": "discard"
+            }
+          ]
+        }
+      ],
+      "summary": {
+        "en": {
+          "count": 27,
+          "valid": 27,
+          "correct": 27,
+          "p95ValidMS": 868.647,
+          "correctWithinBudget": 27,
+          "correctWithin500MS": 8,
+          "budgetMS": 2000,
+          "falseInterrupt": 0,
+          "falseDiscard": 0,
+          "missedInterrupt": 0,
+          "failures": {}
+        },
+        "zh-Hans": {
+          "count": 27,
+          "valid": 27,
+          "correct": 25,
+          "p95ValidMS": 888.0065,
+          "correctWithinBudget": 25,
+          "correctWithin500MS": 6,
+          "budgetMS": 2000,
+          "falseInterrupt": 1,
+          "falseDiscard": 1,
+          "missedInterrupt": 0,
+          "failures": {}
+        },
+        "all": {
+          "count": 54,
+          "valid": 54,
+          "correct": 52,
+          "p95ValidMS": 888.0065,
+          "correctWithinBudget": 52,
+          "correctWithin500MS": 14,
+          "budgetMS": 2000,
+          "falseInterrupt": 1,
+          "falseDiscard": 1,
+          "missedInterrupt": 0,
+          "failures": {}
+        }
+      }
+    }
+  ],
+  "host": "Mac17,3",
+  "sourceSHA256": {
+    "MobileHarness/Agents/Assistant/AssistantDecisionProtocol.swift": "dcd23c5f7a38bd9e6c348b5a96eb99a9236f92e88bb36685c645d77947ace4d6",
+    "MobileHarness/Agents/Assistant/AssistantInputDecision.swift": "0a65783f9932777f277772570305cca2afca1c5fecee00aa0113a13cc5151fde",
+    "MobileHarness/Resources/Agents/Assistant/InputDecision.json": "6c86c0f0d8d78f2ab3d75ae5cda7ccefcb3042a82c05431264197c8a3d3a7b16",
+    "MobileHarness/Resources/Agents/Assistant/InputDecision.zh-Hans.json": "4385c15f3f59e5ce32e2b74ecaee6a7addde310749eee32de53f16fb10da45ed",
+    "Tests/IntegrationTests/DecisionProtocolBenchmark.swift": "50b0d8fa1703dd39c14ab70d14034eebd83c434d5bfcc9613541a19df88d4459",
+    "docs/measurements/decision-language-scenarios-2026-11-14.json": "a32505c475d2f2cd5781616401635a6d4e7295eef27a242705b7b01acb629b92"
+  }
+}

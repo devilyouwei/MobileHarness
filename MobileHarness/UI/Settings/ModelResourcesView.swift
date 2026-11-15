@@ -204,6 +204,17 @@
                         }
                     }
                 }
+                if includesDecision {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(appCopy.text("Apple System LLM"))
+                            modelKindBadge("Chat", color: .blue)
+                        }
+                        Spacer()
+                        Text(appCopy.text(state.appleSystemAvailable ? "Available" : "Unavailable"))
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
 
             .confirmationDialog(

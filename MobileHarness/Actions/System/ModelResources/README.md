@@ -42,7 +42,7 @@ ModelResourcesClient and ModelResourceInteractionWorkflow are Actions-owned UI f
 
 ## Decision 资源
 
-D3 Edge、D3 Lite 和 Gemma 在 Agent Models 共用下载源，各自管理下载、取消、删除、校验、版本与许可。删除 D3 仅围栏对应模型，并加入本地调用和卸载该制品。
+D3 Edge、D3 Lite 和 Gemma 在 Agent Models 共用下载源，各自管理下载、取消、删除、校验、版本与许可。资源快照同时读取 Apple 系统模型的实时可用性，供角色页和本地模型清单使用。Apple 的模型文件由系统管理。删除 D3 仅围栏对应模型，并加入本地调用和卸载该制品。
 
 下载设置保留旧 useLocalDecision 字段供 [Provider 设置](../Provider/README.md) 在升级时读取，保存下载设置时保持旧值。当前 Decision 独占模型选择由 Provider 设置拥有。删除或缺少已选 D3 时，Assistant 提示错误并入队，不切换云端。
 

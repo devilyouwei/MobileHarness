@@ -70,13 +70,15 @@ public enum SettingsModelResourcesAdapter {
             }
             return value
         }
-        return ModelResourceViewSnapshot(items: items, installedGroups: Set(groups))
+        return ModelResourceViewSnapshot(
+            items: items, installedGroups: Set(groups), appleSystemAvailable: inventory.appleSystemAvailable == true)
     }
 }
 
 /// Native SDK adaptation only; Agent/functions select commands and source inputs.
 @MainActor public final class ModelResourceCapabilityAdapter: ModelResourceCapability, ModelResourceInventoryCapability
 {
+    private let systemChatAvailable: @Sendable () async -> Bool
     private let artifacts: @MainActor () async throws -> any ModelArtifactsManaging
     private var speechPreference: [Bool]?
     private let bindSpeech: @MainActor (Bool, Bool) async throws -> Void
@@ -84,12 +86,16 @@ public enum SettingsModelResourcesAdapter {
     public init(
         artifacts: @escaping @MainActor () async throws -> any ModelArtifactsManaging,
         quiesce: @escaping @MainActor (String) async -> Void,
-        bindSpeech: @escaping @MainActor (Bool, Bool) async throws -> Void
+        bindSpeech: @escaping @MainActor (Bool, Bool) async throws -> Void,
+        systemChatAvailable: @escaping @Sendable () async -> Bool = { false }
     ) {
         self.artifacts = artifacts
+        self.systemChatAvailable = systemChatAvailable
         self.quiesce = quiesce
         self.bindSpeech = bindSpeech
     }
+    public func appleSystemAvailable() async -> Bool { await systemChatAvailable() }
+
     public func snapshotResources() async throws -> [ModelResourceFact] {
         let manager = try await artifacts()
         let snapshots = try await manager.artifactSnapshots()

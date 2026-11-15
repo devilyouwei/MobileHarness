@@ -98,9 +98,13 @@ public struct ModelResourceSourceDraft: Codable, Sendable {
 public struct ModelResourceViewSnapshot: Sendable {
     public let items: [ModelResourceItem]
     public let installedGroups: Set<ModelResourceGroup>
-    public init(items: [ModelResourceItem], installedGroups: Set<ModelResourceGroup> = []) {
+    public let appleSystemAvailable: Bool
+    public init(
+        items: [ModelResourceItem], installedGroups: Set<ModelResourceGroup> = [], appleSystemAvailable: Bool = false
+    ) {
         self.items = items
         self.installedGroups = installedGroups
+        self.appleSystemAvailable = appleSystemAvailable
     }
 }
 public enum ModelResourceOperation: Sendable { case download, remove, cancel }
@@ -126,6 +130,7 @@ public final class ModelResourcesState {
     public internal(set) var source = ModelResourceSourceDraft()
     public internal(set) var items: [ModelResourceItem] = []
     public internal(set) var installedGroups: Set<ModelResourceGroup> = []
+    public private(set) var appleSystemAvailable = false
     public internal(set) var error: String? { didSet { refreshErrorGeneration = nil } }
     private var refreshErrorGeneration: UInt64?
     public internal(set) var saving = false
@@ -147,6 +152,7 @@ public final class ModelResourcesState {
         guard generation == refreshGeneration, generation > 0 else { return false }
         items = snapshot.items
         installedGroups = snapshot.installedGroups
+        appleSystemAvailable = snapshot.appleSystemAvailable
         if refreshErrorGeneration != nil { error = nil }
         return true
     }

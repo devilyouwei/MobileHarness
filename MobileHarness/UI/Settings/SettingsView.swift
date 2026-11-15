@@ -278,11 +278,8 @@
         private func summary(_ brain: AgentBrain) -> String {
             let choice = settings.brainDraft(brain)
             if choice.usesLocal {
-                if brain == .decision {
-                    return choice.decisionLocalModelID == "d3-lite"
-                        ? appCopy.text("Local · D3 Lite") : appCopy.text("Local · D3 Edge")
-                }
-                return appCopy.text("Local · Gemma 4 E2B")
+                let model = LocalLanguageModel(rawValue: choice.localModelID(for: brain))
+                return appCopy.format("Local · %@", appCopy.text(model?.title ?? "Unavailable"))
             }
             guard let provider = settings.providers.first(where: { $0.id == choice.providerID }) else {
                 return appCopy.text("Unconfigured")
@@ -358,7 +355,10 @@
                 }
             }
             .task { await restore() }
-            .task { await resourceControls.restore() }
+            .task {
+                await resourceControls.restore()
+                await resourceControls.refresh()
+            }
             .onDisappear { controls.cancelDiscovery() }
         }
 
@@ -380,20 +380,49 @@
                 .pickerStyle(.menu)
                 .accessibilityIdentifier("settings.\(brain.rawValue).provider")
                 if choice.usesLocal {
-                    Picker(
-                        appCopy.text("Model"),
-                        selection: Binding(
-                            get: { localModelID(choice) }, set: selectLocalModel)
-                    ) {
-                        if brain == .decision {
-                            Text("D3 Edge").tag("d3-edge")
-                            Text("D3 Lite").tag("d3-lite")
-                        } else {
-                            Text("Gemma 4 E2B").tag("gemma4-e2b")
+                    let selected = choice.localModelID(for: brain)
+                    Menu {
+                        ForEach(LocalLanguageModel.allCases.filter { $0.supports(brain) }, id: \.rawValue) { model in
+                            Button {
+                                selectLocalModel(model.rawValue)
+                            } label: {
+                                let title = localModelMenuTitle(model)
+                                if model.rawValue == selected {
+                                    Label(title, systemImage: "checkmark")
+                                } else {
+                                    Text(title)
+                                }
+                            }
+                            .disabled(model == .apple && !resources.appleSystemAvailable)
+                        }
+                    } label: {
+                        LabeledContent(appCopy.text("Model")) {
+                            HStack {
+                                Text(
+                                    LocalLanguageModel(rawValue: selected).map(localModelTitle)
+                                        ?? appCopy.text("Unavailable"))
+                                Image(systemName: "chevron.up.chevron.down").font(.caption)
+                            }
+                            .foregroundStyle(.secondary)
                         }
                     }
-                    .pickerStyle(.menu)
                     .accessibilityIdentifier("settings.\(brain.rawValue).model")
+                    if let benchmark = LocalLanguageModel(rawValue: selected)?.benchmark(for: brain) {
+                        LabeledContent(appCopy.text("Mac benchmark rating")) {
+                            HStack(spacing: 3) {
+                                ForEach(0..<5) { index in
+                                    let remaining = benchmark.halfStars - index * 2
+                                    Image(
+                                        systemName: remaining >= 2
+                                            ? "star.fill"
+                                            : remaining == 1 ? "star.leadinghalf.filled" : "star")
+                                }
+                            }
+                            .foregroundStyle(.secondary)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(Text(appCopy.format("%@ out of 5 stars", starNumber(benchmark))))
+                        }
+                    }
                 } else if let id = choice.providerID {
                     modelPicker(id)
                 }
@@ -419,6 +448,23 @@
             }
         }
 
+        private func localModelTitle(_ model: LocalLanguageModel) -> String {
+            let title = appCopy.text(model.title)
+            return model == .apple && !resources.appleSystemAvailable
+                ? appCopy.format("%@ (Unavailable)", title) : title
+        }
+
+        private func localModelMenuTitle(_ model: LocalLanguageModel) -> String {
+            let title = localModelTitle(model)
+            guard let benchmark = model.benchmark(for: brain) else { return title }
+            return "\(title) · \(starNumber(benchmark))/5"
+        }
+
+        private func starNumber(_ benchmark: LocalModelBenchmark) -> String {
+            (Double(benchmark.halfStars) / 2).formatted(
+                .number.precision(.fractionLength(0...1)).locale(appCopy.locale))
+        }
+
         private func modelPicker(_ id: String) -> some View {
             ProviderModelPicker(
                 settings: settings, controls: controls, providerID: id,
@@ -434,7 +480,8 @@
         private func details(_ choice: AgentBrainDraft) -> String {
             switch brain {
             case .assistant:
-                return choice.usesLocal && !resources.installedGroups.contains(.language)
+                return choice.usesLocal && choice.assistantLocalModelID == "gemma4-e2b"
+                    && !resources.installedGroups.contains(.language)
                     ? appCopy.text("Download Gemma 4 E2B in Agent Models.")
                     : appCopy.text("Thinking is off by default. If the model requires it, the lowest setting is used.")
             case .writer:
@@ -447,13 +494,14 @@
             }
         }
 
-        private func localModelID(_ choice: AgentBrainDraft) -> String {
-            brain == .decision ? choice.decisionLocalModelID : "gemma4-e2b"
-        }
-
         private func validateLocalSelection(_ choice: AgentBrainDraft) -> Bool {
             guard choice.usesLocal else { return true }
-            guard resources.items.contains(where: { $0.id == localModelID(choice) && $0.installed }) else {
+            let id = choice.localModelID(for: brain)
+            if id == "apple-system" {
+                selectionError = resources.appleSystemAvailable ? nil : "Apple System LLM is unavailable."
+                return resources.appleSystemAvailable
+            }
+            guard resources.items.contains(where: { $0.id == id && $0.installed }) else {
                 selectionError = "This local model is not downloaded. Download it in Agent Models first."
                 return false
             }
@@ -463,7 +511,8 @@
 
         private func selectLocalModel(_ id: String) {
             guard var choice = draft else { return }
-            choice.decisionLocalModelID = id
+            if brain == .decision { choice.decisionLocalModelID = id }
+            if brain == .assistant { choice.assistantLocalModelID = id }
             guard validateLocalSelection(choice) else { return }
             draft = choice
             result = nil

@@ -33,3 +33,7 @@ MobileHarness/Resources/Models/*/
 
 # Optional local runtime/development configuration; never commit user data.
 /.local/
+
+# Reproducible Mac model test assets, environments and output.
+/Tests/DecisionBenchmarks/.local/
+/Tests/Gemma4Tests/.local/

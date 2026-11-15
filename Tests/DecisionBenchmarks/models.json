@@ -1,0 +1,99 @@
+{
+  "d3-edge": {
+    "directory": "D3Edge",
+    "declaration": {
+      "kind": "huggingface",
+      "repoId": "hugging-mac/d3-edge-CoreAI",
+      "revision": "0690c04ee1640c1c3fa11a882323751dda6d086a",
+      "allowPatterns": [
+        "decision.aimodel/**",
+        "manifest.json",
+        "decision_config.json",
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "vocab.json",
+        "merges.txt",
+        "chat_template.jinja",
+        "NOTICE",
+        "LICENSE"
+      ]
+    },
+    "requiredFiles": [
+      "decision.aimodel/main.mlirb",
+      "decision.aimodel/main.hash",
+      "decision.aimodel/metadata.json",
+      "manifest.json",
+      "decision_config.json",
+      "tokenizer.json",
+      "tokenizer_config.json",
+      "vocab.json",
+      "merges.txt",
+      "chat_template.jinja",
+      "NOTICE",
+      "LICENSE"
+    ],
+    "graph": "decision.aimodel",
+    "graphSHA256": "ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78"
+  },
+  "d3-lite": {
+    "directory": "D3Lite",
+    "declaration": {
+      "kind": "huggingface",
+      "repoId": "ahmedandaloes/d3-lite-CoreAI",
+      "revision": "e7879e3b76d399df29ce4b454573ae1aa1bed189",
+      "allowPatterns": [
+        "decision.aimodel/**",
+        "manifest.json",
+        "decision_config.json",
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "vocab.json",
+        "merges.txt",
+        "chat_template.jinja",
+        "NOTICE",
+        "LICENSE",
+        "config.json"
+      ]
+    },
+    "requiredFiles": [
+      "decision.aimodel/main.mlirb",
+      "decision.aimodel/main.hash",
+      "decision.aimodel/metadata.json",
+      "manifest.json",
+      "decision_config.json",
+      "tokenizer.json",
+      "tokenizer_config.json",
+      "vocab.json",
+      "merges.txt",
+      "chat_template.jinja",
+      "NOTICE",
+      "LICENSE",
+      "config.json"
+    ],
+    "graph": "decision.aimodel",
+    "graphSHA256": "0d78fc50e846cb26e68621c7944534af9bbc2642a33156b26db75e6770172a40"
+  },
+  "qwen2.5-1.5b": {
+    "directory": "Qwen2.5-1.5B",
+    "declaration": {
+      "kind": "huggingface",
+      "repoId": "kevinqz/Qwen2.5-1.5B-Instruct-CoreAI",
+      "revision": "f903417cb9ac4b3c4c53c16aefd7f097cc6b8338",
+      "allowPatterns": [
+        "int8/qwen2.5-1.5b-instruct-int8.aimodel/**",
+        "int8/tokenizer/**",
+        "int8/metadata.json"
+      ]
+    },
+    "requiredFiles": [
+      "int8/qwen2.5-1.5b-instruct-int8.aimodel/main.mlirb",
+      "int8/qwen2.5-1.5b-instruct-int8.aimodel/main.hash",
+      "int8/qwen2.5-1.5b-instruct-int8.aimodel/metadata.json",
+      "int8/tokenizer/tokenizer.json",
+      "int8/tokenizer/tokenizer_config.json",
+      "int8/metadata.json"
+    ],
+    "graph": "int8/qwen2.5-1.5b-instruct-int8.aimodel",
+    "graphSHA256": "307bbb99df39c7856d74f9e27a6692f246ce1a2a9f5e296125731c061aff3517"
+  }
+}

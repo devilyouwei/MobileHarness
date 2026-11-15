@@ -21,7 +21,8 @@ import Foundation
             providers: state.providers, writerProviderID: state.writerProviderID, writerModel: state.writerModel,
             writerThinking: state.writerThinking, writerUsesLocal: state.writerUsesLocal,
             decisionProviderID: state.decisionProviderID, decisionModel: state.decisionModel,
-            decisionUsesLocal: state.decisionUsesLocal, decisionLocalModelID: state.decisionLocalModelID)
+            decisionUsesLocal: state.decisionUsesLocal, decisionLocalModelID: state.decisionLocalModelID,
+            assistantLocalModelID: state.assistantLocalModelID)
     }
     public func restore() async throws {
         guard !stopped else { throw CancellationError() }
@@ -34,6 +35,7 @@ import Foundation
             state.decisionModel = value.decisionModel
             state.decisionUsesLocal = value.decisionUsesLocal
             state.decisionLocalModelID = value.decisionLocalModelID
+            state.assistantLocalModelID = value.assistantLocalModelID
             state.writerProviderID = value.writerProviderID
             state.writerModel = value.writerModel
             state.writerThinking = value.writerThinking
@@ -176,6 +178,7 @@ import Foundation
                     state.present(.error("Select a provider."))
                     return false
                 }
+                if choice.usesLocal { candidate.assistantLocalModelID = choice.assistantLocalModelID }
                 Self.setAssistant(
                     &candidate, provider: choice.usesLocal ? nil : selected, model: choice.usesLocal ? "" : model)
             case .writer:

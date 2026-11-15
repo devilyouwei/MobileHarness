@@ -228,9 +228,11 @@ import StorageFiles
             return languageModels
         }
         private func quiesceForModelRemoval(_ id: String) async {
-            if id == "d3-edge" || id == "d3-lite" {
+            if ["d3-edge", "d3-lite", "gemma4-e2b"].contains(id) {
                 await inputDecisionService?.quiesceLocal(id)
-            } else if id == "yolo26n-pose" {
+            }
+            if id == "d3-edge" || id == "d3-lite" { return }
+            if id == "yolo26n-pose" {
                 await camera.pauseVisionForModelMaintenance()
             } else {
                 await speechPerception.beginSettingsChange()
@@ -279,11 +281,11 @@ import StorageFiles
                 let models = self.languageModels
                 let service = AssistantInputDecision(
                     localModel: { models.decisionModel($0) },
+                    localChatModel: { try await models.localChatModel($0).capability },
                     selectedConfiguration: {
                         guard let configuration else { return (nil, nil) }
                         let (localID, cloud) = try await configuration()
-                        guard let cloud else { return (localID, nil) }
-                        return (localID, { try await cloud().capability })
+                        return (localID, cloud)
                     },
                     report: { value in await reportDecision(value) }, language: self.language)
                 self.inputDecisionService = service

@@ -226,7 +226,7 @@ public actor AssistantExecutionSession {
         let title: String
         let symbol: String
         switch disposition {
-        case .enqueue: return nil
+        case .enqueue, .continueListening: return nil
         case .discard:
             title = "Input discarded"
             symbol = "minus.circle"

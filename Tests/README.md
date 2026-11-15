@@ -4,7 +4,7 @@
 
 ## 职责与边界
 
-测试源统一位于本目录，由根 Package.swift 的独立 target 编译。单元/合成集成测试验证协议、状态及失败契约；真实模型、网络、原生 UI 和物理设备使用各自显式 gate，不能用替身通过代替验收。每次执行的环境、数字、失败和日志只记录到 [validation](../docs/validation/README.md)。
+测试源统一位于本目录。App 与 SDK 测试由根 Package.swift 的独立 target 编译，Mac Decision 基准使用单独的包和 runner。单元/合成集成测试验证协议、状态及失败契约；真实模型、网络、原生 UI 和物理设备使用各自显式 gate，不能用替身通过代替验收。每次执行的环境、数字、失败和日志只记录到 [validation](../docs/validation/README.md)。
 
 ## 当前测试分工
 
@@ -20,6 +20,7 @@
 | [ModelKitHubTests](ModelKitHubTests/README.md) | 下载/制品、安全边界、可选真实网络传输 |
 | [ModelKitAppleSpeechTests](ModelKitAppleSpeechTests/README.md) | Apple 音频请求与 PCM 转换 |
 | [OpenAIChatTests](OpenAIChatTests/README.md) | 请求编码、Responses SSE、原生调用配对与取消 |
+| [DecisionBenchmarks](DecisionBenchmarks/README.md) | 可独立运行的 Mac Decision 固定制品、样例和延迟对照 |
 | [Gemma4Tests](Gemma4Tests/README.md) | 本地语言适配契约和显式启用的真实推理 |
 | [NemotronTests](NemotronTests/README.md) / [SileroTests](SileroTests/README.md) | ASR/VAD 模型适配 |
 | [EnergyVADTests](EnergyVADTests/README.md) | 纯 RMS/hysteresis、分包边界与复位 |

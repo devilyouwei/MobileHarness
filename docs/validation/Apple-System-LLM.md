@@ -20,3 +20,13 @@ The first sandboxed Swift build could not write the system module cache; the aut
 ## Native acceptance boundary
 
 On an eligible physical device with Apple Intelligence available, separately verify Chinese and English generation, system instructions and multi-turn history, token budgeting, refusal/context-limit errors, cancellation and lease retirement, disabled/unready system model states and sustained streaming. These require real FoundationModels execution; deterministic contract tests do not establish model quality or native cleanup latency.
+
+The later M5 Mac run verified 154 real text-only Foundation Models requests using `AppleChat` and compared their decisions against matching D3 Edge and Lite runs. It uses the Decision benchmark's synthetic transcripts. [M5 Decision results](Decision-Model-Mac-Comparison.md#m5-mac-完整复跑)
+
+## Agent Models integration
+
+The application registers Apple as a local Chat choice for Assistant and Decision. The role matrix test covers Gemma, Apple and both D3 models. The settings transaction test rejects unavailable Apple selections and commits them when the availability provider reports ready. Local Decision tests run both Chat routes with a strict digit-only response. These tests use deterministic capabilities to verify routing and selection.
+
+On the M5 Mac, `APPLE_APP_CHAT_SMOKE=1 swift test --filter appleAppChatSelection` ran the real system model through the production Chat selection with a previous tool call, its result and a later system instruction. The test produced a nonempty streamed reply. This checks the selected provider and history adaptation. The disabled menu appearance, on-device response quality and the Decision latency budget still require physical-device acceptance.
+
+The five iOS Simulator schemes passed `./scripts/build-ios.sh`. The Simulator App was rebuilt with the final model menu and passed the Agent, Live Activity and localization resource checks. The full repository check reported the existing D3 Lite selection failure and Writer/Web tests lacking injected Action declarations. The stalled AppWorkflow test process was stopped after about two minutes. The existing cloud forced-tool classification test passed, and the isolated runtime phase passed 228 tests. The repository check exited 1.

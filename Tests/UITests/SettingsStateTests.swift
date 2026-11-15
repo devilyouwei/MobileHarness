@@ -125,3 +125,33 @@ import Testing
     notices.dismissErrorToast(id: "decision")
     #expect(notices.transientToast == nil)
 }
+
+@Test @MainActor func localModelSettingsExposeOnlySupportedRoles() {
+    #expect(LocalLanguageModel.allCases.filter { $0.supports(.assistant) } == [.gemma, .apple])
+    #expect(LocalLanguageModel.allCases.filter { $0.supports(.writer) } == [.gemma])
+    #expect(LocalLanguageModel.allCases.filter { $0.supports(.decision) } == [.gemma, .apple, .edge, .lite])
+    let resources = ModelResourcesState()
+    #expect(!resources.appleSystemAvailable)
+    #expect(resources.applySnapshot(.init(items: [], appleSystemAvailable: true), generation: resources.beginRefresh()))
+    #expect(resources.appleSystemAvailable)
+}
+
+@Test func localModelRecommendationsUseRoleSpecificMeasurements() {
+    #expect(LocalLanguageModel.lite.benchmark(for: .decision)?.halfStars == 7)
+    #expect(LocalLanguageModel.edge.benchmark(for: .decision)?.halfStars == 5)
+    #expect(LocalLanguageModel.apple.benchmark(for: .decision)?.halfStars == 5)
+    #expect(LocalLanguageModel.gemma.benchmark(for: .decision)?.halfStars == 5)
+    for model in LocalLanguageModel.allCases {
+        #expect(model.benchmark(for: .assistant) == nil)
+        #expect(model.benchmark(for: .writer) == nil)
+    }
+}
+
+@Test func localModelRecommendationWeightsAccuracyAndLatency() {
+    #expect(LocalModelBenchmark(correct: 10, total: 10, p95Milliseconds: 0).halfStars == 10)
+    #expect(LocalModelBenchmark(correct: 10, total: 10, p95Milliseconds: 250).halfStars == 9)
+    #expect(LocalModelBenchmark(correct: 10, total: 10, p95Milliseconds: 500).halfStars == 8)
+    #expect(LocalModelBenchmark(correct: 10, total: 10, p95Milliseconds: 700).halfStars == 8)
+    #expect(LocalModelBenchmark(correct: 5, total: 10, p95Milliseconds: 0).halfStars == 6)
+    #expect(LocalModelBenchmark(correct: 0, total: 10, p95Milliseconds: 500).halfStars == 0)
+}

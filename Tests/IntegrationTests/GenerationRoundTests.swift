@@ -237,7 +237,8 @@ private struct RoundHarness {
 }
 private func roundHarness(
     action: Bool, toolCount: Int, fullDuplex: Bool = false, decision: AssistantInputDecision? = nil,
-    deliverActionFeedback: Bool = true, photo: Bool = false, supportsImages: Bool = false, photoCommand: String? = nil,
+    speechSessionID: String? = nil, deliverActionFeedback: Bool = true, photo: Bool = false,
+    supportsImages: Bool = false, photoCommand: String? = nil,
     deviceStatus: Bool = false, playbackDelay: Duration = .zero, requestRounds: Int = 1, actionCount: Int = 1,
     photoObservation: (@Sendable (String, AgentInput) async throws -> ChatImage)? = nil,
     camera: (any CameraControlCapability)? = nil,
@@ -296,7 +297,8 @@ private func roundHarness(
     } else {
         agent = try AssistantAgent(
             stateContext: try publicStateFixture(),
-            inputDecision: decision, fullDuplex: fullDuplex, chat: model, conversations: store,
+            inputDecision: decision, fullDuplex: fullDuplex, speechSessionID: speechSessionID,
+            chat: model, conversations: store,
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
         )
@@ -1885,12 +1887,16 @@ func fullDuplexBuffersUserInputUntilOldActionSettles() async throws {
         }
     }
     let session = UUID().uuidString
+    let assistant = try #require(harness.agent as? AssistantAgent)
+    #expect(await !assistant.hasActiveReply(sessionID: session))
     try await harness.agent.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("执行第一个动作")))
     for _ in 0..<1000 {
         if await gate.entered { break }
         try await Task.sleep(for: .milliseconds(10))
     }
     #expect(await gate.entered)
+    #expect(await assistant.hasActiveReply(sessionID: session))
+    #expect(await !assistant.hasActiveReply(sessionID: "other-session"))
     try await harness.agent.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("同时回答这个新问题")))
     try await Task.sleep(for: .milliseconds(150))
     #expect(await harness.model.requests.count == 1)
@@ -1903,6 +1909,7 @@ func fullDuplexBuffersUserInputUntilOldActionSettles() async throws {
     #expect(await gate.count == 2)
     #expect(await harness.model.requests.count == 2)
     await harness.close()
+    #expect(await !assistant.hasActiveReply(sessionID: session))
     pump.cancel()
     _ = await pump.result
 }
@@ -1967,7 +1974,10 @@ func fullDuplexInterruptSettlesOldActionAndRetainsQueuedInput() async throws {
         .finished(.toolCalls),
     ])
     let decision = AssistantInputDecision(local: UnavailableDecision(), selection: { false }, cloud: { classifier })
-    let harness = try await roundHarness(action: true, toolCount: 0, fullDuplex: true, decision: decision) { _ in
+    let session = UUID().uuidString
+    let harness = try await roundHarness(
+        action: true, toolCount: 0, fullDuplex: true, decision: decision, speechSessionID: session
+    ) { _ in
         try await gate.execute()
         return .completed
     }
@@ -1981,7 +1991,6 @@ func fullDuplexInterruptSettlesOldActionAndRetainsQueuedInput() async throws {
             } catch is CancellationError { try Task.checkCancellation() }
         }
     }
-    let session = UUID().uuidString
     let first = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("old action"))
     try await agent.receive(first)
     for _ in 0..<1000 {
@@ -2016,6 +2025,10 @@ func fullDuplexInterruptSettlesOldActionAndRetainsQueuedInput() async throws {
     #expect(await harness.model.requests.count == 2)
     #expect(await !gate.released)
     #expect(await feedback.values == [next.id])
+    let pending = await agent.speechEndpointActivity(acknowledging: nil)
+    let interruptionID = try #require(pending.interruptionID)
+    #expect(await agent.speechEndpointActivity(acknowledging: UUID()).interruptionID == interruptionID)
+    #expect(await agent.speechEndpointActivity(acknowledging: interruptionID).interruptionID == nil)
     await harness.close()
     pump.cancel()
     _ = await pump.result

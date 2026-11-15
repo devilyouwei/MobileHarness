@@ -340,3 +340,100 @@ Logs: `/tmp/mobileharness-decision-check.log`, `/tmp/mobileharness-decision-focu
 在另一台设备上启用 Apple Intelligence、等待系统模型就绪并安装 Xcode 27+ 后，先 `git pull --ff-only`，再按测试说明运行到一个不存在的新 JSON 路径。美行身份本身不保证 `.available`，仍以测试入口的实际可用性为准。
 
 用户随后要求一并提交当前工作区的代码、文档和测试，包含生成这份快照的 Decision renderer/资源修改；本地 DEVELOPMENT_TEAM 签名设置留在工作区。154 条请求中的 100 条冻结基线可直接复现；54 条 current 请求按运行时 checkout 的 renderer/资源重新生成。复跑时仍须核对请求及 sourceSHA256，以识别后续代码或提示词变化。
+
+### M5 Mac 完整复跑
+
+在 `main` 的 `1312362d` 上运行。主机为 Mac17,3、Apple M5、16 GiB、macOS 27.2.1（26B131），Xcode 27.0（27A266a）。独立 API 查询与 Swift 实验均返回 `available`。新增记录独立于 MacBook Neo 的阻塞记录。
+
+原 Swift 实验完成五组 154 条 Apple 调用与 15 次预热。补测用同机默认 Core AI 的 Edge 和 Lite，各跑相同 154 条，每组预热三次。冻结组逐条校验完整 D3 模板与历史版本相同。当前组从 Swift 实验保存的同一业务文本拆出 State 和 Question，再通过 D3 原生 Choice 编码。Apple 接收同份业务文本并生成单个标签，D3 使用候选读出。每款模型串行分开运行。耗时含各自宿主的文本准备、推理和读出，排除首次载入与 ASR。准确率和误判均为模型原始输出。
+
+| 条件 | Apple 正确 / p95 | D3 Edge 正确 / p95 | D3 Lite 正确 / p95 |
+| --- | ---: | ---: | ---: |
+| 冻结四段中文 | 15/36 · 336.57 ms | 13/36 · 47.57 ms | 18/36 · 112.82 ms |
+| 冻结四段英文 | 16/36 · 333.46 ms | 9/36 · 48.64 ms | 19/36 · 110.41 ms |
+| 冻结旧短中文 | 17/28 · 287.77 ms | 19/28 · 49.96 ms | 14/28 · 110.73 ms |
+| 当前英文提示与英文输入 | 17/27 · 303.78 ms | 10/27 · 49.01 ms | 18/27 · 110.01 ms |
+| 当前中文提示与中文输入 | 10/27 · 305.39 ms | 11/27 · 46.99 ms | 20/27 · 110.61 ms |
+
+两款 D3 在冻结 100 条上的预测逐条与历史一致。当前 54 条合计，Apple、Edge、Lite 的正确数分别是 27、21、38。Apple 漏打断 9/16、误丢弃 22 条、误打断 4 条。Lite 漏打断 1/16、误丢弃 7 条、误打断 8 条。英文 Apple 的分类准确率接近 Lite，中文下尤其容易把应入队的内容判成舍弃（10/13）。当前两组分别使用对应语言的同场景改写，结论反映提示与输入语言共同变化。
+
+三款共 462 条计时请求均在 500 ms 内。Apple 154 条全部无原生错误且格式有效，最长 393.59 ms，149 条超过 250 ms。四项 Apple Decision Swift 测试通过。仅测 Mac 文本和原始模型输出。 [逐条输出、同机 D3 读出和复现代码](../measurements/decision-apple-system-m5-2026-11-15.json)
+
+### Mac Decision 实验迁入 Tests
+
+将满足 500 ms 和 2B 条件且有代表性的 D3 Edge、D3 Lite、Qwen2.5 1.54B 的可执行基线迁到 `Tests/DecisionBenchmarks`。目录拥有冻结样例、版本化下载配置、独立 runner、计分和使用说明。Apple 的现行 Assistant renderer 对照仍由已有 Swift 集成测试负责。Mac Gemma profile 和制品归 `Tests/Gemma4Tests`，App 继续从生产 catalog 取得手机图。下载复用仓库的开发下载器。旧实验报告用于解释历史结果，继续归档。
+
+新增 [独立实验入口](../../Tests/DecisionBenchmarks/README.md) 在 M5 Mac 复跑 D3 Edge/Lite 各 154 条、Qwen2.5 四种输出协议各 100 条。708 条预测与对应归档逐条一致，逐条耗时均在 500 ms 内。Qwen 单词打分及生成各 62/100，数字打分及生成各 57/100。Lite 下载入口验证并复用已存在的模型图后补齐许可文件。Gemma 开发下载入口验证并补齐迁移后的 Mac 制品，默认根为 `Tests/Gemma4Tests/.local/Gemma4`。未运行 Gemma 真实推理。
+
+独立 Swift release 构建、开发下载器的 8 项测试和 `git diff --check` 通过。iOS 的五个 Simulator scheme 与 App 资源校验通过。全量 `scripts/check.sh` 在既有 Lite 路由夹具、NexArm 以及 Writer/Web 声明注入用例上失败。AppWorkflow helper 约 90 秒未继续输出后终止。
+
+## Settings recommendation index
+
+Settings uses the M5 [production protocol comparison](#assistant-decision-protocol-benchmark), pooling the 54 current Chinese and English cases per model. It uses the accuracy and nearest-rank warm p95 of each model's selected protocol. The UI index is `5 × (0.8 × accuracy + 0.2 × max(0, 1 − p95_ms / 500))`, rounded to the nearest half star.
+
+| Local Decision model | Raw correct | Pooled warm p95 | Stars |
+| --- | ---: | ---: | ---: |
+| D3 Lite | 38/54 | 117.67 ms | 3.5/5 |
+| D3 Edge | 21/54 | 53.34 ms | 2.5/5 |
+| Apple system model | 31/54 | 305.21 ms | 2.5/5 |
+| Gemma 4 E2B | 32/54 | 10,203.26 ms | 2.5/5 |
+
+These are Mac text classification results from the recorded model versions and prompts. Assistant and Writer have no equivalent local model measurements for their role. Prompt parser and smoke tests alone do not supply an accuracy denominator.
+
+Implementation verification recomputed the three pooled p95 values from the archived rows. Both recommendation tests passed, covering role isolation and the accuracy/latency formula. The iOS Simulator App built and launched, and its compiled Chinese resources include the recommendation title and spoken score. The Mac was locked during the direct UI check, so menu appearance was not inspected. The repository-wide check reported the existing D3 Lite selection and Writer/Web fixture failures. The stalled AppWorkflow helper was stopped after about a minute.
+All five iOS Simulator schemes built successfully. The isolated native-runtime phase passed 228 tests and plist validation passed. The repository check exited 1.
+
+## Gemma 4 E2B Decision comparison
+
+On the same Mac17,3 M5 with 16 GiB and macOS 27.2.1, Gemma used the pinned Mac non-AOT QAT package at revision `d669ab2b44c691e35e2b795f0535c0e1937b8390` through the native `Gemma4Chat` adapter. The run replayed the 27 English and 27 Chinese business prompts from the M5 Apple/D3 comparison. It supplied the same output instruction as the current Gemma Decision request, temperature 0, and at most 16 tokens. The strict parser accepted only one digit with a normal stop. The adapter strips system messages on this path, so a second diagnostic arm placed the same instruction at the front of user content.
+
+Each mode and language was warmed three times and run serially. Timings include tokenization, full generation and cleanup, excluding warmup and fixture preparation. The 500 ms production deadline was applied when counting timely results; the sampler allowed slower requests to finish so the raw choices and timing distribution remained observable. The initial process exited after writing 44 production samples without a terminal test result. The remaining 10 Chinese samples were collected after a new warmup, and the diagnostic languages ran in separate processes. The combined production and diagnostic rows are matched by fixture identity to the archived baseline. Previous Apple/D3 figures come from their recorded runs on the same Mac.
+
+| Production output | Raw correct | Invalid format | p95 | Correct within 500 ms |
+| --- | ---: | ---: | ---: | ---: |
+| English | 7/27 | 17 | 7.44 s | 0/27 |
+| Chinese | 14/27 | 0 | 7.98 s | 0/27 |
+| Combined | 21/54 | 17 | 7.58 s | 0/54 |
+
+Production recorded no native errors. All 54 measured requests took more than 500 ms, with a minimum of 3.55 s. There were 11 false interrupts and 8 missed interrupts. The Mac replay earns 1.5 stars under the Settings formula. The iPhone uses a separate AOT artifact and was not measured.
+
+| Format instruction in user content | Raw correct | Invalid format | p95 | Correct within 500 ms |
+| --- | ---: | ---: | ---: | ---: |
+| English | 17/27 | 0 | 9.61 s | 0/27 |
+| Chinese | 14/27 | 0 | 9.70 s | 0/27 |
+| Combined | 31/54 | 0 | 9.70 s | 0/54 |
+
+The diagnostic arm eliminated the 17 format failures and added 10 correct classifications in English. Chinese accuracy was unchanged. The diagnostic arm had 4 false discards, 12 false interrupts and one missed interrupt. All 54 calls still exceeded the deadline. Only the production arm contributes to the Settings recommendation.
+
+[Reproduction command](../../Tests/Gemma4Tests/README.md#decision-对照) and [108 measured rows with warmups, source hashes and segment metadata](../measurements/decision-gemma4-m5-2026-11-15.json).
+
+Validation passed the three segmented native runs, the role-rating tests and all five iOS Simulator schemes. The repository check exited 1 after reproducing the known D3 Lite, NexArm tracking and Writer/Web failures. The stalled AppWorkflow helper was stopped. The isolated runtime phase passed 228 tests.
+
+## Assistant Decision protocol benchmark
+
+The protocol comparison calls the production Assistant projection and parser, with the matching 27 English and 27 Chinese fixtures. It measures the provider and complete protocol decoding before queue admission policy, class adoption, or device work. Counts include invalid and failed cases in the denominator. p95 is computed over valid responses. Gemma segments retain their own warmups and process exits. The cloud runs used the existing Aliyun Responses endpoint. Only Qwen3.7 Flash and Qwen3.8 Flash received requests, and all input was synthetic.
+
+| Model | Mode | Raw correct | Within 500 ms | Within App budget | Valid p95 | Invalid or failed |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Qwen3.7 Flash | Tool | 41/54 | 3/54 | 41/54 (2 s) | 969.76 ms | 8 |
+| Qwen3.7 Flash | Text | 48/54 | 32/54 | 48/54 (2 s) | 1,050.74 ms | 0 |
+| Qwen3.8 Flash | Tool | 47/54 | 0/54 | 47/54 (2 s) | 1,140.90 ms | 2 |
+| Qwen3.8 Flash | Text | 52/54 | 14/54 | 52/54 (2 s) | 888.01 ms | 0 |
+
+Text led on timely accuracy and raw accuracy for both cloud IDs, and the application selects it for those exact IDs. Qwen3.7 Flash Tool had eight invalid tool argument objects. Qwen3.8 Flash Tool had one invalid tool argument object and one transport failure. The Text arm had zero false discards for either model. The 500 ms comparison emphasizes fast useful results independently of the cloud Decision ceiling of two seconds.
+
+[Cloud per-case report](../measurements/decision-protocols-cloud-2026-11-15.json) and [benchmark commands](../../Tests/IntegrationTests/README.md#assistant-decision-protocol-comparison).
+
+| Local model | Mode | Raw correct | Within 500 ms | Within App budget | Valid p95 | Invalid or failed |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| D3 Edge | JEV | 21/54 | 21/54 | 21/54 (250 ms) | 53.34 ms | 0 |
+| D3 Lite | JEV | 38/54 | 38/54 | 38/54 (250 ms) | 117.67 ms | 0 |
+| Apple system | Text | 31/54 | 31/54 | 31/54 (500 ms) | 305.21 ms | 0 |
+| Gemma 4 E2B | Tool | 19/54 | 0/54 | 0/54 (500 ms) | 11.65 s | 25 |
+| Gemma 4 E2B | Text | 32/54 | 0/54 | 0/54 (500 ms) | 10.20 s | 0 |
+
+Gemma Text had zero false discards, 15 false interrupts and zero missed interrupts. Tool had six false discards, four false interrupts and five missed interrupts. Its 25 failures failed strict tool argument validation. The App selects Text for Gemma based on raw accuracy and valid-response coverage. Both protocols exceeded the Mac real-time budget. Rankings reflect raw classifier outputs before Assistant's speech guards. The iPhone artifact and end-to-end voice latency require separate measurements.
+
+The local comparison ran on Mac17,3 with Apple M5 and macOS 27.2.1. Local segments used three warmups and cloud cells used one warmup per language. Transport failures were recorded as observed. The launcher uses opt-in synthetic tests and keeps cloud credentials and endpoint out of the archived evidence. The older independent D3/Qwen experiments and the earlier Gemma prompt comparison remain historical baselines. [Local per-case report](../measurements/decision-protocols-local-2026-11-15.json)
+
+Final validation passed the Decision protocol, route, request-log and recommendation tests, all five iOS Simulator schemes, and the 228-test isolated runtime phase. `check.sh` exited 1 after the existing NexArm tracking and Writer/Web fixture failures. The stalled AppWorkflow helper was stopped. The two archives were verified against the same fixture IDs and recomputed summaries.

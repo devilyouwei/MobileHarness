@@ -13,6 +13,7 @@ public struct UserSettingsDocument: Codable, Sendable {
     let version: Int
     let cloud: CloudRecord?
     var providers: [CloudRecord] = []
+    var assistantLocalModelID: String?
     var writerProviderID: String? = nil
     var writerModel: String = ""
     var writerThinking: Bool? = nil
@@ -77,7 +78,8 @@ public actor ProviderSettingsStore: ProviderSettingsPersistence {
                         decisionProviderID: snapshot.value.decisionProviderID,
                         decisionModel: snapshot.value.decisionModel ?? "",
                         decisionUsesLocal: snapshot.value.decisionUsesLocal,
-                        decisionLocalModelID: snapshot.value.decisionLocalModelID
+                        decisionLocalModelID: snapshot.value.decisionLocalModelID,
+                        assistantLocalModelID: snapshot.value.assistantLocalModelID ?? "gemma4-e2b"
                     )
                 }
                 loaded = true
@@ -117,6 +119,7 @@ public actor ProviderSettingsStore: ProviderSettingsPersistence {
             let others = Array(records.dropFirst())
             var document = UserSettingsDocument(version: 1, cloud: current)
             document.providers = others
+            document.assistantLocalModelID = value?.assistantLocalModelID
             document.writerProviderID = value?.writerProviderID
             document.writerModel = value?.writerModel ?? ""
             document.writerThinking = value?.writerThinking

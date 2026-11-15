@@ -5,7 +5,7 @@ import StorageFiles
 
 public enum ProviderSettingsError: LocalizedError, Sendable, ActionExecutionFailureProviding {
     case invalidSelection, invalidConfiguration, persistence, busy, application, cancelled, decisionRequired
-    case languageRequired
+    case languageRequired, appleUnavailable
     case keychain(Int32)
     case rollback(primary: String, secondary: String)
     public var executionFailureCode: ActionExecutionFailureCode {
@@ -18,6 +18,7 @@ public enum ProviderSettingsError: LocalizedError, Sendable, ActionExecutionFail
         case .application: value = "provider.application"
         case .cancelled: value = "provider.cancelled"
         case .decisionRequired: value = "provider.decisionRequired"
+        case .appleUnavailable: value = "provider.appleUnavailable"
         case .languageRequired: value = "provider.languageRequired"
         case .keychain: value = "provider.keychain"
         case .rollback: value = "provider.rollback"
@@ -96,6 +97,7 @@ public final class ProviderSettingsService {
     private let store: any ProviderSettingsPersistence
     private let runtime: ProviderSettingsRuntime
     private let legacyDecision: @Sendable () async throws -> Bool
+    private let isAppleAvailable: @Sendable () async -> Bool
     private let isLanguageInstalled: @Sendable () async throws -> Bool
     private let isDecisionInstalled: @Sendable (String) async throws -> Bool
     private var inheritedDecision = false
@@ -108,13 +110,15 @@ public final class ProviderSettingsService {
         store: any ProviderSettingsPersistence, runtime: ProviderSettingsRuntime,
         legacyDecision: @escaping @Sendable () async throws -> Bool = { false },
         isDecisionInstalled: @escaping @Sendable (String) async throws -> Bool = { _ in false },
-        isLanguageInstalled: @escaping @Sendable () async throws -> Bool = { false }
+        isLanguageInstalled: @escaping @Sendable () async throws -> Bool = { false },
+        isAppleAvailable: @escaping @Sendable () async -> Bool = { false }
     ) {
         self.store = store
         self.runtime = runtime
         self.legacyDecision = legacyDecision
         self.isDecisionInstalled = isDecisionInstalled
         self.isLanguageInstalled = isLanguageInstalled
+        self.isAppleAvailable = isAppleAvailable
     }
     public func summary() throws -> String {
         guard restored else { throw ProviderSettingsError.busy }
@@ -150,6 +154,17 @@ public final class ProviderSettingsService {
         if value.decisionUsesLocal == nil { value.decisionUsesLocal = inheritedDecision }
         return value
     }
+    private func requireLocalModel(_ id: String) async throws {
+        switch id {
+        case "apple-system":
+            guard await isAppleAvailable() else { throw ProviderSettingsError.appleUnavailable }
+        case "gemma4-e2b":
+            guard try await isLanguageInstalled() else { throw ProviderSettingsError.languageRequired }
+        default:
+            guard try await isDecisionInstalled(id) else { throw ProviderSettingsError.decisionRequired }
+        }
+    }
+
     public func save(_ value: ProviderSettings) async throws -> ProviderSettings {
         guard !changing, restoration == nil else { throw ProviderSettingsError.busy }
         changing = true
@@ -166,20 +181,25 @@ public final class ProviderSettingsService {
                 value.decisionModel = ""
             }
             let localID = value.resolvedDecisionLocalModelID
-            guard ["d3-edge", "d3-lite"].contains(localID) else { throw ProviderSettingsError.invalidSelection }
+            guard ["d3-edge", "d3-lite", "gemma4-e2b", "apple-system"].contains(localID),
+                ["gemma4-e2b", "apple-system"].contains(value.assistantLocalModelID)
+            else { throw ProviderSettingsError.invalidSelection }
             if value.decisionUsesLocal == true,
-                current.decisionUsesLocal != true || localID != current.resolvedDecisionLocalModelID,
-                try await !isDecisionInstalled(localID)
+                current.decisionUsesLocal != true || localID != current.resolvedDecisionLocalModelID
             {
-                throw ProviderSettingsError.decisionRequired
+                try await requireLocalModel(localID)
             }
-            if (!value.enabled && current.enabled) || (value.writerUsesLocal && !current.writerUsesLocal) {
-                guard try await isLanguageInstalled() else { throw ProviderSettingsError.languageRequired }
+            if !value.enabled, current.enabled || value.assistantLocalModelID != current.assistantLocalModelID {
+                try await requireLocalModel(value.assistantLocalModelID)
+            }
+            if value.writerUsesLocal && !current.writerUsesLocal {
+                try await requireLocalModel("gemma4-e2b")
             }
             if value.writerUsesLocal && value.writerProviderID != nil { throw ProviderSettingsError.invalidSelection }
             if value.enabled, value.model.isEmpty { throw ProviderSettingsError.invalidSelection }
             let assistantChanged =
                 !restored || value.enabled != current.enabled
+                || (!value.enabled && value.assistantLocalModelID != current.assistantLocalModelID)
                 || (value.enabled
                     && (value.url != current.url || value.key != current.key || value.model != current.model))
             if !assistantChanged {

@@ -138,7 +138,7 @@ for product in package['products']:
 expected_model_dependencies = {
     'ModelKit': set(), 'ModelKitRuntime': {'ModelKit'},
     'ModelKitDefaults': {'ModelKit', 'ModelKitRuntime', 'ModelKitNemotron', 'ModelKitSilero',
-        'ModelKitMossNano', 'ModelKitGemma4', 'ModelKitYOLOPose', 'ModelKitOpenAI', 'ModelKitAppleSpeech', 'ModelKitEnergy', 'ModelKitD3'},
+        'ModelKitMossNano', 'ModelKitGemma4', 'ModelKitYOLOPose', 'ModelKitOpenAI', 'ModelKitAppleSpeech', 'ModelKitEnergy', 'ModelKitD3', 'ModelKitAppleLLM'},
     'ModelKitHub': {'ModelKitRuntime'},
     'ModelKitCoreAI': set(), 'ModelKitCoreML': set(),
     'ModelKitD3': {'ModelKit', 'ModelKitCoreAI'},

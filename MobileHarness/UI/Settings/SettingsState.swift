@@ -3,6 +3,7 @@ import Observation
 
 public struct CloudSettingsDraft: Sendable, Equatable {
     public var id: String
+    public var assistantLocalModelID: String
     public var decisionProviderID: String?
     public var decisionModel: String
     public var decisionUsesLocal: Bool
@@ -22,9 +23,10 @@ public struct CloudSettingsDraft: Sendable, Equatable {
         id: String? = nil, writerProviderID: String? = nil, writerModel: String = "", writerThinking: Bool = false,
         writerUsesLocal: Bool = false,
         decisionProviderID: String? = nil, decisionModel: String = "", decisionUsesLocal: Bool = false,
-        decisionLocalModelID: String = "d3-edge"
+        decisionLocalModelID: String = "d3-edge", assistantLocalModelID: String = "gemma4-e2b"
     ) {
         self.id = id ?? url
+        self.assistantLocalModelID = assistantLocalModelID
         self.decisionProviderID = decisionProviderID
         self.decisionModel = decisionModel
         self.decisionUsesLocal = decisionUsesLocal
@@ -48,12 +50,69 @@ public enum AgentBrain: String, CaseIterable, Identifiable, Sendable {
     public var title: String { rawValue.capitalized }
 }
 
+enum LocalLanguageModel: String, CaseIterable {
+    case gemma = "gemma4-e2b"
+    case apple = "apple-system"
+    case edge = "d3-edge"
+    case lite = "d3-lite"
+
+    var title: String {
+        switch self {
+        case .gemma: "Gemma 4 E2B"
+        case .apple: "Apple System LLM"
+        case .edge: "D3 Edge"
+        case .lite: "D3 Lite"
+        }
+    }
+
+    func supports(_ brain: AgentBrain) -> Bool {
+        switch self {
+        case .gemma: true
+        case .apple: brain != .writer
+        case .edge, .lite: brain == .decision
+        }
+    }
+
+    func benchmark(for brain: AgentBrain) -> LocalModelBenchmark? {
+        // Measured production protocols on matched English and Chinese fixtures (54 requests per model).
+        // Source: docs/measurements/decision-protocols-local-2026-11-15.json
+        switch (brain, self) {
+        case (.decision, .apple): .init(correct: 31, total: 54, p95Milliseconds: 305.21)
+        case (.decision, .edge): .init(correct: 21, total: 54, p95Milliseconds: 53.34)
+        case (.decision, .lite): .init(correct: 38, total: 54, p95Milliseconds: 117.67)
+        case (.decision, .gemma): .init(correct: 32, total: 54, p95Milliseconds: 10203.26)
+        default: nil
+        }
+    }
+}
+
+struct LocalModelBenchmark {
+    let correct: Int
+    let total: Int
+    let p95Milliseconds: Double
+
+    var halfStars: Int {
+        let accuracy = Double(correct) / Double(total)
+        let speed = max(0, 1 - p95Milliseconds / 500)
+        return Int((10 * (0.8 * accuracy + 0.2 * speed)).rounded())
+    }
+}
+
 public struct AgentBrainDraft: Equatable, Sendable {
     public var providerID: String?
     public var model: String
     public var usesLocal: Bool
     public var writerThinking: Bool
     public var decisionLocalModelID = "d3-edge"
+    public var assistantLocalModelID = "gemma4-e2b"
+
+    func localModelID(for brain: AgentBrain) -> String {
+        switch brain {
+        case .assistant: assistantLocalModelID
+        case .writer: LocalLanguageModel.gemma.rawValue
+        case .decision: decisionLocalModelID
+        }
+    }
 }
 
 public enum BrainSettingsChange: Sendable {
@@ -154,6 +213,9 @@ public final class SettingsState {
     public private(set) var revision: UInt64 = 0
     public var decisionProviderID: String? { didSet { if oldValue != decisionProviderID { revision += 1 } } }
     public var decisionModel = "" { didSet { if oldValue != decisionModel { revision += 1 } } }
+    public var assistantLocalModelID = "gemma4-e2b" {
+        didSet { if oldValue != assistantLocalModelID { revision += 1 } }
+    }
     public var decisionLocalModelID = "d3-edge" { didSet { if oldValue != decisionLocalModelID { revision += 1 } } }
     public var decisionUsesLocal = false { didSet { if oldValue != decisionUsesLocal { revision += 1 } } }
     public var writerProviderID: String? { didSet { if oldValue != writerProviderID { revision += 1 } } }
@@ -161,6 +223,7 @@ public final class SettingsState {
     public var writerUsesLocal = false { didSet { if oldValue != writerUsesLocal { revision += 1 } } }
     public var writerThinking = false { didSet { if oldValue != writerThinking { revision += 1 } } }
     public init(initial: CloudSettingsDraft) {
+        assistantLocalModelID = initial.assistantLocalModelID
         decisionProviderID = initial.decisionProviderID
         decisionModel = initial.decisionModel
         decisionUsesLocal = initial.decisionUsesLocal
@@ -183,7 +246,7 @@ public final class SettingsState {
         case .assistant:
             .init(
                 providerID: assistantProviderID, model: isEnabled ? selectedModel : "", usesLocal: !isEnabled,
-                writerThinking: false)
+                writerThinking: false, assistantLocalModelID: assistantLocalModelID)
         case .writer:
             .init(
                 providerID: writerProviderID, model: writerModel, usesLocal: writerUsesLocal,
@@ -263,6 +326,7 @@ public final class SettingsState {
         decisionModel = value.decisionModel
         decisionUsesLocal = value.decisionUsesLocal
         decisionLocalModelID = value.decisionLocalModelID
+        assistantLocalModelID = value.assistantLocalModelID
         writerProviderID = value.writerProviderID
         writerModel = value.writerModel
         writerThinking = value.writerThinking
@@ -332,6 +396,7 @@ public protocol SettingsPresenting: UIPresentationAccess {
     var decisionModel: String { get set }
     var decisionUsesLocal: Bool { get set }
     var decisionLocalModelID: String { get set }
+    var assistantLocalModelID: String { get set }
     var writerProviderID: String? { get set }
     var writerModel: String { get set }
     var writerThinking: Bool { get set }

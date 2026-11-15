@@ -48,7 +48,8 @@ public enum SettingsProviderAdapter {
                 return {
                     do {
                         if #available(iOS 27, macOS 27, *) {
-                            try await language.configure(configuration)
+                            try await language.configure(
+                                configuration, localModelID: value?.assistantLocalModelID ?? "gemma4-e2b")
                         } else {
                             throw ProviderSettingsError.application
                         }
@@ -79,7 +80,8 @@ public enum SettingsProviderAdapter {
                 return "Could not save settings. Check the model and keychain access."
             case "provider.application": return "Could not apply model settings. Check settings and try again."
             case "provider.cancelled": return "Operation cancelled"
-            case "provider.decisionRequired": return "Download D3 in Agent Models before selecting the local model."
+            case "provider.decisionRequired": return "The selected local Decision model must be downloaded first."
+            case "provider.appleUnavailable": return "Apple System LLM is unavailable."
             case "provider.languageRequired":
                 return "Download Gemma 4 E2B in Agent Models before selecting the local model."
             case "provider.capacity": return "Too many model requests. Try again."
@@ -156,7 +158,8 @@ public enum SettingsProviderAdapter {
                     writerThinking: value.writerThinking, writerUsesLocal: value.writerUsesLocal,
                     decisionProviderID: value.decisionProviderID, decisionModel: value.decisionModel,
                     decisionUsesLocal: value.decisionUsesLocal == true,
-                    decisionLocalModelID: value.resolvedDecisionLocalModelID),
+                    decisionLocalModelID: value.resolvedDecisionLocalModelID,
+                    assistantLocalModelID: value.assistantLocalModelID),
                 revision: entry.revision)
         case .save:
             _ = try settings.result(id, sessionID: sessionID)

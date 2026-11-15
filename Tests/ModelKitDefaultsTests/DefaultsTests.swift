@@ -91,3 +91,41 @@ import Testing
     try await root.stop()
     await #expect(throws: InferenceAdmissionError.self) { try await steps[0].prepare { _ in } }
 }
+
+@Test(.enabled(if: ProcessInfo.processInfo.environment["APPLE_APP_CHAT_SMOKE"] == "1"))
+@MainActor func appleAppChatSelectionUsesSystemModelWithTextOnlyHistory() async throws {
+    guard #available(macOS 27, iOS 27, *) else { return }
+    let root = ModelContainer(resources: FileManager.default.temporaryDirectory)
+    try await root.start()
+    do {
+        try await root.setForeground(true)
+        let apple = try await root.language.localChatModel("apple-system")
+        #expect(await apple.capability.availability == .available)
+        #expect(await !apple.capability.supportsToolCalls)
+        try await root.language.configure(nil, localModelID: "apple-system")
+        #expect(await !root.language.supportsToolCalls)
+        let request = try ChatRequest(
+            messages: [
+                .init(role: .user, content: "Check the status."),
+                .init(
+                    role: .assistant, content: "", toolCalls: [.init(id: "status", name: "status", argumentsJSON: "{}")]
+                ),
+                .init(role: .tool, content: "Ready.", toolCallID: "status"),
+                .init(role: .system, content: "Reply with a short English phrase."),
+                .init(role: .user, content: "What did the status check say?"),
+            ], maximumOutputTokens: 24, temperature: 0)
+        let inference = try await root.language.chat(request)
+        let result = try await inference.withCleanup {
+            var output = ""
+            for try await event in inference.events {
+                if case .text(let text) = event { output += text }
+            }
+            return output
+        }
+        #expect(!result.isEmpty)
+    } catch {
+        try await root.stop()
+        throw error
+    }
+    try await root.stop()
+}

@@ -1,5 +1,6 @@
 import Foundation
 import ModelKit
+import ModelKitAppleLLM
 import ModelKitOpenAI
 @_spi(ModelAssembly) import ModelKitRuntime
 
@@ -8,6 +9,14 @@ import ModelKitOpenAI
 #endif
 
 extension DefaultModelAssembly {
+    @available(iOS 27, macOS 27, *)
+    static func registerAppleChat(manager: ModelManager) async throws {
+        try await manager.register(
+            ModelRegistration(id: ModelID("apple-system"), capabilities: [.chat], memoryPolicy: .releaseWhenIdle) {
+                context in
+                ProvidedCapabilities(chat: try AppleChat(context: context))
+            })
+    }
     @available(iOS 27, macOS 27, *)
     static func chatRegistration(resources: URL, configuration: OpenAIChatConfiguration?, id: ModelID = ModelID("chat"))
         throws

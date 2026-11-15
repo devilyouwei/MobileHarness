@@ -13,7 +13,7 @@ flowchart LR
     Adapter -->|ChatEvent| Caller
 ```
 
-Construct `AppleChat(context:)` with a manager-provided ModelContext and consume it through ChatCapability or ChatModel. It is an optional provider; default model registration remains owned by ModelKitDefaults. Availability reflects SystemLanguageModel.default, including device eligibility, system configuration and model readiness. Apple owns model installation and weights; the resource lease manages application inference admission only.
+Construct `AppleChat(context:)` with a manager-provided ModelContext and consume it through ChatCapability or ChatModel. ModelKitDefaults registers it as the named Chat model apple-system. Its app-facing binding converts retained tool-call history to text. The standalone provider validates its native request shape. Availability reflects SystemLanguageModel.default, including device eligibility, system configuration and model readiness. Apple owns model installation and weights; the resource lease manages application inference admission only.
 
 ## Input and output
 

@@ -15,7 +15,7 @@ Use the unsuffixed resource for English and a `.zh-Hans` sibling for Simplified 
 | 文件 | 作用与要求 |
 | --- | --- |
 | `../Catalog.json` | 唯一显式资源索引。`version` 为 1；`agents` 的键为代码使用的配置名，如 `Assistant`，值为相对 Resources 的 `Agents/Assistant/Agent.json`；`skills` 由 [Skill 规范](../Skills/README.md) 定义。不得靠目录扫描或第二套配置生效。 |
-| `Assistant/InputProtocol.json` | Assistant 主模型的输入规则、时间线标签和排版、历史格式识别。 |
+| `Assistant/InputProtocol.json` | Assistant 主模型的输入规则、连续 ASR 片段读法、时间线标签和排版、历史格式识别。 |
 | `Shared/OutputProtocol.md` | 跨角色通用输出协议。 |
 | `Shared/SkillCatalog.json`、`Shared/AgentCatalog.json`、`Shared/ActionCatalog.json` | 目录标题及条目排版。Swift 填入公开 Skill、获准委派的 Agent 和本轮有效 Action。 |
 | `Shared/RequestContext.json` | Task／Skill／State 快照和图片清单在独立 system 消息中的事实框架。 |

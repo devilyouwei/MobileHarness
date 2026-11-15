@@ -39,9 +39,9 @@ Old Qwen receipts are not Gemma installations. Apple ASR/TTS assets are OS-manag
 
 ## Developer artifacts
 
-Existing download wrappers use the production catalog except `gemma4-e2b-macos.download.json`, which selects the matching uncompiled Mac decoder. `--endpoint` accepts Hugging Face/mirror/custom HTTPS sources; `--force` refreshes reused files. Metadata/file bounds, four workers, partial files and atomic replacement avoid replacing a valid local model with a failed download. ZIP extraction validates safe paths/hash/required files.
+App download wrappers use the production catalog. The uncompiled Mac Gemma decoder profile and its local artifacts belong to [Gemma4Tests](../../../Tests/Gemma4Tests/README.md). `--endpoint` accepts Hugging Face/mirror/custom HTTPS sources; `--force` refreshes reused files. Metadata/file bounds, four workers, partial files and atomic replacement avoid replacing a valid local model with a failed download. ZIP extraction validates safe paths/hash/required files.
 
-Ignored Nemotron/Gemma4/Silero/MossTTSNano/YOLOPose directories support opt-in tests, are not build prerequisites and are never committed. Model packages and binary graph subdirectories do not acquire application README contracts. Historical measurements are in [validation history](../../../docs/validation/Validation-History.md).
+Ignored local model directories can hold provisioned assets. Mac Gemma and independent Decision benchmark artifacts live under their owning test directories. Model packages and binary graph subdirectories do not acquire application README contracts. Historical measurements are in [validation history](../../../docs/validation/Validation-History.md).
 
 Production declarations and explicit developer provisioning.
 

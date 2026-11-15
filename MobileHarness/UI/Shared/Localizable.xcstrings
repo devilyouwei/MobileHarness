@@ -2,6 +2,50 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "%@ (Unavailable)": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@（不可用）"
+          }
+        }
+      }
+    },
+    "%@ out of 5 stars": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "满分 5 星，得 %@ 星"
+          }
+        }
+      }
+    },
+    "Apple System LLM": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple 系统语言模型"
+          }
+        }
+      }
+    },
+    "Apple System LLM is unavailable.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple 系统语言模型不可用。"
+          }
+        }
+      }
+    },
     "Chat": {
       "extractionState": "extracted",
       "localizations": {
@@ -9,6 +53,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "对话"
+          }
+        }
+      }
+    },
+    "Mac benchmark rating": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac 实测推荐指数"
           }
         }
       }
@@ -8039,6 +8094,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "请求已中断，未记录回复。"
+          }
+        }
+      }
+    },
+    "The selected local Decision model must be downloaded first.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先下载所选的本地决策模型。"
           }
         }
       }

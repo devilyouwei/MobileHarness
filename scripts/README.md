@@ -32,13 +32,14 @@ model_download.py 从生产 model-catalog.json 选择源，通过分页 Hub 元�
 
 | 入口 | 制品/用途 |
 | --- | --- |
-| download-gemma4.py / test-gemma4.sh | Gemma 4 E2B CoreAI；2B 默认，4B 是独立比较配置；真实推理显式启用 |
+| download-gemma4.py / test-gemma4.sh | Gemma 4 E2B CoreAI；`--platform macos` 使用 Tests/Gemma4Tests 的 profile 和本地制品目录；真实推理显式启用 |
 | download-nemotron.py / test-nemotron.sh | 生产 Nemotron Core ML 制品与 ASR 检查 |
 | download-silero.py / test-silero.sh | Silero VAD 制品及适配检查 |
 | download-moss-tts-nano.py | MOSS-TTS-Nano 制品 |
 | download-yolo26-pose.py | pinned 官方 pose ZIP、安全校验及替换 |
 | test-kokoro.sh | 可选 Kokoro 适配检查 |
 | [evaluate-decision-language.sh](evaluate-decision-language.sh) | Runs the current English and Simplified Chinese Decision resources and the recorded mixed baseline against an installed D3 Edge artifact. Accepts a model resource root containing `D3Edge/` and a new JSON output path. See the [experiment report](../docs/validation/Decision-Model-Mac-Comparison.md#decision-prompt-language-split). |
+| [evaluate-decision-protocols.py](evaluate-decision-protocols.py) | Compares Assistant JEV, Tool and Text protocols on matched cases. The cloud matrix admits Qwen3.7 Flash and Qwen3.8 Flash only. See [benchmark commands](../Tests/IntegrationTests/README.md#assistant-decision-protocol-comparison). |
 
 下载器与 App 安装路径分离；App 运行时资源获取由 ModelKit Management/Hub 及 Settings 工作流拥有。各 gate/模型根路径见 [Tests](../Tests/README.md) 与对应适配器 README，不在普通检查中隐式下载或执行真实模型。
 

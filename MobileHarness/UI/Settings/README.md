@@ -79,7 +79,7 @@ SettingsFormController 只拥有草稿规范化、默认选项、请求忙态和
 
 ## 多 Provider 管理
 
-Settings 的 Agent Models（智能体模型）入口使用 SF Symbols `atom` 原子图标。Agent Models 总页的 Agent Models（智能体模型）分区按 Assistant（助手）、Writer（创作助手）、Decision（决策）顺序展示三个模型配置入口。Agent Models 总页依次展示 Cloud Providers & Models（云端服务与模型）、Agent Models（智能体模型）和 Local Models（本地模型）三个分区。角色入口整行可点，标题和状态使用系统主、次正文色。Provider 列表按名称和 URL 显示，支持添加及左滑编辑／删除；总页草稿随导航保留到离开 Agent Models。子页各自持有草稿，返回时放弃未保存的编辑。根 SettingsFormController 在共享已提交快照上合并当前页改动，成功后发布；失败保留草稿。Provider 凭据留在既有私有设置链路。下载区使用统一下载源，按模型身份管理 Gemma 4 E2B、D3 Edge 与 D3 Lite，名称与模型目录及选择摘要一致。Local Models 名称下方以蓝色 Chat（对话）、橙色 Decision（决策）胶囊标出用途；标签包含文字且支持字体缩放，不仅靠颜色区分。
+Settings 的 Agent Models（智能体模型）入口使用 SF Symbols `atom` 原子图标。Agent Models 总页的 Agent Models（智能体模型）分区按 Assistant（助手）、Writer（创作助手）、Decision（决策）顺序展示三个模型配置入口。Agent Models 总页依次展示 Cloud Providers & Models（云端服务与模型）、Agent Models（智能体模型）和 Local Models（本地模型）三个分区。角色入口整行可点，标题和状态使用系统主、次正文色。Provider 列表按名称和 URL 显示，支持添加及左滑编辑／删除；总页草稿随导航保留到离开 Agent Models。子页各自持有草稿，返回时放弃未保存的编辑。根 SettingsFormController 在共享已提交快照上合并当前页改动，成功后发布；失败保留草稿。Provider 凭据留在既有私有设置链路。下载区使用统一下载源，按模型身份管理 Gemma 4 E2B、D3 Edge 与 D3 Lite，名称与模型目录及选择摘要一致。Local Models 名称下方以蓝色 Chat（对话）、橙色 Decision（决策）胶囊标出用途；标签包含文字且支持字体缩放，不仅靠颜色区分。Apple 系统模型同列于 Local Models，显示系统可用性，模型由系统管理。
 
 Provider 名称与稳定 ID 是当前文档的必填字段，通过私有配置链路保存。新增/编辑采用独立 modal 草稿（name/url/key），默认生成未占用的 Provider N 名称；取消不修改选择和凭据，确认校验 URL 唯一性与名称。列表名称为主、URL 单行省略为辅，保留三字段粘贴和 Key 脱敏。
 
@@ -162,7 +162,9 @@ WelcomeProviderView 提供可选 URL（空值使用 OpenAI）与必填 SecureFie
 
 Assistant 详情在实际删除成功后生成去日志的内存副本，保留业务信息，移除请求、图片来源与生成 meta，导出同一副本；无需通过二次读取才能确认已提交的删除。删除失败保留原详情并显示错误，忙态阻止重复提交。
 
-三个子页均先选 Provider（Local／本地或已保存云端服务），再选 Model。Assistant/Writer 的本地候选为 Gemma 4 E2B，Decision 为 D3 Edge/Lite；未下载候选可点，页面显示中英文先下载错误并拒绝模型变更，保存也按制品身份校验。Local Provider 草稿允许展示尚未安装的默认模型，但不能保存。Writer 本地选择以 writerUsesLocal 独立保存；页面说明 Gemma 支持工具调用及上下文容量限制，云端选择显示深度思考。Decision 没有云端备用区，仅显示独占选择和最近决策状态；本地保存清除旧云端引用。ProviderModelPicker 保留已选模型并展示发现失败和重试；选择云端 Provider 后加载模型，离页取消发现，已准入保存继续。删除 Provider 清除相关云端选择，独立本地选择保持。
+三个子页均先选 Provider（Local／本地或已保存云端服务），再选 Model。Assistant 可选 Gemma 4 E2B 和 Apple 系统模型，Decision 还可选 D3 Edge 和 D3 Lite，Writer 只列出支持工具调用的本地 Chat 模型 Gemma 4 E2B。进入角色页时刷新系统可用性，不可用的 Apple 选项显示为置灰的不可用项。未下载候选可点，页面显示中英文先下载错误并拒绝模型变更，保存也按制品身份校验。Local Provider 草稿允许展示尚未安装的默认模型，但不能保存。Writer 本地选择以 writerUsesLocal 独立保存；页面说明 Gemma 支持工具调用及上下文容量限制，云端选择显示深度思考。Decision 没有云端备用区，仅显示独占选择和最近决策状态；本地保存清除旧云端引用。ProviderModelPicker 保留已选模型并展示发现失败和重试；选择云端 Provider 后加载模型，离页取消发现，已准入保存继续。删除 Provider 清除相关云端选择，独立本地选择保持。
+
+本地模型下拉按角色和模型身份附上实测推荐指数，选中有评分的模型后在下方显示五格星形及可访问数值，来源标为 Mac 实测。评分由准确率和热态 p95 延迟组合并舍入到半星。缺少对应角色数据的模型和云端选项没有该字段。分数属于 UI 的只读数据，与下载状态、可用性及设置事务独立。证据及计算方法见 [Decision 模型比较](../../../docs/validation/Decision-Model-Mac-Comparison.md#settings-recommendation-index)。
 
 Assistant 请求详情的 User Request / Assistant Response 使用完整业务文本、允许选择复制和纵向换行，不限制行数。User Request 可包含多来源输入的完整批次，数据由历史读取端提供；列表预览的长度限制不用于详情。
 

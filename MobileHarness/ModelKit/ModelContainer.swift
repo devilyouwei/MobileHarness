@@ -14,9 +14,23 @@ public protocol ModelLanguageProviding: ChatCapability, ModelResourceControlling
     var decision: any ModelDecisionProviding { get }
     func decisionModel(_ id: String) -> (any ModelDecisionProviding)?
     func configure(_ configuration: OpenAIChatConfiguration?) async throws
+    func configure(_ configuration: OpenAIChatConfiguration?, localModelID: String) async throws
+    func localChatModel(_ id: String) async throws -> ChatModel
     func chatModel(configuration: OpenAIChatConfiguration?) async throws -> ChatModel
 }
 extension ModelLanguageProviding {
+    public func configure(_ configuration: OpenAIChatConfiguration?, localModelID: String) async throws {
+        guard localModelID == "gemma4-e2b" else {
+            throw CapabilityError.unavailable("Local Chat model is not supported")
+        }
+        try await configure(configuration)
+    }
+
+    public func localChatModel(_ id: String) async throws -> ChatModel {
+        guard id == "gemma4-e2b" else { throw CapabilityError.unavailable("Local Chat model is not supported") }
+        return try await chatModel(configuration: nil)
+    }
+
     public func decisionModel(_ id: String) -> (any ModelDecisionProviding)? {
         id == "d3-edge" ? decision : nil
     }
@@ -185,13 +199,14 @@ private actor ModelScope {
     private var waiters = 0
     private var updating = false
     private var cloudChat: OpenAIChatConfiguration?
+    private var assistantLocalModelID = "gemma4-e2b"
     private struct CloudBinding {
         let configuration: OpenAIChatConfiguration
         let id: ModelID
         let capability: Task<any ChatCapability, Error>
     }
     private var cloudBindings: [CloudBinding] = []
-    private var localChat: SerialChat?
+    private var localChats: [String: SerialChat] = [:]
     private let maximumPendingLocalChats: Int
     init(
         resources: URL, admission: InferenceAdmission,
@@ -317,11 +332,12 @@ private actor ModelScope {
             throw error
         }
     }
-    func chatModel(configuration: OpenAIChatConfiguration?) throws -> ChatModel {
+    func chatModel(configuration: OpenAIChatConfiguration?, localModelID: String = "gemma4-e2b") throws -> ChatModel {
         try admission.checkAlive()
         guard !closed else { throw InferenceAdmissionError.stopped }
         return ChatModel(
-            capability: ConfiguredChat(scope: self, configuration: configuration), modelName: configuration?.model)
+            capability: ConfiguredChat(scope: self, configuration: configuration, localModelID: localModelID),
+            modelName: configuration?.model ?? (localModelID == "apple-system" ? "Apple System LLM" : nil))
     }
     private func cloud(_ configuration: OpenAIChatConfiguration) async throws -> any ChatCapability {
         if let binding = cloudBindings.first(where: { $0.configuration == configuration }) {
@@ -345,48 +361,89 @@ private actor ModelScope {
         }
     }
     func selectedChatID() async throws -> ModelID {
-        guard let configuration = cloudChat else { return ModelID("chat") }
+        guard let configuration = cloudChat else { return try localChatID(assistantLocalModelID) }
         _ = try await cloud(configuration)
         guard let id = cloudBindings.first(where: { $0.configuration == configuration })?.id else {
             throw CapabilityError.sessionClosed
         }
         return id
     }
+    private func localChatID(_ id: String) throws -> ModelID {
+        switch id {
+        case "gemma4-e2b": ModelID("chat")
+        case "apple-system": ModelID(id)
+        default: throw CapabilityError.invalidRequest("Unknown local Chat model")
+        }
+    }
     func selectedChat() async throws -> any ChatCapability {
-        try await chatCapability(configuration: cloudChat)
+        try await chatCapability(configuration: cloudChat, localModelID: assistantLocalModelID)
     }
-    func chatCapability(configuration: OpenAIChatConfiguration?) async throws -> any ChatCapability {
+    func chatCapability(configuration: OpenAIChatConfiguration?, localModelID: String) async throws
+        -> any ChatCapability
+    {
         if let configuration { return try await cloud(configuration) }
-        return try await perform("language", "localChat") { try await $0.get(.chat, load: false) }
+        let id = try localChatID(localModelID)
+        return try await perform("language", "localChat", inference: false) {
+            try await $0.get(id, as: .chat, load: false)
+        }
     }
-    func chat(_ request: ChatRequest, configuration: OpenAIChatConfiguration?) async throws -> InferenceSession<
-        ChatEvent
-    > {
+    func chat(
+        _ request: ChatRequest, configuration: OpenAIChatConfiguration?, localModelID: String = "gemma4-e2b"
+    ) async throws -> InferenceSession<ChatEvent> {
         let generation = try admission.check()
         if let configuration {
             let capability = try await cloud(configuration)
             try admission.validate(generation)
             return try await capability.chat(request)
         }
-        if localChat == nil {
-            localChat = try SerialChat(maximumPending: maximumPendingLocalChats) { [weak self] in
+        let id = try localChatID(localModelID)
+        if localChats[localModelID] == nil {
+            localChats[localModelID] = try SerialChat(maximumPending: maximumPendingLocalChats) { [weak self] in
                 guard let self else { throw CapabilityError.sessionClosed }
-                return try await self.perform("language", "localChat") { try await $0.get(.chat, load: false) }
+                return try await self.perform("language", "localChat") { try await $0.get(id, as: .chat, load: false) }
             }
         }
-        guard let localChat else { throw CapabilityError.sessionClosed }
-        return try await localChat.chat(request)
+        guard let queue = localChats[localModelID] else { throw CapabilityError.sessionClosed }
+        let prepared = localModelID == "apple-system" ? try Self.textOnlyRequest(request) : request
+        return try await queue.chat(prepared)
+    }
+    // Text-only Chat receives trusted system facts first and text evidence for prior tool exchanges.
+    static func textOnlyRequest(_ request: ChatRequest) throws -> ChatRequest {
+        var messages = request.messages.filter { $0.role == .system }
+        let names = Dictionary(uniqueKeysWithValues: request.messages.flatMap(\.toolCalls).map { ($0.id, $0.name) })
+        for message in request.messages where message.role != .system {
+            let calls = message.toolCalls.map { "Tool call \($0.name): \($0.argumentsJSON)" }
+            if message.role == .tool {
+                let name = message.toolCallID.flatMap { names[$0] } ?? "tool"
+                messages.append(.init(role: .user, content: "Tool result \(name): \(message.content)"))
+            } else {
+                let text = ([message.content] + calls).filter { !$0.isEmpty }.joined(separator: "\n")
+                if !text.isEmpty { messages.append(.init(role: message.role, content: text)) }
+            }
+        }
+        let firstConversation = messages.firstIndex { $0.role != .system }
+        if let firstConversation, messages[firstConversation].role == .assistant {
+            messages.insert(.init(role: .user, content: "Earlier conversation:"), at: firstConversation)
+        }
+        var prepared = try ChatRequest(
+            messages: messages, context: request.context, maximumOutputTokens: request.maximumOutputTokens,
+            temperature: request.temperature)
+        prepared.onDispatch = request.onDispatch
+        prepared.transportCapture = request.transportCapture
+        prepared.timing = request.timing
+        return prepared
     }
     func defaultChat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
-        try await chat(request, configuration: cloudChat)
+        try await chat(request, configuration: cloudChat, localModelID: assistantLocalModelID)
     }
-    func configureChat(_ configuration: OpenAIChatConfiguration?) async throws {
+    func configureChat(_ configuration: OpenAIChatConfiguration?, localModelID: String = "gemma4-e2b") async throws {
         guard !updating else { throw CapabilityError.inputBusy }
         updating = true
         defer { updating = false }
         try admission.checkAlive()
         guard !closed else { throw InferenceAdmissionError.stopped }
-        if let configuration { _ = try await cloud(configuration) }
+        if let configuration { _ = try await cloud(configuration) } else { _ = try localChatID(localModelID) }
+        assistantLocalModelID = localModelID
         cloudChat = configuration
     }
     func configureSpeech(recognition: Bool, synthesis: Bool) async throws {
@@ -415,7 +472,7 @@ private actor ModelScope {
         }
     }
     func suspend() async {
-        await localChat?.cancelAll()
+        for queue in localChats.values { await queue.cancelAll() }
         if let assembly, let manager = try? await assembly.value { await manager.suspend() }
     }
     func memoryPressure() async {
@@ -423,7 +480,7 @@ private actor ModelScope {
     }
     func stop() async throws {
         closed = true
-        await localChat?.cancelAll()
+        for queue in localChats.values { await queue.cancelAll() }
         for binding in cloudBindings { binding.capability.cancel() }
         for binding in cloudBindings { _ = await binding.capability.result }
         cloudBindings.removeAll()
@@ -453,15 +510,29 @@ private actor ModelScope {
 private struct ConfiguredChat: ChatCapability {
     let scope: ModelScope
     let configuration: OpenAIChatConfiguration?
-    var availability: CapabilityAvailability { .available }
+    let localModelID: String
+    var availability: CapabilityAvailability {
+        get async {
+            do {
+                return try await scope.chatCapability(configuration: configuration, localModelID: localModelID)
+                    .availability
+            } catch { return .unavailable(reason: String(describing: error)) }
+        }
+    }
     var supportsToolCalls: Bool {
-        get async { (try? await scope.chatCapability(configuration: configuration).supportsToolCalls) ?? false }
+        get async {
+            (try? await scope.chatCapability(configuration: configuration, localModelID: localModelID).supportsToolCalls)
+                ?? false
+        }
     }
     var supportsImages: Bool {
-        get async { (try? await scope.chatCapability(configuration: configuration).supportsImages) ?? false }
+        get async {
+            (try? await scope.chatCapability(configuration: configuration, localModelID: localModelID).supportsImages)
+                ?? false
+        }
     }
     func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
-        try await scope.chat(request, configuration: configuration)
+        try await scope.chat(request, configuration: configuration, localModelID: localModelID)
     }
 }
 
@@ -503,6 +574,12 @@ public final class ModelLanguageContainer: ModelLanguageProviding, Sendable {
     }
     public func configure(_ configuration: OpenAIChatConfiguration?) async throws {
         try await scope.configureChat(configuration)
+    }
+    public func configure(_ configuration: OpenAIChatConfiguration?, localModelID: String) async throws {
+        try await scope.configureChat(configuration, localModelID: localModelID)
+    }
+    public func localChatModel(_ id: String) async throws -> ChatModel {
+        try await scope.chatModel(configuration: nil, localModelID: id)
     }
     public func warmup() async throws { try await warmup(reportLoading: { _ in }) }
     public func warmup(reportLoading: @escaping @Sendable (Bool) async -> Void) async throws {
@@ -741,6 +818,7 @@ enum DefaultModelAssembly {
             try await registerSpeechDefaults(manager: manager, selection: selection)
             try await registerVision(manager: manager, resources: resources)
             try await registerDecision(manager: manager, resources: resources)
+            try await registerAppleChat(manager: manager)
             return manager
         } catch {
             await manager.shutdown()

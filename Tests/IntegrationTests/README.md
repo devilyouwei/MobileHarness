@@ -389,3 +389,16 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer APPLE_DECISION_REPORT=/
 ```
 
 The output path must not exist and its parent directory must exist. Reports checkpoint after every request. Unavailable system models produce a blocked report with zero measured requests and an explicit test failure. The ordinary suite runs only fixture/parser/metric regressions; the real-model test is disabled unless `APPLE_DECISION_REPORT` is set. See [Decision comparison](../../docs/validation/Decision-Model-Mac-Comparison.md#apple-system-model-decision-comparison-2026-11-15).
+
+Use [DecisionBenchmarks](../DecisionBenchmarks/README.md) to rerun the frozen D3 and Qwen comparisons without linking the App targets.
+
+## Assistant Decision protocol comparison
+
+`DecisionProtocolBenchmark.swift` runs the production Assistant protocol projections and result decoders directly, without the Assistant queue, history persistence, or adoption overrides. The 27 matched English and Chinese scenarios are stored in `docs/measurements/decision-language-scenarios-2026-11-14.json`. Run the dedicated launcher with a fresh output path.
+
+```sh
+python3 scripts/evaluate-decision-protocols.py qwen3.7-flash qwen3.8-flash --output /tmp/decision-cloud.json
+python3 scripts/evaluate-decision-protocols.py d3-edge d3-lite apple-system gemma4-e2b --output /tmp/decision-local.json
+```
+
+The cloud launcher reads the existing Aliyun HTTPS endpoint and key from `.env.local` and only admits the two Flash models. Local models read the existing benchmark artifacts. Results checkpoint by language and segment. The launcher records strict accuracy, invalid responses, missed/false dispositions, valid p95, and timely correct counts at 500 ms and the applicable App budget. Calls run to completion to preserve correctness evidence, subject to the provider timeout. No credential or endpoint is written to the report.

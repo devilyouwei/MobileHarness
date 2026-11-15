@@ -150,7 +150,7 @@ Photography与ApplicationControl共享Island.setPresentation和ui.island，Basic
 
 Agent task presentation belongs to the executing role: Writer publishes its creative lifecycle and AssistantExecutionSession publishes its own foreground Skill task. Both use registered Gateway Island tools with code-owned permissions, outside model-visible catalogs. Terminal state ends only the owner's activity; passive task logs are history rather than UI authority. Shared latest-value transport is described in [Support](Support/README.md); UI arbitrates all producers without interpreting role identities. Writer titles/operation subtitles similarly reach Actions-owned presentation through producer-bound Gateway direct calls.
 
-SpeechPerception owns recognition-caption onset. Full-duplex Assistant preserves its reply caption until a real new reply begins; final ASR alone enters Decision. Perception consent/capture lifecycle remains independent of LLM generation and output execution.
+SpeechPerception owns recognition-caption onset. Full-duplex Assistant preserves its reply caption until a real new reply begins; final ASR alone enters Decision. Runtime composition provides Assistant reply activity and an interruption marker for SpeechPerception to select its silence endpoint and acknowledge the marker after final ASR. Perception consent/capture lifecycle remains independent of LLM generation and output execution.
 
 各角色均通过自己绑定的 Gateway consumer 调用内部灵动岛工具：SpeechPerception 拥有聆听/识别，Assistant 的语音子能力拥有合成/真实播放，Photographer 沿既有相机输入处理摄影，ApplicationControl 沿连接输入处理蓝牙提示；Assistant 同时管理自身任务、推理等待和语音输出。Actions 不设集中 UI 状态观察器代发。内部调用结果（含异常）由所属执行者处理，只有显式 LLM 调用反馈能触发 ReACT；Assistant 结果来源与续轮规则见 [Assistant](Assistant/README.md#results-history-and-continuation)。
 

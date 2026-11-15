@@ -1,0 +1,3 @@
+coreai-core==1.0.0b3
+numpy==2.4.6
+transformers==5.17.0

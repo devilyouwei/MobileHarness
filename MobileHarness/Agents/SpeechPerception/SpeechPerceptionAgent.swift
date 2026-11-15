@@ -72,6 +72,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
     private let recognition: any SpeechRecognitionCapability
     private let vad: any VoiceActivityCapability
+    private let speechEndpointActivity: @Sendable (UUID?) async -> (replyActive: Bool, interruptionID: UUID?)
     private let resampler: StreamingMonoPCMResampler
     private var sessionID: String
     private let interactionSessionID: String?
@@ -112,6 +113,9 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         uiHome: UIHomeContainer? = nil, microphoneInput: (any AudioCaptureObserving)? = nil,
         microphoneSpectrum: (any SpectrumPresenting)? = nil,
         microphoneObservation: (@MainActor @Sendable (MicrophoneObservation) -> Void)? = nil,
+        speechEndpointActivity: @escaping @Sendable (UUID?) async -> (replyActive: Bool, interruptionID: UUID?) = {
+            _ in (false, nil)
+        },
         context: AgentContextRepository<SpeechPerceptionContextState>
     ) throws {
         if residentListening {
@@ -129,6 +133,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         self.resampler = try StreamingMonoPCMResampler(outputSampleRate: 16000)
         self.recognition = recognition
         self.vad = vad
+        self.speechEndpointActivity = speechEndpointActivity
         self.sessionID = sessionID
         self.interactionSessionID = interactionSessionID
         self.mode = mode
@@ -670,7 +675,10 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         activeInput = AgentInput(
             id: input.id, sessionID: input.sessionID, payload: input.payload,
             metadata: input.metadata, turn: currentTurn)
-        let result = try await segmenter.process(frame)
+        let activity = await speechEndpointActivity(nil)
+        try Task.checkCancellation()
+        let result = try await segmenter.process(
+            frame, useShortEndpoint: activity.replyActive && activity.interruptionID == nil)
         try Task.checkCancellation()
         let beganTurn =
             currentTurn == nil
@@ -706,11 +714,12 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             if case .end(let reason) = $0 { return reason != .maximumDuration }
             return false
         }) {
-            try await finishUtterance(input: input, recognitionTurn: recognitionTurn)
+            try await finishUtterance(
+                input: input, recognitionTurn: recognitionTurn, interruptionID: activity.interruptionID)
         }
     }
     private func finishUtterance(
-        input: AgentInput, recognitionTurn: SpeechRecognitionTurn
+        input: AgentInput, recognitionTurn: SpeechRecognitionTurn, interruptionID: UUID?
     ) async throws {
         recognitionSuspended = true
         phase = .processing
@@ -729,6 +738,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         try emit(.control("agent.finished"), input: input)
         if !text.isEmpty {
             try await communicate(.transcript(text, final: true), parent: input)
+            if let interruptionID { _ = await speechEndpointActivity(interruptionID) }
         }
         try await resetListening(after: input)
         try await transition(to: text.isEmpty ? .empty : .listening, input: input, present: !recognitionSuspended)
