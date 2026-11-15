@@ -4325,6 +4325,17 @@
         }
       }
     },
+    "Local D3 Lite": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地 D3 Lite"
+          }
+        }
+      }
+    },
     "Local Gemma 4 E2B": {
       "extractionState": "extracted",
       "localizations": {
@@ -4376,6 +4387,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "本地 · D3 Decision"
+          }
+        }
+      }
+    },
+    "Local · D3 Lite": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地 · D3 Lite"
           }
         }
       }

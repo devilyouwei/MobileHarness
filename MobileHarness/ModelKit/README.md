@@ -209,6 +209,6 @@ ModelLanguageProviding.chatModel(configuration:) 返回固定配置的轻量 Cha
 
 ## Decision 能力
 
-language.decision 是稳定子端口，使用独立 D3 资源，不占用主 Chat 的串行队列。ModelKitD3 依赖基础契约、CoreAI 图执行和 Tokenizers，默认注册 d3-edge；模型管理只提供选择结果及资源生命周期。云端分类由调用方通过不可变 ChatModel 请求，ChatToolChoice.required 只约束一次命名工具选择，不执行工具。
+language.decision 是稳定子端口，使用独立 D3 资源，不占用主 Chat 的串行队列。ModelKitD3 依赖基础契约、CoreAI 图执行和 Tokenizers，注册 d3-edge 和 d3-lite，默认端口为 Edge，也可按模型 ID 获取 Lite；模型管理提供候选读出及各制品的资源生命周期。云端分类由调用方通过不可变 ChatModel 请求，ChatToolChoice.required 只约束一次命名工具选择，不执行工具。
 
 Chat 的可选 onDispatch 回调报告实际 HTTP/本地推理开始边界，供上层原子持久化请求；详见 [LLM](Language/LLM/README.md)。

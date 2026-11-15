@@ -685,3 +685,15 @@ func multiSourcePreparationFailureRetainsBatchWithoutCreatingMessageOrRetryLoop(
     let quoted = original + "\nUser ｜ 09:00:00"
     #expect(try AssistantInputBatch.historyText(quoted) == quoted)
 }
+
+@Test func d3LiteClassificationUsesTheSelectedProviderAndReportsItsRoute() async throws {
+    let service = AssistantInputDecision(
+        localModel: { $0 == "d3-lite" ? ReadyDecision() : nil },
+        selectedConfiguration: { ("d3-lite", nil) })
+    let input = AgentInput(id: "lite", sessionID: "session", payload: .text("嗯"))
+    let result = await service.classify(.init(input: input, text: "嗯", running: true))
+    #expect(result.route == .lite)
+    #expect(result.modelResult == .discard)
+    #expect(result.requests.first?.hasPrefix("Local D3 Lite") == true)
+    await service.stop()
+}

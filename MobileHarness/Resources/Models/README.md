@@ -33,6 +33,7 @@ flowchart LR
 | `moss-tts-nano` / MossTTSNano | Optional custom synthesis |
 | `yolo26n-pose` / YOLOPose | Explicitly provisioned native pose graph |
 | `d3-edge` / D3Edge | Local candidate scoring with pinned CoreAI graph, tokenizer and configuration |
+| `d3-lite` / D3Lite | Lite text decision graph, tokenizer and configuration |
 
 Old Qwen receipts are not Gemma installations. Apple ASR/TTS assets are OS-managed. Acquisition does not enable a custom mode. Kokoro adapter tests require an external root; Kokoro has no production catalog binding.
 
@@ -48,4 +49,4 @@ Production declarations and explicit developer provisioning.
 
 [Parent design](../README.md)
 
-Decision 使用固定 revision 的 hugging-mac/d3-edge-CoreAI 制品，安装目录 D3Edge。目录只随包分发声明与下载信息，不含权重。图、tokenizer、manifest、配置和许可证一并校验安装，下载不切换业务偏好。
+Decision 固定 Edge 和 Lite 的发布版本，分别安装到 D3Edge 和 D3Lite。Lite 仅下载文本决策图。目录只随包分发声明与下载信息，不含权重。图、tokenizer、manifest、配置和许可证一并校验安装，下载不切换业务偏好。

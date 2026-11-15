@@ -153,7 +153,8 @@ public enum SettingsProviderAdapter {
                     }, writerProviderID: value.writerProviderID, writerModel: value.writerModel,
                     writerThinking: value.writerThinking,
                     decisionProviderID: value.decisionProviderID, decisionModel: value.decisionModel,
-                    decisionUsesLocal: value.decisionUsesLocal == true),
+                    decisionUsesLocal: value.decisionUsesLocal == true,
+                    decisionLocalModelID: value.resolvedDecisionLocalModelID),
                 revision: entry.revision)
         case .save:
             _ = try settings.result(id, sessionID: sessionID)

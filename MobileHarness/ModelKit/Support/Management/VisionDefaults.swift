@@ -14,6 +14,14 @@ extension DefaultModelAssembly {
                 ProvidedCapabilities(
                     decision: try D3Decision(context: context, artifacts: resources.appendingPathComponent("D3Edge")))
             }, defaults: [.decision])
+        try await manager.register(
+            ModelRegistration(
+                id: ModelID("d3-lite"), capabilities: [.decision], memoryPolicy: .retain, artifactID: "d3-lite"
+            ) { context in
+                ProvidedCapabilities(
+                    decision: try D3Decision(
+                        context: context, artifacts: resources.appendingPathComponent("D3Lite"), variant: .lite))
+            })
     }
     static func registerVision(manager: ModelManager, resources: URL) async throws {
         try await manager.register(

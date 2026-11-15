@@ -21,7 +21,7 @@ import Foundation
             providers: state.providers, writerProviderID: state.writerProviderID, writerModel: state.writerModel,
             writerThinking: state.writerThinking,
             decisionProviderID: state.decisionProviderID, decisionModel: state.decisionModel,
-            decisionUsesLocal: state.decisionUsesLocal)
+            decisionUsesLocal: state.decisionUsesLocal, decisionLocalModelID: state.decisionLocalModelID)
     }
     public func restore() async throws {
         guard !stopped else { throw CancellationError() }
@@ -33,6 +33,7 @@ import Foundation
             state.decisionProviderID = value.decisionProviderID
             state.decisionModel = value.decisionModel
             state.decisionUsesLocal = value.decisionUsesLocal
+            state.decisionLocalModelID = value.decisionLocalModelID
             state.writerProviderID = value.writerProviderID
             state.writerModel = value.writerModel
             state.writerThinking = value.writerThinking
@@ -186,6 +187,7 @@ import Foundation
                 candidate.writerThinking = choice.writerThinking
             case .decision:
                 candidate.decisionUsesLocal = choice.usesLocal
+                candidate.decisionLocalModelID = choice.decisionLocalModelID
                 candidate.decisionProviderID = selected?.id
                 candidate.decisionModel = selected == nil ? "" : model
             }

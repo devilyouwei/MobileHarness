@@ -128,10 +128,10 @@
                     language: model.language,
                     beginChange: request.maintenance.beginSettings, endChange: request.maintenance.endSettings),
                 legacyDecision: { try await preferences.legacyDecisionSelection() },
-                isDecisionInstalled: {
+                isDecisionInstalled: { id in
                     let manager = try await request.maintenance.artifacts()
                     return try await manager.artifactSnapshots().contains {
-                        $0.artifact.id == "d3-edge" && $0.phase == .installed
+                        $0.artifact.id == id && $0.phase == .installed
                     }
                 })
             let providerSettings = ProviderSettingsRequests(service: providerService)
@@ -274,10 +274,10 @@
                 },
                 decisionConfiguration: { [model] in
                     let saved = try await providerService.decisionSnapshot()
-                    let useLocal = saved.decisionUsesLocal == true
-                    guard saved.decisionProviderID != nil else { return (useLocal, nil) }
+                    let localID = saved.decisionUsesLocal == true ? saved.resolvedDecisionLocalModelID : nil
+                    guard saved.decisionProviderID != nil else { return (localID, nil) }
                     return (
-                        useLocal,
+                        localID,
                         {
                             let selected = try await ProviderSettingsService.decisionConfiguration(saved)
                             let configuration = try OpenAIChatConfiguration(

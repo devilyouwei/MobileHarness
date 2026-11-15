@@ -190,7 +190,7 @@ extension ApplicationControlAgent {
                         }, writerProviderID: draft.writerProviderID, writerModel: draft.writerModel,
                         writerThinking: draft.writerThinking,
                         decisionProviderID: draft.decisionProviderID, decisionModel: draft.decisionModel,
-                        decisionUsesLocal: draft.decisionUsesLocal),
+                        decisionUsesLocal: draft.decisionUsesLocal, decisionLocalModelID: draft.decisionLocalModelID),
                     sessionID: sessionID)
             } else {
                 operation = .restore
@@ -214,7 +214,8 @@ extension ApplicationControlAgent {
                         }, writerProviderID: stored.writerProviderID, writerModel: stored.writerModel,
                         writerThinking: stored.writerThinking,
                         decisionProviderID: stored.decisionProviderID, decisionModel: stored.decisionModel,
-                        decisionUsesLocal: stored.decisionUsesLocal == true))
+                        decisionUsesLocal: stored.decisionUsesLocal == true,
+                        decisionLocalModelID: stored.resolvedDecisionLocalModelID))
             } catch {
                 await settings.discard(id, sessionID: sessionID)
                 await presentation.discard(id)

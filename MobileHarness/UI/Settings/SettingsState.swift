@@ -6,6 +6,7 @@ public struct CloudSettingsDraft: Sendable, Equatable {
     public var decisionProviderID: String?
     public var decisionModel: String
     public var decisionUsesLocal: Bool
+    public var decisionLocalModelID: String
     public var writerProviderID: String?
     public var writerModel: String
     public var writerThinking: Bool
@@ -18,12 +19,14 @@ public struct CloudSettingsDraft: Sendable, Equatable {
     public init(
         enabled: Bool, url: String, key: String, model: String, providers: [CloudSettingsDraft] = [], name: String = "",
         id: String? = nil, writerProviderID: String? = nil, writerModel: String = "", writerThinking: Bool = false,
-        decisionProviderID: String? = nil, decisionModel: String = "", decisionUsesLocal: Bool = false
+        decisionProviderID: String? = nil, decisionModel: String = "", decisionUsesLocal: Bool = false,
+        decisionLocalModelID: String = "d3-edge"
     ) {
         self.id = id ?? url
         self.decisionProviderID = decisionProviderID
         self.decisionModel = decisionModel
         self.decisionUsesLocal = decisionUsesLocal
+        self.decisionLocalModelID = decisionLocalModelID
         self.writerProviderID = writerProviderID
         self.writerModel = writerModel
         self.writerThinking = writerThinking
@@ -47,6 +50,7 @@ public struct AgentBrainDraft: Equatable, Sendable {
     public var model: String
     public var usesLocal: Bool
     public var writerThinking: Bool
+    public var decisionLocalModelID = "d3-edge"
 }
 
 public enum BrainSettingsChange: Sendable {
@@ -147,6 +151,7 @@ public final class SettingsState {
     public private(set) var revision: UInt64 = 0
     public var decisionProviderID: String? { didSet { if oldValue != decisionProviderID { revision += 1 } } }
     public var decisionModel = "" { didSet { if oldValue != decisionModel { revision += 1 } } }
+    public var decisionLocalModelID = "d3-edge" { didSet { if oldValue != decisionLocalModelID { revision += 1 } } }
     public var decisionUsesLocal = false { didSet { if oldValue != decisionUsesLocal { revision += 1 } } }
     public var writerProviderID: String? { didSet { if oldValue != writerProviderID { revision += 1 } } }
     public var writerModel = "" { didSet { if oldValue != writerModel { revision += 1 } } }
@@ -155,6 +160,7 @@ public final class SettingsState {
         decisionProviderID = initial.decisionProviderID
         decisionModel = initial.decisionModel
         decisionUsesLocal = initial.decisionUsesLocal
+        decisionLocalModelID = initial.decisionLocalModelID
         writerProviderID = initial.writerProviderID
         writerModel = initial.writerModel
         writerThinking = initial.writerThinking
@@ -178,7 +184,7 @@ public final class SettingsState {
         case .decision:
             .init(
                 providerID: decisionProviderID, model: decisionModel, usesLocal: decisionUsesLocal,
-                writerThinking: false)
+                writerThinking: false, decisionLocalModelID: decisionLocalModelID)
         }
     }
     public func selectAssistantProvider(_ id: String?) {
@@ -249,6 +255,7 @@ public final class SettingsState {
         decisionProviderID = value.decisionProviderID
         decisionModel = value.decisionModel
         decisionUsesLocal = value.decisionUsesLocal
+        decisionLocalModelID = value.decisionLocalModelID
         writerProviderID = value.writerProviderID
         writerModel = value.writerModel
         writerThinking = value.writerThinking
@@ -316,6 +323,7 @@ public protocol SettingsPresenting: UIPresentationAccess {
     var decisionProviderID: String? { get set }
     var decisionModel: String { get set }
     var decisionUsesLocal: Bool { get set }
+    var decisionLocalModelID: String { get set }
     var writerProviderID: String? { get set }
     var writerModel: String { get set }
     var writerThinking: Bool { get set }

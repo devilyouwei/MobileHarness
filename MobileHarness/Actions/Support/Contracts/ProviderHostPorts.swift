@@ -6,6 +6,8 @@ public struct ProviderSettings: Equatable, Sendable {
     public let decisionProviderID: String?
     public let decisionModel: String
     public var decisionUsesLocal: Bool?
+    public var decisionLocalModelID: String?
+    public var resolvedDecisionLocalModelID: String { decisionLocalModelID ?? "d3-edge" }
     public let writerProviderID: String?
     public let writerModel: String
     public let writerThinking: Bool
@@ -18,12 +20,14 @@ public struct ProviderSettings: Equatable, Sendable {
     public init(
         enabled: Bool, url: String, key: String, model: String, providers: [ProviderSettings] = [], name: String = "",
         id: String? = nil, writerProviderID: String? = nil, writerModel: String = "", writerThinking: Bool = false,
-        decisionProviderID: String? = nil, decisionModel: String = "", decisionUsesLocal: Bool? = nil
+        decisionProviderID: String? = nil, decisionModel: String = "", decisionUsesLocal: Bool? = nil,
+        decisionLocalModelID: String? = nil
     ) {
         self.id = id ?? url
         self.decisionProviderID = decisionProviderID
         self.decisionModel = decisionModel
         self.decisionUsesLocal = decisionUsesLocal
+        self.decisionLocalModelID = decisionLocalModelID
         self.writerProviderID = writerProviderID
         self.writerModel = writerModel
         self.writerThinking = writerThinking

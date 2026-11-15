@@ -42,7 +42,7 @@ ModelResourcesClient and ModelResourceInteractionWorkflow are Actions-owned UI f
 
 ## Decision 资源
 
-D3 Decision 和 Gemma 在 Agent Brains 共用下载源，分别由模型资源事务管理下载、取消、删除、校验、版本与许可。D3 删除前 quiesce 加入本地调用并卸载。
+D3 Edge、D3 Lite 和 Gemma 在 Agent Brains 共用下载源，各自管理下载、取消、删除、校验、版本与许可。删除 D3 仅围栏对应模型，并加入本地调用和卸载该制品。
 
 下载设置保留旧 useLocalDecision 字段供 [Provider 设置](../Provider/README.md) 在升级时读取，保存下载设置时保持旧值。当前 Decision 主来源及备用由 Provider 设置拥有。删除或缺少 D3 时按已提交备用配置处理。
 

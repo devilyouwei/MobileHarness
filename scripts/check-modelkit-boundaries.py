@@ -1229,7 +1229,7 @@ model_catalog = ROOT / 'MobileHarness/Resources/Models/model-catalog.json'
 if not model_catalog.is_file():
     raise SystemExit('Missing runtime model catalog')
 catalog = json.loads(model_catalog.read_text())
-if catalog.get('schemaVersion') != 2 or {entry.get('id') for entry in catalog.get('packages', [])} != {'moss-tts-nano', 'silero', 'gemma4-e2b', 'yolo26n-pose', 'nemotron', 'd3-edge'}:
+if catalog.get('schemaVersion') != 2 or {entry.get('id') for entry in catalog.get('packages', [])} != {'moss-tts-nano', 'silero', 'gemma4-e2b', 'yolo26n-pose', 'nemotron', 'd3-edge', 'd3-lite'}:
     raise SystemExit('Invalid production model catalog')
 for entry in catalog['packages']:
     source = entry['source']
