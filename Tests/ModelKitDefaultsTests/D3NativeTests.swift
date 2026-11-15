@@ -89,26 +89,27 @@ import Testing
 }
 
 @Test(.enabled(if: ProcessInfo.processInfo.environment["D3_LITE_TEST_RESOURCES"] != nil))
-@MainActor func d3LiteNativeDecisionRunsTextGraphAndRejectsOversizedInput() async throws {
+@MainActor func d3NativeDecisionRunsTextGraphAndRejectsOversizedInput() async throws {
     guard #available(macOS 27, iOS 27, *) else { return }
     let path = try #require(ProcessInfo.processInfo.environment["D3_LITE_TEST_RESOURCES"])
+    let modelID = ProcessInfo.processInfo.environment["D3_NATIVE_MODEL_ID"] ?? "d3-lite"
     let root = ModelContainer(resources: URL(fileURLWithPath: path))
     try await root.start()
     do {
         try await root.setForeground(true)
-        let lite = try #require(root.language.decisionModel("d3-lite"))
-        #expect(await lite.availability == .available)
+        let model = try #require(root.language.decisionModel(modelID))
+        #expect(await model.availability == .available)
         let started = ContinuousClock.now
-        try await lite.warmup()
-        print("D3 Lite native warmup duration: \(started.duration(to: .now))")
-        #expect(try await lite.status() == .ready)
+        try await model.warmup()
+        print("\(modelID) native warmup duration: \(started.duration(to: .now))")
+        #expect(try await model.status() == .ready)
         let request = try DecisionRequest(
             text: "The customer was charged twice for a single order.",
             candidates: [
                 "billing: Payments and invoices", "shipping: Delivery", "account: Login", "wishlist: Saved items",
             ],
             instructions: "Which team should handle this?")
-        let session = try await lite.decide(request)
+        let session = try await model.decide(request)
         let values = try await session.withCleanup {
             var values: [DecisionResult] = []
             for try await result in session.events { values.append(result) }
@@ -116,14 +117,14 @@ import Testing
         }
         try #require(values.count == 1)
         guard case .selected(let label, let score) = values[0].decision else {
-            throw CapabilityError.invalidRequest("D3 Lite did not select a candidate")
+            throw CapabilityError.invalidRequest("D3 did not select a candidate")
         }
         #expect(label == request.candidates[0])
         #expect(score?.isFinite == true)
         let oversized = try DecisionRequest(
             text: String(repeating: "hello ", count: 1000), candidates: ["keep", "drop"])
         await #expect(throws: CapabilityError.self) {
-            let rejected = try await lite.decide(oversized)
+            let rejected = try await model.decide(oversized)
             try await rejected.withCleanup {
                 for try await _ in rejected.events {}
             }

@@ -321,3 +321,5 @@ Decision 页面独立选择本地 D3/云端，云端 Provider/模型沿用共享
 Mac 上通过同一个 ModelKit 端口验证 hugging-mac 三输入制品与原五输入制品，均预热至 ready、完成四候选推理并拒绝超过 512 token 的输入。Edge 原生回归通过。两款制品的常规预热记录来自已运行过的主机环境，不能用于比较冷编译。用同一份官方权重和相同转换工具另导出五输入对照图。全新进程的三输入图遇到 LLVM 磁盘空间错误，五输入图遇到 LLVM mmap 分配错误，未得到有效的成对冷启动结果。真机上的加载异常尚未复现定位。
 
 五个 iOS Simulator 目标通过。全量集成阶段的两个 Action 结算用例在定向重跑中通过；全量检查另复现 Writer/Web Action 声明缺失，在 AppWorkflow 停滞后中止。
+
+D3 共用签名适配验收在 Mac 上运行了四个组合：三输入 Edge、三输入 Lite，以及同一张实际五输入图分别经 Edge 和 Lite 注册端口执行。四个组合均预热至 ready、完成四候选文本推理并拒绝超过 512 token 的输入。1,180 项 IntegrationTests 和五个 iOS Simulator 目标通过。全量检查复现 Writer/Web 缺少 Action 声明，在 AppWorkflow 停滞后中止。iPhone 加载仍待真机验证。

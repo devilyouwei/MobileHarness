@@ -10,12 +10,10 @@ public actor D3Decision: DecisionCapability {
     #if canImport(CoreAI)
         private let resource: ModelResource<D3Graph>
     #endif
-    public init(context: ModelContext, artifacts: URL, allowsVisualInputs: Bool = false) throws {
+    public init(context: ModelContext, artifacts: URL) throws {
         self.artifacts = artifacts
         #if canImport(CoreAI)
-            resource = try context.resource {
-                try await D3Graph(artifacts: artifacts, allowsVisualInputs: allowsVisualInputs)
-            }
+            resource = try context.resource { try await D3Graph(artifacts: artifacts) }
         #endif
     }
     public var availability: CapabilityAvailability {
@@ -88,7 +86,7 @@ public actor D3Decision: DecisionCapability {
         let manifest: Manifest
         let configuration: Configuration
         let visualInputs: [String: TensorValue]
-        init(artifacts: URL, allowsVisualInputs: Bool) async throws {
+        init(artifacts: URL) async throws {
             manifest = try JSONDecoder().decode(
                 Manifest.self, from: Data(contentsOf: artifacts.appendingPathComponent("manifest.json")))
             configuration = try JSONDecoder().decode(
@@ -96,9 +94,8 @@ public actor D3Decision: DecisionCapability {
             let textInputs: Set<String> = ["input_ids", "attention_mask", "position_ids"]
             let expectedInputs = Set(manifest.inputs)
             let usesVisualInputs =
-                allowsVisualInputs && manifest.hiddenSize == 1024
+                manifest.hiddenSize == 1024
                 && expectedInputs == textInputs.union(["visual_embeddings", "visual_mask"])
-                && (manifest.modality == nil || manifest.modality == "text")
             guard manifest.sequenceLength == 512, manifest.inputs.count == expectedInputs.count,
                 usesVisualInputs || (manifest.modality == "text" && expectedInputs == textInputs),
                 configuration.formatID == "d3-code-readout-v1", configuration.codes.count == 255,
@@ -118,7 +115,7 @@ public actor D3Decision: DecisionCapability {
                 let maskShape = [1, 512, 1]
                 guard await graph.shape(ofInput: "visual_embeddings") == embeddingShape,
                     await graph.shape(ofInput: "visual_mask") == maskShape
-                else { throw CapabilityError.invalidRequest("Unexpected D3 Lite visual input shape") }
+                else { throw CapabilityError.invalidRequest("Unexpected D3 visual input shape") }
                 visualInputs = [
                     "visual_embeddings": .float32(Array(repeating: 0, count: 512 * 1024), shape: embeddingShape),
                     "visual_mask": .bool(Array(repeating: false, count: 512), shape: maskShape),

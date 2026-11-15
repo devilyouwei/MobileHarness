@@ -812,3 +812,7 @@ App 的 `d3-lite` 目录与选择 ID 保持稳定，下载来源固定为 `huggi
 ### D3 Lite 图签名兼容
 
 在 ModelKit 内按制品 manifest 校验 Lite 的三输入纯文本图及五输入图。五输入签名要求 1024 隐藏宽度，推理时由加载器绑定全零视觉向量与全 false 掩码。两种签名共用 512-token 文本输入、255 项读出及同一 DecisionRequest/DecisionResult；Edge 仍使用三输入图。生产下载版本保持当前固定提交，签名差异通过真实制品复测，手机冷启动故障单独确认。
+
+### D3 共用图签名适配
+
+ModelKit 的 D3 适配器根据 manifest 和图输入校验三输入及五输入签名，取消型号级开关。文本 Decision 只为声明了视觉输入的图绑定空视觉张量。Edge 和 Lite 均可走任一签名，业务继续使用现有文本 DecisionRequest/DecisionResult。发布制品、下载配置和视觉业务接入不在本次范围内。原生验收覆盖三输入发布制品及以两种型号注册的五输入图。
