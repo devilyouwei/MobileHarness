@@ -276,7 +276,7 @@ public enum RuntimeLogEvent: Sendable {
 
 public struct DecisionLogItem: Identifiable, Sendable, Equatable {
     public enum Route: String, Sendable {
-        case local = "Local D3"
+        case local = "Local"
         case cloud = "Cloud Decision"
         case fallback = "Fallback"
     }
@@ -290,6 +290,7 @@ public struct DecisionLogItem: Identifiable, Sendable, Equatable {
     public let time: Date
     public let duration: Duration
     public let route: Route
+    public let modelName: String?
     public let modelResult: Disposition?
     public let adoptedResult: Disposition
     public let reason: String?
@@ -298,7 +299,7 @@ public struct DecisionLogItem: Identifiable, Sendable, Equatable {
     public init(
         id: String, source: String, inputText: String, time: Date = .now, duration: Duration, route: Route,
         modelResult: Disposition?,
-        adoptedResult: Disposition, reason: String? = nil, requests: [String]
+        adoptedResult: Disposition, reason: String? = nil, requests: [String], modelName: String? = nil
     ) {
         self.id = id
         self.source = String(source.prefix(64))
@@ -306,6 +307,7 @@ public struct DecisionLogItem: Identifiable, Sendable, Equatable {
         self.time = time
         self.duration = duration
         self.route = route
+        self.modelName = modelName
         self.modelResult = modelResult
         self.adoptedResult = adoptedResult
         self.reason = reason.map { String($0.prefix(256)) }

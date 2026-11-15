@@ -51,3 +51,5 @@ The owning stateSnapshot entry point reads current local business/capability val
 Diagnostic test running/stopping, audio workflow phase, support/capture/fallback and sample rate are Runtime. The audio child Business contains actual input route, signal/level, direction/angles and optional permission observations. Stable raw-value enums, units and value sets describe these fields. Reading does not refresh, alter expiry or activate capture. Business sampleAgeSeconds/signalFresh/directionFresh distinguish historical display values from current receipt/angle evidence; missing receipt/deadline remains unknown.
 
 UIDiagnosticsContainer returns only its local admission and speech/audio indices. SpeechDiagnosticState and AudioDetectionState own independent stateSnapshot() async throws readers. Sampling the root never reads child workflow, configuration or sensory values.
+
+设置中的音频检测提示仅说明检测时长与声音方向仅供参考，不展示未校准坐标等实现术语；实际检测状态和失败仍完整呈现。

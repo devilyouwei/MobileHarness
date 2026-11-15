@@ -1,0 +1,1031 @@
+{
+  "commit": "b87eb69c279c452310675c7bd5a054a8afeb3393",
+  "host": {
+    "model": "Mac17,5",
+    "chip": "Apple A18 Pro",
+    "memoryGiB": 8,
+    "macOS": "27.2.1 (26B131)",
+    "xcode": "27.2 (27B52)"
+  },
+  "sourceSHA256": {
+    "MobileHarness/ModelKit/Language/JEV/D3Decision.swift": "3fd4bf130d0c6ecf98d56640459a6fd0aa38812f74dcb59399069996048df731",
+    "MobileHarness/ModelKit/Support/Management/VisionDefaults.swift": "e39497b8688d6e24b23d52ea4c030dcf140eb12b0804bd90b5fd3ad9ad6276e2",
+    "MobileHarness/Agents/Assistant/AssistantDecisionProtocol.swift": "e3a8d7e8ae088a16a04a5aeb517cbc5b7467c0e87da85f3b8ebb1472da35e058",
+    "MobileHarness/Agents/Assistant/AssistantInputDecision.swift": "2c89bf541a7f69f25af847ef3c0499c6364dbe0a13057cf6adce6f4ca9ac7f62",
+    "MobileHarness/Resources/Agents/Assistant/InputDecision.json": "456787738252679985178e609e5b3b1a5e71ecb0ba4e1b300c2eca3a928c0ae1",
+    "MobileHarness/Resources/Agents/Assistant/InputDecision.zh-Hans.json": "a184216ba88140723bae1031672602eaa8c58d2dfeec3a21319e62e52f24f5f0",
+    "Tests/ModelKitDefaultsTests/D3NativeTests.swift": "08b6b36e1fd3a680041b9aef7a0108e235258e8baa0001ed6199630c3fb32ead",
+    "Tests/IntegrationTests/DecisionProtocolBenchmark.swift": "50b0d8fa1703dd39c14ab70d14034eebd83c434d5bfcc9613541a19df88d4459",
+    "Tests/IntegrationTests/DecisionLanguageEvaluationTests.swift": "cca57d300158b25a791e709f03cbd0a034d113f6c66a3c4f814a514b943c518d",
+    "docs/measurements/decision-language-scenarios-2026-11-14.json": "a32505c475d2f2cd5781616401635a6d4e7295eef27a242705b7b01acb629b92",
+    "Tests/DecisionBenchmarks/models.json": "a5faa8014563f9420d1a3a11fd4c649ad903d185ecd93f21dd3e8cac0983efb5"
+  },
+  "fixture": "docs/measurements/decision-language-scenarios-2026-11-14.json",
+  "scope": "Real Mac production JEV protocol; 27 English + 27 Chinese three-choice cases per model. No Assistant adoption overrides or production timeout cancellation.",
+  "results": [
+    {
+      "model": "d3-edge",
+      "mode": "jev",
+      "segments": [
+        {
+          "language": "en",
+          "offset": 0,
+          "exitCode": 0,
+          "warmup": [
+            {
+              "elapsedMS": 280.746417,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 208.519791,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 206.562083,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            }
+          ],
+          "rows": [
+            {
+              "elapsedMS": 208.267708,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 201.346042,
+              "expected": "interrupt",
+              "id": "short-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 198.933666,
+              "expected": "interrupt",
+              "id": "pause-now",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 198.599125,
+              "expected": "interrupt",
+              "id": "enough",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 209.013166,
+              "expected": "interrupt",
+              "id": "skip-current",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 199.751208,
+              "expected": "interrupt",
+              "id": "abort-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 198.456959,
+              "expected": "interrupt",
+              "id": "correct-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 198.569208,
+              "expected": "interrupt",
+              "id": "stop-before-hit",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 198.436167,
+              "expected": "enqueue",
+              "id": "confirm-short",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 198.781,
+              "expected": "enqueue",
+              "id": "confirm-explicit",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 204.544584,
+              "expected": "enqueue",
+              "id": "answer-no",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 198.914459,
+              "expected": "enqueue",
+              "id": "answer-option",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 198.857333,
+              "expected": "enqueue",
+              "id": "new-request-filler",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 198.693875,
+              "expected": "enqueue",
+              "id": "short-command",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 199.198709,
+              "expected": "enqueue",
+              "id": "short-fragment",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 199.332459,
+              "expected": "enqueue",
+              "id": "speech-deferred",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 199.878666,
+              "expected": "enqueue",
+              "id": "motion-deferred",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 201.257542,
+              "expected": "enqueue",
+              "id": "stop-negated",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 200.511583,
+              "expected": "enqueue",
+              "id": "stop-quoted",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 216.130792,
+              "expected": "enqueue",
+              "id": "stop-idle",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 214.446875,
+              "expected": "enqueue",
+              "id": "question-during-speech",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 215.451541,
+              "expected": "discard",
+              "id": "filler-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 205.291791,
+              "expected": "discard",
+              "id": "filler-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 202.144708,
+              "expected": "discard",
+              "id": "noise-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 203.925875,
+              "expected": "discard",
+              "id": "noise-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 204.18725,
+              "expected": "discard",
+              "id": "unintelligible",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 203.172708,
+              "expected": "discard",
+              "id": "punctuation-only",
+              "prediction": "discard"
+            }
+          ]
+        },
+        {
+          "language": "zh-Hans",
+          "offset": 0,
+          "exitCode": 0,
+          "warmup": [
+            {
+              "elapsedMS": 243.890416,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 202.195625,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 211.085208,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            }
+          ],
+          "rows": [
+            {
+              "elapsedMS": 211.756583,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 209.210834,
+              "expected": "interrupt",
+              "id": "short-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 209.628459,
+              "expected": "interrupt",
+              "id": "pause-now",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 220.995708,
+              "expected": "interrupt",
+              "id": "enough",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 206.325042,
+              "expected": "interrupt",
+              "id": "skip-current",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 205.333292,
+              "expected": "interrupt",
+              "id": "abort-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 205.05075,
+              "expected": "interrupt",
+              "id": "correct-motion",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 209.12625,
+              "expected": "interrupt",
+              "id": "stop-before-hit",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 216.298208,
+              "expected": "enqueue",
+              "id": "confirm-short",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 209.5475,
+              "expected": "enqueue",
+              "id": "confirm-explicit",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 212.920333,
+              "expected": "enqueue",
+              "id": "answer-no",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 213.931791,
+              "expected": "enqueue",
+              "id": "answer-option",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 214.150833,
+              "expected": "enqueue",
+              "id": "new-request-filler",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 211.214666,
+              "expected": "enqueue",
+              "id": "short-command",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 214.807083,
+              "expected": "enqueue",
+              "id": "short-fragment",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 215.454791,
+              "expected": "enqueue",
+              "id": "speech-deferred",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 215.627542,
+              "expected": "enqueue",
+              "id": "motion-deferred",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 217.607041,
+              "expected": "enqueue",
+              "id": "stop-negated",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 229.241375,
+              "expected": "enqueue",
+              "id": "stop-quoted",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 219.79,
+              "expected": "enqueue",
+              "id": "stop-idle",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 216.871167,
+              "expected": "enqueue",
+              "id": "question-during-speech",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 220.216333,
+              "expected": "discard",
+              "id": "filler-idle",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 227.351458,
+              "expected": "discard",
+              "id": "filler-speaking",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 234.34625,
+              "expected": "discard",
+              "id": "noise-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 231.647125,
+              "expected": "discard",
+              "id": "noise-speaking",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 228.742125,
+              "expected": "discard",
+              "id": "unintelligible",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 218.407875,
+              "expected": "discard",
+              "id": "punctuation-only",
+              "prediction": "discard"
+            }
+          ]
+        }
+      ],
+      "summary": {
+        "en": {
+          "count": 27,
+          "valid": 27,
+          "correct": 13,
+          "p95ValidMS": 215.451541,
+          "correctWithinBudget": 13,
+          "correctWithin500MS": 13,
+          "budgetMS": 250,
+          "falseInterrupt": 4,
+          "falseDiscard": 10,
+          "missedInterrupt": 1,
+          "failures": {}
+        },
+        "zh-Hans": {
+          "count": 27,
+          "valid": 27,
+          "correct": 8,
+          "p95ValidMS": 231.647125,
+          "correctWithinBudget": 8,
+          "correctWithin500MS": 8,
+          "budgetMS": 250,
+          "falseInterrupt": 11,
+          "falseDiscard": 8,
+          "missedInterrupt": 2,
+          "failures": {}
+        },
+        "all": {
+          "count": 54,
+          "valid": 54,
+          "correct": 21,
+          "p95ValidMS": 229.241375,
+          "correctWithinBudget": 21,
+          "correctWithin500MS": 21,
+          "budgetMS": 250,
+          "falseInterrupt": 15,
+          "falseDiscard": 18,
+          "missedInterrupt": 3,
+          "failures": {}
+        }
+      },
+      "additionalMetrics": {
+        "minMS": 198.436167,
+        "p50MS": 209.069708,
+        "maxMS": 234.34625,
+        "completedWithin250MS": 54,
+        "completedWithin500MS": 54,
+        "ratingRaw": 2.097072805555556,
+        "ratingHalfStars": 2.0,
+        "confusion": {
+          "interrupt": {
+            "interrupt": 13,
+            "discard": 3,
+            "enqueue": 0
+          },
+          "discard": {
+            "interrupt": 4,
+            "discard": 8,
+            "enqueue": 0
+          },
+          "enqueue": {
+            "interrupt": 11,
+            "discard": 15,
+            "enqueue": 0
+          }
+        }
+      }
+    },
+    {
+      "model": "d3-lite",
+      "mode": "jev",
+      "segments": [
+        {
+          "language": "en",
+          "offset": 0,
+          "exitCode": 0,
+          "warmup": [
+            {
+              "elapsedMS": 779.084459,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 659.258166,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 551.348958,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            }
+          ],
+          "rows": [
+            {
+              "elapsedMS": 540.744,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 620.579,
+              "expected": "interrupt",
+              "id": "short-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 638.830959,
+              "expected": "interrupt",
+              "id": "pause-now",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 649.546583,
+              "expected": "interrupt",
+              "id": "enough",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 684.96175,
+              "expected": "interrupt",
+              "id": "skip-current",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 702.213958,
+              "expected": "interrupt",
+              "id": "abort-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 685.067583,
+              "expected": "interrupt",
+              "id": "correct-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 672.538916,
+              "expected": "interrupt",
+              "id": "stop-before-hit",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 688.098959,
+              "expected": "enqueue",
+              "id": "confirm-short",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 611.264541,
+              "expected": "enqueue",
+              "id": "confirm-explicit",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 724.581083,
+              "expected": "enqueue",
+              "id": "answer-no",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 662.559042,
+              "expected": "enqueue",
+              "id": "answer-option",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 589.836375,
+              "expected": "enqueue",
+              "id": "new-request-filler",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 628.784459,
+              "expected": "enqueue",
+              "id": "short-command",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 715.250542,
+              "expected": "enqueue",
+              "id": "short-fragment",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 634.638125,
+              "expected": "enqueue",
+              "id": "speech-deferred",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 752.927125,
+              "expected": "enqueue",
+              "id": "motion-deferred",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 664.324542,
+              "expected": "enqueue",
+              "id": "stop-negated",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 617.655917,
+              "expected": "enqueue",
+              "id": "stop-quoted",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 644.18575,
+              "expected": "enqueue",
+              "id": "stop-idle",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 728.9705,
+              "expected": "enqueue",
+              "id": "question-during-speech",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 652.160792,
+              "expected": "discard",
+              "id": "filler-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 778.866875,
+              "expected": "discard",
+              "id": "filler-speaking",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 657.017,
+              "expected": "discard",
+              "id": "noise-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 613.091333,
+              "expected": "discard",
+              "id": "noise-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 649.060917,
+              "expected": "discard",
+              "id": "unintelligible",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 668.036291,
+              "expected": "discard",
+              "id": "punctuation-only",
+              "prediction": "enqueue"
+            }
+          ]
+        },
+        {
+          "language": "zh-Hans",
+          "offset": 0,
+          "exitCode": 0,
+          "warmup": [
+            {
+              "elapsedMS": 715.155541,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 657.4755,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 596.743875,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            }
+          ],
+          "rows": [
+            {
+              "elapsedMS": 604.073625,
+              "expected": "interrupt",
+              "id": "direct-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 666.213583,
+              "expected": "interrupt",
+              "id": "short-stop",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 627.946,
+              "expected": "interrupt",
+              "id": "pause-now",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 673.892,
+              "expected": "interrupt",
+              "id": "enough",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 758.545958,
+              "expected": "interrupt",
+              "id": "skip-current",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 646.099958,
+              "expected": "interrupt",
+              "id": "abort-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 641.093917,
+              "expected": "interrupt",
+              "id": "correct-motion",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 684.92,
+              "expected": "interrupt",
+              "id": "stop-before-hit",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 656.432458,
+              "expected": "enqueue",
+              "id": "confirm-short",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 735.467625,
+              "expected": "enqueue",
+              "id": "confirm-explicit",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 745.585833,
+              "expected": "enqueue",
+              "id": "answer-no",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 650.239459,
+              "expected": "enqueue",
+              "id": "answer-option",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 669.974125,
+              "expected": "enqueue",
+              "id": "new-request-filler",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 786.262541,
+              "expected": "enqueue",
+              "id": "short-command",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 671.310166,
+              "expected": "enqueue",
+              "id": "short-fragment",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 806.160417,
+              "expected": "enqueue",
+              "id": "speech-deferred",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 689.893167,
+              "expected": "enqueue",
+              "id": "motion-deferred",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 636.914083,
+              "expected": "enqueue",
+              "id": "stop-negated",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 751.12325,
+              "expected": "enqueue",
+              "id": "stop-quoted",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 728.736083,
+              "expected": "enqueue",
+              "id": "stop-idle",
+              "prediction": "interrupt"
+            },
+            {
+              "elapsedMS": 734.521166,
+              "expected": "enqueue",
+              "id": "question-during-speech",
+              "prediction": "enqueue"
+            },
+            {
+              "elapsedMS": 774.78675,
+              "expected": "discard",
+              "id": "filler-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 656.320917,
+              "expected": "discard",
+              "id": "filler-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 671.069584,
+              "expected": "discard",
+              "id": "noise-idle",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 779.059083,
+              "expected": "discard",
+              "id": "noise-speaking",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 687.663667,
+              "expected": "discard",
+              "id": "unintelligible",
+              "prediction": "discard"
+            },
+            {
+              "elapsedMS": 807.683709,
+              "expected": "discard",
+              "id": "punctuation-only",
+              "prediction": "discard"
+            }
+          ]
+        }
+      ],
+      "summary": {
+        "en": {
+          "count": 27,
+          "valid": 27,
+          "correct": 21,
+          "p95ValidMS": 752.927125,
+          "correctWithinBudget": 0,
+          "correctWithin500MS": 0,
+          "budgetMS": 250,
+          "falseInterrupt": 4,
+          "falseDiscard": 0,
+          "missedInterrupt": 0,
+          "failures": {}
+        },
+        "zh-Hans": {
+          "count": 27,
+          "valid": 27,
+          "correct": 20,
+          "p95ValidMS": 806.160417,
+          "correctWithinBudget": 0,
+          "correctWithin500MS": 0,
+          "budgetMS": 250,
+          "falseInterrupt": 3,
+          "falseDiscard": 4,
+          "missedInterrupt": 1,
+          "failures": {}
+        },
+        "all": {
+          "count": 54,
+          "valid": 54,
+          "correct": 41,
+          "p95ValidMS": 786.262541,
+          "correctWithinBudget": 0,
+          "correctWithin500MS": 0,
+          "budgetMS": 250,
+          "falseInterrupt": 7,
+          "falseDiscard": 4,
+          "missedInterrupt": 1,
+          "failures": {}
+        }
+      },
+      "additionalMetrics": {
+        "minMS": 540.744,
+        "p50MS": 670.5218545,
+        "maxMS": 807.683709,
+        "completedWithin250MS": 0,
+        "completedWithin500MS": 0,
+        "ratingRaw": 3.0370370370370376,
+        "ratingHalfStars": 3.0,
+        "confusion": {
+          "interrupt": {
+            "interrupt": 15,
+            "discard": 1,
+            "enqueue": 0
+          },
+          "discard": {
+            "interrupt": 0,
+            "discard": 10,
+            "enqueue": 2
+          },
+          "enqueue": {
+            "interrupt": 7,
+            "discard": 3,
+            "enqueue": 16
+          }
+        }
+      }
+    }
+  ],
+  "native": {
+    "d3-edge": {
+      "initialLog": "◇ Test run started.\n↳ Testing Library Version: 2403\n↳ Target Platform: arm64e-apple-macos14.0\n◇ Test d3NativeDecisionRunsTextGraphAndRejectsOversizedInput() started.\n◇ Test d3NativeDecisionMatchesPublishedFixtureAndRejectsOversizedInput() started.\nd3-edge native warmup duration: 83.983557792 seconds\n✔ Test d3NativeDecisionRunsTextGraphAndRejectsOversizedInput() passed after 89.744 seconds.\nD3 native warm duration: 0.198845917 seconds\n✔ Test d3NativeDecisionMatchesPublishedFixtureAndRejectsOversizedInput() passed after 89.910 seconds.\n✔ Test run with 2 tests in 0 suites passed after 89.911 seconds.\n",
+      "cachedReloadLog": "◇ Test run started.\n↳ Testing Library Version: 2403\n↳ Target Platform: arm64e-apple-macos14.0\n◇ Test d3NativeDecisionRunsTextGraphAndRejectsOversizedInput() started.\nd3-edge native warmup duration: 5.722160709 seconds\n✔ Test d3NativeDecisionRunsTextGraphAndRejectsOversizedInput() passed after 6.209 seconds.\n✔ Test run with 1 test in 0 suites passed after 6.209 seconds.\n"
+    },
+    "d3-lite": {
+      "initialLog": "◇ Test run started.\n↳ Testing Library Version: 2403\n↳ Target Platform: arm64e-apple-macos14.0\n◇ Test d3NativeDecisionRunsTextGraphAndRejectsOversizedInput() started.\nd3-lite native warmup duration: 302.301872416 seconds\n✔ Test d3NativeDecisionRunsTextGraphAndRejectsOversizedInput() passed after 303.646 seconds.\n✔ Test run with 1 test in 0 suites passed after 303.647 seconds.\n",
+      "cachedReloadLog": "◇ Test run started.\n↳ Testing Library Version: 2403\n↳ Target Platform: arm64e-apple-macos14.0\n◇ Test d3NativeDecisionRunsTextGraphAndRejectsOversizedInput() started.\nd3-lite native warmup duration: 7.894226208 seconds\n✔ Test d3NativeDecisionRunsTextGraphAndRejectsOversizedInput() passed after 8.999 seconds.\n✔ Test run with 1 test in 0 suites passed after 8.999 seconds.\n"
+    }
+  },
+  "artifacts": {
+    "d3-edge": {
+      "repository": "hugging-mac/d3-edge-CoreAI",
+      "revision": "0690c04ee1640c1c3fa11a882323751dda6d086a",
+      "graphSHA256": "ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78",
+      "hashVerified": true,
+      "manifest": {
+        "source": "vllm-sr/d3-edge",
+        "revision": "bee5e872f75b9c5d1405767bf244a6948b95c0af",
+        "sequence_length": 512,
+        "precision": "bfloat16",
+        "readout_precision": "float32",
+        "attention_mode": "noncausal_full_attention",
+        "modality": "text",
+        "inputs": [
+          "input_ids",
+          "attention_mask",
+          "position_ids"
+        ],
+        "output": "mm_90",
+        "function": "main",
+        "format": "Apple Core AI .aimodel",
+        "source_weight_sha256": "91bb8618450a7f628f1432bbced76bc19ee7346c93d191a228fdd33c25a57a9d",
+        "experimental": true,
+        "validation": {
+          "baseline_choices_matched": 75,
+          "baseline_cases": 75,
+          "exploratory_prompt_choices_matched": 95,
+          "exploratory_prompt_cases": 96,
+          "maximum_probability_error": 0.02308797836303711,
+          "strict_probability_parity": false,
+          "iphone_tested": false
+        },
+        "platform": {
+          "hardware": "Apple M5, 16 GiB RAM",
+          "os": "macOS 27.2",
+          "accelerator_placement_verified": false
+        }
+      }
+    },
+    "d3-lite": {
+      "repository": "hugging-mac/d3-lite-CoreAI",
+      "revision": "863963d371d5af6784bf726fb85a508c08751d65",
+      "graphSHA256": "c9117d0cfdbd6fae885bda3011c222afd4ac5871a3c58ce6d65ecd525de658ea",
+      "hashVerified": true,
+      "manifest": {
+        "source": "vllm-sr/d3-lite",
+        "revision": "a8d25a91ef75552803f7009d25b7bd435991abd9",
+        "sequence_length": 512,
+        "hidden_size": 1024,
+        "precision": "bfloat16",
+        "readout_precision": "float32",
+        "attention_mode": "noncausal_full_attention",
+        "modality": "text",
+        "inputs": [
+          "input_ids",
+          "attention_mask",
+          "position_ids"
+        ],
+        "output": "mm_186",
+        "function": "main",
+        "format": "Apple Core AI .aimodel",
+        "source_weight_sha256": "ca6222dbf2b72899ae45580ed84d26d1f0e69a8de212edda295072000e34a4c2",
+        "source_readout_sha256": "fe11cfac5c79b6a83e35b707581b1260214279bb22b003c215c62719186ef629"
+      }
+    }
+  },
+  "loadingDiagnostic": {
+    "initialWarmupSeconds": {
+      "d3-edge": 83.983557792,
+      "d3-lite": 302.301872416
+    },
+    "cachedReloadWarmupSeconds": {
+      "d3-edge": 5.722160709,
+      "d3-lite": 7.894226208
+    },
+    "initialEdgeCaveat": "Two enabled Edge native tests ran concurrently in one test process; not an isolated cold-start benchmark. No system cache purge was performed.",
+    "liteSample": "    +                             857 mach_msg2_internal  (in libsystem_kernel.dylib) + 76  [0x195b1e8e0]\n    +                               857 mach_msg2_trap  (in libsystem_kernel.dylib) + 8  [0x195b0bc20]\n    857 Thread_129943   DispatchQueue_15: com.apple.root.default-qos.cooperative  (concurrent)\n    + 857 completeTaskWithClosure(swift::AsyncContext*, swift::SwiftError*)  (in libswift_Concurrency.dylib) + 1  [0x199c14d41]\n    +   857 partial apply for closure #1 in ModelResource.ensureLoaded(reportLoading:)  (in ModelKitDefaultsTests) + 1  [0x1098327f9]  /<compiler-generated>:0\n    +     857 closure #1 in ModelResource.ensureLoaded(reportLoading:)  (in ModelKitDefaultsTests) + 1  [0x10982a139]  ModelResource.swift:140\n    +       857 partial apply for closure #1 in closure #1 in ModelContext.resource<A>(concurrent:loader:)  (in ModelKitDefaultsTests) + 1  [0x109834785]  /<compiler-generated>:0\n    +         857 closure #1 in closure #1 in ModelContext.resource<A>(concurrent:loader:)  (in ModelKitDefaultsTests) + 1  [0x10982fd21]  ModelResource.swift:284\n    +           857 ModelLoadGate.run<A>(_:)  (in ModelKitDefaultsTests) + 1  [0x1098250f1]  ModelResource.swift:59\n    +             857 partial apply for closure #1 in D3Decision.init(context:artifacts:)  (in ModelKitDefaultsTests) + 1  [0x10a3c3531]  /<compiler-generated>:0\n    +               857 closure #1 in D3Decision.init(context:artifacts:)  (in ModelKitDefaultsTests) + 1  [0x10a3c32dd]  D3Decision.swift:16\n    +                 857 D3Graph.__allocating_init(artifacts:)  (in ModelKitDefaultsTests) + 1  [0x10a3c3615]  D3Decision.swift:0\n    +                   857 D3Graph.init(artifacts:)  (in ModelKitDefaultsTests) + 1  [0x10a3c80cd]  D3Decision.swift:105\n    +                     857 GraphModel.__allocating_init(contentsOf:function:computeUnits:)  (in ModelKitDefaultsTests) + 1  [0x10a1b3fa1]  GraphModel.swift:0\n    +                       857 GraphModel.init(contentsOf:function:computeUnits:)  (in ModelKitDefaultsTests) + 1  [0x10a1b4291]  GraphModel.swift:52\n    +                         857 ???  (in CoreAIDelegates)  load address 0x2d0e74000 + 0xb9c4  [0x2d0e7f9c4]\n    +                           857 ???  (in CoreAIDelegates)  load address 0x2d0e74000 + 0xcbe8  [0x2d0e80be8]\n    +                             857 ???  (in CoreAIDelegates)  load address 0x2d0e74000 + 0x12e4c  [0x2d0e86e4c]\n    +                               857 ???  (in CoreAIDelegates)  load address 0x2d0e74000 + 0x10ebc  [0x2d0e84ebc]\n    +                                 857 ???  (in CoreAIDelegates)  load address 0x2d0e74000 + 0xe820  [0x2d0e82820]\n    +                                   857 ???  (in CoreAIDelegates)  load address 0x2d0e74000 + 0xa800  [0x2d0e7e800]\n    +                                     857 ???  (in CoreAIDelegates)  load address 0x2d0e74000 + 0x13040  [0x2d0e87040]\n    +                                       857 ???  (in CoreAIDelegates)  load address 0x2d0e74000 + 0xed18  [0x2d0e82d18]\n    +                                         857 ???  (in CoreAICompiler)  load address 0x2d011f000 + 0xac9c  [0x2d0129c9c]\n    +                                           857 ???  (in CoreAICompiler)  load address 0x2d011f000 + 0xf608  [0x2d012e608]\n    +                                             857 ???  (in CoreAICompiler)  load address 0x2d011f000 + 0xa940  [0x2d0129940]\n    +                                               857 ???  (in CoreAICompiler)  load address 0x2d011f000 + 0xc21c  [0x2d012b21c]\n    +                                                 857 ???  (in CoreAICompiler)  load address 0x2d011f000 + 0xdbcc  [0x2d012cbcc]\n    +                                                   857 mlir::ODIE::Compiler::capi::detail::invoke(odiec_module_t, odiec_pass_t const*, long long, odiec_global_options_t)  (in libODIECompiler.dylib) + 756  [0x2d019b4b8]\n    +                                                     857 mlir::ODIE::Compiler::applyPasses(mlir::ModuleOp, llvm::ArrayRef<std::variant<mlir::ODIE::Compiler::PassEntry, std::function<llvm::LogicalResult (mlir::OpPassManager&)>>>, mlir::ODIE::Compiler::Options const&)  (in libODIECompiler.dylib) + 952  [0x2d01852dc]\n    +                                                       857 mlir::PassManager::run(mlir::Operation*)  (in libODIECompiler.dylib) + 772  [0x2d0539274]\n    +                                                         857 mlir::detail::OpToOpPassAdaptor::runPipeline(mlir::OpPassManager&, mlir::Operation*, mlir::AnalysisManager, bool, unsigned int, mlir::PassInstrumentor*, mlir::PassInstrumentation::PipelineParentInfo const*)  (in libODIECompiler.dylib) + 152  [0x2d05386a4]\n    +                                                           857 mlir::detail::OpToOpPassAdaptor::run(mlir::Pass*, mlir::Operation*, mlir::AnalysisManager, bool, unsigned int)  (in libODIECompiler.dylib) + 832  [0x2d05384a0]\n    +                                                             857 llvm::function_ref<void ()>::callback_fn<mlir::detail::OpToOpPassAdaptor::run(mlir::Pass*, mlir::Operation*, mlir::AnalysisManager, bool, unsigned int)::$_1>(long)  (in libODIECompiler.dylib) + 124  [0x2d053a9d8]\n    +                                                               857 mlir::ODIE::Compiler::Transforms::CompileForDelegates::runOnOperation()  (in libODIECompiler.dylib) + 4948  [0x2d0b82c80]\n    +                                                                 857 llvm::StdThreadPool::wait(llvm::ThreadPoolTaskGroup&)  (in libODIECompiler.dylib) + 124  [0x2d01dc350]\n    +                                                                   857 std::condition_variable::wait(std::unique_lock<std::mutex>&)  (in libc++.1.dylib) + 32  [0x19ab297bc]\n    +                                                                     857 _pthread_cond_wait  (in libsystem_pthread.dylib) + 980  [0x195b511b4]\n    +                                                                       857 __psynch_cvwait  (in libsystem_kernel.dylib) + 8  [0x195b0f50c]\n    857 Thread_130020: llvm-worker-0\n    + 857 thread_start  (in libsystem_pthread.dylib) + 8  [0x195b4bcd0]\n    +   857 _pthread_start  (in libsystem_pthread.dylib) + 136  [0x195b50ce4]\n    +     857 llvm::thread::ThreadProxy<std::tuple<llvm::StdThreadPool::grow(int)::$_0>>(void*)  (in libODIECompiler.dylib) + 136  [0x2d01dcfd0]\n    +       857 llvm::StdThreadPool::processTasks(llvm::ThreadPoolTaskGroup*)  (in libODIECompiler.dylib) + 664  [0x2d01dbfa4]\n    +         857 std::__assoc_sub_state::wait()  (in libc++.1.dylib) + 56  [0x19ab4b1f4]\n    +           857 std::__deferred_assoc_state<llvm::LogicalResult, std::__async_func<std::function<llvm::LogicalResult ()>>>::__execute()  (in libODIECompiler.dylib) + 56  [0x2d0b834cc]\n    +             857 mlir::ODIE::Compiler::Transforms::CompileForDelegates::generateCompilationTask() const::'lambda'(std::basic_string<char> const&, mlir::ODIE::Compiler::ModuleRewriter const&, mlir::ModuleOp)::operator()(std::basic_string<char> const&, mlir::ODIE::Compiler::ModuleRewriter const&, mlir::ModuleOp) const  (in libODIECompiler.dylib) + 564  [0x2d0b818c4]\n    +               857 mlir::ODIE::Compiler::Serialization::rewriteModule(mlir::ModuleOp, mlir::ODIE::Compiler::ModuleRewriter const&, std::optional<std::__fs::filesystem::path> const&, std::__fs::filesystem::path const&, bool)  (in libODIECompiler.dylib) + 520  [0x2d0d69c54]\n    +                 857 std::__function::__func<mlir::ODIE::Compiler::capi::detail::set_callback(odiec_external_rewriter_t, void*, odiec_bytecode_blob_t (*)(void*, odiec_external_rewriter_payload_t))::$_0, std::unique_ptr<llvm::MemoryBuffer> (mlir::ODIE::Compiler::ModuleRewriter::Payload&&)>::operator()(mlir::ODIE::Compiler::ModuleRewriter::Payload&&)  (in libODIECompiler.dylib) + 60  [0x2d019bd84]\n    +                   857 ???  (in CoreAICompiler)  load address 0x2d011f000 + 0x1279c  [0x2d013179c]\n    +                     857 ???  (in CoreAICompiler)  load address 0x2d011f000 + 0x1318c  [0x2d013218c]\n    +                       857 protocol witness for Compiler.Delegates.BinaryGenerator.compile(moduleBytecode:to:with:) in conformance Compiler_coreAI  (in MetalPerformanceShadersGraph) + 56  [0x26ddc808c]\n    +                         857 closure #1 in Compiler_coreAI.compile(moduleBytecode:to:with:)  (in MetalPerformanceShadersGraph) + 1368  [0x26ddc706c]\n    +                           857 -[MPSGraphAICodeCompilerDelegate getInitializedAICodeBytecodeWithPayloadPrefix:delegateId:]  (in MetalPerformanceShadersGraph) + 3456  [0x26dd45790]\n    +                             857 -[MPSGraphExecutable serializeToMPSGraphPackageAtURL:descriptor:]  (in MetalPerformanceShadersGraph) + 644  [0x26dd95b74]\n    +                               857 -[MPSGraphExecutable createMLIRLibraryWithMPSGraphPackage:packageKey:appendOptimizedModules:descriptor:]  (in MetalPerformanceShadersGraph) + 12516  [0x26dd90ad4]\n    +                                 857 -[MPSGraphPackage writeResources:]  (in MetalPerformanceShadersGraph) + 1000  [0x26dbaf31c]\n    +                                   857 support::ResourceStorage::add(llvm::StringRef, llvm::ArrayRef<support::ResourceStorage::ResourceWriteInfo> const&, llvm::StringMap<support::ResourceStorage::ResourceReadInfo, llvm::MallocAllocator>&, std::basic_string<char>*)  (in MetalPerformanceShadersGraph) + 580  [0x26e683b5c]\n    +                                     857 llvm::raw_ostream::write(char const*, unsigned long)  (in MetalPerformanceShadersGraph) + 444  [0x26fb36698]\n    +                                       857 llvm::raw_fd_ostream::write_impl(char const*, unsigned long)  (in MetalPerformanceShadersGraph) + 144  [0x26fb37568]\n    +                                         857 write  (in libsystem_kernel.dylib) + 8  [0x195b0f838]\n    857 Thread_130021: llvm-worker-1",
+    "diskFreeGiBObserved": [
+      27,
+      15,
+      11,
+      13,
+      11,
+      47
+    ],
+    "diskCaveat": "Whole-volume free-space observations, not exact per-process allocations."
+  },
+  "preparationIssues": [
+    "Stale SwiftBuild Metal toolchain path; backed up generated XCBuildData and rebuilt successfully.",
+    "Lite download disconnected/stalled; resumed fixed revision and verified SHA-256 before inference."
+  ]
+}

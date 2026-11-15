@@ -197,7 +197,7 @@ extension AudioDetectionPresenting {
             } header: {
                 Text(appCopy.text("Audio detection"))
             } footer: {
-                Text(appCopy.text("Detection lasts 10 seconds. Direction uses uncalibrated capture coordinates."))
+                Text(appCopy.text("Detection takes 10 seconds. Sound direction is approximate."))
             }
             .onDisappear { submit(.stop) }
             .onChange(of: scenePhase) { _, phase in if phase != .active { submit(.stop) } }

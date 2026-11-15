@@ -13,3 +13,5 @@ ComputeUnits expresses public specialization preferences; cpuOnly restricts the 
 [CoreAIKit notice](../../../../../docs/licenses/CoreAIKit-BSD-3-Clause.txt) · [Parent design](../README.md)
 
 ComputeUnits.automatic uses SpecializationOptions.default without a heterogeneous placement preference. [D3](../../../Language/JEV/README.md) selects this option for its pinned artifact.
+
+GraphModel exposes the native deviceArchitectureName for artifact selection and accepts both source .aimodel and compiled .aimodelc URLs through the same AIModel loader. Compiled assets can still require device specialization.

@@ -24,7 +24,7 @@ AudioContainer 按有限命名作用域缓存原生实现，对外返回 AudioIn
 
 startCapture 仅在调用方明确 preferSpatial 时尝试 FOA；对话路径优先系统回声消除输入，其次共享语音处理图。空间后端启动失败必须加入清理再尝试单声道；已经接纳的流不改变布局。
 
-两后端都在首个有效入队PCM后返回就绪，静音也有效，不伪造首帧超时回退。mono请求1024样本，回调验证1…8192帧；FOA为四声道ACN/SN3D，时间连续误差不超过两样本，每传输包最多4000帧／16000标量。
+两后端都在首个有效入队PCM后返回就绪，静音也有效，首帧等待默认最多10秒，超时明确失败并沿启动清理链关闭采集，不伪造首帧成功；计时子任务在任何终态取消并加入。mono请求1024样本，回调验证1…8192帧；FOA为四声道ACN/SN3D，时间连续误差不超过两样本，每传输包最多4000帧／16000标量。
 
 startCapture 只确认首帧就绪；subscribeCapture 将当前代的唯一原生 64 包有序源交给只读消费者，不经过 MainActor 逐包中转。重复消费者明确 busy，无活动捕获明确 unavailable；原生溢出保留已接纳包并以 overflow 终止。MicrophoneCapture 关闭围栏后迟到回调不能污染新流。stopCapture 关闭接纳并加入空间后端／原生回调。
 
@@ -113,6 +113,16 @@ PlatformContainer injects AudioContainer's native owner fence into VisionContain
 
 ## 语音处理采播图
 
-AppleAudioIO 的单声道语音路径在同一 NativePlaybackGraph 中连接输入、mixer 和 player。优先设置 playAndRecord/default，检测 isEchoCancelledInputAvailable，启用并在激活后确认 isEchoCancelledInputEnabled；不支持、未启用或失败时，回退 voiceChat/voice processing，明确关闭 bypass 并核对输入/输出节点。两个处理器不叠加，配置失败通过原生报告端口保留。I/O 模式配置先于 mixer tap 的安装。采集时固定输出24000Hz，其他 TTS 采样率先转换，播放启停不重建正在采集的图。首个真实PCM确认就绪；输入/输出停止分别加入，完整stop关闭共享图。
+AppleAudioIO 的单声道语音路径在同一 NativePlaybackGraph 中连接输入、mixer 和 player。已激活的蓝牙 HFP 输入保留 voiceChat 并直接确认 voice processing，避免为系统 AEC 探测反复切换会话模式。其他输入优先设置 playAndRecord/default，检测 isEchoCancelledInputAvailable，启用并在激活后确认 isEchoCancelledInputEnabled；不支持、未启用或失败时，回退 voiceChat/voice processing，明确关闭 bypass 并核对输入/输出节点。两个处理器不叠加，配置失败通过原生报告端口保留。I/O 模式配置先于 mixer tap 的安装。采集时固定输出24000Hz，其他 TTS 采样率先转换，播放启停不重建正在采集的图。首个真实PCM确认就绪；输入/输出停止分别加入，完整stop关闭共享图。
 
-AudioCaptureContext.echoCancellation 记录 systemInput/voiceProcessing/unavailable（未采样默认 unknown）。supportsFullDuplex 只来自确认启用的实际能力；无法启用时返回受限采集，业务暂停播放期间的识别。启动、首 PCM 完成与采集中每次播放提交前复核 session/图状态；丢失 AEC 明确失败。原生路由通知即使是 categoryChange/override，也先确认 AEC 仍有效，丢失时发送 routeChanged 以关闭旧代。开启 AEC 的事实不等于已测量实际回声抑制效果。路由变化终止旧捕获代并重新获取能力。startCapture 默认不请求空间后端；明确 preferSpatial 的调用仍可使用既有FOA路径，不能同时宣称FOA与回声处理能力。
+AudioCaptureContext.echoCancellation 记录 systemInput/voiceProcessing/unavailable（未采样默认 unknown）。supportsFullDuplex 要求确认启用 AEC 且活动输入/输出均非蓝牙路线。HFP/A2DP/LE 路线即使处理器已启用也返回受限采集：启用事实不能证明蓝牙链路的回声隔离。MicrophoneCapture 与 captureContext 使用同一选择结果，业务在实际播放期间暂停识别、drain后恢复；此时不支持语音打断。启动、首 PCM 完成与采集中每次播放提交前复核 session/图状态；丢失 AEC 明确失败。原生路由通知即使是 categoryChange/override，也先确认 AEC 仍有效，丢失时发送 routeChanged 以关闭旧代。开启 AEC 的事实不等于已测量实际回声抑制效果。路由变化终止旧捕获代并重新获取能力。startCapture 默认不请求空间后端；明确 preferSpatial 的调用仍可使用既有FOA路径，不能同时宣称FOA与回声处理能力。
+
+单声道在配置完成后、等待首帧前绑定原生事件；中断同时终止就绪门和 PCM，媒体服务重置保留原生错误。事件监听与首帧期限均由原生采集生命周期拥有。
+
+### 引擎格式失效与启动重建
+
+NativePlaybackGraph 单独观察当前 AVAudioEngine 实例的 configurationChange，回调只写容量1、保留最新通知的 AsyncStream。单个 actor 观察任务在同步 start 返回后读取 engine.isRunning 和当前输入采样率/声道；仍在运行且格式一致的配置通知不退役采集。停机或格式变化才通过 AudioCaptureConfigurationGate 终止当前 PCM/首帧等待。启动返回前再次检查门。停止先失效门并移除通知，再取消并加入观察任务，最后停止 tap/引擎；旧任务按门身份拒绝替代代。
+
+启动配置失效最多重试一次；保留已配置的 I/O 引擎及有效 AEC，重新安装格式相关 tap/播放连接，不再次启用已生效的 voice processing。每次重新获取实际格式，首帧期限仍为10秒。取消、普通超时和系统中断不自动重试。运行中配置失效通过现有 PCM 失败/业务恢复链传播。完整 stop 仍释放并重建原生引擎。
+
+环境变量 MH_AUDIO_TRACE=1 开启准备格式、引擎启动返回、配置事实和首帧完成的 stdout 诊断，默认关闭；不记录音频内容、设备名或 UID。

@@ -2,6 +2,61 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "Fallback": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "兜底处理"
+          }
+        }
+      }
+    },
+    "Cloud Decision": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "云端决策"
+          }
+        }
+      }
+    },
+    "Adopted result": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最终采用结果"
+          }
+        }
+      }
+    },
+    "Model result": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型结果"
+          }
+        }
+      }
+    },
+    "No valid result": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无有效结果"
+          }
+        }
+      }
+    },
     "%@ (Unavailable)": {
       "extractionState": "manual",
       "localizations": {
@@ -53,17 +108,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "对话"
-          }
-        }
-      }
-    },
-    "Mac benchmark rating": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mac 实测推荐指数"
           }
         }
       }
@@ -493,28 +537,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "添加 Provider"
-          }
-        }
-      }
-    },
-    "Add a cloud LLM provider, then choose models for Assistant and Writer.": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "添加云端 LLM Provider，随后为 Assistant 和 Writer 分别选择模型。"
-          }
-        }
-      }
-    },
-    "After saving, Assistant will switch to its local model, Writer will be unconfigured, and Decision will clear this cloud provider.": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "保存后，引用此 Provider 的 Assistant 切回本地，Writer 显示未配置，Decision 清除云端引用。"
           }
         }
       }
@@ -1795,17 +1817,6 @@
         }
       }
     },
-    "Could not decode the photo. Go back and try again.": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法解码照片，请返回后重试"
-          }
-        }
-      }
-    },
     "Could not display pose results.": {
       "extractionState": "extracted",
       "localizations": {
@@ -2499,17 +2510,6 @@
         }
       }
     },
-    "Detection lasts 10 seconds. Direction uses uncalibrated capture coordinates.": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "检测 10 秒。方向使用采集坐标，未校准。"
-          }
-        }
-      }
-    },
     "Device communication failed": {
       "extractionState": "manual",
       "localizations": {
@@ -2748,39 +2748,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "删除后需要重新下载 YOLO 才能使用本地姿态识别。"
-          }
-        }
-      }
-    },
-    "Download and install Gemma 4 E2B before switching to the local language model.": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "请先下载并安装 Gemma 4 E2B 大模型，再切换到本地模型。"
-          }
-        }
-      }
-    },
-    "Download and install MOSS before enabling the custom speech model.": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "请先下载并安装 MOSS 语音合成模型，再开启自定义模型。"
-          }
-        }
-      }
-    },
-    "Download and install Nemotron before enabling custom speech recognition.": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "请先下载并安装 Nemotron 语音识别模型，再开启自定义识别模型。"
           }
         }
       }
@@ -4160,39 +4127,6 @@
         }
       }
     },
-    "Latest decision route": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "最近决策路径"
-          }
-        }
-      }
-    },
-    "Leave the URL blank for https://api.openai.com/v1, or enter an OpenAI-compatible endpoint. Your API key is stored in the device keychain.": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "URL 留空使用 https://api.openai.com/v1，也可填写兼容 OpenAI 的服务地址。API key 安全保存在设备钥匙串中。"
-          }
-        }
-      }
-    },
-    "Leave the URL blank to use OpenAI. Confirm, then select Save on the provider list to apply the configuration.": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "URL 留空时使用 OpenAI 官方服务。确认后返回列表，点击页面上的保存应用配置。"
-          }
-        }
-      }
-    },
     "Limited listening · Recognition pauses while speaking": {
       "extractionState": "extracted",
       "localizations": {
@@ -4376,17 +4310,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "本地 Gemma 4 E2B"
-          }
-        }
-      }
-    },
-    "Local Gemma supports tool calls within its context limit. Extended thinking applies to cloud models on new or resumed assignments.": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "本地 Gemma 支持上下文容量内的工具调用。深度思考设置用于云端模型的新建或续作委托。"
           }
         }
       }
@@ -6470,17 +6393,6 @@
         }
       }
     },
-    "Revision %@ · %@": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "版本 %@ · %@"
-          }
-        }
-      }
-    },
     "Robot arm connection": {
       "extractionState": "extracted",
       "localizations": {
@@ -8197,17 +8109,6 @@
         }
       }
     },
-    "Thinking is off by default. If the model requires it, the lowest setting is used.": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "对话协调模型，默认关闭思考；无法关闭时使用最低思考档位。"
-          }
-        }
-      }
-    },
     "This Writer assignment has ended.": {
       "extractionState": "extracted",
       "localizations": {
@@ -8270,17 +8171,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "本轮处理已结束。"
-          }
-        }
-      }
-    },
-    "This service returned no recognizable chat models.": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "此服务没有返回可识别的聊天模型"
           }
         }
       }
@@ -8413,17 +8303,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Token 用量："
-          }
-        }
-      }
-    },
-    "Too many model lookups are running. Try again later.": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "同时处理的模型查询过多，请稍后重试"
           }
         }
       }
@@ -9550,28 +9429,6 @@
         }
       }
     },
-    "Only the selected model is used. If it fails, an error is shown and input is queued.": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "仅使用所选模型。失败时显示错误提示，并将消息入队。"
-          }
-        }
-      }
-    },
-    "This local model is not downloaded. Download it in Agent Models first.": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "此本地模型尚未下载，请先在“智能体模型”中下载。"
-          }
-        }
-      }
-    },
     "Download Gemma 4 E2B in Agent Models before selecting the local model.": {
       "extractionState": "extracted",
       "localizations": {
@@ -9649,13 +9506,178 @@
         }
       }
     },
-    "If this is the selected Decision model, classification will fail and input will be queued until it is downloaded again or another model is selected.": {
+    "Recommendation": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "推荐指数"
+          }
+        }
+      }
+    },
+    "Latest decision": {
       "extractionState": "extracted",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "若此模型是当前所选决策模型，删除后决策会报错并将消息入队，直到重新下载或选择其他模型。"
+            "value": "最新决策"
+          }
+        }
+      }
+    },
+    "After saving, Assistant will use a local model. Select another model for Writer and Decision if they use this provider.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存后，助手将使用本地模型。创作助手和决策若使用此服务，请另选模型。"
+          }
+        }
+      }
+    },
+    "Leave the URL blank to use OpenAI. After confirming, tap Save on the previous page.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "地址留空使用 OpenAI。确认后，请在上一页点击保存。"
+          }
+        }
+      }
+    },
+    "Download this model in Agent Models first.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先在“智能体模型”中下载此模型。"
+          }
+        }
+      }
+    },
+    "If this model is selected, download it again or choose another model to restore decision-making.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "若正在使用此模型，请重新下载或选择其他模型以恢复决策。"
+          }
+        }
+      }
+    },
+    "Connect an AI service to choose models for your assistants.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接 AI 服务，为助手选择模型。"
+          }
+        }
+      }
+    },
+    "Leave the URL blank to use OpenAI, or enter a compatible service URL. Your API key is saved securely on this device.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "地址留空使用 OpenAI，也可填写兼容服务地址。API 密钥将安全保存在本机。"
+          }
+        }
+      }
+    },
+    "Detection takes 10 seconds. Sound direction is approximate.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检测持续 10 秒，声音方向仅供参考。"
+          }
+        }
+      }
+    },
+    "Download Nemotron first.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先下载 Nemotron。"
+          }
+        }
+      }
+    },
+    "Download MOSS first.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先下载 MOSS。"
+          }
+        }
+      }
+    },
+    "Download Gemma 4 E2B first.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先下载 Gemma 4 E2B。"
+          }
+        }
+      }
+    },
+    "Extended thinking may take longer.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "深度思考可能需要更长时间。"
+          }
+        }
+      }
+    },
+    "Could not open the photo. Go back and try again.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法打开照片，请返回后重试。"
+          }
+        }
+      }
+    },
+    "Model search is busy. Try again shortly.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在查询模型，请稍后重试。"
+          }
+        }
+      }
+    },
+    "No chat models found for this service.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到此服务的对话模型。"
           }
         }
       }

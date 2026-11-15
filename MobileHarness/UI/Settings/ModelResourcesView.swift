@@ -80,6 +80,7 @@
         private func modelKindBadge(_ title: String, color: Color) -> some View {
             Text(appCopy.text(title))
                 .font(.caption.weight(.semibold))
+                .fixedSize()
                 .foregroundStyle(color)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
@@ -120,11 +121,13 @@
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(alignment: .center, spacing: 16) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(appCopy.text(item.name))
-                                if ModelResourceGroup.language.modelIDs.contains(item.id) {
-                                    modelKindBadge("Chat", color: .blue)
-                                } else if ModelResourceGroup.decision.modelIDs.contains(item.id) {
-                                    modelKindBadge("Decision", color: .orange)
+                                HStack(alignment: .center, spacing: 8) {
+                                    if ModelResourceGroup.language.modelIDs.contains(item.id) {
+                                        modelKindBadge("Chat", color: .blue)
+                                    } else if ModelResourceGroup.decision.modelIDs.contains(item.id) {
+                                        modelKindBadge("Decision", color: .orange)
+                                    }
+                                    Text(appCopy.text(item.name))
                                 }
                                 if item.id == "silero" {
                                     Text(
@@ -137,13 +140,7 @@
                                     "\(appCopy.text(state.status(item))) · \(item.installed ? "" : appCopy.text("Estimated "))\(ByteCountFormatter.string(fromByteCount: item.installed ? item.installedBytes : item.bytes, countStyle: .file))"
                                 )
                                 .font(.caption).foregroundStyle(.secondary)
-                                Text(
-                                    appCopy.format(
-                                        "Revision %@ · %@", String(describing: item.revision.prefix(12)),
-                                        String(describing: item.license))
-                                ).font(.caption2)
-                                    .foregroundStyle(
-                                        .secondary)
+                                Text(item.license).font(.caption2).foregroundStyle(.secondary)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             VStack(alignment: .trailing, spacing: 0) {
@@ -206,9 +203,9 @@
                 }
                 if includesDecision {
                     HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(appCopy.text("Apple System LLM"))
+                        HStack(alignment: .center, spacing: 8) {
                             modelKindBadge("Chat", color: .blue)
+                            Text(appCopy.text("Apple System LLM"))
                         }
                         Spacer()
                         Text(appCopy.text(state.appleSystemAvailable ? "Available" : "Unavailable"))
@@ -235,7 +232,7 @@
                             ? appCopy.text("Speech will switch to Apple. Download the model again to re-enable it.")
                             : removal.map { ModelResourceGroup.decision.modelIDs.contains($0.id) } == true
                                 ? appCopy.text(
-                                    "If this is the selected Decision model, classification will fail and input will be queued until it is downloaded again or another model is selected."
+                                    "If this model is selected, download it again or choose another model to restore decision-making."
                                 )
                                 : group == .language
                                     ? appCopy.text("Use a cloud model or download Gemma 4 E2B again for local chat.")

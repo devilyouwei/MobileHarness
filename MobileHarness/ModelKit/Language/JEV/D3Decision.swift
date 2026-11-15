@@ -6,6 +6,13 @@ import Tokenizers
 /// Text-only D3 readout. The caller supplies candidate meanings and owns routing policy.
 @available(iOS 27, macOS 27, *)
 public actor D3Decision: DecisionCapability {
+    public static var deviceArchitectureName: String? {
+        #if canImport(CoreAI) && os(iOS) && !targetEnvironment(simulator)
+            GraphModel.deviceArchitectureName
+        #else
+            nil
+        #endif
+    }
     private let artifacts: URL
     #if canImport(CoreAI)
         private let resource: ModelResource<D3Graph>
@@ -18,11 +25,29 @@ public actor D3Decision: DecisionCapability {
     }
     public var availability: CapabilityAvailability {
         #if canImport(CoreAI)
-            FileManager.default.fileExists(atPath: artifacts.appendingPathComponent("decision.aimodel").path)
-                ? .available : .unavailable(reason: "D3 artifacts are not installed")
+            do {
+                let url = try Self.graphURL(artifacts: artifacts)
+                return FileManager.default.fileExists(atPath: url.path)
+                    ? .available : .unavailable(reason: "D3 artifacts are not installed")
+            } catch {
+                return .unavailable(reason: String(describing: error))
+            }
         #else
             .unavailable(reason: "Core AI is unavailable on this platform")
         #endif
+    }
+    static func graphURL(artifacts: URL) throws -> URL {
+        struct GraphManifest: Decodable {
+            enum CodingKeys: String, CodingKey { case compiledModels = "compiled_models" }
+            let compiledModels: [String: String]?
+        }
+        let manifest = try JSONDecoder().decode(
+            GraphManifest.self, from: Data(contentsOf: artifacts.appendingPathComponent("manifest.json")))
+        guard let models = manifest.compiledModels else { return artifacts.appendingPathComponent("decision.aimodel") }
+        guard let architecture = deviceArchitectureName, let name = models[architecture],
+            name == "decision.\(architecture).aimodelc"
+        else { throw CapabilityError.unavailable("No compatible D3 compiled graph for this device") }
+        return artifacts.appendingPathComponent(name)
     }
     public func decide(_ request: DecisionRequest) async throws -> InferenceSession<DecisionResult> {
         #if canImport(CoreAI)
@@ -103,7 +128,7 @@ public actor D3Decision: DecisionCapability {
             else { throw CapabilityError.invalidRequest("Unsupported D3 artifact contract") }
             tokenizer = try await AutoTokenizer.from(modelFolder: artifacts)
             graph = try await GraphModel(
-                contentsOf: artifacts.appendingPathComponent("decision.aimodel"), function: manifest.function,
+                contentsOf: try D3Decision.graphURL(artifacts: artifacts), function: manifest.function,
                 computeUnits: .automatic)
             let inputNames = await graph.inputNames
             let outputNames = await graph.outputNames

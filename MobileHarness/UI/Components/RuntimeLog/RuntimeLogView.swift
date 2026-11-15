@@ -194,12 +194,16 @@ import Foundation
             case .decision:
                 ForEach(state.visibleDecisions) { decision in
                     VStack(alignment: .leading, spacing: 5) {
-                        Text(decision.source + " · " + decision.route.rawValue).font(.body.weight(.medium))
-                        Text(decision.adoptedResult.rawValue)
+                        Text(
+                            decision.source + " · " + appCopy.text(decision.route.rawValue)
+                                + (decision.modelName.map { " · " + $0 } ?? "")
+                        ).font(.body.weight(.medium))
+                        Text(appCopy.text("Adopted result") + " · " + decision.adoptedResult.rawValue)
                             .foregroundStyle(decision.modelResult == nil ? .orange : .primary)
-                        if let result = decision.modelResult, result != decision.adoptedResult {
-                            Text("Model result · " + result.rawValue).foregroundStyle(.secondary)
-                        }
+                        Text(
+                            appCopy.text("Model result") + " · "
+                                + (decision.modelResult?.rawValue ?? appCopy.text("No valid result"))
+                        ).foregroundStyle(.secondary)
                         if let reason = decision.reason {
                             Text(reason).foregroundStyle(.secondary)
                         }

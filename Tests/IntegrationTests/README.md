@@ -402,3 +402,9 @@ python3 scripts/evaluate-decision-protocols.py d3-edge d3-lite apple-system gemm
 ```
 
 The cloud launcher reads the existing Aliyun HTTPS endpoint and key from `.env.local` and only admits the two Flash models. Local models read the existing benchmark artifacts. Results checkpoint by language and segment. The launcher records strict accuracy, invalid responses, missed/false dispositions, valid p95, and timely correct counts at 500 ms and the applicable App budget. Calls run to completion to preserve correctness evidence, subject to the provider timeout. No credential or endpoint is written to the report.
+
+AudioCaptureReadinessTests 另覆盖无 PCM 首帧期限、已有终态优先及蓝牙 HFP 跳过系统 AEC 模式探测；替身测试不代表 AirPods 真机验收。
+
+AudioCaptureReadinessTests 覆盖引擎配置失效在首帧前/后的错误传播、重复与停止后通知围栏，以及启动重建单次预算；跨平台通知门测试不代表蓝牙硬件路由验收。
+
+蓝牙播放误识别回归将实际路线能力选择接入 SpeechPerception 播放准入，覆盖处理器已启用但蓝牙仍受限、播放期间拒绝音频、播放结束可接纳新语句及关闭许可不被恢复；不代表真实噪声/回声测量。

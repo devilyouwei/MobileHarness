@@ -16,6 +16,8 @@
     /// ```
     @available(iOS 27, macOS 27, *)
     public actor GraphModel {
+        public static var deviceArchitectureName: String { AIModel.deviceArchitectureName }
+
         public enum ComputeUnits: Sendable {
             /// `neuralEngine`/`gpu`/`cpu` express a *preference* over the full allowed set
             /// (`[cpu, gpu, neuralEngine]`); `cpuOnly` collapses the allowed set to the CPU alone.
@@ -44,7 +46,7 @@
         public let inputNames: [String]
         public let outputNames: [String]
 
-        /// Loads and specializes a `.aimodel` (first load compiles on-device; cached afterwards).
+        /// Loads a source `.aimodel` or AOT `.aimodelc`; remaining device specialization is cached.
         public init(
             contentsOf url: URL, function name: String = "main",
             computeUnits: ComputeUnits = .gpu

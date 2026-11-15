@@ -236,7 +236,7 @@
             let decoded = source.flatMap { CGImageSourceCreateThumbnailAtIndex($0, 0, options as CFDictionary) }
             guard let decoded else {
                 let label = UILabel(frame: scroll.bounds)
-                label.text = "Could not decode the photo. Go back and try again."
+                label.text = "Could not open the photo. Go back and try again."
                 label.textAlignment = .center
                 label.autoresizingMask = [.flexibleWidth, .flexibleHeight]
                 scroll.addSubview(label)

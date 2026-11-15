@@ -238,7 +238,7 @@
             } message: { _ in
                 Text(
                     appCopy.text(
-                        "After saving, Assistant will switch to its local model, Writer will be unconfigured, and Decision will clear this cloud provider."
+                        "After saving, Assistant will use a local model. Select another model for Writer and Decision if they use this provider."
                     ))
             }
             .overlay(alignment: .bottom) {
@@ -386,7 +386,7 @@
                             Button {
                                 selectLocalModel(model.rawValue)
                             } label: {
-                                let title = localModelMenuTitle(model)
+                                let title = localModelTitle(model)
                                 if model.rawValue == selected {
                                     Label(title, systemImage: "checkmark")
                                 } else {
@@ -408,7 +408,7 @@
                     }
                     .accessibilityIdentifier("settings.\(brain.rawValue).model")
                     if let benchmark = LocalLanguageModel(rawValue: selected)?.benchmark(for: brain) {
-                        LabeledContent(appCopy.text("Mac benchmark rating")) {
+                        LabeledContent(appCopy.text("Recommendation")) {
                             HStack(spacing: 3) {
                                 ForEach(0..<5) { index in
                                     let remaining = benchmark.halfStars - index * 2
@@ -439,10 +439,10 @@
                     .accessibilityIdentifier("settings.writer.thinking")
                 }
             } footer: {
-                Text(details(choice))
+                if let detail = details(choice) { Text(detail) }
             }
             if brain == .decision {
-                Section(appCopy.text("Latest decision route")) {
+                Section(appCopy.text("Latest decision")) {
                     Text(resources.decisionStatus).foregroundStyle(.secondary)
                 }
             }
@@ -452,12 +452,6 @@
             let title = appCopy.text(model.title)
             return model == .apple && !resources.appleSystemAvailable
                 ? appCopy.format("%@ (Unavailable)", title) : title
-        }
-
-        private func localModelMenuTitle(_ model: LocalLanguageModel) -> String {
-            let title = localModelTitle(model)
-            guard let benchmark = model.benchmark(for: brain) else { return title }
-            return "\(title) · \(starNumber(benchmark))/5"
         }
 
         private func starNumber(_ benchmark: LocalModelBenchmark) -> String {
@@ -477,20 +471,17 @@
                 identifier: "settings.\(brain.rawValue).model")
         }
 
-        private func details(_ choice: AgentBrainDraft) -> String {
+        private func details(_ choice: AgentBrainDraft) -> String? {
             switch brain {
             case .assistant:
                 return choice.usesLocal && choice.assistantLocalModelID == "gemma4-e2b"
                     && !resources.installedGroups.contains(.language)
-                    ? appCopy.text("Download Gemma 4 E2B in Agent Models.")
-                    : appCopy.text("Thinking is off by default. If the model requires it, the lowest setting is used.")
+                    ? appCopy.text("Download Gemma 4 E2B in Agent Models.") : nil
             case .writer:
-                return appCopy.text(
-                    "Local Gemma supports tool calls within its context limit. Extended thinking applies to cloud models on new or resumed assignments."
-                )
+                return choice.providerID != nil
+                    ? appCopy.text("Extended thinking may take longer.") : nil
             case .decision:
-                return appCopy.text(
-                    "Only the selected model is used. If it fails, an error is shown and input is queued.")
+                return nil
             }
         }
 
@@ -502,7 +493,7 @@
                 return resources.appleSystemAvailable
             }
             guard resources.items.contains(where: { $0.id == id && $0.installed }) else {
-                selectionError = "This local model is not downloaded. Download it in Agent Models first."
+                selectionError = "Download this model in Agent Models first."
                 return false
             }
             selectionError = nil
@@ -645,7 +636,7 @@
                     } footer: {
                         Text(
                             appCopy.text(
-                                "Leave the URL blank to use OpenAI. Confirm, then select Save on the provider list to apply the configuration."
+                                "Leave the URL blank to use OpenAI. After confirming, tap Save on the previous page."
                             ))
                     }
                     if let error { Section { Text(appCopy.text(error)).foregroundStyle(.red) } }

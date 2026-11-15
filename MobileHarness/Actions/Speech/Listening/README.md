@@ -60,3 +60,5 @@ VoiceCaptureRecovery 拥有单 worker 和一个合并的最新故障槽；重复
 恢复等待实际播放或录像释放音频资源，并检查恢复状态。用户明确调用 startListening 可以重新建立恢复预算，关闭再开启也可建立新会话。用户关闭、设置切换和 shutdown 同步撤销恢复并等待 worker 退出。根会话拥有恢复生命周期。
 
 对话请求 preferSpatial=false；startInput 使用捕获代的实际 supportsFullDuplex，页面状态区分系统回声消除、语音回声消除和受限模式；不能只依据配置偏好宣称全双工。原生和端点延迟仍独立于 Decision，不以 UI 状态推定回声消除质量。
+
+蓝牙音频路线由 PlatformKit 标记 supportsFullDuplex=false，即使 echoCancellation 记录已启用的处理器。播放仍经既有 acquirePlaybackAdmission 暂停 VAD/ASR，原生 PCM 订阅保留并丢弃受限帧；真实播放 drain/清理后恢复。蓝牙回复期间不支持语音打断，不将 AEC 开关状态等同于已验证的回声隔离。

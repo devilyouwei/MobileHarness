@@ -81,3 +81,11 @@ Writer 的 2026-11-08 双模型实验保留 [原始基线](writer-prompt-2026-11
 - [Assistant Decision 三协议本地组](decision-protocols-local-2026-11-15.json)保存 D3 Edge、D3 Lite、Apple 和 Gemma 共 270 条实测、模式分组及预热记录。 [验证报告](../validation/Decision-Model-Mac-Comparison.md#assistant-decision-protocol-benchmark)
 
 [D3 Lite hugging-mac report](d3-lite-hugging-mac-2026-11-15.json) records the 54 matched bilingual JEV requests for the App's replacement artifact, with its release revision and graph hash.
+
+- [A18 Pro Mac D3 复测（2026-11-15）](decision-d3-a18-mac-2026-11-15.json)：Edge/Lite 各54条生产协议评分、加载/缓存后预热日志、制品与源码哈希；方法与限制见[专项报告](../validation/Decision-Model-Mac-Comparison.md#a18-pro-mac-最新代码复测2026-11-15)。
+
+- [iPhone Lite loading 现场摘要（2026-11-15）](decision-d3-lite-iphone-loading-2026-11-15.json)：手机制品核对、App专属CPU资源报告指标、D3加载到ANE编译的符号化调用链及采集限制；不含原始设备诊断包。
+
+- [D3 iOS AOT build inventory](decision-d3-ios-aot-2026-11-15.json): h18p Edge/Lite compile provenance and file hashes; upload and device acceptance status are explicit.
+
+- [D3 Lite iOS AOT native load crash](decision-d3-lite-ios-aot-crash-2026-11-15.json): two matching device crash stacks and all installed file hashes, distinct from successful Mac compilation.

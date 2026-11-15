@@ -38,6 +38,9 @@
         private var installed = false
         private var rate: Int?
         private var capturing = false
+        private var configurationObserver: (any NSObjectProtocol)?
+        private var configurationGate: AudioCaptureConfigurationGate?
+        private var configurationTask: Task<Void, Never>?
         private var echoCancellation = AudioCaptureContext.EchoCancellation.unavailable
         private var token: String?
         private let telemetry: PlaybackTelemetry
@@ -123,8 +126,15 @@
         }
         func prepareCapture(admission: PlatformAdmission?) -> AudioCaptureContext.EchoCancellation {
             engine.stop()
+            // A startup retry retains its configured I/O unit; re-enabling VPIO would retrigger negotiation.
+            if echoCancellation != .unavailable, isEchoCancellationActive() { return echoCancellation }
             // Configure I/O before attaching the mixer tap so no pre-processing format is retained.
+            // Keep an activated HFP route in voiceChat instead of switching profiles to probe system AEC.
+            let bluetoothInput = AVAudioSession.sharedInstance().currentRoute.inputs.contains {
+                $0.portType == .bluetoothHFP
+            }
             echoCancellation = AudioEchoCancellationSelection.select(
+                preferSystemInput: !bluetoothInput,
                 systemInput: {
                     let session = AVAudioSession.sharedInstance()
                     try session.setCategory(
@@ -206,19 +216,60 @@
                     source.finish(throwing: error)
                 }
             }
+            let gate = AudioCaptureConfigurationGate(readiness: readiness, source: source)
+            configurationGate = gate
+            let notifications = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+            configurationObserver = NotificationCenter.default.addObserver(
+                forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil
+            ) { _ in notifications.continuation.yield(()) }
+            configurationTask = Task { [weak self] in
+                for await _ in notifications.stream {
+                    guard !Task.isCancelled else { return }
+                    await self?.inspectCaptureConfiguration(gate: gate, format: format)
+                }
+            }
+            trace("start input=\(format.sampleRate)/\(format.channelCount) echo=\(echoCancellation.rawValue)")
             capturing = true
             do {
                 engine.prepare()
                 try engine.start()
+                trace("start returned running=\(engine.isRunning)")
+                inspectCaptureConfiguration(gate: gate, format: format)
                 try validateEchoCancellation()
                 try await readiness.wait()
+                trace("first PCM received running=\(engine.isRunning)")
+                try gate.check()
                 try validateEchoCancellation()
             } catch {
-                stopCapture()
+                trace("start failed \(error)")
+                await stopCapture()
                 throw error
             }
         }
-        func stopCapture() {
+        private func trace(_ message: String) {
+            if ProcessInfo.processInfo.environment["MH_AUDIO_TRACE"] == "1" {
+                print("[AudioCapture] " + message)
+                fflush(stdout)
+            }
+        }
+        private func inspectCaptureConfiguration(gate: AudioCaptureConfigurationGate, format: AVAudioFormat) {
+            guard configurationGate === gate else { return }
+            let actual = engine.inputNode.outputFormat(forBus: 0)
+            let matches = actual.sampleRate == format.sampleRate && actual.channelCount == format.channelCount
+            trace(
+                "configuration running=\(engine.isRunning) input=\(actual.sampleRate)/\(actual.channelCount) matches=\(matches)"
+            )
+            gate.configurationChanged(engineRunning: engine.isRunning, formatMatches: matches)
+        }
+        func stopCapture() async {
+            configurationGate?.invalidate()
+            configurationGate = nil
+            if let configurationObserver { NotificationCenter.default.removeObserver(configurationObserver) }
+            configurationObserver = nil
+            let observation = configurationTask
+            configurationTask = nil
+            observation?.cancel()
+            await observation?.value
             if capturing { engine.inputNode.removeTap(onBus: 0) }
             capturing = false
             if token == nil { engine.stop() }
@@ -234,9 +285,18 @@
             if !capturing { rate = nil }
         }
 
-        func reset() {
+        func prepareCaptureRetry() {
+            // Keep VPIO, but discard format-dependent output taps and player connections.
+            if installed { engine.mainMixerNode.removeTap(onBus: 0) }
+            installed = false
+            engine.detach(player)
+            player = AVAudioPlayerNode()
+            rate = nil
+        }
+
+        func reset() async {
             guard token == nil else { return }
-            stopCapture()
+            await stopCapture()
             if installed {
                 player.stop()
                 engine.stop()
@@ -300,6 +360,8 @@
                             AVAudioSession.InterruptionType(rawValue: raw) == .began
                         else { continue }
                         admission?.report("audio", "interrupted", AudioIOError.interrupted)
+                        self.captureReadiness?.resolve(.failure(AudioIOError.interrupted))
+                        self.captureSource?.finish(throwing: AudioIOError.interrupted)
                         events.send(.interrupted)
                     }
                 },
@@ -483,20 +545,40 @@
                     captureContext = AudioCaptureContext(
                         input: captureInput(audio), spatialSupport: spatialSupport, fallback: fallback)
                     captureSource?.finish()
-                    let echo = await playback.prepareCapture(admission: platformAdmission)
-                    let duplex = echo == .systemInput || echo == .voiceProcessing
-                    let source = MicrophoneCapture(supportsFullDuplex: duplex)
-                    captureSource = source
-                    let readiness = AudioCaptureReadiness()
-                    captureReadiness = readiness
-                    try await playback.startCapture(source: source, readiness: readiness, admission: platformAdmission)
-                    guard captureToken == token, !Task.isCancelled else { throw CancellationError() }
-                    captureContext = AudioCaptureContext(
-                        input: captureInput(audio), spatialSupport: spatialSupport,
-                        fallback: fallback, supportsFullDuplex: duplex, echoCancellation: echo)
-                    log.info("Capture echo cancellation: \(echo.rawValue, privacy: .public)")
-                    watchEvents()
-                    return
+                    var recovery = AudioCaptureStartupRecovery()
+                    while true {
+                        try Task.checkCancellation()
+                        guard captureToken == token else { throw CancellationError() }
+                        let echo = await playback.prepareCapture(admission: platformAdmission)
+                        let bluetoothPorts: Set<AVAudioSession.Port> = [.bluetoothHFP, .bluetoothA2DP, .bluetoothLE]
+                        let bluetoothRoute = (audio.currentRoute.inputs + audio.currentRoute.outputs).contains {
+                            bluetoothPorts.contains($0.portType)
+                        }
+                        let duplex = AudioCaptureDuplexSelection.supportsFullDuplex(
+                            echoCancellation: echo, bluetoothRoute: bluetoothRoute)
+                        let source = MicrophoneCapture(supportsFullDuplex: duplex)
+                        captureSource = source
+                        let readiness = AudioCaptureReadiness()
+                        captureReadiness = readiness
+                        watchEvents()
+                        do {
+                            try await playback.startCapture(
+                                source: source, readiness: readiness, admission: platformAdmission)
+                        } catch {
+                            source.finish(throwing: error)
+                            guard captureToken == token, !Task.isCancelled, recovery.admit(error) else { throw error }
+                            // Reconnect using fresh formats without recreating/re-enabling the I/O unit.
+                            await playback.prepareCaptureRetry()
+                            log.info("Capture graph configuration changed during startup; rebuilding once")
+                            continue
+                        }
+                        guard captureToken == token, !Task.isCancelled else { throw CancellationError() }
+                        captureContext = AudioCaptureContext(
+                            input: captureInput(audio), spatialSupport: spatialSupport,
+                            fallback: fallback, supportsFullDuplex: duplex, echoCancellation: echo)
+                        log.info("Capture echo cancellation: \(echo.rawValue, privacy: .public)")
+                        return
+                    }
                 } catch {
                     let primary = error
                     guard captureToken == token else { throw primary }

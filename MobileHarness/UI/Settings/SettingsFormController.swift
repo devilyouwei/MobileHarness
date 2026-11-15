@@ -91,7 +91,7 @@ import Foundation
         else { return }
         if let prior = providerRequests[providerID] { discoveries[prior]?.cancel() }
         guard discoveries.count < 32 else {
-            state.modelErrors[providerID] = "Too many model lookups are running. Try again later."
+            state.modelErrors[providerID] = "Model search is busy. Try again shortly."
             return
         }
         let id = UUID()
@@ -117,7 +117,7 @@ import Foundation
                 else { return }
                 self.state.modelCatalogs[providerID] = result
                 if result.isEmpty {
-                    self.state.modelErrors[providerID] = "This service returned no recognizable chat models."
+                    self.state.modelErrors[providerID] = "No chat models found for this service."
                 }
             } catch {
                 guard let self, !Task.isCancelled, self.providerRequests[providerID] == id,

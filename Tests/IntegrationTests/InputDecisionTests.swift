@@ -851,6 +851,7 @@ func multiSourcePreparationFailureRetainsBatchWithoutCreatingMessageOrRetryLoop(
     let input = AgentInput(id: "lite", sessionID: "session", payload: .text("嗯"))
     let result = await service.classify(.init(input: input, text: "嗯", running: true))
     #expect(result.route == .lite)
+    #expect(result.modelName == "D3 Lite")
     #expect(result.modelResult == .discard)
     #expect(result.requests.first?.hasPrefix("Local D3 Lite") == true)
     await service.stop()
@@ -868,6 +869,7 @@ func selectedLocalDecisionFailureNeverCallsConfiguredCloud(id: String) async thr
     let result = await service.classify(snapshot)
     #expect(result.route == .fallback && result.adopted == .enqueue && result.modelResult == nil)
     #expect(result.failure != nil)
+    #expect(result.modelName == (id == "d3-lite" ? "D3 Lite" : "D3 Edge"))
     #expect(await cloud.requests.isEmpty)
     let issue = try #require(result.failureIssue(for: snapshot, language: "en"))
     #expect(issue.inputID == id && issue.userMessage?.contains("Input queued.") == true)
@@ -934,6 +936,7 @@ func localChatDecisionUsesStrictTextWithoutTools(id: String) async throws {
             }, selectedConfiguration: { (id, nil) }, timeout: .seconds(20), localChatTimeout: .seconds(15))
         let input = AgentInput(id: "local-chat", sessionID: "session", payload: .text("停一下"))
         let outcome = await service.classify(.init(input: input, text: "停一下", running: true))
+        #expect(outcome.modelName == (id == "apple-system" ? "Apple System LLM" : "Gemma 4 E2B"))
         #expect(outcome.modelResult == expected, Comment(rawValue: outcome.reason ?? ""))
         #expect(outcome.route == (expected == nil ? .fallback : id == "apple-system" ? .apple : .gemma))
         let request = try #require(await chat.requests.first)
@@ -965,6 +968,7 @@ func inputDecisionCloudTextUsesLocalizedConstraintInUserContent(modelID: String)
         language: { "zh-Hans" })
     let input = AgentInput(id: "text-cloud", sessionID: "session", payload: .text("还有一个问题"))
     let outcome = await service.classify(.init(input: input, text: "还有一个问题", running: true))
+    #expect(outcome.modelName == modelID)
     #expect(outcome.modelResult == .enqueue, Comment(rawValue: outcome.reason ?? ""))
     let request = try #require(await cloud.requests.first)
     #expect(request.messages.map(\.role) == [.user])
@@ -972,4 +976,19 @@ func inputDecisionCloudTextUsesLocalizedConstraintInUserContent(modelID: String)
     #expect(request.messages[0].content.hasSuffix("只输出一个数字：1、2 或 3。"))
     #expect(request.tools.isEmpty)
     await service.stop()
+}
+
+@Test(arguments: [InputDisposition.interrupt, .discard, .enqueue, .continueListening])
+func decisionLogPreservesModelAndSeparatesAdoption(result: InputDisposition) {
+    let snapshot = InputDecisionSnapshot(
+        input: .init(id: "log", sessionID: "session", payload: .text("hello")), text: "hello", running: true)
+    let outcome = InputDecisionOutcome(
+        route: .lite, modelResult: result, adopted: .enqueue, reason: "adoption policy", requests: [],
+        modelName: "D3 Lite")
+    let log = outcome.logItem(for: snapshot, duration: .milliseconds(12))
+    #expect(log.modelName == "D3 Lite")
+    #expect(log.route == .local)
+    #expect(log.modelResult?.rawValue == result.rawValue)
+    #expect(log.adoptedResult == .enqueue)
+    #expect(log.reason == "adoption policy")
 }

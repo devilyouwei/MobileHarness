@@ -47,11 +47,23 @@ public struct AudioCaptureContext: Sendable, Equatable {
 /// Native configuration attempts are ordered; only an observed enabled result admits duplex.
 enum AudioEchoCancellationSelection {
     static func select(
-        systemInput: () throws -> Bool, voiceProcessing: () throws -> Bool,
+        preferSystemInput: Bool = true, systemInput: () throws -> Bool, voiceProcessing: () throws -> Bool,
         report: (any Error) -> Void
     ) -> AudioCaptureContext.EchoCancellation {
-        do { if try systemInput() { return .systemInput } } catch { report(error) }
+        if preferSystemInput {
+            do { if try systemInput() { return .systemInput } } catch { report(error) }
+        }
         do { if try voiceProcessing() { return .voiceProcessing } } catch { report(error) }
         return .unavailable
+    }
+}
+
+/// An enabled processor does not establish echo isolation on a Bluetooth audio route.
+enum AudioCaptureDuplexSelection {
+    static func supportsFullDuplex(
+        echoCancellation: AudioCaptureContext.EchoCancellation, bluetoothRoute: Bool
+    ) -> Bool {
+        guard !bluetoothRoute else { return false }
+        return echoCancellation == .systemInput || echoCancellation == .voiceProcessing
     }
 }

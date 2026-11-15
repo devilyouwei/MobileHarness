@@ -435,3 +435,58 @@ private actor ResumableHubFixture: ModelArtifactDownloader {
     try await store.close()
     #expect(await changes.next() == nil)
 }
+
+@Test func catalogSelectsArchitectureBeforeDownloadAndRetainsSourceForOtherDevices() throws {
+    let base = try fixtureCatalog()
+    var json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(base)) as? [String: Any])
+    var packages = try #require(json["packages"] as? [[String: Any]])
+    let variant: [String: Any] = [
+        "source": [
+            "kind": "huggingface", "repoId": "owner/repo", "revision": "aot-r2",
+            "allowPatterns": ["ios/h18p/*"], "stripPrefix": "ios/h18p",
+        ],
+        "requiredFiles": ["decision.h18p.aimodelc/main.hash"], "estimatedBytes": 1024,
+    ]
+    packages[0]["architectureVariants"] = ["h18p": variant]
+    json["packages"] = packages
+    let catalog = try ModelArtifactCatalog.decode(JSONSerialization.data(withJSONObject: json))
+    let selected = try #require(catalog.resolvingArchitecture("h18p").packages.first)
+    #expect(selected.revision == "aot-r2")
+    #expect(selected.source.stripPrefix == "ios/h18p")
+    #expect(selected.requiredFiles == ["decision.h18p.aimodelc/main.hash"])
+    #expect(selected.estimatedBytes == 1024)
+    #expect(selected.architectureVariants == nil)
+    for architecture: String? in [nil, "h17p"] {
+        let source = try #require(catalog.resolvingArchitecture(architecture).packages.first)
+        #expect(source.revision == "r1")
+        #expect(source.requiredFiles == ["config.json"])
+    }
+    var invalid = variant
+    invalid["requiredFiles"] = ["../escape"]
+    packages[0]["architectureVariants"] = ["other-device": invalid]
+    json["packages"] = packages
+    #expect(throws: ModelArtifactError.self) {
+        try ModelArtifactCatalog.decode(JSONSerialization.data(withJSONObject: json))
+    }
+}
+
+@Test func productionDecisionCatalogSelectsCompiledFilesOnlyForPublishedArchitecture() throws {
+    let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().appendingPathComponent("MobileHarness/Resources/Models/model-catalog.json")
+    let catalog = try ModelArtifactCatalog.read(url)
+    let compiled = try catalog.resolvingArchitecture("h18p")
+    let source = try catalog.resolvingArchitecture(nil)
+    for id in ["d3-edge", "d3-lite"] {
+        let device = try #require(compiled.packages.first { $0.id == id })
+        let original = try #require(source.packages.first { $0.id == id })
+        #expect(device.revision != original.revision)
+        #expect(device.source.stripPrefix == "ios/aot-v1/h18p")
+        #expect(device.requiredFiles.contains("manifest.json"))
+        #expect(device.requiredFiles.contains("tokenizer.json"))
+        #expect(device.requiredFiles.contains("decision.h18p.aimodelc/main.hash"))
+        #expect(device.requiredFiles.contains { $0.hasSuffix("/resources.bin") })
+        #expect(!device.requiredFiles.contains { $0.hasPrefix("decision.aimodel/") })
+        #expect(original.requiredFiles.contains("decision.aimodel/main.mlirb"))
+        #expect(device.source.revision?.count == 40)
+    }
+}

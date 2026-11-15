@@ -1,0 +1,289 @@
+{
+  "device": "iPhone 17 Pro (h18p)",
+  "packageRevision": "4aff26452f53609516813ea61ee76b431b49a4e9",
+  "compiler": "coreai-build-3605.6.3 / Metal Toolchain 27B47",
+  "reports": [
+    {
+      "capturedAt": "2026-11-15 23:42:13.2303 +0800",
+      "os": {
+        "isEmbedded": true,
+        "train": "iPhone OS 27.0.1",
+        "releaseType": "User",
+        "build": "24A446"
+      },
+      "exception": {
+        "codes": "0x0000000000000001, 0x00000000000003f5",
+        "rawCodes": [
+          1,
+          1013
+        ],
+        "type": "EXC_BAD_ACCESS",
+        "signal": "SIGSEGV",
+        "subtype": "KERN_INVALID_ADDRESS at 0x00000000000003f5"
+      },
+      "termination": {
+        "code": 11,
+        "namespace": "SIGNAL",
+        "indicator": "Segmentation fault: 11"
+      },
+      "faultingFrames": [
+        {
+          "image": "MetalPerformanceShadersGraph",
+          "symbol": "-[MPSGraphAICodeCompilerDelegate getInitializedAICodeBytecodeWithPayloadPrefix:delegateId:]",
+          "offset": 3697708
+        },
+        {
+          "image": "MetalPerformanceShadersGraph",
+          "symbol": "closure #1 in Compiler_coreAI.compile(moduleBytecode:to:with:)",
+          "offset": 4201460
+        },
+        {
+          "image": "MetalPerformanceShadersGraph",
+          "symbol": "protocol witness for Compiler.Delegates.BinaryGenerator.compile(moduleBytecode:to:with:) in conformance Compiler_coreAI",
+          "offset": 4205432
+        },
+        {
+          "image": "CoreAICompiler",
+          "symbol": null,
+          "offset": 78452
+        },
+        {
+          "image": "CoreAICompiler",
+          "symbol": null,
+          "offset": 75924
+        },
+        {
+          "image": "libODIECompiler.dylib",
+          "symbol": "std::__1::__function::__func<mlir::ODIE::Compiler::capi::detail::set_callback(odiec_external_rewriter_t, void*, odiec_bytecode_blob_t (*)(void*, odiec_external_rewriter_payload_t))::$_0, std::__1::unique_ptr<llvm::MemoryBuffer, std::__1::default_delete<llvm::MemoryBuffer>> (mlir::ODIE::Compiler::ModuleRewriter::Payload&&)>::operator()(mlir::ODIE::Compiler::ModuleRewriter::Payload&&)",
+          "offset": 379088
+        },
+        {
+          "image": "libODIECompiler.dylib",
+          "symbol": "mlir::ODIE::Compiler::Serialization::rewriteModule(mlir::ModuleOp, mlir::ODIE::Compiler::ModuleRewriter const&, std::__1::optional<std::__1::__fs::filesystem::path> const&, std::__1::__fs::filesystem::path const&, bool)",
+          "offset": 12809352
+        },
+        {
+          "image": "libODIECompiler.dylib",
+          "symbol": "mlir::ODIE::Compiler::Transforms::CompileForDelegates::generateCompilationTask() const::'lambda'(std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&, mlir::ODIE::Compiler::ModuleRewriter const&, mlir::ModuleOp)::operator()(std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&, mlir::ODIE::Compiler::ModuleRewriter const&, mlir::ModuleOp) const",
+          "offset": 10808140
+        },
+        {
+          "image": "libODIECompiler.dylib",
+          "symbol": "std::__1::__deferred_assoc_state<llvm::LogicalResult, std::__1::__async_func<std::__1::function<llvm::LogicalResult ()>>>::__execute()",
+          "offset": 10815380
+        },
+        {
+          "image": "libc++.1.dylib",
+          "symbol": "std::__1::__assoc_sub_state::wait()",
+          "offset": 63748
+        },
+        {
+          "image": "libODIECompiler.dylib",
+          "symbol": "llvm::StdThreadPool::processTasks(llvm::ThreadPoolTaskGroup*)",
+          "offset": 641912
+        },
+        {
+          "image": "libODIECompiler.dylib",
+          "symbol": "void* llvm::thread::ThreadProxy<std::__1::tuple<llvm::StdThreadPool::grow(int)::$_0>>(void*)",
+          "offset": 646076
+        },
+        {
+          "image": "libsystem_pthread.dylib",
+          "symbol": "_pthread_start",
+          "offset": 16440
+        },
+        {
+          "image": "libsystem_pthread.dylib",
+          "symbol": "thread_start",
+          "offset": 2332
+        }
+      ]
+    },
+    {
+      "capturedAt": "2026-11-15 23:42:52.7861 +0800",
+      "os": {
+        "isEmbedded": true,
+        "train": "iPhone OS 27.0.1",
+        "releaseType": "User",
+        "build": "24A446"
+      },
+      "exception": {
+        "codes": "0x0000000000000001, 0x00000000000003f5",
+        "rawCodes": [
+          1,
+          1013
+        ],
+        "type": "EXC_BAD_ACCESS",
+        "signal": "SIGSEGV",
+        "subtype": "KERN_INVALID_ADDRESS at 0x00000000000003f5"
+      },
+      "termination": {
+        "code": 11,
+        "namespace": "SIGNAL",
+        "indicator": "Segmentation fault: 11"
+      },
+      "faultingFrames": [
+        {
+          "image": "MetalPerformanceShadersGraph",
+          "symbol": "-[MPSGraphAICodeCompilerDelegate getInitializedAICodeBytecodeWithPayloadPrefix:delegateId:]",
+          "offset": 3697708
+        },
+        {
+          "image": "MetalPerformanceShadersGraph",
+          "symbol": "closure #1 in Compiler_coreAI.compile(moduleBytecode:to:with:)",
+          "offset": 4201460
+        },
+        {
+          "image": "MetalPerformanceShadersGraph",
+          "symbol": "protocol witness for Compiler.Delegates.BinaryGenerator.compile(moduleBytecode:to:with:) in conformance Compiler_coreAI",
+          "offset": 4205432
+        },
+        {
+          "image": "CoreAICompiler",
+          "symbol": null,
+          "offset": 78452
+        },
+        {
+          "image": "CoreAICompiler",
+          "symbol": null,
+          "offset": 75924
+        },
+        {
+          "image": "libODIECompiler.dylib",
+          "symbol": "std::__1::__function::__func<mlir::ODIE::Compiler::capi::detail::set_callback(odiec_external_rewriter_t, void*, odiec_bytecode_blob_t (*)(void*, odiec_external_rewriter_payload_t))::$_0, std::__1::unique_ptr<llvm::MemoryBuffer, std::__1::default_delete<llvm::MemoryBuffer>> (mlir::ODIE::Compiler::ModuleRewriter::Payload&&)>::operator()(mlir::ODIE::Compiler::ModuleRewriter::Payload&&)",
+          "offset": 379088
+        },
+        {
+          "image": "libODIECompiler.dylib",
+          "symbol": "mlir::ODIE::Compiler::Serialization::rewriteModule(mlir::ModuleOp, mlir::ODIE::Compiler::ModuleRewriter const&, std::__1::optional<std::__1::__fs::filesystem::path> const&, std::__1::__fs::filesystem::path const&, bool)",
+          "offset": 12809352
+        },
+        {
+          "image": "libODIECompiler.dylib",
+          "symbol": "mlir::ODIE::Compiler::Transforms::CompileForDelegates::generateCompilationTask() const::'lambda'(std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&, mlir::ODIE::Compiler::ModuleRewriter const&, mlir::ModuleOp)::operator()(std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&, mlir::ODIE::Compiler::ModuleRewriter const&, mlir::ModuleOp) const",
+          "offset": 10808140
+        },
+        {
+          "image": "libODIECompiler.dylib",
+          "symbol": "std::__1::__deferred_assoc_state<llvm::LogicalResult, std::__1::__async_func<std::__1::function<llvm::LogicalResult ()>>>::__execute()",
+          "offset": 10815380
+        },
+        {
+          "image": "libc++.1.dylib",
+          "symbol": "std::__1::__assoc_sub_state::wait()",
+          "offset": 63748
+        },
+        {
+          "image": "libODIECompiler.dylib",
+          "symbol": "llvm::StdThreadPool::processTasks(llvm::ThreadPoolTaskGroup*)",
+          "offset": 641912
+        },
+        {
+          "image": "libODIECompiler.dylib",
+          "symbol": "void* llvm::thread::ThreadProxy<std::__1::tuple<llvm::StdThreadPool::grow(int)::$_0>>(void*)",
+          "offset": 646076
+        },
+        {
+          "image": "libsystem_pthread.dylib",
+          "symbol": "_pthread_start",
+          "offset": 16440
+        },
+        {
+          "image": "libsystem_pthread.dylib",
+          "symbol": "thread_start",
+          "offset": 2332
+        }
+      ]
+    }
+  ],
+  "installedPathsAndSizesMatched": 19,
+  "largestResourceHash": "96b4d664b6aa76e5d3a72aead6f18090d3e00bc3fe5b1ea3703810241002f070",
+  "edgeControl": "User reports Edge AOT loads normally; not independently measured in this run",
+  "defaultLoadOptionsOnMac": {
+    "expectFrequentReshapes": false,
+    "preferredComputeUnit": null
+  },
+  "limitations": [
+    "All 19 installed files were copied read-only and their SHA-256 matched the published local package.",
+    "Matching crash symbols do not identify a unique root cause.",
+    "No RAM-limit kill is reported in these two incidents."
+  ],
+  "verifiedFiles": [
+    {
+      "path": "LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "path": "NOTICE",
+      "sha256": "ab3eaa5b3aa20aba96cd3e859d3c6a67d4bc8736a5e2747c702ec541b33e5bbf"
+    },
+    {
+      "path": "aot-build.json",
+      "sha256": "618bbe01b292fc673a2d8ac205b86c67b9e07adba8722bed81325a299a6f7d92"
+    },
+    {
+      "path": "chat_template.jinja",
+      "sha256": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80"
+    },
+    {
+      "path": "config.json",
+      "sha256": "a9071195384e1fc2c68f9fe0fae007a22182ab77eb14fe8228a1a24b37d3cee9"
+    },
+    {
+      "path": "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/manifest.plist",
+      "sha256": "d1a1318805623809b1a363b7ae05172aa5b98b7594f1bd848bae2ddd50fc5252"
+    },
+    {
+      "path": "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/original_model_0.mpsgraph",
+      "sha256": "aaea0a45438d80766e7c540c01d3ae9d42c715907168d3170876e0f13f52b21f"
+    },
+    {
+      "path": "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/specialized_model_1.mpsgraph",
+      "sha256": "7214a87072635a75d9e752fc329827c67e20fbc90c9802562b4b23c64fb4481a"
+    },
+    {
+      "path": "decision.h18p.aimodelc/main-h18p.mlirb",
+      "sha256": "d3c3c294457df63581fbfe5d2311ba2fe58d13dd835677aa6f2bcc2d9266f023"
+    },
+    {
+      "path": "decision.h18p.aimodelc/main.hash",
+      "sha256": "3d2a83babdda097f15b31602136c5c8437e8a6c8c2ad8504da56c12d18049a88"
+    },
+    {
+      "path": "decision.h18p.aimodelc/metadata.json",
+      "sha256": "5f8830723817e3668d83bd88e43d539925113ff95618d01fa8caa3d2f6c5ad5e"
+    },
+    {
+      "path": "decision.h18p.aimodelc/stats.json",
+      "sha256": "66f386d90f50eec462a454ffd0264aeb405ecba5380d4e816868959431efc4db"
+    },
+    {
+      "path": "decision_config.json",
+      "sha256": "30b6095b945d5a93697868afdf9be9123ea892085fbaff3078112c48da20dc6b"
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "f8046fc99bf2326109eb607521823ec78b4c8065890746d7c4f6689bce61a41a"
+    },
+    {
+      "path": "merges.txt",
+      "sha256": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d"
+    },
+    {
+      "path": "tokenizer.json",
+      "sha256": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42"
+    },
+    {
+      "path": "tokenizer_config.json",
+      "sha256": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c"
+    },
+    {
+      "path": "vocab.json",
+      "sha256": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+    },
+    {
+      "path": "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/resources.bin",
+      "sha256": "96b4d664b6aa76e5d3a72aead6f18090d3e00bc3fe5b1ea3703810241002f070"
+    }
+  ]
+}

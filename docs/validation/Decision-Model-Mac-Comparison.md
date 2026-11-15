@@ -437,3 +437,81 @@ Gemma Text had zero false discards, 15 false interrupts and zero missed interrup
 The local comparison ran on Mac17,3 with Apple M5 and macOS 27.2.1. Local segments used three warmups and cloud cells used one warmup per language. Transport failures were recorded as observed. The launcher uses opt-in synthetic tests and keeps cloud credentials and endpoint out of the archived evidence. The older independent D3/Qwen experiments and the earlier Gemma prompt comparison remain historical baselines. [Local per-case report](../measurements/decision-protocols-local-2026-11-15.json)
 
 Final validation passed the Decision protocol, route, request-log and recommendation tests, all five iOS Simulator schemes, and the 228-test isolated runtime phase. `check.sh` exited 1 after the existing NexArm tracking and Writer/Web fixture failures. The stalled AppWorkflow helper was stopped. The two archives were verified against the same fixture IDs and recomputed summaries.
+
+## A18 Pro Mac 最新代码复测（2026-11-15）
+
+用户要求先拉取最新代码，再检查 D3 Edge/Lite 的本机加载、调用与现有用例评分。main 从 db614c96 快进到 b87eb69c；此前未提交的日志/UI修改及本地签名设置保留。本轮未修改模型实现、提示词、测试用例或 UI 评分配置。测试运行于 Mac17,5、Apple A18 Pro、8 GiB、macOS 27.2.1（26B131）、Xcode 27.2（27B52），并非历史 M5/16 GiB 主机。
+
+### 制品与方法
+
+复用 `Tests/DecisionBenchmarks/models.json` 固定版本：Edge `0690c04ee1640c1c3fa11a882323751dda6d086a`，Lite `863963d371d5af6784bf726fb85a508c08751d65`。用户批准创建被忽略的 `.local` 测试缓存并下载制品；两张图均通过固定 SHA-256 校验，manifest 均为三输入文本图，所有必需文件齐全。
+
+使用现有 `D3NativeTests` 经生产 ModelContainer/ModelKit 端口验证预热到 ready、四候选推理、有限分数及超长输入拒绝；Edge 另验证公开参考分类/分数。再使用 `scripts/evaluate-decision-protocols.py MODEL --skip-build --output NEW_PATH`，每个模型串行执行27条英文和27条中文场景，语言组各预热3次。评分直接调用生产 JEV 投影与解码，不经过 Assistant 的采用规则。采样允许请求完成，250 ms预算只用于事后统计，不实际取消请求。
+
+### 加载与调用
+
+- Edge 首次本轮原生预热83.984秒；两项原生测试均通过。两项测试在同一进程并发执行，不能作为隔离的冷启动性能基准。
+- Lite 首次本轮原生预热302.302秒；原生测试通过。加载期间采样位于 `D3Graph.init → GraphModel.init → CoreAICompiler → MPSGraph` 的编译和资源写入路径，尚未进入分类推理。
+- 新进程中的缓存后预热：Edge 5.722秒，Lite 7.894秒；两次原生回归均通过。未清空系统模型缓存，不能称为严格冷/热对照。
+- Lite 加载期间全盘可用空间曾从约27 GiB降到11 GiB，结束后回升到47 GiB。这是全盘观测，不是该进程临时文件或交换空间的精确统计。
+- 本轮未复现图接口不匹配、无效输出或原生调用失败；首次编译长、缓存后加载仍需数秒是实际观测。不能据此宣布 iPhone 加载问题已解决。
+
+### 当前生产提示词评分
+
+| 模型 | 英文正确 | 中文正确 | 总正确率 | 有效结果 | p50 / p95 | 250 ms内完成 | 误丢弃 / 误打断 / 漏打断 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| D3 Edge | 13/27 | 8/27 | 21/54（38.9%） | 54/54 | 209.07 / 229.24 ms | 54/54 | 18 / 15 / 3 |
+| D3 Lite | 21/27 | 20/27 | 41/54（75.9%） | 54/54 | 670.52 / 786.26 ms | 0/54 | 4 / 7 / 1 |
+
+Edge热态范围198.44–234.35 ms；Lite为540.74–807.68 ms，54条均超过500 ms。因此这台Mac上Lite虽然原始准确率更高，却不满足当前D3的250 ms执行预算；在这些测得耗时下会触发生产超时，而本次评分本身没有模拟该取消路径。Edge执行正常但分类质量低，不能将其误丢弃解释为加载故障。
+
+按已有推荐公式重新计算，本机Edge为2/5、Lite为3/5；此值仅作为本次硬件测量的派生结果，不更新UI所用历史Mac基准。当前样例与历史54条相同，但提示词/源码哈希不同：Edge总数仍为21/54，13条预测与早期协议报告不同；Lite与hugging-mac制品报告同为41/54。不得把相同总分称为完整条件复现，也不能把A18 Pro延迟直接解释为相对M5的代码性能退化。
+
+### 验证与证据范围
+
+构建最初因生成计划引用已失效的Metal工具链挂载路径失败；备份XCBuildData并重新生成后测试构建成功，协议选择回归1项通过。Edge原生2项、Lite原生1项、缓存后原生2项均通过；两个模型的英文/中文评分进程均exit 0且每组27条完整。下载的远端断开/停滞通过固定版本续传恢复，完整哈希验证在推理前完成。
+
+[原始结果与元数据](../measurements/decision-d3-a18-mac-2026-11-15.json)保存108条评分、预热记录、原生测试日志、加载采样片段、制品身份、混淆矩阵、硬件及源码哈希。这里没有四分类continue_listening语义评分（四候选原生接口单独验证），没有真实ASR/原生UI/iPhone验收，也未重跑全仓检查或iOS构建。
+
+### App 与此次实验流程核对
+
+针对用户报告“App Edge 经常 discard、Lite 一直 loading”，静态核对实际调用链后确认以下覆盖差异。这里没有修改业务逻辑，也未取得 iPhone 加载线程采样。
+
+| 项目 | App 全双工语音 | 本轮54条评分 |
+| --- | --- | --- |
+| 快照与选项 | AssistantChatWorker 对 final ASR 设置 allowsContinueListening=true，拼接保留片段，加入第4项 continue_listening | DecisionLanguageScenario.snapshot 未传此参数，保持默认false，仅3项 |
+| 提示词 | 共用 InputDecisionSnapshot.prompt；语音增加continueDefinition并选latestSpeech | 共用同一renderer，但选latest，无第4项定义 |
+| 上下文 | 真实历史、排队输入、播放/执行状态、交互问题与语音接续 | 固定合成历史/状态，缓冲默认空，无接续 |
+| 语言 | App 当前语言设置 | 英文/中文用例分别强制匹配语言 |
+| 加载 | 检查ready；未就绪时启动独立preparation任务，本条输入立即fallback | 明确await model.warmup成功，然后预热分类3次再计分 |
+| 加载失败 | localFailure保留，阻止后续普通分类重试；切换模型或资源呈现更新可重置 | 原生实验抛出错误结束，不经过Assistant失败缓存 |
+| 截止/清理 | 就绪后D3推理250ms，队列接纳起总预算2秒；超时取消，清理未完时拒绝下一次调用 | 直接调用协议等待完成，按250/500ms事后统计；分段进程另有420秒上限 |
+| 采用 | outcome可覆盖模型判定 | 无采用规则，直接统计模型输出 |
+
+源码位置：AssistantChatWorker.swift的classifyPendingInputs；AssistantInputDecision.swift的prompt/classifyInput/race；DecisionLanguageEvaluationTests.swift的Transcript.snapshot；DecisionProtocolBenchmark.swift的warmup与measure。两边共用AssistantDecisionProtocol.JEV、ModelKit D3Decision、Tokenizer、图输入适配和候选解码；第4选项加入并不改变前3个数字的映射。App catalog和实验模型revision一致，最后一次设备构建包内中英文InputDecision JSON与当前源码逐字节一致。尚未读取手机实际已安装模型文件，不能据此证明手机制品与Mac缓存相同。
+
+用户补充Lite显示loading：若执行日志为not ready (loading)，它尚未进入分类；提示词、输出映射和250ms推理截止不能解释这条加载中状态。App的preparation没有独立加载截止，可持续等待Core AI加载；缓存后的失败阻塞与持续loading是不同分支，不应混为一谈。Mac上已观测到约302秒首次Lite图编译，但iPhone上的持续加载根因仍需设备证据，不能仅凭Mac测试判为已解决。
+
+上次由本聊天安装的设备包基于db614c96；Mac复测已拉取到b87eb69c，后者统一三/五输入图适配。其变化不改三输入Lite的提示词或分类映射，但这不是同一构建的端到端对照。独立原生四候选测试证明接口能收发4项，不等于App的continue_listening提示与语义评分。后续若要复现“始终discard”，需用App完整快照及四项请求回放；本轮Edge是26/54条discard、Lite14/54，并非全discard。
+
+### iPhone Lite loading 现场采集（2026-11-15）
+
+用户授权采集手机Lite加载日志。本轮没有重启、重新安装或改动应用。iPhone17 Pro（iPhone18,1、iOS27.0.1/24A446）经局域网由CoreDevice访问；Instruments设备列表却为Offline，15秒Time Profiler附加未成功。`log collect`要求root，`sudo -n`提示需要密码，未取得统一日志，也未请求或读取密码。随后通过CoreDevice读取应用专属系统CPU资源报告，获得了留存现场采样。
+
+手机Lite安装记录的制品revision为863963d371d5af6784bf726fb85a508c08751d65，实际图文件大小1,510,776,860字节；manifest和main.hash文件与本机测试制品逐字节一致。未下载手机整张图重新计算哈希，因此只确认身份/元数据/大小一致，不能替代完整文件校验。
+
+21:10:18–21:12:03的CPU资源报告对应采集时App进程PID34782。约105秒内消耗90秒CPU，平均86%；43次采样中最重的ANE编译链有34次。内存footprint由73.88MiB增长至525.64MiB。报告Action taken为none，不能称为系统杀进程或崩溃证据。19:19的早期报告也出现相似ANECompiler栈，但不据此推断两次之间持续编译。
+
+本地已安装版本的debug dylib UUID与现场镜像匹配。使用其符号还原，确认 `ModelResource.ensureLoaded → ModelLoadGate.run → D3Decision.init → D3Graph.init → GraphModel.init`，随后进入 `CoreAIDelegates/CoreAICompiler → MPSGraph → AppleNeuralEngine → ANECompiler`。结合用户当前选择Lite并持续loading的反馈，证据指向D3图加载中的神经引擎编译阶段；尚未进入分类请求，因此不能用提示词或250ms推理超时解释这段loading。
+
+仍未确认编译最终是否完成、耗时根因、其他系统版本或限制计算单元后的差异。手机iOS27.0.1与Mac macOS27.2.1并非相同系统实现；同一automatic配置也不能保证不同硬件采用相同编译路径。后续受控对照应保留制品与模型请求不变，分别观察默认编译及明确限制计算设备的加载/数值结果，不能直接把GPU偏好当作排除ANE，也不能跳过分类一致性验证。此轮不修改模型路由。
+
+[脱敏采集摘要](../measurements/decision-d3-lite-iphone-loading-2026-11-15.json)保留身份、指标、符号化链和限制。原始应用系统报告与设备元数据仅保留在本机/tmp，未将设备标识或原始诊断包加入仓库。实时Instruments采样仍待USB连接恢复；已有系统microstackshots提供了独立的加载卡点证据。
+
+#### 直连后的实时采样
+
+用户改为直连后，Instruments将iPhone列为在线。对相同App进程附加Time Profiler成功，21:24:59–21:25:20录制约21.20秒，正常达到时间上限并保存。未重启或重新安装App。
+
+导出20,984条CPU采样，其中20,828条（99.26%）包含ANECompiler／MPSToANECValidation；20,751条包含associateUnmaterializedOpIds。栈经过MPSGraph的ANERegionFormationPass、specializedModule和specializeWithDevice，正在进行MPS到ANE的转换/校验。它是运行中的编译计算热点，不是只凭UI文案推断的loading，也没有进入本次分类推理。与21:10–21:12的同进程留存报告相比，21:25现场仍处于ANE编译；两个采样窗口之间没有连续记录，不声称已证明同一循环始终未前进。
+
+这份证据将加载瓶颈进一步定位到ANE编译转换/校验，但无法单凭采样判定死循环、复杂度退化或具体系统编译器缺陷。后续需要保持制品一致的计算设备限制对照及数值验证；仅增加分类250ms预算不能解决尚未完成的模型加载。原始trace和XML留在/tmp；上述脱敏JSON已增加实时采样统计及符号栈。此前USB连接阻塞已经解除，历史失败记录保留。

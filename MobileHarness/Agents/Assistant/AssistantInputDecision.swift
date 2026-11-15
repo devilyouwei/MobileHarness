@@ -36,6 +36,7 @@ public struct InputDecisionOutcome: Sendable, Equatable {
         case model = "The selected Decision model failed or returned an invalid result. Input queued."
     }
     public var failure: Failure? = nil
+    public var modelName: String? = nil
 }
 
 /// One pending input, one earlier exchange and a bounded excerpt of the same-session buffer.
@@ -271,6 +272,7 @@ public actor AssistantInputDecision {
 
     private func classifyInput(_ snapshot: InputDecisionSnapshot) async -> InputDecisionOutcome {
         let requests = Mutex<[String]>([])
+        let selectedModelName = Mutex<String?>(nil)
         var localFailureReason: String?
         var localFailureKind: InputDecisionOutcome.Failure = .model
         func fallback(_ reason: String, failure: InputDecisionOutcome.Failure? = nil) -> InputDecisionOutcome {
@@ -278,7 +280,7 @@ public actor AssistantInputDecision {
                 route: .fallback, modelResult: nil,
                 adopted: snapshot.allowsContinueListening && Self.transcriptContent(snapshot) == .noise
                     ? .discard : .enqueue, reason: reason,
-                requests: requests.withLock { $0 }, failure: failure)
+                requests: requests.withLock { $0 }, failure: failure, modelName: selectedModelName.withLock { $0 })
         }
         guard !stopped, !Task.isCancelled else { return fallback("Classification cancelled") }
         let deadline = snapshot.receivedAt.advanced(by: timeout)
@@ -290,6 +292,17 @@ public actor AssistantInputDecision {
             }
             await reportFailure(.settings)
             return fallback("Could not read Decision settings: \(error.localizedDescription)", failure: .settings)
+        }
+        selectedModelName.withLock {
+            $0 = route.localID.map { id in
+                switch id {
+                case "d3-edge": "D3 Edge"
+                case "d3-lite": "D3 Lite"
+                case "gemma4-e2b": "Gemma 4 E2B"
+                case "apple-system": "Apple System LLM"
+                default: id
+                }
+            }
         }
         let prompt: InputDecisionSnapshot.Prompt
         do {
@@ -326,7 +339,9 @@ public actor AssistantInputDecision {
             switch result {
             case .selected(let action):
                 await report("Local \(modelName)")
-                return outcome(action, route: modelRoute, snapshot: snapshot, requests: requests.withLock { $0 })
+                return outcome(
+                    action, route: modelRoute, snapshot: snapshot, requests: requests.withLock { $0 },
+                    modelName: selectedModelName.withLock { $0 })
             case .failed(let reason, let failure):
                 if !stopped, !Task.isCancelled { await reportFailure(failure) }
                 return fallback(reason, failure: failure)
@@ -362,7 +377,8 @@ public actor AssistantInputDecision {
                     switch result {
                     case .selected(let action):
                         return outcome(
-                            action, route: modelRoute, snapshot: snapshot, requests: requests.withLock { $0 })
+                            action, route: modelRoute, snapshot: snapshot, requests: requests.withLock { $0 },
+                            modelName: selectedModelName.withLock { $0 })
                     case .failed(let reason, let failure):
                         localFailureReason = reason
                         localFailureKind = failure
@@ -403,6 +419,7 @@ public actor AssistantInputDecision {
         await report(AppLanguage(preferredLanguage: language()).text("Cloud · Selected Decision model"))
         let result = await race("cloud", until: deadline) {
             let model = try await cloud()
+            selectedModelName.withLock { $0 = model.modelName }
             return try await AssistantDecisionProtocol.chat(model.capability, modelID: model.modelName)
                 .classify(prompt) { request in
                     requests.withLock { $0.append("Cloud Decision\n\n" + request) }
@@ -410,7 +427,8 @@ public actor AssistantInputDecision {
         }
         if case .selected(let action) = result {
             return outcome(
-                action, route: .cloud, snapshot: snapshot, requests: requests.withLock { $0 })
+                action, route: .cloud, snapshot: snapshot, requests: requests.withLock { $0 },
+                modelName: selectedModelName.withLock { $0 })
         }
         if stopped || Task.isCancelled { return fallback("Classification cancelled") }
         if case .failed(let reason, let failure) = result {
@@ -426,7 +444,7 @@ public actor AssistantInputDecision {
 
     private func outcome(
         _ action: InputDisposition, route: InputDecisionOutcome.Route, snapshot: InputDecisionSnapshot,
-        requests: [String]
+        requests: [String], modelName: String?
     ) -> InputDecisionOutcome {
         let content = Self.transcriptContent(snapshot)
         let adopted: InputDisposition
@@ -452,7 +470,7 @@ public actor AssistantInputDecision {
         }
         return .init(
             route: route, modelResult: action, adopted: adopted, reason: reason,
-            requests: requests)
+            requests: requests, modelName: modelName)
     }
 
     private static func transcriptContent(_ snapshot: InputDecisionSnapshot) -> TranscriptContent {
@@ -549,7 +567,7 @@ extension InputDecisionOutcome {
             id: snapshot.input.id, source: AgentID.assistant.rawValue, inputText: snapshot.text, duration: duration,
             route: route,
             modelResult: modelResult.map(\.logDisposition), adoptedResult: adopted.logDisposition,
-            reason: reason, requests: requests)
+            reason: reason, requests: requests, modelName: modelName)
     }
 }
 

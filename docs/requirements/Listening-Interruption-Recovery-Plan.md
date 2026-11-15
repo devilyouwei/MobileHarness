@@ -49,3 +49,39 @@ Actions的ConversationPresentation不再因识别轮次变化清空双方字幕�
 回归同步范围补充：`Tests/AppWorkflowTests/HomeEffectsTests.swift` 中停止聆听保留字幕的旧断言也改为双方为空；回复结束但聆听仍启用时的保留断言继续保留。
 
 本节代码、文档与三项字幕生命周期回归已完成；定向测试及四目标 iOS 构建通过，全量检查存在其他失败和中断，真机未验。详情见[验证记录](../validation/Listening-Interruption-Recovery.md#2026-11-14-结束聆听清空双方字幕)。
+
+## 2026-11-15 AirPods 启动停留 waking up
+
+静态检查发现 mono 首帧等待无期限，且蓝牙 HFP 已激活后仍尝试 default 系统 AEC 再切回 voiceChat，启动期间反复改变路由配置。修复限定在既有 PlatformKit/Audio：HFP 输入保留 voiceChat，跳过系统 AEC 探测，仍确认 voice processing 实际能力；其他输入保持原顺序。AudioCaptureReadiness 增加默认 10 秒的首帧期限，超时显式失败，取消/成功/原生失败均取消并加入计时子任务，保留首个终态，不制造 PCM 或成功。AppleAudioIO 在等待首帧前绑定原生事件，中断直接结束首帧等待与 PCM；启动自身配置完成后才绑定，避免把自身配置当作用户拔插。
+
+涉及 AppleAudioIO.swift、AudioCaptureContext.swift、AudioCaptureReadiness.swift 和既有 AudioCaptureReadinessTests.swift；更新 Audio/README.md 与测试 README。补充 HFP 选择、首帧超时、成功/失败/取消先到的回归；运行 check.sh 和 build-ios.sh。真机 AirPods 启停/识别/拔插需独立验证，静态原因推断不替代设备复现证据。
+
+本节代码与当前技术文档已同步；16 项音频定向回归和五目标 iOS 构建通过。全量检查有其他测试失败及 AppWorkflow 阶段中断，AirPods 真机复验仍待执行；结果见[验证记录](../validation/Listening-Interruption-Recovery.md#2026-11-15-airpods-waking-up-修复验证)。
+
+### 23:00 真机反馈后的引擎配置失效修复
+
+用户截图确认 AirPods 首帧 timedOut，断开耳机恢复正常；上一轮并未解决真实采集。继续修复遗漏的 AVAudioEngineConfigurationChange：硬件采样率/声道改变会停止引擎但保留旧格式，现有 AVAudioSession 路由 UID 比较无法覆盖同设备格式变化。
+
+在既有 AudioCaptureReadiness.swift 增加单代配置失效门：首帧前配置变化抛出独立错误，首帧后结束 PCM 为 runtimeFailed；失效门可同步关闭，迟到通知不能污染替代代。AppleAudioIO 的 NativePlaybackGraph 在引擎启动前注册限定 engine 实例的通知，在停止前移除并关闭门；通知中不销毁/重建引擎。启动配置变化最多重建一次完整图和 PCM 源，第二次失败明确退出；首帧超时不扩大期限、不盲目重试。每次重建重新读输入格式。保留系统 AEC/voice processing 能力判断，不凭耳机类型伪造全双工。补充配置变化首帧前后、重复通知、停止后通知及单次重建预算回归，更新 Audio/README 和测试说明。检查、构建及真机限制追加到既有验证记录。
+
+23:00 后续修复的代码、回归与当前设计文档已同步。19 项定向音频测试及五目标 iOS 构建通过；完整检查包含其他失败及停滞中断，新增真机验收尚未执行。详见既有验证记录，不将本轮构建/替身测试升级为 AirPods 已修复的设备结论。
+
+### 23:55 configurationChanged 立即失败的修正
+
+用户复验确认上一版立即 configurationChanged；新建图并再次启用 voice processing 的重试可能重复自身配置通知。通知不能无条件作为故障。修改既有通知门：回调只写容量1的合并通知流，NativePlaybackGraph 的单个观察任务在 actor 上、start同步返回后复核 engine.isRunning 和输入采样率/声道，只有停机或实际格式不匹配才退役采集。停止先失效代际并取消观察任务，旧任务即使迟到也不能触碰替代图；任务只做无悬挂的 actor 事实采样，不在通知线程销毁引擎。
+
+启动重试保留已配置的 I/O 引擎，不再次启用已经生效的 voice processing；重新安装 tap/连接并获取格式，避免 reset→重新启用→再次配置变化的循环。保持单次预算和10秒首帧期限。增加通过环境变量 MH_AUDIO_TRACE=1 开启的无音频内容/设备标识诊断 stdout（准备、启动返回、配置通知事实、首帧完成），用于当前真机复验，默认关闭。补充正常运行且格式一致不退役、停机/格式改变才退役及旧通知隔离回归。此前替身测试直接把每个通知设成失败，未覆盖真实启动时序；此次结果须由真机复验补足。
+
+2026-11-16 本节已实施并安装：20项音频定向回归、五目标iOS和真机构建通过；用户保持AirPods连接时，诊断日志确认首次引擎停机后保留I/O重试能接纳首帧，累计9次成功。完整检查仍有其他失败和中断，转写/听感待用户确认。证据与本轮未取得系统统一日志的限制均记录于既有验证文档。
+
+## 2026-11-16 AirPods 回复播放期间的误识别
+
+用户已确认 AirPods 可以聆听，但无人说话时回复播放期间出现有意义的用户字幕。代码把 voiceProcessing/systemInput 启用直接等同于 supportsFullDuplex，蓝牙路径在实际回复播放时仍持续送入 VAD/ASR。尚无音频内容证据区分残余回声与噪声误识别，不将生成句子当作用户确实说话的证据。
+
+本轮采用明确受限的蓝牙采集能力：活动输入或输出为蓝牙音频时，保留实际 AEC 标记但 supportsFullDuplex=false；沿用既有播放准入暂停识别和播放drain后恢复，不停掉已修复的原生采集图。代价为蓝牙回复期间不能语音打断。其他路线的既有能力判断不变。PlatformKit/AudioCaptureContext.swift拥有可测试的原生路线能力选择，AppleAudioIO 同时将结果写入 MicrophoneCapture 和 captureContext，保证感知与执行双方一致。现有 VoiceTests 的播放/恢复回归增加真实蓝牙选择映射，确认播放期间音频被拒绝、结束后可识别且用户关闭不被恢复覆盖。更新 Audio README 与 Listening README 说明能力限制，验证结果记入现有记录。不改ASR模型、不凭文本内容过滤用户话语。
+
+恢复边界补充：原生队列可能仍含播放期间捕获的包，仅按处理时 recognitionSuspended 判断会在恢复后接纳旧音频。SpeechPerception 保存恢复完成的单调时刻，在 consumeMicrophone 依据 frame.capturedAt 拒绝此前的包；新采集代清除该门限。恢复时重置ASR/VAD后才设置门限，保持关闭/新播放准入优先。涉及 SpeechPerceptionAgent.swift、SpeechPerceptionMicrophone.swift 与角色 README；既有播放回归追加迟到旧包拒绝和新包接纳断言。
+
+本节蓝牙半双工能力选择、恢复时间门限、相关README与回归已实现。3项参数化测试（8个案例）单独及全量中通过，五目标iOS和最终真机构建通过，已安装启动。尚未取得用户对新版播放期间字幕/恢复识别的确认；仍不宣称确定声学根因或完成实机验收。
+
+用户已反馈“好了”，确认本轮 AirPods 修正版可用。保留蓝牙半双工限制以及全量检查其他失败记录；本计划其他历史验收事项不因本次反馈自动结项。

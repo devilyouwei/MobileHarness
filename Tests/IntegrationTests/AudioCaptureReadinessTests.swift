@@ -268,3 +268,111 @@ func echoCancellationFallsBackAfterUnsupportedOrFailedSystemInput(fails: Bool) {
         systemInput: { false }, voiceProcessing: { false }, report: { _ in Issue.record("Unexpected failure") })
     #expect(notEnabled == .unavailable)
 }
+
+@Test func audioCaptureReadinessTimesOutWithoutPCMAndRejectsLateSuccess() async {
+    let readiness = AudioCaptureReadiness()
+    await #expect(throws: AudioCaptureReadinessError.timedOut) {
+        try await readiness.wait(timeout: .milliseconds(10))
+    }
+    readiness.resolve(.success(()))
+    await #expect(throws: AudioCaptureReadinessError.alreadyWaiting) { try await readiness.wait() }
+}
+
+@Test func audioCaptureReadinessFirstResultWinsOverExpiredDeadline() async throws {
+    let ready = AudioCaptureReadiness()
+    ready.resolve(.success(()))
+    try await ready.wait(timeout: .zero)
+    let failed = AudioCaptureReadiness()
+    failed.resolve(.failure(AudioIOError.interrupted))
+    await #expect(throws: AudioIOError.interrupted) { try await failed.wait(timeout: .zero) }
+}
+
+@Test(arguments: [false, true])
+func bluetoothCaptureSkipsSystemModeProbeAndUsesConfirmedVoiceProcessing(enabled: Bool) {
+    var voiceAttempts = 0
+    let selected = AudioEchoCancellationSelection.select(
+        preferSystemInput: false,
+        systemInput: {
+            Issue.record("HFP must not change session mode to probe system AEC")
+            return true
+        },
+        voiceProcessing: {
+            voiceAttempts += 1
+            return enabled
+        }, report: { _ in Issue.record("Unexpected failure") })
+    #expect(voiceAttempts == 1)
+    #expect(selected == (enabled ? .voiceProcessing : .unavailable))
+}
+
+@Test(arguments: [false, true])
+func captureConfigurationChangeRetiresPCMBeforeAndAfterFirstFrame(ready: Bool) async throws {
+    let readiness = AudioCaptureReadiness()
+    let source = MicrophoneCapture()
+    let input = try source.subscribe()
+    let gate = AudioCaptureConfigurationGate(readiness: readiness, source: source)
+    if ready {
+        readiness.resolve(.success(()))
+        try await readiness.wait()
+    }
+    gate.configurationChanged(engineRunning: false, formatMatches: true)
+    gate.configurationChanged(engineRunning: false, formatMatches: true)
+    #expect(throws: AudioCaptureReadinessError.configurationChanged) { try gate.check() }
+    if !ready {
+        await #expect(throws: AudioCaptureReadinessError.configurationChanged) { try await readiness.wait() }
+    }
+    await #expect(throws: AudioIOError.runtimeFailed) { for try await _ in input.frames {} }
+    #expect(!source.isActive)
+}
+
+@Test func captureConfigurationNotificationAfterStopCannotRetireReplacement() async throws {
+    let oldReadiness = AudioCaptureReadiness()
+    let oldSource = MicrophoneCapture()
+    let old = AudioCaptureConfigurationGate(readiness: oldReadiness, source: oldSource)
+    old.invalidate()
+    old.configurationChanged(engineRunning: false, formatMatches: true)
+    try old.check()
+    #expect(oldSource.isActive)
+    oldReadiness.resolve(.success(()))
+    try await oldReadiness.wait()
+    let readiness = AudioCaptureReadiness()
+    let source = MicrophoneCapture()
+    let replacement = AudioCaptureConfigurationGate(readiness: readiness, source: source)
+    old.configurationChanged(engineRunning: false, formatMatches: true)
+    try replacement.check()
+    #expect(source.isActive)
+    oldSource.finish()
+    source.finish()
+}
+
+@Test func captureStartupRebuildIsBoundedAndDoesNotRetryTimeoutOrCancellation() {
+    var recovery = AudioCaptureStartupRecovery()
+    let timeout = recovery.admit(AudioCaptureReadinessError.timedOut)
+    let cancellation = recovery.admit(CancellationError())
+    let interruption = recovery.admit(AudioIOError.interrupted)
+    let firstChange = recovery.admit(AudioCaptureReadinessError.configurationChanged)
+    let secondChange = recovery.admit(AudioCaptureReadinessError.configurationChanged)
+    #expect(!timeout && !cancellation && !interruption)
+    #expect(firstChange && !secondChange)
+}
+
+@Test func captureConfigurationKeepsRunningGraphWithMatchingFormat() async throws {
+    let readiness = AudioCaptureReadiness()
+    let source = MicrophoneCapture()
+    let gate = AudioCaptureConfigurationGate(readiness: readiness, source: source)
+    gate.configurationChanged(engineRunning: true, formatMatches: true)
+    try gate.check()
+    #expect(source.isActive)
+    readiness.resolve(.success(()))
+    try await readiness.wait()
+    gate.configurationChanged(engineRunning: true, formatMatches: false)
+    #expect(throws: AudioCaptureReadinessError.configurationChanged) { try gate.check() }
+    #expect(!source.isActive)
+}
+
+@Test(arguments: [AudioCaptureContext.EchoCancellation.unknown, .unavailable, .systemInput, .voiceProcessing])
+func bluetoothDuplexRequiresMoreThanAnEnabledEchoProcessor(echo: AudioCaptureContext.EchoCancellation) {
+    #expect(!AudioCaptureDuplexSelection.supportsFullDuplex(echoCancellation: echo, bluetoothRoute: true))
+    #expect(
+        AudioCaptureDuplexSelection.supportsFullDuplex(echoCancellation: echo, bluetoothRoute: false)
+            == (echo == .systemInput || echo == .voiceProcessing))
+}

@@ -36,6 +36,13 @@ public struct ModelArtifactSource: Codable, Sendable {
     public let sha256: String?
 }
 
+/// Architecture-specific replacement for a package's source and installed-file contract.
+public struct ModelArtifactVariant: Codable, Sendable {
+    public let source: ModelArtifactSource
+    public let requiredFiles: [String]
+    public let estimatedBytes: Int64
+}
+
 public struct ModelArtifact: Codable, Sendable, Identifiable {
     public let id: String
     public let name: String
@@ -49,6 +56,7 @@ public struct ModelArtifact: Codable, Sendable, Identifiable {
     public let requiredFiles: [String]
     /// Display/storage estimate only; not an integrity assertion.
     public let estimatedBytes: Int64
+    public let architectureVariants: [String: ModelArtifactVariant]?
     public var revision: String { source.revision ?? "main" }
     public var installedBytes: Int64 { estimatedBytes }
     public var downloadBytes: Int64 { estimatedBytes }
@@ -65,6 +73,20 @@ public protocol ModelArtifactDownloader: Sendable {
 public struct ModelArtifactCatalog: Codable, Sendable {
     public let schemaVersion: Int
     public let packages: [ModelArtifact]
+    /// Resolve once before acquisition, so receipts and downloads use the same variant identity.
+    public func resolvingArchitecture(_ architecture: String?) throws -> Self {
+        let resolved = packages.map { package in
+            let variant = architecture.flatMap { package.architectureVariants?[$0] }
+            return ModelArtifact(
+                id: package.id, name: package.name, capability: package.capability,
+                directory: package.directory, source: variant?.source ?? package.source,
+                minimumOS: package.minimumOS, requiresPhysicalDevice: package.requiresPhysicalDevice,
+                deviceRequirement: package.deviceRequirement, license: package.license,
+                requiredFiles: variant?.requiredFiles ?? package.requiredFiles,
+                estimatedBytes: variant?.estimatedBytes ?? package.estimatedBytes, architectureVariants: nil)
+        }
+        return try Self.decode(JSONEncoder().encode(Self(schemaVersion: schemaVersion, packages: resolved)))
+    }
     public static func read(_ url: URL) throws -> Self {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
@@ -111,6 +133,13 @@ public struct ModelArtifactCatalog: Codable, Sendable {
                     source.sha256.map(validHash) ?? true
                 else { throw ModelArtifactError.invalidCatalog }
             }
+        }
+        let architectures = Set(value.packages.flatMap { Array(($0.architectureVariants ?? [:]).keys) })
+        guard architectures.count <= 16, architectures.allSatisfy(validComponent) else {
+            throw ModelArtifactError.invalidCatalog
+        }
+        for architecture in architectures {
+            _ = try value.resolvingArchitecture(architecture)
         }
         return value
     }

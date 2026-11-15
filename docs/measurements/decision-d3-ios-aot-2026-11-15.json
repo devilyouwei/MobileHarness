@@ -1,0 +1,232 @@
+{
+  "status": "Both artifacts compiled/uploaded and hashes verified. Lite physical-device load FAILED with SIGSEGV on iOS 27.0.1; Edge loading succeeds according to user. See decision-d3-lite-ios-aot-crash-2026-11-15.json.",
+  "artifacts": [
+    {
+      "model": "D3Edge",
+      "build": {
+        "source_repository": "hugging-mac/d3-edge-CoreAI",
+        "source_revision": "0690c04ee1640c1c3fa11a882323751dda6d086a",
+        "xcode": "27.2 (27B52)",
+        "metal_toolchain": "27B47",
+        "platform": "iOS",
+        "minimum_os": "27.0",
+        "architecture": "h18p",
+        "preferred_compute": "none",
+        "validation": "AOT compile succeeded; physical-device inference acceptance pending",
+        "files": {
+          "LICENSE": {
+            "bytes": 11357,
+            "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+          },
+          "tokenizer_config.json": {
+            "bytes": 16709,
+            "sha256": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c"
+          },
+          "tokenizer.json": {
+            "bytes": 12807982,
+            "sha256": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42"
+          },
+          "NOTICE": {
+            "bytes": 895,
+            "sha256": "2326c866dd82edf02dea680cc5e7a15df89a6f2a98feb93f04377d03bd8ad56e"
+          },
+          "merges.txt": {
+            "bytes": 3353259,
+            "sha256": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d"
+          },
+          "chat_template.jinja": {
+            "bytes": 7755,
+            "sha256": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80"
+          },
+          "manifest.json": {
+            "bytes": 1007,
+            "sha256": "955d754e288ed5eae86f9f84023f3ae25b80bc6e6f29a03c0a7d867ad0acea7d"
+          },
+          "decision_config.json": {
+            "bytes": 5504,
+            "sha256": "30b6095b945d5a93697868afdf9be9123ea892085fbaff3078112c48da20dc6b"
+          },
+          "vocab.json": {
+            "bytes": 6722759,
+            "sha256": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+          },
+          "decision.h18p.aimodelc/main-h18p.mlirb": {
+            "bytes": 1972,
+            "sha256": "7c798c02307a758ba4f792b1f50b3af0804d693b4e839e061ed48b88ab84a4bd"
+          },
+          "decision.h18p.aimodelc/metadata.json": {
+            "bytes": 192,
+            "sha256": "2fb1b49b2128701c399033365494306f152cc265af080711df51550e5d10818f"
+          },
+          "decision.h18p.aimodelc/stats.json": {
+            "bytes": 1782,
+            "sha256": "01f827e5440404c841bd23537d6dbb4e9073f4c4476bb05d36494d151945f858"
+          },
+          "decision.h18p.aimodelc/main.hash": {
+            "bytes": 32,
+            "sha256": "99b7ef485a3ceb55de8aaff92a4f3732105ac84d41bba1065196f8dd336f1d4e"
+          },
+          "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/manifest.plist": {
+            "bytes": 69177,
+            "sha256": "245bb2104ca0a5df9bfb91e49f2bf11b2f7a98cbb17c3510c52bc3653c1e9f6c"
+          },
+          "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/specialized_model_1.mpsgraph": {
+            "bytes": 3058594,
+            "sha256": "575d53c4d9422814b883bf28bbebafd221ede78f17a4bce8062eddeb3372afb1"
+          },
+          "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/original_model_0.mpsgraph": {
+            "bytes": 1750669,
+            "sha256": "9f18f220bbc3c91ca611db86eba8d7cd47de3635f780d37b14cfe725c66f9a58"
+          },
+          "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/resources.bin": {
+            "bytes": 1468500392,
+            "sha256": "800f4a0462c48809a09b88e6a99013b1d2be7b5646b6fee53361530ec8e225c5"
+          }
+        }
+      },
+      "packageBytes": 1496313166,
+      "publication": {
+        "repo": "hugging-mac/d3-edge-CoreAI",
+        "revision": "61a6a13a44d8390a5cf72755a6f581238ca88740",
+        "prefix": "ios/aot-v1/h18p",
+        "files": [
+          "LICENSE",
+          "NOTICE",
+          "aot-build.json",
+          "chat_template.jinja",
+          "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/manifest.plist",
+          "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/original_model_0.mpsgraph",
+          "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/resources.bin",
+          "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/specialized_model_1.mpsgraph",
+          "decision.h18p.aimodelc/main-h18p.mlirb",
+          "decision.h18p.aimodelc/main.hash",
+          "decision.h18p.aimodelc/metadata.json",
+          "decision.h18p.aimodelc/stats.json",
+          "decision_config.json",
+          "manifest.json",
+          "merges.txt",
+          "tokenizer.json",
+          "tokenizer_config.json",
+          "vocab.json"
+        ],
+        "bytes": 1496313166
+      }
+    },
+    {
+      "model": "D3Lite",
+      "build": {
+        "source_repository": "hugging-mac/d3-lite-CoreAI",
+        "source_revision": "863963d371d5af6784bf726fb85a508c08751d65",
+        "xcode": "27.2 (27B52)",
+        "metal_toolchain": "27B47",
+        "platform": "iOS",
+        "minimum_os": "27.0",
+        "architecture": "h18p",
+        "preferred_compute": "none",
+        "validation": "AOT compile succeeded; physical-device inference acceptance pending",
+        "files": {
+          "LICENSE": {
+            "bytes": 11357,
+            "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+          },
+          "tokenizer_config.json": {
+            "bytes": 16709,
+            "sha256": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c"
+          },
+          "config.json": {
+            "bytes": 2884,
+            "sha256": "a9071195384e1fc2c68f9fe0fae007a22182ab77eb14fe8228a1a24b37d3cee9"
+          },
+          "tokenizer.json": {
+            "bytes": 12807982,
+            "sha256": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42"
+          },
+          "NOTICE": {
+            "bytes": 376,
+            "sha256": "ab3eaa5b3aa20aba96cd3e859d3c6a67d4bc8736a5e2747c702ec541b33e5bbf"
+          },
+          "merges.txt": {
+            "bytes": 3353259,
+            "sha256": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d"
+          },
+          "chat_template.jinja": {
+            "bytes": 7755,
+            "sha256": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80"
+          },
+          "manifest.json": {
+            "bytes": 685,
+            "sha256": "f8046fc99bf2326109eb607521823ec78b4c8065890746d7c4f6689bce61a41a"
+          },
+          "decision_config.json": {
+            "bytes": 5504,
+            "sha256": "30b6095b945d5a93697868afdf9be9123ea892085fbaff3078112c48da20dc6b"
+          },
+          "vocab.json": {
+            "bytes": 6722759,
+            "sha256": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+          },
+          "decision.h18p.aimodelc/main-h18p.mlirb": {
+            "bytes": 1973,
+            "sha256": "d3c3c294457df63581fbfe5d2311ba2fe58d13dd835677aa6f2bcc2d9266f023"
+          },
+          "decision.h18p.aimodelc/metadata.json": {
+            "bytes": 192,
+            "sha256": "5f8830723817e3668d83bd88e43d539925113ff95618d01fa8caa3d2f6c5ad5e"
+          },
+          "decision.h18p.aimodelc/stats.json": {
+            "bytes": 1805,
+            "sha256": "66f386d90f50eec462a454ffd0264aeb405ecba5380d4e816868959431efc4db"
+          },
+          "decision.h18p.aimodelc/main.hash": {
+            "bytes": 32,
+            "sha256": "3d2a83babdda097f15b31602136c5c8437e8a6c8c2ad8504da56c12d18049a88"
+          },
+          "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/manifest.plist": {
+            "bytes": 164292,
+            "sha256": "d1a1318805623809b1a363b7ae05172aa5b98b7594f1bd848bae2ddd50fc5252"
+          },
+          "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/specialized_model_1.mpsgraph": {
+            "bytes": 8890848,
+            "sha256": "7214a87072635a75d9e752fc329827c67e20fbc90c9802562b4b23c64fb4481a"
+          },
+          "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/original_model_0.mpsgraph": {
+            "bytes": 5110036,
+            "sha256": "aaea0a45438d80766e7c540c01d3ae9d42c715907168d3170876e0f13f52b21f"
+          },
+          "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/resources.bin": {
+            "bytes": 2503298936,
+            "sha256": "96b4d664b6aa76e5d3a72aead6f18090d3e00bc3fe5b1ea3703810241002f070"
+          }
+        }
+      },
+      "packageBytes": 2540400645,
+      "publication": {
+        "repo": "hugging-mac/d3-lite-CoreAI",
+        "revision": "4aff26452f53609516813ea61ee76b431b49a4e9",
+        "prefix": "ios/aot-v1/h18p",
+        "files": [
+          "LICENSE",
+          "NOTICE",
+          "aot-build.json",
+          "chat_template.jinja",
+          "config.json",
+          "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/manifest.plist",
+          "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/original_model_0.mpsgraph",
+          "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/resources.bin",
+          "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/specialized_model_1.mpsgraph",
+          "decision.h18p.aimodelc/main-h18p.mlirb",
+          "decision.h18p.aimodelc/main.hash",
+          "decision.h18p.aimodelc/metadata.json",
+          "decision.h18p.aimodelc/stats.json",
+          "decision_config.json",
+          "manifest.json",
+          "merges.txt",
+          "tokenizer.json",
+          "tokenizer_config.json",
+          "vocab.json"
+        ],
+        "bytes": 2540400645
+      }
+    }
+  ]
+}

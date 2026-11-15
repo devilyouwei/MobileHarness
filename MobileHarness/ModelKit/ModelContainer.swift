@@ -1,5 +1,6 @@
 import Foundation
 import ModelKit
+import ModelKitD3
 import ModelKitOpenAI
 @_spi(ModelAssembly) import ModelKitRuntime
 
@@ -283,7 +284,8 @@ private actor ModelScope {
                     if let prepareArtifacts {
                         let configuration = try await prepareArtifacts()
                         try await manager.configureArtifacts(
-                            catalog: configuration.catalog, storage: configuration.storage,
+                            catalog: try configuration.catalog.resolvingArchitecture(D3Decision.deviceArchitectureName),
+                            storage: configuration.storage,
                             downloader: configuration.downloader)
                         _ = try await manager.artifactSnapshots()
                     }

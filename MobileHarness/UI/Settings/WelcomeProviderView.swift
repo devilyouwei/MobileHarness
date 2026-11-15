@@ -22,7 +22,7 @@
                                 .font(.largeTitle).foregroundStyle(.tint)
                                 .accessibilityHidden(true)
                             Text(appCopy.text("Connect your AI service")).font(.title2.bold())
-                            Text(appCopy.text("Add a cloud LLM provider, then choose models for Assistant and Writer."))
+                            Text(appCopy.text("Connect an AI service to choose models for your assistants."))
                                 .foregroundStyle(.secondary)
                         }
                         .padding(.vertical, 12)
@@ -50,7 +50,7 @@
                     } footer: {
                         Text(
                             appCopy.text(
-                                "Leave the URL blank for https://api.openai.com/v1, or enter an OpenAI-compatible endpoint. Your API key is stored in the device keychain."
+                                "Leave the URL blank to use OpenAI, or enter a compatible service URL. Your API key is saved securely on this device."
                             ))
                     }
                     if let error {

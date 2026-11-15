@@ -57,9 +57,9 @@ public enum ModelResourceGroup: String, Sendable, CaseIterable {
     }
     public var installationMessage: String {
         switch self {
-        case .recognition: "Download and install Nemotron before enabling custom speech recognition."
-        case .synthesis: "Download and install MOSS before enabling the custom speech model."
-        case .language: "Download and install Gemma 4 E2B before switching to the local language model."
+        case .recognition: "Download Nemotron first."
+        case .synthesis: "Download MOSS first."
+        case .language: "Download Gemma 4 E2B first."
         case .vision: "Download and install the YOLO pose model first."
         case .decision: "Download D3 Edge or D3 Lite before selecting the local model."
         }

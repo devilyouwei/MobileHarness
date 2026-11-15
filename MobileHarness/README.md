@@ -1724,3 +1724,8 @@ Automated checks, iOS builds, real-model samples, native UI and physical-device 
 Runtime log language is supplied by App composition to execution snapshot projection and by AgentRuntime to cognitive log observations. Agents resolves app-owned copy through UI.AppLanguage while retaining raw execution evidence. No language state or UI dependency enters AgentCore; see [Support presentation](Agents/Support/README.md#state-configuration-and-localization).
 
 Agents root contracts distinguish App-bound host bindings and Gateway configuration/capabilities from Support adapter implementations. Root composition supplies role-owned local native declarations and owner identities to an immutable function catalog; shared configuration/coverage validate those explicit inputs. Assistant owns conversational Task/Decision/history orchestration, while Support/Chat supplies model consumption, recording and neutral projection. These are internal Agents ownership boundaries; AgentCore and foundation target dependencies remain unchanged. See [Agents ownership](Agents/README.md#root-source-ownership).
+
+
+### Model artifact architecture selection
+
+Default ModelKit assembly resolves optional artifact catalog architecture variants before acquisition; native architecture discovery stays inside ModelKit providers/backends. Actions supplies the unchanged declarative catalog and storage/downloader adapters. The selected source revision and required-file set flow together into download, installation receipts and resource loading. Source packages remain available for architectures without a compiled variant. See [ModelKit management](ModelKit/Support/Management/README.md).

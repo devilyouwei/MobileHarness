@@ -66,7 +66,7 @@ extension SpeechPerceptionAgent {
             try Task.checkCancellation()
             guard nativeInputEpoch == epoch else { throw CancellationError() }
             // Listening policy and playback admission are actor-owned; no per-packet MainActor callback.
-            guard try admitsMicrophone(sessionID: sessionID) else {
+            guard try admitsMicrophone(sessionID: sessionID, capturedAt: frame.capturedAt) else {
                 suppressedMicrophonePackets += 1
                 continue
             }

@@ -52,3 +52,7 @@ Production declarations and explicit developer provisioning.
 Decision 固定 Edge 和 Lite 的发布版本，分别安装到 D3Edge 和 D3Lite。Lite 固定下载 hugging-mac 发布的三输入纯文本图。旧 revision 的安装收据显示为不兼容，可在 Agent Models 删除旧制品后重新下载。目录只随包分发声明与下载信息，不含权重。图、tokenizer、manifest、配置和许可证一并校验安装，下载不切换业务偏好。
 
 模型目录的显示名使用 Gemma 4 E2B、D3 Edge、D3 Lite，不附加 Local Chat 或 Decision 用途后缀；用途由 UI 独立标签呈现。模型 ID、目录、版本与下载校验身份不随显示名变化。
+
+Catalog packages can declare architectureVariants replacing source, requiredFiles and estimatedBytes for an exact native architecture. Default assembly resolves this before acquisition; source declarations remain the default for other architectures and developer download scripts. Only the selected package is downloaded. Revision-specific receipts prevent an old source installation from being mistaken for an AOT package.
+
+D3 Edge/Lite h18p variants pin verified iOS AOT packages under ios/aot-v1/h18p in their existing HF repositories. Prefix stripping installs compiled graphs and companion files at the existing D3Edge/D3Lite roots. requiredFiles enumerates the entire compiled bundle plus tokenizer, configuration, manifest, licenses and build provenance. Other architectures and the independent Mac benchmark profile retain source graphs.

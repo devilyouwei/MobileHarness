@@ -1129,10 +1129,13 @@ func completedASRContinuesWithoutAcknowledgmentAndPlaybackUsesRouteCapability(fu
     #expect(await speech.acquirePlaybackAdmission())
     #expect(try await speech.admitsMicrophone(sessionID: epoch) == fullDuplex)
     if !fullDuplex {
+        let capturedDuringPlayback = ContinuousClock.now
         await #expect(throws: CapabilityError.inputBusy) {
             try await processMicrophoneFixture(frame(true, sequence: 2), using: speech)
         }
         try await speech.resumeListening()
+        #expect(try await !speech.admitsMicrophone(sessionID: epoch, capturedAt: capturedDuringPlayback))
+        #expect(try await speech.admitsMicrophone(sessionID: epoch, capturedAt: .now))
     }
     try await processMicrophoneFixture(frame(true, sequence: 2), using: speech)
     try await processMicrophoneFixture(frame(false, sequence: 3), using: speech)
@@ -1437,4 +1440,13 @@ func speechRolesOwnIndependentIslandsAndJoinShutdown(initiallyUnavailable: Bool)
     #expect(await synthesis.snapshot().presentationFailure == nil)
     await output.shutdown()
     await state.stop()
+}
+
+@Test(arguments: [AudioCaptureContext.EchoCancellation.systemInput, .voiceProcessing])
+func bluetoothReplyAdmissionSuppressesRecognitionAndRestoresAfterPlayback(echo: AudioCaptureContext.EchoCancellation)
+    async throws
+{
+    let fullDuplex = AudioCaptureDuplexSelection.supportsFullDuplex(echoCancellation: echo, bluetoothRoute: true)
+    #expect(!fullDuplex)
+    try await completedASRContinuesWithoutAcknowledgmentAndPlaybackUsesRouteCapability(fullDuplex: fullDuplex)
 }

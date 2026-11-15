@@ -1,0 +1,133 @@
+{
+  "date": "2026-11-15",
+  "device": {
+    "model": "iPhone18,1",
+    "os": "27.0.1 (24A446)"
+  },
+  "observation": "User reports Lite remains loading; no restart or reinstall performed during collection.",
+  "artifact": {
+    "revision": "863963d371d5af6784bf726fb85a508c08751d65",
+    "graphBytesObserved": 1510776860,
+    "manifestMatchesMac": true,
+    "graphIdentifierFileMatchesMac": true,
+    "fullGraphHashOnPhoneVerified": false,
+    "manifest": {
+      "source": "vllm-sr/d3-lite",
+      "revision": "a8d25a91ef75552803f7009d25b7bd435991abd9",
+      "sequence_length": 512,
+      "hidden_size": 1024,
+      "precision": "bfloat16",
+      "readout_precision": "float32",
+      "attention_mode": "noncausal_full_attention",
+      "modality": "text",
+      "inputs": [
+        "input_ids",
+        "attention_mask",
+        "position_ids"
+      ],
+      "output": "mm_186",
+      "function": "main",
+      "format": "Apple Core AI .aimodel",
+      "source_weight_sha256": "ca6222dbf2b72899ae45580ed84d26d1f0e69a8de212edda295072000e34a4c2",
+      "source_readout_sha256": "fe11cfac5c79b6a83e35b707581b1260214279bb22b003c215c62719186ef629"
+    }
+  },
+  "cpuResourceReport": {
+    "intervalStart": "2026-11-15 21:10:18.238 +0800",
+    "intervalEnd": "2026-11-15 21:12:03.005 +0800",
+    "durationSeconds": 104.77,
+    "cpuSeconds": 90,
+    "averageCPUPercent": 86,
+    "actionTaken": "none",
+    "samples": 43,
+    "dominantANEStackSamples": 34,
+    "footprintStartMiB": 73.88,
+    "footprintEndMiB": 525.64,
+    "rawReportSHA256": "033614a84359c9ac2c967a7389d4d4a96dee0cc70127d8f6faad12e53fd42114"
+  },
+  "symbolication": {
+    "localDebugDylibUUIDMatchesReport": true,
+    "frames": [
+      "ModelResource.ensureLoaded(reportLoading:) ModelResource.swift:140",
+      "ModelLoadGate.run ModelResource.swift:59",
+      "D3Decision.init(context:artifacts:allowsVisualInputs:) D3Decision.swift:17",
+      "D3Graph.init(artifacts:allowsVisualInputs:) D3Decision.swift:108",
+      "GraphModel.init(contentsOf:function:computeUnits:) GraphModel.swift:52",
+      "CoreAIDelegates",
+      "CoreAICompiler",
+      "MetalPerformanceShadersGraph",
+      "AppleNeuralEngine",
+      "ANECompiler"
+    ]
+  },
+  "collectionLimits": [
+    "Instruments lists paired device Offline while CoreDevice supports app-specific file and process reads over localNetwork; Time Profiler attach failed.",
+    "Unified log collection requires root; sudo -n reported password required, no password prompt or credential read attempted.",
+    "Existing app-specific CPU resource microstackshots provided the sampled loading evidence.",
+    "No successful load completion, on-device classification output, or full model file checksum collected.",
+    "D3 identity is symbolicated; Lite selection is supplied by user and artifact inspection, not a model path printed by the CPU sample."
+  ],
+  "liveAttachFollowup": {
+    "userConfirmedLoading": true,
+    "userReportedUSBAttached": true,
+    "coreDeviceObservedTransport": "localNetwork",
+    "xcodeObservedInterface": "network",
+    "instrumentsObservedState": "offline",
+    "processStillPresent": true,
+    "pidAndNameAttachBothFailed": true,
+    "usbDeviceTreeObservation": "USB2.0 Hub present; no iPhone entry observed",
+    "appRestartedOrReinstalled": false,
+    "newLiveStackCaptured": true,
+    "nextRequiredStep": null,
+    "resolvedAfterDirectConnection": true
+  },
+  "liveCapture": {
+    "start": "2026-11-15 21:24:59.353 +0800",
+    "end": "2026-11-15 21:25:20.549 +0800",
+    "durationSeconds": 21.196231,
+    "template": "Time Profiler",
+    "exitCode": 0,
+    "sameAppProcessAsEarlierReport": true,
+    "counts": {
+      "samples": 20984,
+      "weightNS": 20984000000,
+      "aneSamples": 20828,
+      "aneWeightNS": 20828000000,
+      "associateUnmaterializedOpIds": 20751,
+      "MPSToANECValidation": 20828
+    },
+    "aneSamplePercentage": 99.25657643919176,
+    "exampleANEStack": [
+      "0x19d9280b9",
+      "mlir::(anonymous namespace)::associateUnmaterializedOpIds(mlir::anecir::FunctionConversionInfo*, llvm::DenseMap<mlir::Operation*, std::__1::shared_ptr<mlir::anecir::RegionConversionInfo>, llvm::DenseMapInfo<mlir::Operation*, void>, llvm::detail::DenseMapPair<mlir::Operation*, std::__1::shared_ptr<mlir::anecir::RegionConversionInfo>>>&, llvm::DenseMap<mlir::Operation*, std::__1::shared_ptr<mlir::anecir::RegionConversionInfo>, llvm::DenseMapInfo<mlir::Operation*, void>, llvm::detail::DenseMapPair<mlir::Operation*, std::__1::shared_ptr<mlir::anecir::RegionConversionInfo>>>&, mlir::anec::OpIDMap&)::$_2::operator()(mlir::Operation*, mlir::anecir::RegionConversionInfo const*, bool) const",
+      "mlir::WalkResult llvm::function_ref<mlir::WalkResult (mlir::Operation*)>::callback_fn<std::__1::enable_if<!llvm::is_one_of<mlir::func::FuncOp, mlir::Operation*, mlir::Region*, mlir::Block*>::value && std::is_same<mlir::WalkResult, mlir::WalkResult>::value, mlir::WalkResult>::type mlir::detail::walk<(mlir::WalkOrder)1, mlir::ForwardIterator, mlir::(anonymous namespace)::MPSToANECValidation::basicMPSToANECConversion(mlir::ModuleOp, mlir::RegionOpCreator*, mlir::CostModelParams const*)::'lambda'(mlir::func::FuncOp), mlir::func::FuncOp, mlir::WalkResult>(mlir::Operation*, mlir::(anonymous namespace)::MPSToANECValidation::basicMPSToANECConversion(mlir::ModuleOp, mlir::RegionOpCreator*, mlir::CostModelParams const*)::'lambda'(mlir::func::FuncOp)&&)::'lambda'(mlir::Operation*)>(long, mlir::Operation*)",
+      "mlir::WalkResult mlir::detail::walk<mlir::ForwardIterator>(mlir::Operation*, llvm::function_ref<mlir::WalkResult (mlir::Operation*)>, mlir::WalkOrder)",
+      "mlir::(anonymous namespace)::MPSToANECValidation::runOnOperation()",
+      "mlir::detail::OpToOpPassAdaptor::run(mlir::Pass*, mlir::Operation*, mlir::AnalysisManager, bool, unsigned int)",
+      "mlir::PassManager::run(mlir::Operation*)",
+      "ZinMPSToANECValidate(mlir::OwningOpRef<mlir::ModuleOp>&, char const*, MLIRToANECConversionInfo*, bool, bool, void*, unsigned long long)",
+      "ValidateMLIRProgram(MPSModule const*, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&, std::__1::map<std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>>, std::__1::map<unsigned long long, ValidateEntry, std::__1::less<unsigned long long>, std::__1::allocator<std::__1::pair<unsigned long long const, ValidateEntry>>>, std::__1::less<std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>>>, std::__1::allocator<std::__1::pair<std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const, std::__1::map<unsigned long long, ValidateEntry, std::__1::less<unsigned long long>, std::__1::allocator<std::__1::pair<unsigned long long const, ValidateEntry>>>>>>&, bool, std::__1::map<std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>>, ZinMPSConstantInfo, std::__1::less<std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>>>, std::__1::allocator<std::__1::pair<std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const, ZinMPSConstantInfo>>> const&, long long, bool, bool, CaptureOptions const&, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&, bool, bool)",
+      "ANECValidateMPSModuleCreate",
+      "ANECValidateNetworkCreate",
+      "ANEValidateNetworkCreate",
+      "mlir::mpsx::(anonymous namespace)::ANERegionFormationPass::runOnOperation()",
+      "mlir::detail::OpToOpPassAdaptor::run(mlir::Pass*, mlir::Operation*, mlir::AnalysisManager, bool, unsigned int)",
+      "mlir::PassManager::run(mlir::Operation*)",
+      "-[MPSGraphExecutable applyOptimizationPassesWithDevice:module:compilationID:compilationDescriptor:perEntryPointFuncOpMLIRName:]",
+      "-[MPSGraphExecutable specializedModuleWithDevice:shapedEntryPoints:compilationDescriptor:error:]::$_48::operator()(bool, NSError* __autoreleasing*) const",
+      "-[MPSGraphExecutable specializedModuleWithDevice:shapedEntryPoints:compilationDescriptor:error:]",
+      "__89-[MPSGraphExecutable specializeWithDevice:shapedEntryPoints:compilationDescriptor:error:]_block_invoke",
+      "_dispatch_call_block_and_release",
+      "_dispatch_client_callout",
+      "_dispatch_lane_serial_drain",
+      "_dispatch_lane_invoke",
+      "_dispatch_root_queue_drain_deferred_wlh",
+      "_dispatch_workloop_worker_thread",
+      "_pthread_wqthread",
+      "start_wqthread"
+    ],
+    "traceLocalPath": "/tmp/mobileharness-lite-phone-direct-loading.trace",
+    "exportSHA256": "6991079bb3cae2174bc0c895ab15e671cf7a12637bbc3ebb7f784b8aff6630cb",
+    "interpretation": "Active CPU samples remain in MPSGraph-to-ANE conversion/validation. This localizes long-running compilation; it does not establish an infinite loop or a particular compiler defect."
+  }
+}

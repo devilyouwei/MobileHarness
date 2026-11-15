@@ -22,6 +22,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     let microphoneObservation: (@MainActor @Sendable (MicrophoneObservation) -> Void)?
     var nativeInput: Task<Void, any Error>?
     var nativeInputEpoch: UUID?
+    private var microphoneAdmissionOpenedAt: ContinuousClock.Instant?
     var nativeProcessing = false
     private var nativePacketWaiters: [String: CheckedContinuation<Void, any Error>] = [:]
     public internal(set) var suppressedMicrophonePackets = 0
@@ -237,13 +238,14 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         guard lifecycle == .running else { throw HarnessError.notRunning }
         guard !residentListening || (captureOpen && listeningPolicy.enabled) else { return }
         guard let activeInput else {
+            microphoneAdmissionOpenedAt = .now
             recognitionSuspended = false
             phase = .listening
             await refreshIsland()
             return
         }
         traceListening("resume.reset.begin")
-        try await resetListening(after: activeInput)
+        try await resetListening(after: activeInput, discardEarlierPCM: true)
         traceListening("resume.reset.end")
         guard !recognitionSuspended else { return }
         try await transition(to: .listening, input: activeInput)
@@ -269,6 +271,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
 
     /// A microphone epoch is independent of the resident policy Agent's lifetime.
     func setCaptureDuplex(_ enabled: Bool) {
+        microphoneAdmissionOpenedAt = nil
         listeningPolicy.fullDuplex = enabled
         if enabled {
             recognitionSuspended = false
@@ -512,9 +515,10 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     private func cancelNativePacketWaiter(_ id: String) {
         nativePacketWaiters.removeValue(forKey: id)?.resume(throwing: CancellationError())
     }
-    func admitsMicrophone(sessionID: String) throws -> Bool {
+    func admitsMicrophone(sessionID: String, capturedAt: ContinuousClock.Instant? = nil) throws -> Bool {
         guard lifecycle == .running else { throw HarnessError.notRunning }
         guard sessionID == self.sessionID else { throw CommunicationError.scopeClosed }
+        if let capturedAt, let microphoneAdmissionOpenedAt, capturedAt < microphoneAdmissionOpenedAt { return false }
         return !recognitionSuspended
             && (!residentListening
                 || (captureOpen && listeningPolicy.enabled))
@@ -580,7 +584,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         await refreshIsland()
         if present { try presentPhase(next, input: input) }
     }
-    private func resetListening(after input: AgentInput) async throws {
+    private func resetListening(after input: AgentInput, discardEarlierPCM: Bool = false) async throws {
         let captureSession = sessionID
         let captureGeneration = nativeCaptureGeneration
         let admission = playbackAdmission
@@ -594,6 +598,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             throw CancellationError()
         }
         prepareRecognitionTurn()
+        if discardEarlierPCM { microphoneAdmissionOpenedAt = .now }
         recognitionSuspended =
             admission != playbackAdmission || (residentListening && (!captureOpen || !listeningPolicy.enabled))
         activeInput = input

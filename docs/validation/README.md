@@ -204,3 +204,5 @@ refactor, Agent-only model recording, current-file recovery and automated/build/
 - [本地 Core AI Decision 中英文数字提示词对照](Decision-Local-LLM-Bilingual-Digits.md)记录 5 个通用 LLM 的中英文提示运行，以及 D3 原生 Choice、整段原文和旧提示的同批对照，另记录删去动作定义的复测。每组 100 条，逐条预算 500 ms。
 
 [Apple system LLM](Apple-System-LLM.md) records standalone provider compilation, contract tests, whole-workspace check failures and native-model acceptance limits.
+
+- [D3 iOS AOT validation](D3-iOS-AOT.md): compiler artifacts, publication, architecture selection and device-acceptance limits.

@@ -53,3 +53,7 @@ RuntimeBoundaryTests cover invalid manager configuration, nondefault limits reac
 ## Direct container contract
 
 Direct-input regressions cover typed request receipts, bounds, cancellation/generations, native subscriptions and unchanged authorized execution. Synthetic tests do not establish real model, UI or hardware acceptance. Current cross-module ownership is defined by the [overall design](../../MobileHarness/README.md).
+
+Catalog architecture tests cover exact variant selection, source retention for unknown/no architecture, revision/required-file/size consistency and rejection of unsafe paths in an unselected variant.
+
+The production D3 catalog test checks that h18p selects pinned compiled-only graph inventories with companion tokenizer/manifest files, while non-iOS assembly retains source graphs.
