@@ -141,6 +141,7 @@ let package = Package(
         .library(name: "ModelKitKokoro", targets: ["ModelKitKokoro"]),
         .library(name: "ModelKitNemotron", targets: ["ModelKitNemotron"]),
         .library(name: "ModelKitOpenAI", targets: ["ModelKitOpenAI"]),
+        .library(name: "ModelKitAppleLLM", targets: ["ModelKitAppleLLM"]),
         .library(name: "ModelKit", targets: ["ModelKit"]),
         .library(name: "ModelKitGemma4", targets: ["ModelKitGemma4"]),
         .library(name: "ModelKitRuntime", targets: ["ModelKitRuntime"]),
@@ -382,7 +383,8 @@ let package = Package(
                 "README.md", "ModelContainer.swift", "Language/README.md", "Language/JEV/README.md",
                 "Language/JEV/D3Decision.swift",
                 "Speech/README.md", "Speech/ASR/README.md", "Speech/TTS/README.md", "Speech/VAD/README.md",
-                "Language/LLM/Gemma4", "Language/LLM/OpenAI", "Language/LLM/README.md", "Support/Backends",
+                "Language/LLM/Apple", "Language/LLM/Gemma4", "Language/LLM/OpenAI", "Language/LLM/README.md",
+                "Support/Backends",
                 "Support/README.md", "Support/Speech",
                 "Support/Core/README.md", "Support/Management", "Speech/ASR/Apple", "Speech/TTS/Apple",
                 "Speech/TTS/Kokoro",
@@ -400,6 +402,9 @@ let package = Package(
         .testTarget(
             name: "OpenAIChatTests", dependencies: ["ModelKit", "ModelKitOpenAI", "ModelKitRuntime"],
             exclude: ["README.md"]),
+        .target(
+            name: "ModelKitAppleLLM", dependencies: ["ModelKit"],
+            path: "MobileHarness/ModelKit/Language/LLM/Apple", exclude: ["README.md"]),
         .target(
             name: "ModelKitDefaults",
             dependencies: [
@@ -503,7 +508,7 @@ let package = Package(
                 "StorageCore",
                 "AppLifecycle", "UI",
                 "AgentCore", "Gateway", "Agents", "Actions", "FunctionContracts", "ExecutionRuntime", "CallRuntime",
-                "ModelKit", "ModelKitOpenAI", "ModelKitRuntime",
+                "ModelKit", "ModelKitOpenAI", "ModelKitRuntime", "ModelKitAppleLLM",
                 "StorageChat", "StorageCache", "StorageTasks", "StorageMedia", "StorageDevices", "StorageSQLite",
                 "PlatformKit",
             ],
@@ -526,7 +531,7 @@ let package = Package(
             name: "ModelKitDefaultsTests",
             dependencies: ["ModelKit", "ModelKitRuntime", "ModelKitDefaults", "ModelKitOpenAI"],
             exclude: ["README.md"]),
-        .testTarget(name: "ModelKitTests", dependencies: ["ModelKit"], exclude: ["README.md"]),
+        .testTarget(name: "ModelKitTests", dependencies: ["ModelKit", "ModelKitAppleLLM"], exclude: ["README.md"]),
         .testTarget(
             name: "ModelKitRuntimeTests", dependencies: ["ModelKit", "ModelKitRuntime"],
             exclude: ["README.md"]),

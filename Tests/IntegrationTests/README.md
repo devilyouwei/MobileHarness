@@ -376,3 +376,13 @@ ResourcePresentationTests 覆盖同会话过期刷新/错误呈现不覆盖当�
 Photo countdown regression coverage validates the optional 0…30-second Action parameter before effects, typed endpoint forwarding, no implicit open/configure/retry, and unchanged recording composition. The scripted GenerationRound model emits openCamera, a spoken cue and takePhoto in one response using separate wait groups; a held preview demonstrates ordered execution without an intermediate request. Photography examples parse into two Camera Channel Actions with the countdown attached to takePhoto; spoken examples retain open → speech → capture order and paired waits. Failed opening and unavailable capture report both failures without retries or shutter effects. Native countdown timing/cancellation tests use injected clocks; these are not real-model or physical-camera acceptance.
 
 语音路由回归覆盖同主题的 ASR 片段与最终契约隔离、最终文本接纳时的任务归属、连续识别及受限路线播放准入。语音感知测试验证本地识别字幕与失败恢复，实际原生音频验收单列。
+
+## Apple system Decision comparison
+
+`AppleDecisionEvaluationTests.swift` adds an opt-in real AppleChat experiment. It verifies and reuses the archived D3 Edge/Lite system/user requests (100 rows) and separately renders 54 language-matched current-prompt cases. Generated A/B/C or 1/2/3 answers are parsed strictly; no tools, adoption protection, retries or model fallback participate. Three warmups per condition precede sequential requests with temperature 0 and 16 output tokens. Each request has a 60-second generation timeout with joined provider cleanup. Reports retain exact prompts, raw output/errors, source hashes, native token usage, first-text/total latency and 250/500 ms budget counts. Accuracy includes invalid/error requests; latency percentiles use completed non-error requests. Archived D3 times are not same-host reruns.
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer APPLE_DECISION_REPORT=/tmp/apple-decision-new-run.json swift test --filter appleDecisionModelEvaluation
+```
+
+The output path must not exist and its parent directory must exist. Reports checkpoint after every request. Unavailable system models produce a blocked report with zero measured requests and an explicit test failure. The ordinary suite runs only fixture/parser/metric regressions; the real-model test is disabled unless `APPLE_DECISION_REPORT` is set. See [Decision comparison](../../docs/validation/Decision-Model-Mac-Comparison.md#apple-system-model-decision-comparison-2026-11-15).

@@ -88,3 +88,5 @@ Completed scope: [可读预览编号与合并图片输入](../../completed/Reada
 - [Agents responsibility boundaries](Agents-Responsibility-Boundaries.md): Assistant orchestration ownership, injected local-tool declarations and module-level host/Gateway contracts.
 
 - [模型下载源交互](Model-Download-Source.md)：统一即时选择与系统语言默认源。
+
+- [Apple system LLM](Apple-System-LLM.md)：独立 FoundationModels ChatCapability 适配器与验证边界。

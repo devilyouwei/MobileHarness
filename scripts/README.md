@@ -10,7 +10,7 @@
 | --- | --- |
 | check.sh | Swift 版本、模块/依赖边界、离线 Python 检查、严格格式、根 Swift 测试及项目/权限 plist |
 | check-modelkit-boundaries.py | 项目/SwiftPM 目标与 import 边界、无环依赖、独立基础模块、业务函数/资源约束 |
-| build-ios.sh | 完整 Xcode 下按 Package.resolved 锁定版本依次构建四个 Simulator scheme，禁止自动更新依赖，并验证 App 中的 Agent/Skill 资源 |
+| build-ios.sh | 完整 Xcode 下按 Package.resolved 锁定版本依次构建五个 Simulator scheme（含独立 ModelKitAppleLLM），禁止自动更新依赖，并验证 App 中的 Agent/Skill 资源 |
 | verify-app-agent-resources.py | 最终 Bundle Catalog 可发现、资源路径/字节与源码一致、Core 协议与函数声明打包边界；只排除资源根标准签名元数据，签名包与未签名包采用同一资源校验 |
 
 完整 Xcode/SDK、具体模型和平台能力由相应工具自身校验；不能把缺失工具或失败命令记录为通过。执行结果、失败原因、版本和设备写入 [validation](../docs/validation/README.md)。
@@ -175,3 +175,5 @@ Agent 资源静态检查与运行时 schema 一致：Agent.json 使用 v10，cat
 提示词资源校验覆盖 cognition Agent 的 Shared 与角色模板；Actions 与 ModelKit 的内部文案不属于本次资源迁移。最终包验证核对合并后的 Assistant 资源、完整文件集合与源文件字节。
 
 Writer 评估运行前对 Writer 与 Shared 全部资源核对文件集合和源字节；新增业务模板也受旧 bundle 拒绝检查。源哈希继续覆盖全部 JSON/Markdown。
+
+ModelKit boundary checks classify ModelKitAppleLLM as a provider depending only on ModelKit; FoundationModels is an allowed system import. The optional provider can be built independently with `swift build --target ModelKitAppleLLM`.

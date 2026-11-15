@@ -9,6 +9,8 @@ Language owns provider-neutral conversation and candidate-selection interfaces. 
 ```mermaid
 flowchart LR
     Caller["Capability consumer"] -->|ChatRequest| Chat["ChatCapability"]
+    Chat --> Apple["Apple · system text model"]
+    Apple -->|ChatEvent stream| Caller
     Chat --> Gemma["Gemma4 · local text"]
     Chat --> Cloud["OpenAI Responses · configured cloud"]
     Gemma -->|ChatEvent stream| Caller
@@ -25,3 +27,5 @@ flowchart LR
 [JEV](JEV/README.md) owns the Decision values and the D3 implementation in ModelKitD3. Candidate selection is a typed inference result. The caller interprets it and owns routing, interruption and fallback.
 
 [ModelKit](../README.md)
+
+[Apple](LLM/Apple/README.md) provides optional on-device text chat through FoundationModels, with system availability and request-local sessions. Its standalone ModelKitAppleLLM target depends only on the ModelKit contracts.

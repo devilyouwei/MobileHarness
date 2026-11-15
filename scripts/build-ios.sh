@@ -10,7 +10,7 @@ if ! xcodebuild -version >/dev/null 2>&1; then
     exit 1
 fi
 simulator_derived_data="${MOBILEHARNESS_SIMULATOR_DERIVED_DATA:-build/SimulatorDerivedData}"
-for scheme in MobileHarnessSimulator ModelKitRuntime ModelKitNemotron ModelKitSilero; do
+for scheme in MobileHarnessSimulator ModelKitRuntime ModelKitNemotron ModelKitSilero ModelKitAppleLLM; do
     MOBILEHARNESS_BUILD_VARIANT=simulator xcodebuild -project MobileHarness.xcodeproj -scheme "$scheme" \
         -configuration Debug -destination 'generic/platform=iOS Simulator' \
         -derivedDataPath "$simulator_derived_data" \

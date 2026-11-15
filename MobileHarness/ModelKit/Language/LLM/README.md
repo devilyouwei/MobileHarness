@@ -16,7 +16,7 @@ The diagram shows runtime calls and data flow, not compilation dependencies.
 flowchart LR
  Caller --> Request[ChatRequest and messages]
  Request --> Capability[ChatCapability]
- Capability --> Adapter[Gemma4 or OpenAI]
+ Capability --> Adapter[Apple, Gemma4 or OpenAI]
  Adapter --> Events[ChatEvent session]
  Events --> Caller
 ```
@@ -31,7 +31,7 @@ ChatTiming is one mutex-protected caller sampler per request. Providers sample m
 
 ## Related design
 
-[Parent design](../README.md) · [Gemma4](Gemma4/README.md) · [OpenAI](OpenAI/README.md)
+[Parent design](../README.md) · [Apple](Apple/README.md) · [Gemma4](Gemma4/README.md) · [OpenAI](OpenAI/README.md)
 
 ## Consecutive user message boundaries
 
@@ -82,3 +82,5 @@ The Responses adapter retains each active SSE frame without a cumulative stream/
 ChatRequest.toolChoice 默认为 automatic；required(name:) 要求工具已声明。云端编码强制命名函数并禁用并行工具调用；调用方仍必须验证真实返回。
 
 ChatRequest.onDispatch 是中立的实际开始回调。OpenAI 在请求校验/资源准备成功后、HTTP 发送前调用，Gemma 在实际 generate 前调用；回调失败阻止推理。业务方拥有历史提交，ModelKit 不导入 Storage。
+
+The optional [Apple system provider](Apple/README.md) exposes the same ChatCapability through ModelKitAppleLLM. It preserves native text history and rejects tools/images explicitly; it does not participate in default provider selection.

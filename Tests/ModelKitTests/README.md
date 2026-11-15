@@ -23,3 +23,5 @@ CoreBoundaryTests cover opaque scope propagation, invalid injected limits, globa
 ✅ 模型回归覆盖 App 同根四子能力／根隔离、流式错误观察者早／晚安装及取消无故障；资源暂停取消加入与权重保留由 Runtime 测试覆盖，默认根生命周期由 Defaults 测试覆盖。
 
 Session coverage includes a one-event queue without a single-event byte ceiling, large payload preservation and suspended-producer progress after consumption.
+
+AppleChatTests cover public text-only capability flags and pre-inference rejection, native transcript roles/text, unsupported tools/images/history, empty current input, Unicode snapshot conversion, duplicate snapshots, revisions and output bounds. They import the standalone Apple provider and require no live model.

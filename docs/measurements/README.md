@@ -71,3 +71,5 @@ Writer 的 2026-11-08 双模型实验保留 [原始基线](writer-prompt-2026-11
 - [全双工本地 Decision 去掉动作定义的对照](duplex-local-no-action-definitions-coreai-2026-11-14.json)保留 14 组简化提示、D3 旧提示对照、逐条结果及与有定义版本的差值。方法见[验证记录](../validation/Decision-Local-LLM-Bilingual-Digits.md#去掉动作定义的对照)。
 - [历史对话与缓冲区提示词对照](duplex-history-buffer-prompt-coreai-2026-11-14.json)保留 36 条用例在 D3 与 Qwen2.5 的中英文实际提示及逐条读出。方法见[验证记录](../validation/Decision-Local-LLM-Bilingual-Digits.md#历史对话与缓冲区格式复测)。
 - [D3 Lite 与 Edge 的四段提示对照](duplex-d3-lite-edge-coreai-2026-11-15.json)保留当前中英文提示和旧短中文提示共 200 条原生分类，方法见[验证记录](../validation/Decision-Model-Mac-Comparison.md#d3-lite-与-edge-的四段提示对照)。
+
+- [Apple system Decision experiment attempt](decision-apple-system-2026-11-15.json): 154 prepared requests, exact archived baseline predictions, current renderer output, hashes and host availability. This run is blocked (`deviceNotEligible`), with zero measured Apple requests; it contains no Apple accuracy or latency result.

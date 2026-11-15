@@ -288,3 +288,41 @@ The native experiment, `./scripts/check.sh`, four iOS Simulator schemes in `./sc
 当前英文提示下，Lite 命中 13/15 次应入队、5/9 次应打断和 1/12 次应舍弃。Edge 命中全部 9 次应打断，额外误打断 25 次，两种语言均未选过入队。旧短提示下 Edge 的总分更高，因此排名取决于提示结构。六组共 200 条热态推理全部低于 500 ms，Lite 最慢 190.74 ms。首次运行的 Lite 默认自动编译遇到磁盘空间不足，CPU-only 探测未通过有限分数检查。清理可再生成的旧 Core AI 编译缓存后，两款均以默认配置完成，分进程运行。无 App 源码变化和真机测量。
 
 [两款制品的 SHA-256、实际提示、逐条分数和复现脚本](../measurements/duplex-d3-lite-edge-coreai-2026-11-15.json)。
+
+## Apple system model Decision comparison (2026-11-15)
+
+使用新增 [Swift 实验测试](../../Tests/IntegrationTests/AppleDecisionEvaluationTests.swift)，通过 `ModelKitAppleLLM.AppleChat` 调用 `SystemLanguageModel.default`。实验目标依赖 Apple provider，ModelKit 不依赖 Agents 或其他业务模块。未修改生产 Decision 路由、提示词或模型选择。
+
+### 固定方法与基线
+
+第一组直接读取上面的 D3 Edge/Lite 四段提示原始报告，逐条核对两模型的 ID、预期和完整提示一致。保留原 system/user 文本及 A/B/C 到打断/舍弃/入队的映射，只移除 D3 原生聊天模板控制符，交给 Apple 原生会话编码。Apple 使用生成文本的严格单标签解析；D3 历史结果来自候选头，不假设两者拥有相同 logits 接口。英文提示组仍使用历史报告中的中文场景，不能称为英文输入测试。
+
+| 冻结条件 | 用例 | Edge 历史正确 | Lite 历史正确 | Apple 本次已测 |
+| --- | ---: | ---: | ---: | --- |
+| 四段中文提示 | 36 | 13/36 | 18/36 | 0，系统模型不可用 |
+| 四段英文提示 | 36 | 9/36 | 19/36 | 0，系统模型不可用 |
+| 旧短中文提示 | 28 | 19/28 | 14/28 | 0，系统模型不可用 |
+
+第二组复用已有的 27 条中英文配对场景，通过现行 `InputDecisionSnapshot.prompt()` 渲染语言匹配的 54 条请求，使用严格数字 1/2/3 输出。它保留现行执行、播放与待答问题字段，单独分组，不拿旧提示词的 D3 分数直接衡量模型优劣。本次也未执行这 54 条推理。两组均不应用 Assistant 采纳保护或回退，不将它们混合成一个准确率。
+
+计划每个条件预热三次，随后串行执行，temperature=0、最大输出 16 token。每次完整接收并加入 provider 清理后再计总时延，另记录首次文本时延。250/500 ms 是统计阈值，不提前丢掉慢请求；60 秒生成超时取消并加入清理。保留原始文本、格式失败、原生错误、完成原因和系统返回的 token 用量。准确率以全部已测请求为分母，格式错误和模型错误均不算正确；p50/p95 使用无原生错误请求的 nearest-rank 百分位。系统模型版本随 OS 管理，不声称固定 Apple 权重 revision。
+
+### 本次真实运行结果
+
+正式测试入口与独立可用性查询均返回 `deviceNotEligible`，报告状态为 `blocked:model-unavailable`。预热 0 次、测量 0 次，准确率、误判率和延迟均无结果；没有使用假响应、其他模型或入队回退补齐。测试因此显式失败，这与普通实验代码回归通过是不同结论。
+
+本次主机报告 `Mac17,5`、Apple A18 Pro、macOS 27.2.1（26B131）；历史 D3 对照来自 M5 Mac。因此即使以后本机可用，也不能将旧 M5 的耗时当作相同硬件下的延迟对照。此处只记录系统 API 返回值，不据此推断所有同型号设备永久不支持。仍需在返回 `.available` 的主机上完整运行。
+
+[本次报告](../measurements/decision-apple-system-2026-11-15.json)保存全部 154 条待测请求、100 条配对基线、设备信息、可用性和来源 SHA-256。代码、当前提示和原始基线均保留指纹。运行命令见 [测试说明](../../Tests/IntegrationTests/README.md#apple-system-decision-comparison)，必须使用新的输出文件路径。
+
+### 工程验证
+
+冻结输入/当前 renderer、严格解析器、错误分母与延迟指标三项离线回归通过。iOS 五个 Simulator scheme 构建完成并通过。完整检查的边界、8 项 Python 检查及格式阶段通过；全量 Swift 测试执行期间按用户要求暂停，不能报告完整通过。此前 Apple 适配器验证记录中的全量失败仍保留；编译或合成测试不代表 Apple 真实推理验收。
+
+### 暂停与另一台 Mac 复跑
+
+用户说明本机为中国大陆购买的 MacBook Neo，并要求暂停本机实验，提交后在美行 MacBook Air 拉取再测试。API 的 `deviceNotEligible` 已独立记录；设备购买地区是用户提供的背景信息，不是本次实验验证出的唯一原因。
+
+在另一台设备上启用 Apple Intelligence、等待系统模型就绪并安装 Xcode 27+ 后，先 `git pull --ff-only`，再按测试说明运行到一个不存在的新 JSON 路径。美行身份本身不保证 `.available`，仍以测试入口的实际可用性为准。
+
+本次提交仅包含 Apple 接入与实验改动。154 条请求中的 100 条冻结基线可直接复现；54 条 current 请求按运行时 checkout 的 renderer/资源重新生成。本机 report 保存了当时其他未提交 Decision 修改生成的快照，另一台机器的 current 请求可能不同；比较时必须核对请求及 sourceSHA256，不能假定这 54 条与报告字节相同。

@@ -12,7 +12,7 @@ KIT = ROOT / 'MobileHarness/ModelKit'
 FORBIDDEN = {'Storage', 'StorageFiles', 'StorageCore', 'StorageDatabase', 'AppStorage', 'FactoryKit', 'StorageTasks', 'StorageMedia', 'StorageDevices', 'StorageSQLite', 'AgentCore', 'Agents', 'Gateway', 'StorageCore', 'StorageChat', 'StorageCache', 'Actions', 'Tools', 'PlatformKit', 'SwiftUI', 'UIKit', 'HarnessKit', 'UI', 'AppWorkflows', 'BehaviorAssembly', 'Types'}
 SYSTEM_MODULES = {
     'Foundation', 'Synchronization', 'CoreFoundation', 'Darwin', 'os', 'OSLog',
-    'AVFAudio', 'Speech', 'CoreVideo', 'CoreML', 'CoreAI', 'Metal',
+    'FoundationModels', 'AVFAudio', 'Speech', 'CoreVideo', 'CoreML', 'CoreAI', 'Metal',
     'Accelerate', 'Vision', 'ImageIO', 'Compression', 'CryptoKit',
 }
 THIRD_PARTY_PRODUCTS = {
@@ -144,7 +144,7 @@ expected_model_dependencies = {
     'ModelKitD3': {'ModelKit', 'ModelKitCoreAI'},
     'ModelKitAppleSpeech': {'ModelKit'}, 'ModelKitEnergy': {'ModelKit'},
     'ModelKitNemotron': {'ModelKit'}, 'ModelKitKokoro': {'ModelKit'}, 'ModelKitMossNano': {'ModelKit'},
-    'ModelKitGemma4': {'ModelKit'}, 'ModelKitOpenAI': {'ModelKit'},
+    'ModelKitGemma4': {'ModelKit'}, 'ModelKitOpenAI': {'ModelKit'}, 'ModelKitAppleLLM': {'ModelKit'},
     'ModelKitSilero': {'ModelKit', 'ModelKitCoreML'}, 'ModelKitYOLOPose': {'ModelKit', 'ModelKitCoreML'},
 }
 if set(model_targets) != set(expected_model_dependencies):

@@ -33,7 +33,7 @@ flowchart LR
 | Support/Management | Generic registration/lifecycle/artifacts in ModelKitRuntime; model registration and selection in ModelKitDefaults; disjoint explicit source lists |
 | Support/Management/HuggingFace | Injected download adapter; ModelKitHub |
 | Support/Speech/Apple | PCMCodec shared by Apple ASR/TTS in ModelKitAppleSpeech |
-| Language/LLM/Gemma4, OpenAI | Concrete chat algorithms/protocol adapters |
+| Language/LLM/Apple, Gemma4, OpenAI | Concrete system/local/cloud chat adapters; [Apple](Language/LLM/Apple/README.md) is the optional ModelKitAppleLLM product |
 | Speech/ASR, TTS, VAD provider directories | Concrete speech algorithms/native services |
 | Vision/YOLO | YOLO image layout, graph execution, tensor reading and pose decoding |
 
@@ -69,6 +69,7 @@ flowchart TD
  ModelKitD3[ModelKitD3]
  ModelKitCoreML[ModelKitCoreML]
  ModelKitGemma4[ModelKitGemma4]
+ ModelKitAppleLLM[ModelKitAppleLLM]
  ModelKitOpenAI[ModelKitOpenAI]
  ModelKitAppleSpeech[ModelKitAppleSpeech: Apple ASR, TTS and PCM]
  ModelKitNemotron[ModelKitNemotron]
@@ -93,6 +94,7 @@ flowchart TD
  ModelKitGemma4 --> ModelKit
  ModelKitD3 --> ModelKit
  ModelKitD3 --> ModelKitCoreAI
+ ModelKitAppleLLM --> ModelKit
  ModelKitOpenAI --> ModelKit
  ModelKitAppleSpeech --> ModelKit
  ModelKitNemotron --> ModelKit
@@ -212,3 +214,5 @@ ModelLanguageProviding.chatModel(configuration:) 返回固定配置的轻量 Cha
 language.decision 是稳定子端口，使用独立 D3 资源，不占用主 Chat 的串行队列。ModelKitD3 依赖基础契约、CoreAI 图执行和 Tokenizers，注册 d3-edge 和 d3-lite，默认端口为 Edge，也可按模型 ID 获取 Lite；模型管理提供候选读出及各制品的资源生命周期。云端分类由调用方通过不可变 ChatModel 请求，ChatToolChoice.required 只约束一次命名工具选择，不执行工具。
 
 Chat 的可选 onDispatch 回调报告实际 HTTP/本地推理开始边界，供上层原子持久化请求；详见 [LLM](Language/LLM/README.md)。
+
+Apple system chat is available as the standalone ModelKitAppleLLM provider, depending only on ModelKit and system FoundationModels. It does not change default assembly or own system weight files. Its text-only request, bounds and native cleanup contract are described in [Apple LLM](Language/LLM/Apple/README.md).
