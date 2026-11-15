@@ -226,47 +226,14 @@ private enum CaptureReadinessFixtureError: Error, Equatable { case invalidPCM }
             applicationChange: false, unavailable: true, previous: builtIn, current: builtIn) == .routeChanged)
 }
 
-@Test func echoCancellationUsesConfirmedSystemInputWithoutEnablingSecondProcessor() {
-    var voiceAttempts = 0
-    let selected = AudioEchoCancellationSelection.select(
-        systemInput: { true },
-        voiceProcessing: {
-            voiceAttempts += 1
-            return true
-        },
-        report: { _ in Issue.record("Unexpected failure") })
-    #expect(selected == .systemInput && voiceAttempts == 0)
-}
-
-@Test(arguments: [false, true])
-func echoCancellationFallsBackAfterUnsupportedOrFailedSystemInput(fails: Bool) {
-    var reports: [AudioIOError] = []
-    var voiceAttempts = 0
-    let selected = AudioEchoCancellationSelection.select(
-        systemInput: {
-            if fails { throw AudioIOError.startFailed }
-            return false
-        },
-        voiceProcessing: {
-            voiceAttempts += 1
-            return true
-        },
-        report: { if let error = $0 as? AudioIOError { reports.append(error) } })
-    #expect(selected == .voiceProcessing && voiceAttempts == 1)
-    #expect(reports == (fails ? [.startFailed] : []))
-}
-
-@Test func echoCancellationFailuresRemainVisibleAndNeverClaimDuplex() {
-    var reports: [AudioIOError] = []
-    let selected = AudioEchoCancellationSelection.select(
-        systemInput: { throw AudioIOError.startFailed },
-        voiceProcessing: { throw AudioIOError.runtimeFailed },
-        report: { if let error = $0 as? AudioIOError { reports.append(error) } })
-    #expect(selected == .unavailable)
-    #expect(reports == [.startFailed, .runtimeFailed])
-    let notEnabled = AudioEchoCancellationSelection.select(
-        systemInput: { false }, voiceProcessing: { false }, report: { _ in Issue.record("Unexpected failure") })
-    #expect(notEnabled == .unavailable)
+@Test func echoCancellationRequiresConfirmedVoiceProcessing() throws {
+    #expect(try AudioEchoCancellationSelection.select(voiceProcessing: { true }) == .voiceProcessing)
+    #expect(throws: AudioVoiceProcessingError.self) {
+        try AudioEchoCancellationSelection.select(voiceProcessing: { false })
+    }
+    #expect(throws: AudioIOError.runtimeFailed) {
+        try AudioEchoCancellationSelection.select(voiceProcessing: { throw AudioIOError.runtimeFailed })
+    }
 }
 
 @Test func audioCaptureReadinessTimesOutWithoutPCMAndRejectsLateSuccess() async {
@@ -285,23 +252,6 @@ func echoCancellationFallsBackAfterUnsupportedOrFailedSystemInput(fails: Bool) {
     let failed = AudioCaptureReadiness()
     failed.resolve(.failure(AudioIOError.interrupted))
     await #expect(throws: AudioIOError.interrupted) { try await failed.wait(timeout: .zero) }
-}
-
-@Test(arguments: [false, true])
-func bluetoothCaptureSkipsSystemModeProbeAndUsesConfirmedVoiceProcessing(enabled: Bool) {
-    var voiceAttempts = 0
-    let selected = AudioEchoCancellationSelection.select(
-        preferSystemInput: false,
-        systemInput: {
-            Issue.record("HFP must not change session mode to probe system AEC")
-            return true
-        },
-        voiceProcessing: {
-            voiceAttempts += 1
-            return enabled
-        }, report: { _ in Issue.record("Unexpected failure") })
-    #expect(voiceAttempts == 1)
-    #expect(selected == (enabled ? .voiceProcessing : .unavailable))
 }
 
 @Test(arguments: [false, true])
@@ -370,9 +320,6 @@ func captureConfigurationChangeRetiresPCMBeforeAndAfterFirstFrame(ready: Bool) a
 }
 
 @Test(arguments: [AudioCaptureContext.EchoCancellation.unknown, .unavailable, .systemInput, .voiceProcessing])
-func bluetoothDuplexRequiresMoreThanAnEnabledEchoProcessor(echo: AudioCaptureContext.EchoCancellation) {
-    #expect(!AudioCaptureDuplexSelection.supportsFullDuplex(echoCancellation: echo, bluetoothRoute: true))
-    #expect(
-        AudioCaptureDuplexSelection.supportsFullDuplex(echoCancellation: echo, bluetoothRoute: false)
-            == (echo == .systemInput || echo == .voiceProcessing))
+func duplexRequiresConfirmedCombinedVoiceProcessing(echo: AudioCaptureContext.EchoCancellation) {
+    #expect(AudioCaptureDuplexSelection.supportsFullDuplex(echoCancellation: echo) == (echo == .voiceProcessing))
 }

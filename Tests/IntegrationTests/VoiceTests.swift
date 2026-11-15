@@ -1442,11 +1442,9 @@ func speechRolesOwnIndependentIslandsAndJoinShutdown(initiallyUnavailable: Bool)
     await state.stop()
 }
 
-@Test(arguments: [AudioCaptureContext.EchoCancellation.systemInput, .voiceProcessing])
-func bluetoothReplyAdmissionSuppressesRecognitionAndRestoresAfterPlayback(echo: AudioCaptureContext.EchoCancellation)
-    async throws
-{
-    let fullDuplex = AudioCaptureDuplexSelection.supportsFullDuplex(echoCancellation: echo, bluetoothRoute: true)
-    #expect(!fullDuplex)
+@Test func nativeVoiceProcessingKeepsRecognitionActiveDuringReplies() async throws {
+    let echo = try AudioEchoCancellationSelection.select(voiceProcessing: { true })
+    let fullDuplex = AudioCaptureDuplexSelection.supportsFullDuplex(echoCancellation: echo)
+    #expect(fullDuplex)
     try await completedASRContinuesWithoutAcknowledgmentAndPlaybackUsesRouteCapability(fullDuplex: fullDuplex)
 }

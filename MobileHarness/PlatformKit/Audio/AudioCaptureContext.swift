@@ -44,26 +44,19 @@ public struct AudioCaptureContext: Sendable, Equatable {
     }
 }
 
-/// Native configuration attempts are ordered; only an observed enabled result admits duplex.
+/// Voice Processing supplies AEC/NS together; failures must not become a successful unprocessed capture.
 enum AudioEchoCancellationSelection {
-    static func select(
-        preferSystemInput: Bool = true, systemInput: () throws -> Bool, voiceProcessing: () throws -> Bool,
-        report: (any Error) -> Void
-    ) -> AudioCaptureContext.EchoCancellation {
-        if preferSystemInput {
-            do { if try systemInput() { return .systemInput } } catch { report(error) }
-        }
-        do { if try voiceProcessing() { return .voiceProcessing } } catch { report(error) }
-        return .unavailable
+    static func select(voiceProcessing: () throws -> Bool) throws -> AudioCaptureContext.EchoCancellation {
+        guard try voiceProcessing() else { throw AudioVoiceProcessingError.unavailable }
+        return .voiceProcessing
     }
 }
 
-/// An enabled processor does not establish echo isolation on a Bluetooth audio route.
+enum AudioVoiceProcessingError: Error { case unavailable }
+
+/// Route type does not decide duplex; the native graph must confirm the combined processing path.
 enum AudioCaptureDuplexSelection {
-    static func supportsFullDuplex(
-        echoCancellation: AudioCaptureContext.EchoCancellation, bluetoothRoute: Bool
-    ) -> Bool {
-        guard !bluetoothRoute else { return false }
-        return echoCancellation == .systemInput || echoCancellation == .voiceProcessing
+    static func supportsFullDuplex(echoCancellation: AudioCaptureContext.EchoCancellation) -> Bool {
+        echoCancellation == .voiceProcessing
     }
 }

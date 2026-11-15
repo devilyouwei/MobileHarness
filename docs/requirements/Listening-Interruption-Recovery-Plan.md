@@ -85,3 +85,15 @@ Actions的ConversationPresentation不再因识别轮次变化清空双方字幕�
 本节蓝牙半双工能力选择、恢复时间门限、相关README与回归已实现。3项参数化测试（8个案例）单独及全量中通过，五目标iOS和最终真机构建通过，已安装启动。尚未取得用户对新版播放期间字幕/恢复识别的确认；仍不宣称确定声学根因或完成实机验收。
 
 用户已反馈“好了”，确认本轮 AirPods 修正版可用。保留蓝牙半双工限制以及全量检查其他失败记录；本计划其他历史验收事项不因本次反馈自动结项。
+
+## 2026-11-16 恢复手机与耳机全双工及统一语音处理
+
+用户明确要求全双工，撤销上一节蓝牙半双工方案。单声道对话统一使用 playAndRecord/voiceChat + AVAudioEngine Voice Processing（Apple提供AEC/NS/AGC）；删除仅系统回消输入的优先探测与蓝牙分类禁用全双工逻辑，不叠加额外软件回消。准备必须确认输入/输出VoiceProcessing均启用且bypass=false，否则明确抛错并清理，不吞错降级。现有公开 EchoCancellation.systemInput 值仍表示该能力事实，当前原生对话不再选择此分支。
+
+AppleAudioIO保留同图采播、首帧就绪、配置通知事实复核和一次保留I/O重试；启动后、首帧后、播放提交前/原生路线通知复核实际处理状态。AudioCaptureContext辅助选择只接受已确认VoiceProcessing作为当前原生全双工能力；不依据内置/耳机/蓝牙类别降级。MicrophoneCapture与context使用相同结果，SpeechPerception播放期间继续VAD/ASR，支持语音打断。既有受限后端的队列时间门限保留，但不用于屏蔽全双工播放期间的输入。
+
+变更 AppleAudioIO.swift、AudioCaptureContext.swift、AudioCaptureReadinessTests.swift、VoiceTests.swift；删除已替代选择测试，新增处理未启用/异常传播、有效状态及播放期间真实ASR继续的回归。同步Audio、Listening、SpeechPerception与测试README，保留历史验证原文并追加本轮结果。执行定向、check.sh、build-ios.sh及真机构建/安装；手机外放与AirPods需分别验证无人说话回复时无误字幕、回复中说话可识别打断。构建/布尔回执不等于声学效果已验收。
+
+文档核对补充：PlatformKit 根README含旧系统回消优先/失败受限描述，随实现改为组合VoiceProcessing必需且失败明确退出；总体README的播放流程同步说明手机/耳机按已确认的组合处理能力全双工，不改变模块边界或生命周期所有权。
+
+本节代码与技术README已同步；16项定向测试、五目标iOS及真机构建通过，已安装启动。完整检查其他失败/停滞记录保留；手机和AirPods分别全双工无误字幕、双讲打断的实机验收仍待完成。蓝牙半双工不再是本项目修复方案。

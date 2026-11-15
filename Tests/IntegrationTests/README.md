@@ -363,7 +363,7 @@ Full-duplex fixtures verify buffering until Channel settlement, one request for 
 
 ProviderSettingsTests 覆盖 Decision 独立 Provider/模型持久化重开、旧文档可选字段、未配置/无效选择拒绝、共享 Provider 不同角色模型、私有 UI 暂存及呈现链路；InputDecisionTests 的云端路由为 cloud:decision。使用凭据与模型替身，不证明真实服务分类效果。
 
-AudioCaptureReadinessTests 覆盖 AEC 实际启用结果的选择、失败保留、未支持回退及避免重复处理；配置替身不证明设备回声抑制效果。
+AudioCaptureReadinessTests 覆盖组合 Voice Processing 实际启用、未启用拒绝及原始失败传播；配置替身不证明设备回声抑制效果。
 
 Assistant 前台结束回归使用 SQLite、模型流替身和实际 ChannelScheduler。模型流与 Display Action 同时阻塞时验证 Control Action 持久化任务终态及折叠来源；分别放行后验证原消息的回复、Action journal 与任务折叠。
 
@@ -403,8 +403,8 @@ python3 scripts/evaluate-decision-protocols.py d3-edge d3-lite apple-system gemm
 
 The cloud launcher reads the existing Aliyun HTTPS endpoint and key from `.env.local` and only admits the two Flash models. Local models read the existing benchmark artifacts. Results checkpoint by language and segment. The launcher records strict accuracy, invalid responses, missed/false dispositions, valid p95, and timely correct counts at 500 ms and the applicable App budget. Calls run to completion to preserve correctness evidence, subject to the provider timeout. No credential or endpoint is written to the report.
 
-AudioCaptureReadinessTests 另覆盖无 PCM 首帧期限、已有终态优先及蓝牙 HFP 跳过系统 AEC 模式探测；替身测试不代表 AirPods 真机验收。
+AudioCaptureReadinessTests 另覆盖无 PCM 首帧期限、已有终态优先；替身测试不代表 AirPods 真机验收。
 
 AudioCaptureReadinessTests 覆盖引擎配置失效在首帧前/后的错误传播、重复与停止后通知围栏，以及启动重建单次预算；跨平台通知门测试不代表蓝牙硬件路由验收。
 
-蓝牙播放误识别回归将实际路线能力选择接入 SpeechPerception 播放准入，覆盖处理器已启用但蓝牙仍受限、播放期间拒绝音频、播放结束可接纳新语句及关闭许可不被恢复；不代表真实噪声/回声测量。
+VoiceTests 将生产 Voice Processing 选择接入 SpeechPerception，验证回复播放期间继续识别，保留受限后端暂停/恢复、迟到旧包拒绝和明确关闭许可回归；不根据蓝牙类型关闭全双工，不代表真实噪声/回声测量。

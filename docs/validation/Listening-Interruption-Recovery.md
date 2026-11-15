@@ -113,3 +113,16 @@ Actions分离字幕槽与围栏：clearReply带可选replyInputID冻结旧请求
 AppWorkflow 在前述失败后持续无进展，终止本轮脚本及测试子进程，退出143；后续原生阶段未执行。完整日志 `/tmp/mobileharness-airpods-playback-check.log`。这不改变定向回归及构建通过的范围，也不代表全仓验收通过。
 
 用户随后回复“好了”，确认当前 AirPods 聆听及回复期间字幕问题已恢复可用，并要求提交修改。这是本次用户实机反馈，不扩展为其他蓝牙设备、全双工或长期稳定性验收；蓝牙播放期间半双工限制保留。
+
+## 2026-11-16 按全双工要求统一 Voice Processing
+
+用户否定蓝牙半双工降级，要求手机和耳机均支持全双工回消/降噪。本轮删除蓝牙类型禁用与系统回消优先分支；两路线统一 playAndRecord/voiceChat 的共享 Voice Processing 采播图，验证输入/输出处理已启用且bypass关闭，配置失败显式退出。保留已实测的I/O复用重试、配置事实复核和首帧期限。仅系统回消标记不再作为当前原生组合处理的成功回执；半双工仅保留给其他明确受限后端。
+
+- 定向16项测试通过，包含未启用处理器拒绝、原始失败传播、首帧/配置失效、回复期间ASR继续与关闭许可保持；日志 `/tmp/mobileharness-full-duplex-tests.log`。
+- Debug真机构建通过并安装至iPhone 17 Pro，以 MH_AUDIO_TRACE=1 启动诊断；记录端口类型和处理器/bypass事实，不记录音频内容/名称/UID。日志 `/tmp/mobileharness-full-duplex-device.log`、`/tmp/mobileharness-full-duplex-live.log`。
+- Apple Voice Processing 的AEC/NS/AGC能力依据：https://developer.apple.com/videos/play/wwdc2023/10235/ 。启用配置不等于测得实际回声抑制，尤其此前AirPods的误字幕尚未在恢复全双工后验收。
+- 本轮尚需手机外放与AirPods分别复验：启动、安静听回复无新增用户字幕、回复中说话可识别/打断。上一版半双工“好了”的用户反馈不能作为本轮全双工声学验收证据。
+
+最终 build-ios.sh 五目标全部通过（`/tmp/mobileharness-full-duplex-ios.log`）；git diff --check通过。完整check.sh架构、8项Python、格式通过，但其他集成/Writer/Web存在失败；AppWorkflow在缺失injected Action declarations等错误后持续停滞，终止本轮脚本和子进程（143），后续原生阶段未运行，不能视为全量通过（`/tmp/mobileharness-full-duplex-check.log`）。截至收尾，新版诊断日志仅确认应用启动，没有新麦克风采集记录，手机和AirPods本轮声学效果均尚未实测。
+
+后续读取本轮真机诊断日志确认：输入/输出均为BluetoothHFP，input/output Voice Processing均为true、bypass=false；首次配置停机后保留I/O重试成功收到首帧。用户仍报告环境噪声疑似误识别，故只确认蓝牙采集和处理器启用，不宣称误字幕已消除；系统麦克风模式与手机内置路线本轮仍未取得实测状态。

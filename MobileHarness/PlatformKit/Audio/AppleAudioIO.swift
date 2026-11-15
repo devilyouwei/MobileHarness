@@ -124,53 +124,29 @@
             player.scheduleBuffer(rendered, completionCallbackType: .dataPlayedBack) { @Sendable _ in completed() }
             if !player.isPlaying { player.play() }
         }
-        func prepareCapture(admission: PlatformAdmission?) -> AudioCaptureContext.EchoCancellation {
+        func prepareCapture() throws -> AudioCaptureContext.EchoCancellation {
             engine.stop()
-            // A startup retry retains its configured I/O unit; re-enabling VPIO would retrigger negotiation.
-            if echoCancellation != .unavailable, isEchoCancellationActive() { return echoCancellation }
-            // Configure I/O before attaching the mixer tap so no pre-processing format is retained.
-            // Keep an activated HFP route in voiceChat instead of switching profiles to probe system AEC.
-            let bluetoothInput = AVAudioSession.sharedInstance().currentRoute.inputs.contains {
-                $0.portType == .bluetoothHFP
-            }
-            echoCancellation = AudioEchoCancellationSelection.select(
-                preferSystemInput: !bluetoothInput,
-                systemInput: {
-                    let session = AVAudioSession.sharedInstance()
-                    try session.setCategory(
-                        .playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
-                    guard session.isEchoCancelledInputAvailable else { return false }
-                    try session.setPrefersEchoCancelledInput(true)
-                    try session.setAllowHapticsAndSystemSoundsDuringRecording(true)
-                    try session.setActive(true)
-                    if session.isEchoCancelledInputEnabled { return true }
-                    try session.setPrefersEchoCancelledInput(false)
-                    return false
-                },
-                voiceProcessing: {
-                    try configureNativeAudioSession()
+            // Retain configured I/O on startup retry; toggling VPIO repeats route negotiation.
+            if echoCancellation == .voiceProcessing, isEchoCancellationActive() { return echoCancellation }
+            echoCancellation = try AudioEchoCancellationSelection.select {
+                try configureNativeAudioSession()
+                if !engine.inputNode.isVoiceProcessingEnabled {
                     try engine.inputNode.setVoiceProcessingEnabled(true)
-                    engine.inputNode.isVoiceProcessingBypassed = false
-                    return engine.inputNode.isVoiceProcessingEnabled
-                        && engine.outputNode.isVoiceProcessingEnabled
-                        && !engine.inputNode.isVoiceProcessingBypassed
-                },
-                report: { admission?.report("audio.capture", "echoCancellation", $0) })
+                }
+                engine.inputNode.isVoiceProcessingBypassed = false
+                return voiceProcessingEnabled()
+            }
             return echoCancellation
         }
+        private func voiceProcessingEnabled() -> Bool {
+            engine.inputNode.isVoiceProcessingEnabled && engine.outputNode.isVoiceProcessingEnabled
+                && !engine.inputNode.isVoiceProcessingBypassed
+        }
         func isEchoCancellationActive() -> Bool {
-            switch echoCancellation {
-            case .systemInput:
-                let session = AVAudioSession.sharedInstance()
-                return session.category == .playAndRecord && session.mode == .default
-                    && session.isEchoCancelledInputEnabled
-            case .voiceProcessing:
-                let session = AVAudioSession.sharedInstance()
-                return session.category == .playAndRecord && session.mode == .voiceChat
-                    && engine.inputNode.isVoiceProcessingEnabled && engine.outputNode.isVoiceProcessingEnabled
-                    && !engine.inputNode.isVoiceProcessingBypassed
-            case .unknown, .unavailable: return false
-            }
+            let session = AVAudioSession.sharedInstance()
+            return echoCancellation == .voiceProcessing
+                && session.category == .playAndRecord && session.mode == .voiceChat
+                && voiceProcessingEnabled()
         }
         private func validateEchoCancellation() throws {
             if echoCancellation != .unavailable && !isEchoCancellationActive() { throw AudioIOError.interrupted }
@@ -229,6 +205,13 @@
                 }
             }
             trace("start input=\(format.sampleRate)/\(format.channelCount) echo=\(echoCancellation.rawValue)")
+            let route = AVAudioSession.sharedInstance().currentRoute
+            trace(
+                "ports input=\(route.inputs.map { $0.portType.rawValue }) output=\(route.outputs.map { $0.portType.rawValue })"
+            )
+            trace(
+                "processing input=\(node.isVoiceProcessingEnabled) output=\(engine.outputNode.isVoiceProcessingEnabled) bypass=\(node.isVoiceProcessingBypassed)"
+            )
             capturing = true
             do {
                 engine.prepare()
@@ -259,7 +242,8 @@
             trace(
                 "configuration running=\(engine.isRunning) input=\(actual.sampleRate)/\(actual.channelCount) matches=\(matches)"
             )
-            gate.configurationChanged(engineRunning: engine.isRunning, formatMatches: matches)
+            gate.configurationChanged(
+                engineRunning: engine.isRunning, formatMatches: matches && isEchoCancellationActive())
         }
         func stopCapture() async {
             configurationGate?.invalidate()
@@ -549,13 +533,8 @@
                     while true {
                         try Task.checkCancellation()
                         guard captureToken == token else { throw CancellationError() }
-                        let echo = await playback.prepareCapture(admission: platformAdmission)
-                        let bluetoothPorts: Set<AVAudioSession.Port> = [.bluetoothHFP, .bluetoothA2DP, .bluetoothLE]
-                        let bluetoothRoute = (audio.currentRoute.inputs + audio.currentRoute.outputs).contains {
-                            bluetoothPorts.contains($0.portType)
-                        }
-                        let duplex = AudioCaptureDuplexSelection.supportsFullDuplex(
-                            echoCancellation: echo, bluetoothRoute: bluetoothRoute)
+                        let echo = try await playback.prepareCapture()
+                        let duplex = AudioCaptureDuplexSelection.supportsFullDuplex(echoCancellation: echo)
                         let source = MicrophoneCapture(supportsFullDuplex: duplex)
                         captureSource = source
                         let readiness = AudioCaptureReadiness()
