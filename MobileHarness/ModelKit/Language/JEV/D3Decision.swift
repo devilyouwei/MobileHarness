@@ -10,10 +10,12 @@ public actor D3Decision: DecisionCapability {
     #if canImport(CoreAI)
         private let resource: ModelResource<D3Graph>
     #endif
-    public init(context: ModelContext, artifacts: URL) throws {
+    public init(context: ModelContext, artifacts: URL, allowsVisualInputs: Bool = false) throws {
         self.artifacts = artifacts
         #if canImport(CoreAI)
-            resource = try context.resource { try await D3Graph(artifacts: artifacts) }
+            resource = try context.resource {
+                try await D3Graph(artifacts: artifacts, allowsVisualInputs: allowsVisualInputs)
+            }
         #endif
     }
     public var availability: CapabilityAvailability {
@@ -60,9 +62,11 @@ public actor D3Decision: DecisionCapability {
         struct Manifest: Decodable {
             enum CodingKeys: String, CodingKey {
                 case sequenceLength = "sequence_length"
+                case hiddenSize = "hidden_size"
                 case output, function, modality, inputs
             }
             let sequenceLength: Int
+            let hiddenSize: Int?
             let output: String
             let function: String
             let modality: String?
@@ -83,14 +87,20 @@ public actor D3Decision: DecisionCapability {
         let tokenizer: any Tokenizer
         let manifest: Manifest
         let configuration: Configuration
-        init(artifacts: URL) async throws {
+        let visualInputs: [String: TensorValue]
+        init(artifacts: URL, allowsVisualInputs: Bool) async throws {
             manifest = try JSONDecoder().decode(
                 Manifest.self, from: Data(contentsOf: artifacts.appendingPathComponent("manifest.json")))
             configuration = try JSONDecoder().decode(
                 Configuration.self, from: Data(contentsOf: artifacts.appendingPathComponent("decision_config.json")))
-            let expectedInputs: Set<String> = ["input_ids", "attention_mask", "position_ids"]
-            guard manifest.modality == "text", manifest.sequenceLength == 512,
-                Set(manifest.inputs) == expectedInputs,
+            let textInputs: Set<String> = ["input_ids", "attention_mask", "position_ids"]
+            let expectedInputs = Set(manifest.inputs)
+            let usesVisualInputs =
+                allowsVisualInputs && manifest.hiddenSize == 1024
+                && expectedInputs == textInputs.union(["visual_embeddings", "visual_mask"])
+                && (manifest.modality == nil || manifest.modality == "text")
+            guard manifest.sequenceLength == 512, manifest.inputs.count == expectedInputs.count,
+                usesVisualInputs || (manifest.modality == "text" && expectedInputs == textInputs),
                 configuration.formatID == "d3-code-readout-v1", configuration.codes.count == 255,
                 configuration.tokenIDs.count == 255, configuration.temperature.isFinite, configuration.temperature > 0
             else { throw CapabilityError.invalidRequest("Unsupported D3 artifact contract") }
@@ -102,6 +112,19 @@ public actor D3Decision: DecisionCapability {
             let outputNames = await graph.outputNames
             guard Set(inputNames) == expectedInputs, outputNames.contains(manifest.output) else {
                 throw CapabilityError.invalidRequest("Unexpected D3 graph interface")
+            }
+            if usesVisualInputs {
+                let embeddingShape = [1, 512, 1024]
+                let maskShape = [1, 512, 1]
+                guard await graph.shape(ofInput: "visual_embeddings") == embeddingShape,
+                    await graph.shape(ofInput: "visual_mask") == maskShape
+                else { throw CapabilityError.invalidRequest("Unexpected D3 Lite visual input shape") }
+                visualInputs = [
+                    "visual_embeddings": .float32(Array(repeating: 0, count: 512 * 1024), shape: embeddingShape),
+                    "visual_mask": .bool(Array(repeating: false, count: 512), shape: maskShape),
+                ]
+            } else {
+                visualInputs = [:]
             }
         }
         func decide(_ request: DecisionRequest) async throws -> DecisionResult {
@@ -125,7 +148,7 @@ public actor D3Decision: DecisionCapability {
                 "position_ids": .int32(
                     Array(repeating: positions, count: 4).flatMap { $0 }, shape: [4, 1, 512]),
             ]
-            let output = try await graph.run(inputs)
+            let output = try await graph.run(inputs.merging(visualInputs) { text, _ in text })
             guard let values = output[manifest.output]?.floats(), values.count == 255, values.allSatisfy(\.isFinite)
             else {
                 throw CapabilityError.invalidRequest("Invalid D3 readout")

@@ -315,3 +315,9 @@ Decision 页面独立选择本地 D3/云端，云端 Provider/模型沿用共享
 从公开 Hub 固定提交解析出 13 个 App 下载文件，共 1,533,706,202 字节，目录和本地原版转换制品的每个文件大小一致，模型图 SHA-256 一致。Mac 上使用实际模型端口预热新版 Lite 至 ready，验证四候选选择及超过 512 token 被拒绝；Edge 原生回归也通过。对匹配的 54 条中英文 JEV 三分类样例，新制品有效 54/54、正确 41/54，热态 p95 117.83 ms，按既有公式得 4 星。旧版跑分继续归档。用例和制品身份见 [新版报告](../measurements/d3-lite-hugging-mac-2026-11-15.json)。
 
 1,180 项 IntegrationTests、原生 Edge/Lite 定向测试及五个 iOS Simulator 目标通过，应用包内模型目录与源码一致。全量检查复现 Writer/Web 测试 Action 声明缺失，在 AppWorkflow 停滞后中止。iPhone 安装、旧制品替换和首次编译待真机验收。
+
+## D3 Lite 三输入和五输入兼容
+
+Mac 上通过同一个 ModelKit 端口验证 hugging-mac 三输入制品与原五输入制品，均预热至 ready、完成四候选推理并拒绝超过 512 token 的输入。Edge 原生回归通过。两款制品的常规预热记录来自已运行过的主机环境，不能用于比较冷编译。用同一份官方权重和相同转换工具另导出五输入对照图。全新进程的三输入图遇到 LLVM 磁盘空间错误，五输入图遇到 LLVM mmap 分配错误，未得到有效的成对冷启动结果。真机上的加载异常尚未复现定位。
+
+五个 iOS Simulator 目标通过。全量集成阶段的两个 Action 结算用例在定向重跑中通过；全量检查另复现 Writer/Web Action 声明缺失，在 AppWorkflow 停滞后中止。

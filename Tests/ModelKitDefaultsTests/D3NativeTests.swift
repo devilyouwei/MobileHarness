@@ -98,7 +98,9 @@ import Testing
         try await root.setForeground(true)
         let lite = try #require(root.language.decisionModel("d3-lite"))
         #expect(await lite.availability == .available)
+        let started = ContinuousClock.now
         try await lite.warmup()
+        print("D3 Lite native warmup duration: \(started.duration(to: .now))")
         #expect(try await lite.status() == .ready)
         let request = try DecisionRequest(
             text: "The customer was charged twice for a single order.",

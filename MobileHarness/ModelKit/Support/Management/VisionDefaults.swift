@@ -19,7 +19,9 @@ extension DefaultModelAssembly {
                 id: ModelID("d3-lite"), capabilities: [.decision], memoryPolicy: .retain, artifactID: "d3-lite"
             ) { context in
                 ProvidedCapabilities(
-                    decision: try D3Decision(context: context, artifacts: resources.appendingPathComponent("D3Lite")))
+                    decision: try D3Decision(
+                        context: context, artifacts: resources.appendingPathComponent("D3Lite"),
+                        allowsVisualInputs: true))
             })
     }
     static func registerVision(manager: ModelManager, resources: URL) async throws {
