@@ -70,7 +70,7 @@ SettingsProviderAdapter 的结果呈现调用显式忽略 UI 返回的接纳布�
 
 ProviderSettingsClient is an Actions-owned facade with coalesced restoration (at most 32 waiters) and joined shutdown. Provider draft/configuration and staging ports live in FunctionContracts; ApplicationControl owns cognitive authorization. UI SettingsFormController owns bounded discovery presentation workers and exposes joined shutdown, invoked by Actions cleanup.
 
-设置文档包含 Assistant 选择 cloud、共享 providers 列表和 Writer、Decision 的独立选择。编辑 Provider 保留稳定 ID。Writer 获取其绑定的 Provider 和钥匙串凭据。未绑定云端时，旧设置仍可解析到本地能力，Agent Brains 将 Writer 显示为未配置，因为 Gemma 缺少其所需的原生工具调用。
+设置文档包含 Assistant 选择 cloud、共享 providers 列表和 Writer、Decision 的独立选择。编辑 Provider 保留稳定 ID。Writer 获取其绑定的 Provider 和钥匙串凭据。未绑定云端时，旧设置仍可解析到本地能力，Agent Models 将 Writer 显示为未配置，因为 Gemma 缺少其所需的原生工具调用。
 
 模型发现由角色子页发起，进入时刷新已选云端 Provider，切换时查询新选择。表单控制器按 Provider ID 缓存结果，凭据快照和请求 ID 围栏迟到结果。模型选择由各角色保存，密钥留在钥匙串。UI 请求生命周期见 [Settings](../../../UI/Settings/README.md)。
 

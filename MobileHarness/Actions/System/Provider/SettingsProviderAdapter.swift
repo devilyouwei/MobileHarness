@@ -79,7 +79,7 @@ public enum SettingsProviderAdapter {
                 return "Could not save settings. Check the model and keychain access."
             case "provider.application": return "Could not apply model settings. Check settings and try again."
             case "provider.cancelled": return "Operation cancelled"
-            case "provider.decisionRequired": return "Download D3 in Agent Brains before selecting the local model."
+            case "provider.decisionRequired": return "Download D3 in Agent Models before selecting the local model."
             case "provider.capacity": return "Too many model requests. Try again."
             case "provider.request", "provider.expired": return "The model lookup expired. Try again."
             default: break

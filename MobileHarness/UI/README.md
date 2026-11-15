@@ -127,7 +127,7 @@ Settings历史详情支持清空单条请求日志，历史列表支持清空Ass
 
 首次云端配置由 Root 组合 Settings 的 WelcomeProviderView：恢复完成后按实际 Provider 列表判断展示；表单通过既有 SettingsControlling/SettingsOperating 提交，业务持久化仍由外部 Actions 拥有。成功后进入模型选择，UI 不推定服务支持的模型，也不访问钥匙串或网络。
 
-Settings 的 Agent Brains 总页管理共享 Cloud Providers 和本地下载，并进入独立保存的 Assistant、Writer、Decision 配置。Decision 子页展示业务投影的实际决策路径。Conversation 同时呈现用户与助手字幕、采集/播放状态及待分类/排队数量。具体接口见 [Settings](Settings/README.md) 与 [Conversation](Conversation/README.md)。
+Settings 的 Agent Models 总页管理共享 Cloud Providers 和本地下载，并进入独立保存的 Assistant、Writer、Decision 配置。Decision 子页展示业务投影的实际决策路径。Conversation 同时呈现用户与助手字幕、采集/播放状态及待分类/排队数量。具体接口见 [Settings](Settings/README.md) 与 [Conversation](Conversation/README.md)。
 
 Settings 历史只呈现实际发起的模型请求及其完整输入输出、来源、批次和失败证据。被丢弃的 Signal 不产生历史条目，Assistant 发布瞬时灵动岛反馈。
 

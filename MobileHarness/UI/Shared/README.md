@@ -40,3 +40,5 @@ A request owns one cancellation callback bound to its Agent-owned processing tas
 `ExecutionIssue` 为日志和首页提示提供共同的显示值。失败报告端口由应用注入，各生产者提供关联身份和结构化失败码。
 
 The shared localization catalog includes Agent and execution-log status, completion and formatted issue copy. Agents supplies AppLanguage at projection time; raw business values and original diagnostic strings are not catalog keys. Format strings keep item numbers, motor identity and target/observed values as arguments.
+
+模型设置文案使用 Agent Models／智能体模型及 Models／模型；Assistant／助手、Writer／创作助手、Decision／决策复用角色名称翻译，下载提示中的页面名称与当前语言一致。

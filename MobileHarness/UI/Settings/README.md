@@ -79,7 +79,7 @@ SettingsFormController 只拥有草稿规范化、默认选项、请求忙态和
 
 ## 多 Provider 管理
 
-Agent Brains 总页依次展示 Cloud Providers、Assistant／Writer／Decision 子页入口和本地模型下载。角色入口整行可点，标题和状态使用系统主、次正文色。Provider 列表按名称和 URL 显示，支持添加及左滑编辑／删除；总页草稿随导航保留到离开 Agent Brains。子页各自持有草稿，返回时放弃未保存的编辑。根 SettingsFormController 在共享已提交快照上合并当前页改动，成功后发布；失败保留草稿。Provider 凭据留在既有私有设置链路。下载区使用统一下载源，按模型身份管理 Gemma 4 E2B 与 D3 Decision。
+Settings 的 Agent Models（智能体模型）入口使用 SF Symbols `atom` 原子图标。Agent Models 总页的 Models（模型）分区按 Assistant（助手）、Writer（创作助手）、Decision（决策）顺序展示三个模型配置入口。总页依次展示 Cloud Providers、Assistant／Writer／Decision 子页入口和本地模型下载。角色入口整行可点，标题和状态使用系统主、次正文色。Provider 列表按名称和 URL 显示，支持添加及左滑编辑／删除；总页草稿随导航保留到离开 Agent Models。子页各自持有草稿，返回时放弃未保存的编辑。根 SettingsFormController 在共享已提交快照上合并当前页改动，成功后发布；失败保留草稿。Provider 凭据留在既有私有设置链路。下载区使用统一下载源，按模型身份管理 Gemma 4 E2B 与 D3 Decision。
 
 Provider 名称与稳定 ID 是当前文档的必填字段，通过私有配置链路保存。新增/编辑采用独立 modal 草稿（name/url/key），默认生成未占用的 Provider N 名称；取消不修改选择和凭据，确认校验 URL 唯一性与名称。列表名称为主、URL 单行省略为辅，保留三字段粘贴和 Key 脱敏。
 
@@ -156,7 +156,7 @@ Assistant 对话详情和 Writer 请求详情提供单条日志清空按钮及�
 
 历史详情只消费 UI 投影。Assistant 页可携带前台任务摘要；Writer 页只携带本侧消息轮次，解码时缺少 taskCompressions 表示空摘要列表，不要求 Writer 存储提供 Assistant 字段。消息身份、创建时间和轮次结构仍是必需数据。
 
-WelcomeProviderView 提供可选 URL（空值使用 OpenAI）与必填 SecureField API key，两项均使用用户主动触发的系统 PasteButton。SettingsFormController.needsWelcome 仅在恢复成功且 Provider 列表为空时成立；saveWelcomeProvider 复用现有 URL/长度校验及设置保存事务，成功后发布 Provider 列表，失败保留输入和错误。保存时阻止重复提交、编辑和关闭；停止后不发布新 Provider。Welcome 创建共享 Provider 配置，模型在 Agent Brains 的 Assistant、Writer 和 Decision 子页选择。稍后设置不写持久化标记。
+WelcomeProviderView 提供可选 URL（空值使用 OpenAI）与必填 SecureField API key，两项均使用用户主动触发的系统 PasteButton。SettingsFormController.needsWelcome 仅在恢复成功且 Provider 列表为空时成立；saveWelcomeProvider 复用现有 URL/长度校验及设置保存事务，成功后发布 Provider 列表，失败保留输入和错误。保存时阻止重复提交、编辑和关闭；停止后不发布新 Provider。Welcome 创建共享 Provider 配置，模型在 Agent Models 的 Assistant、Writer 和 Decision 子页选择。稍后设置不写持久化标记。
 
 保存配置仅在 Assistant 启用云端时将其草稿 key/model 同步到选中 Provider；Assistant 为本地时保持 Provider 列表的独立凭据，Writer 单独选择云端不会被 Assistant 的空草稿覆盖。
 

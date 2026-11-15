@@ -64,3 +64,11 @@ Settings 首页保留原有分区顺序及模型入口顺序，界面标题/分�
 - Assistant 使用本地 Gemma 或云端。Writer 云端要求原生工具，保留深度思考和旧无 Provider 状态。Decision 主 Provider 选择包含本地 D3 或云端，选本地可单独选云端备用。首次选 D3 时校验安装；既有本地选择在模型缺失时继续保留。最近路径在收到分类状态前显示尚无记录。下载不触发自动选择。
 - Actions Provider 设置文档新增可选 Decision 本地模式字段。旧文档缺字段时从下载设置读取原值，不因读取而重写；首次保存将有效值写入同一设置事务，主用、备用随之原子提交。下载设置中的旧字段仅为迁移读取保留，新下载设置写入保留旧值。移除原资源保存通道的 Decision 安装错误映射，安装校验由 Provider 保存事务返回。Actions 通过 App 向 Assistant 输入分类交付冻结的模式和可选云端模型工厂，分类过程中沿用该快照。设置提交期间的新分类读取上一次成功提交的快照，保存失败时继续使用该快照。D3 不可用时使用已保存备用，否则保守入队。非 Assistant 配置变更不重配 Assistant 模型。
 - 实现后同步 UI、Root、Provider、模型资源与总体设计。验收覆盖导航、独立提交和回滚、模型发现、迁移、删除、分类回退以及两种模型的独立下载操作。运行全量检查及 iOS 构建，原生导航与真机/真实模型证据分开记录。
+
+## 2026-11-15 模型设置命名与双语呈现
+
+意图：Settings 入口及总页标题由 Agent Brains 改为 Agent Models（智能体模型），入口使用 SF Symbols `atom`；总页 Agents 分区改为 Models（模型），依次保留 Assistant（助手）、Writer（创作助手）、Decision（决策）三项。
+
+涉及 `UI/Settings/SettingsView.swift`、`UI/Shared/Localizable.xcstrings` 和 `Actions/System/Provider/SettingsProviderAdapter.swift`：同步下载说明与安装校验提示中的页面名称，中英文均指向对应语言的页面标题。只调整呈现，不改变角色身份、导航标识、保存事务、模型选择或下载流程。同步 Settings、Shared、Root、UI、Provider、ModelResources 及总体技术 README 中的当前页面名称；跨模块接口与所有权不变。
+
+验证：核对中英文目录键、三个模型顺序、原子符号与旧文案引用，运行 `scripts/check.sh`、完整 Xcode 可用时运行 `scripts/build-ios.sh`；自动化与原生界面验收分别记录。

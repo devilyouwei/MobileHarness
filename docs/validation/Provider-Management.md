@@ -94,3 +94,17 @@ Settings 首页分区/入口/标题及蓝牙状态摘要英文化；User顺序�
 - 最终 `scripts/check.sh` 的格式、边界、Python、plist、188 项工作流和 229 项 LiveRuntimeTests 通过。集成阶段有一项 `assistantPhotographyForegroundTasksPersistThroughSQLite` 失败，报 `agent.error: conflict` 且没有活跃任务 ID，因此脚本退出 1。该项串行单独复跑在 90 秒后以 `.expired` 失败。此用例直接构造 Assistant 与 SQLite 仓库，使用拍照替身。NativePresentationTests 只有开始记录，缺少完成证据。日志 `/tmp/mobileharness-agent-brains-final-check.log`、`/tmp/mobileharness-agent-brains-photo-regression.log`。
 - `scripts/build-ios.sh` 四个目标通过，最终 UI 调整后再次构建 `MobileHarnessSimulator` 并通过。两次均验证了 33 项 Agent/Skill 资源及内嵌 Live Activity。日志 `/tmp/mobileharness-agent-brains-ios.log`、`/tmp/mobileharness-agent-brains-final-ios.log`。
 - 独立 iPhone 18 Pro / iOS 27 模拟器原生点击通过，覆盖 Settings 下的 Agent Brains、三个子页的 Provider 与保存控件、Writer 的本地说明、Decision 无分类记录提示、Provider 草稿在往返子页时保留，以及共享区的 Gemma 与 D3 入口。最终结果包 `/tmp/mobileharness-agent-brains-ui.VAIOUr/AgentBrains-final.xcresult`。真实 Provider 请求、模型下载与推理需要单独验收，本轮未安装真机。
+
+## 2026-11-15 Agent Models 双语命名
+
+- Settings 入口及页面标题为 Agent Models／智能体模型，入口使用 `atom`；分区为 Models／模型，顺序为 Assistant／助手、Writer／创作助手、Decision／决策。下载说明与安装校验提示同步使用新页面名称。
+- 静态核对通过：String Catalog JSON、中英文映射、三个模型顺序、图标引用、MobileHarness 下旧 Agent Brains 引用清理、`git diff --check`。
+- `scripts/build-ios.sh` 通过：MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero 四目标 BUILD SUCCEEDED，脚本内资源校验通过。
+- `scripts/check.sh` 未通过且未完整结束：边界检查、Python 7 项测试和格式检查通过；Swift 测试出现 `inputDecisionProtectsPossibleSpeechCommandsFromModelDiscard(local:)` 路由断言、`slowTrackingDispatchExecutesOnlyTheNewestPendingTarget()` 目标断言及 Writer/Web 测试 `resourceMissing("injected Action declarations")` 等失败。随后 AppWorkflowTests 持续无新输出，主动终止本次检查及子进程；后续原生测试阶段未完成。失败位于本次呈现修改范围之外，未修改相应逻辑。
+- 首次沙箱执行被 Swift 缓存权限阻止，获准使用正常缓存后重跑，以上为重跑结果。日志：`/tmp/mobileharness-settings-check.log`、`/tmp/mobileharness-settings-build.log`（本机临时证据）。未执行原生 UI 点击或真机验收，不将构建视为视觉验收。
+
+### 2026-11-15 真机覆盖安装
+
+用户要求安装到真机。当前工作区以 MobileHarness / Debug 构建到 `build/DeviceDerivedData`，使用主应用已有开发团队作为命令行 DEVELOPMENT_TEAM，使 Live Activity 扩展使用同一团队；未修改仓库签名配置。构建 BUILD SUCCEEDED，正常权限下 `codesign --verify --deep --strict` 与 73 项 Agent/Skill、Live Activity、中英文资源校验通过。
+
+`devicectl device install app` 成功覆盖安装到已配对 iPhone 17 Pro，bundle ID 为 `dev.mobileharness.app`，未卸载或清除应用数据。启动被锁屏拒绝（CoreDevice 10002，FBS Locked），因此安装成功不代表已完成启动或 Settings 原生视觉验收。构建日志为 `/tmp/mobileharness-settings-device-build.log`。

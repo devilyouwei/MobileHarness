@@ -431,7 +431,7 @@
         }
       }
     },
-    "Agent Brains": {
+    "Agent Models": {
       "extractionState": "extracted",
       "localizations": {
         "zh-Hans": {
@@ -2653,35 +2653,35 @@
         }
       }
     },
-    "Download D3 in Agent Brains before selecting the local model.": {
+    "Download D3 in Agent Models before selecting the local model.": {
       "extractionState": "extracted",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "请先在 Agent Brains 下载 D3 Decision 模型，再选择本地"
+            "value": "请先在“智能体模型”下载 D3 Decision 模型，再选择本地"
           }
         }
       }
     },
-    "Download D3 in Agent Brains. Cloud models need tool support. If unavailable, input is kept and queued.": {
+    "Download D3 in Agent Models. Cloud models need tool support. If unavailable, input is kept and queued.": {
       "extractionState": "extracted",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "可在 Agent Brains 下载 D3。云端模型需支持工具调用；不可用时保留输入并排队。"
+            "value": "可在“智能体模型”下载 D3。云端模型需支持工具调用；不可用时保留输入并排队。"
           }
         }
       }
     },
-    "Download Gemma 4 E2B in Agent Brains.": {
+    "Download Gemma 4 E2B in Agent Models.": {
       "extractionState": "extracted",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "请在 Agent Brains 下载 Gemma 4 E2B。"
+            "value": "请在“智能体模型”下载 Gemma 4 E2B。"
           }
         }
       }

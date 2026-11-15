@@ -36,7 +36,7 @@
                     destination(
                         .synthesis, title: "Speech Synthesis", icon: "speaker.wave.2",
                         identifier: "settings.synthesis.open")
-                    destination(.language, title: "Agent Brains", icon: "brain", identifier: "settings.language.open")
+                    destination(.language, title: "Agent Models", icon: "atom", identifier: "settings.language.open")
                     destination(
                         .vision, title: "Vision Recognition", icon: "viewfinder", identifier: "settings.vision.open")
                 }
@@ -159,7 +159,7 @@
                         providerEditor = ProviderEditorDraft(provider: nil, existing: providers)
                     }.disabled(!restored || providers.count >= 32)
                 }
-                Section(appCopy.text("Agents")) {
+                Section(appCopy.text("Models")) {
                     ForEach(AgentBrain.allCases) { brain in
                         Button {
                             navigate(brain)
@@ -184,7 +184,7 @@
                     state: modelResources, controls: modelResourceControls, group: .language, includesDecision: true)
             }
             .disabled(settings.isSaving)
-            .navigationTitle(appCopy.text("Agent Brains"))
+            .navigationTitle(appCopy.text("Agent Models"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
             // Keep native back navigation mounted; the App-owned save continues across navigation.
@@ -436,7 +436,7 @@
             switch brain {
             case .assistant:
                 return choice.usesLocal && !resources.installedGroups.contains(.language)
-                    ? appCopy.text("Download Gemma 4 E2B in Agent Brains.")
+                    ? appCopy.text("Download Gemma 4 E2B in Agent Models.")
                     : appCopy.text("Thinking is off by default. If the model requires it, the lowest setting is used.")
             case .writer:
                 return appCopy.text(
@@ -444,7 +444,7 @@
             case .decision:
                 return !resources.installedGroups.contains(.decision)
                     ? appCopy.text(
-                        "Download D3 in Agent Brains. Cloud models need tool support. If unavailable, input is kept and queued."
+                        "Download D3 in Agent Models. Cloud models need tool support. If unavailable, input is kept and queued."
                     )
                     : appCopy.text(
                         "Cloud models need tool support. If D3 is unavailable, Decision uses the saved cloud fallback.")
@@ -495,7 +495,7 @@
         }
     }
 
-    /// Shared discovery and selection rendering for Agent Brains and Decision.
+    /// Shared discovery and selection rendering for Agent Models and Decision.
     @MainActor
     struct ProviderModelPicker: View {
         @Environment(\.locale) private var appCopyLocale
