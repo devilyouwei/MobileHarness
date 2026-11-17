@@ -1,0 +1,2136 @@
+{
+  "report": "decision-continue-listening-d3-edge-2026-11-16.json",
+  "reportSHA256": "e5ec64555c5570d9747fb58d96466805029cfcbb6826f6ad5383cfaa51231c18",
+  "artifact": {
+    "modelRoot": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/D3Edge",
+    "hashes": {
+      "manifest.json": "b0b63b4d97b1eabc6c3f748b4f0f41ca19d25f9a7b025d55a1cf8eb27c70f81b",
+      "decision_config.json": "30b6095b945d5a93697868afdf9be9123ea892085fbaff3078112c48da20dc6b",
+      "tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+      "tokenizer_config.json": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c",
+      "chat_template.jinja": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80",
+      "decision.aimodel/main.mlirb": "ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78"
+    },
+    "manifest": {
+      "source": "vllm-sr/d3-edge",
+      "revision": "bee5e872f75b9c5d1405767bf244a6948b95c0af",
+      "sequence_length": 512,
+      "precision": "bfloat16",
+      "readout_precision": "float32",
+      "attention_mode": "noncausal_full_attention",
+      "modality": "text",
+      "inputs": [
+        "input_ids",
+        "attention_mask",
+        "position_ids"
+      ],
+      "output": "mm_90",
+      "function": "main",
+      "format": "Apple Core AI .aimodel",
+      "source_weight_sha256": "91bb8618450a7f628f1432bbced76bc19ee7346c93d191a228fdd33c25a57a9d",
+      "experimental": true,
+      "validation": {
+        "baseline_choices_matched": 75,
+        "baseline_cases": 75,
+        "exploratory_prompt_choices_matched": 95,
+        "exploratory_prompt_cases": 96,
+        "maximum_probability_error": 0.02308797836303711,
+        "strict_probability_parity": false,
+        "iphone_tested": false
+      },
+      "platform": {
+        "hardware": "Apple M5, 16 GiB RAM",
+        "os": "macOS 27.2",
+        "accelerator_placement_verified": false
+      }
+    },
+    "os": "macOS-27.2.1-arm64-arm-64bit-Mach-O",
+    "cpu": "Apple A18 Pro",
+    "memoryBytes": 8589934592,
+    "hashesAfter": {
+      "manifest.json": "b0b63b4d97b1eabc6c3f748b4f0f41ca19d25f9a7b025d55a1cf8eb27c70f81b",
+      "decision_config.json": "30b6095b945d5a93697868afdf9be9123ea892085fbaff3078112c48da20dc6b",
+      "tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+      "tokenizer_config.json": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c",
+      "chat_template.jinja": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80",
+      "decision.aimodel/main.mlirb": "ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78"
+    }
+  },
+  "groups": {
+    "en": {
+      "semantic": {
+        "raw": {
+          "count": 91,
+          "correct": 16,
+          "selectedContinue": 3,
+          "expectedContinue": 24,
+          "continueTP": 3,
+          "continuePrecision": 1.0,
+          "continueRecall": 0.125,
+          "falseContinue": 0,
+          "missedContinue": 21,
+          "predictions": {
+            "invalid": 16,
+            "interrupt": 17,
+            "discard": 48,
+            "continue_listening": 3,
+            "enqueue": 7
+          },
+          "matrix": {
+            "interrupt": {
+              "invalid": 7,
+              "interrupt": 4,
+              "discard": 2
+            },
+            "discard": {
+              "discard": 5,
+              "invalid": 1,
+              "interrupt": 2
+            },
+            "enqueue": {
+              "invalid": 8,
+              "discard": 24,
+              "interrupt": 10,
+              "enqueue": 4
+            },
+            "continue_listening": {
+              "continue_listening": 3,
+              "enqueue": 3,
+              "discard": 17,
+              "interrupt": 1
+            }
+          }
+        },
+        "adopted": {
+          "count": 91,
+          "correct": 52,
+          "selectedContinue": 3,
+          "expectedContinue": 24,
+          "continueTP": 3,
+          "continuePrecision": 1.0,
+          "continueRecall": 0.125,
+          "falseContinue": 0,
+          "missedContinue": 21,
+          "predictions": {
+            "enqueue": 71,
+            "interrupt": 11,
+            "discard": 6,
+            "continue_listening": 3
+          },
+          "matrix": {
+            "interrupt": {
+              "enqueue": 9,
+              "interrupt": 4
+            },
+            "discard": {
+              "discard": 6,
+              "enqueue": 2
+            },
+            "enqueue": {
+              "enqueue": 39,
+              "interrupt": 7
+            },
+            "continue_listening": {
+              "continue_listening": 3,
+              "enqueue": 21
+            }
+          }
+        },
+        "tokensMin": 341,
+        "tokensMax": 370,
+        "tokensP50": 349,
+        "tokensP95": 367,
+        "over512": 0,
+        "nativeCompleted": 81,
+        "nativeP50MS": 231.174,
+        "nativeP95MS": 251.514084,
+        "nativeOver250MS": 6,
+        "routes": {
+          "enqueue:fallback": 16,
+          "local:d3-edge": 75
+        },
+        "failures": {
+          "The selected Decision model timed out. Input queued.": 16
+        }
+      },
+      "within512": {
+        "raw": {
+          "count": 91,
+          "correct": 16,
+          "selectedContinue": 3,
+          "expectedContinue": 24,
+          "continueTP": 3,
+          "continuePrecision": 1.0,
+          "continueRecall": 0.125,
+          "falseContinue": 0,
+          "missedContinue": 21,
+          "predictions": {
+            "invalid": 16,
+            "interrupt": 17,
+            "discard": 48,
+            "continue_listening": 3,
+            "enqueue": 7
+          },
+          "matrix": {
+            "interrupt": {
+              "invalid": 7,
+              "interrupt": 4,
+              "discard": 2
+            },
+            "discard": {
+              "discard": 5,
+              "invalid": 1,
+              "interrupt": 2
+            },
+            "enqueue": {
+              "invalid": 8,
+              "discard": 24,
+              "interrupt": 10,
+              "enqueue": 4
+            },
+            "continue_listening": {
+              "continue_listening": 3,
+              "enqueue": 3,
+              "discard": 17,
+              "interrupt": 1
+            }
+          }
+        },
+        "adopted": {
+          "count": 91,
+          "correct": 52,
+          "selectedContinue": 3,
+          "expectedContinue": 24,
+          "continueTP": 3,
+          "continuePrecision": 1.0,
+          "continueRecall": 0.125,
+          "falseContinue": 0,
+          "missedContinue": 21,
+          "predictions": {
+            "enqueue": 71,
+            "interrupt": 11,
+            "discard": 6,
+            "continue_listening": 3
+          },
+          "matrix": {
+            "interrupt": {
+              "enqueue": 9,
+              "interrupt": 4
+            },
+            "discard": {
+              "discard": 6,
+              "enqueue": 2
+            },
+            "enqueue": {
+              "enqueue": 39,
+              "interrupt": 7
+            },
+            "continue_listening": {
+              "continue_listening": 3,
+              "enqueue": 21
+            }
+          }
+        },
+        "tokensMin": 341,
+        "tokensMax": 370,
+        "tokensP50": 349,
+        "tokensP95": 367,
+        "over512": 0,
+        "nativeCompleted": 81,
+        "nativeP50MS": 231.174,
+        "nativeP95MS": 251.514084,
+        "nativeOver250MS": 6,
+        "routes": {
+          "enqueue:fallback": 16,
+          "local:d3-edge": 75
+        },
+        "failures": {
+          "The selected Decision model timed out. Input queued.": 16
+        }
+      },
+      "adoption-probe": {
+        "raw": {
+          "count": 2,
+          "correct": 1,
+          "selectedContinue": 0,
+          "expectedContinue": 1,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": 0.0,
+          "falseContinue": 0,
+          "missedContinue": 1,
+          "predictions": {
+            "discard": 1,
+            "interrupt": 1
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {
+              "discard": 1
+            },
+            "enqueue": {},
+            "continue_listening": {
+              "interrupt": 1
+            }
+          }
+        },
+        "adopted": {
+          "count": 2,
+          "correct": 1,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "discard": 1,
+            "enqueue": 1
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {
+              "discard": 1,
+              "enqueue": 1
+            },
+            "enqueue": {},
+            "continue_listening": {}
+          }
+        },
+        "tokensMin": 346,
+        "tokensMax": 354,
+        "tokensP50": 346,
+        "tokensP95": 354,
+        "over512": 0,
+        "nativeCompleted": 2,
+        "nativeP50MS": 232.248125,
+        "nativeP95MS": 232.595625,
+        "nativeOver250MS": 0,
+        "routes": {
+          "local:d3-edge": 2
+        },
+        "failures": {}
+      },
+      "capacity-probe": {
+        "raw": {
+          "count": 3,
+          "correct": 0,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "discard": 1,
+            "interrupt": 1,
+            "invalid": 1
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {
+              "discard": 1,
+              "interrupt": 1,
+              "invalid": 1
+            },
+            "continue_listening": {}
+          }
+        },
+        "adopted": {
+          "count": 3,
+          "correct": 3,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "enqueue": 3
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {
+              "enqueue": 3
+            },
+            "continue_listening": {}
+          }
+        },
+        "tokensMin": 492,
+        "tokensMax": 607,
+        "tokensP50": 507,
+        "tokensP95": 607,
+        "over512": 1,
+        "nativeCompleted": 2,
+        "nativeP50MS": 231.528583,
+        "nativeP95MS": 236.238,
+        "nativeOver250MS": 0,
+        "routes": {
+          "local:d3-edge": 2,
+          "enqueue:fallback": 1
+        },
+        "failures": {
+          "The selected Decision model failed or returned an invalid result. Input queued.": 1
+        }
+      },
+      "complete-control": {
+        "raw": {
+          "count": 8,
+          "correct": 3,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "interrupt": 5,
+            "invalid": 1,
+            "discard": 1,
+            "enqueue": 1
+          },
+          "matrix": {
+            "interrupt": {
+              "interrupt": 2,
+              "invalid": 1
+            },
+            "discard": {},
+            "enqueue": {
+              "discard": 1,
+              "enqueue": 1,
+              "interrupt": 3
+            },
+            "continue_listening": {}
+          }
+        },
+        "adopted": {
+          "count": 8,
+          "correct": 4,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "interrupt": 5,
+            "enqueue": 3
+          },
+          "matrix": {
+            "interrupt": {
+              "interrupt": 2,
+              "enqueue": 1
+            },
+            "discard": {},
+            "enqueue": {
+              "enqueue": 2,
+              "interrupt": 3
+            },
+            "continue_listening": {}
+          }
+        },
+        "tokensMin": 341,
+        "tokensMax": 360,
+        "tokensP50": 343,
+        "tokensP95": 360,
+        "over512": 0,
+        "nativeCompleted": 7,
+        "nativeP50MS": 234.194375,
+        "nativeP95MS": 244.790708,
+        "nativeOver250MS": 0,
+        "routes": {
+          "local:d3-edge": 7,
+          "enqueue:fallback": 1
+        },
+        "failures": {
+          "The selected Decision model timed out. Input queued.": 1
+        }
+      },
+      "completed-pair": {
+        "raw": {
+          "count": 25,
+          "correct": 1,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "discard": 19,
+            "invalid": 3,
+            "enqueue": 1,
+            "interrupt": 2
+          },
+          "matrix": {
+            "interrupt": {
+              "discard": 1,
+              "invalid": 1
+            },
+            "discard": {},
+            "enqueue": {
+              "discard": 18,
+              "invalid": 2,
+              "enqueue": 1,
+              "interrupt": 2
+            },
+            "continue_listening": {}
+          }
+        },
+        "adopted": {
+          "count": 25,
+          "correct": 23,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "enqueue": 25
+          },
+          "matrix": {
+            "interrupt": {
+              "enqueue": 2
+            },
+            "discard": {},
+            "enqueue": {
+              "enqueue": 23
+            },
+            "continue_listening": {}
+          }
+        },
+        "tokensMin": 346,
+        "tokensMax": 365,
+        "tokensP50": 349,
+        "tokensP95": 364,
+        "over512": 0,
+        "nativeCompleted": 24,
+        "nativeP50MS": 230.16,
+        "nativeP95MS": 256.730417,
+        "nativeOver250MS": 2,
+        "routes": {
+          "local:d3-edge": 22,
+          "enqueue:fallback": 3
+        },
+        "failures": {
+          "The selected Decision model timed out. Input queued.": 3
+        }
+      },
+      "legacy-anchor": {
+        "raw": {
+          "count": 27,
+          "correct": 6,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "invalid": 11,
+            "interrupt": 8,
+            "discard": 8
+          },
+          "matrix": {
+            "interrupt": {
+              "invalid": 5,
+              "interrupt": 2,
+              "discard": 1
+            },
+            "discard": {
+              "discard": 4,
+              "invalid": 1,
+              "interrupt": 1
+            },
+            "enqueue": {
+              "invalid": 5,
+              "discard": 3,
+              "interrupt": 5
+            },
+            "continue_listening": {}
+          }
+        },
+        "adopted": {
+          "count": 27,
+          "correct": 16,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "enqueue": 16,
+            "interrupt": 6,
+            "discard": 5
+          },
+          "matrix": {
+            "interrupt": {
+              "enqueue": 6,
+              "interrupt": 2
+            },
+            "discard": {
+              "discard": 5,
+              "enqueue": 1
+            },
+            "enqueue": {
+              "enqueue": 9,
+              "interrupt": 4
+            },
+            "continue_listening": {}
+          }
+        },
+        "tokensMin": 357,
+        "tokensMax": 370,
+        "tokensP50": 364,
+        "tokensP95": 369,
+        "over512": 0,
+        "nativeCompleted": 20,
+        "nativeP50MS": 229.158583,
+        "nativeP95MS": 259.6305,
+        "nativeOver250MS": 4,
+        "routes": {
+          "enqueue:fallback": 11,
+          "local:d3-edge": 16
+        },
+        "failures": {
+          "The selected Decision model timed out. Input queued.": 11
+        }
+      },
+      "noise": {
+        "raw": {
+          "count": 2,
+          "correct": 1,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "discard": 1,
+            "interrupt": 1
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {
+              "discard": 1,
+              "interrupt": 1
+            },
+            "enqueue": {},
+            "continue_listening": {}
+          }
+        },
+        "adopted": {
+          "count": 2,
+          "correct": 1,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "discard": 1,
+            "enqueue": 1
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {
+              "discard": 1,
+              "enqueue": 1
+            },
+            "enqueue": {},
+            "continue_listening": {}
+          }
+        },
+        "tokensMin": 341,
+        "tokensMax": 341,
+        "tokensP50": 341,
+        "tokensP95": 341,
+        "over512": 0,
+        "nativeCompleted": 2,
+        "nativeP50MS": 231.174,
+        "nativeP95MS": 246.969333,
+        "nativeOver250MS": 0,
+        "routes": {
+          "local:d3-edge": 2
+        },
+        "failures": {}
+      },
+      "short-answer": {
+        "raw": {
+          "count": 5,
+          "correct": 2,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "enqueue": 2,
+            "discard": 2,
+            "invalid": 1
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {
+              "enqueue": 2,
+              "discard": 2,
+              "invalid": 1
+            },
+            "continue_listening": {}
+          }
+        },
+        "adopted": {
+          "count": 5,
+          "correct": 5,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "enqueue": 5
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {
+              "enqueue": 5
+            },
+            "continue_listening": {}
+          }
+        },
+        "tokensMin": 356,
+        "tokensMax": 359,
+        "tokensP50": 356,
+        "tokensP95": 359,
+        "over512": 0,
+        "nativeCompleted": 4,
+        "nativeP50MS": 232.165958,
+        "nativeP95MS": 234.285125,
+        "nativeOver250MS": 0,
+        "routes": {
+          "local:d3-edge": 4,
+          "enqueue:fallback": 1
+        },
+        "failures": {
+          "The selected Decision model timed out. Input queued.": 1
+        }
+      },
+      "typed-probe": {
+        "raw": {
+          "count": 1,
+          "correct": 1,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "enqueue": 1
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {
+              "enqueue": 1
+            },
+            "continue_listening": {}
+          }
+        },
+        "adopted": {
+          "count": 1,
+          "correct": 1,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "enqueue": 1
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {
+              "enqueue": 1
+            },
+            "continue_listening": {}
+          }
+        },
+        "tokensMin": 297,
+        "tokensMax": 297,
+        "tokensP50": 297,
+        "tokensP95": 297,
+        "over512": 0,
+        "nativeCompleted": 1,
+        "nativeP50MS": 231.823458,
+        "nativeP95MS": 231.823458,
+        "nativeOver250MS": 0,
+        "routes": {
+          "local:d3-edge": 1
+        },
+        "failures": {}
+      },
+      "unfinished": {
+        "raw": {
+          "count": 24,
+          "correct": 3,
+          "selectedContinue": 3,
+          "expectedContinue": 24,
+          "continueTP": 3,
+          "continuePrecision": 1.0,
+          "continueRecall": 0.125,
+          "falseContinue": 0,
+          "missedContinue": 21,
+          "predictions": {
+            "continue_listening": 3,
+            "enqueue": 3,
+            "discard": 17,
+            "interrupt": 1
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {},
+            "continue_listening": {
+              "continue_listening": 3,
+              "enqueue": 3,
+              "discard": 17,
+              "interrupt": 1
+            }
+          }
+        },
+        "adopted": {
+          "count": 24,
+          "correct": 3,
+          "selectedContinue": 3,
+          "expectedContinue": 24,
+          "continueTP": 3,
+          "continuePrecision": 1.0,
+          "continueRecall": 0.125,
+          "falseContinue": 0,
+          "missedContinue": 21,
+          "predictions": {
+            "continue_listening": 3,
+            "enqueue": 21
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {},
+            "continue_listening": {
+              "continue_listening": 3,
+              "enqueue": 21
+            }
+          }
+        },
+        "tokensMin": 342,
+        "tokensMax": 361,
+        "tokensP50": 344,
+        "tokensP95": 349,
+        "over512": 0,
+        "nativeCompleted": 24,
+        "nativeP50MS": 228.56575,
+        "nativeP95MS": 247.266625,
+        "nativeOver250MS": 0,
+        "routes": {
+          "local:d3-edge": 24
+        },
+        "failures": {}
+      }
+    },
+    "zh-Hans": {
+      "semantic": {
+        "raw": {
+          "count": 91,
+          "correct": 11,
+          "selectedContinue": 0,
+          "expectedContinue": 24,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": 0.0,
+          "falseContinue": 0,
+          "missedContinue": 24,
+          "predictions": {
+            "interrupt": 34,
+            "discard": 34,
+            "invalid": 20,
+            "enqueue": 3
+          },
+          "matrix": {
+            "interrupt": {
+              "interrupt": 6,
+              "discard": 5,
+              "invalid": 2
+            },
+            "discard": {
+              "interrupt": 2,
+              "discard": 4,
+              "invalid": 1,
+              "enqueue": 1
+            },
+            "enqueue": {
+              "discard": 15,
+              "invalid": 8,
+              "interrupt": 22,
+              "enqueue": 1
+            },
+            "continue_listening": {
+              "invalid": 9,
+              "interrupt": 4,
+              "discard": 10,
+              "enqueue": 1
+            }
+          }
+        },
+        "adopted": {
+          "count": 91,
+          "correct": 52,
+          "selectedContinue": 0,
+          "expectedContinue": 24,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": 0.0,
+          "falseContinue": 0,
+          "missedContinue": 24,
+          "predictions": {
+            "interrupt": 12,
+            "enqueue": 73,
+            "discard": 6
+          },
+          "matrix": {
+            "interrupt": {
+              "interrupt": 6,
+              "enqueue": 7
+            },
+            "discard": {
+              "enqueue": 2,
+              "discard": 6
+            },
+            "enqueue": {
+              "enqueue": 40,
+              "interrupt": 6
+            },
+            "continue_listening": {
+              "enqueue": 24
+            }
+          }
+        },
+        "tokensMin": 334,
+        "tokensMax": 360,
+        "tokensP50": 341,
+        "tokensP95": 356,
+        "over512": 0,
+        "nativeCompleted": 79,
+        "nativeP50MS": 242.402333,
+        "nativeP95MS": 255.045833,
+        "nativeOver250MS": 8,
+        "routes": {
+          "local:d3-edge": 71,
+          "enqueue:fallback": 20
+        },
+        "failures": {
+          "The selected Decision model timed out. Input queued.": 20
+        }
+      },
+      "within512": {
+        "raw": {
+          "count": 91,
+          "correct": 11,
+          "selectedContinue": 0,
+          "expectedContinue": 24,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": 0.0,
+          "falseContinue": 0,
+          "missedContinue": 24,
+          "predictions": {
+            "interrupt": 34,
+            "discard": 34,
+            "invalid": 20,
+            "enqueue": 3
+          },
+          "matrix": {
+            "interrupt": {
+              "interrupt": 6,
+              "discard": 5,
+              "invalid": 2
+            },
+            "discard": {
+              "interrupt": 2,
+              "discard": 4,
+              "invalid": 1,
+              "enqueue": 1
+            },
+            "enqueue": {
+              "discard": 15,
+              "invalid": 8,
+              "interrupt": 22,
+              "enqueue": 1
+            },
+            "continue_listening": {
+              "invalid": 9,
+              "interrupt": 4,
+              "discard": 10,
+              "enqueue": 1
+            }
+          }
+        },
+        "adopted": {
+          "count": 91,
+          "correct": 52,
+          "selectedContinue": 0,
+          "expectedContinue": 24,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": 0.0,
+          "falseContinue": 0,
+          "missedContinue": 24,
+          "predictions": {
+            "interrupt": 12,
+            "enqueue": 73,
+            "discard": 6
+          },
+          "matrix": {
+            "interrupt": {
+              "interrupt": 6,
+              "enqueue": 7
+            },
+            "discard": {
+              "enqueue": 2,
+              "discard": 6
+            },
+            "enqueue": {
+              "enqueue": 40,
+              "interrupt": 6
+            },
+            "continue_listening": {
+              "enqueue": 24
+            }
+          }
+        },
+        "tokensMin": 334,
+        "tokensMax": 360,
+        "tokensP50": 341,
+        "tokensP95": 356,
+        "over512": 0,
+        "nativeCompleted": 79,
+        "nativeP50MS": 242.402333,
+        "nativeP95MS": 255.045833,
+        "nativeOver250MS": 8,
+        "routes": {
+          "local:d3-edge": 71,
+          "enqueue:fallback": 20
+        },
+        "failures": {
+          "The selected Decision model timed out. Input queued.": 20
+        }
+      },
+      "adoption-probe": {
+        "raw": {
+          "count": 2,
+          "correct": 1,
+          "selectedContinue": 0,
+          "expectedContinue": 1,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": 0.0,
+          "falseContinue": 0,
+          "missedContinue": 1,
+          "predictions": {
+            "discard": 2
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {
+              "discard": 1
+            },
+            "enqueue": {},
+            "continue_listening": {
+              "discard": 1
+            }
+          }
+        },
+        "adopted": {
+          "count": 2,
+          "correct": 1,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "discard": 1,
+            "enqueue": 1
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {
+              "discard": 1,
+              "enqueue": 1
+            },
+            "enqueue": {},
+            "continue_listening": {}
+          }
+        },
+        "tokensMin": 338,
+        "tokensMax": 340,
+        "tokensP50": 338,
+        "tokensP95": 340,
+        "over512": 0,
+        "nativeCompleted": 2,
+        "nativeP50MS": 241.228166,
+        "nativeP95MS": 248.064375,
+        "nativeOver250MS": 0,
+        "routes": {
+          "local:d3-edge": 2
+        },
+        "failures": {}
+      },
+      "capacity-probe": {
+        "raw": {
+          "count": 3,
+          "correct": 0,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "invalid": 3
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {
+              "invalid": 3
+            },
+            "continue_listening": {}
+          }
+        },
+        "adopted": {
+          "count": 3,
+          "correct": 3,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "enqueue": 3
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {
+              "enqueue": 3
+            },
+            "continue_listening": {}
+          }
+        },
+        "tokensMin": 674,
+        "tokensMax": 835,
+        "tokensP50": 695,
+        "tokensP95": 835,
+        "over512": 3,
+        "nativeCompleted": 0,
+        "nativeP50MS": null,
+        "nativeP95MS": null,
+        "nativeOver250MS": 0,
+        "routes": {
+          "enqueue:fallback": 3
+        },
+        "failures": {
+          "The selected Decision model failed or returned an invalid result. Input queued.": 3
+        }
+      },
+      "complete-control": {
+        "raw": {
+          "count": 8,
+          "correct": 1,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "discard": 3,
+            "invalid": 1,
+            "interrupt": 4
+          },
+          "matrix": {
+            "interrupt": {
+              "discard": 1,
+              "invalid": 1,
+              "interrupt": 1
+            },
+            "discard": {},
+            "enqueue": {
+              "discard": 2,
+              "interrupt": 3
+            },
+            "continue_listening": {}
+          }
+        },
+        "adopted": {
+          "count": 8,
+          "correct": 3,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "enqueue": 4,
+            "interrupt": 4
+          },
+          "matrix": {
+            "interrupt": {
+              "enqueue": 2,
+              "interrupt": 1
+            },
+            "discard": {},
+            "enqueue": {
+              "enqueue": 2,
+              "interrupt": 3
+            },
+            "continue_listening": {}
+          }
+        },
+        "tokensMin": 335,
+        "tokensMax": 349,
+        "tokensP50": 336,
+        "tokensP95": 349,
+        "over512": 0,
+        "nativeCompleted": 8,
+        "nativeP50MS": 241.6165,
+        "nativeP95MS": 261.690875,
+        "nativeOver250MS": 1,
+        "routes": {
+          "local:d3-edge": 7,
+          "enqueue:fallback": 1
+        },
+        "failures": {
+          "The selected Decision model timed out. Input queued.": 1
+        }
+      },
+      "completed-pair": {
+        "raw": {
+          "count": 25,
+          "correct": 0,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "discard": 7,
+            "interrupt": 13,
+            "invalid": 5
+          },
+          "matrix": {
+            "interrupt": {
+              "discard": 2
+            },
+            "discard": {},
+            "enqueue": {
+              "discard": 5,
+              "interrupt": 13,
+              "invalid": 5
+            },
+            "continue_listening": {}
+          }
+        },
+        "adopted": {
+          "count": 25,
+          "correct": 23,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "enqueue": 25
+          },
+          "matrix": {
+            "interrupt": {
+              "enqueue": 2
+            },
+            "discard": {},
+            "enqueue": {
+              "enqueue": 23
+            },
+            "continue_listening": {}
+          }
+        },
+        "tokensMin": 338,
+        "tokensMax": 353,
+        "tokensP50": 341,
+        "tokensP95": 353,
+        "over512": 0,
+        "nativeCompleted": 22,
+        "nativeP50MS": 242.667125,
+        "nativeP95MS": 250.711166,
+        "nativeOver250MS": 2,
+        "routes": {
+          "local:d3-edge": 20,
+          "enqueue:fallback": 5
+        },
+        "failures": {
+          "The selected Decision model timed out. Input queued.": 5
+        }
+      },
+      "legacy-anchor": {
+        "raw": {
+          "count": 27,
+          "correct": 9,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "interrupt": 10,
+            "discard": 12,
+            "invalid": 3,
+            "enqueue": 2
+          },
+          "matrix": {
+            "interrupt": {
+              "interrupt": 5,
+              "discard": 2,
+              "invalid": 1
+            },
+            "discard": {
+              "interrupt": 1,
+              "discard": 3,
+              "invalid": 1,
+              "enqueue": 1
+            },
+            "enqueue": {
+              "discard": 7,
+              "invalid": 1,
+              "interrupt": 4,
+              "enqueue": 1
+            },
+            "continue_listening": {}
+          }
+        },
+        "adopted": {
+          "count": 27,
+          "correct": 20,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "interrupt": 8,
+            "enqueue": 14,
+            "discard": 5
+          },
+          "matrix": {
+            "interrupt": {
+              "interrupt": 5,
+              "enqueue": 3
+            },
+            "discard": {
+              "enqueue": 1,
+              "discard": 5
+            },
+            "enqueue": {
+              "enqueue": 10,
+              "interrupt": 3
+            },
+            "continue_listening": {}
+          }
+        },
+        "tokensMin": 346,
+        "tokensMax": 360,
+        "tokensP50": 350,
+        "tokensP95": 359,
+        "over512": 0,
+        "nativeCompleted": 25,
+        "nativeP50MS": 240.675708,
+        "nativeP95MS": 247.86725,
+        "nativeOver250MS": 1,
+        "routes": {
+          "local:d3-edge": 24,
+          "enqueue:fallback": 3
+        },
+        "failures": {
+          "The selected Decision model timed out. Input queued.": 3
+        }
+      },
+      "noise": {
+        "raw": {
+          "count": 2,
+          "correct": 1,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "discard": 1,
+            "interrupt": 1
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {
+              "discard": 1,
+              "interrupt": 1
+            },
+            "enqueue": {},
+            "continue_listening": {}
+          }
+        },
+        "adopted": {
+          "count": 2,
+          "correct": 1,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "discard": 1,
+            "enqueue": 1
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {
+              "discard": 1,
+              "enqueue": 1
+            },
+            "enqueue": {},
+            "continue_listening": {}
+          }
+        },
+        "tokensMin": 334,
+        "tokensMax": 335,
+        "tokensP50": 334,
+        "tokensP95": 335,
+        "over512": 0,
+        "nativeCompleted": 2,
+        "nativeP50MS": 242.4215,
+        "nativeP95MS": 245.956375,
+        "nativeOver250MS": 0,
+        "routes": {
+          "local:d3-edge": 2
+        },
+        "failures": {}
+      },
+      "short-answer": {
+        "raw": {
+          "count": 5,
+          "correct": 0,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "invalid": 2,
+            "interrupt": 2,
+            "discard": 1
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {
+              "invalid": 2,
+              "interrupt": 2,
+              "discard": 1
+            },
+            "continue_listening": {}
+          }
+        },
+        "adopted": {
+          "count": 5,
+          "correct": 5,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "enqueue": 5
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {
+              "enqueue": 5
+            },
+            "continue_listening": {}
+          }
+        },
+        "tokensMin": 345,
+        "tokensMax": 346,
+        "tokensP50": 345,
+        "tokensP95": 346,
+        "over512": 0,
+        "nativeCompleted": 4,
+        "nativeP50MS": 246.208333,
+        "nativeP95MS": 251.286208,
+        "nativeOver250MS": 1,
+        "routes": {
+          "enqueue:fallback": 2,
+          "local:d3-edge": 3
+        },
+        "failures": {
+          "The selected Decision model timed out. Input queued.": 2
+        }
+      },
+      "typed-probe": {
+        "raw": {
+          "count": 1,
+          "correct": 0,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "invalid": 1
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {
+              "invalid": 1
+            },
+            "continue_listening": {}
+          }
+        },
+        "adopted": {
+          "count": 1,
+          "correct": 1,
+          "selectedContinue": 0,
+          "expectedContinue": 0,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": null,
+          "falseContinue": 0,
+          "missedContinue": 0,
+          "predictions": {
+            "enqueue": 1
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {
+              "enqueue": 1
+            },
+            "continue_listening": {}
+          }
+        },
+        "tokensMin": 285,
+        "tokensMax": 285,
+        "tokensP50": 285,
+        "tokensP95": 285,
+        "over512": 0,
+        "nativeCompleted": 0,
+        "nativeP50MS": null,
+        "nativeP95MS": null,
+        "nativeOver250MS": 0,
+        "routes": {
+          "enqueue:fallback": 1
+        },
+        "failures": {
+          "The selected Decision model timed out. Input queued.": 1
+        }
+      },
+      "unfinished": {
+        "raw": {
+          "count": 24,
+          "correct": 0,
+          "selectedContinue": 0,
+          "expectedContinue": 24,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": 0.0,
+          "falseContinue": 0,
+          "missedContinue": 24,
+          "predictions": {
+            "invalid": 9,
+            "interrupt": 4,
+            "discard": 10,
+            "enqueue": 1
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {},
+            "continue_listening": {
+              "invalid": 9,
+              "interrupt": 4,
+              "discard": 10,
+              "enqueue": 1
+            }
+          }
+        },
+        "adopted": {
+          "count": 24,
+          "correct": 0,
+          "selectedContinue": 0,
+          "expectedContinue": 24,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": 0.0,
+          "falseContinue": 0,
+          "missedContinue": 24,
+          "predictions": {
+            "enqueue": 24
+          },
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {},
+            "continue_listening": {
+              "enqueue": 24
+            }
+          }
+        },
+        "tokensMin": 334,
+        "tokensMax": 349,
+        "tokensP50": 337,
+        "tokensP95": 340,
+        "over512": 0,
+        "nativeCompleted": 18,
+        "nativeP50MS": 242.402333,
+        "nativeP95MS": 257.198125,
+        "nativeOver250MS": 3,
+        "routes": {
+          "enqueue:fallback": 9,
+          "local:d3-edge": 15
+        },
+        "failures": {
+          "The selected Decision model timed out. Input queued.": 9
+        }
+      }
+    }
+  },
+  "missedContinue": [
+    {
+      "id": "want-unfinished-en",
+      "latest": "I would like to",
+      "tokens": 344,
+      "raw": "enqueue",
+      "adopted": "enqueue",
+      "score": 0.2853793501853943
+    },
+    {
+      "id": "remind-time-unfinished-en",
+      "latest": "Remind me tomorrow at",
+      "tokens": 345,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.4007745087146759
+    },
+    {
+      "id": "search-object-unfinished-en",
+      "latest": "Search for",
+      "tokens": 342,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.38783928751945496
+    },
+    {
+      "id": "destination-unfinished-en",
+      "latest": "Send the message to",
+      "tokens": 344,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.34414082765579224
+    },
+    {
+      "id": "filename-unfinished-en",
+      "latest": "Save it as",
+      "tokens": 343,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.3597547709941864
+    },
+    {
+      "id": "conditional-unfinished-en",
+      "latest": "If it rains tomorrow,",
+      "tokens": 344,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.3540857136249542
+    },
+    {
+      "id": "because-unfinished-en",
+      "latest": "I cannot go because",
+      "tokens": 344,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.3487115204334259
+    },
+    {
+      "id": "conjunction-unfinished-en",
+      "latest": "Take a photo and then",
+      "tokens": 345,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.3159550130367279
+    },
+    {
+      "id": "comparison-unfinished-en",
+      "latest": "Make it bigger than",
+      "tokens": 344,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.3100548982620239
+    },
+    {
+      "id": "choice-unfinished-en",
+      "latest": "I choose the",
+      "tokens": 343,
+      "raw": "enqueue",
+      "adopted": "enqueue",
+      "score": 0.34545114636421204
+    },
+    {
+      "id": "number-unfinished-en",
+      "latest": "Set the timer for",
+      "tokens": 344,
+      "raw": "interrupt",
+      "adopted": "enqueue",
+      "score": 0.3790738582611084
+    },
+    {
+      "id": "location-unfinished-en",
+      "latest": "The place I mean is",
+      "tokens": 345,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.36768463253974915
+    },
+    {
+      "id": "correction-unfinished-en",
+      "latest": "Actually, change the title to",
+      "tokens": 361,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.3304651379585266
+    },
+    {
+      "id": "list-unfinished-en",
+      "latest": "Bring these three things: keys,",
+      "tokens": 346,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.38409876823425293
+    },
+    {
+      "id": "rather-unfinished-en",
+      "latest": "Not a photo, I want you to",
+      "tokens": 348,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.39178088307380676
+    },
+    {
+      "id": "relative-unfinished-en",
+      "latest": "Find the photo that",
+      "tokens": 344,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.35192662477493286
+    },
+    {
+      "id": "question-prefix-unfinished-en",
+      "latest": "Could you tell me how to",
+      "tokens": 346,
+      "raw": "enqueue",
+      "adopted": "enqueue",
+      "score": 0.30695870518684387
+    },
+    {
+      "id": "mixed-unfinished-en",
+      "latest": "Set a reminder for",
+      "tokens": 344,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.3561827838420868
+    },
+    {
+      "id": "broken-name-unfinished-en",
+      "latest": "The city is New",
+      "tokens": 344,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.3418659567832947
+    },
+    {
+      "id": "false-start-unfinished-en",
+      "latest": "What I meant was, um,",
+      "tokens": 346,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.34372127056121826
+    },
+    {
+      "id": "buffer-incomplete-en",
+      "latest": "and send it to",
+      "tokens": 347,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.3336470425128937
+    },
+    {
+      "id": "request-verb-unfinished-zh-Hans",
+      "latest": "请帮我",
+      "tokens": 335,
+      "raw": null,
+      "adopted": "enqueue",
+      "score": null
+    },
+    {
+      "id": "want-unfinished-zh-Hans",
+      "latest": "我想要",
+      "tokens": 334,
+      "raw": "interrupt",
+      "adopted": "enqueue",
+      "score": 0.3475542962551117
+    },
+    {
+      "id": "remind-time-unfinished-zh-Hans",
+      "latest": "明天提醒我，时间是",
+      "tokens": 338,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.3857041895389557
+    },
+    {
+      "id": "search-object-unfinished-zh-Hans",
+      "latest": "帮我搜索",
+      "tokens": 335,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.42793789505958557
+    },
+    {
+      "id": "translate-object-unfinished-zh-Hans",
+      "latest": "翻译这句话：",
+      "tokens": 335,
+      "raw": null,
+      "adopted": "enqueue",
+      "score": 0.40448153018951416
+    },
+    {
+      "id": "destination-unfinished-zh-Hans",
+      "latest": "把消息发给",
+      "tokens": 336,
+      "raw": "interrupt",
+      "adopted": "enqueue",
+      "score": 0.3875110447406769
+    },
+    {
+      "id": "filename-unfinished-zh-Hans",
+      "latest": "把文件命名为",
+      "tokens": 336,
+      "raw": null,
+      "adopted": "enqueue",
+      "score": null
+    },
+    {
+      "id": "conditional-unfinished-zh-Hans",
+      "latest": "如果明天下雨的话，",
+      "tokens": 339,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.37612342834472656
+    },
+    {
+      "id": "because-unfinished-zh-Hans",
+      "latest": "我不能去，因为",
+      "tokens": 337,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.4316999912261963
+    },
+    {
+      "id": "conjunction-unfinished-zh-Hans",
+      "latest": "拍张照片，然后",
+      "tokens": 337,
+      "raw": "interrupt",
+      "adopted": "enqueue",
+      "score": 0.4068874716758728
+    },
+    {
+      "id": "comparison-unfinished-zh-Hans",
+      "latest": "把它放得比",
+      "tokens": 337,
+      "raw": null,
+      "adopted": "enqueue",
+      "score": null
+    },
+    {
+      "id": "choice-unfinished-zh-Hans",
+      "latest": "我选第",
+      "tokens": 336,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.37722262740135193
+    },
+    {
+      "id": "number-unfinished-zh-Hans",
+      "latest": "倒计时设为",
+      "tokens": 335,
+      "raw": null,
+      "adopted": "enqueue",
+      "score": 0.43031635880470276
+    },
+    {
+      "id": "location-unfinished-zh-Hans",
+      "latest": "我说的地点是",
+      "tokens": 337,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.3511877954006195
+    },
+    {
+      "id": "correction-unfinished-zh-Hans",
+      "latest": "其实把标题改成",
+      "tokens": 349,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.43485209345817566
+    },
+    {
+      "id": "list-unfinished-zh-Hans",
+      "latest": "带上这三样东西：钥匙，",
+      "tokens": 340,
+      "raw": null,
+      "adopted": "enqueue",
+      "score": null
+    },
+    {
+      "id": "rather-unfinished-zh-Hans",
+      "latest": "不是拍照，我是要你",
+      "tokens": 339,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.3482479751110077
+    },
+    {
+      "id": "explicit-more-unfinished-zh-Hans",
+      "latest": "我还没说完，我想要的是",
+      "tokens": 339,
+      "raw": "enqueue",
+      "adopted": "enqueue",
+      "score": 0.3572479784488678
+    },
+    {
+      "id": "relative-unfinished-zh-Hans",
+      "latest": "找出那张",
+      "tokens": 335,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.38972899317741394
+    },
+    {
+      "id": "question-prefix-unfinished-zh-Hans",
+      "latest": "你能告诉我怎么",
+      "tokens": 336,
+      "raw": null,
+      "adopted": "enqueue",
+      "score": null
+    },
+    {
+      "id": "mixed-unfinished-zh-Hans",
+      "latest": "帮我设置 reminder，时间是",
+      "tokens": 338,
+      "raw": "interrupt",
+      "adopted": "enqueue",
+      "score": 0.45090603828430176
+    },
+    {
+      "id": "broken-name-unfinished-zh-Hans",
+      "latest": "城市是新",
+      "tokens": 335,
+      "raw": "discard",
+      "adopted": "enqueue",
+      "score": 0.3373053967952728
+    },
+    {
+      "id": "false-start-unfinished-zh-Hans",
+      "latest": "我的意思是，呃，",
+      "tokens": 338,
+      "raw": null,
+      "adopted": "enqueue",
+      "score": 0.36460381746292114
+    },
+    {
+      "id": "buffer-incomplete-zh-Hans",
+      "latest": "再发给",
+      "tokens": 337,
+      "raw": null,
+      "adopted": "enqueue",
+      "score": null
+    }
+  ],
+  "falseContinue": [],
+  "nativeReadout": {
+    "file": "decision-continue-listening-readout-2026-11-16.json",
+    "groups": {
+      "en": {
+        "raw": {
+          "count": 91,
+          "correct": 21,
+          "selectedContinue": 4,
+          "expectedContinue": 24,
+          "continueTP": 3,
+          "continuePrecision": 0.75,
+          "continueRecall": 0.125,
+          "falseContinue": 1,
+          "missedContinue": 21,
+          "predictions": {
+            "interrupt": 21,
+            "discard": 59,
+            "continue_listening": 4,
+            "enqueue": 7
+          },
+          "matrix": {
+            "interrupt": {
+              "interrupt": 8,
+              "discard": 4,
+              "continue_listening": 1
+            },
+            "discard": {
+              "discard": 6,
+              "interrupt": 2
+            },
+            "enqueue": {
+              "discard": 32,
+              "interrupt": 10,
+              "enqueue": 4
+            },
+            "continue_listening": {
+              "continue_listening": 3,
+              "enqueue": 3,
+              "discard": 17,
+              "interrupt": 1
+            }
+          }
+        },
+        "p50MS": 240.068292,
+        "p95MS": 253.1725,
+        "over250MS": 10,
+        "errors": 0,
+        "continueHits": [
+          "request-verb-unfinished-en",
+          "translate-object-unfinished-en",
+          "explicit-more-unfinished-en",
+          "stop-followup-completed-en"
+        ],
+        "completedProductionComparisons": 75,
+        "completedProductionDisagreements": 0
+      },
+      "zh-Hans": {
+        "raw": {
+          "count": 91,
+          "correct": 13,
+          "selectedContinue": 0,
+          "expectedContinue": 24,
+          "continueTP": 0,
+          "continuePrecision": null,
+          "continueRecall": 0.0,
+          "falseContinue": 0,
+          "missedContinue": 24,
+          "predictions": {
+            "interrupt": 44,
+            "discard": 43,
+            "enqueue": 4
+          },
+          "matrix": {
+            "interrupt": {
+              "interrupt": 8,
+              "discard": 5
+            },
+            "discard": {
+              "interrupt": 2,
+              "discard": 4,
+              "enqueue": 2
+            },
+            "enqueue": {
+              "discard": 22,
+              "interrupt": 23,
+              "enqueue": 1
+            },
+            "continue_listening": {
+              "interrupt": 11,
+              "discard": 12,
+              "enqueue": 1
+            }
+          }
+        },
+        "p50MS": 257.941208,
+        "p95MS": 272.257417,
+        "over250MS": 76,
+        "errors": 0,
+        "continueHits": [],
+        "completedProductionComparisons": 71,
+        "completedProductionDisagreements": 0
+      }
+    }
+  }
+}

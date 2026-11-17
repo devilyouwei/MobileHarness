@@ -210,41 +210,7 @@
         "chat_template.jinja",
         "NOTICE",
         "LICENSE"
-      ],
-      "architectureVariants": {
-        "h18p": {
-          "source": {
-            "kind": "huggingface",
-            "repoId": "hugging-mac/d3-edge-CoreAI",
-            "revision": "61a6a13a44d8390a5cf72755a6f581238ca88740",
-            "allowPatterns": [
-              "ios/aot-v1/h18p/**"
-            ],
-            "stripPrefix": "ios/aot-v1/h18p"
-          },
-          "requiredFiles": [
-            "LICENSE",
-            "NOTICE",
-            "aot-build.json",
-            "chat_template.jinja",
-            "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/manifest.plist",
-            "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/original_model_0.mpsgraph",
-            "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/resources.bin",
-            "decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/specialized_model_1.mpsgraph",
-            "decision.h18p.aimodelc/main-h18p.mlirb",
-            "decision.h18p.aimodelc/main.hash",
-            "decision.h18p.aimodelc/metadata.json",
-            "decision.h18p.aimodelc/stats.json",
-            "decision_config.json",
-            "manifest.json",
-            "merges.txt",
-            "tokenizer.json",
-            "tokenizer_config.json",
-            "vocab.json"
-          ],
-          "estimatedBytes": 1496313166
-        }
-      }
+      ]
     },
     {
       "id": "d3-lite",

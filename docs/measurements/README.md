@@ -89,3 +89,19 @@ Writer 的 2026-11-08 双模型实验保留 [原始基线](writer-prompt-2026-11
 - [D3 iOS AOT build inventory](decision-d3-ios-aot-2026-11-15.json): h18p Edge/Lite compile provenance and file hashes; upload and device acceptance status are explicit.
 
 - [D3 Lite iOS AOT native load crash](decision-d3-lite-ios-aot-crash-2026-11-15.json): two matching device crash stacks and all installed file hashes, distinct from successful Mac compilation.
+
+- [D3 Edge 继续聆听四分类汇总（2026-11-16）](decision-continue-listening-summary-2026-11-16.json)：[194条冻结样例](decision-continue-listening-scenarios-2026-11-16.json)、[App实际提示/期限/采纳](decision-continue-listening-d3-edge-2026-11-16.json)、[无Assistant期限的原生读出](decision-continue-listening-readout-2026-11-16.json)及[制品/主机哈希](decision-continue-listening-artifact-2026-11-16.json)。仅D3 Edge；语义评分与容量/持有探测分开。见[实验报告](../validation/Decision-Model-Mac-Comparison.md#d3-edge-继续聆听四分类实验2026-11-16)。
+
+- [D3 Edge 提示词优化（仅实验环境）](decision-prompt-optimization-summary-2026-11-16.json)：11组开发对照、[第二阶段汇总](decision-prompt-optimization-refined-summary-2026-11-16.json)、[48条预冻结留出复核](decision-prompt-optimization-holdout-summary-2026-11-16.json)及[入选模板](decision-prompt-optimization-template-2026-11-16.json)。完整请求、选型依据和限制见[报告](../validation/Decision-Model-Mac-Comparison.md#d3-edge-提示词结构优化实验2026-11-16仅实验环境)。
+
+- [D3 Edge 真机 discard 反馈复核](decision-discard-recheck-summary-2026-11-16.json)：现场完整请求回放、单独替换 B 候选及原48条留出复测；输入和结果见[原对照报告](../validation/Decision-Model-Mac-Comparison.md#真机-discard-反馈复核2026-11-16-2205)。
+
+- [精简 App JEV 请求](decision-minimal-app-input-2026-11-16.json)与[六条 D3 Edge 原始结果](decision-minimal-app-results-2026-11-16.json)：仅utterance/busy及四类定义，接入与安装见原Mac报告。
+
+- [D3 Edge 源图切换文件核对（2026-11-17）](decision-edge-source-rollback-parity-2026-11-17.json)：固定HF revision与Mac本地12个对应文件内容匹配；App下载配置切换见[D3制品记录](../validation/D3-iOS-AOT.md#edge-source-package-selection-restored--2026-11-17)。
+
+- [Vela3 Fast / D3补充对照](decision-vela-d3-summary-2026-11-17.json)：两模板的Vela108条请求，D3本轮失败与历史准确率分开，见[原Mac报告](../validation/Decision-Model-Mac-Comparison.md#vela3-fast-本地补充对照2026-11-17)。
+
+- [第三方D3 Edge制品配置证据](decision-alternative-edge-artifact-2026-11-17.json)：maxffarrell固定版本、五输入接口及远端元数据哈希；[Hello原样回放](decision-hello-phone-replay-results-2026-11-17.json)记录原制品Mac三次discard。
+
+- [discard边界两轮对照](decision-discard-refinement-summary-2026-11-17.json)：自有D3 Edge、440条评分；单条Hello改善不能替代整体质量，本轮无生产提示迁移。

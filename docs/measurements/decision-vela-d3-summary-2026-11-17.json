@@ -1,0 +1,123 @@
+{
+  "model": "vela3-fast",
+  "revision": "6aaa9ccd747c4bad65037979e7f9373a76fb7683",
+  "groups": {
+    "minimal-holdout": {
+      "count": 48,
+      "correct": 19,
+      "macroF1": 0.40110895779500433,
+      "falseDiscard": 19,
+      "falseInterrupt": 1,
+      "continueTP": 0,
+      "expectedContinue": 16,
+      "errors": 0,
+      "p50MS": 144.35493749624584,
+      "p95MS": 160.92137500527315,
+      "over250MS": 0,
+      "matrix": {
+        "interrupt": {
+          "interrupt": 3,
+          "discard": 1
+        },
+        "discard": {
+          "discard": 4
+        },
+        "enqueue": {
+          "enqueue": 12,
+          "discard": 9,
+          "continue_listening": 2,
+          "interrupt": 1
+        },
+        "continue_listening": {
+          "enqueue": 7,
+          "discard": 9
+        }
+      }
+    },
+    "minimal-diagnostic": {
+      "count": 6,
+      "correct": 1,
+      "macroF1": 0.07142857142857142,
+      "falseDiscard": 4,
+      "falseInterrupt": 0,
+      "continueTP": 0,
+      "expectedContinue": 1,
+      "errors": 0,
+      "p50MS": 131.04787549673347,
+      "p95MS": 146.94775000680238,
+      "over250MS": 0,
+      "matrix": {
+        "interrupt": {},
+        "discard": {},
+        "enqueue": {
+          "discard": 4,
+          "enqueue": 1
+        },
+        "continue_listening": {
+          "enqueue": 1
+        }
+      }
+    },
+    "utterance_status-holdout": {
+      "count": 48,
+      "correct": 7,
+      "macroF1": 0.2045238095238095,
+      "falseDiscard": 40,
+      "falseInterrupt": 1,
+      "continueTP": 0,
+      "expectedContinue": 16,
+      "errors": 0,
+      "p50MS": 234.73893749905983,
+      "p95MS": 267.14400001219474,
+      "over250MS": 5,
+      "matrix": {
+        "interrupt": {
+          "discard": 2,
+          "interrupt": 2
+        },
+        "discard": {
+          "discard": 4
+        },
+        "enqueue": {
+          "discard": 22,
+          "interrupt": 1,
+          "enqueue": 1
+        },
+        "continue_listening": {
+          "discard": 16
+        }
+      }
+    },
+    "utterance_status-diagnostic": {
+      "count": 6,
+      "correct": 0,
+      "macroF1": 0.0,
+      "falseDiscard": 6,
+      "falseInterrupt": 0,
+      "continueTP": 0,
+      "expectedContinue": 1,
+      "errors": 0,
+      "p50MS": 228.09989600500558,
+      "p95MS": 236.2164170044707,
+      "over250MS": 0,
+      "matrix": {
+        "interrupt": {},
+        "discard": {},
+        "enqueue": {
+          "discard": 5
+        },
+        "continue_listening": {
+          "discard": 1
+        }
+      }
+    }
+  },
+  "d3Comparison": {
+    "historicalUtteranceStatusCorrect": 29,
+    "count": 48,
+    "identicalRequestsVerified": true,
+    "currentAutomaticRun": "failed during load: LLVM no space left on device; 0 scored",
+    "cpuRun": "failed first warmup: 0/255 finite logits; 0 scored",
+    "minimalHoldout": "unavailable"
+  }
+}

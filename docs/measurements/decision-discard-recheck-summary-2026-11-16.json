@@ -1,0 +1,69 @@
+{
+  "device-replay": {
+    "report": "decision-discard-device-replay-results-2026-11-16.json",
+    "sha256": "af05de3aa9f94eae51629c28f5feba205ddc3843838537190dff963f6a6ed95b",
+    "sourcesUnchanged": true,
+    "groups": {
+      "current": {
+        "count": 12,
+        "correct": 0,
+        "predictions": {
+          "discard": 12
+        },
+        "falseDiscard": 12,
+        "errors": 0,
+        "tokenMin": 285,
+        "tokenMax": 313
+      },
+      "archived_candidate": {
+        "count": 12,
+        "correct": 5,
+        "predictions": {
+          "enqueue": 4,
+          "discard": 3,
+          "interrupt": 3,
+          "continue_listening": 2
+        },
+        "falseDiscard": 3,
+        "errors": 0,
+        "tokenMin": 290,
+        "tokenMax": 318
+      }
+    }
+  },
+  "holdout-recheck": {
+    "report": "decision-discard-holdout-recheck-results-2026-11-16.json",
+    "sha256": "48636e30928903772a21e90c5fc162f0a1f84523d7a2c0944a154258dbfc6b23",
+    "sourcesUnchanged": true,
+    "groups": {
+      "current": {
+        "count": 48,
+        "correct": 13,
+        "predictions": {
+          "discard": 35,
+          "interrupt": 6,
+          "enqueue": 4,
+          "continue_listening": 3
+        },
+        "falseDiscard": 31,
+        "errors": 0,
+        "tokenMin": 283,
+        "tokenMax": 295
+      },
+      "archived_candidate": {
+        "count": 48,
+        "correct": 29,
+        "predictions": {
+          "enqueue": 10,
+          "continue_listening": 25,
+          "discard": 7,
+          "interrupt": 6
+        },
+        "falseDiscard": 3,
+        "errors": 0,
+        "tokenMin": 288,
+        "tokenMax": 300
+      }
+    }
+  }
+}

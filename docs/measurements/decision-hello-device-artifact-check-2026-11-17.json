@@ -1,0 +1,78 @@
+{
+  "receipt": {
+    "files": [
+      {
+        "path": "LICENSE",
+        "bytes": 11357
+      },
+      {
+        "path": "NOTICE",
+        "bytes": 895
+      },
+      {
+        "path": "chat_template.jinja",
+        "bytes": 7755
+      },
+      {
+        "path": "decision.aimodel/main.hash",
+        "bytes": 32
+      },
+      {
+        "path": "decision.aimodel/main.mlirb",
+        "bytes": 990262410
+      },
+      {
+        "path": "decision.aimodel/metadata.json",
+        "bytes": 105
+      },
+      {
+        "path": "decision_config.json",
+        "bytes": 5504
+      },
+      {
+        "path": "manifest.json",
+        "bytes": 942
+      },
+      {
+        "path": "merges.txt",
+        "bytes": 3353259
+      },
+      {
+        "path": "tokenizer.json",
+        "bytes": 12807982
+      },
+      {
+        "path": "tokenizer_config.json",
+        "bytes": 16709
+      },
+      {
+        "path": "vocab.json",
+        "bytes": 6722759
+      }
+    ],
+    "revision": "0690c04ee1640c1c3fa11a882323751dda6d086a",
+    "id": "d3-edge"
+  },
+  "files": {
+    "decision.aimodel/main.mlirb": {
+      "deviceSHA256": "ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78",
+      "macSHA256": "ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78",
+      "matches": true
+    },
+    "manifest.json": {
+      "deviceSHA256": "b0b63b4d97b1eabc6c3f748b4f0f41ca19d25f9a7b025d55a1cf8eb27c70f81b",
+      "macSHA256": "b0b63b4d97b1eabc6c3f748b4f0f41ca19d25f9a7b025d55a1cf8eb27c70f81b",
+      "matches": true
+    },
+    "decision_config.json": {
+      "deviceSHA256": "30b6095b945d5a93697868afdf9be9123ea892085fbaff3078112c48da20dc6b",
+      "macSHA256": "30b6095b945d5a93697868afdf9be9123ea892085fbaff3078112c48da20dc6b",
+      "matches": true
+    },
+    "decision.aimodel/main.hash": {
+      "deviceSHA256": "99b7ef485a3ceb55de8aaff92a4f3732105ac84d41bba1065196f8dd336f1d4e",
+      "macSHA256": "99b7ef485a3ceb55de8aaff92a4f3732105ac84d41bba1065196f8dd336f1d4e",
+      "matches": true
+    }
+  }
+}

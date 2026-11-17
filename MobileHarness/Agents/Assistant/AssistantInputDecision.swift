@@ -61,7 +61,6 @@ public struct InputDecisionSnapshot: Sendable {
     public let allowsContinueListening: Bool
     let canHoldTranscript: Bool
     public var occupied: Bool { running || playing == true }
-    public var protectsAnswer: Bool { question != nil }
     public let receivedAt: ContinuousClock.Instant
     public init(
         input: AgentInput, text: String, running: Bool, playing: Bool? = nil, history: Exchange? = nil,
@@ -82,6 +81,7 @@ public struct InputDecisionSnapshot: Sendable {
     }
 
     struct Prompt: Sendable {
+        let jevState: String
         let background: String
         let latest: String
         let context: InferenceContext
@@ -127,18 +127,19 @@ public struct InputDecisionSnapshot: Sendable {
             [
                 "input": quote(text)
             ])
+        let jevFields = [
+            "\"utterance\":" + (try quote(text)),
+            "\"assistant_busy\":" + (occupied ? "true" : "false"),
+        ]
+        let jevState = "{" + jevFields.joined(separator: ",") + "}"
         return .init(
-            background: definitions + "\n\n" + state + "\n\n" + context, latest: latest,
+            jevState: jevState, background: definitions + "\n\n" + state + "\n\n" + context, latest: latest,
             context: .init(requestID: input.id + ".decision", scopeID: input.sessionID), choices: choices)
     }
 }
 
 /// Root-owned bounded classification and cleanup. A timeout retires its result, not its native resource.
 public actor AssistantInputDecision {
-    private enum TranscriptContent {
-        case possibleSpeech, filler, noise
-    }
-
     private let localModel: @Sendable (String) -> (any ModelDecisionProviding)?
     private let localChatModel: @Sendable (String) async throws -> any ChatCapability
     private var activeLocalID: String?
@@ -278,8 +279,7 @@ public actor AssistantInputDecision {
         func fallback(_ reason: String, failure: InputDecisionOutcome.Failure? = nil) -> InputDecisionOutcome {
             .init(
                 route: .fallback, modelResult: nil,
-                adopted: snapshot.allowsContinueListening && Self.transcriptContent(snapshot) == .noise
-                    ? .discard : .enqueue, reason: reason,
+                adopted: .enqueue, reason: reason,
                 requests: requests.withLock { $0 }, failure: failure, modelName: selectedModelName.withLock { $0 })
         }
         guard !stopped, !Task.isCancelled else { return fallback("Classification cancelled") }
@@ -446,24 +446,15 @@ public actor AssistantInputDecision {
         _ action: InputDisposition, route: InputDecisionOutcome.Route, snapshot: InputDecisionSnapshot,
         requests: [String], modelName: String?
     ) -> InputDecisionOutcome {
-        let content = Self.transcriptContent(snapshot)
         let adopted: InputDisposition
         let reason: String?
-        switch (action, content) {
-        case (_, .noise):
-            adopted = .discard
-            reason = action == .discard ? nil : "Transcript contains only noise markers or has no usable text"
-        case (.discard, .possibleSpeech):
-            adopted = .enqueue
-            reason =
-                snapshot.protectsAnswer
-                ? "Retained a valid answer to the current interaction" : "Retained potentially useful input"
-        case (.interrupt, _) where !snapshot.occupied:
+        switch action {
+        case .interrupt where !snapshot.occupied:
             adopted = .enqueue
             reason = "No active reply to interrupt"
-        case (.continueListening, _) where !snapshot.canHoldTranscript:
-            adopted = .discard
-            reason = "Continuation buffer reached its limit"
+        case .continueListening where !snapshot.canHoldTranscript:
+            adopted = .enqueue
+            reason = "Continuation buffer reached its limit; queued the combined input"
         default:
             adopted = action
             reason = nil
@@ -471,34 +462,6 @@ public actor AssistantInputDecision {
         return .init(
             route: route, modelResult: action, adopted: adopted, reason: reason,
             requests: requests, modelName: modelName)
-    }
-
-    private static func transcriptContent(_ snapshot: InputDecisionSnapshot) -> TranscriptContent {
-        guard !snapshot.protectsAnswer,
-            case .transcript(let transcript, final: true)? = snapshot.input.payload.perception
-        else { return .possibleSpeech }
-        let latest = snapshot.allowsContinueListening ? transcript : snapshot.text
-        let text = latest.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let noiseMarkers: Set<String> = [
-            "[noise]", "[background noise]", "[inaudible]", "[unintelligible]", "[music]", "[silence]",
-            "[杂音]", "[噪声]", "[噪音]", "[听不清]", "[音乐]", "（杂音）", "（噪声）", "（听不清）",
-        ]
-        let marker = text.trimmingCharacters(in: CharacterSet(charactersIn: ".。!！…"))
-        if noiseMarkers.contains(marker) { return .noise }
-
-        func hasQuestionMark(_ value: String) -> Bool { value.contains("?") || value.contains("？") }
-        guard !hasQuestionMark(text) else { return .possibleSpeech }
-        let separators = CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters)
-            .union(CharacterSet(charactersIn: "�"))
-        let words = text.components(separatedBy: separators).filter { !$0.isEmpty }
-        if words.isEmpty { return .noise }
-        guard !hasQuestionMark(snapshot.history?.assistant ?? "") else { return .possibleSpeech }
-
-        let englishFillers: Set<String> = ["ah", "eh", "er", "hm", "hmm", "mm", "mmm", "oh", "uh", "um", "umm"]
-        let isFiller = words.allSatisfy { word in
-            englishFillers.contains(word) || word.allSatisfy { "嗯啊呃唔哦唉欸哎".contains($0) }
-        }
-        return isFiller ? .filler : .possibleSpeech
     }
 
     private func race(

@@ -1,0 +1,482 @@
+{
+  "report": "decision-prompt-optimization-refined-results-2026-11-16.json",
+  "reportSHA256": "01e27f7e92f07bf640e83ae78b632277d620f34cdc1f10e956a1883b7004e74e",
+  "groups": {
+    "explicit_gap": {
+      "all": {
+        "count": 182,
+        "correct": 100,
+        "macroF1": 0.5732916613385709,
+        "continueRecall": 0.7291666666666666,
+        "continuePrecision": 0.4375,
+        "continueTP": 35,
+        "expectedContinue": 48,
+        "falseContinue": 45,
+        "falseInterrupt": 10,
+        "falseDiscard": 18,
+        "invalid": 0,
+        "tokensMin": 358,
+        "tokensMax": 379,
+        "p50MS": 256.436083,
+        "p95MS": 280.71425,
+        "over250MS": 146,
+        "matrix": {
+          "interrupt": {
+            "interrupt": 17,
+            "discard": 4,
+            "continue_listening": 5
+          },
+          "discard": {
+            "discard": 15,
+            "continue_listening": 1
+          },
+          "enqueue": {
+            "enqueue": 33,
+            "discard": 10,
+            "interrupt": 10,
+            "continue_listening": 39
+          },
+          "continue_listening": {
+            "continue_listening": 35,
+            "discard": 4,
+            "enqueue": 9
+          }
+        }
+      },
+      "en": {
+        "count": 91,
+        "correct": 53,
+        "macroF1": 0.623626893939394,
+        "continueRecall": 0.7916666666666666,
+        "continuePrecision": 0.4523809523809524,
+        "continueTP": 19,
+        "expectedContinue": 24,
+        "falseContinue": 23,
+        "falseInterrupt": 7,
+        "falseDiscard": 5,
+        "invalid": 0,
+        "tokensMin": 358,
+        "tokensMax": 379,
+        "p50MS": 256.111125,
+        "p95MS": 279.150375,
+        "over250MS": 66,
+        "matrix": {
+          "interrupt": {
+            "interrupt": 12,
+            "continue_listening": 1
+          },
+          "discard": {
+            "discard": 7,
+            "continue_listening": 1
+          },
+          "enqueue": {
+            "enqueue": 15,
+            "interrupt": 7,
+            "discard": 3,
+            "continue_listening": 21
+          },
+          "continue_listening": {
+            "continue_listening": 19,
+            "enqueue": 3,
+            "discard": 2
+          }
+        }
+      },
+      "zh-Hans": {
+        "count": 91,
+        "correct": 47,
+        "macroF1": 0.5145823401663223,
+        "continueRecall": 0.6666666666666666,
+        "continuePrecision": 0.42105263157894735,
+        "continueTP": 16,
+        "expectedContinue": 24,
+        "falseContinue": 22,
+        "falseInterrupt": 3,
+        "falseDiscard": 13,
+        "invalid": 0,
+        "tokensMin": 358,
+        "tokensMax": 378,
+        "p50MS": 256.627375,
+        "p95MS": 281.819166,
+        "over250MS": 80,
+        "matrix": {
+          "interrupt": {
+            "interrupt": 5,
+            "discard": 4,
+            "continue_listening": 4
+          },
+          "discard": {
+            "discard": 8
+          },
+          "enqueue": {
+            "enqueue": 18,
+            "discard": 7,
+            "continue_listening": 18,
+            "interrupt": 3
+          },
+          "continue_listening": {
+            "continue_listening": 16,
+            "discard": 2,
+            "enqueue": 6
+          }
+        }
+      }
+    },
+    "minimal_state": {
+      "all": {
+        "count": 182,
+        "correct": 99,
+        "macroF1": 0.5571409762680622,
+        "continueRecall": 0.8125,
+        "continuePrecision": 0.4588235294117647,
+        "continueTP": 39,
+        "expectedContinue": 48,
+        "falseContinue": 46,
+        "falseInterrupt": 10,
+        "falseDiscard": 24,
+        "invalid": 0,
+        "tokensMin": 341,
+        "tokensMax": 355,
+        "p50MS": 254.854125,
+        "p95MS": 287.805,
+        "over250MS": 136,
+        "matrix": {
+          "interrupt": {
+            "interrupt": 16,
+            "continue_listening": 6,
+            "discard": 4
+          },
+          "discard": {
+            "discard": 16
+          },
+          "enqueue": {
+            "enqueue": 28,
+            "discard": 14,
+            "interrupt": 10,
+            "continue_listening": 40
+          },
+          "continue_listening": {
+            "continue_listening": 39,
+            "discard": 6,
+            "enqueue": 3
+          }
+        }
+      },
+      "en": {
+        "count": 91,
+        "correct": 53,
+        "macroF1": 0.6103552713811836,
+        "continueRecall": 0.8333333333333334,
+        "continuePrecision": 0.47619047619047616,
+        "continueTP": 20,
+        "expectedContinue": 24,
+        "falseContinue": 22,
+        "falseInterrupt": 7,
+        "falseDiscard": 8,
+        "invalid": 0,
+        "tokensMin": 341,
+        "tokensMax": 355,
+        "p50MS": 254.629625,
+        "p95MS": 279.445416,
+        "over250MS": 68,
+        "matrix": {
+          "interrupt": {
+            "interrupt": 11,
+            "discard": 1,
+            "continue_listening": 1
+          },
+          "discard": {
+            "discard": 8
+          },
+          "enqueue": {
+            "enqueue": 14,
+            "interrupt": 7,
+            "continue_listening": 21,
+            "discard": 4
+          },
+          "continue_listening": {
+            "continue_listening": 20,
+            "discard": 3,
+            "enqueue": 1
+          }
+        }
+      },
+      "zh-Hans": {
+        "count": 91,
+        "correct": 46,
+        "macroF1": 0.49874188963019006,
+        "continueRecall": 0.7916666666666666,
+        "continuePrecision": 0.4418604651162791,
+        "continueTP": 19,
+        "expectedContinue": 24,
+        "falseContinue": 24,
+        "falseInterrupt": 3,
+        "falseDiscard": 16,
+        "invalid": 0,
+        "tokensMin": 341,
+        "tokensMax": 353,
+        "p50MS": 255.885458,
+        "p95MS": 290.247167,
+        "over250MS": 68,
+        "matrix": {
+          "interrupt": {
+            "interrupt": 5,
+            "continue_listening": 5,
+            "discard": 3
+          },
+          "discard": {
+            "discard": 8
+          },
+          "enqueue": {
+            "enqueue": 14,
+            "discard": 10,
+            "continue_listening": 19,
+            "interrupt": 3
+          },
+          "continue_listening": {
+            "discard": 3,
+            "continue_listening": 19,
+            "enqueue": 2
+          }
+        }
+      }
+    },
+    "unfinished_first": {
+      "all": {
+        "count": 182,
+        "correct": 99,
+        "macroF1": 0.5832651114698522,
+        "continueRecall": 0.75,
+        "continuePrecision": 0.4235294117647059,
+        "continueTP": 36,
+        "expectedContinue": 48,
+        "falseContinue": 49,
+        "falseInterrupt": 10,
+        "falseDiscard": 14,
+        "invalid": 0,
+        "tokensMin": 288,
+        "tokensMax": 309,
+        "p50MS": 255.162292,
+        "p95MS": 280.14,
+        "over250MS": 129,
+        "matrix": {
+          "interrupt": {
+            "interrupt": 17,
+            "continue_listening": 6,
+            "discard": 3
+          },
+          "discard": {
+            "discard": 16
+          },
+          "enqueue": {
+            "enqueue": 30,
+            "discard": 9,
+            "interrupt": 10,
+            "continue_listening": 43
+          },
+          "continue_listening": {
+            "continue_listening": 36,
+            "discard": 2,
+            "enqueue": 10
+          }
+        }
+      },
+      "en": {
+        "count": 91,
+        "correct": 54,
+        "macroF1": 0.6530971857796986,
+        "continueRecall": 0.7916666666666666,
+        "continuePrecision": 0.4523809523809524,
+        "continueTP": 19,
+        "expectedContinue": 24,
+        "falseContinue": 23,
+        "falseInterrupt": 7,
+        "falseDiscard": 3,
+        "invalid": 0,
+        "tokensMin": 288,
+        "tokensMax": 309,
+        "p50MS": 255.776417,
+        "p95MS": 281.825708,
+        "over250MS": 66,
+        "matrix": {
+          "interrupt": {
+            "interrupt": 11,
+            "continue_listening": 2
+          },
+          "discard": {
+            "discard": 8
+          },
+          "enqueue": {
+            "enqueue": 16,
+            "discard": 2,
+            "interrupt": 7,
+            "continue_listening": 21
+          },
+          "continue_listening": {
+            "continue_listening": 19,
+            "enqueue": 4,
+            "discard": 1
+          }
+        }
+      },
+      "zh-Hans": {
+        "count": 91,
+        "correct": 45,
+        "macroF1": 0.5174380622141816,
+        "continueRecall": 0.7083333333333334,
+        "continuePrecision": 0.3953488372093023,
+        "continueTP": 17,
+        "expectedContinue": 24,
+        "falseContinue": 26,
+        "falseInterrupt": 3,
+        "falseDiscard": 11,
+        "invalid": 0,
+        "tokensMin": 288,
+        "tokensMax": 308,
+        "p50MS": 254.223416,
+        "p95MS": 279.4305,
+        "over250MS": 63,
+        "matrix": {
+          "interrupt": {
+            "interrupt": 6,
+            "continue_listening": 4,
+            "discard": 3
+          },
+          "discard": {
+            "discard": 8
+          },
+          "enqueue": {
+            "enqueue": 14,
+            "discard": 7,
+            "continue_listening": 22,
+            "interrupt": 3
+          },
+          "continue_listening": {
+            "continue_listening": 17,
+            "discard": 1,
+            "enqueue": 6
+          }
+        }
+      }
+    },
+    "utterance_status": {
+      "all": {
+        "count": 182,
+        "correct": 113,
+        "macroF1": 0.6252412289555492,
+        "continueRecall": 0.4791666666666667,
+        "continuePrecision": 0.5111111111111111,
+        "continueTP": 23,
+        "expectedContinue": 48,
+        "falseContinue": 22,
+        "falseInterrupt": 10,
+        "falseDiscard": 15,
+        "invalid": 0,
+        "tokensMin": 288,
+        "tokensMax": 309,
+        "p50MS": 255.037583,
+        "p95MS": 287.762583,
+        "over250MS": 126,
+        "matrix": {
+          "interrupt": {
+            "interrupt": 18,
+            "discard": 3,
+            "continue_listening": 4,
+            "enqueue": 1
+          },
+          "discard": {
+            "discard": 16
+          },
+          "enqueue": {
+            "enqueue": 56,
+            "discard": 8,
+            "interrupt": 10,
+            "continue_listening": 18
+          },
+          "continue_listening": {
+            "continue_listening": 23,
+            "enqueue": 21,
+            "discard": 4
+          }
+        }
+      },
+      "en": {
+        "count": 91,
+        "correct": 63,
+        "macroF1": 0.7064935064935065,
+        "continueRecall": 0.5,
+        "continuePrecision": 0.6666666666666666,
+        "continueTP": 12,
+        "expectedContinue": 24,
+        "falseContinue": 6,
+        "falseInterrupt": 7,
+        "falseDiscard": 4,
+        "invalid": 0,
+        "tokensMin": 288,
+        "tokensMax": 309,
+        "p50MS": 255.391833,
+        "p95MS": 287.762583,
+        "over250MS": 63,
+        "matrix": {
+          "interrupt": {
+            "interrupt": 12,
+            "enqueue": 1
+          },
+          "discard": {
+            "discard": 8
+          },
+          "enqueue": {
+            "enqueue": 31,
+            "interrupt": 7,
+            "discard": 2,
+            "continue_listening": 6
+          },
+          "continue_listening": {
+            "continue_listening": 12,
+            "enqueue": 10,
+            "discard": 2
+          }
+        }
+      },
+      "zh-Hans": {
+        "count": 91,
+        "correct": 50,
+        "macroF1": 0.5447939461569303,
+        "continueRecall": 0.4583333333333333,
+        "continuePrecision": 0.4074074074074074,
+        "continueTP": 11,
+        "expectedContinue": 24,
+        "falseContinue": 16,
+        "falseInterrupt": 3,
+        "falseDiscard": 11,
+        "invalid": 0,
+        "tokensMin": 288,
+        "tokensMax": 308,
+        "p50MS": 255.037583,
+        "p95MS": 288.039292,
+        "over250MS": 63,
+        "matrix": {
+          "interrupt": {
+            "interrupt": 6,
+            "discard": 3,
+            "continue_listening": 4
+          },
+          "discard": {
+            "discard": 8
+          },
+          "enqueue": {
+            "enqueue": 25,
+            "discard": 6,
+            "continue_listening": 12,
+            "interrupt": 3
+          },
+          "continue_listening": {
+            "continue_listening": 11,
+            "enqueue": 11,
+            "discard": 2
+          }
+        }
+      }
+    }
+  }
+}

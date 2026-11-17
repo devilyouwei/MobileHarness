@@ -470,13 +470,22 @@ private actor ResumableHubFixture: ModelArtifactDownloader {
     }
 }
 
-@Test func productionDecisionCatalogSelectsCompiledFilesOnlyForPublishedArchitecture() throws {
+@Test func productionDecisionCatalogUsesEdgeSourceAndLiteCompiledVariant() throws {
     let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent().appendingPathComponent("MobileHarness/Resources/Models/model-catalog.json")
     let catalog = try ModelArtifactCatalog.read(url)
     let compiled = try catalog.resolvingArchitecture("h18p")
     let source = try catalog.resolvingArchitecture(nil)
-    for id in ["d3-edge", "d3-lite"] {
+    let edge = try #require(compiled.packages.first { $0.id == "d3-edge" })
+    let macEdge = try #require(source.packages.first { $0.id == "d3-edge" })
+    #expect(edge.revision == macEdge.revision)
+    #expect(edge.source.revision == "0690c04ee1640c1c3fa11a882323751dda6d086a")
+    #expect(edge.source.repoId == "hugging-mac/d3-edge-CoreAI")
+    #expect(edge.source.stripPrefix == nil)
+    #expect(edge.requiredFiles == macEdge.requiredFiles)
+    #expect(edge.requiredFiles.contains("decision.aimodel/main.mlirb"))
+    #expect(!edge.requiredFiles.contains { $0.contains("aimodelc") })
+    for id in ["d3-lite"] {
         let device = try #require(compiled.packages.first { $0.id == id })
         let original = try #require(source.packages.first { $0.id == id })
         #expect(device.revision != original.revision)

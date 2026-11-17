@@ -1,0 +1,3560 @@
+{
+  "sourceHashes": {
+    "MobileHarness/Resources/Agents/Assistant/InputDecision.json": "d7424a471f4ce34c64fc884125540e560ee55b9d78cacfcc6a6dfa1b1b56acf8",
+    "MobileHarness/Agents/Assistant/AssistantDecisionProtocol.swift": "aa09fcc9f931facd83ea4893fce9f59a74e1f5f9e03df2649c43d9ccdd9648a8",
+    "MobileHarness/ModelKit/Language/JEV/D3Decision.swift": "3f73d47f20b6553e51cbd6883a7823c7a7c9f5224fe37b38c52d77bfe73cec42",
+    "Tests/IntegrationTests/DecisionPromptOptimizationTests.swift": "24a7a3087556274c640bd7445699fa4777bd4a57bb884561929949bcec8d7e5f",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/tokenizer_config.json": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/NOTICE": "2326c866dd82edf02dea680cc5e7a15df89a6f2a98feb93f04377d03bd8ad56e",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/chat_template.jinja": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/manifest.json": "b0b63b4d97b1eabc6c3f748b4f0f41ca19d25f9a7b025d55a1cf8eb27c70f81b",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision_config.json": "30b6095b945d5a93697868afdf9be9123ea892085fbaff3078112c48da20dc6b",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision.aimodel/metadata.json": "723a13872446d6e5d3bb147752d58b612909259dfe35fb7a39fc4c603c3b53f2",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision.aimodel/main.mlirb": "ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision.aimodel/main.hash": "99b7ef485a3ceb55de8aaff92a4f3732105ac84d41bba1065196f8dd336f1d4e",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/aot-build.json": "2906935260906afb85b50aaae013366b659d271d4f78a9919f1ebf5bf3a0d5b1",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/tokenizer_config.json": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/NOTICE": "2326c866dd82edf02dea680cc5e7a15df89a6f2a98feb93f04377d03bd8ad56e",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/chat_template.jinja": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/manifest.json": "955d754e288ed5eae86f9f84023f3ae25b80bc6e6f29a03c0a7d867ad0acea7d",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/decision_config.json": "30b6095b945d5a93697868afdf9be9123ea892085fbaff3078112c48da20dc6b",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/decision.h18p.aimodelc/main-h18p.mlirb": "7c798c02307a758ba4f792b1f50b3af0804d693b4e839e061ed48b88ab84a4bd",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/decision.h18p.aimodelc/metadata.json": "2fb1b49b2128701c399033365494306f152cc265af080711df51550e5d10818f",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/decision.h18p.aimodelc/stats.json": "01f827e5440404c841bd23537d6dbb4e9073f4c4476bb05d36494d151945f858",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/decision.h18p.aimodelc/main.hash": "99b7ef485a3ceb55de8aaff92a4f3732105ac84d41bba1065196f8dd336f1d4e",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/manifest.plist": "245bb2104ca0a5df9bfb91e49f2bf11b2f7a98cbb17c3510c52bc3653c1e9f6c",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/specialized_model_1.mpsgraph": "575d53c4d9422814b883bf28bbebafd221ede78f17a4bce8062eddeb3372afb1",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/original_model_0.mpsgraph": "9f18f220bbc3c91ca611db86eba8d7cd47de3635f780d37b14cfe725c66f9a58",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/resources.bin": "800f4a0462c48809a09b88e6a99013b1d2be7b5646b6fee53361530ec8e225c5"
+  },
+  "rows": [
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-alarm-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "Wake me on Monday at",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Wake me on Monday at\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-alarm-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "Wake me on Monday at",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Wake me on Monday at\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-alarm-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "周一叫醒我，时间定在",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"周一叫醒我，时间定在\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-alarm-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "周一叫醒我，时间定在",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"周一叫醒我，时间定在\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-alarm-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "six thirty.",
+        "held": [
+          "Wake me on Monday at"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Wake me on Monday at\\nsix thirty.\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-alarm-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "six thirty.",
+        "held": [
+          "Wake me on Monday at"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Wake me on Monday at\\nsix thirty.\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-alarm-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "六点半。",
+        "held": [
+          "周一叫醒我，时间定在"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"周一叫醒我，时间定在\\n六点半。\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-alarm-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "六点半。",
+        "held": [
+          "周一叫醒我，时间定在"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"周一叫醒我，时间定在\\n六点半。\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-brightness-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "Change the brightness to",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Change the brightness to\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-brightness-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "Change the brightness to",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Change the brightness to\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-brightness-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "把亮度调成",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"把亮度调成\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-brightness-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "把亮度调成",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"把亮度调成\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-brightness-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "twenty percent.",
+        "held": [
+          "Change the brightness to"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Change the brightness to\\ntwenty percent.\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-brightness-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "twenty percent.",
+        "held": [
+          "Change the brightness to"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Change the brightness to\\ntwenty percent.\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-brightness-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "百分之二十。",
+        "held": [
+          "把亮度调成"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"把亮度调成\\n百分之二十。\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-brightness-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "百分之二十。",
+        "held": [
+          "把亮度调成"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"把亮度调成\\n百分之二十。\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-attachment-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "Attach the",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Attach the\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-attachment-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "Attach the",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Attach the\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-attachment-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "附上那份",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"附上那份\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-attachment-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "附上那份",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"附上那份\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-attachment-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "budget spreadsheet.",
+        "held": [
+          "Attach the"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Attach the\\nbudget spreadsheet.\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-attachment-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "budget spreadsheet.",
+        "held": [
+          "Attach the"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Attach the\\nbudget spreadsheet.\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-attachment-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "预算表。",
+        "held": [
+          "附上那份"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"附上那份\\n预算表。\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-attachment-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "预算表。",
+        "held": [
+          "附上那份"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"附上那份\\n预算表。\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-unless-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "Unless the shop is closed,",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Unless the shop is closed,\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-unless-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "Unless the shop is closed,",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Unless the shop is closed,\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-unless-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "除非商店关门了，否则",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"除非商店关门了，否则\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-unless-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "除非商店关门了，否则",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"除非商店关门了，否则\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-unless-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "remind me to buy bread.",
+        "held": [
+          "Unless the shop is closed,"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Unless the shop is closed,\\nremind me to buy bread.\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-unless-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "remind me to buy bread.",
+        "held": [
+          "Unless the shop is closed,"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Unless the shop is closed,\\nremind me to buy bread.\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-unless-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "提醒我买面包。",
+        "held": [
+          "除非商店关门了，否则"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"除非商店关门了，否则\\n提醒我买面包。\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-unless-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "提醒我买面包。",
+        "held": [
+          "除非商店关门了，否则"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"除非商店关门了，否则\\n提醒我买面包。\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-route-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "Show the route from the museum to",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Show the route from the museum to\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-route-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "Show the route from the museum to",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Show the route from the museum to\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-route-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "显示从博物馆到",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"显示从博物馆到\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-route-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "显示从博物馆到",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"显示从博物馆到\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-route-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "the library.",
+        "held": [
+          "Show the route from the museum to"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Show the route from the museum to\\nthe library.\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-route-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "the library.",
+        "held": [
+          "Show the route from the museum to"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Show the route from the museum to\\nthe library.\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-route-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "图书馆的路线。",
+        "held": [
+          "显示从博物馆到"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"显示从博物馆到\\n图书馆的路线。\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-route-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "图书馆的路线。",
+        "held": [
+          "显示从博物馆到"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"显示从博物馆到\\n图书馆的路线。\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-rewrite-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "Rewrite the last sentence as",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Rewrite the last sentence as\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-rewrite-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "Rewrite the last sentence as",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Rewrite the last sentence as\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-rewrite-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "把最后一句改为",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"把最后一句改为\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-rewrite-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "把最后一句改为",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"把最后一句改为\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-rewrite-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "See you next week.",
+        "held": [
+          "Rewrite the last sentence as"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Rewrite the last sentence as\\nSee you next week.\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-rewrite-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "See you next week.",
+        "held": [
+          "Rewrite the last sentence as"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Rewrite the last sentence as\\nSee you next week.\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-rewrite-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "下周见。",
+        "held": [
+          "把最后一句改为"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"把最后一句改为\\n下周见。\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-rewrite-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "下周见。",
+        "held": [
+          "把最后一句改为"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"把最后一句改为\\n下周见。\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-list-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "Pack socks, shoes, and",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Pack socks, shoes, and\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-list-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "Pack socks, shoes, and",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Pack socks, shoes, and\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-list-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "打包袜子、鞋子，还有",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"打包袜子、鞋子，还有\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-list-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "打包袜子、鞋子，还有",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"打包袜子、鞋子，还有\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-list-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "a jacket.",
+        "held": [
+          "Pack socks, shoes, and"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Pack socks, shoes, and\\na jacket.\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-list-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "a jacket.",
+        "held": [
+          "Pack socks, shoes, and"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Pack socks, shoes, and\\na jacket.\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-list-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "一件夹克。",
+        "held": [
+          "打包袜子、鞋子，还有"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"打包袜子、鞋子，还有\\n一件夹克。\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-list-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "一件夹克。",
+        "held": [
+          "打包袜子、鞋子，还有"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"打包袜子、鞋子，还有\\n一件夹克。\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-purpose-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "I need a note that says",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"I need a note that says\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-purpose-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "I need a note that says",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"I need a note that says\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-purpose-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "我需要一张便条，上面写",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"我需要一张便条，上面写\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-purpose-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "我需要一张便条，上面写",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"我需要一张便条，上面写\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-purpose-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "Please close the door.",
+        "held": [
+          "I need a note that says"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"I need a note that says\\nPlease close the door.\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-purpose-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "Please close the door.",
+        "held": [
+          "I need a note that says"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"I need a note that says\\nPlease close the door.\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-purpose-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "请关门。",
+        "held": [
+          "我需要一张便条，上面写"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"我需要一张便条，上面写\\n请关门。\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-purpose-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "请关门。",
+        "held": [
+          "我需要一张便条，上面写"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"我需要一张便条，上面写\\n请关门。\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-short-answer-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "The smaller one.",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": "Which size?"
+      },
+      "request": {
+        "text": "{\"utterance\":\"The smaller one.\",\"assistant_busy\":false,\"question_to_user\":\"Which size?\",\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-short-answer-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "The smaller one.",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": "Which size?"
+      },
+      "request": {
+        "text": "{\"utterance\":\"The smaller one.\",\"assistant_busy\":false,\"question_to_user\":\"Which size?\",\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-short-answer-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "小的那个。",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": "哪种尺寸？"
+      },
+      "request": {
+        "text": "{\"utterance\":\"小的那个。\",\"assistant_busy\":false,\"question_to_user\":\"哪种尺寸？\",\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-short-answer-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "小的那个。",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": "哪种尺寸？"
+      },
+      "request": {
+        "text": "{\"utterance\":\"小的那个。\",\"assistant_busy\":false,\"question_to_user\":\"哪种尺寸？\",\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-short-command-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "Take a selfie.",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Take a selfie.\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-short-command-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "Take a selfie.",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Take a selfie.\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-short-command-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "拍张自拍。",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"拍张自拍。\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-short-command-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "拍张自拍。",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"拍张自拍。\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-stop-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "interrupt",
+        "expectedAdopted": "interrupt",
+        "running": true,
+        "playing": true,
+        "latest": "Be quiet now.",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Be quiet now.\",\"assistant_busy\":true,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-stop-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "interrupt",
+        "expectedAdopted": "interrupt",
+        "running": true,
+        "playing": true,
+        "latest": "Be quiet now.",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Be quiet now.\",\"assistant_busy\":true,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-stop-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "interrupt",
+        "expectedAdopted": "interrupt",
+        "running": true,
+        "playing": true,
+        "latest": "现在别出声了。",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"现在别出声了。\",\"assistant_busy\":true,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-stop-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "interrupt",
+        "expectedAdopted": "interrupt",
+        "running": true,
+        "playing": true,
+        "latest": "现在别出声了。",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"现在别出声了。\",\"assistant_busy\":true,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-switch-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "interrupt",
+        "expectedAdopted": "interrupt",
+        "running": true,
+        "playing": true,
+        "latest": "Stop this and read my calendar instead.",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Stop this and read my calendar instead.\",\"assistant_busy\":true,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-switch-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "interrupt",
+        "expectedAdopted": "interrupt",
+        "running": true,
+        "playing": true,
+        "latest": "Stop this and read my calendar instead.",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Stop this and read my calendar instead.\",\"assistant_busy\":true,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-switch-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "interrupt",
+        "expectedAdopted": "interrupt",
+        "running": true,
+        "playing": true,
+        "latest": "先停下，改读我的日历。",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"先停下，改读我的日历。\",\"assistant_busy\":true,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-switch-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "interrupt",
+        "expectedAdopted": "interrupt",
+        "running": true,
+        "playing": true,
+        "latest": "先停下，改读我的日历。",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"先停下，改读我的日历。\",\"assistant_busy\":true,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-negated-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": true,
+        "playing": true,
+        "latest": "Keep going, do not stop.",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Keep going, do not stop.\",\"assistant_busy\":true,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-negated-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": true,
+        "playing": true,
+        "latest": "Keep going, do not stop.",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Keep going, do not stop.\",\"assistant_busy\":true,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-negated-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": true,
+        "playing": true,
+        "latest": "接着说，不要停。",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"接着说，不要停。\",\"assistant_busy\":true,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-negated-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": true,
+        "playing": true,
+        "latest": "接着说，不要停。",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"接着说，不要停。\",\"assistant_busy\":true,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-quoted-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": true,
+        "playing": true,
+        "latest": "Write the words stop now.",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Write the words stop now.\",\"assistant_busy\":true,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-quoted-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": true,
+        "playing": true,
+        "latest": "Write the words stop now.",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"Write the words stop now.\",\"assistant_busy\":true,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-quoted-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": true,
+        "playing": true,
+        "latest": "写下“现在停止”四个字。",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"写下“现在停止”四个字。\",\"assistant_busy\":true,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-quoted-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": true,
+        "playing": true,
+        "latest": "写下“现在停止”四个字。",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"写下“现在停止”四个字。\",\"assistant_busy\":true,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-noise-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "discard",
+        "expectedAdopted": "discard",
+        "running": false,
+        "playing": false,
+        "latest": "[inaudible]",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"[inaudible]\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-noise-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "discard",
+        "expectedAdopted": "discard",
+        "running": false,
+        "playing": false,
+        "latest": "[inaudible]",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"[inaudible]\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-noise-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "discard",
+        "expectedAdopted": "discard",
+        "running": false,
+        "playing": false,
+        "latest": "[听不清]",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"[听不清]\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-noise-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "discard",
+        "expectedAdopted": "discard",
+        "running": false,
+        "playing": false,
+        "latest": "[听不清]",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"[听不清]\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-filler-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "discard",
+        "expectedAdopted": "discard",
+        "running": false,
+        "playing": false,
+        "latest": "er",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"er\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-filler-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "discard",
+        "expectedAdopted": "discard",
+        "running": false,
+        "playing": false,
+        "latest": "er",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"er\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "archived_candidate",
+      "scenario": {
+        "id": "holdout-filler-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "discard",
+        "expectedAdopted": "discard",
+        "running": false,
+        "playing": false,
+        "latest": "呃",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"呃\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "current",
+      "scenario": {
+        "id": "holdout-filler-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "discard",
+        "expectedAdopted": "discard",
+        "running": false,
+        "playing": false,
+        "latest": "呃",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null
+      },
+      "request": {
+        "text": "{\"utterance\":\"呃\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    }
+  ]
+}

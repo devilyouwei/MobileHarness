@@ -1,0 +1,29 @@
+{
+  "status": "experimental-only; not approved for production; holdout false-continue rate remains high",
+  "variant": "utterance_status",
+  "model": "d3-edge",
+  "rulesLanguage": "en",
+  "inputLanguage": "preserve original",
+  "stateFields": {
+    "utterance": "All held fragments plus latest final transcript, joined by newline.",
+    "assistant_busy": "Boolean: running or playing.",
+    "question_to_user": "Current pending question, or null.",
+    "preceding_assistant": "Last 80 characters of preceding assistant reply, or null.",
+    "preceding_user": "Last 80 characters of preceding user utterance, or null.",
+    "queued_inputs": "At most three queued user excerpts, at most 80 characters each."
+  },
+  "question": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+  "criteria": {
+    "stop_request": "The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+    "non_speech": "The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+    "complete_utterance": "The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+    "unfinished_utterance": "The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+  },
+  "actionMapping": {
+    "stop_request": "interrupt",
+    "non_speech": "discard",
+    "complete_utterance": "enqueue",
+    "unfinished_utterance": "continue_listening"
+  },
+  "nativeFormat": "Preserve D3 system template, State / Question / Options and A/B/C/D answer-code readout; do not ask for generated JSON or explanation."
+}

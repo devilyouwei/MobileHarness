@@ -1,0 +1,201 @@
+{
+  "selectedVariant": "utterance_status",
+  "selectionRule": "highest pooled four-class development macro-F1, shorter token length breaks ties",
+  "development": {
+    "all": {
+      "count": 182,
+      "correct": 113,
+      "macroF1": 0.6252412289555492,
+      "continueRecall": 0.4791666666666667,
+      "continuePrecision": 0.5111111111111111,
+      "continueTP": 23,
+      "expectedContinue": 48,
+      "falseContinue": 22,
+      "falseInterrupt": 10,
+      "falseDiscard": 15,
+      "invalid": 0,
+      "tokensMin": 288,
+      "tokensMax": 309,
+      "p50MS": 255.037583,
+      "p95MS": 287.762583,
+      "over250MS": 126,
+      "matrix": {
+        "interrupt": {
+          "interrupt": 18,
+          "discard": 3,
+          "continue_listening": 4,
+          "enqueue": 1
+        },
+        "discard": {
+          "discard": 16
+        },
+        "enqueue": {
+          "enqueue": 56,
+          "discard": 8,
+          "interrupt": 10,
+          "continue_listening": 18
+        },
+        "continue_listening": {
+          "continue_listening": 23,
+          "enqueue": 21,
+          "discard": 4
+        }
+      }
+    },
+    "en": {
+      "count": 91,
+      "correct": 63,
+      "macroF1": 0.7064935064935065,
+      "continueRecall": 0.5,
+      "continuePrecision": 0.6666666666666666,
+      "continueTP": 12,
+      "expectedContinue": 24,
+      "falseContinue": 6,
+      "falseInterrupt": 7,
+      "falseDiscard": 4,
+      "invalid": 0,
+      "tokensMin": 288,
+      "tokensMax": 309,
+      "p50MS": 255.391833,
+      "p95MS": 287.762583,
+      "over250MS": 63,
+      "matrix": {
+        "interrupt": {
+          "interrupt": 12,
+          "enqueue": 1
+        },
+        "discard": {
+          "discard": 8
+        },
+        "enqueue": {
+          "enqueue": 31,
+          "interrupt": 7,
+          "discard": 2,
+          "continue_listening": 6
+        },
+        "continue_listening": {
+          "continue_listening": 12,
+          "enqueue": 10,
+          "discard": 2
+        }
+      }
+    },
+    "zh-Hans": {
+      "count": 91,
+      "correct": 50,
+      "macroF1": 0.5447939461569303,
+      "continueRecall": 0.4583333333333333,
+      "continuePrecision": 0.4074074074074074,
+      "continueTP": 11,
+      "expectedContinue": 24,
+      "falseContinue": 16,
+      "falseInterrupt": 3,
+      "falseDiscard": 11,
+      "invalid": 0,
+      "tokensMin": 288,
+      "tokensMax": 308,
+      "p50MS": 255.037583,
+      "p95MS": 288.039292,
+      "over250MS": 63,
+      "matrix": {
+        "interrupt": {
+          "interrupt": 6,
+          "discard": 3,
+          "continue_listening": 4
+        },
+        "discard": {
+          "discard": 8
+        },
+        "enqueue": {
+          "enqueue": 25,
+          "discard": 6,
+          "continue_listening": 12,
+          "interrupt": 3
+        },
+        "continue_listening": {
+          "continue_listening": 11,
+          "enqueue": 11,
+          "discard": 2
+        }
+      }
+    }
+  },
+  "holdoutSHA256": "6b7629f4f21c61929a2743c241258967ba20cfe54e725d002f88be45482c352f",
+  "summaryHashes": {
+    "decision-prompt-optimization-summary-2026-11-16.json": "063d579f5e6e9688776adc63406251b0589f35e3d2a44f598c43d5c1a90214ea",
+    "decision-prompt-optimization-refined-summary-2026-11-16.json": "0348d23b37102211d2b9caac03f8b7ae190e89df60b2093eda65e3e47fab7ec9"
+  },
+  "examples": [
+    {
+      "variant": "utterance_status",
+      "scenario": {
+        "assistant": "",
+        "buffer": [],
+        "canHold": true,
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "group": "unfinished",
+        "held": [],
+        "id": "request-verb-unfinished-en",
+        "language": "en",
+        "latest": "Please help me",
+        "playing": false,
+        "running": false,
+        "speech": true,
+        "user": ""
+      },
+      "request": {
+        "text": "{\"utterance\":\"Please help me\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "utterance_status",
+      "scenario": {
+        "assistant": "",
+        "buffer": [],
+        "canHold": true,
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "group": "unfinished",
+        "held": [],
+        "id": "request-verb-unfinished-zh-Hans",
+        "language": "zh-Hans",
+        "latest": "请帮我",
+        "playing": false,
+        "running": false,
+        "speech": true,
+        "user": ""
+      },
+      "request": {
+        "text": "{\"utterance\":\"请帮我\",\"assistant_busy\":false,\"question_to_user\":null,\"preceding_assistant\":null,\"preceding_user\":null,\"queued_inputs\":[]}",
+        "instructions": "Which description best matches the user utterance? It may contain several fragments of the SAME sentence joined by newlines. Use a question_to_user to interpret short answers. A stop request requires an assistant that is busy. Meaningful unfinished words are speech, not noise.",
+        "candidates": [
+          "stop_request: The user explicitly commands the currently busy assistant to stop now, correct its ongoing work, or immediately switch tasks.",
+          "non_speech: The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.",
+          "complete_utterance: The user has finished expressing a request, question, fact, or answer. The meaning is complete in context, even with very few words.",
+          "unfinished_utterance: The user has started meaningful speech but has not finished the sentence or thought. A required object, value or following clause is still absent."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    }
+  ],
+  "scope": "Experiment only. Not deployed. Holdout not yet run at selection time."
+}

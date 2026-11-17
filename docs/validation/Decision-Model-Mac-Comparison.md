@@ -1,5 +1,7 @@
 # Mac 本地 Decision 模型对照
 
+本报告记录 Mac 本地 Decision 多分类实验及相关验证。
+
 日期为 2026-11-11，设备为 Apple M5 Mac，macOS 27.2（26B123）。Python 3.13、coreai-core 1.0.0b3、PyTorch 2.14.0、Transformers 5.17.0、tokenizers 0.23.3。
 
 ## 方法
@@ -515,3 +517,313 @@ Edge热态范围198.44–234.35 ms；Lite为540.74–807.68 ms，54条均超过5
 导出20,984条CPU采样，其中20,828条（99.26%）包含ANECompiler／MPSToANECValidation；20,751条包含associateUnmaterializedOpIds。栈经过MPSGraph的ANERegionFormationPass、specializedModule和specializeWithDevice，正在进行MPS到ANE的转换/校验。它是运行中的编译计算热点，不是只凭UI文案推断的loading，也没有进入本次分类推理。与21:10–21:12的同进程留存报告相比，21:25现场仍处于ANE编译；两个采样窗口之间没有连续记录，不声称已证明同一循环始终未前进。
 
 这份证据将加载瓶颈进一步定位到ANE编译转换/校验，但无法单凭采样判定死循环、复杂度退化或具体系统编译器缺陷。后续需要保持制品一致的计算设备限制对照及数值验证；仅增加分类250ms预算不能解决尚未完成的模型加载。原始trace和XML留在/tmp；上述脱敏JSON已增加实时采样统计及符号栈。此前USB连接阻塞已经解除，历史失败记录保留。
+
+## D3 Edge 继续聆听四分类实验（2026-11-16）
+
+### 目的与冻结条件
+
+只测现有本机 D3 Edge，逐字使用最新 App 的 `InputDecisionSnapshot.prompt()` 和 `AssistantDecisionProtocol.JEV`，生产提示词、期限及采纳规则未改。旧 `DecisionLanguageEvaluationTests` 的快照未显式开启 `allowsContinueListening`，因此旧实验只有三候选，不能解释第四类的效果。本次语音请求均显式携带 `1/2/3/4`，D3 模板映射 `A/B/C/D`；键盘对照仍为三候选。
+
+主机为 Apple A18 Pro、8 GiB、macOS 27.2.1（26B131）。模型保持在 `Tests/DecisionBenchmarks/.local/models/D3Edge`，源 revision 为 `bee5e872f75b9c5d1405767bf244a6948b95c0af`，BF16 源图 SHA-256 为 `ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78`。制品文件及生产输入相关源码在运行前后核对一致。请求 token 数由同一 Swift Tokenizers 和制品模板计算，并验证记录请求与真实 D3 入参一致。
+
+### 样例与方法
+
+冻结194条合成快照，中英文各97条，按输入语言使用对应生产提示。每种语言含91条语义样例与6条独立探测：
+
+| 组 | 每种语言条数 | 用途 |
+| --- | ---: | --- |
+| 历史锚点 | 27 | 保留原双语实验标签，检测扩大候选后的表现；不是新提示的重新标注集 |
+| 应继续聆听 | 24 | 缺宾语、参数、条件后半句、连接词、混说、未完成更正及已有缓冲 |
+| 已补全片段 | 25 | 将持有片段与本次最终 ASR 用换行拼接，检查补全后是否正常处理 |
+| 完整短回答 | 5 | 肯定、否定、数量、选择、“嗯”等待答回答 |
+| 完整控制 | 8 | 停止、短暂停、新请求、补充、否定、引用及延后停止 |
+| 噪声／填充音 | 2 | 噪声与独立犹豫音 |
+| 采纳探测 | 2 | 有旧片段时的新噪声、持有空间不足 |
+| 键盘探测 | 1 | 相同短文本仍只提供三候选 |
+| 容量探测 | 3 | 历史、问题及三条缓冲填满后的长输入 |
+
+预期在推理前固定，未根据输出改标签。“别说了，改成”已含明确停止指令，预期打断而不是继续聆听。已补全对使用预设的持有上下文，是条件快照对照，不声称上一条真实预测一定进入持有状态。每个请求的 payload 只含本次最终转写，Decision text 才拼接旧片段，符合 App 的噪声检查路径。`canHoldTranscript`遵守三片段和640 UTF-8字节限制；没有模拟整个到达队列。
+
+两轮均串行，每语言预热三次。第一轮走真实 Assistant 分类器，包括250ms本地期限、2秒总期限、取消收尾及后置保护；第二轮逐字重放首轮的194条 DecisionRequest，仍用真实 D3 适配器但绕过 Assistant 截止和采纳，专门观察原生分类。没有云端或其他模型。两轮共388条计分/探测请求，另12条预热请求；超长拒绝和取消不算成功图读出。完整报告保留预热失败。
+
+### 继续聆听命中
+
+| 条件 | 应继续聆听 | 正确选4 | 召回率 | 其他语义样例误选4 | 语义样例超时 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 英文 · App真实期限 | 24 | 3 | 12.5% | 0 | 16/91 |
+| 中文 · App真实期限 | 24 | 0 | 0% | 0 | 20/91 |
+| 英文 · 原生读出诊断 | 24 | 3 | 12.5% | 1 | 不施加250ms期限 |
+| 中文 · 原生读出诊断 | 24 | 0 | 0% | 0 | 不施加250ms期限 |
+
+去掉期限也没有提高应继续聆听样例的命中。英文24条的原生结果为3继续聆听、17舍弃、3排队、1打断；中文为0继续聆听、12舍弃、1排队、11打断。两轮中首轮有及时有效结果的146条语义请求，重放选择全部一致。
+
+原生读出的实例：
+
+| 实际最新输入或拼接输入 | 预期 | D3选择 | App首轮采纳 |
+| --- | --- | --- | --- |
+| `Please help me` | 继续聆听 | 继续聆听 | 继续聆听 |
+| `请帮我` | 继续聆听 | 打断 | 排队（该条首轮超时） |
+| `明天提醒我，时间是` | 继续聆听 | 舍弃 | 排队（保护有效输入） |
+| `如果明天下雨的话，` | 继续聆听 | 舍弃 | 排队（保护有效输入） |
+| `我还没说完，我想要的是` | 继续聆听 | 排队 | 排队 |
+| `Stop talking, and instead\nshow the photo.` | 打断 | 继续聆听 | 排队（该条首轮超时） |
+
+英文正确的另外两条是 `Translate this sentence:` 和 `I have not finished. What I want is`。英文原生读出的误继续聆听表明“有持有片段”不保证模型能识别它已补全。
+
+### 原始分类与采纳分开看
+
+以下91条分母包含历史锚点；不要把它当成真实用户分布的准确率，也不能直接与此前三候选、不同主机/提示条件的总分相减。
+
+| 条件 | 原始正确 / 91 | App采纳正确 / 91 | 未完成话语最终进入排队 |
+| --- | ---: | ---: | ---: |
+| 英文 · App真实期限 | 16 | 52 | 21/24 |
+| 中文 · App真实期限 | 11 | 52 | 24/24 |
+| 英文 · 原生读出诊断 | 21 | 不执行采纳 | 不执行采纳 |
+| 中文 · 原生读出诊断 | 13 | 不执行采纳 | 不执行采纳 |
+
+采纳保护主要把可理解文本的“舍弃”和空闲时的“打断”转成排队。它提高了输入保留率，但不会把明显未说完的话改成继续聆听。因此只看排队/未丢失，会掩盖第四类低召回。中文5条短回答全部被App保留，却没有一条在首轮得到正确的原始排队分类；中文25条已补全片段有23条经保护后正确处理。
+
+### 容量、时延和因果边界
+
+- 英文91条语义请求为341–370 tokens，中文为334–360 tokens，全部小于512。漏选4不是这些请求超长造成的。
+- 填满历史、待答问题和三条缓冲时，英文容量探测为492、507、607 tokens；中文为674、695、835 tokens。英文最长及中文三条均被原生适配器明确拒绝，App排队。没有截断原文或扩展上下文上限。
+- 第二轮无期限读出的英文原生p50/p95为240.07/253.17ms，10/91超过250ms；中文为257.94/272.26ms，76/91超过250ms。首轮App实际超时分别16/91与20/91。二者是不同轮次，不能按超时数量逐项对应。
+- 两轮均先英文后中文，没有随机化顺序或热状态控制；这些时延是本机本次观测，不能把差值全归因于语言，不能替代iPhone时延。分数是候选softmax，不是校准置信度。
+- 持有上限探测中模型没有选择4，因此本实验未实际触发“4→容量拒绝”的后置分支；没有据此声称该分支通过真实模型验收。
+
+结论：第四选项已进入真实请求，语义上下文未超长，采纳层也未普遍拦截4；当前提示＋D3 Edge组合本身对未完成话语的召回很低，且250ms预算在这台A18 Pro Mac上存在压力。仅放宽期限不能解决本轮中文0命中。下一步可独立比较第四项边界/位置、候选文字描述和成对短例；这只是后续实验方向，本轮未改生产提示、模型选择或超时。
+
+### 复现和证据
+
+- [冻结194条样例](../measurements/decision-continue-listening-scenarios-2026-11-16.json)
+- [App路径完整请求、原始输出、采纳及计时](../measurements/decision-continue-listening-d3-edge-2026-11-16.json)
+- [无Assistant期限的原生读出诊断](../measurements/decision-continue-listening-readout-2026-11-16.json)
+- [混淆矩阵、分类别统计与误判清单](../measurements/decision-continue-listening-summary-2026-11-16.json)
+- [主机、制品manifest及前后哈希](../measurements/decision-continue-listening-artifact-2026-11-16.json)
+- [实验入口和运行命令](../../Tests/IntegrationTests/README.md#d3-edge-continuation-classification-experiment)
+
+两项真实D3实验均完成，源码前后校验通过。新增读出入口首次编译出现Swift并发捕获错误，修正后再执行；没有把失败编译计为模型请求。仓库验证结果另列在本节末尾。原有测试文件、模型位置和历史报告保持原样，仅新增本次入口/样例/结果并追加导航。
+
+仓库验证：`scripts/build-ios.sh` 五个scheme及资源验证通过；新增两份Swift实验入口的严格格式检查、JSON结构/194条双轮配对/候选/哈希/新增链接验证、`git diff --check`通过。`scripts/check.sh`的架构边界和8项Python测试通过，但在本次未修改的`Actions/Speech/Listening/VoiceNativeEffects.swift:108`遇到`OnlyOneTrailingClosureArgument`格式错误并退出1，后续全量Swift测试未执行；未为通过检查改动该文件。日志为`/tmp/decision-continuation-{check,ios}-2026-11-16.log`与两项实验日志，属于本机临时证据；可长期查阅的请求与测量已保存到上述JSON。
+
+## D3 Edge 提示词结构优化实验（2026-11-16，仅实验环境）
+
+### 官方与公开集成调研
+
+检索并阅读官方模型卡、vLLM serving/recipe、官方`d3_format.py`及公开集成方的自身文档，未把搜索摘要或社区讨论当成准确率证据：
+
+- [官方格式代码](https://huggingface.co/vllm-sr/d3-edge/blob/main/d3_format.py)：原生模板按State、Question、Options排列；State被声明为数据，choice选项由键与说明组合。它支持把事实、任务指令和候选语义分开，不支持“规则必须放State、候选只写数字”的假设。
+- [官方D3 Edge模型卡](https://huggingface.co/vllm-sr/d3-edge/blob/main/README.md)与[vLLM recipe](https://recipes.vllm.ai/vllm-sr/d3-edge)：公开用例把业务文本放state、具体分类问题放question.instructions、候选名称和解释放criteria。返回候选读出，无需模型生成解释或JSON文本。
+- [Ollaya自己的D3集成示例](https://ollaya.cobanov.dev/library/d3)：同样使用事实state、短问题和有含义的criteria；其GPU性能数字不能替代本地CoreAI测量。
+- [Vis自己的D3集成说明](https://vis.blockether.com/decision-models.html)：强调用自己的标签评估，状态、指令和候选共同占用token预算。它的ONNX容量及FP32运行设置与本仓库512-token BF16制品不同，未照搬参数。
+
+据此形成实验假设：将规则移出State，给Options直接提供语义描述，可能比当前State内长规则加数字候选更符合D3格式。该假设不能由文档本身证明，以下用本地真实模型检验。官方公开资料没有提供本应用“继续聆听”任务的现成最优模板。固定旧revision的格式网页未能由检索工具打开；本地适配器模板与已读main格式核对，制品仍用原revision，未下载或执行网络代码。
+
+### 方法与开发集结果
+
+只修改实验请求，生产资源/实现、现有模型位置和旧测试文件保持不变。首轮7组×194请求，第二轮4组×194请求，另有每条件3次预热。每组排除12条容量/采纳/键盘探测，语义分母为182，含48条预期继续聆听。比较的是原生选择，无App采纳、无250ms截止；所有期限超标只是观测，不能算生产已接纳。候选行显式映射回业务标签，重排不改变评分含义。按样例ID配对，轮转条件次序，串行执行。
+
+48条新留出快照在开发实验前冻结，直到完成开发选择后才运行。第二轮追加的原因和方案在运行前记录：首轮仍有大量误舍弃，尝试直接分类“话语状态”而不是让小模型选择应用操作。最后按全部开发集四类macro-F1最高选一组，误判作为风险同时保留，没有用留出调模板。三次实验的生产源码前后哈希均一致。
+
+| 方案 | 正确 / 182 | macro-F1 | 继续聆听命中 / 48 | 继续聆听精确率 | 误继续 | 误打断 | 误舍弃 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 生产原样基线 | 34 | 0.183 | 3 | 75.0% | 1 | 49 | 92 |
+| 只将规则移到Question | 34 | 0.170 | 0 | 0.0% | 3 | 35 | 93 |
+| 紧凑事实＋语义动作选项 | 44 | 0.263 | 3 | 37.5% | 5 | 19 | 114 |
+| 语义动作＋边界短例 | 58 | 0.340 | 8 | 47.1% | 9 | 22 | 87 |
+| 继续聆听候选前置 | 62 | 0.369 | 15 | 53.6% | 13 | 22 | 80 |
+| 统一英文规则＋短例 | 82 | 0.464 | 17 | 45.9% | 20 | 16 | 50 |
+| 官方式短问题＋说明选项 | 34 | 0.212 | 0 | 0.0% | 0 | 5 | 143 |
+| 直接描述话语状态（入选） | 113 | 0.625 | 23 | 51.1% | 22 | 10 | 15 |
+| 话语状态＋语法缺口说明 | 100 | 0.573 | 35 | 43.8% | 45 | 10 | 18 |
+| 语法缺口＋最小状态 | 99 | 0.557 | 39 | 45.9% | 46 | 10 | 24 |
+| 未完成状态候选前置 | 99 | 0.583 | 36 | 42.4% | 49 | 10 | 14 |
+
+“官方式”只是格式对齐，不能自动保证本任务有效：仅移动规则没有改善；最短问题组仍把48条未完成话语全部判为舍弃。统一英文规则比同语种规则有帮助；这些是本组实验的结果，不是官方宣称只支持英文。入选方案用英文询问“哪种描述符合用户话语”，候选描述stop_request、non_speech、complete_utterance、unfinished_utterance，再由实验映射到原四类动作。它没有加few-shot例子，保留当前问题、历史和缓冲事实。
+
+入选方案开发集正确113/182（62.1%），原样基线34/182（18.7%）；中英文分别50/91与63/91。继续聆听召回23/48（47.9%），但误继续22条，其中18条应排队、4条应打断。将未完成候选前置或强调语法缺口可提高召回，却让误继续进一步增加，因此没有仅按召回选方案。
+
+### 预冻结留出复核
+
+留出48条是24个双语情境，包括8个未完成/补全对、短回答、完整命令、明确停止、引用/否定、噪声。它们是合成且双语配对的小样本，不等于48个独立真实用户场景。只运行基线与入选方案，共96请求，另6次预热。没有依据结果再改提示。
+
+| 条件 | 正确 / 48 | macro-F1 | 继续聆听命中 / 16 | 继续聆听精确率 | 误继续 | 误打断 | 误舍弃 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 生产原样基线 | 6 | 0.106 | 0 | 0.0% | 0 | 24 | 14 |
+| 直接描述话语状态（入选） | 29 | 0.658 | 13 | 52.0% | 12 | 2 | 3 |
+
+入选方案留出正确率为60.4%，继续聆听召回81.3%，但精确率只有52%；12条应排队的完整话语被误认为未说完。中文未完成8条命中6条，英文8条命中7条。该结果支持作为下一轮实验基线，不足以直接替换生产；开发集中4条应打断话语被延后也不能被留出中的停止命中掩盖。
+
+### 实验模板与使用边界
+
+[完整实验模板及动作映射](../measurements/decision-prompt-optimization-template-2026-11-16.json)保留实际测试的英文Question与Options。State只放事实，输入原文保留中文/英文，接续片段仍用换行组合。布局为：
+
+```text
+State: {utterance, assistant_busy, question_to_user,
+        preceding_assistant, preceding_user, queued_inputs}
+Question: Which description best matches the user utterance? ...
+Options:
+A: stop_request: ...
+B: non_speech: ...
+C: complete_utterance: ...
+D: unfinished_utterance: ...
+```
+
+以上是实验概览，精确英文内容以JSON为准。它沿用D3固定系统模板和候选读出，没有要求生成解释、思维链或JSON文本。生产JEV仍传数字候选；未来采用语义候选需要同时适配候选到动作的映射，不能只替换资源文字。本轮没有实施这类生产变更，也未重新安装手机。
+
+入选方案开发集288–309 tokens，基线334–370；本机图仍固定512长度，因此token缩短不保证图推理变快。开发集原生p95分别287.76ms与280.84ms；留出入选p95为259.82ms，仍有8/48超过250ms。热状态和样本不同，不能据此宣称延迟降低；本轮仅A18 Pro Mac原生读出，未验证App竞速、ASR、真实对话到达或iPhone体验。
+
+### 文件与复现
+
+- [首轮完整请求](../measurements/decision-prompt-optimization-input-2026-11-16.json)、[首轮逐条结果](../measurements/decision-prompt-optimization-results-2026-11-16.json)、[首轮汇总](../measurements/decision-prompt-optimization-summary-2026-11-16.json)
+- [第二轮完整请求](../measurements/decision-prompt-optimization-refined-input-2026-11-16.json)、[逐条结果](../measurements/decision-prompt-optimization-refined-results-2026-11-16.json)、[汇总](../measurements/decision-prompt-optimization-refined-summary-2026-11-16.json)
+- [预冻结留出样例](../measurements/decision-prompt-optimization-holdout-2026-11-16.json)、[选型记录（留出前）](../measurements/decision-prompt-optimization-selection-2026-11-16.json)、[留出实际请求](../measurements/decision-prompt-optimization-holdout-input-2026-11-16.json)、[逐条结果](../measurements/decision-prompt-optimization-holdout-results-2026-11-16.json)、[汇总](../measurements/decision-prompt-optimization-holdout-summary-2026-11-16.json)
+- [请求生成/评分说明](../../Tests/DecisionBenchmarks/README.md#实验环境提示词优化)、[Swift原生入口](../../Tests/IntegrationTests/README.md#experimental-d3-prompt-optimization)
+
+三次真实D3实验均通过，共2230条计分/探测请求，另39条预热。超512的探测拒绝不计为成功图调用。新留出基线的生成器已与194条存档生产请求逐字校验一致。所有输入/结果保留哈希和选项映射；第一次生成输入时处理了可选question字段缺省的JSON解析问题，该准备错误没有计作模型推理。
+
+### 工程验证
+
+三组opt-in真实模型测试通过；输入、实验runner和8项冻结源码/样例哈希复核一致。`./scripts/build-ios.sh`成功完成五个scheme构建，属于构建验证，不代表真机验收。`./scripts/check.sh`通过边界检查和8条Python测试后，因原有工作区`MobileHarness/Actions/Speech/Listening/VoiceNativeEffects.swift:108:27`的`OnlyOneTrailingClosureArgument`格式错误退出，未执行后续完整Swift测试；未修改该任务外文件。本次新增Swift实验入口另行严格格式检查，Python脚本语法及diff空白检查通过。
+
+## App 采用话语状态 JEV 提示（2026-11-16）
+
+经用户明确要求，将上述utterance_status模板接入Assistant生产JEV路径。State包含原文及有界上下文JSON；Question和四个描述选项与实验模板逐字一致（中英文资源均使用英文规则），候选按提交顺序映射回四个业务动作。键盘仍只有前三项。日志记录真实State/Question/Options。Chat Tool/Text保持原协议，D3 Edge/Lite共用JEV适配器；本轮没有新增Lite模型测量，旧实验结论仍仅适用于Edge。
+
+这次接入不会消除前述误继续风险，也未改变250ms预算、512token容量和语音持有上限。历史实验JSON及哈希保持原样；要求旧源码哈希的历史重放必须在相应代码版本运行，不能把生产迁移后哈希不一致视为旧实验通过。
+
+生产两份JEV模板与入选JSON逐字校验通过；修改文件的Swift严格格式检查及diff空白检查通过。验证命令为`./scripts/check.sh`、`./scripts/build-ios.sh`与`swift test --filter 'Decision|decision|PromptTemplate|promptTemplate'`。首次受沙箱缓存/模拟器服务限制，已按工具权限重新运行；结果见下方最终记录。本轮未安装手机，未进行新一轮真实ASR或真机模型验收。
+
+最终记录：五个iOS scheme全部构建成功。Decision/Prompt专项命令退出0，其中IntegrationTests的92项通过（包含双语JEV新回归），其余匹配目标也通过，opt-in真实模型实验未开启。全量check通过边界、8条Python和严格Swift格式检查；其IntegrationTests共1204项运行有4项失败：readyD3ReportsItsSelectionAndDoesNotCallCloud、slowTrackingDispatchExecutesOnlyTheNewestPendingTarget、nativeVoiceProcessingKeepsRecognitionActiveDuringReplies、completedASRContinuesWithoutAcknowledgmentAndPlaybackUsesRouteCapability。AppWorkflowTests另有多项resourceMissing("injected Action declarations")，该阶段运行超过五分钟且日志不再推进后主动中止，因此全量检查未通过，后续阶段未完成。
+
+D3替身断言在专项回归中通过，全量并发中失败（该测试使用5秒本地预算）；随后用SwiftPM testing helper直接执行已编译的三个D3测试（readyD3、jevSpeechState、speechDecisionFourthChoice），补齐Xcode XCTest framework/library路径后退出0，三个测试及双语参数均通过。直接启动前两次因XCTest动态加载路径不完整而未能启动测试，不计为通过。上述差异与并发负载相符，但没有证明全量失败的唯一原因；不通过扩大生产期限隐藏问题。运行日志位于本机`/tmp/decision-app-semantic-{tests-authorized,ios-authorized,check-authorized,direct-recheck}.log`。
+
+## 仅保留模型丢弃结果（2026-11-16）
+
+按用户再次限定的范围，仅移除AssistantInputDecision.outcome中将`discard + possibleSpeech`改为enqueue的分支。有效语句、键盘文本、短回答及绑定问题的答案也保留模型discard。其他噪声判定、idle interrupt转enqueue、缓冲满转discard、模型失败默认enqueue、全部聆听与播报策略保持原样。此前未完成的可选采用值、失败不入队和执行端容量迁移已全部撤回。
+
+回归覆盖本地/云端模型丢弃、短答案与idle interrupt区别，以及worker对噪声/有效语音/键盘的实际丢弃反馈和不调用主模型。旧实验记录仍是历史证据，不重算原结果。
+
+验证：专项`swift test --filter 'inputDecision|readyD3|speechDecision'`退出0，13项测试及参数化用例通过，覆盖模型discard保持、worker不调用主模型，同时验证噪声、idle interrupt、失败入队和接续流程仍保持原行为。五个iOS scheme构建全部成功。按代码段比较确认outcome及transcriptContent相对于原实现仅少了discard→enqueue分支。diff空白检查通过。
+
+`./scripts/check.sh`通过边界、8项Python和Swift格式检查；全量IntegrationTests的1204项有8个问题，后续AppWorkflowTests出现缺少injected Action declarations及UI/采集生命周期断言失败，运行超过三分钟无新日志后停止。本轮未修改这些模块以追逐全量失败，后续全量检查阶段未完成。日志为`/tmp/decision-discard-only-{tests,check,ios}.log`，不将全量检查称为通过。本轮未安装真机。
+
+## 继续聆听容量满时释放入队（2026-11-16）
+
+用户要求容量满不能丢弃当前输入：仅把continueListening且canHoldTranscript=false的采纳结果改为enqueue，并记录容量原因。worker复用已有入队批次逻辑，将原持有片段与当前输入合并释放。扩展speechDecisionHoldsIncompleteInputOutsideQueueAndReclassifiesJoinedText的bufferFull参数，验证模型仍选continue_listening、采纳enqueue、所有片段送入主模型、只创建一次消息；正常继续聆听/噪声丢弃/补全释放场景仍保留。
+
+前置噪声处理与文本规则不等价：音频增强和VAD不保证ASR最终不会输出非空噪声标记。SpeechRecognitionTurn.finish仅修剪空白，SpeechPerceptionAgent.finishUtterance仅对空字符串停止投递；非空final会进入Assistant Decision，噪声词表在模型输出后的outcome执行。此轮未修改这条路径及其优先级。
+
+验证：`swift test --filter 'speechDecisionHolds|inputDecision|readyD3'`退出0，12项专项测试及参数化用例通过；缓冲满/未满的worker用例均通过。`./scripts/build-ios.sh`五个scheme全部构建成功。`./scripts/check.sh`通过边界、8项Python及Swift格式检查，但全量IntegrationTests的1204项出现5个问题（含并发下分类断言失败，专项通过）；AppWorkflowTests再次出现缺少injected Action declarations等失败后停止，后续阶段未完成，不算全量通过。未扩大修改范围处理这些失败。日志为`/tmp/decision-buffer-enqueue-{tests,check,ios}.log`。diff检查通过；未进行新的真机/ASR模型验收，噪声说明是代码路径分析，不代表已实测当前ASR会输出这些标记。
+
+## ASR 输出协议核查与删除文本噪声猜测（2026-11-16）
+
+核查范围由生产注册确定：Nemotron本地模型以及Apple Speech的en-US、zh-CN实例，并非从其他ASR的输出习惯推断。
+
+- Apple：生产使用SpeechTranscriber + SpeechDetector(reportResults:false)。[官方初始化文档](https://developer.apple.com/documentation/speech/speechdetector/init(detectionoptions:reportresults:))说明检测器默认启用VAD而不向调用方报告结果；[results文档](https://developer.apple.com/documentation/speech/speechdetector/results)明确当前结果流除抛错外保持空。它不是噪声词表，也不能当作可接入的逐条噪声分类标签。该原生检测器已经使用，未删除。
+- Nemotron：生产为FluidInference的Nemotron 3.5 multilingual CoreML。其[发布方模型卡](https://huggingface.co/FluidInference/Nemotron-3.5-ASR-Streaming-Multilingual-0.6b-CoreML)说明RNN-T转录部署；[NVIDIA原模型卡](https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b)定义输出为输入语言的文字字符串，公开的特殊输出涉及语言标签，没有为本项目noiseMarkers提供协议支持。当前适配器仅发布转录text/revision/finality；RNN-T blank不是可当作噪声文字的标签。
+- 结论是“没有可依赖的噪声词表协议”，不是断言模型永远不可能生成这些字符。之前把手写词表称为ASR能力没有依据。历史实验中的[noise]等输入是人工构造场景，不能反过来证明ASR会输出它们。
+
+删除内容：AssistantInputDecision的TranscriptContent、noiseMarkers、标点/问号/语气词启发式、噪声强制discard、失败时噪声discard例外，以及无调用方的protectsAnswer计算属性。Decision提示中去掉“ASR noise/silence marker”的假设，不再宣称与旧实验模板逐字一致，不推断准确率提升。旧实验JSON保留为历史证据。
+
+保留内容：模型discard决定、idle interrupt转enqueue、继续聆听容量满转enqueue、失败默认enqueue，以及所有音频增强/VAD/原生SpeechDetector/播报准入/空识别结果处理。本轮没有新加一个Decision前的文本黑名单。回归将旧词表文字、标点、语气词作为普通人工文本，检查四类模型输出不被内容规则覆盖，并检查失败按既定策略入队。
+
+验证结果：14项Decision专项测试及参数化用例通过，包含四类动作对人工标记/标点/语气词的保真及失败入队；五个iOS scheme构建成功。`check.sh`通过边界、8项Python及格式检查，全量IntegrationTests的1205项有7个问题（包含本轮专项通过而全量并发失败的分类断言）；后续AppWorkflowTests再次出现resourceMissing("injected Action declarations")后停止，未完成其余阶段。全量检查未通过，没有因此改动其他模块。日志：`/tmp/decision-remove-noise-{tests,check,ios}.log`。diff检查通过。未进行新的ASR/真机实测，不将文档核查描述为识别效果验收。
+
+## 真机 discard 反馈复核（2026-11-16 22:05）
+
+用户截图显示 D3 Edge 原始与采纳结果均为 discard，包含 Open the camera.；附件给出了 Do not ignore this message. 的完整 State/Question/Options。后者作为逐字回放，其他截图话语与中文/未完成话语作为构造对照，分别保留附件历史或清空历史。没有将构造上下文冒充手机实际快照。
+
+确认当前 JEV 中 A/B/C/D 与 interrupt/discard/enqueue/continue_listening 映射一致。当前资源与附件 Question/Options 一致，但与原入选实验的 B 不同：删除噪声词表时，B 从历史的 “The input is only an ASR noise/silence marker or a standalone hesitation sound with no question to answer.” 改为 “The input contains no meaningful speech or is a standalone hesitation sound with no question to answer.”。旧描述仅作为实验控制，不恢复它的 ASR 协议假设。
+
+复用现有 D3PromptOptimization 原生入口、同一 Mac D3Edge 本地制品，逐对仅改变 B，其他 State/Question/A/C/D、动作映射相同；制品及源码哈希运行前后相同，无生产超时/采纳覆盖。首次准备因对模型目录调用 read_bytes 失败，修正为逐文件哈希后再运行；失败准备没有计入模型结果。使用已构建测试产物 --skip-build，未修改任何 Swift/App 资源。
+
+| 请求集 | 历史候选 | 当前候选 |
+| --- | --- | --- |
+| 现场及构造对照 12 条 | discard 3/12 | discard 12/12 |
+| 原冻结留出 48 条：正确 | 29/48（60.4%） | 13/48（27.1%） |
+| 原冻结留出 48 条：discard | 7/48 | 35/48 |
+
+原留出历史候选的 48 个标签与原存档逐条一致，支持历史实验可复现；当前候选明显退化。原样附件当前输出 discard，候选归一化分数 0.5592；历史 B 输出 enqueue，分数 0.3515。这些分数不是校准后的正确概率。清空历史后的 Open the camera. 当前也输出 discard，说明这组失败不依赖历史。旧版也会误判相机请求，因此不能仅回退 B 就宣称修复。
+
+结论：历史实验测量可复现，但它只达到 60.4% 留出正确率，不能称为生产可靠。删除噪声描述后的实际新模板没有经过真实模型复测，之前的模拟回归/构建不能覆盖这个语义退化。这是实验结论应用与后续变更验证的缺口。当前模板在这些样本上对 B 有强偏向；单因素对照证明 B 的措辞变化会导致分类变化，不能据此推断模型内部的具体原因。
+
+Mac 使用源图，手机 catalog 指向 h18p AOT；本轮未重新读取手机模型制品，也未测两者逐 logits 一致性。但 Mac 已复现当前模板的大量 discard，不能仅归因于手机 AOT。请求均小于512token，模型输出有效；不是容量拒绝或 fallback。两个真实实验完成 120 个评分请求与 12 次预热，源码哈希验证通过。本轮只追加实验输入、结果和文档，未修改 App 提示词、结果采纳或安装版本；未重复 App 构建/全量检查。
+
+证据：[汇总](../measurements/decision-discard-recheck-summary-2026-11-16.json)、[现场回放输入](../measurements/decision-discard-device-replay-input-2026-11-16.json)、[现场回放结果](../measurements/decision-discard-device-replay-results-2026-11-16.json)、[留出对照输入](../measurements/decision-discard-holdout-recheck-input-2026-11-16.json)、[留出对照结果](../measurements/decision-discard-holdout-recheck-results-2026-11-16.json)。
+
+## 精简 JEV 接入与安装（2026-11-16）
+
+用户要求将前述简短模板用于 App。JEV State 仅保留 utterance 和 assistant_busy；中英文资源统一短 Question 与 Interrupt/Discard/Enqueue/Continue listening 定义。历史、待回答问题与队列仍由原快照供 Chat 协议使用，不再进入 JEV；接续文本仍按现有流程合并。未改变任何结果采纳规则。Assistant README 与双语契约回归已同步。
+
+双语 JEV 契约回归通过，验证 State 仅两项、原文转义、播放态 busy、四类映射及键盘三候选。真实 D3 Edge 使用原位置模型重放六条最小上下文请求，原始分类仅1/6正确：Do not ignore this message.、Do not discard this message.、不要忽略这条消息。均选择interrupt；Open the camera. 与 I want to 均选择discard；打开相机。选择enqueue。输入186–188token，全部有效返回，源码/模型哈希前后相同。原有idle interrupt采纳入队不计为模型分类正确。该小样本不代表总体准确率，但明确显示精简后仍不能稳定判断基本输入。
+
+[最小请求](../measurements/decision-minimal-app-input-2026-11-16.json)与[原始结果](../measurements/decision-minimal-app-results-2026-11-16.json)保存原实验位置。直接调用SwiftPM测试helper的前两次尝试因XCTest动态依赖缺失失败，未执行模型；补齐Xcode的DYLD_FRAMEWORK_PATH/DYLD_LIBRARY_PATH后，使用刚编译的同一测试bundle成功完成6条及3次预热。标准swift test排队入口在共享构建锁等待期间终止，没有重复写结果。并行构建与全量检查影响延迟，本轮不作性能结论。
+
+真机 Debug 构建成功，严格深层签名、73项Agent/Skill、Live Activity及中英文资源检查通过。安装包两份InputDecision资源与源码逐字节一致。已原位安装至Youwei’s iPhone 17 Pro，回执序号7220，并收到Launched application成功启动回执。构建、安装及启动日志 `/tmp/decision-minimal-device-{build,install,launch}.log`。未清除用户数据；安装启动不等于真机分类效果验收。
+
+仓库检查：`./scripts/build-ios.sh` 五个scheme全部成功。`./scripts/check.sh` 的边界检查、8项Python及严格格式检查通过；全量IntegrationTests 1204项报告19个问题，另AppWorkflow出现Writer/Web缺失injected Action declarations等错误并持续不再推进，主动停止本次检查及其子进程，后续独立原生阶段和plist阶段未运行。因此全量检查未通过。没有修复范围外测试。日志 `/tmp/decision-minimal-{tests,ios,check}.log`；diff空白检查通过。
+
+## Vela3 Fast 本地补充对照（2026-11-17）
+
+### 制品与接口
+
+核对[发布模型](https://huggingface.co/hugging-mac/vela3-fast-CoreAI/tree/6aaa9ccd747c4bad65037979e7f9373a76fb7683)，固定 revision 6aaa9ccd747c4bad65037979e7f9373a76fb7683，上游 revision fa60e3aa41132c60bf05a84cabfdced39cb6d4f7。网页工具连接失败后读取 HF API，核对另一项目发布目录的26个文件，均与远端 LFS SHA-256 或 Git blob 哈希匹配。逐文件 SHA-256 在 Tests/DecisionBenchmarks/vela-model.json。经用户批准，制品存放于 .local/models/Vela3Fast，与 D3Edge 并列。
+
+这是 FP32 decision backbone 的实验转换，支持 choice/noul，不是完整上游任务适配器或生成模型。Vela 使用 [Q]/[O]/[SEP_SCHEMA]/[SEG_user] 编码，输入 input_ids、attention_mask、option_positions、pool_mask，输出动态候选 logits。声明输入上限32768，发布方实际CPU校验到2048token；本轮未验证长输入、GPU/ANE或iPhone。D3使用聊天模板、固定512token和255码读出，两者不能混用编码。发布说明中的12/12上游一致性不是本App四分类准确率。
+
+### 方法与结果
+
+固定原48条留出场景，对比历史 utterance_status 和当前 minimal 两套条件，各另加6条诊断，共108条。每条件预热3次，轮转条件顺序，串行推理；不套App采纳规则或250ms deadline。候选键A/B/C/D、候选描述及顺序与D3相同，使用Vela发布适配器原生编码。两个模板同时改变上下文和描述，不能据此单独归因于上下文长度。本轮未根据输出改提示或重标答案。
+
+复用另一项目已安装的Python3.12环境，coreai-core1.0.0b3、numpy2.3.5、tokenizers0.23.3，Vela显式CPU。耗时包括编码和推理，排除加载及预热；加载约16.5秒。所有108条有效返回，源码及输入哈希前后相同，制品结束后复核。只测固定A/B/C/D格式，不声称已找到Vela最佳候选命名或提示。
+
+| 模型及模板 | 正确/48 | macro-F1 | 误discard | 继续聆听命中/16 | P50/P95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Vela CPU，minimal | 19（39.6%） | 0.401 | 19 | 0 | 144 / 161 |
+| Vela CPU，utterance_status | 7（14.6%） | 0.205 | 40 | 0 | 235 / 267 |
+| D3自动模式，utterance_status，历史已复现 | 29（60.4%） | 见历史留出 | 3 | 13 | 不作本轮速度配对 |
+| D3，本轮minimal留出 | 未取得 | — | — | — | — |
+
+Vela minimal留出0/48超过250ms，utterance_status为5/48。6条诊断单列：minimal仅1/6正确，英文Open the camera.入队，中文打开相机。却discard，I want to错误入队；utterance_status为0/6且全部discard。诊断不混入留出分母。
+
+D3历史utterance_status的48条完整请求已与本次逐项核对一致，可作带日期的历史准确率参照；不是本轮成功原生重测，不能进行当前负载下速度比较。历史minimal诊断1/6也不能外推D3在48条minimal场景上的成绩。
+
+### 失败与限制
+
+Vela完成后磁盘耗尽。本轮复制的大图已改为APFS克隆并重新验哈希；未清理向用户请求但尚未获批准的模拟器缓存。D3自动模式两次加载失败，重试明确报LLVM IO failure / No space left on device，均0条评分。CPU首轮因transformers返回BatchEncoding造成编码失败，改回原有render字符串再encode；随后发现输出形状(1,255)，但全部255项非有限。最终入口在第一次预热明确失败并停止，0条评分。一次脚本缩进错误在模型执行前修正。编码、加载、非有限值失败均不计为语义准确率0%，不能据此证明iOS AOT有问题。
+
+结论：Vela四候选推理可运行，但当前两套固定模板没有显示可替换D3的分类能力，继续聆听召回为0。精简条件相对较好，完整表达误discard仍明显。后续可独立验证Vela语义候选键和任务描述，但不能凭12个基础发布例子或低时延直接接入。App目录、生产提示、采纳及手机安装本轮均未修改。
+
+证据：[配对输入](../measurements/decision-vela-d3-input-2026-11-17.json)、[Vela结果](../measurements/decision-vela-results-2026-11-17.json)、[汇总](../measurements/decision-vela-d3-summary-2026-11-17.json)、[D3最终CPU失败](../measurements/decision-d3-cpu-vela-final-results-2026-11-17.json)、[运行说明](../../Tests/DecisionBenchmarks/README.md#vela3-fast-paired-comparison)。自动模式空报告及中间失败报告保留为失败记录，不作为完成结果。
+
+验证收尾：Vela全部108条完成，结果JSON、脚本语法、概率归一化、制品/源码/输入哈希及git diff --check通过。`build-ios.sh`五个scheme全部构建通过。`check.sh`边界、8项Python和严格Swift格式通过；1204项IntegrationTests有7个问题，AppWorkflow随后报缺失Action声明等错误并停止推进，终止本次检查及子进程，未执行后续独立原生/plist阶段。全量检查未通过。日志 `/tmp/vela-comparison-{check,ios}.log`。新实验没有生产代码修改，构建结果不代表Vela iOS验收。
+
+## Hello 真机请求原样回放（2026-11-17）
+
+用户提供的完整State为`{"utterance":"Hello.","assistant_busy":false}`，Question/四候选与当前minimal资源逐字一致。原Mac D3自动模式入口完成3次重复评分，均输出discard，分数0.7523189187，184token，约200–208ms；源码和输入哈希前后相同。该误判不是仅在手机出现，也不能与旧utterance_status的60.4%混比。原始请求及结果为decision-hello-phone-replay-{input,results}-2026-11-17.json。
+
+只读检查手机D3Edge目录和安装收据，确认已装decision.aimodel源图，revision为0690c04ee1640c1c3fa11a882323751dda6d086a；不是此前h18p AOT目录。元数据不能单独证明内存中正在执行的图或全权重内容一致。
+
+手机完整main.mlirb已只读导出并计算SHA-256，ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78与Mac完全一致；manifest、decision_config和main.hash也一致。见[手机制品核对](../measurements/decision-hello-device-artifact-check-2026-11-17.json)。这排除已检查文件内容不一致，不证明跨平台运行数值一致，也不排除共同转换问题。
+
+## 恢复自有制品及discard边界对照（2026-11-17）
+
+用户反馈第三方制品也频繁discard，要求恢复自有repo并优化提示。App Edge source及requiredFiles完整恢复到DecisionBenchmarks/models.json中的hugging-mac/d3-edge-CoreAI、revision0690c04ee1640c1c3fa11a882323751dda6d086a，原始三输入decision.aimodel，大小1013189709，无AOT覆盖。Lite未变；生产提示及模型结果采纳均未改。
+
+在自有Mac制品及原生Swift入口运行两轮，各4条件×55请求=220条，合计440条评分及24次预热。48条旧留出已经多次观察，本轮称回归集，不再称独立留出；另有7条诊断，包括Hello及既有6条。使用同一冻结预期动作，不根据输出重标。第一轮仅修改minimal的C定义、B定义、或两项组合；第二轮回到历史utterance_status，只改B，保留历史原样作为控制。第二轮方案在执行前写入计划；未将ASR噪声词表或相关假设恢复到生产。
+
+| 条件 | 正确/48 | 误discard | 继续聆听命中/16 |
+| --- | ---: | ---: | ---: |
+| minimal原样 | 18 | 21 | 0 |
+| minimal仅C补问候/命令 | 8 | 32 | 0 |
+| minimal仅B改为unintelligible | 24 | 9 | 0 |
+| minimal两项组合 | 8 | 21 | 0 |
+| 历史utterance_status参考 | 29 | 3 | 13 |
+| 历史结构，B的ASR短语替换为unintelligible text | 18 | 21 | 4 |
+| 历史结构，B仅保留hesitation | 29 | 5 | 12 |
+| 历史结构，B改为no recognizable words | 14 | 27 | 2 |
+
+补问候定义让Hello进入enqueue，但使总体准确率下降；不能把单条修正当成整体改善。仅收窄discard虽减少误丢弃，仍未恢复继续聆听能力。历史结构hesitation条件回归正确29/48，但7条诊断仅I want to正确继续聆听，Hello及中英文相机命令等仍discard。因此本轮没有可上线的新候选，也未自动应用分数最高项。现有证据支持模型对候选文字高度敏感，不能单凭这两轮推断内部原因或宣布纯提示工程能达到目标。
+
+两轮无推理错误，源文件和输入哈希前后相同。证据：[第一轮输入](../measurements/decision-discard-boundary-input-2026-11-17.json)、[第一轮结果](../measurements/decision-discard-boundary-results-2026-11-17.json)、[第二轮输入](../measurements/decision-discard-status-refinement-input-2026-11-17.json)、[第二轮结果](../measurements/decision-discard-status-refinement-results-2026-11-17.json)、[汇总](../measurements/decision-discard-refinement-summary-2026-11-17.json)。

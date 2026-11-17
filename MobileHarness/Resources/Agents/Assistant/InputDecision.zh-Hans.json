@@ -14,6 +14,11 @@
     "state": "【当前状态】\n回复执行或结算中：{{running}}\n正在播报：{{playing}}\n待答问题：{{question}}",
     "yes": "是",
     "no": "否",
-    "unknown": "未知"
+    "unknown": "未知",
+    "jevQuestion": "Classify the user's utterance. Choose the best matching category.",
+    "jev_interrupt": "Interrupt — While the assistant is busy, the user explicitly asks it to stop or change its current action immediately.",
+    "jev_discard": "Discard — The utterance has no understandable communicative meaning.",
+    "jev_enqueue": "Enqueue — An understandable request, question, statement, or answer. Short utterances can be complete.",
+    "jev_continue_listening": "Continue listening — An unfinished utterance that needs more words before its intended meaning can be understood."
   }
 }

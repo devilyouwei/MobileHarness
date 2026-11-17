@@ -48,17 +48,21 @@ enum AssistantDecisionProtocol: Sendable {
 
     enum JEV {
         static func request(_ prompt: InputDecisionSnapshot.Prompt) throws -> DecisionRequest {
-            try .init(
-                text: prompt.background, candidates: prompt.labels,
-                context: prompt.context, instructions: prompt.latest)
+            let owner = "Assistant/InputDecision"
+            let candidates = try prompt.choices.map { try AgentPrompts.text(owner, "jev_" + $0.rawValue) }
+            return try .init(
+                text: prompt.jevState, candidates: candidates,
+                context: prompt.context, instructions: AgentPrompts.text(owner, "jevQuestion"))
         }
 
         static func classify(
             _ prompt: InputDecisionSnapshot.Prompt, model: any DecisionCapability, record: @Sendable (String) -> Void
         ) async throws -> InputDisposition {
             let request = try request(prompt)
-            let options = zip(["A", "B", "C", "D"], prompt.labels).map { "\($0): \($1)" }.joined(separator: "\n")
-            record("JEV\n\n" + prompt.text + "\n\nOptions\n" + options)
+            let options = zip(["A", "B", "C", "D"], request.candidates).map { "\($0): \($1)" }.joined(separator: "\n")
+            record(
+                "JEV\n\nState:\n" + request.text + "\n\nQuestion:\n" + request.instructions + "\n\nOptions:\n" + options
+            )
             let session = try await model.decide(request)
             return try await session.withCleanup {
                 var result: InputDisposition?
@@ -66,7 +70,10 @@ enum AssistantDecisionProtocol: Sendable {
                     guard result == nil, case .selected(let choice, _) = value.decision else {
                         throw CapabilityError.invalidRequest("Invalid JEV candidate selection")
                     }
-                    result = try label(choice, in: prompt)
+                    guard let index = request.candidates.firstIndex(of: choice) else {
+                        throw CapabilityError.invalidRequest("Invalid JEV candidate selection")
+                    }
+                    result = prompt.choices[index]
                 }
                 guard let result else { throw CapabilityError.invalidRequest("Missing JEV candidate") }
                 return result

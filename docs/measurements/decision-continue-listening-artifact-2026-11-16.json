@@ -1,0 +1,55 @@
+{
+  "modelRoot": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/D3Edge",
+  "hashes": {
+    "manifest.json": "b0b63b4d97b1eabc6c3f748b4f0f41ca19d25f9a7b025d55a1cf8eb27c70f81b",
+    "decision_config.json": "30b6095b945d5a93697868afdf9be9123ea892085fbaff3078112c48da20dc6b",
+    "tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+    "tokenizer_config.json": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c",
+    "chat_template.jinja": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80",
+    "decision.aimodel/main.mlirb": "ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78"
+  },
+  "manifest": {
+    "source": "vllm-sr/d3-edge",
+    "revision": "bee5e872f75b9c5d1405767bf244a6948b95c0af",
+    "sequence_length": 512,
+    "precision": "bfloat16",
+    "readout_precision": "float32",
+    "attention_mode": "noncausal_full_attention",
+    "modality": "text",
+    "inputs": [
+      "input_ids",
+      "attention_mask",
+      "position_ids"
+    ],
+    "output": "mm_90",
+    "function": "main",
+    "format": "Apple Core AI .aimodel",
+    "source_weight_sha256": "91bb8618450a7f628f1432bbced76bc19ee7346c93d191a228fdd33c25a57a9d",
+    "experimental": true,
+    "validation": {
+      "baseline_choices_matched": 75,
+      "baseline_cases": 75,
+      "exploratory_prompt_choices_matched": 95,
+      "exploratory_prompt_cases": 96,
+      "maximum_probability_error": 0.02308797836303711,
+      "strict_probability_parity": false,
+      "iphone_tested": false
+    },
+    "platform": {
+      "hardware": "Apple M5, 16 GiB RAM",
+      "os": "macOS 27.2",
+      "accelerator_placement_verified": false
+    }
+  },
+  "os": "macOS-27.2.1-arm64-arm-64bit-Mach-O",
+  "cpu": "Apple A18 Pro",
+  "memoryBytes": 8589934592,
+  "hashesAfter": {
+    "manifest.json": "b0b63b4d97b1eabc6c3f748b4f0f41ca19d25f9a7b025d55a1cf8eb27c70f81b",
+    "decision_config.json": "30b6095b945d5a93697868afdf9be9123ea892085fbaff3078112c48da20dc6b",
+    "tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+    "tokenizer_config.json": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c",
+    "chat_template.jinja": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80",
+    "decision.aimodel/main.mlirb": "ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78"
+  }
+}

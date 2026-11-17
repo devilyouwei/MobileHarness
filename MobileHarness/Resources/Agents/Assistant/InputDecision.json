@@ -14,6 +14,11 @@
     "state": "【Current state】\nReply execution or settlement pending: {{running}}\nPlaying speech: {{playing}}\nPending question: {{question}}",
     "yes": "yes",
     "no": "no",
-    "unknown": "unknown"
+    "unknown": "unknown",
+    "jevQuestion": "Classify the user's utterance. Choose the best matching category.",
+    "jev_interrupt": "Interrupt — While the assistant is busy, the user explicitly asks it to stop or change its current action immediately.",
+    "jev_discard": "Discard — The utterance has no understandable communicative meaning.",
+    "jev_enqueue": "Enqueue — An understandable request, question, statement, or answer. Short utterances can be complete.",
+    "jev_continue_listening": "Continue listening — An unfinished utterance that needs more words before its intended meaning can be understood."
   }
 }

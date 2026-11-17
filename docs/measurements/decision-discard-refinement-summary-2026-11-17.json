@@ -1,0 +1,408 @@
+{
+  "decision-discard-boundary": {
+    "report": "decision-discard-boundary-results-2026-11-17.json",
+    "sha256": "841f722d6d36b74a2abb656c2a76896c8791fac6f8c39267cf94666ca8b323c4",
+    "groups": {
+      "baseline": {
+        "regression": {
+          "count": 48,
+          "correct": 18,
+          "falseDiscard": 21,
+          "falseInterrupt": 7,
+          "continueTP": 0,
+          "expectedContinue": 16,
+          "invalid": 0,
+          "matrix": {
+            "interrupt": {
+              "interrupt": 4
+            },
+            "discard": {
+              "discard": 4
+            },
+            "enqueue": {
+              "discard": 9,
+              "enqueue": 10,
+              "interrupt": 4,
+              "continue_listening": 1
+            },
+            "continue_listening": {
+              "discard": 12,
+              "interrupt": 3,
+              "enqueue": 1
+            }
+          }
+        },
+        "diagnostic": {
+          "count": 7,
+          "correct": 1,
+          "falseDiscard": 3,
+          "falseInterrupt": 3,
+          "continueTP": 0,
+          "expectedContinue": 1,
+          "invalid": 0,
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {
+              "interrupt": 3,
+              "discard": 2,
+              "enqueue": 1
+            },
+            "continue_listening": {
+              "discard": 1
+            }
+          }
+        }
+      },
+      "combined": {
+        "regression": {
+          "count": 48,
+          "correct": 8,
+          "falseDiscard": 21,
+          "falseInterrupt": 19,
+          "continueTP": 0,
+          "expectedContinue": 16,
+          "invalid": 0,
+          "matrix": {
+            "interrupt": {
+              "interrupt": 4
+            },
+            "discard": {
+              "discard": 4
+            },
+            "enqueue": {
+              "interrupt": 13,
+              "discard": 11
+            },
+            "continue_listening": {
+              "interrupt": 6,
+              "discard": 10
+            }
+          }
+        },
+        "diagnostic": {
+          "count": 7,
+          "correct": 1,
+          "falseDiscard": 0,
+          "falseInterrupt": 6,
+          "continueTP": 0,
+          "expectedContinue": 1,
+          "invalid": 0,
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {
+              "interrupt": 5,
+              "enqueue": 1
+            },
+            "continue_listening": {
+              "interrupt": 1
+            }
+          }
+        }
+      },
+      "greeting_enqueue": {
+        "regression": {
+          "count": 48,
+          "correct": 8,
+          "falseDiscard": 32,
+          "falseInterrupt": 8,
+          "continueTP": 0,
+          "expectedContinue": 16,
+          "invalid": 0,
+          "matrix": {
+            "interrupt": {
+              "interrupt": 4
+            },
+            "discard": {
+              "discard": 4
+            },
+            "enqueue": {
+              "discard": 18,
+              "interrupt": 6
+            },
+            "continue_listening": {
+              "discard": 14,
+              "interrupt": 2
+            }
+          }
+        },
+        "diagnostic": {
+          "count": 7,
+          "correct": 1,
+          "falseDiscard": 3,
+          "falseInterrupt": 3,
+          "continueTP": 0,
+          "expectedContinue": 1,
+          "invalid": 0,
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {
+              "interrupt": 3,
+              "discard": 2,
+              "enqueue": 1
+            },
+            "continue_listening": {
+              "discard": 1
+            }
+          }
+        }
+      },
+      "unintelligible_discard": {
+        "regression": {
+          "count": 48,
+          "correct": 24,
+          "falseDiscard": 9,
+          "falseInterrupt": 12,
+          "continueTP": 0,
+          "expectedContinue": 16,
+          "invalid": 0,
+          "matrix": {
+            "interrupt": {
+              "interrupt": 4
+            },
+            "discard": {
+              "discard": 4
+            },
+            "enqueue": {
+              "interrupt": 6,
+              "enqueue": 16,
+              "discard": 2
+            },
+            "continue_listening": {
+              "interrupt": 6,
+              "enqueue": 3,
+              "discard": 7
+            }
+          }
+        },
+        "diagnostic": {
+          "count": 7,
+          "correct": 1,
+          "falseDiscard": 1,
+          "falseInterrupt": 5,
+          "continueTP": 0,
+          "expectedContinue": 1,
+          "invalid": 0,
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {
+              "interrupt": 4,
+              "enqueue": 1,
+              "discard": 1
+            },
+            "continue_listening": {
+              "interrupt": 1
+            }
+          }
+        }
+      }
+    }
+  },
+  "decision-discard-status-refinement": {
+    "report": "decision-discard-status-refinement-results-2026-11-17.json",
+    "sha256": "65d684c02d74c624c180822a2c2f175bda3482a2c63fc72ea938b6d891f08488",
+    "groups": {
+      "hesitation_only": {
+        "regression": {
+          "count": 48,
+          "correct": 29,
+          "falseDiscard": 5,
+          "falseInterrupt": 2,
+          "continueTP": 12,
+          "expectedContinue": 16,
+          "invalid": 0,
+          "matrix": {
+            "interrupt": {
+              "interrupt": 4
+            },
+            "discard": {
+              "discard": 4
+            },
+            "enqueue": {
+              "enqueue": 9,
+              "discard": 3,
+              "continue_listening": 10,
+              "interrupt": 2
+            },
+            "continue_listening": {
+              "continue_listening": 12,
+              "discard": 2,
+              "enqueue": 2
+            }
+          }
+        },
+        "diagnostic": {
+          "count": 7,
+          "correct": 1,
+          "falseDiscard": 6,
+          "falseInterrupt": 0,
+          "continueTP": 1,
+          "expectedContinue": 1,
+          "invalid": 0,
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {
+              "discard": 6
+            },
+            "continue_listening": {
+              "continue_listening": 1
+            }
+          }
+        }
+      },
+      "historical_reference": {
+        "regression": {
+          "count": 48,
+          "correct": 29,
+          "falseDiscard": 3,
+          "falseInterrupt": 2,
+          "continueTP": 13,
+          "expectedContinue": 16,
+          "invalid": 0,
+          "matrix": {
+            "interrupt": {
+              "interrupt": 4
+            },
+            "discard": {
+              "discard": 4
+            },
+            "enqueue": {
+              "enqueue": 8,
+              "continue_listening": 12,
+              "interrupt": 2,
+              "discard": 2
+            },
+            "continue_listening": {
+              "continue_listening": 13,
+              "discard": 1,
+              "enqueue": 2
+            }
+          }
+        },
+        "diagnostic": {
+          "count": 7,
+          "correct": 2,
+          "falseDiscard": 4,
+          "falseInterrupt": 0,
+          "continueTP": 1,
+          "expectedContinue": 1,
+          "invalid": 0,
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {
+              "enqueue": 1,
+              "discard": 4,
+              "continue_listening": 1
+            },
+            "continue_listening": {
+              "continue_listening": 1
+            }
+          }
+        }
+      },
+      "no_recognizable_words": {
+        "regression": {
+          "count": 48,
+          "correct": 14,
+          "falseDiscard": 27,
+          "falseInterrupt": 2,
+          "continueTP": 2,
+          "expectedContinue": 16,
+          "invalid": 0,
+          "matrix": {
+            "interrupt": {
+              "interrupt": 4
+            },
+            "discard": {
+              "discard": 4
+            },
+            "enqueue": {
+              "discard": 14,
+              "continue_listening": 4,
+              "interrupt": 2,
+              "enqueue": 4
+            },
+            "continue_listening": {
+              "discard": 13,
+              "enqueue": 1,
+              "continue_listening": 2
+            }
+          }
+        },
+        "diagnostic": {
+          "count": 7,
+          "correct": 0,
+          "falseDiscard": 7,
+          "falseInterrupt": 0,
+          "continueTP": 0,
+          "expectedContinue": 1,
+          "invalid": 0,
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {
+              "discard": 6
+            },
+            "continue_listening": {
+              "discard": 1
+            }
+          }
+        }
+      },
+      "unintelligible_only": {
+        "regression": {
+          "count": 48,
+          "correct": 18,
+          "falseDiscard": 21,
+          "falseInterrupt": 2,
+          "continueTP": 4,
+          "expectedContinue": 16,
+          "invalid": 0,
+          "matrix": {
+            "interrupt": {
+              "interrupt": 4
+            },
+            "discard": {
+              "discard": 4
+            },
+            "enqueue": {
+              "discard": 10,
+              "continue_listening": 6,
+              "enqueue": 6,
+              "interrupt": 2
+            },
+            "continue_listening": {
+              "discard": 11,
+              "continue_listening": 4,
+              "enqueue": 1
+            }
+          }
+        },
+        "diagnostic": {
+          "count": 7,
+          "correct": 1,
+          "falseDiscard": 6,
+          "falseInterrupt": 0,
+          "continueTP": 1,
+          "expectedContinue": 1,
+          "invalid": 0,
+          "matrix": {
+            "interrupt": {},
+            "discard": {},
+            "enqueue": {
+              "discard": 6
+            },
+            "continue_listening": {
+              "continue_listening": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}

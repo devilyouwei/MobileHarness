@@ -40,3 +40,37 @@ py="$bench/.local/venv/bin/python"
 ```
 
 Qwen 另支持 `score-digits`、`words` 和 `digits`。各条件可用 `--limit N` 做烟雾测试，输出须使用新路径。计分保留误打断、漏打断、误丢弃、无效输出、混淆矩阵和 500 ms 预算。推理错误使运行明确失败。时延包括文本编码、推理及读出，排除加载和预热。当前输出是 Mac 合成文本实验，应用采纳规则、ASR、执行和真机延迟另行验证。
+
+## 继续聆听四分类
+
+最新 App 四分类由 [IntegrationTests 的独立入口](../IntegrationTests/README.md#d3-edge-continuation-classification-experiment) 实测，继续复用这里 `.local/models/D3Edge` 的制品。原 `fixtures.json`、`benchmark.py` 与其他模型入口保持不变。`summarize_continuation.py REPORT --artifact ARTIFACT_JSON --output FRESH_JSON` 只汇总四分类报告，不加载模型；artifact JSON 包含本次主机、制品 manifest 与文件哈希。汇总按语言、场景类别、原始/采纳结果区分，并单列512 token、250ms和容量保护。冻结样例与结果位于 `docs/measurements`，分析追加到原 [Mac 对照报告](../../docs/validation/Decision-Model-Mac-Comparison.md#d3-edge-继续聆听四分类实验2026-11-16)。
+
+```bash
+python3 Tests/DecisionBenchmarks/summarize_continuation.py \
+  docs/measurements/decision-continue-listening-d3-edge-2026-11-16.json \
+  --artifact docs/measurements/decision-continue-listening-artifact-2026-11-16.json \
+  --readout docs/measurements/decision-continue-listening-readout-2026-11-16.json \
+  --output /tmp/decision-continuation-summary-new.json
+```
+
+## 实验环境提示词优化
+
+`continuation_prompt_experiment.py`只生成实验请求和评分，不改App资源，也不加载其他模型。`prepare`生成首轮七组开发集请求，并在任何评分前冻结48条留出；`refine`生成仅开发集的四组话语状态标签对照；已有留出必须完全一致。`summarize --report REPORT --output NEW_JSON`计算四类macro-F1、继续聆听精确率/召回率、误打断/误舍弃、token及耗时；容量/采纳/键盘探测排除在语义评分外。`holdout --variant NAME`只生成基线和已选方案的留出请求。生成的已发布文件拒绝覆盖。
+
+原生推理由[IntegrationTests入口](../IntegrationTests/README.md#experimental-d3-prompt-optimization)执行。运行后用以下方式独立复算结果：
+
+```bash
+python3 Tests/DecisionBenchmarks/continuation_prompt_experiment.py summarize \
+  --report docs/measurements/decision-prompt-optimization-results-2026-11-16.json \
+  --output /tmp/decision-prompt-optimization-summary-new.json
+```
+
+方案取开发集四类macro-F1最高者，并列时取更短者；报告错误类型而不只看4的选择次数。留出复核后不再针对其输出调模板。语义选项直接符合D3的`key: description`呈现，继续聆听前置组独立记录选项映射。研究来源、结果和限制见[原Mac报告](../../docs/validation/Decision-Model-Mac-Comparison.md#d3-edge-提示词结构优化实验2026-11-16仅实验环境)。
+
+## Vela3 Fast paired comparison
+
+`vela-model.json` pins the remote revision and every copied file hash. The approved `.local/models/Vela3Fast` directory sits beside D3Edge. `vela_comparison.py` loads the verified published adapter only for offline experiments, using CPU and Vela-native markers. State, question, A/B/C/D candidate meanings and action order match the D3 request matrix; no App configuration changes. Use Python 3.12 with coreai-core 1.0.0b3, numpy 2.3.5 and tokenizers 0.23.3.
+
+Run with `USE_OS_COREAI=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 /path/to/python Tests/DecisionBenchmarks/vela_comparison.py --input docs/measurements/decision-vela-d3-input-2026-11-17.json --output /tmp/vela-new-results.json`. Output must not exist. The runner verifies artifact/source hashes, warms each condition three times, rotates conditions, and records raw classifications, probabilities, tokens, errors and elapsed time. It rechecks sources and input on completion. The same matrix runs through the existing D3PromptOptimizationTests entry. Keep diagnostic cases separate from the 48-case holdout. Vela CPU and D3 automatic-mode timing describe different execution paths, not matched accelerators.
+
+`d3_cpu_comparison.py` provides an isolated CPU diagnostic with the same input/output CLI. It preserves the D3 chat template, 512-token left padding, four position axes and native candidate readout. Use an environment also containing transformers, with `USE_TORCH=0`. It stops on a failed warmup. On the recorded host the D3 CPU graph returned no finite logits; this is a runtime failure, not a classification score.

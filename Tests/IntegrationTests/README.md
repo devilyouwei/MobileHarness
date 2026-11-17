@@ -408,3 +408,40 @@ AudioCaptureReadinessTests 另覆盖无 PCM 首帧期限、已有终态优先；
 AudioCaptureReadinessTests 覆盖引擎配置失效在首帧前/后的错误传播、重复与停止后通知围栏，以及启动重建单次预算；跨平台通知门测试不代表蓝牙硬件路由验收。
 
 VoiceTests 将生产 Voice Processing 选择接入 SpeechPerception，验证回复播放期间继续识别，保留受限后端暂停/恢复、迟到旧包拒绝和明确关闭许可回归；不根据蓝牙类型关闭全双工，不代表真实噪声/回声测量。
+
+## D3 Edge continuation classification experiment
+
+`DecisionContinuationEvaluationTests.swift` is an opt-in, D3-Edge-only evaluation of the current production prompt, JEV projection and Assistant adoption policy. It reads the expanded frozen cases in `docs/measurements/decision-continue-listening-scenarios-2026-11-16.json`, explicitly enables four options for final ASR, preserves three options for typed probes, joins held fragments with newlines, and retains the latest raw fragment in the perception payload. Language-matched requests run sequentially after three warmups per language. Reports checkpoint actual requests, native-tokenizer lengths, selections, adoption, failures, timings and before/after source hashes. Semantic cases and capacity/adoption probes are scored separately. No cloud or other model is configured.
+
+`DecisionContinuationReadoutTests.swift` replays those exact recorded DecisionRequests through D3 without the Assistant deadline or adoption. This isolates native classification from the production 250 ms deadline; the report is diagnostic and contains no claimed App adoption. It validates that the primary run's source files have not changed. Both tests leave ordinary test runs disabled unless their respective report variable is supplied.
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+D3_CONTINUATION_REPORT="$PWD/docs/measurements/decision-continue-listening-d3-edge-2026-11-16.json" \
+swift test --filter d3DecisionContinuationEvaluation
+
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+D3_CONTINUATION_READOUT_REPORT="$PWD/docs/measurements/decision-continue-listening-readout-2026-11-16.json" \
+swift test --filter d3DecisionContinuationReadout
+```
+
+Report paths must be fresh. Replay reads the primary dated report above; preserve it for reproduction or explicitly update that input path for a new run. Existing model files stay under `Tests/DecisionBenchmarks/.local/models/D3Edge`. Historical runners and fixtures remain unchanged. See [methods and evidence](../../docs/validation/Decision-Model-Mac-Comparison.md#d3-edge-继续聆听四分类实验2026-11-16).
+
+## Experimental D3 prompt optimization
+
+`DecisionPromptOptimizationTests.swift` accepts an experimental request matrix through `D3_PROMPT_OPT_INPUT` and writes a new `D3_PROMPT_OPT_REPORT`. It runs only the existing D3 Edge graph. Input rows contain explicit candidate-to-action mappings so reordered or descriptive options cannot change label interpretation. It checks production-source hashes before and after, records tokenizer lengths and native result/errors, warms each condition three times, then rotates condition order for paired sorted case IDs. It does not apply Assistant adoption or the 250ms deadline. All production prompts remain untouched.
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+D3_PROMPT_OPT_INPUT="$PWD/docs/measurements/decision-prompt-optimization-input-2026-11-16.json" \
+D3_PROMPT_OPT_REPORT=/tmp/decision-prompt-optimization-new.json \
+swift test --filter d3PromptOptimizationExperiment
+```
+
+Use the same runner with the frozen holdout-input matrix for the selected condition and baseline. Input and output parents must exist; output must not already exist. Generator, scoring and selection methodology belong to [DecisionBenchmarks](../DecisionBenchmarks/README.md#实验环境提示词优化).
+
+VoiceTests 的 speechAdmission/speechPlayback 用例验证采样时间冷却、播放 burst/尾部/历史容量、外部会话隔离，以及起声与维持阈值分离。SpeechEnhancementWorkflowTests 使用受控时钟验证空 ASR 后原始 PCM 丢弃、冷却后恢复、起播前置门控和增强缓存重建；输入为替身 PCM，不代表真机回声抑制率或用户打断召回率。
+
+InputDecisionTests 的JEV回归检查JSON事实、片段拼接、数据转义、上下文边界、固定英文语义候选、四项动作映射及非法候选拒绝，保留Chat数字与Tool协议回归。模型为可控替身，不等于真实D3分类效果验收。
+
+InputDecisionTests 将旧噪声词表字符串、标点及语气词作为普通人工输入，验证四类模型选择不被文本启发式覆盖、失败按既定策略入队。它们不是ASR实测输出或特殊token契约。接续容量参数化回归验证正常持有与容量满后所有片段一起入队。

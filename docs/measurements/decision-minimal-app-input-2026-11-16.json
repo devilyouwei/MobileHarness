@@ -1,0 +1,190 @@
+{
+  "sourceHashes": {
+    "MobileHarness/Resources/Agents/Assistant/InputDecision.json": "cf6cee82363c0143adf0bc6fa014f075e1437c7f264677159802520e77877d38",
+    "MobileHarness/Agents/Assistant/AssistantDecisionProtocol.swift": "aa09fcc9f931facd83ea4893fce9f59a74e1f5f9e03df2649c43d9ccdd9648a8",
+    "MobileHarness/ModelKit/Language/JEV/D3Decision.swift": "3f73d47f20b6553e51cbd6883a7823c7a7c9f5224fe37b38c52d77bfe73cec42",
+    "Tests/IntegrationTests/DecisionPromptOptimizationTests.swift": "24a7a3087556274c640bd7445699fa4777bd4a57bb884561929949bcec8d7e5f",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/tokenizer_config.json": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/NOTICE": "2326c866dd82edf02dea680cc5e7a15df89a6f2a98feb93f04377d03bd8ad56e",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/chat_template.jinja": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/manifest.json": "b0b63b4d97b1eabc6c3f748b4f0f41ca19d25f9a7b025d55a1cf8eb27c70f81b",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision_config.json": "30b6095b945d5a93697868afdf9be9123ea892085fbaff3078112c48da20dc6b",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision.aimodel/metadata.json": "723a13872446d6e5d3bb147752d58b612909259dfe35fb7a39fc4c603c3b53f2",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision.aimodel/main.mlirb": "ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision.aimodel/main.hash": "99b7ef485a3ceb55de8aaff92a4f3732105ac84d41bba1065196f8dd336f1d4e",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/aot-build.json": "2906935260906afb85b50aaae013366b659d271d4f78a9919f1ebf5bf3a0d5b1",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/tokenizer_config.json": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/NOTICE": "2326c866dd82edf02dea680cc5e7a15df89a6f2a98feb93f04377d03bd8ad56e",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/chat_template.jinja": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/manifest.json": "955d754e288ed5eae86f9f84023f3ae25b80bc6e6f29a03c0a7d867ad0acea7d",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/decision_config.json": "30b6095b945d5a93697868afdf9be9123ea892085fbaff3078112c48da20dc6b",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/decision.h18p.aimodelc/main-h18p.mlirb": "7c798c02307a758ba4f792b1f50b3af0804d693b4e839e061ed48b88ab84a4bd",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/decision.h18p.aimodelc/metadata.json": "2fb1b49b2128701c399033365494306f152cc265af080711df51550e5d10818f",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/decision.h18p.aimodelc/stats.json": "01f827e5440404c841bd23537d6dbb4e9073f4c4476bb05d36494d151945f858",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/decision.h18p.aimodelc/main.hash": "99b7ef485a3ceb55de8aaff92a4f3732105ac84d41bba1065196f8dd336f1d4e",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/manifest.plist": "245bb2104ca0a5df9bfb91e49f2bf11b2f7a98cbb17c3510c52bc3653c1e9f6c",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/specialized_model_1.mpsgraph": "575d53c4d9422814b883bf28bbebafd221ede78f17a4bce8062eddeb3372afb1",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/original_model_0.mpsgraph": "9f18f220bbc3c91ca611db86eba8d7cd47de3635f780d37b14cfe725c66f9a58",
+    "Tests/DecisionBenchmarks/.local/models/D3Edge/decision-ios/decision.h18p.aimodelc/main-h18p-delegates/MPSGraph/mpsExecutable.mpsgraphpackage/resources.bin": "800f4a0462c48809a09b88e6a99013b1d2be7b5646b6fee53361530ec8e225c5"
+  },
+  "rows": [
+    {
+      "variant": "minimal",
+      "scenario": {
+        "id": "00-empty",
+        "language": "en",
+        "group": "constructed_control",
+        "expected": "enqueue"
+      },
+      "request": {
+        "text": "{\"utterance\":\"Do not ignore this message.\",\"assistant_busy\":false}",
+        "instructions": "Classify the user's utterance. Choose the best matching category.",
+        "candidates": [
+          "Interrupt — While the assistant is busy, the user explicitly asks it to stop or change its current action immediately.",
+          "Discard — The utterance has no understandable communicative meaning.",
+          "Enqueue — An understandable request, question, statement, or answer. Short utterances can be complete.",
+          "Continue listening — An unfinished utterance that needs more words before its intended meaning can be understood."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "minimal",
+      "scenario": {
+        "id": "01-empty",
+        "language": "en",
+        "group": "constructed_control",
+        "expected": "enqueue"
+      },
+      "request": {
+        "text": "{\"utterance\":\"Do not discard this message.\",\"assistant_busy\":false}",
+        "instructions": "Classify the user's utterance. Choose the best matching category.",
+        "candidates": [
+          "Interrupt — While the assistant is busy, the user explicitly asks it to stop or change its current action immediately.",
+          "Discard — The utterance has no understandable communicative meaning.",
+          "Enqueue — An understandable request, question, statement, or answer. Short utterances can be complete.",
+          "Continue listening — An unfinished utterance that needs more words before its intended meaning can be understood."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "minimal",
+      "scenario": {
+        "id": "02-empty",
+        "language": "en",
+        "group": "constructed_control",
+        "expected": "enqueue"
+      },
+      "request": {
+        "text": "{\"utterance\":\"Open the camera.\",\"assistant_busy\":false}",
+        "instructions": "Classify the user's utterance. Choose the best matching category.",
+        "candidates": [
+          "Interrupt — While the assistant is busy, the user explicitly asks it to stop or change its current action immediately.",
+          "Discard — The utterance has no understandable communicative meaning.",
+          "Enqueue — An understandable request, question, statement, or answer. Short utterances can be complete.",
+          "Continue listening — An unfinished utterance that needs more words before its intended meaning can be understood."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "minimal",
+      "scenario": {
+        "id": "03-empty",
+        "language": "zh",
+        "group": "constructed_control",
+        "expected": "enqueue"
+      },
+      "request": {
+        "text": "{\"utterance\":\"不要忽略这条消息。\",\"assistant_busy\":false}",
+        "instructions": "Classify the user's utterance. Choose the best matching category.",
+        "candidates": [
+          "Interrupt — While the assistant is busy, the user explicitly asks it to stop or change its current action immediately.",
+          "Discard — The utterance has no understandable communicative meaning.",
+          "Enqueue — An understandable request, question, statement, or answer. Short utterances can be complete.",
+          "Continue listening — An unfinished utterance that needs more words before its intended meaning can be understood."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "minimal",
+      "scenario": {
+        "id": "04-empty",
+        "language": "zh",
+        "group": "constructed_control",
+        "expected": "enqueue"
+      },
+      "request": {
+        "text": "{\"utterance\":\"打开相机。\",\"assistant_busy\":false}",
+        "instructions": "Classify the user's utterance. Choose the best matching category.",
+        "candidates": [
+          "Interrupt — While the assistant is busy, the user explicitly asks it to stop or change its current action immediately.",
+          "Discard — The utterance has no understandable communicative meaning.",
+          "Enqueue — An understandable request, question, statement, or answer. Short utterances can be complete.",
+          "Continue listening — An unfinished utterance that needs more words before its intended meaning can be understood."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    },
+    {
+      "variant": "minimal",
+      "scenario": {
+        "id": "05-empty",
+        "language": "en",
+        "group": "constructed_control",
+        "expected": "continue_listening"
+      },
+      "request": {
+        "text": "{\"utterance\":\"I want to\",\"assistant_busy\":false}",
+        "instructions": "Classify the user's utterance. Choose the best matching category.",
+        "candidates": [
+          "Interrupt — While the assistant is busy, the user explicitly asks it to stop or change its current action immediately.",
+          "Discard — The utterance has no understandable communicative meaning.",
+          "Enqueue — An understandable request, question, statement, or answer. Short utterances can be complete.",
+          "Continue listening — An unfinished utterance that needs more words before its intended meaning can be understood."
+        ],
+        "actions": [
+          "interrupt",
+          "discard",
+          "enqueue",
+          "continue_listening"
+        ]
+      }
+    }
+  ]
+}

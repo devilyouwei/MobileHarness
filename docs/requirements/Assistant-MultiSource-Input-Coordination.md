@@ -816,3 +816,79 @@ App 的 `d3-lite` 目录与选择 ID 保持稳定，下载来源固定为 `huggi
 ### D3 共用图签名适配
 
 ModelKit 的 D3 适配器根据 manifest 和图输入校验三输入及五输入签名，取消型号级开关。文本 Decision 只为声明了视觉输入的图绑定空视觉张量。Edge 和 Lite 均可走任一签名，业务继续使用现有文本 DecisionRequest/DecisionResult。发布制品、下载配置和视觉业务接入不在本次范围内。原生验收覆盖三输入发布制品及以两种型号注册的五输入图。
+
+### D3 Edge 四分类继续聆听实验（2026-11-16）
+
+按最新 App 的 `InputDecisionSnapshot.prompt()`、`AssistantDecisionProtocol.JEV` 和 `AssistantInputDecision` 进行只读生产行为实验，只加载现有 `Tests/DecisionBenchmarks/.local/models/D3Edge`，不移动制品、不运行其他模型、不调整生产提示词或采纳逻辑。旧测试文件及冻结样例保持原样。新增 opt-in 实验入口放在 `Tests/IntegrationTests`，扩展样例和逐条结果放在 `docs/measurements`，方法、结论和限制追加到原 `docs/validation/Decision-Model-Mac-Comparison.md`。
+
+新样例显式区分语音四候选与键盘三候选。保留原27组双语样例作历史锚点；新增未完成意图、缺宾语/参数、悬空连接词、连续片段补全、完整短回答/命令、否定/引用停止、噪声、缓冲满及上下文容量探测。先固定人工预期，不根据输出改标签。成对样例将持有片段按生产 newline 规则拼到最新输入，原始 payload 仅含当前片段。分别报告模型原始动作和运行时采纳动作，容量/保护探测不混入语义准确率。
+
+实验记录实际生产请求、四候选是否出现、原生 tokenizer token 数、选中候选和分数、路由/错误/采纳原因、热调用和端到端耗时、制品与源码哈希。中英文分别用同语言提示，串行推理、每语言预热三次，保留超过512 token或250ms的失败，不用云端备用掩盖。本实验不代表真实 ASR 截断、iPhone 延迟或真实对话到达顺序验收。扩展入口及复现说明同步现有 README 导航。
+
+首轮发现真实 App 的250ms预算会产生超时，增加独立的原生读出诊断：在 `Tests/IntegrationTests` 新增 opt-in 入口，逐字复用首轮记录的生产 DecisionRequest（含四候选），仅绕过 Assistant 的250ms竞速，仍由 D3 原生适配器执行512 token检查和图推理。保留完整App结果，不将第二轮输出称为实际采纳；两轮分别统计，验证是否因超时而掩盖模型原始分类。该诊断不改生产期限、提示词或制品。
+
+本次194条扩展快照的App路径与独立原生读出均已完成，只使用D3 Edge。结果、复现命令、原始请求、超时/容量限制及检查失败说明见[原Mac实验报告的新节](../validation/Decision-Model-Mac-Comparison.md#d3-edge-继续聆听四分类实验2026-11-16)。生产优化与真实语音验收不属于本轮已完成实验结论。
+
+### D3 Edge 提示词实验优化（仅实验环境，2026-11-16）
+
+生产源码和资源保持不变。新增实验文件仍放 `Tests/DecisionBenchmarks` / `Tests/IntegrationTests`，测量和分析沿用 `docs/measurements` 与原Mac报告。以194条冻结快照作开发对照，比较原样基线、仅把规则从State移到Question、紧凑事实State加语义候选、加入完整/不完整边界短例、继续聆听候选前置、统一英文规则六个条件；候选顺序显式映射回稳定业务标签。所有变体只修改实验输入。
+
+同时在选择方案前冻结独立留出样例；开发集按原始四分类macro-F1、继续聆听召回/精确率、完整话语误继续、误打断/误舍弃、512token和250ms观测共同选择方案。只将基线和入选方案用于留出复核，不依据留出结果再调模板。全程仅现有D3 Edge，串行真实读出、每条件3次预热，不执行App采纳，不修改生产期限；保存逐条完整请求、token数、选择/分数/错误、耗时和输入/生产文件哈希。结论不声称真实ASR或iPhone验收。
+
+执行前补充官方/公开集成调研，增加第七组`official_short`：State仅事实，Question只问如何处理整句，Options使用稳定动作名加语义定义。其他语义候选组也使用`key: description`。依据为官方d3_format.py、vLLM recipe以及Ollaya自身集成示例；这些资料支持结构设计，不证明本任务准确率。开发集尚未推理，已据此更新生成输入；48条留出样例不变。候选顺序按样例轮转交错运行，减少方案之间的顺序/热状态混杂。
+
+开发集选择规则在评分前固定：排除容量/采纳/键盘探测，按双语合并的四类macro-F1选最高方案，报告继续聆听精确率/召回及误打断/误舍弃作为约束与风险，不以单独提高4的频率宣称优化。并列时选token更少者。48条留出只验证基线与该方案；若留出不支持改善，保留失败结论而不继续针对留出调参。
+
+首轮七组已完成，最高macro-F1方案仍有较多误舍弃和误继续，尚不足以推荐采用。留出集未运行。追加第二阶段四组开发实验，仍用相同194条开发集：英文话语状态标签（明确停止/非语音/完整/未完成）、同标签加语法缺口判定、去除无关历史的精简状态、未完成标签前置。均以描述输入的正向语义代替操作名称，候选映射不变。保留首轮全部结果，最终仍按开发集macro-F1在全部已测方案中选一组，再只做一次基线/入选组留出复核；不会根据留出反向调参。
+
+上述11组开发实验及一次48条留出复核已完成，按预设macro-F1选择`utterance_status`。留出正确29/48、未完成命中13/16，但12条完整话语误继续，故仅保留为实验模板，不替换生产。完整结果和验证限制见[报告](../validation/Decision-Model-Mac-Comparison.md#d3-edge-提示词结构优化实验2026-11-16仅实验环境)。
+
+### 将话语状态提示接入 App（2026-11-16）
+
+用户明确要求将最新实验模板接入App。Assistant拥有JEV专用投影：State为JSON事实（utterance、assistant_busy、question_to_user、preceding_assistant、preceding_user、queued_inputs），Question和四个语义候选逐字采用utterance_status英文模板，中文原文不翻译。JEV按候选索引映射动作，不再解析数字候选；键盘仅前三项。现有Chat Tool/Text协议保留自己的本地化模板。InputDecisionSnapshot提供专用State，AssistantDecisionProtocol负责请求、解码及日志，InputDecision资源存放英文JEV模板，两种语言内容一致。ModelKit模板、512token限制、250ms期限、接续缓冲及采纳保护不变。
+
+修改前记录：实验仍有完整话语误继续风险，接入不等于真机效果验收。更新Assistant和资源设计说明，覆盖事实转义/边界、语音四项/键盘三项、全部候选动作映射及非法输出，执行相关回归、check.sh和iOS构建。旧实验制品保留历史哈希，不重写历史结果。
+
+话语状态JEV模板及候选映射已接入App，源码设计说明已同步。专项回归、模板逐字核对和五个iOS构建通过；全量检查的失败、终止及单项复核结果见[接入验证](../validation/Decision-Model-Mac-Comparison.md#app-采用话语状态-jev-提示2026-11-16)。本轮没有安装设备；误继续聆听与真机ASR体验仍需现场验收。
+
+### 仅移除模型丢弃改入队（2026-11-16）
+
+以用户最新澄清为准：仅删除AssistantInputDecision.outcome中的(.discard, .possibleSpeech)改为enqueue分支。模型判丢弃时保留丢弃，包括有效话语、键盘输入、短回答和绑定问题的答案。噪声处理、无活动回复的interrupt转换、接续容量处理、失败默认入队，以及全部聆听/VAD/播报门控保持原样。更新对应分类和真实worker回归、Assistant和总体流程说明，运行相关测试与必需检查。前一轮尚未完成的扩大修改已撤回。
+
+### 接续缓冲满时入队（2026-11-16）
+
+按用户要求，仅将continueListening且canHoldTranscript为false时的采用值从discard改为enqueue，原因明确记录缓冲上限。worker复用现有入队路径释放已持有片段与当前输入，保持身份和顺序，不丢弃当前片段。噪声分支及其优先级、其他采纳规则、上游音频处理均保持原样。扩展接续worker回归，在合并文本超过640字节且模型仍选择继续聆听时检查完整批次只入队一次。
+
+噪声调查：SpeechPCMPreparation负责声学增强，VAD负责语音概率分段；SpeechRecognitionTurn仅trim最终文本，SpeechPerceptionAgent对非空final进行投递，因此非空ASR噪声标记仍会进入Decision。Assistant的词表在模型返回之后执行，不是ASR入口过滤。本轮只解释该路径，不迁移或删除噪声规则。
+
+容量满改入队及合并批次回归已完成；专项与五个iOS构建通过。全量检查失败及噪声路径分析见[验证记录](../validation/Decision-Model-Mac-Comparison.md#继续聆听容量满时释放入队2026-11-16)。
+
+### 删除无ASR协议依据的文本噪声推断（2026-11-16）
+
+核对可选ASR与官方资料后，Apple中英文实例和Nemotron均未提供本项目noiseMarkers词表作为可靠输出协议；Apple原生SpeechDetector已集成，但不是文本噪声标签，当前官方results说明除错误外为空。删除AssistantInputDecision内TranscriptContent、noiseMarkers、标点/问号/语气词启发式及其强制discard和失败时噪声discard例外。失败仍按用户保留的规则入队；无活动回复interrupt入队、接续容量满入队保持不变。不改SpeechPerception、音频增强、VAD、Apple检测器或空识别文本处理。
+
+两份InputDecision资源去掉jev_discard中“ASR noise/silence marker”这一未验证的协议假设，保留非有效话语的模型分类含义；不宣称新准确率。回归以普通文本验证旧词表、标点、语气词不触发代码改判，覆盖模型入队/丢弃/打断、继续聆听和失败入队。更新Assistant、ASR契约及总体说明，历史实验文件不改写。
+
+协议核查、无依据文本噪声推断删除和对应回归已完成。官方依据、范围及全量检查限制见[验证记录](../validation/Decision-Model-Mac-Comparison.md#asr-输出协议核查与删除文本噪声猜测2026-11-16)。
+
+## 2026-11-16 真机大量 discard 的实验核查
+
+依据用户提供的 Decision 完整请求，在原 DecisionBenchmarks 模型位置及现有 Swift 实验入口重放 D3 Edge。新增测量文件保留原请求，比较当前候选与历史入选候选、带历史与无历史；其他截图输入仅为构造对照，不冒充完整真机快照。核查候选映射、原始预测、token 长度及实验/设备图差异。本轮不修改 App 提示词、采纳规则或模型制品，不恢复语义兜底；结果追加原 Mac 对照报告。
+
+## 2026-11-16 精简 JEV 提示并安装真机
+
+用户明确采用简短四类定义。AssistantInputDecision 的 JEV State 仅输出 utterance 与 assistant_busy；移除历史、队列和待回答问题字段，接续原文仍按现有逻辑合并。中英文 InputDecision 资源统一采用简短英文 Question 和 Interrupt/Discard/Enqueue/Continue listening 定义。只改变 JEV 投影和提示，Chat 协议及结果采纳保持原样。更新双语契约回归、Assistant README，执行专项、check.sh、build-ios.sh 与签名真机构建/安装。真实 D3 使用现有回放样例评估新请求，不以构建通过替代分类准确率。
+
+精简JEV已实现并安装启动，验证及真实模型仍误判的限制见[原对照报告](../validation/Decision-Model-Mac-Comparison.md#精简-jev-接入与安装2026-11-16)。不将本次安装表述为分类效果已修复。
+
+## 2026-11-17 Vela3 Fast 本地对照
+
+用户要求分析 hugging-mac/vela3-fast-CoreAI 并补充本地对比，已批准新增 DecisionBenchmarks/.local/models/Vela3Fast。固定远端revision，复用另一个项目发布制品并逐文件核对远端哈希。新增独立Python评测入口及模型声明，沿用docs/measurements和原Mac对照报告，不修改App或旧实验文件。使用原48条留出场景，对比历史utterance_status和当前精简模板；额外6条现场衍生诊断单列。两模型保留相同语义请求/候选顺序，各使用原生编码协议；Vela采用发布验证的CPU模式，D3采用现行自动模式，速度比较标明运行路径差异。各条件预热三次，保存原始分类、候选概率、token、耗时、错误、哈希及四类汇总；不使用采纳覆盖或deadline制造正确结果，不据输出调参。
+
+执行补充：Vela完成108条；D3自动设备加载两次因磁盘耗尽未产生评分。改为新增独立D3 CPU对照入口，保持D3原生tokenizer/聊天模板/候选读出及512限制，使用与Vela相同CPU模式。自动模式失败单列，不计为模型分类错误；不清理未获授权的构建缓存。
+
+Vela的108条本地原生实验已完成，D3当前重测因自动模式磁盘错误及CPU非有限输出未完成，保留完整失败记录，使用逐项核对相同请求的历史D3成绩作有限对照。制品、输入、结果和限制已追加原Mac报告；未改变App或做Vela真机安装。
+
+## 2026-11-17 Hello 原样请求核查
+
+重放用户提供的Hello.最小JEV请求，检查当前手机模型收据/manifest，区分提示误判与端侧制品差异。只读手机模型元数据，不修改模型或App。用现有Mac D3自动模式入口保存三次完全相同请求的原始选择及分数，不以历史模板成绩代替此请求结果。

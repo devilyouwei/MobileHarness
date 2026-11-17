@@ -189,3 +189,5 @@ BasicSkill 的 Lifetime and completion 独占通用窗口生命周期教学：�
 [`Shared/`](Shared/)
 
 [OutputProtocol.md](Shared/OutputProtocol.md) 定义固定 Action 输出协议。[ActionCatalog.json](Shared/ActionCatalog.json)、[SkillCatalog.json](Shared/SkillCatalog.json) 和 [AgentCatalog.json](Shared/AgentCatalog.json) 定义目录排版。[RequestContext.json](Shared/RequestContext.json) 提供请求事实框架，[ExecutionFeedback.json](Shared/ExecutionFeedback.json) 和 [CommunicationContext.json](Shared/CommunicationContext.json) 定义回馈及通信模板。加载器按本轮协议、权限及实际数据选择资源。角色身份、输入策略和任务流程由各自配置拥有。
+
+Assistant/InputDecision 的 `jevQuestion` 与 `jev_interrupt`、`jev_discard`、`jev_enqueue`、`jev_continue_listening` 保存JEV话语状态模板，两种语言资源保持相同英文规则；用户原文不翻译。其余模板用于本地化Chat Tool/Text分类。候选顺序、语音/键盘许可及动作映射由Assistant拥有。

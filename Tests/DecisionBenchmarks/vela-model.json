@@ -1,0 +1,138 @@
+{
+  "repository": "hugging-mac/vela3-fast-CoreAI",
+  "revision": "6aaa9ccd747c4bad65037979e7f9373a76fb7683",
+  "directory": "Vela3Fast",
+  "runtime": "cpu",
+  "files": [
+    {
+      "path": ".python-version",
+      "size": 5,
+      "sha256": "7b55f8e67b5623c4bef3fa691288da9437d79d3aba156de48d481db32ac7d16d"
+    },
+    {
+      "path": "LICENSE",
+      "size": 11357,
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "path": "NOTICE",
+      "size": 768,
+      "sha256": "46710ad6644d63748efc1d91895ed2f7d039ddd3e4fe9caf7351f2f7a18ae448"
+    },
+    {
+      "path": "README.md",
+      "size": 8728,
+      "sha256": "b8c3735da9846be5e0c0ff4e7dcaa4724464b33d3b7044d69cc6edd7bdb39e22"
+    },
+    {
+      "path": "README.zh-CN.md",
+      "size": 8051,
+      "sha256": "48a4f8a55205833272d55ec08bc74b025ae65b18eb8a18dd704036f52dd52929"
+    },
+    {
+      "path": "SHA256SUMS",
+      "size": 2057,
+      "sha256": "cba494440e488ab95f501c465dd798e1f7d2c737195f525db56a12c4a67b4a35"
+    },
+    {
+      "path": "decision.json",
+      "size": 269,
+      "sha256": "1150af4f64b7cec72e35ad2ad06db180be009d5d18ed05903c2af21f2a85ece3"
+    },
+    {
+      "path": "environment.json",
+      "size": 202,
+      "sha256": "c9c84393adbd3d190c0443fabae3bc313ecc807870287472bba318d5352b3cc7"
+    },
+    {
+      "path": "evaluation.json",
+      "size": 15116,
+      "sha256": "80793396bc59f00d88a7df5c75b3ce729ef089501702733fda50fed49d08a691"
+    },
+    {
+      "path": "example.py",
+      "size": 857,
+      "sha256": "83dd42bf29453dafe9ca9525e9f8085198dc01afee7338012643b900ed0ac57e"
+    },
+    {
+      "path": "input_boundary.json",
+      "size": 130,
+      "sha256": "636221d20e2bcaaded4299220632346f377231dd9fdaae006482f4f9faa350ad"
+    },
+    {
+      "path": "manifest.json",
+      "size": 3167,
+      "sha256": "6593400dbc76848462ffbc464d5f326fbf9a959f638c8f3c218df4a1b98ac804"
+    },
+    {
+      "path": "model.aimodel/main.hash",
+      "size": 32,
+      "sha256": "d1e3ae70a989d8d38ccae6513bf0b4085f751545cb6cd4efbd5373fa26f74fc4"
+    },
+    {
+      "path": "model.aimodel/main.mlirb",
+      "size": 1522191259,
+      "sha256": "d7b63896067e505f67a03c1afe31e070b0a1f5d746e14d603d9130708798adad"
+    },
+    {
+      "path": "model.aimodel/metadata.json",
+      "size": 105,
+      "sha256": "a19b297a1df17828004220bd2a85bdd86f6630fd3edca8e9d3853366147d96b7"
+    },
+    {
+      "path": "package_smoke.json",
+      "size": 3830,
+      "sha256": "328ec37a9e1d578ae789bc0930db16ac05cbb30b4dab87c4358b4318e1bacdbf"
+    },
+    {
+      "path": "pyproject.toml",
+      "size": 320,
+      "sha256": "fe8ebeab92a5ecbca37f7fd768d480c122ceee326f5ac78f2e02cbf8c42adb85"
+    },
+    {
+      "path": "smoke.py",
+      "size": 4514,
+      "sha256": "32d69284eacb23ac0b6be8fe4de2e3604248d4c0adb377cbd8c0afac5153b4be"
+    },
+    {
+      "path": "swift_fixture.json",
+      "size": 867,
+      "sha256": "9f3a0299f9df5a090df083fc4862fbc79e72f1387db467efbd5ef4ac26927b2a"
+    },
+    {
+      "path": "swift_smoke.json",
+      "size": 251,
+      "sha256": "92ebf2b041505c1acb0f1f68b5b2d2962f470785609b17d7ae54e57a0707b361"
+    },
+    {
+      "path": "tokenizer.json",
+      "size": 3523470,
+      "sha256": "38734bb17ef19f84c67b5eb5692bea19801ffd02cb5c5ffc11429e76b0242e08"
+    },
+    {
+      "path": "tokenizer_config.json",
+      "size": 764,
+      "sha256": "649781df90d51837dd6ba951a89fae07c985a9eacfd781d84002d480c3cb0b6e"
+    },
+    {
+      "path": "uv.lock",
+      "size": 57756,
+      "sha256": "2f622f1a164e966f012193787cc8325837d96c2bd33f62f7a704606f0d0e17a9"
+    },
+    {
+      "path": "validation_cases.json",
+      "size": 154531,
+      "sha256": "c43550694f14e808e66044db2145b2780cc794336425f9674718dccf6f09022e"
+    },
+    {
+      "path": "vela_coreai.py",
+      "size": 6343,
+      "sha256": "0e6f26d2bbe55ac16368da959bf07521e54be0276eddeeb1f65a64004ae6476e"
+    },
+    {
+      "path": "verify_coreai.swift",
+      "size": 3330,
+      "sha256": "04d7528586eaa525bb0fe5c5952cefbf5f1363098cd941803f0560cace854cb8"
+    }
+  ]
+}

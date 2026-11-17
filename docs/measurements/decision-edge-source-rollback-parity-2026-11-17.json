@@ -1,0 +1,102 @@
+{
+  "repo": "hugging-mac/d3-edge-CoreAI",
+  "revision": "0690c04ee1640c1c3fa11a882323751dda6d086a",
+  "files": [
+    {
+      "path": "LICENSE",
+      "size": 11357,
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "remoteSHA256": null,
+      "remoteGitBlob": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+      "matches": true
+    },
+    {
+      "path": "NOTICE",
+      "size": 895,
+      "sha256": "2326c866dd82edf02dea680cc5e7a15df89a6f2a98feb93f04377d03bd8ad56e",
+      "remoteSHA256": null,
+      "remoteGitBlob": "abc6263be985c56f5b1aa56eb63315b97fa2102f",
+      "matches": true
+    },
+    {
+      "path": "chat_template.jinja",
+      "size": 7755,
+      "sha256": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80",
+      "remoteSHA256": null,
+      "remoteGitBlob": "0ef09f214eaa6d9bca297988afc1454b5827b2c7",
+      "matches": true
+    },
+    {
+      "path": "decision.aimodel/main.hash",
+      "size": 32,
+      "sha256": "99b7ef485a3ceb55de8aaff92a4f3732105ac84d41bba1065196f8dd336f1d4e",
+      "remoteSHA256": null,
+      "remoteGitBlob": "22a80837fe7e452814d648bceeaa96d9ed3f00f5",
+      "matches": true
+    },
+    {
+      "path": "decision.aimodel/main.mlirb",
+      "size": 990262410,
+      "sha256": "ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78",
+      "remoteSHA256": "ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78",
+      "remoteGitBlob": "a9127b1a0321ba0c07a8624911300c492bc71650",
+      "matches": true
+    },
+    {
+      "path": "decision.aimodel/metadata.json",
+      "size": 105,
+      "sha256": "723a13872446d6e5d3bb147752d58b612909259dfe35fb7a39fc4c603c3b53f2",
+      "remoteSHA256": null,
+      "remoteGitBlob": "da9f586143d064d0a811dd9adf9090b71c045cb9",
+      "matches": true
+    },
+    {
+      "path": "decision_config.json",
+      "size": 5504,
+      "sha256": "30b6095b945d5a93697868afdf9be9123ea892085fbaff3078112c48da20dc6b",
+      "remoteSHA256": null,
+      "remoteGitBlob": "5bf6f72adb66002996fcf44a04947687eb2c2034",
+      "matches": true
+    },
+    {
+      "path": "manifest.json",
+      "size": 942,
+      "sha256": "b0b63b4d97b1eabc6c3f748b4f0f41ca19d25f9a7b025d55a1cf8eb27c70f81b",
+      "remoteSHA256": null,
+      "remoteGitBlob": "422e57f1bbb726d241ad2cbf4947651e517a1069",
+      "matches": true
+    },
+    {
+      "path": "merges.txt",
+      "size": 3353259,
+      "sha256": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+      "remoteSHA256": null,
+      "remoteGitBlob": "a494e019ca1502219fd0128658b979e5f05ae8e8",
+      "matches": true
+    },
+    {
+      "path": "tokenizer.json",
+      "size": 12807982,
+      "sha256": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+      "remoteSHA256": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+      "remoteGitBlob": "a73a846725794819aa6e1c9e97d8dc9671c2006d",
+      "matches": true
+    },
+    {
+      "path": "tokenizer_config.json",
+      "size": 16709,
+      "sha256": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c",
+      "remoteSHA256": null,
+      "remoteGitBlob": "fae3ce993e07c092ad024dde45e592379fde91bb",
+      "matches": true
+    },
+    {
+      "path": "vocab.json",
+      "size": 6722759,
+      "sha256": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003",
+      "remoteSHA256": null,
+      "remoteGitBlob": "0aa0ce0658d60ac4a5d609f4eadb0e8e43514176",
+      "matches": true
+    }
+  ]
+}

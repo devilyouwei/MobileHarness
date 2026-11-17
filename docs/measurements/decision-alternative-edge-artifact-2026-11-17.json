@@ -1,0 +1,69 @@
+{
+  "repository": "maxffarrell/d3-edge-CoreAI",
+  "revision": "ffa8431fe8dd5209f3ec2c8bf59afc829ec96c31",
+  "manifest": {
+    "source": "vllm-sr/d3-edge",
+    "sequence_length": 512,
+    "hidden_size": 1024,
+    "inputs": [
+      "input_ids",
+      "attention_mask",
+      "position_ids",
+      "visual_embeddings",
+      "visual_mask"
+    ],
+    "output": "mm_90",
+    "vision_output": "_to_copy_51",
+    "image_side": 224,
+    "precision": "bfloat16",
+    "revision": "18d61df78684675463af9ae732872478845c5a79",
+    "format": "Apple Core AI .aimodel",
+    "attention_mode": "noncausal_full_attention",
+    "function": "main",
+    "experimental": true,
+    "validation": {
+      "selected_answer_matches": 10,
+      "cases": 10,
+      "max_probability_error": 0.05374589562416077,
+      "strict_probability_parity": false
+    },
+    "platform": {
+      "os": "macOS 27.0.1",
+      "runtime": "coreai-core 1.0.0b3",
+      "specialization": "default",
+      "accelerator_placement_verified": false
+    }
+  },
+  "verifiedMetadata": [
+    {
+      "file": "manifest.json",
+      "sha256": "3f6aa3d0d9f83d17053b5bac6ec9f32f50fd79ee5d4a73e5edfce491d55be262"
+    },
+    {
+      "file": "decision_config.json",
+      "sha256": "30b6095b945d5a93697868afdf9be9123ea892085fbaff3078112c48da20dc6b"
+    },
+    {
+      "file": "tokenizer.json",
+      "sha256": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42"
+    },
+    {
+      "file": "tokenizer_config.json",
+      "sha256": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c"
+    },
+    {
+      "file": "chat_template.jinja",
+      "sha256": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80"
+    }
+  ],
+  "graphFile": {
+    "rfilename": "decision.aimodel/main.mlirb",
+    "blobId": "3078c1af6581a4494718ab046086ecf9e4db760f",
+    "size": 990263433,
+    "lfs": {
+      "sha256": "7e1213a1632df8106e221c9dc9ffb1da809a97edb32e0505c9ddff9d5c5c5c2d",
+      "size": 990263433,
+      "pointerSize": 134
+    }
+  }
+}

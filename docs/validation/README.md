@@ -189,7 +189,7 @@ refactor, Agent-only model recording, current-file recovery and automated/build/
 - [Agent 静态类别](Agent-Categories.md)：类别配置、运行时保留、非法配置拒绝与构建证据。
 
 - [D3 Edge Core AI](D3-Edge-CoreAI.md)：本机 Core AI/PyTorch/Swift 对照、全双工文本三分类、性能与实验性发布证据。
-- [Mac 本地 Decision 模型对照](Decision-Model-Mac-Comparison.md)记录 D3、Laya 和 UniMC 在同一组全双工样例上的分类错误与热调用时延。
+- [Mac 本地 Decision 多分类对照](Decision-Model-Mac-Comparison.md)记录全双工多分类的模型、提示词和时延对照。
 - [Decision prompt language split](Decision-Model-Mac-Comparison.md#decision-prompt-language-split) compares the current English and Chinese prompts with the pre-split mixed prompt using native D3 and the application adoption policy.
 - [小参数生成模型的 Core AI 对照](Decision-Model-Mac-Comparison.md#小参数生成模型的-core-ai-对照)记录 0.6B 至 1.54B 制品在 100 条中英全双工探测上的分类、延迟和提示词复测。
 
@@ -206,3 +206,7 @@ refactor, Agent-only model recording, current-file recovery and automated/build/
 [Apple system LLM](Apple-System-LLM.md) records standalone provider compilation, contract tests, whole-workspace check failures and native-model acceptance limits.
 
 - [D3 iOS AOT validation](D3-iOS-AOT.md): compiler artifacts, publication, architecture selection and device-acceptance limits.
+
+[D3 Edge 继续聆听四分类实验](Decision-Model-Mac-Comparison.md#d3-edge-继续聆听四分类实验2026-11-16)：最新生产提示、194条双语扩展场景、真实App采纳与独立原生读出，区分低召回、250ms超时及512-token容量。
+
+[D3 Edge 提示词结构优化](Decision-Model-Mac-Comparison.md#d3-edge-提示词结构优化实验2026-11-16仅实验环境)：官方/公开集成调研、11组对照与48条预冻结留出；仅实验，保留误继续聆听风险及生产未变的哈希证据。

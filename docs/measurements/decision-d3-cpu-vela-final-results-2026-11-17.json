@@ -1,0 +1,39 @@
+{
+  "model": "d3-edge",
+  "mode": "native-choice-cpu-no-adoption-no-deadline",
+  "inputSHA256": "c41c18f208d479587209bcba1f6222b45ae4da36f2fe4fb341df92bafcb51de6",
+  "sourceHashes": {
+    "MobileHarness/Resources/Agents/Assistant/InputDecision.json": "cf6cee82363c0143adf0bc6fa014f075e1437c7f264677159802520e77877d38",
+    "MobileHarness/ModelKit/Language/JEV/D3Decision.swift": "3f73d47f20b6553e51cbd6883a7823c7a7c9f5224fe37b38c52d77bfe73cec42",
+    "Tests/IntegrationTests/DecisionPromptOptimizationTests.swift": "24a7a3087556274c640bd7445699fa4777bd4a57bb884561929949bcec8d7e5f"
+  },
+  "warmup": [
+    {
+      "variant": "minimal",
+      "id": "holdout-alarm-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Wake me on Monday at",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "inputTokens": 188,
+      "prediction": null,
+      "error": "AssertionError: Invalid readout: shape=(1, 255), finite=0/255",
+      "milliseconds": 4861.143208006979
+    }
+  ],
+  "rows": [],
+  "sourcesUnchanged": false,
+  "runnerSHA256": "027a31583a356ee922b24c6ef9de773fcdc83e5ff570105f8ea9976213faf43d",
+  "graphSHA256": "ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78",
+  "loadMilliseconds": 20.69574999040924
+}
