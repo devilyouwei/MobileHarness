@@ -34,7 +34,8 @@ private func entries(_ json: String) throws -> [Git.TreeEntry] {
 func liveHubDownloadPublishesFilesAndIntermediateProgress() async throws {
     let endpoint = try #require(ProcessInfo.processInfo.environment["HARNESS_TEST_HUB_ENDPOINT"])
     let catalog = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-        .deletingLastPathComponent().appendingPathComponent("MobileHarness/Resources/Models/model-catalog.json")
+        .deletingLastPathComponent().appendingPathComponent(
+            "MobileHarness/ModelKit/Support/Management/model-catalog.json")
     let artifact = try #require(ModelArtifactCatalog.read(catalog).packages.first { $0.id == "silero" })
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -58,7 +59,8 @@ func liveHubDownloadPublishesFilesAndIntermediateProgress() async throws {
 
 @Test func completedFilesAndPersistedPlanResumeWithoutNetwork() async throws {
     let catalog = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-        .deletingLastPathComponent().appendingPathComponent("MobileHarness/Resources/Models/model-catalog.json")
+        .deletingLastPathComponent().appendingPathComponent(
+            "MobileHarness/ModelKit/Support/Management/model-catalog.json")
     let artifact = try #require(ModelArtifactCatalog.read(catalog).packages.first { $0.id == "silero" })
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

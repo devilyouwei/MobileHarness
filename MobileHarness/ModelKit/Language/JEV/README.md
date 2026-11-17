@@ -6,7 +6,7 @@ DecisionCapability 提供 choice(DecisionRequest) 和 noul(NoulRequest)。choice
 
 ## D3 执行
 
-ModelKitD3 独立编译 D3Decision，依赖 ModelKitCoreAI 和现有 Tokenizers。默认端口 language.decision 使用 d3-edge。按 ID 可取得 d3-lite，制品目录分别是 D3Edge 和 D3Lite。加载 manifest、decision_config、tokenizer，以及源图或匹配设备架构的编译图，并校验 512 token、255 项候选读出及输入名称。文本接口传入 `input_ids`、`attention_mask` 和 `position_ids`。Edge 和 Lite 共用图签名适配。适配器按 manifest 和实际图校验三输入或五输入。三输入图仅接收文本张量，五输入图在 ModelKit 内另绑定全零 Float32 视觉向量与全 false Bool 掩码。业务使用统一的文本 DecisionRequest 和 DecisionResult。固定 chat template 关闭 thinking，短输入左填充，position_ids 为四组同序位置；超长输入明确失败，不截断。GraphModel 使用系统默认 specialization，与发布制品验证路径一致。
+ModelKitD3 独立编译 D3Decision，依赖 ModelKitCoreAI 和现有 Tokenizers。默认端口 language.decision 使用 d3-edge。Edge 制品目录为 D3Edge。加载 manifest、decision_config、tokenizer，以及源图或匹配设备架构的编译图，并校验 512 token、255 项候选读出及输入名称。文本接口传入 `input_ids`、`attention_mask` 和 `position_ids`。适配器按 manifest 和实际图校验三输入或五输入。三输入图仅接收文本张量，五输入图在 ModelKit 内另绑定全零 Float32 视觉向量与全 false Bool 掩码。业务使用统一的文本 DecisionRequest 和 DecisionResult。固定 chat template 关闭 thinking，短输入左填充，position_ids 为四组同序位置；超长输入明确失败，不截断。GraphModel 使用系统默认 specialization，与发布制品验证路径一致。
 
 一个资源租约执行一次 stateless 图并输出一个 DecisionResult；按当前候选数量裁取 logits 后 softmax。InferenceTaskControl 取消并加入原生执行，再释放租约。下载、加载和卸载由 ModelKit 资源体系拥有；调用者不得以超时冒充资源释放。
 

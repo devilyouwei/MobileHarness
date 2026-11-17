@@ -4,7 +4,7 @@
 
 ModelKit supplies typed Language/Speech/Vision inference, model execution and model/artifact lifecycle. Core owns neutral values and concurrency mechanisms; capability domains own request/result contracts; concrete providers own algorithms and native integration; Management owns registration, residency, artifacts and default assembly.
 
-The SDK depends on its own targets, approved third-party products and system frameworks. It has no dependency on another capability or business module. Consumers own application tasks, history selection, device actions, capture/playback and presentation. Storage, download and quiescence implementations enter through ModelKit-owned protocols or closures.
+The SDK depends on its own targets, approved third-party products and system frameworks. It has no dependency on another capability or business module. Consumers own application tasks, history selection, device actions, capture/playback and presentation. ModelKit owns disk storage and downloads. Consumers supply only business quiescence and inference configuration; optional SDK-owned protocols support isolated tests.
 
 ## External relationships and data flow
 
@@ -16,8 +16,8 @@ flowchart LR
  Caller["Agents / Actions · capability consumers"] -->|Typed requests and input media| SDK
  SDK -->|Events, results and neutral errors| Caller
  SDK -->|Handles and lifecycle snapshots| Host
- Host -.->|SDK-owned storage and download protocols, quiescence closure| SDK
- SDK -->|Artifact operations through injected contracts| Adapters[Host-provided implementations]
+ Host -.->|Business quiescence closure| SDK
+ SDK -->|Artifact operations| Adapters[ModelKit disk and network implementations]
     linkStyle default stroke:#64748b,stroke-width:1.5px
 ```
 
@@ -31,7 +31,7 @@ flowchart LR
 | Support/Backends/CoreAI | Generic stateless graph/tensor runtime; ModelKitCoreAI |
 | Support/Backends/CoreML | Generic named tensor runtime; ModelKitCoreML |
 | Support/Management | Generic registration/lifecycle/artifacts in ModelKitRuntime; model registration and selection in ModelKitDefaults; disjoint explicit source lists |
-| Support/Management/HuggingFace | Injected download adapter; ModelKitHub |
+| Support/Management/HuggingFace | Hugging Face downloader; ModelKitHub |
 | Support/Speech/Apple | PCMCodec shared by Apple ASR/TTS in ModelKitAppleSpeech |
 | Language/LLM/Apple, Gemma4, OpenAI | Concrete system/local/cloud chat adapters; [Apple](Language/LLM/Apple/README.md) is the standalone ModelKitAppleLLM product |
 | Speech/ASR, TTS, VAD provider directories | Concrete speech algorithms/native services |
@@ -80,6 +80,7 @@ flowchart TD
  ModelKitYOLOPose[ModelKitYOLOPose]
  ModelKitDefaults --> ModelKit
  ModelKitDefaults --> ModelKitRuntime
+ ModelKitDefaults --> ModelKitHub
  ModelKitDefaults -->|device / macOS| ModelKitGemma4
  ModelKitDefaults --> ModelKitD3
  ModelKitDefaults --> ModelKitOpenAI
@@ -129,7 +130,7 @@ The existing speech selector accepts a host-provided locale reader for automatic
 | Synthesis | Enabled, installed and available MOSS Nano; otherwise Apple PCM TTS |
 | Voice activity | Installed and available Silero; otherwise Energy, independent of ASR preference |
 | Pose | YOLO26n-Pose |
-| Decision | D3 Edge/Lite and Vela 3 Fast when the selected artifact and platform are available. Agents owns the exclusive local or cloud selection and enqueues with an error notice on failure; ModelKit never switches providers. |
+| Decision | D3 Edge and Vela 3 Fast when the selected artifact and platform are available. Agents owns the exclusive local or cloud selection and enqueues with an error notice on failure; ModelKit never switches providers. |
 
 Custom ASR/TTS switches default off and are independent. Kokoro is an explicitly provisioned optional provider without Defaults registration. Selection occurs before admission; failure during active inference never switches provider. Local inference never initiates artifact downloads. The simulator local-chat binding reports unavailable; the Gemma package's native framework requirements still apply at compilation.
 
@@ -139,7 +140,7 @@ App owns one ModelContainer with four stable child ports. Each root owns an inde
 
 InferenceSession has one consumer and explicit event-count/byte limits. Core's default is 64 events/4096 estimated bytes per event; each provider declares its own bounds. Gemma uses 4096 events/2097152 bytes with a separate 256 KiB tool-generation buffer; OpenAI uses 128 events with producer backpressure and no single-event byte ceiling. Normal completion drains accepted events; failure/cancellation suppresses buffered delivery. InferenceTaskControl owns one worker's cancellation state; providers join cleanup and release leases after native work exits. OpenAI separately owns HTTP cancellation.
 
-Artifacts have an independent schema-v2 catalog, bounded transfer state, validated installed receipts, safe publication/deletion and resource maintenance fences. The host supplies persistence/download adapters. Configuration, admission, native execution and cleanup failures remain observable; consumers choose recovery and presentation.
+Artifacts have an independent schema-v2 catalog, bounded transfer state, validated installed receipts, safe publication/deletion and resource maintenance fences. ModelKit supplies persistence and download implementations. Configuration, admission, native execution and cleanup failures remain observable; consumers choose recovery and presentation.
 
 ## Coverage and platform constraints
 
@@ -157,9 +158,9 @@ The Responses adapter maps minimum and enabled modes to provider-specific wire f
 
 Apple TTS retains one native synthesizer per capability, fences request cleanup and emits its first bounded PCM portion immediately. See [Apple TTS](Speech/TTS/Apple/README.md).
 
-## Storage 文件作用域接入
+## 独立制品文件所有权
 
-模型制品适配器由 App 注入 Files；后台回调复用同一制品服务。制品绑定停止时关闭接纳、取消并加入下载并保留清理错误，释放配置后允许在新 Files 作用域重新绑定，不停止无关模型实例。App 只转交接口与调度启停。
+ModelKit 自行拥有制品目录、文件存储、下载与后台恢复，不接收 Storage/FilesContainer。默认根在 Application Support/MobileHarness/Models，installed 保存安装收据和文件，staging 保存传输计划及恢复数据；原安装位置与收据兼容。关闭制品接纳后取消并加入下载、报告清理错误；App 只转交系统事件与调度启停。显式资源 URL 和协议注入用于独立装配与测试。
 
 ## 分类异常诊断
 
@@ -178,7 +179,7 @@ LLM 中立失败诊断向消费者提供原因/协议阶段及安全标识；具
 | vision | ModelVisionProviding：单帧姿态、可用性及统一资源控制 |
 | artifacts | ModelArtifactsManaging：准备、库存、下载、取消及带宿主静默屏障的删除 |
 
-语言／视觉共享 ModelResourceControlling 的 load、warmup、unload、status；语音按类别提供同名操作，状态对应所选后端、卸载覆盖同类本地与系统后端。子能力不暴露注册、manager 或根关闭权限；首次准备和后台恢复共用一个实例级准备任务。查询元信息不加载权重。关闭推理不终止后台制品传输；根 stop 先加入推理，再关闭制品，最后终止 manager，Storage 随后关闭。取消与生命周期拒绝不升级为故障；真实调用失败及流失败由所属子能力通过注入的中立回调上报给宿主。
+语言／视觉共享 ModelResourceControlling 的 load、warmup、unload、status；语音按类别提供同名操作，状态对应所选后端、卸载覆盖同类本地与系统后端。子能力不暴露注册、manager 或根关闭权限；首次准备和后台恢复共用一个实例级准备任务。查询元信息不加载权重。关闭推理不终止后台制品传输；根 stop 先加入推理，再关闭制品，最后终止 manager；Storage 独立关闭。取消与生命周期拒绝不升级为故障；真实调用失败及流失败由所属子能力通过注入的中立回调上报给宿主。
 
 [Gemma4](Language/LLM/Gemma4/README.md) owns context fitting, local engine timing and OpenAI-style native tool adaptation. Tool requests preserve complete instructions/declarations/history and fail explicitly if the local window cannot fit them; tool execution remains caller-owned.
 
@@ -212,7 +213,7 @@ ModelLanguageProviding.chatModel(configuration:) 返回固定配置的轻量 Cha
 
 ## Decision 能力
 
-language.decision 默认 D3 Edge；decisionModel(id) 可选 D3 Lite、Vela 3 Fast。DecisionCapability 同时提供 choice 和 noul，ModelKitD3 封装 D3/Vela 原生格式，基础 ModelKit 的 ChatDecision 提供通用聊天布尔/候选适配。ModelKit 不执行上层打断策略，不自动切换模型。独立资源租约及取消清理见 [JEV](Language/JEV/README.md)。
+language.decision 默认 D3 Edge；decisionModel(id) 可选 Vela 3 Fast。DecisionCapability 同时提供 choice 和 noul，ModelKitD3 封装 D3/Vela 原生格式，基础 ModelKit 的 ChatDecision 提供通用聊天布尔/候选适配。ModelKit 不执行上层打断策略，不自动切换模型。独立资源租约及取消清理见 [JEV](Language/JEV/README.md)。
 
 Chat 的可选 onDispatch 回调报告实际 HTTP/本地推理开始边界，供上层原子持久化请求；详见 [LLM](Language/LLM/README.md)。
 
@@ -222,7 +223,7 @@ ModelKitDefaults registers apple-system as a named Chat model backed by the stan
 
 Default artifact assembly obtains the physical iOS architecture through D3/CoreAI and resolves declarative catalog variants before configuring acquisition. Runtime remains independent of native backends; provider manifests separately validate the compiled graph architecture.
 
-localModelPreparationStep accepts a caller-owned asynchronous local-model selection. Nil requires no resource; d3-edge/d3-lite/apple-system map directly and gemma4-e2b maps to the shared chat resource. It checks actual readiness and forwards manager warmup/loading notifications, propagating unknown selection, read, load and admission failures. It neither selects a business role nor contacts a cloud model.
+localModelPreparationStep accepts a caller-owned asynchronous local-model selection. Nil requires no resource; d3-edge/apple-system map directly and gemma4-e2b maps to the shared chat resource. It checks actual readiness and forwards manager warmup/loading notifications, propagating unknown selection, read, load and admission failures. It neither selects a business role nor contacts a cloud model.
 
 ## Speech enhancement interface
 

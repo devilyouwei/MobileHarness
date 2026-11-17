@@ -319,15 +319,21 @@ App's ApplicationContainer retains one instance of each module root per applicat
 
 #### Dependencies and startup
 
-Arrows show readiness dependencies. App owns diagnostics, execution bindings and home preparation.
+Arrows point from a prerequisite to the service that waits for it, matching [ModuleRegistration](App/Composition/ModuleRegistration.swift). App owns diagnostics, execution bindings and home preparation. The four foundation roots each depend on diagnostics; ModelKit owns its model files and downloads independently of Storage.
 
 ```mermaid
 flowchart TB
-    D["diagnostics"] --> S["StorageContainer"]
-    D --> M["ModelContainer"]
-    D --> P["PlatformContainer"]
-    D --> U["UIContainer"]
-    S --> M
+    D["diagnostics"]
+    subgraph F["Independent foundations"]
+        S["StorageContainer"]
+        M["ModelContainer"]
+        P["PlatformContainer"]
+        U["UIContainer"]
+    end
+    D --> S
+    D --> M
+    D --> P
+    D --> U
     S --> B["executionBindings"]
     M --> B
     P --> B
@@ -336,6 +342,7 @@ flowchart TB
     X --> G["GatewayContainer"]
     G --> A["AgentContainer"]
     A --> H["homePreparation"]
+    style F fill:#f4f8f5,stroke:#56936a,color:#2c573a
     classDef host fill:#eaf2ff,stroke:#5078b8,color:#203b64
     classDef foundation fill:#eaf7ed,stroke:#56936a,color:#2c573a
     classDef business fill:#f0eaff,stroke:#8261b5,color:#463065
@@ -344,7 +351,7 @@ flowchart TB
     class X,G,A business
 ```
 
-Startup runs serially: **diagnostics → storage → model → platform → ui → executionBindings → actions → gateway → agents → homePreparation**. Storage opens repositories; ModelKit registers inference capabilities, with weights loaded on demand.
+[ApplicationLifecycle](App/Lifecycle/ApplicationLifecycle.swift) selects the first registered service whose prerequisites are ready and starts services serially. With the current registration order, startup is: **diagnostics → storage → model → platform → ui → executionBindings → actions → gateway → agents → homePreparation**. This sequence reflects the current registration order; the readiness prerequisites are the edges above. Storage opens repositories; ModelKit prepares its own artifact management and registers inference capabilities, with weights loaded on demand. executionBindings waits for all four foundation roots before assembling the business execution interfaces.
 
 During `executionBindings`, Agents prepares its requirements, Actions assembles the business services and catalog, and Agents validates catalog coverage. App then configures Gateway and injects the resulting execution facilities into Agents. Actions then starts execution services, Gateway opens admission, and Agents starts its roles. Home preparation follows the foreground barrier and visible-home condition.
 
@@ -1428,9 +1435,9 @@ First-run Welcome is composed by UI Root after settings restore confirms an empt
 
 UI owns drafts, revisions and typed requests. ApplicationControl authorizes the settings calls. Actions validates and applies changes through injected model and persistence ports. Provider settings persist credential references, with the credential itself stored through the native credential adapter. Failures cannot become empty configuration, an undocumented old-model fallback or fabricated success. Primary and cleanup errors remain distinct.
 
-Download, installation, preference selection and model residency are separate states. Opening a page does not start transfers; pages do not poll to drive downloads. Root observers coalesce artifact revisions and read real state. Actions supplies application adapters to ModelKit-owned storage/download ports. Removing an artifact first quiesces actual consumers; background URLSession completion belongs to the artifact owner. Actions also owns UI interaction workers and joins them during shutdown. See [ApplicationControl](Agents/ApplicationControl/README.md), [Provider](Actions/System/Provider/README.md), [ModelResources](Actions/System/ModelResources/README.md) and [Management](ModelKit/Support/Management/README.md).
+Download, installation, preference selection and model residency are separate states. Opening a page does not start transfers; pages do not poll to drive downloads. Root observers coalesce artifact revisions and read real state. ModelKit owns its bundled catalog, disk layout, receipts and download implementations; Actions supplies only business preference and interaction policy. Removing an artifact first quiesces actual consumers; background URLSession completion belongs to the artifact owner. Actions also owns UI interaction workers and joins them during shutdown. See [ApplicationControl](Agents/ApplicationControl/README.md), [Provider](Actions/System/Provider/README.md), [ModelResources](Actions/System/ModelResources/README.md) and [Management](ModelKit/Support/Management/README.md).
 
-Agent Models manages shared cloud Providers and local model downloads. Assistant, Writer and Decision save their own model selections. UI merges each page’s draft into the committed settings and shares per-provider discovery; ApplicationControl and Gateway carry requests to the Actions transaction owner. Assistant can select local Gemma, the Apple system model or a cloud model with minimum reasoning. Decision adds D3 Edge, D3 Lite and Vela 3 Fast to the existing Chat choices. Assistant uses the same noul interface and context with each selection; ModelKit owns native formats. See the [Assistant Decision design](Agents/Assistant/README.md#full-duplex-input-and-decision). Writer offers tool-capable local Gemma and requires tool support from its cloud Chat capability. Gemma adapts native tools within its context window and reports overflow. Cloud Writer offers optional deeper reasoning. The Apple model remains visible in the Assistant and Decision menus and is selectable when the system reports availability. Each classification reads one snapshot, invokes only the selected model, and reports failure with a localized Toast and enqueue. UI selects Provider then Model, with artifact-specific installation checks before local selection is saved. In-flight Writer execution retains its configuration. See [Provider](Actions/System/Provider/README.md), [Settings](UI/Settings/README.md) and [Writer](Agents/Writer/README.md).
+Agent Models manages shared cloud Providers and local model downloads. Assistant, Writer and Decision save their own model selections. UI merges each page’s draft into the committed settings and shares per-provider discovery; ApplicationControl and Gateway carry requests to the Actions transaction owner. Assistant can select local Gemma, the Apple system model or a cloud model with minimum reasoning. Decision adds D3 Edge and Vela 3 Fast to the existing Chat choices. Assistant uses the same noul interface and context with each selection; ModelKit owns native formats. See the [Assistant Decision design](Agents/Assistant/README.md#full-duplex-input-and-decision). Writer offers tool-capable local Gemma and requires tool support from its cloud Chat capability. Gemma adapts native tools within its context window and reports overflow. Cloud Writer offers optional deeper reasoning. The Apple model remains visible in the Assistant and Decision menus and is selectable when the system reports availability. Each classification reads one snapshot, invokes only the selected model, and reports failure with a localized Toast and enqueue. UI selects Provider then Model, with artifact-specific installation checks before local selection is saved. In-flight Writer execution retains its configuration. See [Provider](Actions/System/Provider/README.md), [Settings](UI/Settings/README.md) and [Writer](Agents/Writer/README.md).
 
 ### 18. History, business records and restart behavior
 
@@ -1507,7 +1514,8 @@ Memory authorizes history requests; Actions owns queries, mutations and presenta
 | Current model facts                          | Actual container memory, sampled per request; no persistent StorageState mirror.                               |
 | PCM and temporary buffers                    | Bounded Storage.cache sessions and leases; not durable creations.                                              |
 | Conversation, task, media and device records | Storage repositories with actual commit/recovery contracts.                                                    |
-| Photos, settings and model artifact files    | Controlled Storage.files namespaces; pending/ready/compensation rather than cross-backend atomic transactions. |
+| Photos, settings and workspace files | Controlled Storage.files namespaces; pending/ready/compensation rather than cross-backend atomic transactions. |
+| Model artifacts and download metadata | ModelKit-owned filesystem, receipts, transfer indexes and background transports; independent of Storage. |
 
 See [Memory](Agents/Memory/README.md), [History](Actions/History/README.md) and [Storage](Storage/README.md).
 
@@ -1536,7 +1544,7 @@ flowchart TB
         Manager["Instance-local management /<br/>loading / residency"]:::model
         Provider["Cloud or local provider"]:::model
         Backend["Responses / CoreAI / CoreML<br/>/ engine"]:::model
-        Ports["Artifacts / ModelKit-owned<br/>storage and download ports"]:::model
+        Ports["Artifacts / ModelKit-owned<br/>disk storage and download transports"]:::model
     end
     style Inference fill:#eeefff,stroke:#747bb8,color:#3c426d
     subgraph Host["APP"]
@@ -1728,7 +1736,7 @@ Agents root contracts distinguish App-bound host bindings and Gateway configurat
 
 ### Model artifact architecture selection
 
-Default ModelKit assembly resolves optional artifact catalog architecture variants before acquisition; native architecture discovery stays inside ModelKit providers/backends. Actions supplies the unchanged declarative catalog and storage/downloader adapters. The selected source revision and required-file set flow together into download, installation receipts and resource loading. Source packages remain available for architectures without a compiled variant. See [ModelKit management](ModelKit/Support/Management/README.md).
+Default ModelKit assembly resolves optional artifact catalog architecture variants before acquisition; native architecture discovery stays inside ModelKit providers/backends. ModelKitRuntime bundles the declarative catalog; ModelKitDefaults composes its own disk storage and Hub downloader. The selected source revision and required-file set flow together into download, installation receipts and resource loading. Source packages remain available for architectures without a compiled variant. See [ModelKit management](ModelKit/Support/Management/README.md).
 
 Speech detection settings follow UI Settings → ApplicationControl → Actions resource preferences → Storage. App composition injects a read-only settings closure into Agents; SpeechPerception snapshots it when opening its VAD session. UI and PlatformKit do not own recognition thresholds.
 

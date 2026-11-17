@@ -1,6 +1,7 @@
 import Foundation
 import ModelKit
 import ModelKitD3
+import ModelKitHub
 import ModelKitOpenAI
 @_spi(ModelAssembly) import ModelKitRuntime
 
@@ -55,12 +56,16 @@ public protocol ModelSpeechProviding: Sendable {
 public protocol ModelDecisionProviding: DecisionCapability, ModelResourceControlling {}
 public protocol ModelVisionProviding: PoseCapability, ModelResourceControlling {}
 public protocol ModelArtifactsManaging: Sendable {
+    func upsertArtifact(_ artifact: ModelArtifact) async throws
     func prepare() async throws
     func observeArtifactChanges() async throws -> AsyncStream<UInt64>
     func artifactSnapshots() async throws -> [ModelArtifactSnapshot]
     func downloadArtifact(_ id: String, source: ModelDownloadSource) async throws
     func cancelArtifact(_ id: String) async throws
     func removeArtifact(_ id: String, quiesce: @escaping @Sendable () async -> Void) async throws
+}
+extension ModelArtifactsManaging {
+    public func upsertArtifact(_ artifact: ModelArtifact) async throws { throw ModelArtifactError.invalidCatalog }
 }
 public struct ModelArtifactConfiguration: Sendable {
     public let catalog: ModelArtifactCatalog
@@ -91,15 +96,29 @@ public struct ModelArtifactConfiguration: Sendable {
     private var suspension: Task<Void, Never>?
     private var shutdown: Task<Void, Error>?
     public init(
-        resources: URL,
+        resources: URL? = nil,
         prepareArtifacts: (@Sendable () async throws -> ModelArtifactConfiguration)? = nil,
         onFailure: @escaping @Sendable (String, String, any Error) -> Void = { _, _, _ in },
         maximumPendingLocalChats: Int = 8,
         recognitionLocale: @escaping @Sendable () -> String = { "en-US" }
     ) {
         let admission = InferenceAdmission(open: false)
+        let artifactPreparation: (@Sendable () async throws -> ModelArtifactConfiguration)?
+        if let prepareArtifacts {
+            artifactPreparation = prepareArtifacts
+        } else if resources == nil {
+            artifactPreparation = {
+                ModelArtifactConfiguration(
+                    catalog: try .bundled(), storage: try ModelArtifactDiskStorage(),
+                    downloader: HuggingFaceArtifactDownloader())
+            }
+        } else {
+            artifactPreparation = nil
+        }
         let scope = ModelScope(
-            resources: resources, admission: admission, prepareArtifacts: prepareArtifacts, onFailure: onFailure,
+            resources: resources
+                ?? ModelArtifactDiskStorage.defaultRoot.appendingPathComponent("installed", isDirectory: true),
+            admission: admission, prepareArtifacts: artifactPreparation, onFailure: onFailure,
             maximumPendingLocalChats: maximumPendingLocalChats, recognitionLocale: recognitionLocale)
         self.admission = admission
         self.scope = scope
@@ -276,7 +295,7 @@ private actor ModelScope {
         waiters += 1
         defer { waiters -= 1 }
         if assembly == nil {
-            assembly = Task { [resources, selection, admission, prepareArtifacts] in
+            assembly = Task { [resources, selection, admission, prepareArtifacts, failure] in
                 guard #available(iOS 27, macOS 27, *) else {
                     throw CapabilityError.unavailable("Model assembly requires OS 27")
                 }
@@ -288,7 +307,12 @@ private actor ModelScope {
                         try await manager.configureArtifacts(
                             catalog: try configuration.catalog.resolvingArchitecture(D3Decision.deviceArchitectureName),
                             storage: configuration.storage,
-                            downloader: configuration.downloader)
+                            downloader: configuration.downloader,
+                            onFailure: { id, error in
+                                failure(
+                                    "artifacts", "restore." + id,
+                                    ModelFailure(component: "artifacts", operation: "restore." + id, underlying: error))
+                            })
                         _ = try await manager.artifactSnapshots()
                     }
                     return manager
@@ -556,7 +580,7 @@ public final class ModelLanguageContainer: ModelLanguageProviding, Sendable {
     public func decisionModel(_ id: String) -> (any ModelDecisionProviding)? {
         switch id {
         case "d3-edge": decision
-        case "d3-lite", "vela3-fast": ModelDecisionContainer(scope: scope, id: ModelID(id))
+        case "vela3-fast": ModelDecisionContainer(scope: scope, id: ModelID(id))
         default: nil
         }
     }
@@ -798,6 +822,9 @@ public final class ModelArtifactsContainer: ModelArtifactsManaging, Sendable {
     public func artifactSnapshots() async throws -> [ModelArtifactSnapshot] {
         try await scope.perform("artifacts", "snapshot", inference: false) { try await $0.artifactSnapshots() }
     }
+    public func upsertArtifact(_ artifact: ModelArtifact) async throws {
+        try await scope.perform("artifacts", "upsert", inference: false) { try await $0.upsertArtifact(artifact) }
+    }
     public func downloadArtifact(_ id: String, source: ModelDownloadSource) async throws {
         try await scope.perform("artifacts", "download", inference: false) {
             try await $0.downloadArtifact(id, source: source)
@@ -977,7 +1004,7 @@ extension ModelContainer {
             guard let selected = try await selection() else { return nil }
             switch selected {
             case "gemma4-e2b": return ModelID("chat")
-            case "d3-edge", "d3-lite", "vela3-fast", "apple-system", "deepfilternet3": return ModelID(selected)
+            case "d3-edge", "vela3-fast", "apple-system", "deepfilternet3": return ModelID(selected)
             default: throw CapabilityError.invalidRequest("Unknown local preparation model: \(selected)")
             }
         }

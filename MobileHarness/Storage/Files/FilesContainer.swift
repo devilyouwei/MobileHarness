@@ -25,16 +25,14 @@ public final class FilesContainer: Sendable {
     private let failures: StorageFailureReporter
     public let settings: FileNamespace
     public let photos: FileNamespace
-    public let models: FileNamespace
     public let workspaces: FileNamespace
     public init(
-        settings: URL, photos: URL, models: URL, workspaces: URL? = nil, failures: StorageFailureReporter = .init()
+        settings: URL, photos: URL, workspaces: URL? = nil, failures: StorageFailureReporter = .init()
     ) {
         self.failures = failures
         access = FileAccess(failures: failures)
         self.settings = FileNamespace(root: settings, owner: id)
         self.photos = FileNamespace(root: photos, owner: id)
-        self.models = FileNamespace(root: models, owner: id)
         self.workspaces = FileNamespace(
             root: workspaces ?? settings.deletingLastPathComponent().appendingPathComponent("WebWorkspaces"), owner: id)
     }

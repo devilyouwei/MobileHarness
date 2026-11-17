@@ -4,7 +4,7 @@
 
 | 制品 | 用例 | 输出协议 |
 | --- | --- | --- |
-| D3 Edge、D3 Lite | 154 条，含三个冻结提示组和两个现行提示的冻结样本组 | Core AI 原生 Choice，A/B/C 对应打断、舍弃、入队 |
+| D3 Edge | 154 条，含三个冻结提示组和两个现行提示的冻结样本组 | Core AI 原生 Choice，A/B/C 对应打断、舍弃、入队 |
 | Qwen2.5 1.54B INT8 | 原输出协议对照的 100 条 | 首 token 单词或数字打分，或严格生成一个完整单词或数字 |
 
 这两套样例有各自的来源。横向比较只使用相同用例、预期和提示条件。Apple 系统模型与现行 Assistant renderer、采纳策略的核对继续使用 [IntegrationTests 的原生入口](../IntegrationTests/README.md#apple-system-decision-comparison)。它与这里的 D3 冻结用例有配对记录。历史报告保留超预算制品的测量证据。
@@ -13,7 +13,6 @@
 
 - `models.json` 固定 Hugging Face revision、文本图路径、必需文件和 SHA-256。
 - `fixtures.json` 保存合成输入和预期动作。现行提示组是迁移时的快照。
-- `benchmark.py` 负责下载、编码、执行、计分和 JSON 输出。D3 Edge 与 Lite 文本路径共用三输入接口。旧版 Lite 本机制品可运行 `benchmark.py download d3-lite --force` 更新，归档报告保留当时的制品版本。
 - `DecisionDecoder.swift` 是独立包的 Qwen 解码执行器。每条请求重置上下文，预热三次。
 - `.local/` 存储权重、虚拟环境和本次输出，受 Git 忽略。
 
@@ -24,7 +23,6 @@ bench=Tests/DecisionBenchmarks
 python3.13 -m venv "$bench/.local/venv"
 "$bench/.local/venv/bin/python" -m pip install -r "$bench/requirements.txt"
 python3 "$bench/benchmark.py" download d3-edge
-python3 "$bench/benchmark.py" download d3-lite
 python3 "$bench/benchmark.py" download qwen2.5-1.5b
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 swift build --package-path "$bench" --configuration release
@@ -35,7 +33,6 @@ swift build --package-path "$bench" --configuration release
 ```bash
 py="$bench/.local/venv/bin/python"
 "$py" "$bench/benchmark.py" run d3-edge --output "$bench/.local/results/edge.json"
-"$py" "$bench/benchmark.py" run d3-lite --output "$bench/.local/results/lite.json"
 "$py" "$bench/benchmark.py" run qwen2.5-1.5b --mode score-words --output "$bench/.local/results/qwen.json"
 ```
 

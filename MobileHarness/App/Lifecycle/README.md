@@ -2,7 +2,7 @@
 
 ## 职责与编译边界
 
-ApplicationLifecycle.swift 独立编译为 AppLifecycle，只依赖 Foundation。它管理服务图，不实现语音、相机、蓝牙、配置或展示。ApplicationSystemDelegate.swift仅由App executable编译，下载回调转交Actions的ModelDownloadBackgroundService；applicationWillTerminate调用UI的IslandProcessLifecycle终止清理端口，超时记录OSLog错误。同步等待上限1秒，只有OS实际发出终止回调才可执行，不能保证挂起强杀的清理。
+ApplicationLifecycle.swift 独立编译为 AppLifecycle，只依赖 Foundation。它管理服务图，不实现语音、相机、蓝牙、配置或展示。ApplicationSystemDelegate.swift仅由App executable编译，下载回调转交ModelKitRuntime 的 ModelDownloadBackgroundService；applicationWillTerminate调用UI的IslandProcessLifecycle终止清理端口，超时记录OSLog错误。同步等待上限1秒，只有OS实际发出终止回调才可执行，不能保证挂起强杀的清理。
 
 同文件中的 WriterContinuedProcessing 只在 App 活跃时提交 BGContinuedProcessingTaskRequest，使用每段唯一标识和 fail 策略。最多有一个在途提交和对应的活跃任务，系统资源不足或旧请求尚未结算时保留 Writer 前台执行并记录拒绝。迟到回调完成并退出，不开启新业务。系统进度根据真实回合推进，运行时总量未知。结束调用只结算对应系统任务，过期通过 Writer 端口请求取消和清理。
 

@@ -12,12 +12,15 @@ public actor ModelArtifactStore {
         var task: Task<Void, Never>?
     }
     private let changes = ArtifactChanges()
+    private let onFailure: @Sendable (String, any Error) -> Void
     public func observeChanges() throws -> AsyncStream<UInt64> { try changes.observe() }
     private var fixtureDownload: (@Sendable (URL, URL, Int64) async throws -> URL)?
     private let downloader: (any ModelArtifactDownloader)?
     private final class ProgressMeter: Sendable { let value = Mutex<Double>(0) }
     private var hubProgress: [String: ProgressMeter] = [:]
-    private let catalog: ModelArtifactCatalog
+    private let bundledIDs: Set<String>
+    private var catalog: ModelArtifactCatalog
+    private var catalogRestoration: Task<ModelArtifactCatalog, Error>?
     private let storage: any ModelArtifactStorage
     private var transfers: [String: Transfer] = [:]
     private var queue: [String] = []
@@ -35,10 +38,13 @@ public actor ModelArtifactStore {
     private var deleting: Set<String> = []
     public init(
         catalog: ModelArtifactCatalog, storage: any ModelArtifactStorage,
-        downloader: (any ModelArtifactDownloader)? = nil
+        downloader: (any ModelArtifactDownloader)? = nil,
+        onFailure: @escaping @Sendable (String, any Error) -> Void = { _, _ in }
     ) {
+        self.onFailure = onFailure
         self.downloader = downloader
         self.catalog = catalog
+        self.bundledIDs = Set(catalog.packages.map(\.id))
         self.storage = storage
     }
     @_spi(ModelAssembly) public init(
@@ -46,8 +52,10 @@ public actor ModelArtifactStore {
         download: @escaping @Sendable (URL, URL, Int64) async throws -> URL
     ) {
         self.catalog = catalog
+        self.bundledIDs = Set(catalog.packages.map(\.id))
         self.storage = storage
         self.downloader = nil
+        self.onFailure = { _, _ in }
         self.fixtureDownload = download
     }
     private func package(_ id: String) throws -> ModelArtifact {
@@ -58,11 +66,38 @@ public actor ModelArtifactStore {
     }
     private func restore() async throws {
         guard !restored else { return }
+        if catalogRestoration == nil {
+            let defaults = catalog
+            catalogRestoration = Task { try await storage.restoreCatalog(defaults: defaults) }
+        }
+        if let task = catalogRestoration {
+            let value = try await task.value
+            guard !restored else { return }
+            catalog = value
+        }
         if restoring == nil {
             restoring = Task {
                 let records = try await storage.restoreTransfers()
                 guard records.count <= 10 else { throw ModelArtifactError.storage }
-                return records
+                let ids = Set(catalog.packages.map(\.id))
+                let retained = records.filter { ids.contains($0.id) }
+                for record in records where !ids.contains(record.id) {
+                    guard ModelArtifactCatalog.validComponent(record.id),
+                        ModelArtifactCatalog.validComponent(record.generation)
+                    else { throw ModelArtifactError.storage }
+                    for identifier in [
+                        "dev.mobileharness.artifacts." + record.id,
+                        "dev.mobileharness.artifacts.hub." + record.generation,
+                    ] {
+                        let transport = ArtifactDownloadTransport(
+                            identifier: identifier, allowsCellular: record.source.allowsCellular)
+                        await transport.cancelAndJoin()
+                    }
+                    try await storage.discard(task: record.generation)
+                    onFailure(record.id, ModelArtifactError.missingArtifact)
+                }
+                if retained.count != records.count { try await storage.saveTransfers(retained) }
+                return retained
             }
         }
         guard let task = restoring else { throw ModelArtifactError.storage }
@@ -138,6 +173,32 @@ public actor ModelArtifactStore {
         }
         return result
     }
+    /// Adds or revises a declaration; existing installed/active packages must be removed first.
+    public func upsert(_ artifact: ModelArtifact) async throws {
+        try admit()
+        defer { releaseAdmission() }
+        try await restore()
+        guard !bundledIDs.contains(artifact.id) else { throw ModelArtifactError.incompatible }
+        guard !mutation, transfers[artifact.id] == nil, !deleting.contains(artifact.id) else {
+            throw ModelArtifactError.busy
+        }
+        mutation = true
+        defer { mutation = false }
+        if let previous = catalog.packages.first(where: { $0.id == artifact.id }),
+            try await storage.installed(previous)
+        {
+            throw ModelArtifactError.busy
+        }
+        var packages = catalog.packages.filter { $0.id != artifact.id }
+        packages.append(artifact)
+        let next = try ModelArtifactCatalog.decode(
+            JSONEncoder().encode(
+                ModelArtifactCatalog(schemaVersion: 2, packages: packages)))
+        try await storage.saveCatalog(next)
+        catalog = next
+        phases[artifact.id] = .notInstalled
+        failures[artifact.id] = nil
+    }
     public func download(_ id: String, source: ModelDownloadSource) async throws {
         try admit()
         defer { releaseAdmission() }
@@ -211,11 +272,22 @@ public actor ModelArtifactStore {
                     liveTransports[id] = nil
                 }
                 let temporary = try await fetch(
-                    url, bytes: 64 * 1024 * 1024, hash: artifact.source.sha256,
+                    url, bytes: artifact.source.kind == .urlFile ? artifact.estimatedBytes : 64 * 1024 * 1024,
+                    hash: artifact.source.sha256,
                     transport: transport, stage: stage)
                 phases[id] = .verifying
-                try extractZIP(temporary, artifact: artifact, into: stage)
-                try FileManager.default.removeItem(at: temporary)
+                if artifact.source.kind == .urlFile {
+                    let target = stage.appendingPathComponent(artifact.requiredFiles[0])
+                    try FileManager.default.createDirectory(
+                        at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    if FileManager.default.fileExists(atPath: target.path) {
+                        try FileManager.default.removeItem(at: target)
+                    }
+                    try FileManager.default.moveItem(at: temporary, to: target)
+                } else {
+                    try extractZIP(temporary, artifact: artifact, into: stage)
+                    try FileManager.default.removeItem(at: temporary)
+                }
                 progress[id] = artifact.downloadBytes
             }
             try validateInstallation(artifact, at: stage)
@@ -232,12 +304,12 @@ public actor ModelArtifactStore {
             failures[id] =
                 cancelled
                 ? nil : (network.domain == NSURLErrorDomain ? "network:\(network.code)" : String(describing: error))
-            if cancelled || (try? package(id).source.kind) != .huggingface {
-                try? await storage.discard(task: generation)
+            if cancelled {
+                do { try await storage.discard(task: generation) } catch { failures[id] = "cleanup: \(error)" }
             }
         }
         if transfers[id]?.generation == generation {
-            if phases[id] == .failed, (try? package(id).source.kind) == .huggingface {
+            if phases[id] == .failed {
                 transfers[id]?.task = nil
             } else {
                 transfers[id] = nil
@@ -259,7 +331,10 @@ public actor ModelArtifactStore {
     private func fetch(_ url: URL, bytes: Int64, hash: String?, transport: ArtifactDownloadTransport, stage: URL)
         async throws -> URL
     {
-        let incoming = stage.appendingPathComponent(".incoming-" + (hash ?? UUID().uuidString))
+        let incoming = stage.appendingPathComponent(
+            ".incoming-"
+                + (hash ?? SHA256.hash(data: Data(url.absoluteString.utf8)).map { String(format: "%02x", $0) }.joined())
+        )
         let file: URL
         if let fixtureDownload {
             file = try await fixtureDownload(url, incoming, bytes)
@@ -338,7 +413,7 @@ public actor ModelArtifactStore {
         try await persist()
     }
 
-    /// Joined teardown before releasing the injected file scope.
+    /// Joined teardown before releasing the artifact filesystem owner.
     public func close() async throws {
         if let closeTask { return try await closeTask.value }
         closing = true
@@ -380,13 +455,23 @@ public actor ModelArtifactStore {
     public func remove(_ id: String) async throws {
         try admit()
         defer { releaseAdmission() }
+        try await restore()
         let artifact = try package(id)
+        guard !mutation else { throw ModelArtifactError.busy }
         guard deleting.insert(id).inserted else { throw ModelArtifactError.busy }
         defer { deleting.remove(id) }
         try await cancelOwned(id)
         phases[id] = .deleting
         do {
             try await storage.remove(artifact)
+            if !bundledIDs.contains(id) {
+                guard !mutation else { throw ModelArtifactError.busy }
+                mutation = true
+                defer { mutation = false }
+                let next = ModelArtifactCatalog(schemaVersion: 2, packages: catalog.packages.filter { $0.id != id })
+                try await storage.saveCatalog(next)
+                catalog = next
+            }
             phases[id] = .notInstalled
             failures[id] = nil
             progress[id] = 0

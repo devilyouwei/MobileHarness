@@ -12,10 +12,14 @@ import Gateway
                 id: "diagnostics", start: { services.containerFailures.start() },
                 stop: { await services.containerFailures.stop() }),
             ManagedService(
-                id: "storage", dependencies: ["diagnostics"], start: { try await services.storage.start() },
+                id: "storage", dependencies: ["diagnostics"],
+                start: {
+                    try services.registry.migrateResourcePreferences()
+                    try await services.storage.start()
+                },
                 stop: { try await services.storage.stop() }),
             ManagedService(
-                id: "model", dependencies: ["storage", "diagnostics"], continuesInBackground: true,
+                id: "model", dependencies: ["diagnostics"], continuesInBackground: true,
                 start: { try await services.model.start() }, invalidate: services.model.invalidate,
                 foreground: { if $0 { try await services.model.setForeground(true) } },
                 stop: { try await services.model.stop() }),

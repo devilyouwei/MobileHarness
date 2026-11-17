@@ -2,7 +2,7 @@
 
 ## 职责与关系
 
-下载完成准入与制品实际下载完成分开。可变请求、偏好更改与刷新有独立界限；停止取消并加入防抖／恢复，原生后台交接最多保留十个 completion。应用只注入唯一制品根和仓库，不在这里创建第二套模型管理器。
+下载完成准入与制品实际下载完成分开。可变请求、偏好更改与刷新有独立界限；停止取消并加入防抖／恢复；原生后台交接由 ModelKit 拥有。应用只注入唯一制品根和仓库，不在这里创建第二套模型管理器。
 
 本目录由所属域目录绑定，接受标准 FunctionInput；调用权限、通用调度与资源仲裁由上游 Gateway 保持。下游只消费注入的基础能力。
 
@@ -12,9 +12,6 @@
 
 | 文件 | 当前职责 |
 | --- | --- |
-| [ArtifactServices.swift](ArtifactServices.swift) | 制品配置和文件／下载适配的组合 |
-| [ModelArtifactStorageAdapter.swift](ModelArtifactStorageAdapter.swift) | 制品文件、标记与存储协议适配 |
-| [ModelDownloadBackgroundService.swift](ModelDownloadBackgroundService.swift) | 后台下载事件交接和有界完成回调 |
 | [ModelResourceInteractionWorkflow.swift](ModelResourceInteractionWorkflow.swift) | 资源提交、恢复、防抖与真实操作反馈 |
 | [ModelResourceInventory.swift](ModelResourceInventory.swift) | 有界资源事实、进度和安装资格投影 |
 | [ModelResourcePreferencesService.swift](ModelResourcePreferencesService.swift) | 偏好文档的校验与排他持久化 |
@@ -42,7 +39,7 @@ ModelResourcesClient and ModelResourceInteractionWorkflow are Actions-owned UI f
 
 ## Decision 资源
 
-D3 Edge、D3 Lite 和 Gemma 在 Agent Models 共用下载源，各自管理下载、取消、删除、校验、版本与许可。资源快照同时读取 Apple 系统模型的实时可用性，供角色页和本地模型清单使用。Apple 的模型文件由系统管理。删除 D3 仅围栏对应模型，并加入本地调用和卸载该制品。
+D3 Edge 和 Gemma 在 Agent Models 共用下载源，各自管理下载、取消、删除、校验、版本与许可。资源快照同时读取 Apple 系统模型的实时可用性，供角色页和本地模型清单使用。Apple 的模型文件由系统管理。删除 D3 仅围栏对应模型，并加入本地调用和卸载该制品。
 
 下载设置保留旧 useLocalDecision 字段供 [Provider 设置](../Provider/README.md) 在升级时读取，保存下载设置时保持旧值。当前 Decision 独占模型选择由 Provider 设置拥有。删除或缺少已选 D3 时，Assistant 提示错误并入队，不切换云端。
 
@@ -55,3 +52,5 @@ Resource preferences also persist vadOnsetWindows (1…16) and vadThreshold (0.0
 ## Speech enhancement preference
 
 `useSpeechEnhancement` is independent of the custom-ASR switch and defaults false when absent in stored records. Enabling requires an installed `deepfilternet3` artifact; restore disables and persists it after removal. The workflow preserves confirmed state on failed saves and does not save unfinished endpoint edits when toggling denoising. Existing bounded resource commands handle download/progress/cancel/delete; removal quiesces the voice owner before artifact deletion. The read-only enablement closure crosses App composition into Agents; Actions never processes PCM.
+
+Actions 只拥有用户意图、UI 投影和模型选择／下载源／语音参数偏好。偏好文档位于 Storage settings 命名空间；模型目录、制品存储、传输恢复与后台交接均由 [ModelKit Management](../../../ModelKit/Support/Management/README.md) 拥有。

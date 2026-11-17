@@ -18,7 +18,6 @@ public enum HistoricalInputDisposition: String, Codable, Sendable {
 public struct HistoricalInputDecisionOutcome: Sendable, Equatable {
     public enum Route: String, Sendable {
         case local = "local:d3-edge"
-        case lite = "local:d3-lite"
         case gemma = "local:gemma4-e2b"
         case apple = "local:apple-system"
         case cloud = "cloud:decision"
@@ -303,7 +302,6 @@ public actor HistoricalAssistantInputDecision {
             $0 = route.localID.map { id in
                 switch id {
                 case "d3-edge": "D3 Edge"
-                case "d3-lite": "D3 Lite"
                 case "gemma4-e2b": "Gemma 4 E2B"
                 case "apple-system": "Apple System LLM"
                 default: id
@@ -354,8 +352,8 @@ public actor HistoricalAssistantInputDecision {
                 return fallback(reason, failure: failure)
             }
         }
-        let modelName = route.localID == "d3-lite" ? "D3 Lite" : "D3"
-        let modelRoute: HistoricalInputDecisionOutcome.Route = route.localID == "d3-lite" ? .lite : .local
+        let modelName = "D3"
+        let modelRoute: HistoricalInputDecisionOutcome.Route = .local
         if let id = route.localID {
             localFailureReason = localFailure
             if switchingLocal || activeLocalID != id || localMaintenance.contains(id) {
@@ -530,7 +528,7 @@ extension HistoricalInputDecisionOutcome {
     func logItem(for snapshot: HistoricalInputDecisionSnapshot, duration: Duration) -> DecisionLogItem {
         let route: DecisionLogItem.Route =
             switch self.route {
-            case .local, .lite, .gemma, .apple: .local
+            case .local, .gemma, .apple: .local
             case .cloud: .cloud
             case .fallback: .fallback
             }

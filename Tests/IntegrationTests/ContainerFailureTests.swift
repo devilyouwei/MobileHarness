@@ -382,7 +382,7 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
         receive: channel.sink(module: "storage", details: ApplicationContainer.failureDetails))
     let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: path) }
-    let files = FilesContainer(settings: path, photos: path, models: path, failures: reporter)
+    let files = FilesContainer(settings: path, photos: path, failures: reporter)
     let storage = StorageContainer(database: FailedDiagnosticDatabase(), files: files, failures: reporter)
     let startedAgent = Mutex(false)
     let lifecycle = try ApplicationLifecycle(services: [
@@ -465,7 +465,7 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
         receive: channel.sink(module: "storage", details: ApplicationContainer.failureDetails))
     let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: path) }
-    let files = FilesContainer(settings: path, photos: path, models: path, failures: reporter)
+    let files = FilesContainer(settings: path, photos: path, failures: reporter)
     try files.start()
     let document = try files.document(String.self, in: files.settings, name: "limited.json", maximumBytes: 16)
     await #expect(throws: DocumentStorageError.capacityExceeded) {

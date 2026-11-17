@@ -31,8 +31,7 @@ import UI
         let root = URL.applicationSupportDirectory.appendingPathComponent("MobileHarness", isDirectory: true)
         let registry = ApplicationContainer(
             root: root, uiConfiguration: .init(settings: SettingsProviderAdapter.initial),
-            recognitionLocale: { language().speechRecognitionLocale },
-            modelArtifacts: { try ArtifactServices.configuration(files: $0) })
+            recognitionLocale: { language().speechRecognitionLocale })
         let containerFailures = registry.containerFailures()
         let storage = registry.storage()
         let files = storage.files

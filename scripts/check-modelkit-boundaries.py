@@ -137,7 +137,7 @@ for product in package['products']:
 # Every implementation target has an explicit layer; providers must never import each other.
 expected_model_dependencies = {
     'ModelKit': set(), 'ModelKitRuntime': {'ModelKit'},
-    'ModelKitDefaults': {'ModelKit', 'ModelKitRuntime', 'ModelKitNemotron', 'ModelKitSilero', 'ModelKitDeepFilterNet3',
+    'ModelKitDefaults': {'ModelKit', 'ModelKitRuntime', 'ModelKitHub', 'ModelKitNemotron', 'ModelKitSilero', 'ModelKitDeepFilterNet3',
         'ModelKitMossNano', 'ModelKitGemma4', 'ModelKitYOLOPose', 'ModelKitOpenAI', 'ModelKitAppleSpeech', 'ModelKitEnergy', 'ModelKitD3', 'ModelKitAppleLLM'},
     'ModelKitHub': {'ModelKitRuntime'},
     'ModelKitCoreAI': set(), 'ModelKitCoreML': set(),
@@ -656,10 +656,10 @@ for source in list((ROOT / 'MobileHarness').rglob('*.swift')) + list((ROOT / 'Te
 # Business modules consume foundational public capabilities directly; foundations remain independent.
 expected_business = {
     'Actions': {'BehaviorDefinitions', 'CallRuntime', 'ExecutionRuntime', 'FunctionContracts',
-        'ModelKit', 'ModelKitDefaults', 'ModelKitHub', 'ModelKitOpenAI', 'ModelKitRuntime', 'PlatformKit',
+        'ModelKit', 'ModelKitDefaults', 'ModelKitOpenAI', 'ModelKitRuntime', 'PlatformKit',
         'StorageCore', 'StorageFiles', 'StorageDatabase', 'StorageChat', 'StorageMedia', 'StorageCache', 'StorageDevices', 'UI'},
     'Agents': {'AgentCore', 'Gateway', 'FunctionContracts',
-        'ModelKit', 'ModelKitDefaults', 'ModelKitHub', 'ModelKitRuntime', 'PlatformKit', 'UI',
+        'ModelKit', 'ModelKitDefaults', 'ModelKitRuntime', 'PlatformKit', 'UI',
         'StorageCore', 'StorageFiles', 'StorageChat', 'StorageMedia', 'StorageCache', 'StorageTasks', 'StorageDevices'},
 }
 system_imports = {'Foundation', 'Observation', 'Synchronization', 'Security', 'UIKit', 'SwiftUI',
@@ -1226,11 +1226,20 @@ if errors:
     raise SystemExit('\n'.join(errors))
 print('ModelKit boundaries: source imports, target dependencies, test location and directory documentation passed.')
 # Runtime model catalog is the only model payload staged into either App variant.
-model_catalog = ROOT / 'MobileHarness/Resources/Models/model-catalog.json'
+# Model acquisition is self-contained; hosts cannot reintroduce the old file adapters.
+for retired in ('ArtifactServices.swift', 'ModelArtifactStorageAdapter.swift', 'ModelDownloadBackgroundService.swift'):
+    if (ROOT / 'MobileHarness/Actions/System/ModelResources' / retired).exists():
+        errors.append(f'Model acquisition implementation outside ModelKit: {retired}')
+app_container = (ROOT / 'MobileHarness/App/Composition/ApplicationContainer.swift').read_text()
+if 'prepareArtifacts:' in app_container or 'Models/installed' in app_container:
+    errors.append('App must not inject model filesystem space or adapters')
+if 'public let models:' in (ROOT / 'MobileHarness/Storage/Files/FilesContainer.swift').read_text():
+    errors.append('Storage must not own a model file namespace')
+model_catalog = ROOT / 'MobileHarness/ModelKit/Support/Management/model-catalog.json'
 if not model_catalog.is_file():
     raise SystemExit('Missing runtime model catalog')
 catalog = json.loads(model_catalog.read_text())
-if catalog.get('schemaVersion') != 2 or {entry.get('id') for entry in catalog.get('packages', [])} != {'moss-tts-nano', 'silero', 'gemma4-e2b', 'yolo26n-pose', 'nemotron', 'd3-edge', 'd3-lite', 'vela3-fast', 'deepfilternet3'}:
+if catalog.get('schemaVersion') != 2 or {entry.get('id') for entry in catalog.get('packages', [])} != {'moss-tts-nano', 'silero', 'gemma4-e2b', 'yolo26n-pose', 'nemotron', 'd3-edge', 'vela3-fast', 'deepfilternet3'}:
     raise SystemExit('Invalid production model catalog')
 for entry in catalog['packages']:
     source = entry['source']
@@ -1243,8 +1252,8 @@ for entry in catalog['packages']:
         raise SystemExit('Invalid archive source')
 for platform in ('iphoneos', 'iphonesimulator'):
     content = (ROOT / f'Config/Voice-Models-{platform}-Inputs.xcfilelist').read_text()
-    model_inputs = [line for line in content.splitlines() if '/Resources/Models/' in line]
-    if model_inputs != ['$(SRCROOT)/MobileHarness/Resources/Models/model-catalog.json']:
+    model_inputs = [line for line in content.splitlines() if '/ModelKit/Support/Management/' in line]
+    if model_inputs != ['$(SRCROOT)/MobileHarness/ModelKit/Support/Management/model-catalog.json']:
         raise SystemExit('App staging must not depend on model weights')
 print('Model resources: declarative catalog and metadata-only App staging passed.')
 

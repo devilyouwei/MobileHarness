@@ -20,18 +20,29 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
     private let root: URL
     private let uiConfiguration: UIConfiguration
     private let recognitionLocale: @Sendable () -> String
-    private let modelArtifacts: @Sendable (FilesContainer) async throws -> ModelArtifactConfiguration
     public init(
         root: URL, uiConfiguration: UIConfiguration = .init(),
-        recognitionLocale: @escaping @Sendable () -> String = { "en-US" },
-        modelArtifacts: @escaping @Sendable (FilesContainer) async throws -> ModelArtifactConfiguration = { _ in
-            throw CocoaError(.fileReadNoSuchFile)
-        }
+        recognitionLocale: @escaping @Sendable () -> String = { "en-US" }
     ) {
         self.root = root
         self.uiConfiguration = uiConfiguration
         self.recognitionLocale = recognitionLocale
-        self.modelArtifacts = modelArtifacts
+    }
+    /// One-time application preference migration; model artifacts are never read or moved here.
+    public func migrateResourcePreferences() throws {
+        let root = root.standardizedFileURL.resolvingSymlinksInPath()
+        let previous = root.appendingPathComponent("Models/download-source.json")
+        let destination = root.appendingPathComponent("Settings/download-source.json")
+        let files = FileManager.default
+        guard files.fileExists(atPath: previous.path) else { return }
+        guard !files.fileExists(atPath: destination.path) else { return }
+        guard previous.resolvingSymlinksInPath() == previous.standardizedFileURL,
+            destination.resolvingSymlinksInPath() == destination.standardizedFileURL
+        else {
+            throw CocoaError(.fileReadInvalidFileName)
+        }
+        try files.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try files.moveItem(at: previous, to: destination)
     }
     /// Structural projection only. Each independent SDK retains its own Failure definition.
     public nonisolated static func failureDetails(_ error: any Error) -> ContainerFailureDetails? {
@@ -149,10 +160,6 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
         self {
             MainActor.assumeIsolated {
                 ModelContainer(
-                    resources: self.root.appendingPathComponent("Models/installed", isDirectory: true),
-                    prepareArtifacts: { [files = self.files(), configure = self.modelArtifacts] in
-                        try await configure(files)
-                    },
                     onFailure: self.containerFailures().sink(
                         module: "model",
                         details: Self.failureDetails), recognitionLocale: self.recognitionLocale)
@@ -193,7 +200,6 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
             let files = FilesContainer(
                 settings: self.root.appendingPathComponent("Settings", isDirectory: true),
                 photos: self.root.appendingPathComponent("CapturedPhotos", isDirectory: true),
-                models: self.root.appendingPathComponent("Models", isDirectory: true),
                 workspaces: self.root.appendingPathComponent("ArtifactWorkspaces", isDirectory: true),
                 failures: failures)
             return StorageContainer(

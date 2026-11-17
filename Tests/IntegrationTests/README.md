@@ -400,7 +400,7 @@ Use [DecisionBenchmarks](../DecisionBenchmarks/README.md) to rerun the frozen D3
 
 ```sh
 python3 scripts/evaluate-decision-protocols.py qwen3.7-flash qwen3.8-flash --output /tmp/decision-cloud.json
-python3 scripts/evaluate-decision-protocols.py d3-edge d3-lite apple-system gemma4-e2b --output /tmp/decision-local.json
+python3 scripts/evaluate-decision-protocols.py d3-edge apple-system gemma4-e2b --output /tmp/decision-local.json
 ```
 
 The cloud launcher reads the existing Aliyun HTTPS endpoint and key from `.env.local` and only admits the two Flash models. Local models read the existing benchmark artifacts. Results checkpoint by language and segment. The launcher records strict accuracy, invalid responses, missed/false dispositions, valid p95, and timely correct counts at 500 ms and the applicable App budget. Calls run to completion to preserve correctness evidence, subject to the provider timeout. No credential or endpoint is written to the report.

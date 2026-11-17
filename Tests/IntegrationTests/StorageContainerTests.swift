@@ -153,8 +153,7 @@ extension StorageContainerTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let database = FailingContainerDatabase()
         let files = FilesContainer(
-            settings: root.appendingPathComponent("Settings"), photos: root.appendingPathComponent("Photos"),
-            models: root.appendingPathComponent("Models"))
+            settings: root.appendingPathComponent("Settings"), photos: root.appendingPathComponent("Photos"))
         let storage = StorageContainer(database: database, files: files)
         do {
             try await storage.start()
@@ -212,8 +211,7 @@ extension StorageContainerTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let database = WaitingContainerDatabase()
         let files = FilesContainer(
-            settings: root.appendingPathComponent("Settings"), photos: root.appendingPathComponent("Photos"),
-            models: root.appendingPathComponent("Models"))
+            settings: root.appendingPathComponent("Settings"), photos: root.appendingPathComponent("Photos"))
         let storage = StorageContainer(database: database, files: files)
         let work = Task { try await storage.start() }
         while !(await database.isStarting()) { await Task.yield() }
@@ -278,8 +276,7 @@ private actor StateReadSpyDatabase: DatabaseStorage {
     let location = containerRoot()
     let database = StateReadSpyDatabase()
     let files = FilesContainer(
-        settings: location.appendingPathComponent("settings"), photos: location.appendingPathComponent("photos"),
-        models: location.appendingPathComponent("models"))
+        settings: location.appendingPathComponent("settings"), photos: location.appendingPathComponent("photos"))
     let root = StorageContainer(database: database, files: files)
     let own = try await root.stateSnapshot()
     #expect(own.children.map(\.path).contains("storage.database"))
@@ -290,4 +287,21 @@ private actor StateReadSpyDatabase: DatabaseStorage {
     #expect(try await read().runtime["phase"] == .text("cold"))
     #expect(await database.observedReads() == 1)
     #expect(!FileManager.default.fileExists(atPath: location.path))
+}
+
+@Test func modelPreferenceMigrationPreservesSettingsWithoutModelStorageNamespace() throws {
+    let root = containerRoot().resolvingSymlinksInPath()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let previous = root.appendingPathComponent("Models/download-source.json")
+    let destination = root.appendingPathComponent("Settings/download-source.json")
+    try FileManager.default.createDirectory(at: previous.deletingLastPathComponent(), withIntermediateDirectories: true)
+    let content = Data("saved-preference-envelope".utf8)
+    try content.write(to: previous)
+    let app = ApplicationContainer(root: root)
+    try app.migrateResourcePreferences()
+    #expect(try Data(contentsOf: destination) == content)
+    #expect(!FileManager.default.fileExists(atPath: previous.path))
+    try Data("older-copy".utf8).write(to: previous)
+    try app.migrateResourcePreferences()
+    #expect(try Data(contentsOf: destination) == content)
 }

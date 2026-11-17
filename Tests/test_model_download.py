@@ -91,15 +91,9 @@ class SourceCatalogTests(unittest.TestCase):
         self.assertNotIn('decision.aimodel', config['requiredFiles'])
         self.assertEqual(len(config['declaration']['revision']), 40)
 
-    def test_d3_lite_download_pins_text_graph_without_vision(self):
-        from model_download import load_config
-        config = load_config('d3-lite')
-        self.assertEqual(config['directory'], 'D3Lite')
-        self.assertEqual(config['declaration']['repoId'], 'hugging-mac/d3-lite-CoreAI')
-        self.assertEqual(config['declaration']['revision'], '863963d371d5af6784bf726fb85a508c08751d65')
-        self.assertIn('decision.aimodel/**', config['declaration']['allowPatterns'])
-        self.assertIn('decision.aimodel/main.mlirb', config['requiredFiles'])
-        self.assertFalse(any('vision' in item for item in config['declaration']['allowPatterns']))
+    def test_removed_d3_lite_is_not_downloadable(self):
+        from model_download import PRODUCTION
+        self.assertNotIn('d3-lite', PRODUCTION)
 
     def test_hub_selection_prefix_metadata_and_mirror(self):
         from model_download import resolve_hub

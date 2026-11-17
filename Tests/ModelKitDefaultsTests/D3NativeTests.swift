@@ -88,11 +88,11 @@ import Testing
     try await root.stop()
 }
 
-@Test(.enabled(if: ProcessInfo.processInfo.environment["D3_LITE_TEST_RESOURCES"] != nil))
+@Test(.enabled(if: ProcessInfo.processInfo.environment["D3_EDGE_TEST_RESOURCES"] != nil))
 @MainActor func d3NativeDecisionRunsTextGraphAndRejectsOversizedInput() async throws {
     guard #available(macOS 27, iOS 27, *) else { return }
-    let path = try #require(ProcessInfo.processInfo.environment["D3_LITE_TEST_RESOURCES"])
-    let modelID = ProcessInfo.processInfo.environment["D3_NATIVE_MODEL_ID"] ?? "d3-lite"
+    let path = try #require(ProcessInfo.processInfo.environment["D3_EDGE_TEST_RESOURCES"])
+    let modelID = ProcessInfo.processInfo.environment["D3_NATIVE_MODEL_ID"] ?? "d3-edge"
     let root = ModelContainer(resources: URL(fileURLWithPath: path))
     try await root.start()
     do {

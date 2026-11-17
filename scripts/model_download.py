@@ -24,7 +24,7 @@ def file_hash(path):
             digest.update(chunk)
     return digest.hexdigest()
 
-PRODUCTION = {"d3-edge": "d3-edge", "d3-lite": "d3-lite", "nemotron": "nemotron", "silero": "silero", "moss-tts-nano": "moss-tts-nano", "gemma4-e2b": "gemma4-e2b", "yolo26-pose": "yolo26n-pose"}
+PRODUCTION = {"d3-edge": "d3-edge", "nemotron": "nemotron", "silero": "silero", "moss-tts-nano": "moss-tts-nano", "gemma4-e2b": "gemma4-e2b", "yolo26-pose": "yolo26n-pose"}
 
 
 def load_config(profile, platform=None):
@@ -34,7 +34,7 @@ def load_config(profile, platform=None):
         return json.loads((GEMMA_TESTS / "gemma4-e2b-macos.download.json").read_text())
     if profile not in PRODUCTION:
         return json.loads((MODELS / (profile + ".download.json")).read_text())
-    catalog = json.loads((MODELS / "model-catalog.json").read_text())
+    catalog = json.loads((REPOSITORY / "MobileHarness/ModelKit/Support/Management/model-catalog.json").read_text())
     if catalog["schemaVersion"] != 2:
         raise ValueError("Unsupported model catalog")
     model = next(p for p in catalog["packages"] if p["id"] == PRODUCTION[profile])

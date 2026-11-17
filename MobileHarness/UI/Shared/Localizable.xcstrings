@@ -2686,24 +2686,13 @@
         }
       }
     },
-    "Download D3 Edge or D3 Lite before selecting the local model.": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "请先下载 D3 Edge 或 D3 Lite 模型，再选择本地。"
-          }
-        }
-      }
-    },
     "Download D3 in Agent Models before selecting the local model.": {
       "extractionState": "extracted",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "请先在“智能体模型”下载 D3 Edge 或 D3 Lite，再选择本地"
+            "value": "请先在“智能体模型”下载 D3 Edge，再选择本地"
           }
         }
       }
@@ -4292,17 +4281,6 @@
         }
       }
     },
-    "Local D3 Lite": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "本地 D3 Lite"
-          }
-        }
-      }
-    },
     "Local Gemma 4 E2B": {
       "extractionState": "extracted",
       "localizations": {
@@ -4332,17 +4310,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "本地 · D3 Edge"
-          }
-        }
-      }
-    },
-    "Local · D3 Lite": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "本地 · D3 Lite"
           }
         }
       }

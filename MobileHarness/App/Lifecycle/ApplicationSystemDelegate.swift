@@ -1,7 +1,8 @@
-import Actions
+import ModelKitRuntime
 
 #if os(iOS)
 
+    import PlatformKit
     import UIKit
     import UI
     import OSLog
@@ -11,6 +12,7 @@ import Actions
     /// Native callbacks are forwarded to the registered domain handler without interpreting payloads.
     @MainActor final class ApplicationSystemDelegate: NSObject, UIApplicationDelegate {
         private let handler = ModelDownloadBackgroundService()
+        private let allowance = NativeBackgroundAllowance()
         func connect(prepare: @escaping @MainActor () async throws -> Void) { handler.connect(prepare: prepare) }
         func applicationWillTerminate(_ application: UIApplication) {
             if !IslandProcessLifecycle.endBeforeTermination() {
@@ -19,17 +21,16 @@ import Actions
             }
         }
         func applicationDidEnterBackground(_ application: UIApplication) {
-            handler.applicationDidEnterBackground(application)
+            allowance.begin(name: "Model download preparation", duration: .seconds(25))
         }
         func applicationWillEnterForeground(_ application: UIApplication) {
-            handler.applicationWillEnterForeground(application)
+            allowance.end()
         }
         func application(
             _ application: UIApplication, handleEventsForBackgroundURLSession identifier: String,
             completionHandler: @escaping () -> Void
         ) {
-            handler.application(
-                application, handleEventsForBackgroundURLSession: identifier, completionHandler: completionHandler)
+            handler.handleEvents(identifier: identifier, completionHandler: completionHandler)
         }
     }
 

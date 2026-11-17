@@ -8,7 +8,6 @@ import UI
 public struct InputDecisionOutcome: Sendable, Equatable {
     public enum Route: String, Sendable {
         case local = "local:d3-edge"
-        case lite = "local:d3-lite"
         case vela = "local:vela3-fast"
         case gemma = "local:gemma4-e2b"
         case apple = "local:apple-system"
@@ -236,7 +235,6 @@ public actor AssistantInputDecision {
             $0 = route.localID.map { id in
                 switch id {
                 case "d3-edge": "D3 Edge"
-                case "d3-lite": "D3 Lite"
                 case "vela3-fast": "Vela 3 Fast"
                 case "gemma4-e2b": "Gemma 4 E2B"
                 case "apple-system": "Apple System LLM"
@@ -289,7 +287,7 @@ public actor AssistantInputDecision {
         }
         let modelName = selectedModelName.withLock { $0 } ?? "Decision"
         let modelRoute: InputDecisionOutcome.Route =
-            route.localID == "vela3-fast" ? .vela : route.localID == "d3-lite" ? .lite : .local
+            route.localID == "vela3-fast" ? .vela : .local
         if let id = route.localID {
             localFailureReason = localFailure
             if switchingLocal || activeLocalID != id || localMaintenance.contains(id) {
@@ -463,7 +461,7 @@ extension InputDecisionOutcome {
     func logItem(for snapshot: InputDecisionSnapshot, duration: Duration) -> DecisionLogItem {
         let route: DecisionLogItem.Route =
             switch self.route {
-            case .local, .lite, .vela, .gemma, .apple: .local
+            case .local, .vela, .gemma, .apple: .local
             case .cloud: .cloud
             case .failed: .failed
             }

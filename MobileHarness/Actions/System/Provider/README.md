@@ -79,3 +79,5 @@ Writer配置的writerThinking是独立选择，默认false；可选持久覆盖�
 首次 Welcome 使用同一 SettingsOperating 保存完整 Provider 配置，沿 ApplicationControl/Gateway 请求与现有 ProviderSettingsService/ProviderSettingsStore 事务写入。仅新增 Provider 且尚未选择角色模型时保持既有本地配置；密钥仍经 credentialID 引用保存到钥匙串。Welcome 不引入新的凭据仓库、发现端点或模型默认策略。
 
 Decision 在同一 Provider 设置文档提交 decisionUsesLocal、decisionLocalModelID、decisionProviderID 和 decisionModel。旧文档缺模式时读取下载设置历史模式，本地 ID 缺失解析为 Edge。启用或切换本地模型时校验目标制品是否已安装，Apple 系统模型改用系统可用性查询。Writer 启用本地时校验支持工具调用的 Gemma。资源未就绪时事务拒绝保存。云端 Provider 的模型发现接口仅返回模型 ID，Writer 执行仍要求 Chat 能力声明支持工具调用。已选资源后来缺失不会因无关设置保存而静默切换。每次分类读取一份已提交快照；本地模式只提供本地 ID，云端模式只提供已选 Provider/Model 工厂。旧本地配置残留云端引用不执行，保存时清空。执行失败由 Assistant 提示错误并入队，不调用备用模型。
+
+已移除的 D3 Lite ID 不出现在选择列表、库存资格或保存白名单中。旧偏好保留原值供用户修正；执行失败明确报告，不自动切换到 Edge 或云端。

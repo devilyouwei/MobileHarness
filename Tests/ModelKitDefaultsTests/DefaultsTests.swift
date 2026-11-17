@@ -146,12 +146,15 @@ import Testing
 func localPreparationUsesSelectedResourceAndRejectsStoppedScope() async throws {
     let root = ModelContainer(resources: URL.temporaryDirectory.appendingPathComponent(UUID().uuidString))
     try await root.start()
-    for id in ["d3-edge", "d3-lite", "gemma4-e2b", "apple-system"] {
+    for id in ["d3-edge", "gemma4-e2b", "apple-system"] {
         let step = root.localModelPreparationStep(id: "decision") { id }
         #expect(step.id == "decision")
         #expect(try await !step.isReady())
     }
-    let selected = root.localModelPreparationStep(id: "decision") { "d3-lite" }
+    #expect(root.language.decisionModel("d3-lite") == nil)
+    let removed = root.localModelPreparationStep(id: "decision") { "d3-lite" }
+    await #expect(throws: CapabilityError.self) { try await removed.isReady() }
+    let selected = root.localModelPreparationStep(id: "decision") { "d3-edge" }
     try await root.stop()
     await #expect(throws: InferenceAdmissionError.self) { try await selected.isReady() }
     await #expect(throws: InferenceAdmissionError.self) { try await selected.prepare { _ in } }

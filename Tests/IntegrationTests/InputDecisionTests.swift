@@ -366,7 +366,7 @@ func binaryContextContainsOnlyCurrentExchangeAndLatest(language: String) throws 
     }
 }
 
-@Test(arguments: ["d3-edge", "d3-lite", "vela3-fast"])
+@Test(arguments: ["d3-edge", "vela3-fast"])
 func selectedNativeDecisionUsesNoulAndNeverCloud(id: String) async throws {
     let cloud = DecisionCloudFixture(events: [.text("false"), .finished(.stop)])
     let service = AssistantInputDecision(

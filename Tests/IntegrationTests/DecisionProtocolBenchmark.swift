@@ -45,7 +45,7 @@ func decisionProtocolBenchmark() async throws {
     let cloud = ["qwen3.7-flash", "qwen3.8-flash"].contains(modelID)
     let resourceDirectory: String
     switch (modelID, mode) {
-    case ("d3-edge", .jev), ("d3-lite", .jev):
+    case ("d3-edge", .jev):
         resourceDirectory = "Tests/DecisionBenchmarks/.local/models"
     case ("gemma4-e2b", .text), ("gemma4-e2b", .tool):
         resourceDirectory = "Tests/Gemma4Tests/.local"

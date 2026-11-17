@@ -1,7 +1,9 @@
 import Foundation
 @_spi(ModelManagement) import ModelKit
-@_spi(ModelAssembly) import ModelKitRuntime
+import Synchronization
 import Testing
+
+@_spi(ModelAssembly) @testable import ModelKitRuntime
 
 @Test func downloadDomainValidationAndNormalization() throws {
     let mirror = try ModelDownloadSource(endpoint: "  hf-mirror.com \n")
@@ -314,7 +316,8 @@ private actor UnreadableReceiptStorage: ModelArtifactStorage {
 func productionYOLOArchiveInstallsWithNativeExtractor() async throws {
     let archive = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["HARNESS_TEST_YOLO_ARCHIVE"]))
     let catalogURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-        .deletingLastPathComponent().appendingPathComponent("MobileHarness/Resources/Models/model-catalog.json")
+        .deletingLastPathComponent().appendingPathComponent(
+            "MobileHarness/ModelKit/Support/Management/model-catalog.json")
     var declaration = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: catalogURL)) as? [String: Any])
     let packages = try #require(declaration["packages"] as? [[String: Any]])
     declaration["packages"] = packages.filter { $0["id"] as? String == "yolo26n-pose" }
@@ -470,9 +473,10 @@ private actor ResumableHubFixture: ModelArtifactDownloader {
     }
 }
 
-@Test func productionDecisionCatalogUsesEdgeSourceAndLiteCompiledVariant() throws {
+@Test func productionDecisionCatalogUsesEdgeSourceWithoutRemovedLite() throws {
     let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-        .deletingLastPathComponent().appendingPathComponent("MobileHarness/Resources/Models/model-catalog.json")
+        .deletingLastPathComponent().appendingPathComponent(
+            "MobileHarness/ModelKit/Support/Management/model-catalog.json")
     let catalog = try ModelArtifactCatalog.read(url)
     let compiled = try catalog.resolvingArchitecture("h18p")
     let source = try catalog.resolvingArchitecture(nil)
@@ -485,17 +489,149 @@ private actor ResumableHubFixture: ModelArtifactDownloader {
     #expect(edge.requiredFiles == macEdge.requiredFiles)
     #expect(edge.requiredFiles.contains("decision.aimodel/main.mlirb"))
     #expect(!edge.requiredFiles.contains { $0.contains("aimodelc") })
-    for id in ["d3-lite"] {
-        let device = try #require(compiled.packages.first { $0.id == id })
-        let original = try #require(source.packages.first { $0.id == id })
-        #expect(device.revision != original.revision)
-        #expect(device.source.stripPrefix == "ios/aot-v1/h18p")
-        #expect(device.requiredFiles.contains("manifest.json"))
-        #expect(device.requiredFiles.contains("tokenizer.json"))
-        #expect(device.requiredFiles.contains("decision.h18p.aimodelc/main.hash"))
-        #expect(device.requiredFiles.contains { $0.hasSuffix("/resources.bin") })
-        #expect(!device.requiredFiles.contains { $0.hasPrefix("decision.aimodel/") })
-        #expect(original.requiredFiles.contains("decision.aimodel/main.mlirb"))
-        #expect(device.source.revision?.count == 40)
+    #expect(!catalog.packages.contains { $0.id == "d3-lite" })
+}
+
+@Test func modelKitDiskStorageOwnsInstallationAndTransferPersistence() async throws {
+    let root = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString).resolvingSymlinksInPath()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = try ModelArtifactDiskStorage(root: root)
+    let artifact = try fixtureCatalog().packages[0]
+    let source = try ModelDownloadSource()
+    let records = [ModelArtifactTransferRecord(id: artifact.id, generation: "transfer-1", source: source)]
+    try await storage.saveTransfers(records)
+    let reopened = try ModelArtifactDiskStorage(root: root)
+    #expect(try await reopened.restoreTransfers().map(\.generation) == ["transfer-1"])
+    let stage = try await storage.stage(artifact, task: "transfer-1")
+    try Data("abc".utf8).write(to: stage.appendingPathComponent("config.json"))
+    try await storage.publish(artifact, task: "transfer-1")
+    #expect(try await reopened.installed(artifact))
+    #expect(try await reopened.installedBytes(artifact) == 3)
+    try Data("changed".utf8).write(to: reopened.installedRoot.appendingPathComponent("Fixture/config.json"))
+    #expect(try await reopened.installed(artifact) == false)
+    try await reopened.remove(artifact)
+    #expect(try await storage.installed(artifact) == false)
+}
+
+@Test func modelKitDiskStorageRejectsTraversalAndSymlinkStages() async throws {
+    let root = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString).resolvingSymlinksInPath()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = try ModelArtifactDiskStorage(root: root)
+    let artifact = try fixtureCatalog().packages[0]
+    await #expect(throws: ModelArtifactError.self) { try await storage.stage(artifact, task: "../../escape") }
+    let stage = try await storage.stage(artifact, task: "safe")
+    try FileManager.default.createSymbolicLink(
+        at: stage.appendingPathComponent("config.json"), withDestinationURL: root)
+    await #expect(throws: ModelArtifactError.self) { try await storage.publish(artifact, task: "safe") }
+    try await storage.discard(task: "safe")
+    #expect(!FileManager.default.fileExists(atPath: stage.path))
+}
+
+@Test func modelKitCatalogIsBundledAndCustomDeclarationsPersist() async throws {
+    #expect(try ModelArtifactCatalog.bundled().packages.contains { $0.id == "gemma4-e2b" })
+    let root = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString).resolvingSymlinksInPath()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = try ModelArtifactDiskStorage(root: root)
+    let defaults = try ModelArtifactCatalog.bundled()
+    let store = ModelArtifactStore(catalog: defaults, storage: storage)
+    let artifact = try fixtureCatalog().packages[0]
+    try await store.upsert(artifact)
+    var edited = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(artifact)) as? [String: Any])
+    edited["name"] = "Updated fixture"
+    let updated = try JSONDecoder().decode(ModelArtifact.self, from: JSONSerialization.data(withJSONObject: edited))
+    try await store.upsert(updated)
+    let reopened = ModelArtifactStore(catalog: defaults, storage: try ModelArtifactDiskStorage(root: root))
+    #expect(try await reopened.snapshots().first { $0.artifact.id == "fixture" }?.artifact.name == "Updated fixture")
+    #expect(try await reopened.snapshots().contains { $0.artifact.id == "fixture" })
+    try await reopened.remove("fixture")
+    #expect(try await reopened.snapshots().allSatisfy { $0.artifact.id != "fixture" })
+    try await reopened.upsert(artifact)
+    let stage = try await storage.stage(artifact, task: "installed")
+    try Data("abc".utf8).write(to: stage.appendingPathComponent("config.json"))
+    try await storage.publish(artifact, task: "installed")
+    await #expect(throws: ModelArtifactError.self) { try await store.upsert(artifact) }
+    try await reopened.close()
+    try await store.close()
+}
+
+@Test func directURLFileUsesModelKitPublication() async throws {
+    let data = Data(
+        """
+        {"schemaVersion":2,"packages":[{"id":"url","name":"URL model","capability":"chat",
+        "directory":"URLModel","source":{"kind":"urlFile","revision":"r1","url":"https://example.com/model.bin"},
+        "minimumOS":1,"requiresPhysicalDevice":false,"license":"MIT","estimatedBytes":3,"requiredFiles":["model.bin"]}]}
+        """.utf8)
+    let catalog = try ModelArtifactCatalog.decode(data)
+    let root = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString).resolvingSymlinksInPath()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = try ModelArtifactDiskStorage(root: root)
+    let store = ModelArtifactStore(
+        catalog: catalog, storage: storage,
+        download: { _, destination, _ in
+            try Data("abc".utf8).write(to: destination)
+            return destination
+        })
+    try await store.download("url", source: ModelDownloadSource())
+    for _ in 0..<500 {
+        if try await store.snapshots().first?.phase == .installed { break }
+        try await Task.sleep(for: .milliseconds(10))
     }
+    #expect(try await storage.installed(catalog.packages[0]))
+    try await store.close()
+}
+
+@Test func urlResumeDataIsBoundToSourceAndLimit() throws {
+    let root = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString).resolvingSymlinksInPath()
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let destination = root.appendingPathComponent(".incoming-test")
+    let url = URL(string: "https://example.com/model.bin")!
+    let record = ArtifactDownloadTransport.ResumeRecord(url: url, maximumBytes: 32, data: Data([1, 2, 3]))
+    try JSONEncoder().encode(record).write(to: destination.appendingPathExtension("resume"))
+    #expect(
+        try ArtifactDownloadTransport.resumeData(for: url, destination: destination, maximumBytes: 32) == record.data)
+    #expect(try ArtifactDownloadTransport.resumeData(for: url, destination: destination, maximumBytes: 64) == nil)
+    #expect(!FileManager.default.fileExists(atPath: destination.appendingPathExtension("resume").path))
+}
+
+@Test @MainActor func backgroundHandoffCompletesOnceAndReportsPreparationFailure() async throws {
+    let service = ModelDownloadBackgroundService()
+    service.connect { throw ModelArtifactError.storage }
+    let id = "dev.mobileharness.artifacts.test-" + UUID().uuidString
+    var completions = 0
+    service.handleEvents(identifier: id) { completions += 1 }
+    for _ in 0..<100 where completions == 0 { await Task.yield() }
+    #expect(completions == 1)
+    #expect(service.lastFailure != nil)
+    ModelArtifactBackgroundEvents.finished(id)
+    await Task.yield()
+    #expect(completions == 1)
+    service.handleEvents(identifier: "unrelated.session") { completions += 1 }
+    #expect(completions == 2)
+}
+
+@Test func removedCatalogTransferDoesNotBlockRemainingModels() async throws {
+    let root = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString).resolvingSymlinksInPath()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = try ModelArtifactDiskStorage(root: root)
+    let artifact = try fixtureCatalog().packages[0]
+    _ = try await storage.stage(artifact, task: "retired-transfer")
+    try await storage.saveTransfers([
+        ModelArtifactTransferRecord(id: "d3-lite", generation: "retired-transfer", source: ModelDownloadSource())
+    ])
+    let reported = ArtifactFailureProbe()
+    let store = ModelArtifactStore(
+        catalog: try fixtureCatalog(), storage: storage,
+        onFailure: { id, _ in
+            reported.ids.withLock { $0.append(id) }
+        })
+    #expect(try await store.snapshots().map(\.artifact.id) == ["fixture"])
+    #expect(reported.ids.withLock { $0 } == ["d3-lite"])
+    #expect(try await storage.restoreTransfers().isEmpty)
+    #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("staging/retired-transfer").path))
+    try await store.close()
+}
+
+private final class ArtifactFailureProbe: Sendable {
+    let ids = Mutex<[String]>([])
 }

@@ -110,7 +110,7 @@
             let preferences = ModelResourcePreferencesService(
                 store: {
                     try files.document(
-                        ModelResourcePreferences.self, in: files.models, name: "download-source.json",
+                        ModelResourcePreferences.self, in: files.settings, name: "download-source.json",
                         maximumBytes: 4096)
                 }, validate: { try await SettingsModelResourcesAdapter.validatePreferences($0) },
                 installed: {

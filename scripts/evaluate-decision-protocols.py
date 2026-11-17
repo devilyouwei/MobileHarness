@@ -14,7 +14,6 @@ ROOT = Path(__file__).resolve().parent.parent
 CLOUD = ("qwen3.7-flash", "qwen3.8-flash")
 MATRIX = {
     "d3-edge": ("jev",),
-    "d3-lite": ("jev",),
     "apple-system": ("text",),
     "gemma4-e2b": ("tool", "text"),
     **{model: ("tool", "text") for model in CLOUD},

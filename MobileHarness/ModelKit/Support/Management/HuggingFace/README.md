@@ -6,7 +6,7 @@ Concrete ModelArtifactDownloader using swift-huggingface 0.9.0 metadata and nati
 
 ## Ownership and boundaries
 
-ModelKitHub depends on ModelKitRuntime contracts and HuggingFace; Management remains ModelKit-only. The host supplies endpoint/cellular configuration and background completion. The injected storage contract publishes one installed tree; there is no permanent SDK weight cache.
+ModelKitHub depends on ModelKitRuntime contracts and HuggingFace; Management remains ModelKit-only. The host supplies endpoint/cellular configuration and background completion. ModelKit disk storage publishes one installed tree; there is no permanent SDK weight cache.
 
 ## External relationships and data flow
 

@@ -16,13 +16,6 @@ extension DefaultModelAssembly {
             }, defaults: [.decision])
         try await manager.register(
             ModelRegistration(
-                id: ModelID("d3-lite"), capabilities: [.decision], memoryPolicy: .retain, artifactID: "d3-lite"
-            ) { context in
-                ProvidedCapabilities(
-                    decision: try D3Decision(context: context, artifacts: resources.appendingPathComponent("D3Lite")))
-            })
-        try await manager.register(
-            ModelRegistration(
                 id: ModelID("vela3-fast"), capabilities: [.decision], memoryPolicy: .retain,
                 artifactID: "vela3-fast"
             ) { context in

@@ -11,7 +11,6 @@ import StorageFiles
 
     import ModelKit
     import ModelKitDefaults
-    import ModelKitHub
     import ModelKitRuntime
     import Observation
     import PlatformKit
@@ -228,10 +227,10 @@ import StorageFiles
             return languageModels
         }
         private func quiesceForModelRemoval(_ id: String) async {
-            if ["d3-edge", "d3-lite", "vela3-fast", "gemma4-e2b"].contains(id) {
+            if ["d3-edge", "vela3-fast", "gemma4-e2b"].contains(id) {
                 await inputDecisionService?.quiesceLocal(id)
             }
-            if id == "d3-edge" || id == "d3-lite" || id == "vela3-fast" { return }
+            if id == "d3-edge" || id == "vela3-fast" { return }
             if id == "yolo26n-pose" {
                 await camera.pauseVisionForModelMaintenance()
             } else {

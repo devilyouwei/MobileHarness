@@ -181,7 +181,7 @@ public final class ProviderSettingsService {
                 value.decisionModel = ""
             }
             let localID = value.resolvedDecisionLocalModelID
-            guard ["d3-edge", "d3-lite", "vela3-fast", "gemma4-e2b", "apple-system"].contains(localID),
+            guard ["d3-edge", "vela3-fast", "gemma4-e2b", "apple-system"].contains(localID),
                 ["gemma4-e2b", "apple-system"].contains(value.assistantLocalModelID)
             else { throw ProviderSettingsError.invalidSelection }
             if value.decisionUsesLocal == true,

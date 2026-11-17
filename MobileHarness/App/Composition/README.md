@@ -126,3 +126,5 @@ Home preparation appends the selected local Decision step to language, recogniti
 Foreground model preparation adds an optional enhancement step: prepare/read artifact inventory, select deepfilternet3 only when installed, then join its normal managed load. This ignores the listening enablement switch; absent models are ready/no-op. The durable denoising preference passes from Actions bindings to Agents; the ModelKit speech enhancement port reaches SpeechPerception through the voice composition.
 
 语音宿主桥透传 playbackChanged(audioID, active, time) 的单调原生播放时刻，不在组合根推断播放开始或执行 ASR 冷却。
+
+ModelContainer 自行构造模型文件与下载能力；ApplicationContainer 不计算模型路径、不注入 Storage 文件接口。模型生命周期只依赖 diagnostics。App 启动 Storage 前将旧 Models/download-source.json 一次移动到 Settings/download-source.json，已有新位置优先，迁移失败阻止启动并报告；该兼容逻辑仅处理业务偏好，不读取或搬迁模型制品。

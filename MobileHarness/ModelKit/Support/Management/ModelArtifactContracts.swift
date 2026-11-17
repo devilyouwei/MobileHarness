@@ -26,7 +26,7 @@ public struct ModelDownloadSource: Codable, Sendable, Equatable {
 
 /// Declarative source; Hub resolves its own file URLs and metadata at download time.
 public struct ModelArtifactSource: Codable, Sendable {
-    public enum Kind: String, Codable, Sendable { case huggingface, urlArchive }
+    public enum Kind: String, Codable, Sendable { case huggingface, urlArchive, urlFile }
     public let kind: Kind
     public let repoId: String?
     public let revision: String?
@@ -62,7 +62,7 @@ public struct ModelArtifact: Codable, Sendable, Identifiable {
     public var downloadBytes: Int64 { estimatedBytes }
 }
 
-/// Concrete SDKs implement this outside Management; publication remains owned by the store.
+/// Concrete ModelKit download providers implement this port; the artifact store owns publication.
 public protocol ModelArtifactDownloader: Sendable {
     func download(
         _ artifact: ModelArtifact, source: ModelDownloadSource, into directory: URL,
@@ -86,6 +86,12 @@ public struct ModelArtifactCatalog: Codable, Sendable {
                 estimatedBytes: variant?.estimatedBytes ?? package.estimatedBytes, architectureVariants: nil)
         }
         return try Self.decode(JSONEncoder().encode(Self(schemaVersion: schemaVersion, packages: resolved)))
+    }
+    public static func bundled() throws -> Self {
+        guard let url = Bundle.module.url(forResource: "model-catalog", withExtension: "json") else {
+            throw ModelArtifactError.invalidCatalog
+        }
+        return try read(url)
     }
     public static func read(_ url: URL) throws -> Self {
         let handle = try FileHandle(forReadingFrom: url)
@@ -126,10 +132,12 @@ public struct ModelArtifactCatalog: Codable, Sendable {
                         throw ModelArtifactError.invalidCatalog
                     }
                 }
-            case .urlArchive:
-                guard let url = source.url, url.scheme == "https", url.user == nil, url.password == nil,
+            case .urlArchive, .urlFile:
+                guard let url = source.url, url.scheme == "https", url.host?.isEmpty == false,
+                    url.user == nil, url.password == nil, url.fragment == nil,
                     source.repoId == nil, source.allowPatterns == nil, source.stripPrefix == nil,
-                    package.estimatedBytes <= 64 * 1024 * 1024,
+                    source.kind != .urlArchive || package.estimatedBytes <= 64 * 1024 * 1024,
+                    source.kind != .urlFile || package.requiredFiles.count == 1,
                     source.sha256.map(validHash) ?? true
                 else { throw ModelArtifactError.invalidCatalog }
             }
@@ -174,8 +182,10 @@ public struct ModelArtifactSnapshot: Sendable {
     public let failure: String?
 }
 
-/// Generic operations injected by App; Runtime has no Storage dependency.
+/// ModelKit-owned persistence contract; default disk storage has no dependency on the Storage module.
 public protocol ModelArtifactStorage: Sendable {
+    func restoreCatalog(defaults: ModelArtifactCatalog) async throws -> ModelArtifactCatalog
+    func saveCatalog(_ catalog: ModelArtifactCatalog) async throws
     func restoreTransfers() async throws -> [ModelArtifactTransferRecord]
     func saveTransfers(_ records: [ModelArtifactTransferRecord]) async throws
     func installed(_ artifact: ModelArtifact) async throws -> Bool
@@ -187,6 +197,8 @@ public protocol ModelArtifactStorage: Sendable {
 }
 
 extension ModelArtifactStorage {
+    public func restoreCatalog(defaults: ModelArtifactCatalog) async throws -> ModelArtifactCatalog { defaults }
+    public func saveCatalog(_ catalog: ModelArtifactCatalog) async throws { throw ModelArtifactError.storage }
     public func installedBytes(_ artifact: ModelArtifact) async throws -> Int64? { nil }
 }
 

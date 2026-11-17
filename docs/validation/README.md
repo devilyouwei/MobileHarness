@@ -221,3 +221,5 @@ refactor, Agent-only model recording, current-file recovery and automated/build/
 [D3 Edge 继续聆听四分类实验](Decision-Model-Mac-Comparison.md#d3-edge-继续聆听四分类实验2026-11-16)：最新生产提示、194条双语扩展场景、真实App采纳与独立原生读出，区分低召回、250ms超时及512-token容量。
 
 [D3 Edge 提示词结构优化](Decision-Model-Mac-Comparison.md#d3-edge-提示词结构优化实验2026-11-16仅实验环境)：官方/公开集成调研、11组对照与48条预冻结留出；仅实验，保留误继续聆听风险及生产未变的哈希证据。
+
+- [ModelKit 制品所有权与 D3 Lite 移除](ModelKit-Artifact-Ownership.md)：独立存储、下载、目录与回归验证。

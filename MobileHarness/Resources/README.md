@@ -1,8 +1,8 @@
-# Resources — Assets and Model Metadata
+# Resources — Application Assets
 
 ## 职责与边界
 
-Resources 管理随包分发的 Agent 与 Skill 声明、模型制品元数据、应用图标和隐私清单。Agents 定义声明的 schema、加载、目录投影和授权。ModelKit 负责制品获取、校验、安装及模型选择。App 注入资源根与宿主能力。
+Resources 管理随包分发的 Agent 与 Skill 声明、应用图标和隐私清单。Agents 定义声明的 schema、加载、目录投影和授权。ModelKit 自带制品声明并负责获取、校验和安装；业务层负责模型选择。App 注入资源根与宿主能力。
 
 ## 上下游链路
 
@@ -10,7 +10,7 @@ Resources 管理随包分发的 Agent 与 Skill 声明、模型制品元数据�
 flowchart LR
     Build["SwiftPM / Xcode / 打包脚本"] -->|选择、复制和编译资源| Resource["Resources"]
     Resource -->|Catalog.json、Agent / Skill / Prompt| Agents["Agents · 解码与校验"]
-    Resource -->|模型目录和许可声明| Model["ModelKit · 制品目录"]
+    Model["ModelKit · 自有制品目录"] -->|制品许可声明| Resource
     Resource -->|图标和隐私声明| Bundle["App bundle"]
     Resource -->|固定模型配置| Tools["开发下载与验证脚本"]
     linkStyle default stroke:#64748b,stroke-width:1.5px
@@ -29,7 +29,7 @@ flowchart TB
     Variants["AppIconVariants · 原始图稿"] --> Assets["Assets.xcassets · 选定的 AppIcon"]
     Assets --> AppBundle["App staging"]
     Privacy["PrivacyInfo.xcprivacy"] --> AppBundle
-    Models["Models · 生产目录和独立开发配置"] -->|生产目录和许可| AppBundle
+    Models["Models · 忽略的本地测试制品"] -->|仅开发者显式使用| Tests
     linkStyle default stroke:#64748b,stroke-width:1.5px
 ```
 
@@ -37,7 +37,7 @@ flowchart TB
 
 Agent prompt translations use `.zh-Hans` siblings in the existing role and Skill directories. Unsuffixed prompt resources are English and provide runtime fallback. The packaged-resource check compares both versions’ template keys and interpolation variables. Role and Skill descriptions and localizable function prose are projected by stable identifiers while their declarations remain canonical.
 
-The bundle contains source declarations/license notices, not model weights. Catalog declarations identify acquirable artifacts; installed receipts record actual sandbox installation. Neither proves capability readiness or selects an active provider. App injects paths; ModelKit Defaults combines installation state, compatibility and preferences.
+The bundle contains source declarations/license notices, not model weights. Catalog declarations identify acquirable artifacts; installed receipts record actual sandbox installation. Neither proves capability readiness or selects an active provider. ModelKit owns paths; ModelKit Defaults combines installation state, compatibility and preferences.
 
 Pure Agent/Skill assets live here as Agents/, Skills/ and Catalog.json. Agents owns their schema and runtime policy; Resources owns source asset organization. The Agents package target compiles Agents sources and copies these explicit resources. Runtime lookup must locate Catalog.json with Bundle APIs rather than append Resources to resourceURL. Build staging uses [license notices](../../docs/licenses/README.md). `PrivacyInfo.xcprivacy` and the asset catalog supply platform declarations. Original icon artwork is retained separately from the selected build icon.
 

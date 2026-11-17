@@ -3,7 +3,14 @@ import Synchronization
 
 /// Persists OS task identity in taskDescription; completion files survive relaunch before a waiter reattaches.
 final class ArtifactDownloadTransport: NSObject, URLSessionDownloadDelegate, Sendable {
+    struct ResumeRecord: Codable {
+        let url: URL
+        let maximumBytes: Int64
+        let data: Data
+    }
     private struct State {
+        var invalidated = false
+        var invalidationWaiter: CheckedContinuation<Void, Never>?
         var received: Int64 = 0
         var session: URLSession?
         var waiters: [Int: CheckedContinuation<URL, Error>] = [:]
@@ -28,6 +35,28 @@ final class ArtifactDownloadTransport: NSObject, URLSessionDownloadDelegate, Sen
         let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
         state.withLock { $0.session = session }
     }
+    func cancelAndJoin() async {
+        guard let session = state.withLock({ $0.session }) else { return }
+        session.invalidateAndCancel()
+        await withCheckedContinuation { continuation in
+            let done = state.withLock { value in
+                if value.invalidated { return true }
+                value.invalidationWaiter = continuation
+                return false
+            }
+            if done { continuation.resume() }
+        }
+    }
+    func urlSession(_ session: URLSession, didBecomeInvalidWithError error: Error?) {
+        let waiter = state.withLock { value in
+            value.invalidated = true
+            let waiter = value.invalidationWaiter
+            value.invalidationWaiter = nil
+            value.session = nil
+            return waiter
+        }
+        waiter?.resume()
+    }
     var receivedBytes: Int64 { state.withLock { $0.received } }
     func resetProgress() { state.withLock { $0.received = 0 } }
     func finishTransfers() { state.withLock { $0.session }?.finishTasksAndInvalidate() }
@@ -36,10 +65,17 @@ final class ArtifactDownloadTransport: NSObject, URLSessionDownloadDelegate, Sen
         guard let session = state.withLock({ $0.session }) else { throw ModelArtifactError.storage }
         let descriptor = destination.absoluteString + "\n" + String(maximumBytes)
         let existing = await session.allTasks
-        let task =
-            existing.first { $0.taskDescription == descriptor && $0.originalRequest?.url == url }
-            as? URLSessionDownloadTask
-            ?? session.downloadTask(with: url)
+        let task: URLSessionDownloadTask
+        if let restored = existing.first(where: {
+            $0.taskDescription == descriptor && $0.originalRequest?.url == url
+                && ($0.state == .running || $0.state == .suspended)
+        }) as? URLSessionDownloadTask {
+            task = restored
+        } else if let data = try Self.resumeData(for: url, destination: destination, maximumBytes: maximumBytes) {
+            task = session.downloadTask(withResumeData: data)
+        } else {
+            task = session.downloadTask(with: url)
+        }
         task.taskDescription = descriptor
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
@@ -70,7 +106,8 @@ final class ArtifactDownloadTransport: NSObject, URLSessionDownloadDelegate, Sen
     }
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         do {
-            guard let response = downloadTask.response as? HTTPURLResponse, response.statusCode == 200,
+            guard let response = downloadTask.response as? HTTPURLResponse,
+                response.statusCode == 200 || response.statusCode == 206,
                 response.url?.scheme == "https", let descriptor = downloadTask.taskDescription
             else {
                 throw ModelArtifactError.integrity
@@ -87,6 +124,8 @@ final class ArtifactDownloadTransport: NSObject, URLSessionDownloadDelegate, Sen
             if !FileManager.default.fileExists(atPath: destination.path) {
                 try FileManager.default.moveItem(at: location, to: destination)
             }
+            let resume = destination.appendingPathExtension("resume")
+            if FileManager.default.fileExists(atPath: resume.path) { try FileManager.default.removeItem(at: resume) }
             finish(downloadTask, .success(destination))
         } catch { finish(downloadTask, .failure(error)) }
     }
@@ -103,7 +142,43 @@ final class ArtifactDownloadTransport: NSObject, URLSessionDownloadDelegate, Sen
         if totalBytesWritten > limit || totalBytesExpectedToWrite > limit { downloadTask.cancel() }
     }
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        if let error { finish(task, .failure(error)) }
+        guard let error else { return }
+        do {
+            if let data = (error as NSError).userInfo[NSURLSessionDownloadTaskResumeData] as? Data,
+                data.count <= 8 * 1024 * 1024, let url = task.originalRequest?.url,
+                let fields = task.taskDescription?.split(separator: "\n"), fields.count == 2,
+                let destination = URL(string: String(fields[0])), destination.isFileURL,
+                let maximum = Int64(fields[1])
+            {
+                let record = ResumeRecord(url: url, maximumBytes: maximum, data: data)
+                let encoded = try JSONEncoder().encode(record)
+                #if os(iOS)
+                    try encoded.write(
+                        to: destination.appendingPathExtension("resume"),
+                        options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+                #else
+                    try encoded.write(to: destination.appendingPathExtension("resume"), options: .atomic)
+                #endif
+            }
+            finish(task, .failure(error))
+        } catch { finish(task, .failure(error)) }
+    }
+    static func resumeData(for url: URL, destination: URL, maximumBytes: Int64) throws -> Data? {
+        let file = destination.appendingPathExtension("resume")
+        guard FileManager.default.fileExists(atPath: file.path) else { return nil }
+        guard file.resolvingSymlinksInPath() == file else { throw ModelArtifactError.storage }
+        let handle = try FileHandle(forReadingFrom: file)
+        defer { try? handle.close() }
+        let data = try handle.read(upToCount: 12 * 1024 * 1024 + 1) ?? Data()
+        guard data.count <= 12 * 1024 * 1024 else { throw ModelArtifactError.integrity }
+        let record = try JSONDecoder().decode(ResumeRecord.self, from: data)
+        guard record.url == url, record.maximumBytes == maximumBytes else {
+            try FileManager.default.removeItem(at: file)
+            return nil
+        }
+        guard record.data.count <= 8 * 1024 * 1024 else { throw ModelArtifactError.integrity }
+        try FileManager.default.removeItem(at: file)
+        return record.data
     }
     func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
         ModelArtifactBackgroundEvents.finished(identifier)

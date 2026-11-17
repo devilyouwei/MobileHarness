@@ -624,7 +624,7 @@ func settingsContainerRunsInItsAgentWithPrivateStagingAndActualPresentation() as
     await ui.stop()
 }
 
-@Test @MainActor func d3LiteSelectionRequiresItsOwnInstallationAndPersists() async throws {
+@Test @MainActor func removedD3LiteSelectionIsRejectedEvenWithOldInstallation() async throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent("lite-settings-\(UUID().uuidString).json")
     defer { try? FileManager.default.removeItem(at: url) }
     let credentials = ProviderCredentialFixture()
@@ -641,18 +641,13 @@ func settingsContainerRunsInItsAgentWithPrivateStagingAndActualPresentation() as
     var choice = try await edgeOnly.restore()
     #expect(choice.decisionUsesLocal == true && choice.resolvedDecisionLocalModelID == "d3-edge")
     choice.decisionLocalModelID = "d3-lite"
-    do {
-        _ = try await edgeOnly.save(choice)
-        Issue.record("D3 Lite was selected without its artifact")
-    } catch ProviderSettingsError.decisionRequired {}
+    await #expect(throws: ProviderSettingsError.self) { try await edgeOnly.save(choice) }
     let liteReady = ProviderSettingsService(
         store: store, runtime: runtime, legacyDecision: { true }, isDecisionInstalled: { $0 == "d3-lite" })
     _ = try await liteReady.restore()
-    _ = try await liteReady.save(choice)
-    let reopened = try #require(await makeStore().load())
-    #expect(reopened.decisionUsesLocal == true && reopened.resolvedDecisionLocalModelID == "d3-lite")
+    await #expect(throws: ProviderSettingsError.self) { try await liteReady.save(choice) }
     let inventory = ModelResourceInventory(items: [.init(id: "d3-lite", name: "D3 Lite", bytes: 1, phase: .installed)])
-    #expect(inventory.installedGroups.contains(.decision))
+    #expect(!inventory.installedGroups.contains(.decision))
 }
 
 @Test @MainActor func localModelSelectionRequiresInstalledArtifactBeforePersistence() async throws {

@@ -98,3 +98,5 @@ Completed scope: [可读预览编号与合并图片输入](../../completed/Reada
 - [D3 iOS AOT delivery](D3-iOS-AOT-Delivery.md): compiled artifact publishing and architecture-aware acquisition.
 
 - [Settings user-facing copy](Settings-User-Copy.md): concise settings labels and help in English and Simplified Chinese.
+
+- [ModelKit 制品所有权与 D3 Lite 移除](ModelKit-Artifact-Ownership.md)

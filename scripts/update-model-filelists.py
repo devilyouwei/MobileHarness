@@ -13,7 +13,7 @@ for platform in ["iphoneos", "iphonesimulator"]:
     inputs = ["$(SRCROOT)/scripts/stage-voice-models.sh"]
     outputs = {"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Models"}
     files = []
-    files = [("MobileHarness/Resources/Models/model-catalog.json", "model-catalog.json")]
+    files = [("MobileHarness/ModelKit/Support/Management/model-catalog.json", "model-catalog.json")]
     files += [("docs/licenses/" + name + ".txt", "Licenses/" + name + ".txt") for name in licenses]
     for source, relative in files:
         inputs.append("$(SRCROOT)/" + source)

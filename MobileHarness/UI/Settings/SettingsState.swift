@@ -54,7 +54,6 @@ enum LocalLanguageModel: String, CaseIterable {
     case gemma = "gemma4-e2b"
     case apple = "apple-system"
     case edge = "d3-edge"
-    case lite = "d3-lite"
     case vela = "vela3-fast"
 
     var title: String {
@@ -62,7 +61,6 @@ enum LocalLanguageModel: String, CaseIterable {
         case .gemma: "Gemma 4 E2B"
         case .apple: "Apple System LLM"
         case .edge: "D3 Edge"
-        case .lite: "D3 Lite"
         case .vela: "Vela 3 Fast"
         }
     }
@@ -71,7 +69,7 @@ enum LocalLanguageModel: String, CaseIterable {
         switch self {
         case .gemma: true
         case .apple: brain != .writer
-        case .edge, .lite, .vela: brain == .decision
+        case .edge, .vela: brain == .decision
         }
     }
 

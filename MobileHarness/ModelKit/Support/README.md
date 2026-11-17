@@ -37,6 +37,6 @@ flowchart LR
 
 [Core](Core/README.md) · [Backends](Backends/README.md) · [Management](Management/README.md) · [Speech](Speech/README.md) · [Parent design](../README.md)
 
-## Storage 文件作用域接入
+## 独立制品文件所有权
 
-模型制品适配器由 App 注入 Files；后台回调复用同一制品服务。制品绑定停止时关闭接纳、取消并加入下载并保留清理错误，释放配置后允许在新 Files 作用域重新绑定，不停止无关模型实例。App 只转交接口与调度启停。
+ModelKit 自行拥有制品目录、文件存储、下载与后台恢复，不接收 Storage/FilesContainer。默认根在 Application Support/MobileHarness/Models，installed 保存安装收据和文件，staging 保存传输计划及恢复数据；原安装位置与收据兼容。关闭制品接纳后取消并加入下载、报告清理错误；App 只转交系统事件与调度启停。显式资源 URL 和协议注入用于独立装配与测试。

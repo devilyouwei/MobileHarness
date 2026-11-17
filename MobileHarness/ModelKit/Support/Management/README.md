@@ -8,11 +8,11 @@ Shared directory for independent lifecycle, artifact acquisition and default-pro
 
 ## Ownership and boundaries
 
-ModelKitRuntime depends only on ModelKit. Management owns ModelState (including registered/constructing), maps Core ModelResourceState exhaustively, and injects loading limits. Its throwing ModelManager initializer defaults to four concurrent loaders and 32 waiters per resource; positive custom limits are permitted and invalid values fail before registrations are created. ModelKitDefaults uses ModelAssembly SPI for production registration/replacement and depends on Runtime/concrete providers. ModelKitHub separately depends on Runtime/HuggingFace. The host injects storage, downloader and native quiescence; Runtime imports no concrete provider or Storage. Directory grouping does not permit reverse dependencies.
+ModelKitRuntime depends only on ModelKit. Management owns ModelState (including registered/constructing), maps Core ModelResourceState exhaustively, and injects loading limits. Its throwing ModelManager initializer defaults to four concurrent loaders and 32 waiters per resource; positive custom limits are permitted and invalid values fail before registrations are created. ModelKitDefaults uses ModelAssembly SPI for production registration/replacement and depends on Runtime/concrete providers. ModelKitHub separately depends on Runtime/HuggingFace. Defaults composes the bundled catalog, ModelArtifactDiskStorage and Hub downloader; the host supplies business quiescence; Runtime imports no concrete provider or Storage. Directory grouping does not permit reverse dependencies.
 
 | Target | Explicit root source ownership |
 | --- | --- |
-| ModelKitRuntime | ModelManager.swift, ModelRegistration.swift, ModelArtifactContracts.swift, ModelArtifactStore.swift, ArtifactDownloadTransport.swift |
+| ModelKitRuntime | ModelManager.swift, ModelRegistration.swift, ModelArtifactContracts.swift, ModelArtifactStore.swift, ArtifactDownloadTransport.swift, ModelArtifactDiskStorage.swift, ModelDownloadBackgroundService.swift; model-catalog.json resource |
 | ModelKitDefaults | 模块根 ModelContainer.swift；本目录 ChatDefaults.swift, SpeechDefaults.swift, VisionDefaults.swift, SpeechProviderSelection.swift |
 | ModelKitHub | HuggingFace/ source files |
 
@@ -32,8 +32,8 @@ flowchart TB
  Provider -->|Inference lease| Resource[ModelResource]
  Manager -->|Resource lifecycle and maintenance fence| Resource
  Manager -->|Transfer and publication operations| Artifacts[ModelArtifactStore]
- Host -.->|Catalog and SDK-owned storage/download protocols| Artifacts
- Artifacts --> Storage[Injected storage implementation]
+ Host -.->|Business quiescence| Artifacts
+ Artifacts --> Storage[ModelKit disk storage]
  Artifacts --> Downloader[Injected downloader implementation]
 ```
 
@@ -62,13 +62,13 @@ Explicit SPI replacement constructs candidate before retiring old resource, vali
 
 ModelRegistration associates providers with artifact IDs. Schema v2 declares HF repository/revision/patterns/stripPrefix or HTTPS ZIP URL/optional archive SHA-256 plus license/compatibility/required files. Bounds: 1 MiB catalog, 32 packages, 128 patterns and 4096 required files. Malformed/traversing sources reject; estimatedBytes is display/storage estimate, not integrity evidence.
 
-ModelArtifactStore owns two active package slots and eight FIFO pending requests; overflow rejects. Persist generations before admission, validate a symlink-free installed tree (16,384 entries/32 GiB) and required files, then atomically publish through injected storage with actual path/size receipt. ZIP bounds are 64 MiB compressed/256 MiB expanded with safe extraction and optional archive trust anchor. No duplicate permanent SDK cache exists.
+ModelArtifactStore owns two active package slots and eight FIFO pending requests; overflow rejects. Persist generations before admission, validate a symlink-free installed tree (16,384 entries/32 GiB) and required files, then atomically publish through ModelKit disk storage with actual path/size receipt. ZIP bounds are 64 MiB compressed/256 MiB expanded with safe extraction and optional archive trust anchor. No duplicate permanent SDK cache exists.
 
-Valid settled receipts determine installed state. Identity/revision/path/actual size failures remain observable, with explicit delete available. A valid published installation survives later transfer-index write failure as a bookkeeping warning. Cancel after installation is a no-op; explicit active cancel joins and discards staging. HF transient failure retains compatible generation/completed files for explicit retry/relaunch; network codes remain explicit.
+Valid settled receipts determine installed state. Identity/revision/path/actual size failures remain observable, with explicit delete available. A valid published installation survives later transfer-index write failure as a bookkeeping warning. Cancel after installation is a no-op; explicit active cancel joins and discards staging. HF and URL transient failure retains compatible generation/completed files for explicit retry/relaunch; network codes remain explicit.
 
 ## Maintenance and background separation
 
-Delete gates every referencing resource before host quiescence, drains/unloads, joins transfer cancellation, removes files, then reopens admission. Retained handles cannot reload mid-delete. Installing never starts inference. Background native transfer/OS reattachment belongs to the injected downloader; Manager retains package state independently of pages. Force-quit/server resume behavior remains conditional rather than guaranteed.
+Delete gates every referencing resource before host quiescence, drains/unloads, joins transfer cancellation, removes files, then reopens admission. Retained handles cannot reload mid-delete. Installing never starts inference. Background native transfer/OS reattachment belongs to ModelKit download transports; Manager retains package state independently of pages. Force-quit/server resume behavior remains conditional rather than guaranteed.
 
 ## Default assembly and provider selection
 
@@ -105,9 +105,9 @@ Large local Gemma/Nemotron/MOSS and pose releaseWhenIdle opt into memory-pressur
 
 ModelLanguageContainer 属于默认装配目标，按每个请求解析当前 chat binding，并转交工具/图片支持和推理会话。它不认识 App、UI、设置 schema 或业务仓库；失败的 availability 返回不可用诊断，实际 chat 错误继续抛出。SDK 仍只依赖自身目标和批准的第三方 SDK。
 
-## Storage 文件作用域接入
+## 独立制品文件所有权
 
-模型制品适配器由 App 注入 Files；后台回调复用同一制品服务。制品绑定停止时关闭接纳、取消并加入下载并保留清理错误，释放配置后允许在新 Files 作用域重新绑定，不停止无关模型实例。App 只转交接口与调度启停。
+ModelKit 自行拥有制品目录、文件存储、下载与后台恢复，不接收 Storage/FilesContainer。默认根在 Application Support/MobileHarness/Models，installed 保存安装收据和文件，staging 保存传输计划及恢复数据；原安装位置与收据兼容。关闭制品接纳后取消并加入下载、报告清理错误；App 只转交系统事件与调度启停。显式资源 URL 和协议注入用于独立装配与测试。
 
 默认装配根实例独立，制品协议及托管加载／卸载不依赖应用模块；消费者不获得管理器。
 
@@ -151,10 +151,24 @@ HF 只使用当前传输计划和完成文件；不从 .hub-snapshot 搬迁旧 S
 
 SerialChat forwards full native calls through the existing 128-event queued session without a single-event byte ceiling. Local pending-request bounds and cancellation/cleanup FIFO are independent of argument size; backend capability and token-window errors remain explicit.
 
-The default assembly registers d3-edge, d3-lite and vela3-fast as decision providers with independent retained resources and matching artifact IDs. D3Edge, D3Lite and Vela3Fast contain their respective graphs, manifests and tokenizers. Vela uses the same catalog schema and required-runtime-file checks as other packages. Removing a package fences and joins its provider before deleting files.
+The default assembly registers d3-edge and vela3-fast as decision providers with independent retained resources and matching artifact IDs. D3Edge and Vela3Fast contain their respective graphs, manifests and tokenizers. Vela uses the same catalog schema and required-runtime-file checks as other packages. Removing a package fences and joins its provider before deleting files.
 
 Catalog schema v2 optionally declares architectureVariants per package, overriding source, requiredFiles and estimatedBytes. Decode validates every variant, including variants for other devices, with the existing bounds and path rules; at most 16 architecture keys are allowed. Default assembly resolves the physical iOS architecture before configuring the artifact store. Packages without a matching variant retain their source declaration. Resolved catalogs omit variants so downloads, required-file checks and receipts share one revision and file contract. Runtime consumes architecture strings without importing CoreAI.
 
 ## Enhancement registration
 
 `ProvidedCapability.enhancement` and typed `.enhancement` acquisition map to `deepfilternet3`, using the `DeepFilterNet3` artifact directory. The speech container exposes availability, enhancement and explicit load/status/unload/warmup. This optional capability has no fallback. The root local-model preparation step supports deepfilternet3; App selects it only when its artifact snapshot is installed, independent of the listening enablement preference.
+
+## Catalog, disk and URL ownership
+
+[model-catalog.json](model-catalog.json) is a ModelKitRuntime package resource, read through `ModelArtifactCatalog.bundled()`. It describes acquisition and compatibility only. The host owns the selected/default model, inference parameters and persisted business preferences.
+
+`ModelArtifactDiskStorage` implements the SDK storage port with bounded JSON reads, confined relative paths, symlink rejection, disk reservations, backup exclusion, after-first-unlock protection on iOS, receipts and no-overwrite directory publication. Transfer indexes retain the version-1 envelope for compatibility. Metadata and weights use the same ModelKit root, independent of Storage lifecycle.
+
+`upsertArtifact` adds or updates custom declarations and persists the catalog. Bundled declarations are immutable through this API and follow SDK releases; restoration merges current bundled declarations with persisted custom entries. Removing a custom package also removes its declaration, while bundled entries remain downloadable. Installed or transferring entries reject mutation; callers remove the installed copy first. Default provider identities/revisions/directories remain fixed by assembly, while custom declarations do not register executable inference providers. Catalog reads and downloads use the restored catalog. Package/file limits apply to edits as well as bundled declarations.
+
+Sources support Hugging Face repositories, HTTPS `urlArchive` ZIPs, and HTTPS `urlFile` with exactly one required destination path. URL files are limited by estimatedBytes (at most 32 GiB); ZIPs retain 64 MiB compressed/256 MiB expanded limits. Optional SHA-256 verifies downloads. URL transfers retain bounded resume data tied to the exact URL and byte bound, with a deterministic incoming filename. HTTP 200 and resumed 206 responses are accepted; subsequent installation still verifies bounds and receipts. Network failure retains the generation for retry; explicit cancel joins and removes staging. Server support and OS scheduling determine whether a transfer can resume.
+
+`ModelDownloadBackgroundService` owns up to ten OS completion handoffs. The App forwards identifiers/completions and provides preparation of the same model root; it does not manage files or downloads. Native transport delegates own reattachment and event completion. App's short OS execution allowance is independent of the long-lived background URLSession transfer.
+
+Catalog retirement cancels and joins orphaned native sessions before discarding their staging, reports the retired ID through the module failure callback, and persists the remaining transfer index. Existing installed weights are not automatically deleted. This prevents removed declarations from blocking unrelated restoration.

@@ -139,7 +139,6 @@ import UI
                 await services.homePreparation.stop()
                 if backgroundArtifactsPrepared {
                     try await services.model.stop()
-                    try await services.storage.stop()
                 }
                 backgroundArtifactsPrepared = false
                 services = ServiceFactories.make(language: languageSettings.read)

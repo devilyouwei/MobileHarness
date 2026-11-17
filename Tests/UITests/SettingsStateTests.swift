@@ -129,7 +129,7 @@ import Testing
 @Test @MainActor func localModelSettingsExposeOnlySupportedRoles() {
     #expect(LocalLanguageModel.allCases.filter { $0.supports(.assistant) } == [.gemma, .apple])
     #expect(LocalLanguageModel.allCases.filter { $0.supports(.writer) } == [.gemma])
-    #expect(LocalLanguageModel.allCases.filter { $0.supports(.decision) } == [.gemma, .apple, .edge, .lite, .vela])
+    #expect(LocalLanguageModel.allCases.filter { $0.supports(.decision) } == [.gemma, .apple, .edge, .vela])
     let resources = ModelResourcesState()
     #expect(!resources.appleSystemAvailable)
     #expect(resources.applySnapshot(.init(items: [], appleSystemAvailable: true), generation: resources.beginRefresh()))

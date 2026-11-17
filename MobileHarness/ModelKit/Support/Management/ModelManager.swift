@@ -43,7 +43,8 @@ public actor ModelManager {
 
     @_spi(ModelAssembly) public func configureArtifacts(
         catalog: ModelArtifactCatalog, storage: any ModelArtifactStorage,
-        downloader: (any ModelArtifactDownloader)? = nil
+        downloader: (any ModelArtifactDownloader)? = nil,
+        onFailure: @escaping @Sendable (String, any Error) -> Void = { _, _ in }
     ) throws {
         guard !closed else { throw CapabilityError.sessionClosed }
         guard artifactRelease == nil else { throw ModelArtifactError.busy }
@@ -59,7 +60,7 @@ public actor ModelManager {
         }
         artifactConfiguration = configuration
         artifactIDs = ids
-        artifacts = ModelArtifactStore(catalog: catalog, storage: storage, downloader: downloader)
+        artifacts = ModelArtifactStore(catalog: catalog, storage: storage, downloader: downloader, onFailure: onFailure)
     }
     /// Detaches file-backed artifact work while preserving unrelated model instances.
     public func releaseArtifacts() async throws {
@@ -84,6 +85,15 @@ public actor ModelManager {
         guard !closed, let artifacts else { throw ModelArtifactError.missingArtifact }
         return try await artifacts.snapshots()
     }
+    public func upsertArtifact(_ artifact: ModelArtifact) async throws {
+        guard !closed, let artifacts else { throw ModelArtifactError.missingArtifact }
+        if let configured = artifactConfiguration?[artifact.id] {
+            guard configured == artifact.revision + "/" + artifact.directory else {
+                throw ModelArtifactError.incompatible
+            }
+        }
+        try await artifacts.upsert(artifact)
+    }
     public func downloadArtifact(_ id: String, source: ModelDownloadSource) async throws {
         guard !closed, let artifacts else { throw ModelArtifactError.missingArtifact }
         try await artifacts.download(id, source: source)
@@ -94,7 +104,6 @@ public actor ModelManager {
     }
     public func removeArtifact(_ id: String, quiesce: @Sendable () async throws -> Void) async throws {
         guard !closed, let artifacts else { throw ModelArtifactError.missingArtifact }
-        guard artifactIDs?.contains(id) == true else { throw ModelArtifactError.missingArtifact }
         let affected = entries.values.filter { $0.registration.artifactID == id }
         guard affected.allSatisfy({ !$0.unloading }) else { throw ModelArtifactError.busy }
         for entry in affected { entry.unloading = true }

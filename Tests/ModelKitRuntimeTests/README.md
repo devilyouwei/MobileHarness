@@ -57,3 +57,5 @@ Direct-input regressions cover typed request receipts, bounds, cancellation/gene
 Catalog architecture tests cover exact variant selection, source retention for unknown/no architecture, revision/required-file/size consistency and rejection of unsafe paths in an unselected variant.
 
 The production D3 catalog test checks that Edge selects the pinned hugging-mac source graph on h18p and non-device catalog resolution, while Lite retains its h18p compiled graph inventory and source default.
+
+ModelKit disk tests exercise publication receipts, tamper detection, removal, transfer-index persistence, traversal/symlink rejection, bundled catalog loading, custom declaration persistence, URL-file installation and resume URL/size binding. These are filesystem/fixture tests, not native background or real model acceptance.

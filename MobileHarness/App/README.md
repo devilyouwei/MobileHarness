@@ -51,7 +51,7 @@ Shutdown reverses that order. Agents closes requests and joins roles; Gateway jo
 
 Initial inactive waits for active. Synchronous invalidation closes admission before asynchronous pause. Rapid reactivation completes necessary suspension first. One replacement task coalesces retries and rechecks foreground state; there is no replay queue. Durable records/media remain independent from runtime work.
 
-ForegroundPreparation is root-owned and active only for visible foreground home. It uses public readiness/preparation interfaces, independently of ordinary conversation waiting. Background artifact restoration may use the same model/storage roots before foreground startup; replacement still joins those owners. Native UI, real-model and physical-device evidence remains separate in [validation](../../docs/validation/README.md).
+ForegroundPreparation is root-owned and active only for visible foreground home. It uses public readiness/preparation interfaces, independently of ordinary conversation waiting. Background artifact restoration may use the same model root before foreground startup; replacement still joins those owners. Native UI, real-model and physical-device evidence remains separate in [validation](../../docs/validation/README.md).
 
 ## System facts and context injection
 

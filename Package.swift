@@ -261,7 +261,7 @@ let package = Package(
             name: "Actions",
             dependencies: [
                 "BehaviorDefinitions", "CallRuntime", "ExecutionRuntime", "FunctionContracts", "ModelKit",
-                "ModelKitDefaults", "ModelKitHub", "ModelKitOpenAI", "ModelKitRuntime", "PlatformKit", "StorageCache",
+                "ModelKitDefaults", "ModelKitOpenAI", "ModelKitRuntime", "PlatformKit", "StorageCache",
                 "StorageChat", "StorageCore", "StorageDevices", "StorageFiles", "StorageDatabase", "StorageMedia", "UI",
             ],
             path: "MobileHarness/Actions",
@@ -310,7 +310,7 @@ let package = Package(
             name: "Agents",
             dependencies: [
                 "AgentCore", "FunctionContracts", "Gateway", "ModelKit",
-                "ModelKitDefaults", "ModelKitHub", "ModelKitRuntime", "PlatformKit", "StorageCache", "StorageChat",
+                "ModelKitDefaults", "ModelKitRuntime", "PlatformKit", "StorageCache", "StorageChat",
                 "StorageCore", "StorageDevices", "StorageFiles", "StorageMedia", "StorageTasks", "UI",
             ],
             path: "MobileHarness",
@@ -411,7 +411,8 @@ let package = Package(
         .target(
             name: "ModelKitDefaults",
             dependencies: [
-                "ModelKit", "ModelKitRuntime", "ModelKitNemotron", "ModelKitSilero", "ModelKitDeepFilterNet3",
+                "ModelKit", "ModelKitRuntime", "ModelKitHub", "ModelKitNemotron", "ModelKitSilero",
+                "ModelKitDeepFilterNet3",
                 "ModelKitMossNano", "ModelKitYOLOPose", "ModelKitOpenAI", "ModelKitAppleSpeech",
                 "ModelKitEnergy", "ModelKitD3", "ModelKitAppleLLM",
             ] + localChatDependencies,
@@ -423,6 +424,8 @@ let package = Package(
                 "Support/Management/ModelManager.swift", "Support/Management/ModelRegistration.swift",
                 "Support/Management/ModelArtifactContracts.swift", "Support/Management/ModelArtifactStore.swift",
                 "Support/Management/ArtifactDownloadTransport.swift",
+                "Support/Management/ModelArtifactDiskStorage.swift",
+                "Support/Management/ModelDownloadBackgroundService.swift", "Support/Management/model-catalog.json",
             ],
             sources: [
                 "ModelContainer.swift", "Support/Management/ChatDefaults.swift",
@@ -439,7 +442,9 @@ let package = Package(
             sources: [
                 "ModelManager.swift", "ModelRegistration.swift", "ModelArtifactContracts.swift",
                 "ModelArtifactStore.swift", "ArtifactDownloadTransport.swift",
-            ]),
+                "ModelArtifactDiskStorage.swift", "ModelDownloadBackgroundService.swift",
+            ],
+            resources: [.copy("model-catalog.json")]),
         .target(
             name: "ModelKitEnergy", dependencies: ["ModelKit"],
             path: "MobileHarness/ModelKit/Speech/VAD/Energy"),

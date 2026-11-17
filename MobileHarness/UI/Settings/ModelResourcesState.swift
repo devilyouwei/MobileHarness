@@ -52,7 +52,7 @@ public enum ModelResourceGroup: String, Sendable, CaseIterable {
         case .synthesis: ["moss-tts-nano"]
         case .language: ["gemma4-e2b"]
         case .vision: ["yolo26n-pose"]
-        case .decision: ["d3-edge", "d3-lite", "vela3-fast"]
+        case .decision: ["d3-edge", "vela3-fast"]
         }
     }
     public var installationMessage: String {
