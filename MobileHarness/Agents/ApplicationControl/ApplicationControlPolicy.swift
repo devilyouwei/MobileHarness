@@ -25,21 +25,30 @@ enum ApplicationControlResourcePolicy {
     struct PreferenceValue: Decodable {
         let endpoint: String
         let allowsCellular: Bool
+        let useSpeechEnhancement: Bool?
         let useCustomRecognition: Bool
         let useCustomSynthesis: Bool
         let useLocalDecision: Bool?
+        let vadOnsetWindows: Int?
+        let vadThreshold: Double?
     }
     static func preferenceValue(_ raw: String) throws -> PreferenceValue {
         guard raw.utf8.count <= 2048,
             let keys = try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any],
             Set(keys.keys).isSubset(of: [
                 "endpoint", "allowsCellular", "useCustomRecognition", "useCustomSynthesis", "useLocalDecision",
+                "vadOnsetWindows", "vadThreshold", "useSpeechEnhancement",
             ])
         else { throw CommunicationError.invalidPayload }
         let value = try JSONDecoder().decode(PreferenceValue.self, from: Data(raw.utf8))
         guard !value.endpoint.isEmpty, value.endpoint.utf8.count <= 1024 else {
             throw CommunicationError.invalidPayload
         }
+        let windows = value.vadOnsetWindows ?? 8
+        let threshold = value.vadThreshold ?? 0.65
+        guard (1...16).contains(windows), threshold.isFinite, (0.05...0.95).contains(threshold),
+            abs(threshold * 20 - (threshold * 20).rounded()) < 0.00001
+        else { throw CommunicationError.invalidPayload }
         return value
     }
 }

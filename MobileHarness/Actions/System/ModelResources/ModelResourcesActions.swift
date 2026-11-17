@@ -32,7 +32,19 @@ extension SystemActions {
         invocation: any FunctionInput, using preferences: any ModelResourcePreferencesCapability
     ) async throws -> String {
         let args = ActionArguments(invocation.call.parameters)
-        try args.validateAllowedKeys(["endpoint", "allowsCellular", "recognition", "synthesis", "decision"])
+        try args.validateAllowedKeys([
+            "endpoint", "allowsCellular", "recognition", "synthesis", "decision", "vadOnsetWindows", "vadThreshold",
+            "enhancement",
+        ])
+        guard let windows = Int(invocation.call.parameters["vadOnsetWindows"] ?? "8"),
+            let threshold = Double(invocation.call.parameters["vadThreshold"] ?? "0.65"),
+            (1...16).contains(windows), threshold.isFinite, (0.05...0.95).contains(threshold),
+            abs(threshold * 20 - (threshold * 20).rounded()) < 0.00001
+        else { throw ActionArguments.ValidationError.invalidValue("speechDetection") }
+        let enhancement = invocation.call.parameters["enhancement"] ?? "false"
+        guard ["true", "false"].contains(enhancement) else {
+            throw ActionArguments.ValidationError.invalidValue("enhancement")
+        }
         let decision = invocation.call.parameters["decision"] ?? "false"
         guard ["true", "false"].contains(decision) else {
             throw ActionArguments.ValidationError.invalidValue("decision")
@@ -49,7 +61,8 @@ extension SystemActions {
             .init(
                 endpoint: endpoint, allowsCellular: flags[0] == "true",
                 useCustomRecognition: flags[1] == "true", useCustomSynthesis: flags[2] == "true",
-                useLocalDecision: decision == "true")
+                useLocalDecision: decision == "true", vadOnsetWindows: windows, vadThreshold: threshold,
+                useSpeechEnhancement: enhancement == "true")
         ).encoded()
     }
 

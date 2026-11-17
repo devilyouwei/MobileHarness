@@ -79,11 +79,11 @@
         public let cancelReply: @MainActor () async throws -> Void
         public let adaptFailure: @Sendable (any Error) -> any Error
         public let detection: AudioDetectionConnections
-        public let playbackChanged: @Sendable (String, Bool) async -> Void
+        public let playbackChanged: @Sendable (String, Bool, ContinuousClock.Instant) async -> Void
         public init(
             sessionID: String, cancelReply: @escaping @MainActor () async throws -> Void,
             detection: AudioDetectionConnections, adaptFailure: @escaping @Sendable (any Error) -> any Error,
-            playbackChanged: @escaping @Sendable (String, Bool) async -> Void = { _, _ in }
+            playbackChanged: @escaping @Sendable (String, Bool, ContinuousClock.Instant) async -> Void = { _, _, _ in }
         ) {
             self.sessionID = sessionID
             self.cancelReply = cancelReply
@@ -139,6 +139,8 @@
             ) -> Void
         public let observeTranscript: @MainActor @Sendable (String, String) throws -> Void
         public let output: @Sendable (ActionOutputObservation) async -> Void
+        public let speechEnhancementEnabled: @Sendable () async throws -> Bool
+        public let speechDetection: @Sendable () async throws -> (windows: Int, threshold: Double)
         public let decodeResources: @Sendable (String) throws -> ModelResourceViewSnapshot
         public let makeVoice: @MainActor (ActionsVoiceHost) throws -> ActionsVoiceExecution
         public init(
@@ -169,6 +171,8 @@
                 ) -> Void,
             observeTranscript: @escaping @MainActor @Sendable (String, String) throws -> Void,
             output: @escaping @Sendable (ActionOutputObservation) async -> Void,
+            speechEnhancementEnabled: @escaping @Sendable () async throws -> Bool = { false },
+            speechDetection: @escaping @Sendable () async throws -> (windows: Int, threshold: Double) = { (8, 0.65) },
             decodeResources: @escaping @Sendable (String) throws -> ModelResourceViewSnapshot,
             makeVoice: @escaping @MainActor (ActionsVoiceHost) throws -> ActionsVoiceExecution
         ) {
@@ -193,6 +197,8 @@
             self.bindResourceRun = bindResourceRun
             self.observeTranscript = observeTranscript
             self.output = output
+            self.speechEnhancementEnabled = speechEnhancementEnabled
+            self.speechDetection = speechDetection
             self.decodeResources = decodeResources
             self.makeVoice = makeVoice
         }

@@ -23,8 +23,10 @@ private struct BoundaryRecorder {
     private var frames: [AudioFrame] = []
     var isSpeaking: Bool { policy.isSpeaking }
     var streamEvents: [VoiceStreamEvent] { policy.streamEvents }
-    mutating func consume(_ frame: AudioFrame, probability: Float, threshold: Float) -> RecordedSegment? {
-        _ = policy.consume(frame, probability: probability, threshold: threshold)
+    mutating func consume(_ frame: AudioFrame, probability: Float, threshold: Float, onsetWindows: Int = 3)
+        -> RecordedSegment?
+    {
+        _ = policy.consume(frame, probability: probability, threshold: threshold, onsetWindows: onsetWindows)
         var completed: RecordedSegment?
         for event in policy.streamEvents {
             switch event {
@@ -48,13 +50,13 @@ private struct BoundaryRecorder {
 @Test func speechBoundariesUseConsecutiveProbabilityNotAmplitude() throws {
     var policy = BoundaryRecorder()
     let frame = try pcm(Array(repeating: 0, count: 512), sequence: 0)
-    for _ in 0..<2 { #expect(policy.consume(frame, probability: 0.9, threshold: 0.5) == nil) }
+    for _ in 0..<2 { #expect(policy.consume(frame, probability: 0.9, threshold: 0.5, onsetWindows: 3) == nil) }
     #expect(!policy.isSpeaking)
-    _ = policy.consume(frame, probability: 0.1, threshold: 0.5)
-    for _ in 0..<3 { _ = policy.consume(frame, probability: 0.9, threshold: 0.5) }
+    _ = policy.consume(frame, probability: 0.1, threshold: 0.5, onsetWindows: 3)
+    for _ in 0..<3 { _ = policy.consume(frame, probability: 0.9, threshold: 0.5, onsetWindows: 3) }
     #expect(policy.isSpeaking)
-    for _ in 0..<24 { #expect(policy.consume(frame, probability: 0.1, threshold: 0.5) == nil) }
-    let utterance = policy.consume(frame, probability: 0.1, threshold: 0.5)
+    for _ in 0..<24 { #expect(policy.consume(frame, probability: 0.1, threshold: 0.5, onsetWindows: 3) == nil) }
+    let utterance = policy.consume(frame, probability: 0.1, threshold: 0.5, onsetWindows: 3)
     #expect(utterance != nil)
     #expect(!policy.isSpeaking)
     #expect(utterance!.frames.reduce(0) { $0 + $1.duration } <= 1.1)
@@ -65,7 +67,7 @@ private struct BoundaryRecorder {
     let frame = try pcm(Array(repeating: 0, count: 512), sequence: 0)
     var completed: RecordedSegment?
     for _ in 0..<380 {
-        if let value = policy.consume(frame, probability: 0.9, threshold: 0.5) {
+        if let value = policy.consume(frame, probability: 0.9, threshold: 0.5, onsetWindows: 3) {
             completed = value
             break
         }
@@ -191,11 +193,11 @@ func realSileroStreamingResetTailAndSilence() async throws {
         defer { sequence += 1 }
         return try pcm(Array(repeating: 0, count: 512), sequence: sequence)
     }
-    for _ in 0..<10 { _ = policy.consume(try frame(), probability: 0.9, threshold: 0.5) }
-    for _ in 0..<10 { _ = policy.consume(try frame(), probability: 0.1, threshold: 0.5) }
-    for _ in 0..<10 { _ = policy.consume(try frame(), probability: 0.9, threshold: 0.5) }
+    for _ in 0..<10 { _ = policy.consume(try frame(), probability: 0.9, threshold: 0.5, onsetWindows: 3) }
+    for _ in 0..<10 { _ = policy.consume(try frame(), probability: 0.1, threshold: 0.5, onsetWindows: 3) }
+    for _ in 0..<10 { _ = policy.consume(try frame(), probability: 0.9, threshold: 0.5, onsetWindows: 3) }
     var result: RecordedSegment?
-    for _ in 0..<25 { result = policy.consume(try frame(), probability: 0.1, threshold: 0.5) }
+    for _ in 0..<25 { result = policy.consume(try frame(), probability: 0.1, threshold: 0.5, onsetWindows: 3) }
     let segment = try #require(result)
     #expect(segment.reason == .silence)
     #expect(segment.frames.count == 36)
@@ -207,7 +209,9 @@ func realSileroStreamingResetTailAndSilence() async throws {
     var segments: [RecordedSegment] = []
     for index in 0..<800 {
         let frame = try pcm(Array(repeating: 0, count: 512), sequence: UInt64(index))
-        if let segment = policy.consume(frame, probability: 0.9, threshold: 0.5) { segments.append(segment) }
+        if let segment = policy.consume(frame, probability: 0.9, threshold: 0.5, onsetWindows: 3) {
+            segments.append(segment)
+        }
     }
     #expect(policy.isSpeaking)
     #expect(segments.count == 2)
@@ -222,9 +226,9 @@ func realSileroStreamingResetTailAndSilence() async throws {
 @Test func silenceAfterExactChunkBoundaryDoesNotBecomeAnotherASRInput() throws {
     var policy = BoundaryRecorder()
     let frame = try pcm(Array(repeating: 0, count: 512), sequence: 0)
-    for _ in 0..<375 { _ = policy.consume(frame, probability: 0.9, threshold: 0.5) }
+    for _ in 0..<375 { _ = policy.consume(frame, probability: 0.9, threshold: 0.5, onsetWindows: 3) }
     var last: RecordedSegment?
-    for _ in 0..<25 { last = policy.consume(frame, probability: 0.1, threshold: 0.5) }
+    for _ in 0..<25 { last = policy.consume(frame, probability: 0.1, threshold: 0.5, onsetWindows: 3) }
     #expect(last?.reason == .silence)
     #expect(last?.frames.isEmpty == true)
 }
@@ -254,7 +258,7 @@ private actor ConstantVAD: VoiceActivitySession {
 @Test func finishPreservesSubframeTailAndCancelDiscardsIt() async throws {
     let vad = ConstantVAD()
     let segmenter = VoiceActivitySegmenter(session: vad)
-    let initial = try await segmenter.process(pcm(Array(repeating: 0.2, count: 1700), sequence: 0))
+    let initial = try await segmenter.process(pcm(Array(repeating: 0.2, count: 1700), sequence: 0), onsetWindows: 3)
     let tail = try await segmenter.finishStreaming()
     let events = initial.streamEvents + tail
     let sampleCount = events.reduce(0) { count, event in
@@ -290,7 +294,7 @@ private actor ConstantVAD: VoiceActivitySession {
     for index in 0..<825 {
         let probability: Float = index >= 800 || (200..<210).contains(index) ? 0.1 : 0.9
         let frame = try pcm(Array(repeating: 0, count: 512), sequence: UInt64(index))
-        _ = policy.consume(frame, probability: probability, threshold: 0.5)
+        _ = policy.consume(frame, probability: probability, threshold: 0.5, onsetWindows: 3)
         for event in policy.streamEvents {
             switch event {
             case .audio(let frames): streamed += frames.map(\.sequence)

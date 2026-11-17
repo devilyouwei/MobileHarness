@@ -10,7 +10,7 @@
 
 ## 职责与注入能力
 
-构造注入 PlatformKit `AudioCaptureObserving`、ModelKit `SpeechRecognitionCapability`／`VoiceActivityCapability`、可选 `UIHomeContainer`、FunctionContracts `SpectrumPresenting`、低频测量回调和私有 Context。角色直接取得 PCM，负责声道／采样率／序号／连续性、VAD、ASR、声源和半双工政策；不直接开启麦克风或启动动画。
+构造注入 PlatformKit `AudioCaptureObserving`、ModelKit `SpeechRecognitionCapability`／`VoiceActivityCapability`／可选 `SpeechEnhancementCapability`、可选 `UIHomeContainer`、FunctionContracts `SpectrumPresenting`、低频测量回调和私有 Context。角色直接取得 PCM，负责声道／采样率／序号／连续性、VAD、ASR、声源和半双工政策；不直接开启麦克风或启动动画。
 
 UI.home.listeningRequests 是本角色单独订阅的控制源，提供 enabled/toggle/press 数据。UI 不调用角色；订阅本身不请求权限或开启设备。soundSourceOnly 模式不获得识别呈现权限。
 
@@ -25,6 +25,7 @@ UI.home.listeningRequests 是本角色单独订阅的控制源，提供 enabled/
 | [SpeechPerceptionAgent.swift](SpeechPerceptionAgent.swift) | 聆听策略、输入代际、VAD／ASR 协调与角色消息 |
 | [SpeechPerceptionMicrophone.swift](SpeechPerceptionMicrophone.swift) | 只读 PCM 的唯一角色订阅、布局校验与模型输入转换 |
 | [SpeechPerceptionProcessing.swift](SpeechPerceptionProcessing.swift) | 感知角色私有 Context、预处理和聆听策略 |
+| [SpeechPCMPreparation.swift](SpeechPCMPreparation.swift) | Capture-scoped optional enhancement and 48/16 kHz resampling; clears history at full-utterance boundaries |
 | [SpeechRecognitionTurn.swift](SpeechRecognitionTurn.swift) | 已提交片段、冷启动前缀和转写聚合的有界工作 |
 | [VoiceActivitySegmenter.swift](VoiceActivitySegmenter.swift) | VAD 分段、尾静音及实际片段结束判定 |
 | [VoiceAgentSession.swift](VoiceAgentSession.swift) | 感知容器、Assistant 语音子能力与 Actions 语音执行的连接适配器 |
@@ -83,7 +84,7 @@ flowchart TB
  V["VoiceInteractionSession · 语音和检测生命周期"]:::agent
  L["同意／采集代／播放准入"]:::agent
  N["Microphone 消费：一个长期任务"]:::agent
- R["声道选择／16kHz resampler"]:::agent
+ R["声道选择／可选降噪／16kHz resampler"]:::agent
  B["VoiceActivitySegmenter／BoundaryPolicy"]:::agent
  T["RecognitionTurn：partial／final"]:::agent
  S["SoundSourceEstimator／频谱测量"]:::agent
@@ -122,13 +123,13 @@ flowchart TB
 
 原生源单消费者，64 包有序 FIFO 加当前处理包；一个长期任务完成当前包后才取下一包，包括冷模型获取期间，不增加第二个原生积压 FIFO，不逐包创建处理 Task。保留 Float 存储及原生序号，8–192 kHz，mono 或 ACN/SN3D FOA；半双工门控不重新编号。每包至多 64,000 字节。通用 AgentInput 不接纳 PCM，不存在程序化媒体兼容入口或额外积压队列。
 
-选择 mono/W，每次转换至多 8192 samples，状态化重采样为 16 kHz ModelKit.AudioFrame。ASR turn 最多 2048 事件、480,000 排队 mono samples；12 秒仅为内部段边界，没有整句时长截止。缓冲满显式失败，不扩大容量等待模型。采集代重绑重置格式、声源与 DSP，旧代 PCM 不可进入新会话。
+选择 mono/W，每次转换至多 8192 samples；按设置经 48 kHz 降噪窗口或直接转换，最后状态化重采样为 16 kHz ModelKit.AudioFrame。ASR turn 最多 2048 事件、480,000 排队 mono samples；12 秒仅为内部段边界，没有整句时长截止。缓冲满显式失败，不扩大容量等待模型。采集代重绑重置格式、声源与 DSP，旧代 PCM 不可进入新会话。
 
 ## 分段算法
 
-`VoiceActivitySegmenter` validates contiguous scores over 16 kHz mono Float32: at most 16000 samples per frame, 32000 pending samples and 64 scores per process call. Default probability threshold is 0.5, valid 0.05…0.95. Overlap rejects inputBusy; failure closes/cancels the VAD session and clears damaged state.
+`VoiceActivitySegmenter` validates contiguous scores over 16 kHz mono Float32: at most 16000 samples per frame, 32000 pending samples and 64 scores per process call. Default probability threshold is 0.65, valid 0.05…0.95. Overlap rejects inputBusy; failure closes/cancels the VAD session and clears damaged state.
 
-`SpeechBoundaryPolicy` uses sample counts: confirmed onset 1536 (96 ms), pre-roll budget 4096 (256 ms), endpoint padding 3072 (192 ms), and model-sized segment 192000 (12 s). Consecutive silent VAD scores determine the endpoint. Idle sessions and the first nonempty utterance following accepted interruption use 25 windows (800 ms at 512 samples per score). Active reply work uses 16 windows (512 ms). SpeechPerception reads the injected activity and interruption marker per model audio packet. Changes apply to accumulated silent windows at the next VAD score. After forwarding a nonempty final transcript, SpeechPerception acknowledges the marker observed for its endpoint. Newer markers survive earlier acknowledgements. Independent perception sessions use the idle threshold. Silence is held back, then preserved in full if speech resumes; only endpoint padding is forwarded at utterance end. Prefix/suffix operations preserve whole frames, so padding is quantized to VAD windows. Maximum-duration boundaries keep speaking/hysteresis and stable utterance identity; there is no sixty-second complete-turn cutoff. Finish includes pending speaking tail and an explicit inputFinished event. Reset clears DSP/segmentation state without choosing a new device.
+`SpeechBoundaryPolicy` uses sample counts: configurable onset 1…16 windows of 512 samples (default 8 / 256 ms), pre-roll budget max(4096, onset windows × 512), endpoint padding 3072 (192 ms), and model-sized segment 192000 (12 s). Consecutive silent VAD scores determine the endpoint. Idle sessions and the first nonempty utterance following accepted interruption use 25 windows (800 ms at 512 samples per score). Active reply work uses 16 windows (512 ms). SpeechPerception reads the injected activity and interruption marker per model audio packet. Changes apply to accumulated silent windows at the next VAD score. After forwarding a nonempty final transcript, SpeechPerception acknowledges the marker observed for its endpoint. Newer markers survive earlier acknowledgements. Independent perception sessions use the idle threshold. Silence is held back, then preserved in full if speech resumes; only endpoint padding is forwarded at utterance end. Prefix/suffix operations preserve whole frames, so padding is quantized to VAD windows. Maximum-duration boundaries keep speaking/hysteresis and stable utterance identity; there is no sixty-second complete-turn cutoff. Finish includes pending speaking tail and an explicit inputFinished event. Reset clears DSP/segmentation state without choosing a new device.
 
 ## 输出契约
 
@@ -147,7 +148,7 @@ Publication is one-way. Subscriber rejection is isolated from inference. Output 
 
 同意只在本会话有效。撤销或暂停推进接纳 epoch，异步提交后重验 UI 代际。原生 stopListening(sessionID:) 撤销许可，公开启停 Action 用 setListening(enabled:sessionID:) 更新同一许可并返回单调 revision。执行方应用策略并加入原生完成。
 
-最终文本发布后，感知重置识别器并结束本轮。全双工路线可在播放期间接纳音频；受限路线由实际播放准入暂停识别，播放完成或取消后通过执行端恢复。重置校验采集会话和代际，新播放准入可阻止旧恢复开放识别。
+最终文本发布后，感知重置识别器并结束本轮。全双工路线持续接纳音频，并按播放状态调整起声门槛；受限路线由实际播放准入暂停识别，播放完成或取消后通过执行端恢复。重置校验采集会话和代际，新播放准入可阻止旧恢复开放识别。
 
 startInput 只订阅当前已开启采集代。回复半双工暂停保留该订阅并丢弃未获准入的帧；设备关闭时取消空闲取帧、加入当前包，完整 close/stop 先取消识别，再加入原生任务、获取模型和发布者。恢复最多 32 个可取消当前包等待者，只等待已接纳工作，不承载 PCM。UI 回执确认策略接纳；原生停机和播放终态由执行服务单独确认。
 
@@ -181,7 +182,7 @@ SpeechPerceptionContainer.presentation returns one complete SpeechSessionPresent
 
 ASR 创建、输入或结果失败时保留原始 agent.error，取消并加入该轮 ASR/VAD，校验采集代、会话与运行态后重建下一轮。失败字幕由 finishTranscript 封口，transition(.empty) 记录本地阶段，并在准入仍有效时呈现 listening。
 
-根语音许可跨场景可见性保留。全双工路线在播放时继续 VAD 和 ASR。受限路线等当前语句收尾后取得播放准入，播放期间暂停识别。实际关闭或中断会取消并等待原生采集、识别和发布工作退出。Actions 持有原生权限与播放屏障，感知在恢复时校验用户许可、会话和采集代。
+根语音许可跨场景可见性保留。全双工路线保持原生采播，播报期间使用较严格的起声门槛，已确认的双讲语句继续。受限路线等当前语句收尾后取得播放准入，播放期间暂停识别。实际关闭或中断会取消并等待原生采集、识别和发布工作退出。Actions 持有原生权限与播放屏障，感知在恢复时校验用户许可、会话和采集代。
 
 ## 新人声字幕生命周期
 
@@ -193,4 +194,32 @@ SpeechListening 日志记录许可、采集开启、识别暂停、原生包处�
 
 SpeechPerception 在采集、聆听许可、识别阶段和播放准入变化时更新自有活动。可接纳输入时显示聆听或人声，ASR 收尾显示识别，受限路线播放或关闭采集时撤下。连续聆听和人声共用计时起点。容器为感知绑定有界发布端，展示失败通过 presentationFailure 及容器状态公开，停止时先完成最终 end，再撤销身份。识别定稿后独立重置，下一句采集按本地准入处理。
 
-半双工恢复完成 ASR/VAD 重置后记录单调接纳时刻；原生帧以 capturedAt 判断，播放期间录到但在恢复后才出队的旧包仍被拒绝。新采集代清除门限。手机与蓝牙耳机的 Voice Processing 路线均返回全双工；播放期间持续接纳VAD/ASR，时间门限只作用于确有暂停的后端恢复，不用于屏蔽全双工双讲。
+半双工恢复完成 ASR/VAD 重置后记录单调接纳时刻；原生帧以 capturedAt 判断，播放期间录到但在恢复后才出队的旧包仍被拒绝。新采集代清除门限。手机与蓝牙耳机的 Voice Processing 路线均返回全双工；播放期间保持底层采播；半双工恢复围栏独立于下述全双工短时语音接纳策略。
+
+Speech detection preferences are injected through a throwing read-only closure and snapshotted before VAD session creation. The capture keeps the same base settings; playback adds 0.15 to the onset probability and two onset windows, capped at 0.95/16. Confirmed speech retains the base probability for continuation/endpoint detection. No per-packet persistence reads occur.
+
+## Optional speech enhancement
+
+`SpeechPCMPreparation` owns capture-scoped resamplers and an optional `WindowedSpeechEnhancement` supplied through the ModelKit speech port. StartInput snapshots the durable denoising preference. Native VPIO echo processing remains in PlatformKit; mono/W audio then goes through 48 kHz conversion, optional denoising, 16 kHz conversion and the existing shared VAD/ASR path. Native spatial measurements remain unchanged. The same route applies to AirPods and phone capture. Prepared PCM uses original capture time to select playback-dependent onset thresholds.
+
+```mermaid
+flowchart LR
+ Capture[PlatformKit VPIO PCM] --> Mono[Mono/W selection]
+ Mono --> Enabled{Denoising enabled}
+ Enabled -->|yes| Up[48 kHz conversion]
+ Up --> Window[ModelKit windowed enhancement]
+ Window --> Down[16 kHz conversion]
+ Enabled -->|no| Down
+ Down --> VAD[Segmentation]
+ VAD --> ASR[Current recognition turn]
+```
+
+Each native input is processed inline; there is no second native FIFO. The window adapter adds 400 ms initial buffering and has no recurrent-state/real-time equivalence claim. On full utterance completion with confirmed onset, utterance completion clears preprocessing context/lookahead along with segmentation; maximum-duration model chunks preserve the same utterance. Subsequent prepared packets resolve the current turn. Explicit discard, failed recognition recovery, new capture generation or changed native format resets all preprocessing buffers and timestamps. Enhanced PCM errors use the existing visible perception failure/recovery path; an enabled failing model never silently forwards original audio. Settings changes take effect on the next capture subscription; model removal joins listening cleanup before releasing model resources.
+
+## 播放状态与连续接纳
+
+SpeechBoundaryPolicy.swift拥有SpeechPlaybackSnapshot及最多32区间的SpeechPlaybackHistory。Assistant发布带原生schedule时刻的播放事实；播放及结束后200ms使用较严格起声门槛。历史淘汰保留known信息，不以历史缺失拒绝音频。没有起播保护窗口或ASR结束后的冷却窗口。
+
+ASR完整语句结束后重置识别和预处理历史，允许下一片音频立即进入VAD。ASR收尾中的现有识别状态机、半双工播放暂停、会话与采集代隔离仍由原有生命周期控制。
+
+SpeechPerceptionAgent按至多32ms原始片段和512样本DSP输出处理音频。每个DSP切片获得采集代内严格递增的独立序号，frame.timestamp与原始audio.timestamp的偏移映射回capturedAt，用于播放期间起声阈值选择；不因起播或ASR完成时刻丢弃片段。没有额外PCM队列。

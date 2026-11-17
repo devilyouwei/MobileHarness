@@ -129,7 +129,7 @@ The existing speech selector accepts a host-provided locale reader for automatic
 | Synthesis | Enabled, installed and available MOSS Nano; otherwise Apple PCM TTS |
 | Voice activity | Installed and available Silero; otherwise Energy, independent of ASR preference |
 | Pose | YOLO26n-Pose |
-| Decision | D3 Edge/Lite when the selected artifact and platform are available. Agents owns the exclusive local or cloud selection and enqueues with an error notice on failure; ModelKit never switches providers. |
+| Decision | D3 Edge/Lite and Vela 3 Fast when the selected artifact and platform are available. Agents owns the exclusive local or cloud selection and enqueues with an error notice on failure; ModelKit never switches providers. |
 
 Custom ASR/TTS switches default off and are independent. Kokoro is an explicitly provisioned optional provider without Defaults registration. Selection occurs before admission; failure during active inference never switches provider. Local inference never initiates artifact downloads. The simulator local-chat binding reports unavailable; the Gemma package's native framework requirements still apply at compilation.
 
@@ -212,7 +212,7 @@ ModelLanguageProviding.chatModel(configuration:) 返回固定配置的轻量 Cha
 
 ## Decision 能力
 
-language.decision 是稳定子端口，使用独立 D3 资源，不占用主 Chat 的串行队列。ModelKitD3 依赖基础契约、CoreAI 图执行和 Tokenizers，注册 d3-edge 和 d3-lite，默认端口为 Edge，也可按模型 ID 获取 Lite；模型管理提供候选读出及各制品的资源生命周期。云端分类由调用方通过不可变 ChatModel 请求，ChatToolChoice.required 只约束一次命名工具选择，不执行工具。
+language.decision 默认 D3 Edge；decisionModel(id) 可选 D3 Lite、Vela 3 Fast。DecisionCapability 同时提供 choice 和 noul，ModelKitD3 封装 D3/Vela 原生格式，基础 ModelKit 的 ChatDecision 提供通用聊天布尔/候选适配。ModelKit 不执行上层打断策略，不自动切换模型。独立资源租约及取消清理见 [JEV](Language/JEV/README.md)。
 
 Chat 的可选 onDispatch 回调报告实际 HTTP/本地推理开始边界，供上层原子持久化请求；详见 [LLM](Language/LLM/README.md)。
 
@@ -221,3 +221,11 @@ Immutable ChatModel bindings forward tool/image capability queries to the capabi
 ModelKitDefaults registers apple-system as a named Chat model backed by the standalone ModelKitAppleLLM provider. The system manages the weights and provides the availability state. ModelScope serializes Chat separately per local model ID. The app-facing Apple binding maps prior tool call and result records into dialogue text and combines system messages as instructions before submitting a text-only request. Its text-only request, bounds and native cleanup contract are described in [Apple LLM](Language/LLM/Apple/README.md).
 
 Default artifact assembly obtains the physical iOS architecture through D3/CoreAI and resolves declarative catalog variants before configuring acquisition. Runtime remains independent of native backends; provider manifests separately validate the compiled graph architecture.
+
+localModelPreparationStep accepts a caller-owned asynchronous local-model selection. Nil requires no resource; d3-edge/d3-lite/apple-system map directly and gemma4-e2b maps to the shared chat resource. It checks actual readiness and forwards manager warmup/loading notifications, propagating unknown selection, read, load and admission failures. It neither selects a business role nor contacts a cloud model.
+
+## Speech enhancement interface
+
+`speech.enhancement.enhance(_:)` exposes [bounded utterance noise suppression](Speech/Enhancement/README.md). DeepFilterNet3 is independently registered and provisioned. App optionally preloads installed artifacts; SpeechPerception uses the bounded window adapter when its denoising preference is enabled. Speech consumers own capture/resampling/segmentation; ModelKit owns DSP and model resources.
+
+Decision exposes independent choice, noul and multi-question decide interfaces through ModelDecisionContainer; [JEV](Language/JEV/README.md) owns their types and execution semantics. Consumers choose the interface; the SDK does not interpret interruption or queue state.

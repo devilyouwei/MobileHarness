@@ -103,7 +103,8 @@ public struct AssistantSignalPreprocessor: SignalPreprocessor {
         case .communicationReceipt, .actionResult, .toolResult, .roundResult: return .feedback
         case .text: return .enqueue(priority: 0)
         case .observation(let message):
-            return message.contract == "assistant.control" ? .control : .enqueue(priority: 0)
+            return ["assistant.control", AssistantInterrupt.contract].contains(message.contract)
+                ? .control : .enqueue(priority: 0)
         default: throw HarnessError.unsupportedInput
         }
     }

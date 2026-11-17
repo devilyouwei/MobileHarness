@@ -1,6 +1,6 @@
 # Mac 本地 Decision 模型对照
 
-本报告记录 Mac 本地 Decision 多分类实验及相关验证。
+本报告保留此前的多分类实验和相关验证记录。D3 Edge 与 Vela3 Fast 的三波打断二分类实验见[独立报告](Decision-Binary-Interrupt-Mac-Comparison.md)。
 
 日期为 2026-11-11，设备为 Apple M5 Mac，macOS 27.2（26B123）。Python 3.13、coreai-core 1.0.0b3、PyTorch 2.14.0、Transformers 5.17.0、tokenizers 0.23.3。
 

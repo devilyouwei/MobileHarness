@@ -73,7 +73,8 @@ public actor AssistantExecutionSession {
                 try await manager.start(.assistant)
                 let consumer = try await output.consumer(for: agent)
                 await agent.bindInputInterruption { [weak self] session in
-                    try await self?.interruptConversation(sessionID: session)
+                    guard let self else { throw CommunicationError.unavailableTarget }
+                    try await self.performInterruption(sessionID: session)
                 }
                 await island.bind { operation, parameters, session in
                     let result = try await consumer.executeInternal(
@@ -97,8 +98,8 @@ public actor AssistantExecutionSession {
                 await waitingIsland.start()
                 await decisionIsland.bind(consumer: consumer, source: .assistant)
                 await decisionIsland.start()
-                await agent.bindInputDecisionFeedback { [weak self] disposition, id in
-                    await self?.presentInputDecision(disposition, id: id)
+                await agent.bindInputDecisionFeedback { [weak self] id in
+                    await self?.presentInputDecision(id: id)
                 }
                 await speech?.bindPresentation(consumer)
                 await agent.bindReplyWaiting { [waitingIsland] waiting in
@@ -172,17 +173,15 @@ public actor AssistantExecutionSession {
     /// Stop accepted execution without ending the conversation or its public State scope.
     public func interruptConversation(sessionID: String) async throws {
         guard started, !closed else { return }
-        await agent.setExecutionCancellationBarrier(true)
-        do {
-            async let calls: Void = output.cancelCalls(for: agent, sessionID: sessionID)
-            async let model: Void = sendControl(.interruptSession, sessionID: sessionID)
-            _ = try await (model, calls)
-            try await agent.settleInterruptedExecution(sessionID: sessionID)
-            await agent.setExecutionCancellationBarrier(false)
-        } catch {
-            await agent.setExecutionCancellationBarrier(false)
-            throw error
-        }
+        _ = try await agent.requestInterrupt(AssistantInterrupt(), sessionID: sessionID)
+    }
+
+    private func performInterruption(sessionID: String) async throws {
+        guard started, !closed else { throw CommunicationError.unavailableTarget }
+        async let calls: Void = output.cancelCalls(for: agent, sessionID: sessionID)
+        async let model: Void = sendControl(.interruptSession, sessionID: sessionID)
+        _ = try await (model, calls)
+        try await agent.settleInterruptedExecution(sessionID: sessionID)
     }
 
     /// Receives the existing role-owned Skill snapshot; task logs are not a presentation authority.
@@ -208,10 +207,9 @@ public actor AssistantExecutionSession {
             detail: .init(text: String(task.goal.prefix(320))))
     }
 
-    private func presentInputDecision(_ disposition: InputDisposition, id: String) async {
-        guard started, !closed, allowsDecisionPresentation,
-            let content = Self.inputDecisionContent(disposition, id: id)
-        else { return }
+    private func presentInputDecision(id: String) async {
+        guard started, !closed, allowsDecisionPresentation else { return }
+        let content = Self.inputDecisionContent(id: id)
         decisionExpiry?.cancel()
         decisionRevision &+= 1
         let revision = decisionRevision
@@ -222,18 +220,9 @@ public actor AssistantExecutionSession {
         await decisionIsland.submit(content)
     }
 
-    static func inputDecisionContent(_ disposition: InputDisposition, id: String) -> IslandContent? {
-        let title: String
-        let symbol: String
-        switch disposition {
-        case .enqueue, .continueListening: return nil
-        case .discard:
-            title = "Input discarded"
-            symbol = "minus.circle"
-        case .interrupt:
-            title = "Reply interrupted"
-            symbol = "stop.circle"
-        }
+    static func inputDecisionContent(id: String) -> IslandContent {
+        let title = "Reply interrupted"
+        let symbol = "stop.circle"
         return .init(
             title: title, primary: .symbol(name: symbol), tone: .warning, priority: .attention,
             liveActivity: false, expansionID: id, detail: .init(text: title), localizedLabels: true)

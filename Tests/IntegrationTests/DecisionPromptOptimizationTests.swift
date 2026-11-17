@@ -102,7 +102,7 @@ private struct OptimizationReport: Encodable {
             var failure: String?
             do {
                 let request = try DecisionRequest(text: r.text, candidates: r.candidates, instructions: r.instructions)
-                let session = try await model.decide(request)
+                let session = try await model.choice(request)
                 let selection = try await session.withCleanup {
                     var selection: (String, Double?)?
                     for try await result in session.events {

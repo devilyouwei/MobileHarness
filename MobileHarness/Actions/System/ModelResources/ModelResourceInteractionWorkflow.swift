@@ -117,8 +117,10 @@ import UI
             guard !stopped, !Task.isCancelled, generation == state.refreshGeneration else { return }
             if !state.saving, !preferenceFailed {
                 let saved = try await restoreConfirmedSource()
+                state.present(.sourceUseSpeechEnhancement(saved.useSpeechEnhancement))
                 state.present(.sourceUseCustomRecognition(saved.useCustomRecognition))
                 state.present(.sourceUseCustomSynthesis(saved.useCustomSynthesis))
+                state.present(.speechDetection(windows: saved.vadOnsetWindows, threshold: saved.vadThreshold))
             }
 
         } catch {
@@ -178,9 +180,38 @@ import UI
             state.present(.error(nil))
         }
         if let saved = confirmedSource {
+            state.present(.sourceUseSpeechEnhancement(saved.useSpeechEnhancement))
             state.present(.sourceUseCustomRecognition(saved.useCustomRecognition))
             state.present(.sourceUseCustomSynthesis(saved.useCustomSynthesis))
+            state.present(.speechDetection(windows: saved.vadOnsetWindows, threshold: saved.vadThreshold))
         }
+    }
+    public func setSpeechEnhancement(enabled: Bool) async {
+        guard !stopped, state.hasRestored, !state.saving else { return }
+        state.present(.saving(true))
+        defer { finishSaving() }
+        do {
+            var draft = try await restoreConfirmedSource()
+            draft.useSpeechEnhancement = enabled
+            try await operations.saveSource(draft)
+            let saved = try await restoreConfirmedSource()
+            state.present(.sourceUseSpeechEnhancement(saved.useSpeechEnhancement))
+            state.present(.error(nil))
+        } catch { await handleSaveFailure(error) }
+    }
+    public func setSpeechDetection(windows: Int, threshold: Double) async {
+        guard !stopped, state.hasRestored, !state.saving else { return }
+        state.present(.saving(true))
+        defer { finishSaving() }
+        do {
+            var draft = try await restoreConfirmedSource()
+            draft.vadOnsetWindows = windows
+            draft.vadThreshold = threshold
+            try await operations.saveSource(draft)
+            let saved = try await restoreConfirmedSource()
+            state.present(.speechDetection(windows: saved.vadOnsetWindows, threshold: saved.vadThreshold))
+            state.present(.error(nil))
+        } catch { await handleSaveFailure(error) }
     }
     public func setCustomModel(_ group: ModelResourceGroup, enabled: Bool) async {
         guard !stopped, !state.saving, group == .recognition || group == .synthesis else {
@@ -200,8 +231,10 @@ import UI
             }
             try await operations.saveSource(draft)
             let saved = try await restoreConfirmedSource()
+            state.present(.sourceUseSpeechEnhancement(saved.useSpeechEnhancement))
             state.present(.sourceUseCustomRecognition(saved.useCustomRecognition))
             state.present(.sourceUseCustomSynthesis(saved.useCustomSynthesis))
+            state.present(.speechDetection(windows: saved.vadOnsetWindows, threshold: saved.vadThreshold))
             state.present(.error(nil))
         } catch { await handleSaveFailure(error) }
     }

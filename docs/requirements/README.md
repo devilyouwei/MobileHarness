@@ -84,3 +84,5 @@
 - [网页当前截图 State](technical/Web-Screenshot-State.md)：与相机统一多模态附件，只保留当前截图，撤除网页 feedback 附图链路。
 
 [资源刷新过期误报](technical/Resource-Refresh-Supersession.md)：保存成功快速离页后的旧 UI 刷新正常结束与真实失败保留。
+
+- [DeepFilterNet3 listening integration](technical/DeepFilterNet3-Listening-Plan.md): optional pre-ASR denoising, settings and installed-model startup loading.

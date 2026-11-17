@@ -254,7 +254,8 @@ extension ApplicationControlAgent {
             intent = .saveSource(
                 endpoint: draft.endpoint, allowsCellular: draft.allowsCellular,
                 recognition: draft.useCustomRecognition, synthesis: draft.useCustomSynthesis,
-                decision: draft.useLocalDecision)
+                decision: draft.useLocalDecision, vadOnsetWindows: draft.vadOnsetWindows,
+                vadThreshold: draft.vadThreshold, enhancement: draft.useSpeechEnhancement)
         case .download(let id, let draft):
             intent = .download(id: id, endpoint: draft.endpoint, allowsCellular: draft.allowsCellular)
         case .cancel(let id): intent = .cancel(id)

@@ -23,8 +23,8 @@ private enum AppleDecisionExperiment {
         }
         struct Row: Decodable {
             let id: String
-            let expected: InputDisposition
-            let prediction: InputDisposition
+            let expected: HistoricalInputDisposition
+            let prediction: HistoricalInputDisposition
             let elapsedMS: Double
             let prompt: String
         }
@@ -39,7 +39,7 @@ private enum AppleDecisionExperiment {
             let latest: String
         }
         let id: String
-        let expected: InputDisposition
+        let expected: HistoricalInputDisposition
         let running: Bool
         let playing: Bool
         let english: Text
@@ -49,12 +49,12 @@ private enum AppleDecisionExperiment {
     struct Case: Codable, Sendable {
         let id: String
         let condition: String
-        let expected: InputDisposition
+        let expected: HistoricalInputDisposition
         let system: String
         let user: String
         let digits: Bool
-        var edge: InputDisposition?
-        var lite: InputDisposition?
+        var edge: HistoricalInputDisposition?
+        var lite: HistoricalInputDisposition?
         var edgeMS: Double?
         var liteMS: Double?
     }
@@ -62,8 +62,8 @@ private enum AppleDecisionExperiment {
     struct Sample: Codable, Sendable {
         let id: String
         let condition: String
-        let expected: InputDisposition
-        let prediction: InputDisposition?
+        let expected: HistoricalInputDisposition
+        let prediction: HistoricalInputDisposition?
         let output: String
         let error: String?
         let elapsedMS: Double
@@ -131,12 +131,12 @@ private enum AppleDecisionExperiment {
         var summaries: [String: Summary] = [:]
     }
 
-    static func parse(_ output: String, digits: Bool) -> InputDisposition? {
+    static func parse(_ output: String, digits: Bool) -> HistoricalInputDisposition? {
         let labels = digits ? ["1", "2", "3"] : ["A", "B", "C"]
         guard let index = labels.firstIndex(of: output.trimmingCharacters(in: .whitespacesAndNewlines)) else {
             return nil
         }
-        return [InputDisposition.interrupt, .discard, .enqueue][index]
+        return [HistoricalInputDisposition.interrupt, .discard, .enqueue][index]
     }
 
     static func unwrap(_ prompt: String) throws -> (String, String) {
@@ -175,7 +175,7 @@ private enum AppleDecisionExperiment {
         for language in ["en", "zh-Hans"] {
             for scenario in scenarios {
                 let text = language == "en" ? scenario.english : scenario.chinese
-                let snapshot = InputDecisionSnapshot(
+                let snapshot = HistoricalInputDecisionSnapshot(
                     input: .init(
                         id: scenario.id, sessionID: "apple-decision-evaluation",
                         payload: .observation(.transcript(text.latest, final: true))),
@@ -199,7 +199,7 @@ private enum AppleDecisionExperiment {
             baselinePath, fixturePath,
             "MobileHarness/Resources/Agents/Assistant/InputDecision.json",
             "MobileHarness/Resources/Agents/Assistant/InputDecision.zh-Hans.json",
-            "MobileHarness/Agents/Assistant/AssistantInputDecision.swift",
+            "Tests/IntegrationTests/HistoricalDecisionBenchmarkSupport.swift",
             "MobileHarness/ModelKit/Language/LLM/Apple/AppleChat.swift",
             "Tests/IntegrationTests/AppleDecisionEvaluationTests.swift",
         ]
@@ -358,7 +358,10 @@ func appleDecisionModelEvaluation() async throws {
 }
 
 @Test func appleDecisionMetricsKeepFailuresInDenominator() {
-    func row(_ expected: InputDisposition, _ actual: InputDisposition?, _ ms: Double, error: String? = nil)
+    func row(
+        _ expected: HistoricalInputDisposition, _ actual: HistoricalInputDisposition?, _ ms: Double,
+        error: String? = nil
+    )
         -> AppleDecisionExperiment.Sample
     {
         .init(

@@ -75,11 +75,12 @@
             _ stream: AudioStream, context: ActionExecutionContext,
             validate: @escaping @MainActor () throws -> Void,
             currentSession: @escaping @MainActor () -> Bool,
-            activeChanged: @escaping @MainActor (Bool) async -> Void
+            activeChanged: @escaping @MainActor (Bool, ContinuousClock.Instant) async -> Void
         ) async throws {
             try validate()
             let displayToken = state.token
             var started = false
+            var startPublication: Task<Void, Never>?
             let meter = Task { [weak self] in
                 while !Task.isCancelled {
                     guard let self, currentSession() else { return }
@@ -94,34 +95,39 @@
                 }
             }
             func finishMeter() async {
+                let finishedAt = ContinuousClock.now
                 meter.cancel()
                 await meter.value
                 if currentSession() {
                     state.present(.playbackSpectrum(AudioSpectrum.silence), token: displayToken)
                     self.spectrum(AudioSpectrum.silence, false)
                 }
-                if started { await activeChanged(false) }
+                await startPublication?.value
+                if started { await activeChanged(false, finishedAt) }
             }
             do {
-                try await audio.playStream { [weak self] in
-                    try Task.checkCancellation()
-                    guard let self else { throw CancellationError() }
-                    try validate()
-                    guard let frame = try await stream.next() else { return nil }
-                    try Task.checkCancellation()
-                    try validate()
-                    guard frame.format.encoding == .float32, frame.format.channels == 1 else {
-                        throw AudioIOError.invalidFormat
-                    }
-                    let samples = frame.data.withUnsafeBytes { bytes in
-                        (0..<frame.sampleCount).map { bytes.loadUnaligned(fromByteOffset: $0 * 4, as: Float.self) }
-                    }
-                    if !started {
+                try await audio.playStream(
+                    onStarted: {
+                        guard !started else { return }
                         started = true
-                        await activeChanged(true)
-                    }
-                    return PlaybackPCM(samples: samples, sampleRate: frame.format.sampleRate)
-                }
+                        let time = ContinuousClock.now
+                        startPublication = Task { await activeChanged(true, time) }
+                    },
+                    next: { [weak self] in
+                        try Task.checkCancellation()
+                        guard let self else { throw CancellationError() }
+                        try validate()
+                        guard let frame = try await stream.next() else { return nil }
+                        try Task.checkCancellation()
+                        try validate()
+                        guard frame.format.encoding == .float32, frame.format.channels == 1 else {
+                            throw AudioIOError.invalidFormat
+                        }
+                        let samples = frame.data.withUnsafeBytes { bytes in
+                            (0..<frame.sampleCount).map { bytes.loadUnaligned(fromByteOffset: $0 * 4, as: Float.self) }
+                        }
+                        return PlaybackPCM(samples: samples, sampleRate: frame.format.sampleRate)
+                    })
             } catch {
                 await finishMeter()
                 throw error

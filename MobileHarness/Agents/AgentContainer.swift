@@ -228,10 +228,10 @@ import StorageFiles
             return languageModels
         }
         private func quiesceForModelRemoval(_ id: String) async {
-            if ["d3-edge", "d3-lite", "gemma4-e2b"].contains(id) {
+            if ["d3-edge", "d3-lite", "vela3-fast", "gemma4-e2b"].contains(id) {
                 await inputDecisionService?.quiesceLocal(id)
             }
-            if id == "d3-edge" || id == "d3-lite" { return }
+            if id == "d3-edge" || id == "d3-lite" || id == "vela3-fast" { return }
             if id == "yolo26n-pose" {
                 await camera.pauseVisionForModelMaintenance()
             } else {
@@ -343,6 +343,10 @@ import StorageFiles
         }
         @ObservationIgnored private var preparation: Task<Void, Error>?
         private var foreground = true
+        public func foregroundDecisionModelID() async throws -> String? {
+            guard let configuration = try runtime().business.decisionConfiguration else { return nil }
+            return try await configuration().0
+        }
         public var foregroundModelRequirements: [ModelPreparationRequirement] {
             var requirements: [ModelPreparationRequirement] = [.language, .recognition, .synthesis, .voiceActivity]
             if cameraUI.state.perceptionEnabled { requirements.append(.vision) }

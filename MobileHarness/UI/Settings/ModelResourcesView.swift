@@ -48,6 +48,24 @@
                                 : appCopy.text("Download MOSS first. Turning this off uses Apple system voices."))
                     }
                 }
+                if group == .recognition {
+                    Section {
+                        Toggle(
+                            appCopy.text("Noise suppression"),
+                            isOn: Binding(
+                                get: { state.source.useSpeechEnhancement },
+                                set: { enabled in Task { await controls.setSpeechEnhancement(enabled: enabled) } })
+                        )
+                        .disabled(state.saving || !state.hasRestored)
+                        .accessibilityIdentifier("settings.recognition.enhancement")
+                    } footer: {
+                        Text(
+                            appCopy.text(
+                                "Download DeepFilterNet3 first. Works with Apple and custom recognition. Applies the next time listening starts and adds about 400 ms of buffering."
+                            ))
+                    }
+                    SpeechDetectionSettings(state: state, controls: controls)
+                }
                 ModelResourceSections(state: state, controls: controls, group: group)
             }
             .navigationTitle(appCopy.text(group.title))
@@ -61,6 +79,58 @@
             } message: {
                 Text(appCopy.text(state.installationNotice ?? ""))
             }
+        }
+    }
+
+    @MainActor
+    private struct SpeechDetectionSettings: View {
+        @Environment(\.locale) private var locale
+        @Bindable var state: ModelResourcesState
+        let controls: any ModelResourcesControlling
+        @State private var windows = 8.0
+        @State private var threshold = 0.65
+        private var copy: AppLanguage { AppLanguage(preferredLanguage: locale.identifier) }
+        private func restore() {
+            windows = Double(state.source.vadOnsetWindows)
+            threshold = state.source.vadThreshold
+        }
+        private func save(_ editing: Bool) {
+            guard !editing else { return }
+            let count = Int(windows.rounded())
+            let probability = (threshold * 20).rounded() / 20
+            Task {
+                await controls.setSpeechDetection(windows: count, threshold: probability)
+                restore()
+            }
+        }
+        var body: some View {
+            Section {
+                VStack(alignment: .leading) {
+                    Text(copy.format("Speech onset: %d windows (%d ms)", Int(windows), Int(windows) * 32))
+                    Slider(value: $windows, in: 1...16, step: 1, onEditingChanged: save)
+                        .accessibilityLabel(copy.text("Speech onset windows"))
+                        .accessibilityIdentifier("settings.recognition.onsetWindows")
+                }
+                VStack(alignment: .leading) {
+                    Text(copy.format("Speech probability threshold: %.2f", threshold))
+                    Slider(value: $threshold, in: 0.05...0.95, step: 0.05, onEditingChanged: save)
+                        .accessibilityLabel(copy.text("Speech probability threshold"))
+                        .accessibilityIdentifier("settings.recognition.vadThreshold")
+                }
+                if let error = state.error { Text(copy.text(error)).foregroundStyle(.red) }
+            } header: {
+                Text(copy.text("Speech detection"))
+            } footer: {
+                Text(
+                    copy.text(
+                        "Higher values reduce false triggers but may delay or miss short speech. Applies the next time listening starts."
+                    ))
+            }
+            .disabled(state.saving || !state.hasRestored)
+            .onAppear(perform: restore)
+            .onChange(of: state.hasRestored) { _, _ in restore() }
+            .onChange(of: state.source.vadOnsetWindows) { _, _ in restore() }
+            .onChange(of: state.source.vadThreshold) { _, _ in restore() }
         }
     }
 
@@ -128,6 +198,14 @@
                                         modelKindBadge("Decision", color: .orange)
                                     }
                                     Text(appCopy.text(item.name))
+                                }
+                                if item.id == "deepfilternet3" {
+                                    Text(
+                                        appCopy.text(
+                                            "Loaded at startup when installed. Enable Noise suppression to use it for listening."
+                                        )
+                                    )
+                                    .font(.caption).foregroundStyle(.secondary)
                                 }
                                 if item.id == "silero" {
                                     Text(
@@ -226,17 +304,20 @@
                 }
             } message: {
                 Text(
-                    removal?.id == "silero"
-                        ? appCopy.text("Voice activity detection will switch to the basic detector.")
-                        : group == .recognition || group == .synthesis
-                            ? appCopy.text("Speech will switch to Apple. Download the model again to re-enable it.")
-                            : removal.map { ModelResourceGroup.decision.modelIDs.contains($0.id) } == true
-                                ? appCopy.text(
-                                    "If this model is selected, download it again or choose another model to restore decision-making."
-                                )
-                                : group == .language
-                                    ? appCopy.text("Use a cloud model or download Gemma 4 E2B again for local chat.")
-                                    : appCopy.text("Download YOLO again to use local pose recognition."))
+                    removal?.id == "deepfilternet3"
+                        ? appCopy.text("Noise suppression will turn off. Your speech recognition model stays selected.")
+                        : removal?.id == "silero"
+                            ? appCopy.text("Voice activity detection will switch to the basic detector.")
+                            : group == .recognition || group == .synthesis
+                                ? appCopy.text("Speech will switch to Apple. Download the model again to re-enable it.")
+                                : removal.map { ModelResourceGroup.decision.modelIDs.contains($0.id) } == true
+                                    ? appCopy.text(
+                                        "If this model is selected, download it again or choose another model to restore decision-making."
+                                    )
+                                    : group == .language
+                                        ? appCopy.text(
+                                            "Use a cloud model or download Gemma 4 E2B again for local chat.")
+                                        : appCopy.text("Download YOLO again to use local pose recognition."))
             }
             .task {
                 await controls.restore()

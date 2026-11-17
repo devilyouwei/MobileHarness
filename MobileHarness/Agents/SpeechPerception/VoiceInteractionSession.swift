@@ -20,6 +20,7 @@
         private let voiceAgents: VoiceAgentSession
         private let stopDiagnostic: @MainActor () async throws -> Void
         private let recognition: any SpeechRecognitionCapability
+        private let enhancement: any SpeechEnhancementCapability
         private let vad: any VoiceActivityCapability
         private let synthesis: any SpeechSynthesisCapability
         private let voiceInput: any AudioCaptureObserving
@@ -31,7 +32,7 @@
                 do {
                     let store = try await voiceAgents.audioStore()
                     let perception = try await voiceAgents.start(
-                        recognition, vad: vad, synthesis: synthesis,
+                        recognition, vad: vad, enhancement: enhancement, synthesis: synthesis,
                         input: voiceInput, store: store)
                     try Task.checkCancellation()
                     try await lifecycle.start(perception: perception, audioStore: store)
@@ -115,6 +116,7 @@
             let vad = speech.voiceActivity
             let synthesis = speech.synthesis
             self.recognition = recognition
+            self.enhancement = speech.enhancement
             self.vad = vad
             self.synthesis = synthesis
             voiceInput = audio.io(.voice)

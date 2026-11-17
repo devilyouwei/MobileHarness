@@ -43,7 +43,7 @@ get by capability or ModelID preserves provider identity. Deferred get construct
 
 | Boundary | Limit / policy |
 | --- | --- |
-| Registrations / default bindings | 32 / six; atomic collision rejection |
+| Registrations / default bindings | 32 / seven; atomic collision rejection |
 | Concurrent factories | Four; excess construction rejects |
 | Concurrent loaders | Configurable positive limit, default four; no loader queue |
 | Construction waiters | 32 per model |
@@ -151,6 +151,10 @@ HF 只使用当前传输计划和完成文件；不从 .hub-snapshot 搬迁旧 S
 
 SerialChat forwards full native calls through the existing 128-event queued session without a single-event byte ceiling. Local pending-request bounds and cancellation/cleanup FIFO are independent of argument size; backend capability and token-window errors remain explicit.
 
-The default assembly registers d3-edge and d3-lite as decision providers with independent retained resources and matching artifact IDs. D3Edge and D3Lite contain their respective graphs, manifests and tokenizers. Removing a package fences and joins its provider before deleting files.
+The default assembly registers d3-edge, d3-lite and vela3-fast as decision providers with independent retained resources and matching artifact IDs. D3Edge, D3Lite and Vela3Fast contain their respective graphs, manifests and tokenizers. Vela uses the same catalog schema and required-runtime-file checks as other packages. Removing a package fences and joins its provider before deleting files.
 
 Catalog schema v2 optionally declares architectureVariants per package, overriding source, requiredFiles and estimatedBytes. Decode validates every variant, including variants for other devices, with the existing bounds and path rules; at most 16 architecture keys are allowed. Default assembly resolves the physical iOS architecture before configuring the artifact store. Packages without a matching variant retain their source declaration. Resolved catalogs omit variants so downloads, required-file checks and receipts share one revision and file contract. Runtime consumes architecture strings without importing CoreAI.
+
+## Enhancement registration
+
+`ProvidedCapability.enhancement` and typed `.enhancement` acquisition map to `deepfilternet3`, using the `DeepFilterNet3` artifact directory. The speech container exposes availability, enhancement and explicit load/status/unload/warmup. This optional capability has no fallback. The root local-model preparation step supports deepfilternet3; App selects it only when its artifact snapshot is installed, independent of the listening enablement preference.

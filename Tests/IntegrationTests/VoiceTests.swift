@@ -492,6 +492,7 @@ func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop(profile: String) async t
                 return (profile != "idle", state.pending)
             }
         },
+        speechDetection: { (3, 0.5) },
         context: context)
     try await manager.register(assistant, sessionID: session)
     await assistant.start()
@@ -600,6 +601,7 @@ func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop(profile: String) async t
     let session = UUID().uuidString
     let speech = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "hello", includeFinal: true), vad: EndpointVAD(), sessionID: session,
+        speechDetection: { (3, 0.5) },
         context: try AgentContextRepository(
             agent: .speechPerception, scope: UUID().uuidString,
             state: SpeechPerceptionContextState()))
@@ -788,8 +790,8 @@ func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop(profile: String) async t
             data: Data(repeating: 0, count: samples * 4), format: format,
             sequence: UInt64(position), timestamp: Double(position) / 16000)
     }
-    _ = policy.consume(try frame(1536), probability: 1, threshold: 0.5)
-    for _ in 0..<25 { _ = policy.consume(try frame(1024), probability: 0, threshold: 0.5) }
+    _ = policy.consume(try frame(1536), probability: 1, threshold: 0.5, onsetWindows: 3)
+    for _ in 0..<25 { _ = policy.consume(try frame(1024), probability: 0, threshold: 0.5, onsetWindows: 3) }
     let padding = policy.streamEvents.reduce(0) { total, event in
         if case .audio(let frames) = event { return total + frames.reduce(0) { $0 + $1.sampleCount } }
         return total
@@ -811,16 +813,19 @@ func speechBoundaryUsesCurrentEndpointDuringSilence(initiallyShort: Bool) throws
         data: Data(repeating: 0, count: 512 * 4), format: format, sequence: 0, timestamp: 0)
 
     for _ in 0..<3 {
-        _ = policy.consume(frame, probability: 1, threshold: 0.5, useShortEndpoint: initiallyShort)
+        _ = policy.consume(frame, probability: 1, threshold: 0.5, onsetWindows: 3, useShortEndpoint: initiallyShort)
     }
     for _ in 0..<15 {
-        #expect(policy.consume(frame, probability: 0, threshold: 0.5, useShortEndpoint: initiallyShort) == nil)
+        #expect(
+            policy.consume(frame, probability: 0, threshold: 0.5, onsetWindows: 3, useShortEndpoint: initiallyShort)
+                == nil)
     }
-    let afterChange = policy.consume(frame, probability: 0, threshold: 0.5, useShortEndpoint: !initiallyShort)
+    let afterChange = policy.consume(
+        frame, probability: 0, threshold: 0.5, onsetWindows: 3, useShortEndpoint: !initiallyShort)
     if initiallyShort {
         #expect(afterChange == nil)
-        for _ in 0..<8 { #expect(policy.consume(frame, probability: 0, threshold: 0.5) == nil) }
-        #expect(policy.consume(frame, probability: 0, threshold: 0.5) == .silence)
+        for _ in 0..<8 { #expect(policy.consume(frame, probability: 0, threshold: 0.5, onsetWindows: 3) == nil) }
+        #expect(policy.consume(frame, probability: 0, threshold: 0.5, onsetWindows: 3) == .silence)
     } else {
         #expect(afterChange == .silence)
     }
@@ -853,6 +858,7 @@ private actor NativeRateVADProbe: VoiceActivityCapability, VoiceActivitySession 
     let session = UUID().uuidString
     let agent = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "", includeFinal: false), vad: probe, sessionID: session,
+        speechDetection: { (3, 0.5) },
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
             state: SpeechPerceptionContextState())
@@ -908,6 +914,7 @@ func speechRecognitionFailureReportsAndNextUtteranceStillPublishes(failsAtFinish
         state: SpeechPerceptionContextState())
     let agent = try SpeechPerceptionAgent(
         recognition: FailOnceRecognition(failsAtFinish: failsAtFinish), vad: EndpointVAD(), sessionID: session,
+        speechDetection: { (3, 0.5) },
         context: context)
     let observed = Mutex((displays: [String](), sealed: 0))
     let events = AsyncStream<String>.makeStream(bufferingPolicy: .bufferingOldest(16))
@@ -972,6 +979,7 @@ func speechRecognitionFailureReportsAndNextUtteranceStillPublishes(failsAtFinish
     let agent = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "", includeFinal: false),
         vad: NativeRateVADProbe(), sessionID: session,
+        speechDetection: { (3, 0.5) },
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
             state: SpeechPerceptionContextState())
@@ -1022,6 +1030,7 @@ func speechPerceptionOwnsConsentAcrossCaptureEpochs() async throws {
     let agent = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "", includeFinal: false), vad: NativeRateVADProbe(),
         sessionID: session, interactionSessionID: session, residentListening: true,
+        speechDetection: { (3, 0.5) },
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
             state: SpeechPerceptionContextState())
@@ -1052,6 +1061,7 @@ func speechPerceptionOwnsConsentAcrossCaptureEpochs() async throws {
     let agent = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "", includeFinal: false), vad: NativeRateVADProbe(),
         sessionID: session, interactionSessionID: session, residentListening: true,
+        speechDetection: { (3, 0.5) },
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
             state: SpeechPerceptionContextState())
@@ -1076,6 +1086,7 @@ func speechPerceptionOwnsConsentAcrossCaptureEpochs() async throws {
     let speech = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "", includeFinal: false), vad: NativeRateVADProbe(),
         sessionID: session, interactionSessionID: session, residentListening: true,
+        speechDetection: { (3, 0.5) },
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
             state: SpeechPerceptionContextState())
@@ -1101,9 +1112,11 @@ func speechPerceptionOwnsConsentAcrossCaptureEpochs() async throws {
 func completedASRContinuesWithoutAcknowledgmentAndPlaybackUsesRouteCapability(fullDuplex: Bool) async throws {
     let session = UUID().uuidString
     let epoch = UUID().uuidString
+    let origin = ContinuousClock.now
     let speech = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "你好", includeFinal: true), vad: EndpointVAD(),
         sessionID: session, interactionSessionID: session, residentListening: true,
+        speechDetection: { (3, 0.5) },
         context: try AgentContextRepository(
             agent: .speechPerception, scope: UUID().uuidString, state: SpeechPerceptionContextState()))
     try await speech.start()
@@ -1115,12 +1128,13 @@ func completedASRContinuesWithoutAcknowledgmentAndPlaybackUsesRouteCapability(fu
 
     func frame(_ speaking: Bool, sequence: UInt64) throws -> AgentInput {
         let samples = [Float](repeating: speaking ? 0.1 : 0, count: speaking ? 1536 : 12800)
+        let timestamp = Double(sequence / 2) * 1.2 + (speaking ? 0 : 0.096)
         return AgentInput(
             id: UUID().uuidString, sessionID: epoch,
             payload: .audio(
                 try syntheticAudioInput(
                     samples: samples.withUnsafeBytes { Data($0) }, sampleRate: 16000,
-                    sequence: sequence, timestamp: Double(sequence))))
+                    sequence: sequence, timestamp: timestamp, capturedAt: origin + .seconds(timestamp))))
     }
     try await processMicrophoneFixture(frame(true, sequence: 0), using: speech)
     #expect(await speech.acquirePlaybackAdmission() == fullDuplex)
@@ -1137,6 +1151,7 @@ func completedASRContinuesWithoutAcknowledgmentAndPlaybackUsesRouteCapability(fu
         #expect(try await !speech.admitsMicrophone(sessionID: epoch, capturedAt: capturedDuringPlayback))
         #expect(try await speech.admitsMicrophone(sessionID: epoch, capturedAt: .now))
     }
+    // PCM timestamps stay contiguous within each utterance, including delayed prepared slices.
     try await processMicrophoneFixture(frame(true, sequence: 2), using: speech)
     try await processMicrophoneFixture(frame(false, sequence: 3), using: speech)
     _ = try await speech.setListening(enabled: false, sessionID: session)
@@ -1225,6 +1240,7 @@ func coldVADAndASRPreserveRecordedPrefixAndJoinLiveAudioInOrder() async throws {
     let speech = try SpeechPerceptionAgent(
         recognition: recognition, vad: vad, sessionID: root, interactionSessionID: root, residentListening: true,
         microphoneInput: microphone,
+        speechDetection: { (3, 0.5) },
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
             state: SpeechPerceptionContextState())
@@ -1372,6 +1388,7 @@ func speechRolesOwnIndependentIslandsAndJoinShutdown(initiallyUnavailable: Bool)
     let perception = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "", includeFinal: false), vad: NativeRateVADProbe(),
         sessionID: session, interactionSessionID: session, residentListening: true,
+        speechDetection: { (3, 0.5) },
         context: AgentContextRepository(
             agent: .speechPerception, scope: UUID().uuidString, state: SpeechPerceptionContextState()))
     let synthesis = AssistantSpeechOutput()
@@ -1447,4 +1464,88 @@ func speechRolesOwnIndependentIslandsAndJoinShutdown(initiallyUnavailable: Bool)
     let fullDuplex = AudioCaptureDuplexSelection.supportsFullDuplex(echoCancellation: echo)
     #expect(fullDuplex)
     try await completedASRContinuesWithoutAcknowledgmentAndPlaybackUsesRouteCapability(fullDuplex: fullDuplex)
+}
+
+@Test(arguments: [1, 8, 16])
+func configurableSpeechOnsetRetainsCandidate(windows: Int) throws {
+    var policy = SpeechBoundaryPolicy()
+    let format = try ModelKit.AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32)
+    let frame = try ModelKit.AudioFrame(
+        data: Data(repeating: 0, count: 512 * 4), format: format, sequence: 0, timestamp: 0)
+    for _ in 0..<20 {
+        _ = policy.consume(frame, probability: 0.64, threshold: 0.65, onsetWindows: windows)
+        #expect(!policy.isSpeaking)
+    }
+    for _ in 0..<(windows - 1) {
+        _ = policy.consume(frame, probability: 0.65, threshold: 0.65, onsetWindows: windows)
+        #expect(!policy.isSpeaking)
+    }
+    _ = policy.consume(frame, probability: 0.65, threshold: 0.65, onsetWindows: windows)
+    #expect(policy.isSpeaking)
+    let retained = policy.streamEvents.reduce(0) { total, event in
+        if case .audio(let frames) = event { return total + frames.reduce(0) { $0 + $1.sampleCount } }
+        return total
+    }
+    #expect(retained >= windows * 512)
+}
+
+@Test func speechPlaybackFactsRetainTailAndSessionIdentityWithoutProtectionWindow() {
+    let time = ContinuousClock.now
+    var history = SpeechPlaybackHistory()
+    history.started(id: "a", sessionID: "voice", at: time)
+    #expect(history.read(sessionID: "voice").state(at: time).playing)
+    #expect(!history.read(sessionID: "other").state(at: time).playing)
+    history.ended(id: "a", at: time + .milliseconds(10))
+    #expect(history.read(sessionID: "voice").state(at: time + .milliseconds(209)).playing)
+    #expect(!history.read(sessionID: "voice").state(at: time + .milliseconds(210)).playing)
+    history.started(id: "b", sessionID: "voice", at: time + .seconds(1))
+    history.ended(id: "a", at: time + .seconds(2))
+    #expect(history.read(sessionID: "voice").state(at: time + .seconds(2)).playing)
+    for index in 3..<40 {
+        history.started(id: String(index), sessionID: "voice", at: time + .seconds(index))
+        history.ended(id: String(index), at: time + .seconds(index) + .milliseconds(1))
+    }
+    let snapshot = history.read(sessionID: "voice")
+    #expect(snapshot.periods.count == 32)
+    #expect(!snapshot.state(at: time).known)
+}
+
+@Test func speechPlaybackOnsetIsStricterWithoutCuttingConfirmedSpeech() throws {
+    var policy = SpeechBoundaryPolicy()
+    let frame = try ModelKit.AudioFrame(
+        data: Data(repeating: 0, count: 512 * 4),
+        format: ModelKit.AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32), sequence: 0, timestamp: 0)
+    for _ in 0..<20 {
+        _ = policy.consume(frame, probability: 0.7, threshold: 0.65, onsetWindows: 10, onsetThreshold: 0.8)
+    }
+    #expect(!policy.isSpeaking)
+    for _ in 0..<10 {
+        _ = policy.consume(frame, probability: 0.9, threshold: 0.65, onsetWindows: 10, onsetThreshold: 0.8)
+    }
+    #expect(policy.isSpeaking)
+    for _ in 0..<30 {
+        #expect(policy.consume(frame, probability: 0.7, threshold: 0.65, onsetWindows: 10, onsetThreshold: 0.8) == nil)
+    }
+    #expect(policy.isSpeaking)
+}
+
+@Test func speechPlaybackFactsSurviveAudioRetirementAndClearWithSession() async throws {
+    let session = UUID().uuidString
+    let input = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("reply"))
+    let (speech, store, _, invocation) = try await preparedSpeech(text: "reply", input: input, probe: VoiceProbe())
+    let id = try #require(invocation.call.parameters["audioID"])
+    let time = ContinuousClock.now
+    await speech.playbackChanged(audioID: id, active: true, at: time)
+    #expect(await speech.playbackSnapshot(sessionID: session).state(at: time).playing)
+    #expect(await !speech.playbackSnapshot(sessionID: "other").state(at: time).playing)
+    await speech.cancel(input: input)
+    await speech.playbackChanged(audioID: id, active: false, at: time + .seconds(1))
+    #expect(await speech.playbackSnapshot(sessionID: session).state(at: time + .milliseconds(1100)).playing)
+    #expect(await !speech.playbackSnapshot(sessionID: session).state(at: time + .milliseconds(1200)).playing)
+    await speech.endSession()
+    #expect(await speech.playbackSnapshot(sessionID: session).periods.isEmpty)
+    await speech.playbackChanged(audioID: id, active: true, at: time + .seconds(2))
+    #expect(await speech.playbackSnapshot(sessionID: session).periods.isEmpty)
+    await speech.stop()
+    await store.shutdown()
 }

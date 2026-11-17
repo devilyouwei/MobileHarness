@@ -106,3 +106,9 @@ Agent Models 总页三分区依次改为 Cloud Providers & Models（云端服务
 ModelResourceSections 的本地模型条目在名称下方显示用途胶囊：Gemma 为蓝色 Chat（对话），D3 Edge/Lite 为橙色 Decision（决策）。文字标签同时表达用途，不仅靠颜色；标签使用可缩放字体并保留模型标题换行空间。仅涉及显示与现有模型 ID 的 UI 分类，不引入业务依赖或新目录。同步 Settings、Shared、模型资源 README 及相关当前设计；验证中英文名称、分区、标签与布局，执行 check.sh/build-ios.sh，记录原生检查与自动化结果。
 
 模型原名、三分区及双色中英文用途标签已实现，构建产物核对和四目标构建通过；新版已安装到 iPhone 17 Pro，手机锁定导致自动启动未成功。原生视觉验收限制、全量测试失败及运行时通过结果见 [验证记录](../../validation/Provider-Management.md#canonical-model-names-and-purpose-badges-2026-11-15)。
+
+## 2026-11-16 首页 Decision 预加载
+
+目标：首页前台准备流程包含当前已配置的本地 Decision 模型，避免首次输入才冷启动。Agents 从已保存的 Decision 配置提供只读模型 ID；App Composition 将其接到 ModelKit 的按本地模型选择生成的准备步骤，追加到现有 language/recognition/synthesis/voiceActivity（及按需 vision）队列。支持 d3-edge、d3-lite、gemma4-e2b、apple-system；云端或无独立本地选择返回 nil，不加载本地资源。ModelKit 负责公开模型 ID 到资源的映射、真实 status/warmup 及 loading 回报，不拥有角色配置。准备保持串行、取消加入、交互时延后、完成后统一复查；未知 ID/缺资源/配置读取失败明确失败。更新 Agents/ModelKit/App Composition 及总体 README。测试未选择、各本地 ID、未知 ID、配置读取失败和停止后的拒绝，运行 check.sh/build-ios.sh；不宣称云端连接或物理设备实测通过。
+
+Decision 首页预加载已实现，定向测试与 iOS 五目标构建通过。验证与真实模型/设备限制见 [Decision 首页预加载](../../validation/Decision-Startup-Preparation.md)。

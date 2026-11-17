@@ -528,3 +528,42 @@ import Testing
     #expect(finished && !state.saving && state.error == nil)
     #expect(operations.storedSource.endpoint != "https://pending.example")
 }
+
+@Test @MainActor
+func speechDetectionSlidersPersistWithoutSavingUnfinishedSourceAndRetainOnFailure() async {
+    let state = ModelResourcesState()
+    let operations = ResourceOperationsFixture(state: state)
+    let workflow = ModelResourceInteractionWorkflow(state: state, operations: operations)
+    await workflow.restore()
+    state.present(.sourceEndpoint("unfinished"))
+    await workflow.setSpeechDetection(windows: 12, threshold: 0.75)
+    #expect(operations.storedSource.endpoint == "https://huggingface.co")
+    #expect(operations.storedSource.vadOnsetWindows == 12)
+    #expect(state.source.endpoint == "unfinished")
+    #expect(state.source.vadThreshold == 0.75)
+    operations.failSave = true
+    await workflow.setSpeechDetection(windows: 16, threshold: 0.95)
+    #expect(state.source.vadOnsetWindows == 12)
+    #expect(state.source.vadThreshold == 0.75)
+    #expect(state.error != nil)
+    #expect(!state.saving)
+    await workflow.stopAndWait()
+}
+
+@Test @MainActor func speechEnhancementTogglePersistsAndRetainsConfirmedStateOnFailure() async {
+    let state = ModelResourcesState()
+    let operations = ResourceOperationsFixture(state: state)
+    let workflow = ModelResourceInteractionWorkflow(state: state, operations: operations)
+    await workflow.restore()
+    state.present(.sourceEndpoint("unfinished"))
+    await workflow.setSpeechEnhancement(enabled: true)
+    #expect(operations.storedSource.useSpeechEnhancement)
+    #expect(state.source.useSpeechEnhancement)
+    #expect(operations.storedSource.endpoint == "https://huggingface.co")
+    #expect(state.source.endpoint == "unfinished")
+    operations.failSave = true
+    await workflow.setSpeechEnhancement(enabled: false)
+    #expect(state.source.useSpeechEnhancement && state.error != nil && !state.saving)
+    #expect(ModelResourceGroup.recognition.modelIDs.contains("deepfilternet3"))
+    await workflow.stopAndWait()
+}

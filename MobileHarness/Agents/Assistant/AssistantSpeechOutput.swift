@@ -43,6 +43,7 @@ actor AssistantSpeechOutput: AssistantSpeechProducing {
     private var activeScope: InputScope?
     private var processed = 0
     private var playing: String?
+    private var playbackHistory = SpeechPlaybackHistory()
     private let island = AgentIslandPublication()
 
     func configure(synthesis: any SpeechSynthesisCapability, store: AudioCache) throws {
@@ -61,10 +62,21 @@ actor AssistantSpeechOutput: AssistantSpeechProducing {
             installed: binding != nil, queued: pending.count,
             processed: processed, presentationFailure: await island.lastFailure)
     }
-    func playbackChanged(audioID: String, active: Bool) async {
+    func playbackChanged(audioID: String, active: Bool, at time: ContinuousClock.Instant = .now) async {
         guard !closed, binding != nil else { return }
-        if active { playing = audioID } else if playing == audioID { playing = nil }
+        if active {
+            playing = audioID
+            if let job = handles[audioID] {
+                playbackHistory.started(id: audioID, sessionID: job.input.sessionID, at: time)
+            }
+        } else {
+            playbackHistory.ended(id: audioID, at: time)
+            if playing == audioID { playing = nil }
+        }
         await refreshIsland()
+    }
+    func playbackSnapshot(sessionID: String) -> SpeechPlaybackSnapshot {
+        playbackHistory.read(sessionID: sessionID)
     }
     func isPlaying(sessionID: String) -> Bool? {
         guard !closed, binding != nil else { return nil }
@@ -257,6 +269,7 @@ actor AssistantSpeechOutput: AssistantSpeechProducing {
             await producer?.value
             handles.removeAll()
             playing = nil
+            playbackHistory = SpeechPlaybackHistory()
             await refreshIsland()
         }
         ending = task

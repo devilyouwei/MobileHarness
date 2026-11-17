@@ -1,5 +1,7 @@
 # 技术需求
 
+- [全双工播放期间的语音接纳优化](Full-Duplex-Playback-Admission.md)：动态起声门槛、起播 ASR 保护窗口、采样时间对齐与真机误触发/打断延迟验收。
+
 - [拍照倒计时与显式打开相机](Photo-Countdown-And-Explicit-Open.md)：单次倒计时、独立打开、同轮多 Action 与验证。
 
 已完成：[删除 Channel 覆盖与照片忽略](../../completed/Remove-Channel-Override-And-Photo-Ignore.md)，包括配置、教学、UI和专用音效清理，以及固定路由、重拍保留与完整检查。

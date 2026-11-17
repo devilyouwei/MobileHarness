@@ -56,3 +56,8 @@ Decision 固定 Edge 和 Lite 的发布版本，分别安装到 D3Edge 和 D3Lit
 Catalog packages can declare architectureVariants replacing source, requiredFiles and estimatedBytes for an exact native architecture. Default assembly resolves this before acquisition; source declarations remain the default for other architectures and developer download scripts. Only the selected package is downloaded. Revision-specific receipts prevent an old source installation from being mistaken for an AOT package.
 
 D3 Edge uses hugging-mac/d3-edge-CoreAI source decision.aimodel on every App architecture, pinned to 0690c04ee1640c1c3fa11a882323751dda6d086a, with the same source declaration and required files as the historical Mac benchmark. Its graph has three text inputs; no vision graph is downloaded. CoreAI specializes the source graph at load time. Existing third-party or AOT Edge receipts do not match this source revision and require removal and acquisition through Agent Models. D3 Lite retains its h18p iOS AOT package under ios/aot-v1/h18p, including the compiled bundle and companion files; other architectures retain its source graph.
+
+`deepfilternet3` / `DeepFilterNet3` declares the optional enhancement graph and auxiliary DSP arrays from aufklarer/DeepFilterNet3-CoreML at pinned revision 937bad9811f1ffc1a06ea0d676461b080b2bdc93. Installed artifacts are eligible for App startup preloading. Registration/download alone does not enable listening denoising; the Speech Recognition preference controls that separately.
+
+
+Vela 3 Fast 使用固定 hugging-mac/vela3-fast-CoreAI revision 6aaa9ccd747c4bad65037979e7f9373a76fb7683，安装目录 Vela3Fast；catalog 沿用统一配置格式，只下载权重、tokenizer 和运行配置，不下载 LICENSE、NOTICE、README，不打包权重。

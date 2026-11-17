@@ -1,5 +1,7 @@
 # 已完成需求归档
 
+- [ReACT 回复字幕](ReACT-Reply-Captions.md)（2026-11-16）：Action/native Tool 观察续轮继承呈现身份，正文进入字幕；独立真机验收及完整检查限制见验证记录。
+
 - [MobileHarness 技术文档核对](Readme-Ownership-Audit.md)（2026-11-14）。总设计、九个一级模块和子目录的职责、数据流与实现说明同步。
 
 - [Agent 静态类别](Agent-Categories.md)（2026-11-10）：perception/cognition 资源声明、运行时身份保留与严格配置校验。
@@ -154,3 +156,5 @@
 - [Writer 重复创建与缺入口恢复](Writer-Create-Loop.md)（2026-11-09）。同一委托复用创建分配，初始化时创建入口文件，旧草稿缺入口引导到 edit。
 
 - [D3 Edge Core AI conversion](D3-Edge-CoreAI-Conversion.md)：文本模型转换、对照验证与 Hugging Face 发布完成；业务误判、数值漂移和平台边界见专项验证。
+
+- [DeepFilterNet3 capability](DeepFilterNet3-Capability-Plan.md): standalone ModelKit denoising interface and provider; validation limitations recorded separately.

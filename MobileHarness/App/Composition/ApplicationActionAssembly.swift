@@ -81,6 +81,7 @@ final class ApplicationActionAssembly {
                     try await resources.runInCurrentContext(resources: requested, operation: operation)
                 }
             }, observeTranscript: ports.observeTranscript, output: ports.output,
+            speechEnhancementEnabled: ports.speechEnhancementEnabled, speechDetection: ports.speechDetection,
             decodeResources: ports.decodeResources,
             makeVoice: { host in
                 let voice = try ports.makeVoice(

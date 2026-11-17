@@ -464,12 +464,10 @@ func photographerAndApplicationControlPublishOwnActivitiesWithoutAssistant() asy
         content: .init(
             title: "任务", primary: .symbol(name: "scope"), priority: .normal, detail: .init(text: "当前任务")))
     let id = UUID().uuidString
-    #expect(AssistantExecutionSession.inputDecisionContent(.enqueue, id: "enqueue") == nil)
-    for (revision, decision, text) in [
-        (1, InputDisposition.discard, "Input discarded"),
-        (2, InputDisposition.interrupt, "Reply interrupted"),
+    for (revision, text) in [
+        (2, "Reply interrupted")
     ] {
-        let content = try #require(AssistantExecutionSession.inputDecisionContent(decision, id: String(revision)))
+        let content = AssistantExecutionSession.inputDecisionContent(id: String(revision))
         let payload = String(decoding: try JSONEncoder().encode(content), as: UTF8.self)
         _ = try await IslandActions.present(
             invocation: islandInput(

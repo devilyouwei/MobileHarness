@@ -43,6 +43,8 @@ Task/Skill 的边界矩阵包括四种预加载接管方式（指定、加载、
 
 ## 容器与直接输入覆盖
 
+GenerationRoundTests 的 fullDuplexReACTRepliesReachCaptions 使用替身模型分别生成 Action/native Tool 观察及后续正文，通过真实 ConversationPresentation 校验新 Decision 的字幕替换、轮次继承及旧 Decision/取消轮次拒绝；不代表真实网页、模型或原生字幕渲染验收。
+
 ✅ AgentContainerTests 使用生产 AgentContainerLifecycle 和可控 gate，覆盖冷根失效、真实 ApplicationLifecycle 初始 inactive → active 组合、启动在途取消、并发启停、部分启动回滚、必须暂停、迟到恢复围栏、终态拒绝及原始／清理失败。AgentSpecialistTests 验证 Assistant 前后台切换不控制平级角色。
 
 iOS 条件用例验证 ApplicationContainer 同根缓存、七个子能力身份和跨根隔离，需要 iOS 测试宿主；macOS check.sh 不执行这些用例。具体执行状态归[容器验证](../../docs/validation/Agent-Containers.md)，README 只定义覆盖范围。
@@ -445,3 +447,6 @@ VoiceTests 的 speechAdmission/speechPlayback 用例验证采样时间冷却、�
 InputDecisionTests 的JEV回归检查JSON事实、片段拼接、数据转义、上下文边界、固定英文语义候选、四项动作映射及非法候选拒绝，保留Chat数字与Tool协议回归。模型为可控替身，不等于真实D3分类效果验收。
 
 InputDecisionTests 将旧噪声词表字符串、标点及语气词作为普通人工输入，验证四类模型选择不被文本启发式覆盖、失败按既定策略入队。它们不是ASR实测输出或特殊token契约。接续容量参数化回归验证正常持有与容量满后所有片段一起入队。
+
+
+InputDecisionTests 验证先入队、独立布尔推理和迟到信号；DecisionBinaryNativeTests 是显式启用的 App 提示词/双 Swift 原生模型比较。HistoricalDecisionBenchmarkSupport 冻结 3a962f11 多分类协议和提示词，仅供历史实验，不编译入 App。

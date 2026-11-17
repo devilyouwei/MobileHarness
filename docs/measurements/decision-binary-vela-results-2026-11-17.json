@@ -1,0 +1,4473 @@
+{
+  "model": "vela3-fast",
+  "mode": "native-choice-cpu-no-adoption-no-deadline",
+  "revision": "6aaa9ccd747c4bad65037979e7f9373a76fb7683",
+  "inputSHA256": "f7f62d8f5e7bb736c6b3419d2227d750f928b9d705d7a7f958a512ec60f58fd8",
+  "runnerSHA256": "285da7f5bad5497cf1607e6077c5ba50f41976d6cded3bad091ba516ad1a7b94",
+  "sourceHashes": {
+    "MobileHarness/Resources/Agents/Assistant/InputDecision.json": "cf6cee82363c0143adf0bc6fa014f075e1437c7f264677159802520e77877d38",
+    "MobileHarness/ModelKit/Language/JEV/D3Decision.swift": "3f73d47f20b6553e51cbd6883a7823c7a7c9f5224fe37b38c52d77bfe73cec42",
+    "Tests/IntegrationTests/DecisionPromptOptimizationTests.swift": "24a7a3087556274c640bd7445699fa4777bd4a57bb884561929949bcec8d7e5f"
+  },
+  "platform": "macOS-27.2.1-arm64-arm-64bit",
+  "warmup": [
+    {
+      "variant": "defined_bool",
+      "id": "00-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 114,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.3577040530449006,
+        "B": 0.6422959469550994
+      },
+      "score": 0.6422959469550994,
+      "milliseconds": 2335.852916992735
+    },
+    {
+      "variant": "defined_bool",
+      "id": "00-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 114,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.3577040530449006,
+        "B": 0.6422959469550994
+      },
+      "score": 0.6422959469550994,
+      "milliseconds": 789.3955839972477
+    },
+    {
+      "variant": "defined_bool",
+      "id": "00-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 114,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.3577040530449006,
+        "B": 0.6422959469550994
+      },
+      "score": 0.6422959469550994,
+      "milliseconds": 111.85183399356902
+    },
+    {
+      "variant": "yes_no",
+      "id": "00-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 81,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.18554043877020926,
+        "B": 0.8144595612297907
+      },
+      "score": 0.8144595612297907,
+      "milliseconds": 92.253749986412
+    },
+    {
+      "variant": "yes_no",
+      "id": "00-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 81,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.18554043877020926,
+        "B": 0.8144595612297907
+      },
+      "score": 0.8144595612297907,
+      "milliseconds": 91.40554099576548
+    },
+    {
+      "variant": "yes_no",
+      "id": "00-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 81,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.18554043877020926,
+        "B": 0.8144595612297907
+      },
+      "score": 0.8144595612297907,
+      "milliseconds": 94.22445899690501
+    }
+  ],
+  "rows": [
+    {
+      "variant": "defined_bool",
+      "id": "00-en-busy",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 110,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.1577514152665973,
+        "B": 0.8422485847334026
+      },
+      "score": 0.8422485847334026,
+      "milliseconds": 110.5213749979157
+    },
+    {
+      "variant": "yes_no",
+      "id": "00-en-busy",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 77,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.2281232091509518,
+        "B": 0.7718767908490481
+      },
+      "score": 0.7718767908490481,
+      "milliseconds": 92.68791700014845
+    },
+    {
+      "variant": "yes_no",
+      "id": "00-en-idle",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 77,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.2281232091509518,
+        "B": 0.7718767908490481
+      },
+      "score": 0.7718767908490481,
+      "milliseconds": 91.6235409968067
+    },
+    {
+      "variant": "defined_bool",
+      "id": "00-en-idle",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 110,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.1577514152665973,
+        "B": 0.8422485847334026
+      },
+      "score": 0.8422485847334026,
+      "milliseconds": 111.69545899610966
+    },
+    {
+      "variant": "defined_bool",
+      "id": "00-zh-busy",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 114,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.3577040530449006,
+        "B": 0.6422959469550994
+      },
+      "score": 0.6422959469550994,
+      "milliseconds": 115.11383301694877
+    },
+    {
+      "variant": "yes_no",
+      "id": "00-zh-busy",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 81,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.18554043877020926,
+        "B": 0.8144595612297907
+      },
+      "score": 0.8144595612297907,
+      "milliseconds": 94.04937498038635
+    },
+    {
+      "variant": "yes_no",
+      "id": "00-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 81,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.18554043877020926,
+        "B": 0.8144595612297907
+      },
+      "score": 0.8144595612297907,
+      "milliseconds": 93.35912499227561
+    },
+    {
+      "variant": "defined_bool",
+      "id": "00-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 114,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.3577040530449006,
+        "B": 0.6422959469550994
+      },
+      "score": 0.6422959469550994,
+      "milliseconds": 112.79208300402388
+    },
+    {
+      "variant": "defined_bool",
+      "id": "01-en-busy",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 111,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.3219051334643616,
+        "B": 0.6780948665356384
+      },
+      "score": 0.6780948665356384,
+      "milliseconds": 113.24637499637902
+    },
+    {
+      "variant": "yes_no",
+      "id": "01-en-busy",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 78,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.3264617191418229,
+        "B": 0.6735382808581771
+      },
+      "score": 0.6735382808581771,
+      "milliseconds": 94.58266600267962
+    },
+    {
+      "variant": "yes_no",
+      "id": "01-en-idle",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 78,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.3264617191418229,
+        "B": 0.6735382808581771
+      },
+      "score": 0.6735382808581771,
+      "milliseconds": 92.21116700791754
+    },
+    {
+      "variant": "defined_bool",
+      "id": "01-en-idle",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 111,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.3219051334643616,
+        "B": 0.6780948665356384
+      },
+      "score": 0.6780948665356384,
+      "milliseconds": 114.20695800916292
+    },
+    {
+      "variant": "defined_bool",
+      "id": "01-zh-busy",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 114,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9658946658640486,
+        "B": 0.03410533413595136
+      },
+      "score": 0.9658946658640486,
+      "milliseconds": 114.7052499873098
+    },
+    {
+      "variant": "yes_no",
+      "id": "01-zh-busy",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 81,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9198221513016521,
+        "B": 0.0801778486983478
+      },
+      "score": 0.9198221513016521,
+      "milliseconds": 94.91854198859073
+    },
+    {
+      "variant": "yes_no",
+      "id": "01-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 81,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9198221513016521,
+        "B": 0.0801778486983478
+      },
+      "score": 0.9198221513016521,
+      "milliseconds": 94.34062501532026
+    },
+    {
+      "variant": "defined_bool",
+      "id": "01-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 114,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9658946658640486,
+        "B": 0.03410533413595136
+      },
+      "score": 0.9658946658640486,
+      "milliseconds": 112.77666699606925
+    },
+    {
+      "variant": "defined_bool",
+      "id": "02-en-busy",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 114,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.08039126887160798,
+        "B": 0.919608731128392
+      },
+      "score": 0.919608731128392,
+      "milliseconds": 114.05083298450336
+    },
+    {
+      "variant": "yes_no",
+      "id": "02-en-busy",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 81,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.061080598497427974,
+        "B": 0.938919401502572
+      },
+      "score": 0.938919401502572,
+      "milliseconds": 95.56300000986084
+    },
+    {
+      "variant": "yes_no",
+      "id": "02-en-idle",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 81,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.061080598497427974,
+        "B": 0.938919401502572
+      },
+      "score": 0.938919401502572,
+      "milliseconds": 95.32666599261574
+    },
+    {
+      "variant": "defined_bool",
+      "id": "02-en-idle",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 114,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.08039126887160798,
+        "B": 0.919608731128392
+      },
+      "score": 0.919608731128392,
+      "milliseconds": 114.57841700757854
+    },
+    {
+      "variant": "defined_bool",
+      "id": "02-zh-busy",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 124,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.7211640558846755,
+        "B": 0.27883594411532453
+      },
+      "score": 0.7211640558846755,
+      "milliseconds": 119.10220800200477
+    },
+    {
+      "variant": "yes_no",
+      "id": "02-zh-busy",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 91,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.262276311495995,
+        "B": 0.7377236885040049
+      },
+      "score": 0.7377236885040049,
+      "milliseconds": 98.5709159867838
+    },
+    {
+      "variant": "yes_no",
+      "id": "02-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 91,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.262276311495995,
+        "B": 0.7377236885040049
+      },
+      "score": 0.7377236885040049,
+      "milliseconds": 97.24670799914747
+    },
+    {
+      "variant": "defined_bool",
+      "id": "02-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 124,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.7211640558846755,
+        "B": 0.27883594411532453
+      },
+      "score": 0.7211640558846755,
+      "milliseconds": 117.96112501178868
+    },
+    {
+      "variant": "defined_bool",
+      "id": "03-en-busy",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 115,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.15727051120749722,
+        "B": 0.8427294887925028
+      },
+      "score": 0.8427294887925028,
+      "milliseconds": 115.60833299881779
+    },
+    {
+      "variant": "yes_no",
+      "id": "03-en-busy",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 82,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.07915031699902608,
+        "B": 0.9208496830009738
+      },
+      "score": 0.9208496830009738,
+      "milliseconds": 94.57995797856711
+    },
+    {
+      "variant": "yes_no",
+      "id": "03-en-idle",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 82,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.07915031699902608,
+        "B": 0.9208496830009738
+      },
+      "score": 0.9208496830009738,
+      "milliseconds": 97.5486249953974
+    },
+    {
+      "variant": "defined_bool",
+      "id": "03-en-idle",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 115,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.15727051120749722,
+        "B": 0.8427294887925028
+      },
+      "score": 0.8427294887925028,
+      "milliseconds": 115.97295899991877
+    },
+    {
+      "variant": "defined_bool",
+      "id": "03-zh-busy",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 121,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.8645662495417844,
+        "B": 0.13543375045821554
+      },
+      "score": 0.8645662495417844,
+      "milliseconds": 119.94450000929646
+    },
+    {
+      "variant": "yes_no",
+      "id": "03-zh-busy",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 88,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.5362004305997331,
+        "B": 0.46379956940026695
+      },
+      "score": 0.5362004305997331,
+      "milliseconds": 98.79412499140017
+    },
+    {
+      "variant": "yes_no",
+      "id": "03-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 88,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.5362004305997331,
+        "B": 0.46379956940026695
+      },
+      "score": 0.5362004305997331,
+      "milliseconds": 97.07629200420342
+    },
+    {
+      "variant": "defined_bool",
+      "id": "03-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 121,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.8645662495417844,
+        "B": 0.13543375045821554
+      },
+      "score": 0.8645662495417844,
+      "milliseconds": 118.1171250063926
+    },
+    {
+      "variant": "defined_bool",
+      "id": "04-en-busy",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 116,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.37062816493047085,
+        "B": 0.6293718350695291
+      },
+      "score": 0.6293718350695291,
+      "milliseconds": 118.49387499387376
+    },
+    {
+      "variant": "yes_no",
+      "id": "04-en-busy",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 83,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.30028792826748774,
+        "B": 0.6997120717325123
+      },
+      "score": 0.6997120717325123,
+      "milliseconds": 95.38658300880343
+    },
+    {
+      "variant": "yes_no",
+      "id": "04-en-idle",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 83,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.30028792826748774,
+        "B": 0.6997120717325123
+      },
+      "score": 0.6997120717325123,
+      "milliseconds": 97.22187498118728
+    },
+    {
+      "variant": "defined_bool",
+      "id": "04-en-idle",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 116,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.37062816493047085,
+        "B": 0.6293718350695291
+      },
+      "score": 0.6293718350695291,
+      "milliseconds": 117.90145799750462
+    },
+    {
+      "variant": "defined_bool",
+      "id": "04-zh-busy",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 128,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.32473135190759034,
+        "B": 0.6752686480924097
+      },
+      "score": 0.6752686480924097,
+      "milliseconds": 123.99179200292565
+    },
+    {
+      "variant": "yes_no",
+      "id": "04-zh-busy",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 95,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.22747278376838054,
+        "B": 0.7725272162316195
+      },
+      "score": 0.7725272162316195,
+      "milliseconds": 102.17166598886251
+    },
+    {
+      "variant": "yes_no",
+      "id": "04-zh-idle",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 95,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.22747278376838054,
+        "B": 0.7725272162316195
+      },
+      "score": 0.7725272162316195,
+      "milliseconds": 100.125291995937
+    },
+    {
+      "variant": "defined_bool",
+      "id": "04-zh-idle",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 128,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.32473135190759034,
+        "B": 0.6752686480924097
+      },
+      "score": 0.6752686480924097,
+      "milliseconds": 119.84545798623003
+    },
+    {
+      "variant": "defined_bool",
+      "id": "05-en-busy",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 119,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.21312936930323184,
+        "B": 0.7868706306967682
+      },
+      "score": 0.7868706306967682,
+      "milliseconds": 118.79345899797045
+    },
+    {
+      "variant": "yes_no",
+      "id": "05-en-busy",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 86,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.1333854361952215,
+        "B": 0.8666145638047784
+      },
+      "score": 0.8666145638047784,
+      "milliseconds": 98.3061250008177
+    },
+    {
+      "variant": "yes_no",
+      "id": "05-en-idle",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 86,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.1333854361952215,
+        "B": 0.8666145638047784
+      },
+      "score": 0.8666145638047784,
+      "milliseconds": 98.38779200799763
+    },
+    {
+      "variant": "defined_bool",
+      "id": "05-en-idle",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 119,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.21312936930323184,
+        "B": 0.7868706306967682
+      },
+      "score": 0.7868706306967682,
+      "milliseconds": 119.95429199305363
+    },
+    {
+      "variant": "defined_bool",
+      "id": "05-zh-busy",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 135,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.907821544351122,
+        "B": 0.09217845564887804
+      },
+      "score": 0.907821544351122,
+      "milliseconds": 227.9283330135513
+    },
+    {
+      "variant": "yes_no",
+      "id": "05-zh-busy",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 102,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.6503859563179655,
+        "B": 0.3496140436820344
+      },
+      "score": 0.6503859563179655,
+      "milliseconds": 373.1477500114124
+    },
+    {
+      "variant": "yes_no",
+      "id": "05-zh-idle",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 102,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.6503859563179655,
+        "B": 0.3496140436820344
+      },
+      "score": 0.6503859563179655,
+      "milliseconds": 216.8648749939166
+    },
+    {
+      "variant": "defined_bool",
+      "id": "05-zh-idle",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 135,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.907821544351122,
+        "B": 0.09217845564887804
+      },
+      "score": 0.907821544351122,
+      "milliseconds": 2151.6308749851305
+    },
+    {
+      "variant": "defined_bool",
+      "id": "06-en-busy",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 119,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9488637308106681,
+        "B": 0.051136269189331875
+      },
+      "score": 0.9488637308106681,
+      "milliseconds": 125.85220800247043
+    },
+    {
+      "variant": "yes_no",
+      "id": "06-en-busy",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 86,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9229710043554635,
+        "B": 0.07702899564453637
+      },
+      "score": 0.9229710043554635,
+      "milliseconds": 92.27033299976029
+    },
+    {
+      "variant": "yes_no",
+      "id": "06-en-idle",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 86,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9229710043554635,
+        "B": 0.07702899564453637
+      },
+      "score": 0.9229710043554635,
+      "milliseconds": 92.80462499009445
+    },
+    {
+      "variant": "defined_bool",
+      "id": "06-en-idle",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 119,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9488637308106681,
+        "B": 0.051136269189331875
+      },
+      "score": 0.9488637308106681,
+      "milliseconds": 113.07404100080021
+    },
+    {
+      "variant": "defined_bool",
+      "id": "06-zh-busy",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 132,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9354530796362194,
+        "B": 0.0645469203637807
+      },
+      "score": 0.9354530796362194,
+      "milliseconds": 132.52470799488947
+    },
+    {
+      "variant": "yes_no",
+      "id": "06-zh-busy",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 99,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9441970243627781,
+        "B": 0.055802975637222064
+      },
+      "score": 0.9441970243627781,
+      "milliseconds": 108.90995900263079
+    },
+    {
+      "variant": "yes_no",
+      "id": "06-zh-idle",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 99,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9441970243627781,
+        "B": 0.055802975637222064
+      },
+      "score": 0.9441970243627781,
+      "milliseconds": 109.1989169945009
+    },
+    {
+      "variant": "defined_bool",
+      "id": "06-zh-idle",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 132,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9354530796362194,
+        "B": 0.0645469203637807
+      },
+      "score": 0.9354530796362194,
+      "milliseconds": 130.90837499476038
+    },
+    {
+      "variant": "defined_bool",
+      "id": "07-en-busy",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 119,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.37107054884005347,
+        "B": 0.6289294511599466
+      },
+      "score": 0.6289294511599466,
+      "milliseconds": 117.3443750012666
+    },
+    {
+      "variant": "yes_no",
+      "id": "07-en-busy",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 86,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.2125964688025745,
+        "B": 0.7874035311974256
+      },
+      "score": 0.7874035311974256,
+      "milliseconds": 95.70308402180672
+    },
+    {
+      "variant": "yes_no",
+      "id": "07-en-idle",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 86,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.2125964688025745,
+        "B": 0.7874035311974256
+      },
+      "score": 0.7874035311974256,
+      "milliseconds": 95.80675000324845
+    },
+    {
+      "variant": "defined_bool",
+      "id": "07-en-idle",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 119,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.37107054884005347,
+        "B": 0.6289294511599466
+      },
+      "score": 0.6289294511599466,
+      "milliseconds": 115.71933300001547
+    },
+    {
+      "variant": "defined_bool",
+      "id": "07-zh-busy",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 134,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.6915661181439728,
+        "B": 0.30843388185602727
+      },
+      "score": 0.6915661181439728,
+      "milliseconds": 134.99991700518876
+    },
+    {
+      "variant": "yes_no",
+      "id": "07-zh-busy",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 101,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.5232116845078516,
+        "B": 0.4767883154921484
+      },
+      "score": 0.5232116845078516,
+      "milliseconds": 112.23683299613185
+    },
+    {
+      "variant": "yes_no",
+      "id": "07-zh-idle",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 101,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.5232116845078516,
+        "B": 0.4767883154921484
+      },
+      "score": 0.5232116845078516,
+      "milliseconds": 111.88545898767188
+    },
+    {
+      "variant": "defined_bool",
+      "id": "07-zh-idle",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 134,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.6915661181439728,
+        "B": 0.30843388185602727
+      },
+      "score": 0.6915661181439728,
+      "milliseconds": 131.5619999950286
+    },
+    {
+      "variant": "defined_bool",
+      "id": "08-en-busy",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 119,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.37461728303366876,
+        "B": 0.6253827169663313
+      },
+      "score": 0.6253827169663313,
+      "milliseconds": 118.69400000432506
+    },
+    {
+      "variant": "yes_no",
+      "id": "08-en-busy",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 86,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.159868422265747,
+        "B": 0.8401315777342531
+      },
+      "score": 0.8401315777342531,
+      "milliseconds": 95.81091700238176
+    },
+    {
+      "variant": "yes_no",
+      "id": "08-en-idle",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 86,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.159868422265747,
+        "B": 0.8401315777342531
+      },
+      "score": 0.8401315777342531,
+      "milliseconds": 97.54062499268912
+    },
+    {
+      "variant": "defined_bool",
+      "id": "08-en-idle",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 119,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.37461728303366876,
+        "B": 0.6253827169663313
+      },
+      "score": 0.6253827169663313,
+      "milliseconds": 116.88779198448174
+    },
+    {
+      "variant": "defined_bool",
+      "id": "08-zh-busy",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 132,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.8417610161641678,
+        "B": 0.15823898383583226
+      },
+      "score": 0.8417610161641678,
+      "milliseconds": 135.92016699840315
+    },
+    {
+      "variant": "yes_no",
+      "id": "08-zh-busy",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 99,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.8169234812435602,
+        "B": 0.18307651875643982
+      },
+      "score": 0.8169234812435602,
+      "milliseconds": 112.74008301552385
+    },
+    {
+      "variant": "yes_no",
+      "id": "08-zh-idle",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 99,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.8169234812435602,
+        "B": 0.18307651875643982
+      },
+      "score": 0.8169234812435602,
+      "milliseconds": 112.78870797832496
+    },
+    {
+      "variant": "defined_bool",
+      "id": "08-zh-idle",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 132,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.8417610161641678,
+        "B": 0.15823898383583226
+      },
+      "score": 0.8417610161641678,
+      "milliseconds": 132.29641699581407
+    },
+    {
+      "variant": "defined_bool",
+      "id": "09-en-busy",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 117,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.2299085884020654,
+        "B": 0.7700914115979346
+      },
+      "score": 0.7700914115979346,
+      "milliseconds": 118.72291698819026
+    },
+    {
+      "variant": "yes_no",
+      "id": "09-en-busy",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 84,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.31212934346888366,
+        "B": 0.6878706565311163
+      },
+      "score": 0.6878706565311163,
+      "milliseconds": 106.7912919970695
+    },
+    {
+      "variant": "yes_no",
+      "id": "09-en-idle",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 84,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.31212934346888366,
+        "B": 0.6878706565311163
+      },
+      "score": 0.6878706565311163,
+      "milliseconds": 99.00104199186899
+    },
+    {
+      "variant": "defined_bool",
+      "id": "09-en-idle",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 117,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.2299085884020654,
+        "B": 0.7700914115979346
+      },
+      "score": 0.7700914115979346,
+      "milliseconds": 117.6761670212727
+    },
+    {
+      "variant": "defined_bool",
+      "id": "09-zh-busy",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 131,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.8058073455358581,
+        "B": 0.19419265446414188
+      },
+      "score": 0.8058073455358581,
+      "milliseconds": 134.27041698014364
+    },
+    {
+      "variant": "yes_no",
+      "id": "09-zh-busy",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "inputTokens": 98,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.6949910323945296,
+        "B": 0.3050089676054703
+      },
+      "score": 0.6949910323945296,
+      "milliseconds": 112.97091699088924
+    },
+    {
+      "variant": "yes_no",
+      "id": "09-zh-idle",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 98,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.6949910323945296,
+        "B": 0.3050089676054703
+      },
+      "score": 0.6949910323945296,
+      "milliseconds": 119.14404202252626
+    },
+    {
+      "variant": "defined_bool",
+      "id": "09-zh-idle",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 131,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.8058073455358581,
+        "B": 0.19419265446414188
+      },
+      "score": 0.8058073455358581,
+      "milliseconds": 136.50962497922592
+    },
+    {
+      "variant": "defined_bool",
+      "id": "10-en-busy",
+      "language": "en",
+      "group": "greeting",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 110,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9978161949059475,
+        "B": 0.0021838050940524425
+      },
+      "score": 0.9978161949059475,
+      "milliseconds": 116.07724998611957
+    },
+    {
+      "variant": "yes_no",
+      "id": "10-en-busy",
+      "language": "en",
+      "group": "greeting",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 77,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9932866140273223,
+        "B": 0.006713385972677695
+      },
+      "score": 0.9932866140273223,
+      "milliseconds": 97.28933300357312
+    },
+    {
+      "variant": "yes_no",
+      "id": "10-en-idle",
+      "language": "en",
+      "group": "greeting",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 77,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9932866140273223,
+        "B": 0.006713385972677695
+      },
+      "score": 0.9932866140273223,
+      "milliseconds": 95.54166698944755
+    },
+    {
+      "variant": "defined_bool",
+      "id": "10-en-idle",
+      "language": "en",
+      "group": "greeting",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 110,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9978161949059475,
+        "B": 0.0021838050940524425
+      },
+      "score": 0.9978161949059475,
+      "milliseconds": 115.05091702565551
+    },
+    {
+      "variant": "defined_bool",
+      "id": "10-zh-busy",
+      "language": "zh",
+      "group": "greeting",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 113,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9917068370757505,
+        "B": 0.008293162924249496
+      },
+      "score": 0.9917068370757505,
+      "milliseconds": 117.11808299878612
+    },
+    {
+      "variant": "yes_no",
+      "id": "10-zh-busy",
+      "language": "zh",
+      "group": "greeting",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 80,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9859836016703093,
+        "B": 0.014016398329690673
+      },
+      "score": 0.9859836016703093,
+      "milliseconds": 97.83000001334585
+    },
+    {
+      "variant": "yes_no",
+      "id": "10-zh-idle",
+      "language": "zh",
+      "group": "greeting",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 80,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9859836016703093,
+        "B": 0.014016398329690673
+      },
+      "score": 0.9859836016703093,
+      "milliseconds": 101.1114590219222
+    },
+    {
+      "variant": "defined_bool",
+      "id": "10-zh-idle",
+      "language": "zh",
+      "group": "greeting",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 113,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9917068370757505,
+        "B": 0.008293162924249496
+      },
+      "score": 0.9917068370757505,
+      "milliseconds": 124.17862500296906
+    },
+    {
+      "variant": "defined_bool",
+      "id": "11-en-busy",
+      "language": "en",
+      "group": "greeting",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 111,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9972956670852395,
+        "B": 0.002704332914760433
+      },
+      "score": 0.9972956670852395,
+      "milliseconds": 120.67350000143051
+    },
+    {
+      "variant": "yes_no",
+      "id": "11-en-busy",
+      "language": "en",
+      "group": "greeting",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 78,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9929124612843434,
+        "B": 0.007087538715656525
+      },
+      "score": 0.9929124612843434,
+      "milliseconds": 95.33737500896677
+    },
+    {
+      "variant": "yes_no",
+      "id": "11-en-idle",
+      "language": "en",
+      "group": "greeting",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 78,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9929124612843434,
+        "B": 0.007087538715656525
+      },
+      "score": 0.9929124612843434,
+      "milliseconds": 215.83487500902265
+    },
+    {
+      "variant": "defined_bool",
+      "id": "11-en-idle",
+      "language": "en",
+      "group": "greeting",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 111,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9972956670852395,
+        "B": 0.002704332914760433
+      },
+      "score": 0.9972956670852395,
+      "milliseconds": 3432.513709005434
+    },
+    {
+      "variant": "defined_bool",
+      "id": "11-zh-busy",
+      "language": "zh",
+      "group": "greeting",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 114,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.949999986545203,
+        "B": 0.05000001345479698
+      },
+      "score": 0.949999986545203,
+      "milliseconds": 2921.816125017358
+    },
+    {
+      "variant": "yes_no",
+      "id": "11-zh-busy",
+      "language": "zh",
+      "group": "greeting",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 81,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9573269574799567,
+        "B": 0.04267304252004335
+      },
+      "score": 0.9573269574799567,
+      "milliseconds": 385.84612499107607
+    },
+    {
+      "variant": "yes_no",
+      "id": "11-zh-idle",
+      "language": "zh",
+      "group": "greeting",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 81,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9573269574799567,
+        "B": 0.04267304252004335
+      },
+      "score": 0.9573269574799567,
+      "milliseconds": 93.14362501027063
+    },
+    {
+      "variant": "defined_bool",
+      "id": "11-zh-idle",
+      "language": "zh",
+      "group": "greeting",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 114,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.949999986545203,
+        "B": 0.05000001345479698
+      },
+      "score": 0.949999986545203,
+      "milliseconds": 112.48287500347942
+    },
+    {
+      "variant": "defined_bool",
+      "id": "12-en-busy",
+      "language": "en",
+      "group": "request",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 112,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9973834503805811,
+        "B": 0.0026165496194190075
+      },
+      "score": 0.9973834503805811,
+      "milliseconds": 108.59229101333767
+    },
+    {
+      "variant": "yes_no",
+      "id": "12-en-busy",
+      "language": "en",
+      "group": "request",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 79,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9910289137910357,
+        "B": 0.008971086208964339
+      },
+      "score": 0.9910289137910357,
+      "milliseconds": 91.1595829820726
+    },
+    {
+      "variant": "yes_no",
+      "id": "12-en-idle",
+      "language": "en",
+      "group": "request",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 79,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9910289137910357,
+        "B": 0.008971086208964339
+      },
+      "score": 0.9910289137910357,
+      "milliseconds": 90.15966599690728
+    },
+    {
+      "variant": "defined_bool",
+      "id": "12-en-idle",
+      "language": "en",
+      "group": "request",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 112,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9973834503805811,
+        "B": 0.0026165496194190075
+      },
+      "score": 0.9973834503805811,
+      "milliseconds": 158.24345900909975
+    },
+    {
+      "variant": "defined_bool",
+      "id": "12-zh-busy",
+      "language": "zh",
+      "group": "request",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 117,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.913501443524622,
+        "B": 0.08649855647537805
+      },
+      "score": 0.913501443524622,
+      "milliseconds": 118.06516698561609
+    },
+    {
+      "variant": "yes_no",
+      "id": "12-zh-busy",
+      "language": "zh",
+      "group": "request",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 84,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9114280164395326,
+        "B": 0.08857198356046746
+      },
+      "score": 0.9114280164395326,
+      "milliseconds": 100.28833299293183
+    },
+    {
+      "variant": "yes_no",
+      "id": "12-zh-idle",
+      "language": "zh",
+      "group": "request",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 84,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9114280164395326,
+        "B": 0.08857198356046746
+      },
+      "score": 0.9114280164395326,
+      "milliseconds": 97.3437089996878
+    },
+    {
+      "variant": "defined_bool",
+      "id": "12-zh-idle",
+      "language": "zh",
+      "group": "request",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 117,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.913501443524622,
+        "B": 0.08649855647537805
+      },
+      "score": 0.913501443524622,
+      "milliseconds": 114.20145799638703
+    },
+    {
+      "variant": "defined_bool",
+      "id": "13-en-busy",
+      "language": "en",
+      "group": "request",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 113,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9776107519901327,
+        "B": 0.02238924800986726
+      },
+      "score": 0.9776107519901327,
+      "milliseconds": 116.39995899167843
+    },
+    {
+      "variant": "yes_no",
+      "id": "13-en-busy",
+      "language": "en",
+      "group": "request",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 80,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.984423143290864,
+        "B": 0.015576856709135998
+      },
+      "score": 0.984423143290864,
+      "milliseconds": 93.17550002015196
+    },
+    {
+      "variant": "yes_no",
+      "id": "13-en-idle",
+      "language": "en",
+      "group": "request",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 80,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.984423143290864,
+        "B": 0.015576856709135998
+      },
+      "score": 0.984423143290864,
+      "milliseconds": 94.1201249952428
+    },
+    {
+      "variant": "defined_bool",
+      "id": "13-en-idle",
+      "language": "en",
+      "group": "request",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 113,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9776107519901327,
+        "B": 0.02238924800986726
+      },
+      "score": 0.9776107519901327,
+      "milliseconds": 113.6868330067955
+    },
+    {
+      "variant": "defined_bool",
+      "id": "13-zh-busy",
+      "language": "zh",
+      "group": "request",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 130,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9676046479254792,
+        "B": 0.03239535207452088
+      },
+      "score": 0.9676046479254792,
+      "milliseconds": 129.826749995118
+    },
+    {
+      "variant": "yes_no",
+      "id": "13-zh-busy",
+      "language": "zh",
+      "group": "request",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 97,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9694196537616082,
+        "B": 0.030580346238391766
+      },
+      "score": 0.9694196537616082,
+      "milliseconds": 108.59679197892547
+    },
+    {
+      "variant": "yes_no",
+      "id": "13-zh-idle",
+      "language": "zh",
+      "group": "request",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 97,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9694196537616082,
+        "B": 0.030580346238391766
+      },
+      "score": 0.9694196537616082,
+      "milliseconds": 110.12395800207742
+    },
+    {
+      "variant": "defined_bool",
+      "id": "13-zh-idle",
+      "language": "zh",
+      "group": "request",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 130,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9676046479254792,
+        "B": 0.03239535207452088
+      },
+      "score": 0.9676046479254792,
+      "milliseconds": 128.32829199032858
+    },
+    {
+      "variant": "defined_bool",
+      "id": "14-en-busy",
+      "language": "en",
+      "group": "question",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 115,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9996489269078994,
+        "B": 0.0003510730921004908
+      },
+      "score": 0.9996489269078994,
+      "milliseconds": 114.55674999160692
+    },
+    {
+      "variant": "yes_no",
+      "id": "14-en-busy",
+      "language": "en",
+      "group": "question",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 82,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9965106375609244,
+        "B": 0.0034893624390755816
+      },
+      "score": 0.9965106375609244,
+      "milliseconds": 97.35370799899101
+    },
+    {
+      "variant": "yes_no",
+      "id": "14-en-idle",
+      "language": "en",
+      "group": "question",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 82,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9965106375609244,
+        "B": 0.0034893624390755816
+      },
+      "score": 0.9965106375609244,
+      "milliseconds": 96.29645801032893
+    },
+    {
+      "variant": "defined_bool",
+      "id": "14-en-idle",
+      "language": "en",
+      "group": "question",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 115,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9996489269078994,
+        "B": 0.0003510730921004908
+      },
+      "score": 0.9996489269078994,
+      "milliseconds": 116.94270800217055
+    },
+    {
+      "variant": "defined_bool",
+      "id": "14-zh-busy",
+      "language": "zh",
+      "group": "question",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 126,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9978472375212544,
+        "B": 0.0021527624787456455
+      },
+      "score": 0.9978472375212544,
+      "milliseconds": 118.43099998077378
+    },
+    {
+      "variant": "yes_no",
+      "id": "14-zh-busy",
+      "language": "zh",
+      "group": "question",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 93,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9937721239204785,
+        "B": 0.006227876079521544
+      },
+      "score": 0.9937721239204785,
+      "milliseconds": 101.16620798362419
+    },
+    {
+      "variant": "yes_no",
+      "id": "14-zh-idle",
+      "language": "zh",
+      "group": "question",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 93,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9937721239204785,
+        "B": 0.006227876079521544
+      },
+      "score": 0.9937721239204785,
+      "milliseconds": 102.9272919986397
+    },
+    {
+      "variant": "defined_bool",
+      "id": "14-zh-idle",
+      "language": "zh",
+      "group": "question",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 126,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9978472375212544,
+        "B": 0.0021527624787456455
+      },
+      "score": 0.9978472375212544,
+      "milliseconds": 125.36954201641493
+    },
+    {
+      "variant": "defined_bool",
+      "id": "15-en-busy",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 110,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9698931679667075,
+        "B": 0.03010683203329257
+      },
+      "score": 0.9698931679667075,
+      "milliseconds": 141.27270801691338
+    },
+    {
+      "variant": "yes_no",
+      "id": "15-en-busy",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 77,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9816229270802838,
+        "B": 0.018377072919716235
+      },
+      "score": 0.9816229270802838,
+      "milliseconds": 99.0870840032585
+    },
+    {
+      "variant": "yes_no",
+      "id": "15-en-idle",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 77,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9816229270802838,
+        "B": 0.018377072919716235
+      },
+      "score": 0.9816229270802838,
+      "milliseconds": 98.40308298589662
+    },
+    {
+      "variant": "defined_bool",
+      "id": "15-en-idle",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 110,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9698931679667075,
+        "B": 0.03010683203329257
+      },
+      "score": 0.9698931679667075,
+      "milliseconds": 118.67525000707246
+    },
+    {
+      "variant": "defined_bool",
+      "id": "15-zh-busy",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 115,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9399036677709454,
+        "B": 0.060096332229054646
+      },
+      "score": 0.9399036677709454,
+      "milliseconds": 121.91995899775065
+    },
+    {
+      "variant": "yes_no",
+      "id": "15-zh-busy",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 82,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9728886207321533,
+        "B": 0.027111379267846708
+      },
+      "score": 0.9728886207321533,
+      "milliseconds": 98.84395799599588
+    },
+    {
+      "variant": "yes_no",
+      "id": "15-zh-idle",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 82,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9728886207321533,
+        "B": 0.027111379267846708
+      },
+      "score": 0.9728886207321533,
+      "milliseconds": 105.41962500428781
+    },
+    {
+      "variant": "defined_bool",
+      "id": "15-zh-idle",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 115,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9399036677709454,
+        "B": 0.060096332229054646
+      },
+      "score": 0.9399036677709454,
+      "milliseconds": 119.77237497922033
+    },
+    {
+      "variant": "defined_bool",
+      "id": "16-en-busy",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 110,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.957851895146804,
+        "B": 0.042148104853196026
+      },
+      "score": 0.957851895146804,
+      "milliseconds": 121.30037500173785
+    },
+    {
+      "variant": "yes_no",
+      "id": "16-en-busy",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 77,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.7753118742499929,
+        "B": 0.2246881257500071
+      },
+      "score": 0.7753118742499929,
+      "milliseconds": 101.23262499109842
+    },
+    {
+      "variant": "yes_no",
+      "id": "16-en-idle",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 77,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.7753118742499929,
+        "B": 0.2246881257500071
+      },
+      "score": 0.7753118742499929,
+      "milliseconds": 103.80708298180252
+    },
+    {
+      "variant": "defined_bool",
+      "id": "16-en-idle",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 110,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.957851895146804,
+        "B": 0.042148104853196026
+      },
+      "score": 0.957851895146804,
+      "milliseconds": 123.13508399529383
+    },
+    {
+      "variant": "defined_bool",
+      "id": "16-zh-busy",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 111,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.990040080188719,
+        "B": 0.00995991981128105
+      },
+      "score": 0.990040080188719,
+      "milliseconds": 119.89495900343172
+    },
+    {
+      "variant": "yes_no",
+      "id": "16-zh-busy",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 78,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.889698829992792,
+        "B": 0.11030117000720795
+      },
+      "score": 0.889698829992792,
+      "milliseconds": 96.5217089978978
+    },
+    {
+      "variant": "yes_no",
+      "id": "16-zh-idle",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 78,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.889698829992792,
+        "B": 0.11030117000720795
+      },
+      "score": 0.889698829992792,
+      "milliseconds": 98.50962500786409
+    },
+    {
+      "variant": "defined_bool",
+      "id": "16-zh-idle",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 111,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.990040080188719,
+        "B": 0.00995991981128105
+      },
+      "score": 0.990040080188719,
+      "milliseconds": 121.78641598438844
+    },
+    {
+      "variant": "defined_bool",
+      "id": "17-en-busy",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 112,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9950697814645659,
+        "B": 0.004930218535433997
+      },
+      "score": 0.9950697814645659,
+      "milliseconds": 119.28487499244511
+    },
+    {
+      "variant": "yes_no",
+      "id": "17-en-busy",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 79,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9944474494153729,
+        "B": 0.005552550584627168
+      },
+      "score": 0.9944474494153729,
+      "milliseconds": 95.79695799038745
+    },
+    {
+      "variant": "yes_no",
+      "id": "17-en-idle",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 79,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9944474494153729,
+        "B": 0.005552550584627168
+      },
+      "score": 0.9944474494153729,
+      "milliseconds": 95.5818330112379
+    },
+    {
+      "variant": "defined_bool",
+      "id": "17-en-idle",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 112,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9950697814645659,
+        "B": 0.004930218535433997
+      },
+      "score": 0.9950697814645659,
+      "milliseconds": 122.78708300436847
+    },
+    {
+      "variant": "defined_bool",
+      "id": "17-zh-busy",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 117,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9848808141618575,
+        "B": 0.01511918583814256
+      },
+      "score": 0.9848808141618575,
+      "milliseconds": 120.84866699296981
+    },
+    {
+      "variant": "yes_no",
+      "id": "17-zh-busy",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 84,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9294388714973181,
+        "B": 0.07056112850268202
+      },
+      "score": 0.9294388714973181,
+      "milliseconds": 98.8665419863537
+    },
+    {
+      "variant": "yes_no",
+      "id": "17-zh-idle",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 84,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9294388714973181,
+        "B": 0.07056112850268202
+      },
+      "score": 0.9294388714973181,
+      "milliseconds": 99.09508400596678
+    },
+    {
+      "variant": "defined_bool",
+      "id": "17-zh-idle",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 117,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9848808141618575,
+        "B": 0.01511918583814256
+      },
+      "score": 0.9848808141618575,
+      "milliseconds": 119.18949999380857
+    },
+    {
+      "variant": "defined_bool",
+      "id": "18-en-busy",
+      "language": "en",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 111,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9822779920295432,
+        "B": 0.017722007970456696
+      },
+      "score": 0.9822779920295432,
+      "milliseconds": 120.92958300490864
+    },
+    {
+      "variant": "yes_no",
+      "id": "18-en-busy",
+      "language": "en",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 78,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.980567640380579,
+        "B": 0.019432359619421014
+      },
+      "score": 0.980567640380579,
+      "milliseconds": 113.09608299052343
+    },
+    {
+      "variant": "yes_no",
+      "id": "18-en-idle",
+      "language": "en",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 78,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.980567640380579,
+        "B": 0.019432359619421014
+      },
+      "score": 0.980567640380579,
+      "milliseconds": 100.0251249934081
+    },
+    {
+      "variant": "defined_bool",
+      "id": "18-en-idle",
+      "language": "en",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 111,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9822779920295432,
+        "B": 0.017722007970456696
+      },
+      "score": 0.9822779920295432,
+      "milliseconds": 120.12941698776558
+    },
+    {
+      "variant": "defined_bool",
+      "id": "18-zh-busy",
+      "language": "zh",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 115,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9439662138362207,
+        "B": 0.056033786163779215
+      },
+      "score": 0.9439662138362207,
+      "milliseconds": 121.6913330135867
+    },
+    {
+      "variant": "yes_no",
+      "id": "18-zh-busy",
+      "language": "zh",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 82,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9469571611177506,
+        "B": 0.05304283888224928
+      },
+      "score": 0.9469571611177506,
+      "milliseconds": 98.445375013398
+    },
+    {
+      "variant": "yes_no",
+      "id": "18-zh-idle",
+      "language": "zh",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 82,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9469571611177506,
+        "B": 0.05304283888224928
+      },
+      "score": 0.9469571611177506,
+      "milliseconds": 97.3017499782145
+    },
+    {
+      "variant": "defined_bool",
+      "id": "18-zh-idle",
+      "language": "zh",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 115,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9439662138362207,
+        "B": 0.056033786163779215
+      },
+      "score": 0.9439662138362207,
+      "milliseconds": 120.4667919955682
+    },
+    {
+      "variant": "defined_bool",
+      "id": "19-en-busy",
+      "language": "en",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 112,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.99761827042741,
+        "B": 0.002381729572589947
+      },
+      "score": 0.99761827042741,
+      "milliseconds": 118.86191699886695
+    },
+    {
+      "variant": "yes_no",
+      "id": "19-en-busy",
+      "language": "en",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 79,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9951861155216597,
+        "B": 0.004813884478340256
+      },
+      "score": 0.9951861155216597,
+      "milliseconds": 98.0779999808874
+    },
+    {
+      "variant": "yes_no",
+      "id": "19-en-idle",
+      "language": "en",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 79,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9951861155216597,
+        "B": 0.004813884478340256
+      },
+      "score": 0.9951861155216597,
+      "milliseconds": 98.66412499104626
+    },
+    {
+      "variant": "defined_bool",
+      "id": "19-en-idle",
+      "language": "en",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 112,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.99761827042741,
+        "B": 0.002381729572589947
+      },
+      "score": 0.99761827042741,
+      "milliseconds": 118.56320899096318
+    },
+    {
+      "variant": "defined_bool",
+      "id": "19-zh-busy",
+      "language": "zh",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 121,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9582471578147611,
+        "B": 0.04175284218523874
+      },
+      "score": 0.9582471578147611,
+      "milliseconds": 121.30970798898488
+    },
+    {
+      "variant": "yes_no",
+      "id": "19-zh-busy",
+      "language": "zh",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 88,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9572886243179776,
+        "B": 0.04271137568202239
+      },
+      "score": 0.9572886243179776,
+      "milliseconds": 101.09612499945797
+    },
+    {
+      "variant": "yes_no",
+      "id": "19-zh-idle",
+      "language": "zh",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 88,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9572886243179776,
+        "B": 0.04271137568202239
+      },
+      "score": 0.9572886243179776,
+      "milliseconds": 99.37608399195597
+    },
+    {
+      "variant": "defined_bool",
+      "id": "19-zh-idle",
+      "language": "zh",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 121,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9582471578147611,
+        "B": 0.04175284218523874
+      },
+      "score": 0.9582471578147611,
+      "milliseconds": 120.83804199937731
+    },
+    {
+      "variant": "defined_bool",
+      "id": "20-en-busy",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 115,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9836779573860106,
+        "B": 0.01632204261398929
+      },
+      "score": 0.9836779573860106,
+      "milliseconds": 122.14541700086556
+    },
+    {
+      "variant": "yes_no",
+      "id": "20-en-busy",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 82,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9746402883277793,
+        "B": 0.025359711672220706
+      },
+      "score": 0.9746402883277793,
+      "milliseconds": 98.29825002816506
+    },
+    {
+      "variant": "yes_no",
+      "id": "20-en-idle",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 82,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9746402883277793,
+        "B": 0.025359711672220706
+      },
+      "score": 0.9746402883277793,
+      "milliseconds": 99.33324999292381
+    },
+    {
+      "variant": "defined_bool",
+      "id": "20-en-idle",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 115,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9836779573860106,
+        "B": 0.01632204261398929
+      },
+      "score": 0.9836779573860106,
+      "milliseconds": 119.52295797527768
+    },
+    {
+      "variant": "defined_bool",
+      "id": "20-zh-busy",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 121,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9777365573198361,
+        "B": 0.02226344268016399
+      },
+      "score": 0.9777365573198361,
+      "milliseconds": 120.44370800140314
+    },
+    {
+      "variant": "yes_no",
+      "id": "20-zh-busy",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 88,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.8949561244874179,
+        "B": 0.10504387551258214
+      },
+      "score": 0.8949561244874179,
+      "milliseconds": 99.08216699841432
+    },
+    {
+      "variant": "yes_no",
+      "id": "20-zh-idle",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 88,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.8949561244874179,
+        "B": 0.10504387551258214
+      },
+      "score": 0.8949561244874179,
+      "milliseconds": 102.18662497936748
+    },
+    {
+      "variant": "defined_bool",
+      "id": "20-zh-idle",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 121,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9777365573198361,
+        "B": 0.02226344268016399
+      },
+      "score": 0.9777365573198361,
+      "milliseconds": 122.10429200786166
+    },
+    {
+      "variant": "defined_bool",
+      "id": "21-en-busy",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 116,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9603125302169123,
+        "B": 0.03968746978308761
+      },
+      "score": 0.9603125302169123,
+      "milliseconds": 120.17312500393018
+    },
+    {
+      "variant": "yes_no",
+      "id": "21-en-busy",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 83,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9522726892137289,
+        "B": 0.047727310786271154
+      },
+      "score": 0.9522726892137289,
+      "milliseconds": 103.11108399764635
+    },
+    {
+      "variant": "yes_no",
+      "id": "21-en-idle",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 83,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9522726892137289,
+        "B": 0.047727310786271154
+      },
+      "score": 0.9522726892137289,
+      "milliseconds": 107.8280410147272
+    },
+    {
+      "variant": "defined_bool",
+      "id": "21-en-idle",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 116,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9603125302169123,
+        "B": 0.03968746978308761
+      },
+      "score": 0.9603125302169123,
+      "milliseconds": 122.59470799472183
+    },
+    {
+      "variant": "defined_bool",
+      "id": "21-zh-busy",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 122,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9356819263359294,
+        "B": 0.0643180736640707
+      },
+      "score": 0.9356819263359294,
+      "milliseconds": 121.5608750062529
+    },
+    {
+      "variant": "yes_no",
+      "id": "21-zh-busy",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 89,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9315613903771026,
+        "B": 0.06843860962289743
+      },
+      "score": 0.9315613903771026,
+      "milliseconds": 100.9678749833256
+    },
+    {
+      "variant": "yes_no",
+      "id": "21-zh-idle",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 89,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9315613903771026,
+        "B": 0.06843860962289743
+      },
+      "score": 0.9315613903771026,
+      "milliseconds": 101.30391601705924
+    },
+    {
+      "variant": "defined_bool",
+      "id": "21-zh-idle",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 122,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9356819263359294,
+        "B": 0.0643180736640707
+      },
+      "score": 0.9356819263359294,
+      "milliseconds": 123.13575000735
+    },
+    {
+      "variant": "defined_bool",
+      "id": "22-en-busy",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 114,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9204651156919856,
+        "B": 0.07953488430801427
+      },
+      "score": 0.9204651156919856,
+      "milliseconds": 121.33649998577312
+    },
+    {
+      "variant": "yes_no",
+      "id": "22-en-busy",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 81,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9391406317629992,
+        "B": 0.06085936823700072
+      },
+      "score": 0.9391406317629992,
+      "milliseconds": 98.60404199571349
+    },
+    {
+      "variant": "yes_no",
+      "id": "22-en-idle",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 81,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9391406317629992,
+        "B": 0.06085936823700072
+      },
+      "score": 0.9391406317629992,
+      "milliseconds": 98.704041010933
+    },
+    {
+      "variant": "defined_bool",
+      "id": "22-en-idle",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 114,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9204651156919856,
+        "B": 0.07953488430801427
+      },
+      "score": 0.9204651156919856,
+      "milliseconds": 121.21500002103858
+    },
+    {
+      "variant": "defined_bool",
+      "id": "22-zh-busy",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 123,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9707985948539413,
+        "B": 0.029201405146058606
+      },
+      "score": 0.9707985948539413,
+      "milliseconds": 123.98787500569597
+    },
+    {
+      "variant": "yes_no",
+      "id": "22-zh-busy",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 90,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9123191970239767,
+        "B": 0.08768080297602336
+      },
+      "score": 0.9123191970239767,
+      "milliseconds": 100.72637497796677
+    },
+    {
+      "variant": "yes_no",
+      "id": "22-zh-idle",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 90,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9123191970239767,
+        "B": 0.08768080297602336
+      },
+      "score": 0.9123191970239767,
+      "milliseconds": 100.48591700615361
+    },
+    {
+      "variant": "defined_bool",
+      "id": "22-zh-idle",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 123,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9707985948539413,
+        "B": 0.029201405146058606
+      },
+      "score": 0.9707985948539413,
+      "milliseconds": 123.01504201604985
+    },
+    {
+      "variant": "defined_bool",
+      "id": "23-en-busy",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 117,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.5549064944745017,
+        "B": 0.4450935055254984
+      },
+      "score": 0.5549064944745017,
+      "milliseconds": 123.13624998205341
+    },
+    {
+      "variant": "yes_no",
+      "id": "23-en-busy",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 84,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.5828509388486276,
+        "B": 0.41714906115137235
+      },
+      "score": 0.5828509388486276,
+      "milliseconds": 99.142708000727
+    },
+    {
+      "variant": "yes_no",
+      "id": "23-en-idle",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 84,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.5828509388486276,
+        "B": 0.41714906115137235
+      },
+      "score": 0.5828509388486276,
+      "milliseconds": 100.2972080023028
+    },
+    {
+      "variant": "defined_bool",
+      "id": "23-en-idle",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 117,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.5549064944745017,
+        "B": 0.4450935055254984
+      },
+      "score": 0.5549064944745017,
+      "milliseconds": 120.95737500931136
+    },
+    {
+      "variant": "defined_bool",
+      "id": "23-zh-busy",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 128,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9784197575965858,
+        "B": 0.0215802424034142
+      },
+      "score": 0.9784197575965858,
+      "milliseconds": 125.86804199963808
+    },
+    {
+      "variant": "yes_no",
+      "id": "23-zh-busy",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 95,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9881469577001618,
+        "B": 0.011853042299838273
+      },
+      "score": 0.9881469577001618,
+      "milliseconds": 102.6007919863332
+    },
+    {
+      "variant": "yes_no",
+      "id": "23-zh-idle",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 95,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9881469577001618,
+        "B": 0.011853042299838273
+      },
+      "score": 0.9881469577001618,
+      "milliseconds": 102.923667000141
+    },
+    {
+      "variant": "defined_bool",
+      "id": "23-zh-idle",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 128,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9784197575965858,
+        "B": 0.0215802424034142
+      },
+      "score": 0.9784197575965858,
+      "milliseconds": 124.53137498232536
+    },
+    {
+      "variant": "defined_bool",
+      "id": "24-en-busy",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 117,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9162972896764561,
+        "B": 0.08370271032354393
+      },
+      "score": 0.9162972896764561,
+      "milliseconds": 124.28737501613796
+    },
+    {
+      "variant": "yes_no",
+      "id": "24-en-busy",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 84,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9669396931723044,
+        "B": 0.033060306827695514
+      },
+      "score": 0.9669396931723044,
+      "milliseconds": 107.48779200366698
+    },
+    {
+      "variant": "yes_no",
+      "id": "24-en-idle",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 84,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9669396931723044,
+        "B": 0.033060306827695514
+      },
+      "score": 0.9669396931723044,
+      "milliseconds": 108.91029197955504
+    },
+    {
+      "variant": "defined_bool",
+      "id": "24-en-idle",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 117,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9162972896764561,
+        "B": 0.08370271032354393
+      },
+      "score": 0.9162972896764561,
+      "milliseconds": 161.47029199055396
+    },
+    {
+      "variant": "defined_bool",
+      "id": "24-zh-busy",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 129,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9343810135509905,
+        "B": 0.06561898644900944
+      },
+      "score": 0.9343810135509905,
+      "milliseconds": 154.37604099861346
+    },
+    {
+      "variant": "yes_no",
+      "id": "24-zh-busy",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 96,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9460806963154521,
+        "B": 0.053919303684547906
+      },
+      "score": 0.9460806963154521,
+      "milliseconds": 104.53499999130145
+    },
+    {
+      "variant": "yes_no",
+      "id": "24-zh-idle",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 96,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9460806963154521,
+        "B": 0.053919303684547906
+      },
+      "score": 0.9460806963154521,
+      "milliseconds": 104.26949997781776
+    },
+    {
+      "variant": "defined_bool",
+      "id": "24-zh-idle",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 129,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9343810135509905,
+        "B": 0.06561898644900944
+      },
+      "score": 0.9343810135509905,
+      "milliseconds": 139.55525000346825
+    },
+    {
+      "variant": "defined_bool",
+      "id": "25-en-busy",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 119,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.7409701406547852,
+        "B": 0.25902985934521483
+      },
+      "score": 0.7409701406547852,
+      "milliseconds": 126.07262498931959
+    },
+    {
+      "variant": "yes_no",
+      "id": "25-en-busy",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 86,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.7635296762320491,
+        "B": 0.2364703237679509
+      },
+      "score": 0.7635296762320491,
+      "milliseconds": 101.60487500252202
+    },
+    {
+      "variant": "yes_no",
+      "id": "25-en-idle",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 86,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.7635296762320491,
+        "B": 0.2364703237679509
+      },
+      "score": 0.7635296762320491,
+      "milliseconds": 100.55420800927095
+    },
+    {
+      "variant": "defined_bool",
+      "id": "25-en-idle",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 119,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.7409701406547852,
+        "B": 0.25902985934521483
+      },
+      "score": 0.7409701406547852,
+      "milliseconds": 123.49091697251424
+    },
+    {
+      "variant": "defined_bool",
+      "id": "25-zh-busy",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 131,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.364296501746291,
+        "B": 0.635703498253709
+      },
+      "score": 0.635703498253709,
+      "milliseconds": 143.9525000168942
+    },
+    {
+      "variant": "yes_no",
+      "id": "25-zh-busy",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 98,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.38175097328844837,
+        "B": 0.6182490267115517
+      },
+      "score": 0.6182490267115517,
+      "milliseconds": 117.44329202338122
+    },
+    {
+      "variant": "yes_no",
+      "id": "25-zh-idle",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 98,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.38175097328844837,
+        "B": 0.6182490267115517
+      },
+      "score": 0.6182490267115517,
+      "milliseconds": 117.15583299519494
+    },
+    {
+      "variant": "defined_bool",
+      "id": "25-zh-idle",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 131,
+      "prediction": "true",
+      "probabilities": {
+        "A": 0.364296501746291,
+        "B": 0.635703498253709
+      },
+      "score": 0.635703498253709,
+      "milliseconds": 138.5109169932548
+    },
+    {
+      "variant": "defined_bool",
+      "id": "26-en-busy",
+      "language": "en",
+      "group": "deferred",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 115,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.6376656062267115,
+        "B": 0.3623343937732884
+      },
+      "score": 0.6376656062267115,
+      "milliseconds": 125.00920798629522
+    },
+    {
+      "variant": "yes_no",
+      "id": "26-en-busy",
+      "language": "en",
+      "group": "deferred",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 82,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.547993269961957,
+        "B": 0.4520067300380431
+      },
+      "score": 0.547993269961957,
+      "milliseconds": 100.25700001278892
+    },
+    {
+      "variant": "yes_no",
+      "id": "26-en-idle",
+      "language": "en",
+      "group": "deferred",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 82,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.547993269961957,
+        "B": 0.4520067300380431
+      },
+      "score": 0.547993269961957,
+      "milliseconds": 100.68204201525077
+    },
+    {
+      "variant": "defined_bool",
+      "id": "26-en-idle",
+      "language": "en",
+      "group": "deferred",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 115,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.6376656062267115,
+        "B": 0.3623343937732884
+      },
+      "score": 0.6376656062267115,
+      "milliseconds": 122.87466699490324
+    },
+    {
+      "variant": "defined_bool",
+      "id": "26-zh-busy",
+      "language": "zh",
+      "group": "deferred",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 123,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.825073299914431,
+        "B": 0.17492670008556896
+      },
+      "score": 0.825073299914431,
+      "milliseconds": 125.946791988099
+    },
+    {
+      "variant": "yes_no",
+      "id": "26-zh-busy",
+      "language": "zh",
+      "group": "deferred",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 90,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.702174383079436,
+        "B": 0.297825616920564
+      },
+      "score": 0.702174383079436,
+      "milliseconds": 102.43575001368299
+    },
+    {
+      "variant": "yes_no",
+      "id": "26-zh-idle",
+      "language": "zh",
+      "group": "deferred",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 90,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.702174383079436,
+        "B": 0.297825616920564
+      },
+      "score": 0.702174383079436,
+      "milliseconds": 104.63812501984648
+    },
+    {
+      "variant": "defined_bool",
+      "id": "26-zh-idle",
+      "language": "zh",
+      "group": "deferred",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 123,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.825073299914431,
+        "B": 0.17492670008556896
+      },
+      "score": 0.825073299914431,
+      "milliseconds": 126.0495420137886
+    },
+    {
+      "variant": "defined_bool",
+      "id": "27-en-busy",
+      "language": "en",
+      "group": "deferred",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 119,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9682441780326181,
+        "B": 0.031755821967381935
+      },
+      "score": 0.9682441780326181,
+      "milliseconds": 126.48441700730473
+    },
+    {
+      "variant": "yes_no",
+      "id": "27-en-busy",
+      "language": "en",
+      "group": "deferred",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 86,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9499144937704572,
+        "B": 0.0500855062295428
+      },
+      "score": 0.9499144937704572,
+      "milliseconds": 103.49862501607276
+    },
+    {
+      "variant": "yes_no",
+      "id": "27-en-idle",
+      "language": "en",
+      "group": "deferred",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 86,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9499144937704572,
+        "B": 0.0500855062295428
+      },
+      "score": 0.9499144937704572,
+      "milliseconds": 103.23145799338818
+    },
+    {
+      "variant": "defined_bool",
+      "id": "27-en-idle",
+      "language": "en",
+      "group": "deferred",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 119,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9682441780326181,
+        "B": 0.031755821967381935
+      },
+      "score": 0.9682441780326181,
+      "milliseconds": 124.47504099691287
+    },
+    {
+      "variant": "defined_bool",
+      "id": "27-zh-busy",
+      "language": "zh",
+      "group": "deferred",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 128,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.8934909583343486,
+        "B": 0.10650904166565149
+      },
+      "score": 0.8934909583343486,
+      "milliseconds": 127.7364160050638
+    },
+    {
+      "variant": "yes_no",
+      "id": "27-zh-busy",
+      "language": "zh",
+      "group": "deferred",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 95,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.6708210442674735,
+        "B": 0.32917895573252653
+      },
+      "score": 0.6708210442674735,
+      "milliseconds": 105.97825000877492
+    },
+    {
+      "variant": "yes_no",
+      "id": "27-zh-idle",
+      "language": "zh",
+      "group": "deferred",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 95,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.6708210442674735,
+        "B": 0.32917895573252653
+      },
+      "score": 0.6708210442674735,
+      "milliseconds": 105.07329099345952
+    },
+    {
+      "variant": "defined_bool",
+      "id": "27-zh-idle",
+      "language": "zh",
+      "group": "deferred",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 128,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.8934909583343486,
+        "B": 0.10650904166565149
+      },
+      "score": 0.8934909583343486,
+      "milliseconds": 129.39245798042975
+    },
+    {
+      "variant": "defined_bool",
+      "id": "28-en-busy",
+      "language": "en",
+      "group": "addition",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 113,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9960961224361109,
+        "B": 0.0039038775638891637
+      },
+      "score": 0.9960961224361109,
+      "milliseconds": 123.4525420004502
+    },
+    {
+      "variant": "yes_no",
+      "id": "28-en-busy",
+      "language": "en",
+      "group": "addition",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 80,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9924734319376288,
+        "B": 0.00752656806237111
+      },
+      "score": 0.9924734319376288,
+      "milliseconds": 102.2495000215713
+    },
+    {
+      "variant": "yes_no",
+      "id": "28-en-idle",
+      "language": "en",
+      "group": "addition",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 80,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9924734319376288,
+        "B": 0.00752656806237111
+      },
+      "score": 0.9924734319376288,
+      "milliseconds": 100.16587501741014
+    },
+    {
+      "variant": "defined_bool",
+      "id": "28-en-idle",
+      "language": "en",
+      "group": "addition",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 113,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9960961224361109,
+        "B": 0.0039038775638891637
+      },
+      "score": 0.9960961224361109,
+      "milliseconds": 126.94708298658952
+    },
+    {
+      "variant": "defined_bool",
+      "id": "28-zh-busy",
+      "language": "zh",
+      "group": "addition",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 117,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9879420489798059,
+        "B": 0.012057951020194196
+      },
+      "score": 0.9879420489798059,
+      "milliseconds": 124.33525000233203
+    },
+    {
+      "variant": "yes_no",
+      "id": "28-zh-busy",
+      "language": "zh",
+      "group": "addition",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 84,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9920759420092689,
+        "B": 0.00792405799073129
+      },
+      "score": 0.9920759420092689,
+      "milliseconds": 102.97874998650514
+    },
+    {
+      "variant": "yes_no",
+      "id": "28-zh-idle",
+      "language": "zh",
+      "group": "addition",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 84,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9920759420092689,
+        "B": 0.00792405799073129
+      },
+      "score": 0.9920759420092689,
+      "milliseconds": 103.44387500663288
+    },
+    {
+      "variant": "defined_bool",
+      "id": "28-zh-idle",
+      "language": "zh",
+      "group": "addition",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 117,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9879420489798059,
+        "B": 0.012057951020194196
+      },
+      "score": 0.9879420489798059,
+      "milliseconds": 144.67383301234804
+    },
+    {
+      "variant": "defined_bool",
+      "id": "29-en-busy",
+      "language": "en",
+      "group": "addition",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 114,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9991254938008501,
+        "B": 0.0008745061991499356
+      },
+      "score": 0.9991254938008501,
+      "milliseconds": 130.14920899877325
+    },
+    {
+      "variant": "yes_no",
+      "id": "29-en-busy",
+      "language": "en",
+      "group": "addition",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 81,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9947489330168171,
+        "B": 0.005251066983182934
+      },
+      "score": 0.9947489330168171,
+      "milliseconds": 106.67695800657384
+    },
+    {
+      "variant": "yes_no",
+      "id": "29-en-idle",
+      "language": "en",
+      "group": "addition",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 81,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9947489330168171,
+        "B": 0.005251066983182934
+      },
+      "score": 0.9947489330168171,
+      "milliseconds": 105.49387498758733
+    },
+    {
+      "variant": "defined_bool",
+      "id": "29-en-idle",
+      "language": "en",
+      "group": "addition",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 114,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9991254938008501,
+        "B": 0.0008745061991499356
+      },
+      "score": 0.9991254938008501,
+      "milliseconds": 123.86754099861719
+    },
+    {
+      "variant": "defined_bool",
+      "id": "29-zh-busy",
+      "language": "zh",
+      "group": "addition",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 123,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.955662592954938,
+        "B": 0.04433740704506189
+      },
+      "score": 0.955662592954938,
+      "milliseconds": 126.5524160116911
+    },
+    {
+      "variant": "yes_no",
+      "id": "29-zh-busy",
+      "language": "zh",
+      "group": "addition",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 90,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9354506358958262,
+        "B": 0.06454936410417375
+      },
+      "score": 0.9354506358958262,
+      "milliseconds": 104.87362500862218
+    },
+    {
+      "variant": "yes_no",
+      "id": "29-zh-idle",
+      "language": "zh",
+      "group": "addition",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 90,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9354506358958262,
+        "B": 0.06454936410417375
+      },
+      "score": 0.9354506358958262,
+      "milliseconds": 107.86991697386838
+    },
+    {
+      "variant": "defined_bool",
+      "id": "29-zh-idle",
+      "language": "zh",
+      "group": "addition",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 123,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.955662592954938,
+        "B": 0.04433740704506189
+      },
+      "score": 0.955662592954938,
+      "milliseconds": 125.99195798975416
+    },
+    {
+      "variant": "defined_bool",
+      "id": "30-en-busy",
+      "language": "en",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 114,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9571639070817383,
+        "B": 0.04283609291826173
+      },
+      "score": 0.9571639070817383,
+      "milliseconds": 123.193583014654
+    },
+    {
+      "variant": "yes_no",
+      "id": "30-en-busy",
+      "language": "en",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 81,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9730237489835787,
+        "B": 0.026976251016421263
+      },
+      "score": 0.9730237489835787,
+      "milliseconds": 100.08562498842366
+    },
+    {
+      "variant": "yes_no",
+      "id": "30-en-idle",
+      "language": "en",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 81,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9730237489835787,
+        "B": 0.026976251016421263
+      },
+      "score": 0.9730237489835787,
+      "milliseconds": 102.99845898407511
+    },
+    {
+      "variant": "defined_bool",
+      "id": "30-en-idle",
+      "language": "en",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 114,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9571639070817383,
+        "B": 0.04283609291826173
+      },
+      "score": 0.9571639070817383,
+      "milliseconds": 125.81875000614673
+    },
+    {
+      "variant": "defined_bool",
+      "id": "30-zh-busy",
+      "language": "zh",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 128,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.5920357200618039,
+        "B": 0.4079642799381961
+      },
+      "score": 0.5920357200618039,
+      "milliseconds": 156.85900000971742
+    },
+    {
+      "variant": "yes_no",
+      "id": "30-zh-busy",
+      "language": "zh",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 95,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.7373758448717226,
+        "B": 0.2626241551282775
+      },
+      "score": 0.7373758448717226,
+      "milliseconds": 129.9307500012219
+    },
+    {
+      "variant": "yes_no",
+      "id": "30-zh-idle",
+      "language": "zh",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 95,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.7373758448717226,
+        "B": 0.2626241551282775
+      },
+      "score": 0.7373758448717226,
+      "milliseconds": 116.91570800030604
+    },
+    {
+      "variant": "defined_bool",
+      "id": "30-zh-idle",
+      "language": "zh",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 128,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.5920357200618039,
+        "B": 0.4079642799381961
+      },
+      "score": 0.5920357200618039,
+      "milliseconds": 128.84258400299586
+    },
+    {
+      "variant": "defined_bool",
+      "id": "31-en-busy",
+      "language": "en",
+      "group": "injection",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 119,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9919500665949071,
+        "B": 0.008049933405092942
+      },
+      "score": 0.9919500665949071,
+      "milliseconds": 128.00208301632665
+    },
+    {
+      "variant": "yes_no",
+      "id": "31-en-busy",
+      "language": "en",
+      "group": "injection",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 86,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9848571267616915,
+        "B": 0.01514287323830855
+      },
+      "score": 0.9848571267616915,
+      "milliseconds": 102.50312500284053
+    },
+    {
+      "variant": "yes_no",
+      "id": "31-en-idle",
+      "language": "en",
+      "group": "injection",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 86,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9848571267616915,
+        "B": 0.01514287323830855
+      },
+      "score": 0.9848571267616915,
+      "milliseconds": 107.12687502382323
+    },
+    {
+      "variant": "defined_bool",
+      "id": "31-en-idle",
+      "language": "en",
+      "group": "injection",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 119,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9919500665949071,
+        "B": 0.008049933405092942
+      },
+      "score": 0.9919500665949071,
+      "milliseconds": 126.46358300116844
+    },
+    {
+      "variant": "defined_bool",
+      "id": "31-zh-busy",
+      "language": "zh",
+      "group": "injection",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 131,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.993802705999046,
+        "B": 0.006197294000953958
+      },
+      "score": 0.993802705999046,
+      "milliseconds": 143.16862498526461
+    },
+    {
+      "variant": "yes_no",
+      "id": "31-zh-busy",
+      "language": "zh",
+      "group": "injection",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "inputTokens": 98,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9919973690897731,
+        "B": 0.008002630910226793
+      },
+      "score": 0.9919973690897731,
+      "milliseconds": 120.28845900204033
+    },
+    {
+      "variant": "yes_no",
+      "id": "31-zh-idle",
+      "language": "zh",
+      "group": "injection",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 98,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.9919973690897731,
+        "B": 0.008002630910226793
+      },
+      "score": 0.9919973690897731,
+      "milliseconds": 124.06495801405981
+    },
+    {
+      "variant": "defined_bool",
+      "id": "31-zh-idle",
+      "language": "zh",
+      "group": "injection",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "inputTokens": 131,
+      "prediction": "false",
+      "probabilities": {
+        "A": 0.993802705999046,
+        "B": 0.006197294000953958
+      },
+      "score": 0.993802705999046,
+      "milliseconds": 144.67474998673424
+    }
+  ],
+  "sourcesUnchanged": true,
+  "loadMilliseconds": 12615.188458003104
+}

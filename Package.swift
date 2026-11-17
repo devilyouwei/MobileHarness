@@ -137,6 +137,7 @@ let package = Package(
         .library(name: "StorageDevices", targets: ["StorageDevices"]),
         .library(name: "StorageSQLite", targets: ["StorageSQLite"]),
         .library(name: "ModelKitYOLOPose", targets: ["ModelKitYOLOPose"]),
+        .library(name: "ModelKitDeepFilterNet3", targets: ["ModelKitDeepFilterNet3"]),
         .library(name: "ModelKitSilero", targets: ["ModelKitSilero"]),
         .library(name: "ModelKitKokoro", targets: ["ModelKitKokoro"]),
         .library(name: "ModelKitNemotron", targets: ["ModelKitNemotron"]),
@@ -381,7 +382,8 @@ let package = Package(
             name: "ModelKit", dependencies: [], path: "MobileHarness/ModelKit",
             exclude: [
                 "README.md", "ModelContainer.swift", "Language/README.md", "Language/JEV/README.md",
-                "Language/JEV/D3Decision.swift",
+                "Language/JEV/D3Decision.swift", "Language/JEV/VelaDecision.swift",
+                "Speech/Enhancement/README.md", "Speech/Enhancement/DeepFilterNet3",
                 "Speech/README.md", "Speech/ASR/README.md", "Speech/TTS/README.md", "Speech/VAD/README.md",
                 "Language/LLM/Apple", "Language/LLM/Gemma4", "Language/LLM/OpenAI", "Language/LLM/README.md",
                 "Support/Backends",
@@ -395,7 +397,8 @@ let package = Package(
             name: "ModelKitD3",
             dependencies: ["ModelKit", "ModelKitCoreAI", .product(name: "Tokenizers", package: "swift-transformers")],
             path: "MobileHarness/ModelKit/Language/JEV",
-            exclude: ["README.md", "DecisionCapability.swift"], sources: ["D3Decision.swift"]),
+            exclude: ["README.md", "DecisionCapability.swift", "ChatDecision.swift"],
+            sources: ["D3Decision.swift", "VelaDecision.swift"]),
         .target(
             name: "ModelKitOpenAI", dependencies: ["ModelKit"],
             path: "MobileHarness/ModelKit/Language/LLM/OpenAI", exclude: ["README.md"]),
@@ -408,7 +411,7 @@ let package = Package(
         .target(
             name: "ModelKitDefaults",
             dependencies: [
-                "ModelKit", "ModelKitRuntime", "ModelKitNemotron", "ModelKitSilero",
+                "ModelKit", "ModelKitRuntime", "ModelKitNemotron", "ModelKitSilero", "ModelKitDeepFilterNet3",
                 "ModelKitMossNano", "ModelKitYOLOPose", "ModelKitOpenAI", "ModelKitAppleSpeech",
                 "ModelKitEnergy", "ModelKitD3", "ModelKitAppleLLM",
             ] + localChatDependencies,
@@ -449,7 +452,7 @@ let package = Package(
                 "Speech/ASR/README.md", "Speech/TTS/README.md", "Speech/ASR/Apple/README.md",
                 "Speech/TTS/Apple/README.md", "Speech/ASR/SpeechRecognitionCapability.swift",
                 "Speech/TTS/SpeechSynthesisCapability.swift", "Speech/TTS/Kokoro", "Speech/TTS/MossNano",
-                "Speech/ASR/Nemotron", "Speech/VAD",
+                "Speech/ASR/Nemotron", "Speech/VAD", "Speech/Enhancement",
             ],
             sources: ["Speech/ASR/Apple", "Speech/TTS/Apple", "Support/Speech/Apple"]),
         .target(
@@ -461,12 +464,16 @@ let package = Package(
             exclude: ["README.md"]),
         .target(name: "ModelKitCoreML", path: "MobileHarness/ModelKit/Support/Backends/CoreML"),
         .target(
+            name: "ModelKitDeepFilterNet3", dependencies: ["ModelKit", "ModelKitCoreML"],
+            path: "MobileHarness/ModelKit/Speech/Enhancement/DeepFilterNet3", exclude: ["README.md"]),
+        .target(
             name: "ModelKitSilero", dependencies: ["ModelKit", "ModelKitCoreML"],
             path: "MobileHarness/ModelKit/Speech/VAD/Silero", exclude: ["README.md"]),
         .testTarget(
             name: "SileroTests",
             dependencies: [
-                "ModelKit", "ModelKitSilero", "ModelKitNemotron", "ModelKitKokoro", "Agents", "PlatformKit",
+                "ModelKit", "ModelKitDeepFilterNet3", "ModelKitSilero", "ModelKitNemotron", "ModelKitKokoro", "Agents",
+                "PlatformKit",
             ], exclude: ["README.md"]),
         .target(
             name: "ModelKitCoreAI", path: "MobileHarness/ModelKit/Support/Backends/CoreAI", exclude: ["README.md"]),

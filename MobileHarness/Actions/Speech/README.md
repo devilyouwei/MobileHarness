@@ -59,3 +59,5 @@ Assistant 的语音子能力预留并生产 AudioCache 句柄；Speech.Playback.
 [`Support/`](Support/)
 
 [SpeechCapabilities.swift](Support/SpeechCapabilities.swift) 定义播放和聆听端口。内部策略用 `updateListening` 应用，公开意图用 `setListening` 提交，不接受 revision 或 paused。未提供公开控制时抛出 `listeningUnavailable`。[SpeechTypes.swift](../Support/Contracts/SpeechTypes.swift) 定义语音错误与反馈值。
+
+播放执行向宿主传递 audioID、active 与原生开始/结束的 ContinuousClock.Instant；首块 schedule 与流排空由 Listening/VoiceNativeEffects 观测并加入通知清理。播放期起声策略由 Agents/SpeechPerception 拥有，本域保持全双工硬件运行。

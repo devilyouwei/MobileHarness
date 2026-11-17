@@ -44,3 +44,7 @@ Apple's transcriber/detector share analyzer state; normal detector activity call
 ## Related design
 
 [Parent design](../README.md) · [ASR](ASR/README.md) · [Shared support](../Support/Speech/README.md) · [TTS](TTS/README.md) · [VAD](VAD/README.md)
+
+## Enhancement
+
+[Enhancement](Enhancement/README.md) provides independent, bounded 48 kHz PCM utterance denoising through DeepFilterNet3 and the shared CoreML backend. It remains independent of ASR/TTS/VAD selection. App optionally preloads installed artifacts; SpeechPerception applies the window adapter before VAD/ASR when enabled.

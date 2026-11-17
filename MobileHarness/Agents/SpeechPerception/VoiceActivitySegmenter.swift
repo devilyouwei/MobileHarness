@@ -19,13 +19,15 @@ public actor VoiceActivitySegmenter {
     public init(session: any VoiceActivitySession) { self.session = session }
 
     public func process(
-        _ frame: AudioFrame, threshold: Float = 0.5, useShortEndpoint: Bool = false
+        _ frame: AudioFrame, threshold: Float = 0.65, onsetWindows: Int = 8, useShortEndpoint: Bool = false,
+        onsetThreshold: Float? = nil
     ) async throws -> VoiceSegmentation {
         guard !closed else { throw CapabilityError.sessionClosed }
         guard !busy else { throw CapabilityError.inputBusy }
         guard frame.format.sampleRate == 16000, frame.format.channels == 1, frame.format.encoding == .float32,
             frame.sampleCount <= 16000, pending.count + frame.sampleCount <= 32000,
-            threshold.isFinite, (0.05...0.95).contains(threshold)
+            threshold.isFinite, (0.05...0.95).contains(threshold), (1...16).contains(onsetWindows),
+            onsetThreshold.map({ $0.isFinite && (0.05...0.95).contains($0) }) ?? true
         else { throw CapabilityError.invalidRequest("Invalid VAD segmentation input") }
         busy = true
         defer { busy = false }
@@ -50,7 +52,8 @@ public actor VoiceActivitySegmenter {
                     data: slice.withUnsafeBytes { Data($0) }, format: frame.format,
                     sequence: UInt64(position), timestamp: Double(position) / 16000)
                 _ = policy.consume(
-                    window, probability: score.probability, threshold: threshold, useShortEndpoint: useShortEndpoint)
+                    window, probability: score.probability, threshold: threshold, onsetWindows: onsetWindows,
+                    useShortEndpoint: useShortEndpoint, onsetThreshold: onsetThreshold)
                 streamEvents += policy.streamEvents
                 consumed += score.sampleCount
                 position += Int64(score.sampleCount)

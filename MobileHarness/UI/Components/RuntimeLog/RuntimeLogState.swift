@@ -144,7 +144,9 @@ public final class RuntimeLogState: RuntimeLogWriting {
     public var visibleDecisions: [DecisionLogItem] {
         decisions.reversed().filter {
             matchesSource([$0.source])
-                && matchesStatus(active: false, success: $0.modelResult != nil, failure: $0.modelResult == nil)
+                && matchesStatus(
+                    active: false, success: $0.booleanResult != nil || $0.modelResult != nil,
+                    failure: $0.booleanResult == nil && $0.modelResult == nil)
         }.sorted { $0.time > $1.time }
     }
 
@@ -279,6 +281,7 @@ public struct DecisionLogItem: Identifiable, Sendable, Equatable {
         case local = "Local"
         case cloud = "Cloud Decision"
         case fallback = "Fallback"
+        case failed = "Failed"
     }
     public enum Disposition: String, Sendable {
         case enqueue, discard, interrupt
@@ -293,13 +296,16 @@ public struct DecisionLogItem: Identifiable, Sendable, Equatable {
     public let modelName: String?
     public let modelResult: Disposition?
     public let adoptedResult: Disposition
+    public let booleanResult: Bool?
+    public let signalStatus: String?
     public let reason: String?
     public let requests: [String]
 
     public init(
         id: String, source: String, inputText: String, time: Date = .now, duration: Duration, route: Route,
         modelResult: Disposition?,
-        adoptedResult: Disposition, reason: String? = nil, requests: [String], modelName: String? = nil
+        adoptedResult: Disposition, booleanResult: Bool? = nil, signalStatus: String? = nil, reason: String? = nil,
+        requests: [String], modelName: String? = nil
     ) {
         self.id = id
         self.source = String(source.prefix(64))
@@ -309,6 +315,8 @@ public struct DecisionLogItem: Identifiable, Sendable, Equatable {
         self.route = route
         self.modelName = modelName
         self.modelResult = modelResult
+        self.booleanResult = booleanResult
+        self.signalStatus = signalStatus
         self.adoptedResult = adoptedResult
         self.reason = reason.map { String($0.prefix(256)) }
         self.requests = requests

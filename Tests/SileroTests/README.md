@@ -23,3 +23,7 @@ SDK boundary tests use caller-selected resampler rates and distinct model/storag
 - Real-model tests require explicit environment flags and local fixtures; default test success is not device acceptance.
 
 - Real microphone/camera acceptance remains opt-in and device-specific.
+
+DeepFilterTests additionally covers the standalone enhancement DSP roundtrip, malformed auxiliary archives and input validation. Set `DEEPFILTER_MODEL_ROOT` to a provisioned DeepFilterNet3 directory to run real Core ML smoke cases; absence of this variable does not validate real model inference.
+
+WindowedEnhancementTests covers seam gain, exact sample count/timestamps, bounded input, discontinuity rejection, failure/reset and cancellation of in-flight results. SpeechEnhancementWorkflowTests in IntegrationTests verifies that VAD and ASR receive the same processed PCM and that utterance boundaries retain capture-scoped history. Real windowed timing includes DSP and tensor transfer after explicit preload; it is a host smoke measurement, not iPhone acoustic acceptance.

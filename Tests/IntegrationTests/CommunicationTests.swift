@@ -287,7 +287,7 @@ extension LiveRuntimeTests {
         Set(assistant.inputs.map(\.contract))
             == [
                 "agent.task.response", "runtime.action.result", "runtime.tool.result", "runtime.round.result",
-                "runtime.message.receipt",
+                "runtime.message.receipt", "assistant.interrupt",
             ])
     #expect(Set(assistant.sends.map(\.target)) == ["writer"])
     #expect(Set(assistant.sends.map(\.contract)) == commands)

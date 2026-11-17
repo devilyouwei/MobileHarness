@@ -409,3 +409,7 @@ extension CapabilityKey where Value == any DecisionCapability {
 extension CapabilityKey where Value == any PoseCapability {
     public static var pose: Self { Self(kind: .pose, select: { $0.pose }) }
 }
+
+extension CapabilityKey where Value == any SpeechEnhancementCapability {
+    public static var enhancement: Self { Self(kind: .enhancement, select: { $0.enhancement }) }
+}

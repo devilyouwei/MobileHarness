@@ -49,3 +49,9 @@ D3 Edge、D3 Lite 和 Gemma 在 Agent Models 共用下载源，各自管理下�
 ResourcePresentationAdapter 在校验根接纳与会话后，将小于当前 refreshGeneration 的有效刷新/错误呈现视为已被替代并正常结束；不写 UI、不 acknowledge，不触发二次失败。当前序号仍应用实际快照或错误；无效/未来序号、外来会话和根关闭继续拒绝。Provider 保存事务不受页面刷新替代影响。
 
 未存储偏好时，ModelResourcePreferencesService 按系统首选语言初始化下载源：zh（含简繁体）为 HF Mirror (China)，其他语言为 Hugging Face。已保存 endpoint 优先于系统语言。语言读取可注入，独立于应用界面语言。下载前提交当前源，ModelResourcesClient 将源值传入下载请求；后续偏好编辑不修改在途任务。
+
+Resource preferences also persist vadOnsetWindows (1…16) and vadThreshold (0.05…0.95 in 0.05 increments). Missing fields decode as 8/0.65; validation rejects invalid ranges and steps. Speech detection edits restore the confirmed source before saving so unfinished domain edits are excluded. A read-only composition port supplies saved settings to perception; persistence errors propagate.
+
+## Speech enhancement preference
+
+`useSpeechEnhancement` is independent of the custom-ASR switch and defaults false when absent in stored records. Enabling requires an installed `deepfilternet3` artifact; restore disables and persists it after removal. The workflow preserves confirmed state on failed saves and does not save unfinished endpoint edits when toggling denoising. Existing bounded resource commands handle download/progress/cancel/delete; removal quiesces the voice owner before artifact deletion. The read-only enablement closure crosses App composition into Agents; Actions never processes PCM.

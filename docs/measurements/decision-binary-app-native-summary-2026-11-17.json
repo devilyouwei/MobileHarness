@@ -1,0 +1,68 @@
+{
+  "environment": "macOS-27.2.1-arm64-arm-64bit",
+  "scope": "Mac Swift native debug build; 28 cases per model, no device quality claim; three warmups; noul plus equivalent choice per case",
+  "groups": [
+    {
+      "model": "d3-edge",
+      "language": "en",
+      "count": 14,
+      "tp": 4,
+      "fp": 0,
+      "fn": 1,
+      "tn": 9,
+      "accuracy": 0.9285714285714286,
+      "recall": 0.8,
+      "falsePositiveRate": 0.0,
+      "p50ms": 267.045875,
+      "p95ms": 332.202875
+    },
+    {
+      "model": "d3-edge",
+      "language": "zh-Hans",
+      "count": 14,
+      "tp": 4,
+      "fp": 0,
+      "fn": 1,
+      "tn": 9,
+      "accuracy": 0.9285714285714286,
+      "recall": 0.8,
+      "falsePositiveRate": 0.0,
+      "p50ms": 326.905604,
+      "p95ms": 389.592833
+    },
+    {
+      "model": "vela3-fast",
+      "language": "en",
+      "count": 14,
+      "tp": 4,
+      "fp": 0,
+      "fn": 1,
+      "tn": 9,
+      "accuracy": 0.9285714285714286,
+      "recall": 0.8,
+      "falsePositiveRate": 0.0,
+      "p50ms": 221.66443800000002,
+      "p95ms": 261.650083
+    },
+    {
+      "model": "vela3-fast",
+      "language": "zh-Hans",
+      "count": 14,
+      "tp": 2,
+      "fp": 0,
+      "fn": 3,
+      "tn": 9,
+      "accuracy": 0.7857142857142857,
+      "recall": 0.4,
+      "falsePositiveRate": 0.0,
+      "p50ms": 397.0156045,
+      "p95ms": 433.780917
+    }
+  ],
+  "source_sha256": {
+    "docs/measurements/decision-binary-app-native-2026-11-17.json": "67d1a5a7b9c605b03ebfd661294b3932a1b95d397859d155683a04cc9b0d3ece",
+    "Tests/IntegrationTests/DecisionBinaryNativeTests.swift": "012e5ac1a65ef30ddf12a4183c9fd8da8616eb16c2c4445e177a27d612d86548",
+    "MobileHarness/Resources/Agents/Assistant/InputDecision.json": "b098e266bc5d9caf97c83e7b8a6dd333db06619e5adef5e6ec0c6925ac484f54",
+    "MobileHarness/Resources/Agents/Assistant/InputDecision.zh-Hans.json": "69a4a766a955ecf94d9a07f75470da256b26a161c1fbb4d141f27f8723d07897"
+  }
+}

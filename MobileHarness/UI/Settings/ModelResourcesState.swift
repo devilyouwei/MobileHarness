@@ -48,11 +48,11 @@ public enum ModelResourceGroup: String, Sendable, CaseIterable {
     }
     public var modelIDs: Set<String> {
         switch self {
-        case .recognition: ["nemotron", "silero"]
+        case .recognition: ["nemotron", "silero", "deepfilternet3"]
         case .synthesis: ["moss-tts-nano"]
         case .language: ["gemma4-e2b"]
         case .vision: ["yolo26n-pose"]
-        case .decision: ["d3-edge", "d3-lite"]
+        case .decision: ["d3-edge", "d3-lite", "vela3-fast"]
         }
     }
     public var installationMessage: String {
@@ -61,21 +61,28 @@ public enum ModelResourceGroup: String, Sendable, CaseIterable {
         case .synthesis: "Download MOSS first."
         case .language: "Download Gemma 4 E2B first."
         case .vision: "Download and install the YOLO pose model first."
-        case .decision: "Download D3 Edge or D3 Lite before selecting the local model."
+        case .decision: "Download the selected Decision model before using it."
         }
     }
 }
 public struct ModelResourceSourceDraft: Codable, Sendable {
     public var endpoint: String
     public var allowsCellular: Bool
+    public var useSpeechEnhancement: Bool
     public var useCustomRecognition: Bool
     public var useCustomSynthesis: Bool
+    public var vadOnsetWindows: Int
+    public var vadThreshold: Double
     public var useLocalDecision: Bool
     private enum CodingKeys: String, CodingKey {
-        case endpoint, allowsCellular, useCustomRecognition, useCustomSynthesis, useLocalDecision
+        case endpoint, allowsCellular, useCustomRecognition, useCustomSynthesis, useLocalDecision, vadOnsetWindows,
+            vadThreshold, useSpeechEnhancement
     }
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
+        useSpeechEnhancement = try values.decodeIfPresent(Bool.self, forKey: .useSpeechEnhancement) ?? false
+        vadOnsetWindows = try values.decodeIfPresent(Int.self, forKey: .vadOnsetWindows) ?? 8
+        vadThreshold = try values.decodeIfPresent(Double.self, forKey: .vadThreshold) ?? 0.65
         endpoint = try values.decode(String.self, forKey: .endpoint)
         allowsCellular = try values.decode(Bool.self, forKey: .allowsCellular)
         useCustomRecognition = try values.decode(Bool.self, forKey: .useCustomRecognition)
@@ -84,8 +91,12 @@ public struct ModelResourceSourceDraft: Codable, Sendable {
     }
     public init(
         endpoint: String = "https://huggingface.co", allowsCellular: Bool = true,
-        useCustomRecognition: Bool = false, useCustomSynthesis: Bool = false, useLocalDecision: Bool = false
+        useCustomRecognition: Bool = false, useCustomSynthesis: Bool = false, useLocalDecision: Bool = false,
+        vadOnsetWindows: Int = 8, vadThreshold: Double = 0.65, useSpeechEnhancement: Bool = false
     ) {
+        self.useSpeechEnhancement = useSpeechEnhancement
+        self.vadOnsetWindows = vadOnsetWindows
+        self.vadThreshold = vadThreshold
         self.endpoint = endpoint
         self.allowsCellular = allowsCellular
         self.useCustomRecognition = useCustomRecognition
@@ -116,6 +127,8 @@ public protocol ModelResourcesControlling: AnyObject {
     func refresh() async
     func saveSource() async
     func saveDownloadSource() async -> Bool
+    func setSpeechEnhancement(enabled: Bool) async
+    func setSpeechDetection(windows: Int, threshold: Double) async
     func setCustomModel(_ group: ModelResourceGroup, enabled: Bool) async
     func perform(_ id: String, operation: ModelResourceOperation) async
 }
@@ -199,8 +212,12 @@ public final class ModelResourcesState {
         switch update {
         case .sourceEndpoint(let value): source.endpoint = value
         case .sourceAllowsCellular(let value): source.allowsCellular = value
+        case .sourceUseSpeechEnhancement(let value): source.useSpeechEnhancement = value
         case .sourceUseCustomRecognition(let value): source.useCustomRecognition = value
         case .sourceUseCustomSynthesis(let value): source.useCustomSynthesis = value
+        case .speechDetection(let windows, let threshold):
+            source.vadOnsetWindows = windows
+            source.vadThreshold = threshold
         case .decisionStatus(let value): decisionStatus = value
         case .source(let value): source = value
         case .items(let value): items = value
@@ -221,6 +238,8 @@ public enum ModelResourcesUpdate {
     case sourceAllowsCellular(Bool)
     case sourceUseCustomRecognition(Bool)
     case sourceUseCustomSynthesis(Bool)
+    case sourceUseSpeechEnhancement(Bool)
+    case speechDetection(windows: Int, threshold: Double)
     case decisionStatus(String)
     case source(ModelResourceSourceDraft)
     case items([ModelResourceItem])

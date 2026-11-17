@@ -28,6 +28,13 @@ public enum AgentContracts {
             try CommunicationContracts(
                 additional: AgentTaskSignal.contracts + [
                     CommunicationContract(
+                        name: AssistantInterrupt.contract, kind: .observation, maximumBytes: 1024,
+                        validateMessage: { message in
+                            guard message.content(as: AssistantInterrupt.self) != nil else {
+                                throw CommunicationError.invalidPayload
+                            }
+                        }),
+                    CommunicationContract(
                         name: AgentTaskRequest.contract, kind: .observation, maximumBytes: 32768, startsNewWork: true,
                         validateMessage: { message in
                             guard let value = message.content(as: AgentTaskRequest.self) else {

@@ -432,8 +432,7 @@ func fullDuplexInterruptedReplyPreservesPhotographyTaskAndPersistsSummary() asyn
         repository: context, messages: database.assistantMessages, tasks: database.assistantTasks,
         conversations: database.assistantConversations, logs: database.logs)
     let classifier = DecisionCloudFixture(events: [
-        .toolCall(.init(id: "classification", name: "classify_input", argumentsJSON: #"{"action":"interrupt"}"#)),
-        .finished(.toolCalls),
+        .text("true"), .finished(.stop),
     ])
     let decision = AssistantInputDecision(local: UnavailableDecision(), selection: { false }, cloud: { classifier })
     let agent = try AssistantAgent(
@@ -488,7 +487,7 @@ func fullDuplexInterruptedReplyPreservesPhotographyTaskAndPersistsSummary() asyn
     let old = try #require(turns.first { $0.id == "photo-old-reply" })
     #expect(old.error == "CancellationError()")
     let end = try #require(turns.first { $0.id == "photo-end" })
-    #expect(end.coordination?.decision == "interrupt")
+    #expect(end.coordination?.decision == "true")
     #expect(end.modelRequests?.first?.historyTaskID == task)
     #expect(end.generationRounds?.last?.resultsJSON.contains("Camera.Capture.close") == true)
 

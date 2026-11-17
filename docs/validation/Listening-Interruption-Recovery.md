@@ -126,3 +126,13 @@ AppWorkflow 在前述失败后持续无进展，终止本轮脚本及测试子�
 最终 build-ios.sh 五目标全部通过（`/tmp/mobileharness-full-duplex-ios.log`）；git diff --check通过。完整check.sh架构、8项Python、格式通过，但其他集成/Writer/Web存在失败；AppWorkflow在缺失injected Action declarations等错误后持续停滞，终止本轮脚本和子进程（143），后续原生阶段未运行，不能视为全量通过（`/tmp/mobileharness-full-duplex-check.log`）。截至收尾，新版诊断日志仅确认应用启动，没有新麦克风采集记录，手机和AirPods本轮声学效果均尚未实测。
 
 后续读取本轮真机诊断日志确认：输入/输出均为BluetoothHFP，input/output Voice Processing均为true、bypass=false；首次配置停机后保留I/O重试成功收到首帧。用户仍报告环境噪声疑似误识别，故只确认蓝牙采集和处理器启用，不宣称误字幕已消除；系统麦克风模式与手机内置路线本轮仍未取得实测状态。
+
+## 2026-11-16 可配置起声窗口与阈值
+
+Speech Recognition 页面新增持久化滑块：起声 1…16 个 32 ms 窗口，step 1、默认 8；概率 0.05…0.95，step 0.05、默认 0.65。释放滑块后保存，失败恢复已确认值；未完成的下载源草稿不随之提交或覆盖。旧配置缺字段采用新默认，非法范围/步进拒绝。实际聆听通过注入的只读闭包读取配置，VAD session 使用固定快照；全双工与句尾策略保持不变。长起声候选的前滚缓存同步扩展。
+
+验证：最终定向测试 9 项通过（含参数化用例），覆盖 1/8/16 起声、阈值边界、句首保留、旧文档解码、UI/持久化往返、ApplicationControl 结果字段校验、保存失败回退、未完成下载源草稿以及原有语音路由。日志 `/tmp/vad-targeted-final.log`。`./scripts/build-ios.sh` 五个目标全部通过，日志 `/tmp/vad-ios-final.log`。`git diff --check` 通过。
+
+`./scripts/check.sh` 最终运行的架构、8 个 Python 测试与格式检查通过；IntegrationTests 的 1189 项中 NexArm 的 slowTrackingDispatchExecutesOnlyTheNewestPendingTarget 断言失败。AppWorkflowTests 的 Writer/Web 存在 injected Action declarations 缺失失败，与此前记录一致。该阶段随后超过 80 秒无输出，已终止本次进程树；后续独立原生 runtime 阶段未完成，不宣称全量通过。日志 `/tmp/vad-check-final.log`。本轮未安装真机、未进行原生页面操作或手机/AirPods 声学验收；参数调节不代表回声根因已解决。
+
+随后按用户要求完成真机交付：MobileHarness Debug 真机构建成功（`/tmp/vad-device-build.log`），devicectl 确认已安装到连接的 iPhone 17 Pro，并成功启动 `dev.mobileharness.app`。安装/启动成功不代表已验证滑块原生交互或 AirPods/手机的误字幕与插话效果。

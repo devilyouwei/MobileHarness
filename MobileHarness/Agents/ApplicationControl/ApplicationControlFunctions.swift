@@ -40,7 +40,7 @@ enum ApplicationControlFunctions {
     static let restoration = InternalTool(path: "System.ModelResources.restoreSource")
     static let saving = InternalTool(
         path: "System.ModelResources.saveSource", required: ["endpoint", "allowsCellular", "recognition", "synthesis"],
-        optional: ["decision"])
+        optional: ["decision", "vadOnsetWindows", "vadThreshold", "enhancement"])
     static let speechBinding = InternalTool(
         path: "System.ModelResources.configureSpeech", required: ["recognition", "synthesis"])
 

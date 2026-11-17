@@ -461,14 +461,24 @@ import StorageFiles
                     try await speech.configure(synthesis: synthesis, store: store)
                 },
                 stopSpeech: { [interaction] in await interaction.speech?.endSession() },
-                playbackChanged: { [interaction] id, active in
-                    await interaction.speech?.playbackChanged(audioID: id, active: active)
+                playbackChanged: { [interaction] id, active, time in
+                    await interaction.speech?.playbackChanged(audioID: id, active: active, at: time)
                 },
-                makePerception: { [interactionSessionID, uiHome, contextScope, assistant = interaction.agent] in
+                makePerception: {
+                    [
+                        interactionSessionID, uiHome, contextScope, assistant = interaction.agent,
+                        speechOutput = interaction.speech,
+                        detection = business.speechDetection, enhancementEnabled = business.speechEnhancementEnabled
+                    ] in
                     try SpeechPerceptionAgent(
-                        recognition: $0, vad: $1, sessionID: $2, interactionSessionID: interactionSessionID,
+                        recognition: $0, vad: $1, enhancement: $5, speechEnhancementEnabled: enhancementEnabled,
+                        sessionID: $2, interactionSessionID: interactionSessionID,
                         residentListening: true, uiHome: uiHome, microphoneInput: $3, microphoneSpectrum: $4,
                         speechEndpointActivity: { await assistant.speechEndpointActivity(acknowledging: $0) },
+                        speechPlayback: {
+                            await speechOutput?.playbackSnapshot(sessionID: interactionSessionID) ?? .init()
+                        },
+                        speechDetection: detection,
                         context: try Self.context(
                             .speechPerception, SpeechPerceptionContextState(), scope: contextScope))
                 })

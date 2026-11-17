@@ -129,3 +129,57 @@ import Testing
     }
     try await root.stop()
 }
+
+@Test @MainActor func optionalLocalPreparationSkipsUnselectedAndPropagatesSelectionFailure() async throws {
+    let root = ModelContainer(resources: URL.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+    let empty = root.localModelPreparationStep(id: "decision") { nil }
+    #expect(try await empty.isReady())
+    try await empty.prepare { _ in Issue.record("Unselected model must not report loading") }
+    let failed = root.localModelPreparationStep(id: "decision") { throw CancellationError() }
+    await #expect(throws: CancellationError.self) { try await failed.isReady() }
+    await #expect(throws: CancellationError.self) { try await failed.prepare { _ in } }
+    let unknown = root.localModelPreparationStep(id: "decision") { "unknown" }
+    await #expect(throws: CapabilityError.self) { try await unknown.isReady() }
+}
+
+@Test @MainActor
+func localPreparationUsesSelectedResourceAndRejectsStoppedScope() async throws {
+    let root = ModelContainer(resources: URL.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+    try await root.start()
+    for id in ["d3-edge", "d3-lite", "gemma4-e2b", "apple-system"] {
+        let step = root.localModelPreparationStep(id: "decision") { id }
+        #expect(step.id == "decision")
+        #expect(try await !step.isReady())
+    }
+    let selected = root.localModelPreparationStep(id: "decision") { "d3-lite" }
+    try await root.stop()
+    await #expect(throws: InferenceAdmissionError.self) { try await selected.isReady() }
+    await #expect(throws: InferenceAdmissionError.self) { try await selected.prepare { _ in } }
+}
+
+@Test @MainActor func deepFilterDefaultIsLazyAndExplicit() async throws {
+    guard #available(macOS 27, iOS 27, *) else { return }
+    let root = ModelContainer(resources: URL(fileURLWithPath: "/missing/deepfilter-default"))
+    try await root.start()
+    try await root.setForeground(true)
+    #expect(try await root.speech.status(.enhancement) == .registered)
+    #expect(await root.speech.enhancement.availability != .available)
+    await #expect(throws: (any Error).self) { try await root.speech.load(.enhancement) }
+    try await root.speech.unload(.enhancement)
+    try await root.stop()
+}
+
+@Test @MainActor func speechEnhancementOptionalPreparationSkipsMissingSelection() async throws {
+    guard #available(macOS 27, iOS 27, *) else { return }
+    let root = ModelContainer(resources: URL(fileURLWithPath: "/missing/enhancement-preload"))
+    try await root.start()
+    try await root.setForeground(true)
+    let absent = root.localModelPreparationStep(id: "enhancement") { nil }
+    #expect(try await absent.isReady())
+    try await absent.prepare { _ in Issue.record("Missing optional model must not load") }
+    #expect(try await root.speech.status(.enhancement) == .registered)
+    let selected = root.localModelPreparationStep(id: "enhancement") { "deepfilternet3" }
+    #expect(try await !selected.isReady())
+    await #expect(throws: (any Error).self) { try await selected.prepare { _ in } }
+    try await root.stop()
+}

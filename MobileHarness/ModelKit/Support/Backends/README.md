@@ -21,3 +21,7 @@ Generic execution is separated from model-specific implementations.
 [`CoreML/`](CoreML/)
 
 [CoreMLGraph.swift](CoreML/CoreMLGraph.swift) owns actor-isolated loading and synchronous prediction for `ModelKitCoreML`. It validates input names, shape, count and finite values, copies multi-array outputs with their native shape and caps each output at 1,048,576 elements. Native Float16 values cross the Swift interface as Float. Providers choose function and compute units explicitly. Silero uses CPU-only and owns its recurrent state. Cancellation is checked around the native prediction, which the provider joins before releasing the lease.
+
+CoreMLGraph accepts fixed, enumerated or ranged input shapes declared by Core ML, with positive dimensions and at most 1,048,576 elements per tensor. It allocates the requested validated shape; providers still validate model-specific output shapes.
+
+Contiguous Float16/Float32 tensors use typed buffer transfers without per-element NSNumber allocation. Shape/stride checks select this path; strided views and other data types retain indexed conversion semantics. This optimization does not change shape, finiteness, cancellation or resource ownership contracts.

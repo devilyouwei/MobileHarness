@@ -13,3 +13,6 @@ Gateway 调度通过 App 注入的快照回调供给 Action 日志。生产者�
 首页入口的无障碍标签与面板标题随应用语言显示“Execution Log／执行日志”，通过环境 locale 与共享 AppLanguage 文案解析即时刷新。Action 摘要及列表使用注册函数路径 `Domain.Module.function`。列表按真实 Channel、来源、状态及关联任务筛选，Channel 彩色标签显示通道，状态图标及颜色由执行阶段决定。展开 Action 可查看并复制实参和结果。参数按键显示，每个值最多 2048 UTF-8 字节，凭据字段隐藏。值、活动回执和结构化报告使用实际执行完成值，输出预览最多 16384 UTF-8 字节，超限标记截断。
 
 Decision 标题将 Local／Cloud Decision／Fallback 与生产者提供的模型身份分别显示，不将所有本地模型命名为 D3。每条记录始终标注“最终采用结果”和“模型结果”；失败显示“无有效结果”，不伪造模型输出。两者不同的原因由 Assistant 提供，UI 不推断采用策略或重新解码结果。
+
+
+DecisionLogItem 可携带 booleanResult 和 signalStatus；新记录分别展示原始布尔值和打断信号执行状态。旧 disposition 字段仅保留历史展示兼容。错误不显示为 false。

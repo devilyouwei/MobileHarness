@@ -7,14 +7,21 @@ import StorageFiles
 public struct ModelResourcePreferences: Codable, Sendable, Equatable {
     public var endpoint: String
     public var allowsCellular: Bool
+    public var useSpeechEnhancement: Bool
     public var useCustomRecognition: Bool
     public var useCustomSynthesis: Bool
+    public var vadOnsetWindows: Int
+    public var vadThreshold: Double
     public var useLocalDecision: Bool
     private enum CodingKeys: String, CodingKey {
-        case endpoint, allowsCellular, useCustomRecognition, useCustomSynthesis, useLocalDecision
+        case endpoint, allowsCellular, useCustomRecognition, useCustomSynthesis, useLocalDecision, vadOnsetWindows,
+            vadThreshold, useSpeechEnhancement
     }
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
+        useSpeechEnhancement = try values.decodeIfPresent(Bool.self, forKey: .useSpeechEnhancement) ?? false
+        vadOnsetWindows = try values.decodeIfPresent(Int.self, forKey: .vadOnsetWindows) ?? 8
+        vadThreshold = try values.decodeIfPresent(Double.self, forKey: .vadThreshold) ?? 0.65
         endpoint = try values.decode(String.self, forKey: .endpoint)
         allowsCellular = try values.decode(Bool.self, forKey: .allowsCellular)
         useCustomRecognition = try values.decode(Bool.self, forKey: .useCustomRecognition)
@@ -23,8 +30,12 @@ public struct ModelResourcePreferences: Codable, Sendable, Equatable {
     }
     public init(
         endpoint: String = "https://huggingface.co", allowsCellular: Bool = true,
-        useCustomRecognition: Bool = false, useCustomSynthesis: Bool = false, useLocalDecision: Bool = false
+        useCustomRecognition: Bool = false, useCustomSynthesis: Bool = false, useLocalDecision: Bool = false,
+        vadOnsetWindows: Int = 8, vadThreshold: Double = 0.65, useSpeechEnhancement: Bool = false
     ) {
+        self.useSpeechEnhancement = useSpeechEnhancement
+        self.vadOnsetWindows = vadOnsetWindows
+        self.vadThreshold = vadThreshold
         self.endpoint = endpoint
         self.allowsCellular = allowsCellular
         self.useCustomRecognition = useCustomRecognition
@@ -38,11 +49,13 @@ public struct ModelResourcePreferences: Codable, Sendable, Equatable {
     }
 }
 public enum ModelResourcePreferenceError: Error, Sendable, CustomStringConvertible, ActionExecutionFailureProviding {
-    case invalidSource, recognitionRequired, synthesisRequired
+    case invalidSource, invalidDetection, recognitionRequired, synthesisRequired, enhancementRequired
     public var executionFailureCode: ActionExecutionFailureCode { .init(rawValue: description) }
     public var description: String {
         switch self {
+        case .enhancementRequired: "Download DeepFilterNet3 before enabling noise suppression."
         case .invalidSource: "resource.source.invalid"
+        case .invalidDetection: "Invalid speech detection settings."
         case .recognitionRequired: "resource.selection.recognition"
         case .synthesisRequired: "resource.selection.synthesis"
         }
@@ -93,12 +106,14 @@ public actor ModelResourcePreferencesService: ModelResourcePreferencesCapability
                 endpoint: isChinese ? "https://hf-mirror.com" : "https://huggingface.co")
         var valid = try await validate(value)
         let ids = try await installed()
+        if !ids.contains("deepfilternet3") { valid.useSpeechEnhancement = false }
         if !ResourceModelGroup.recognition.isInstalled(in: ids) { valid.useCustomRecognition = false }
         if !ResourceModelGroup.synthesis.isInstalled(in: ids) { valid.useCustomSynthesis = false }
         try Task.checkCancellation()
         // Persist actual preference changes; endpoint canonicalization alone does not force a write.
         if valid.allowsCellular != value.allowsCellular || valid.useCustomRecognition != value.useCustomRecognition
             || valid.useCustomSynthesis != value.useCustomSynthesis
+            || valid.useSpeechEnhancement != value.useSpeechEnhancement
         {
             try await persistence().save(valid, expecting: record?.revision)
         }
@@ -111,6 +126,9 @@ public actor ModelResourcePreferencesService: ModelResourcePreferencesCapability
         try Task.checkCancellation()
         var value = try await validate(preferences)
         let ids = try await installed()
+        if value.useSpeechEnhancement && !ids.contains("deepfilternet3") {
+            throw ModelResourcePreferenceError.enhancementRequired
+        }
         if value.useCustomRecognition && !ResourceModelGroup.recognition.isInstalled(in: ids) {
             throw ModelResourcePreferenceError.recognitionRequired
         }

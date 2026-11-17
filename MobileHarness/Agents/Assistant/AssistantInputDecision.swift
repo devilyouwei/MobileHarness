@@ -5,26 +5,20 @@ import ModelKitDefaults
 import Synchronization
 import UI
 
-public enum InputDisposition: String, Codable, Sendable {
-    case enqueue, discard, interrupt
-    case continueListening = "continue_listening"
-
-    static let standardChoices: [Self] = [.interrupt, .discard, .enqueue]
-}
-
 public struct InputDecisionOutcome: Sendable, Equatable {
     public enum Route: String, Sendable {
         case local = "local:d3-edge"
         case lite = "local:d3-lite"
+        case vela = "local:vela3-fast"
         case gemma = "local:gemma4-e2b"
         case apple = "local:apple-system"
         case cloud = "cloud:decision"
-        case fallback = "enqueue:fallback"
+        case failed = "decision:failed"
     }
     public let route: Route
-    public let modelResult: InputDisposition?
-    public let adopted: InputDisposition
-    public let reason: String?
+    public let modelResult: Bool?
+    public var signalStatus: String = "not_requested"
+    public var reason: String?
     public let requests: [String]
     public enum Failure: String, Sendable {
         case settings = "Could not read Decision settings. Input queued."
@@ -39,102 +33,45 @@ public struct InputDecisionOutcome: Sendable, Equatable {
     public var modelName: String? = nil
 }
 
-/// One pending input, one earlier exchange and a bounded excerpt of the same-session buffer.
+/// Frozen at admission: current user/reply and latest input; no queue or runtime state.
 public struct InputDecisionSnapshot: Sendable {
-    public struct Exchange: Sendable, Equatable {
+    public struct Exchange: Sendable, Equatable, Codable {
         public let user: String
         public let assistant: String
-
         public init(user: String, assistant: String) {
-            self.user = String(user.suffix(80))
-            self.assistant = String(assistant.suffix(80))
+            self.user = user
+            self.assistant = assistant
         }
     }
-
     public let input: AgentInput
     public let text: String
-    public let running: Bool
-    public let playing: Bool?
-    public let history: Exchange?
-    public let bufferedUserInputs: [String]
-    public let question: String?
-    public let allowsContinueListening: Bool
-    let canHoldTranscript: Bool
-    public var occupied: Bool { running || playing == true }
+    public let currentTurn: Exchange?
     public let receivedAt: ContinuousClock.Instant
     public init(
-        input: AgentInput, text: String, running: Bool, playing: Bool? = nil, history: Exchange? = nil,
-        bufferedUserInputs: [String] = [], question: String? = nil,
-        receivedAt: ContinuousClock.Instant = .now, allowsContinueListening: Bool = false,
-        canHoldTranscript: Bool = true
+        input: AgentInput, text: String, currentTurn: Exchange? = nil,
+        receivedAt: ContinuousClock.Instant = .now
     ) {
         self.input = input
         self.text = text
-        self.running = running
-        self.playing = playing
-        self.history = history
-        self.bufferedUserInputs = bufferedUserInputs.suffix(3).map { String($0.suffix(80)) }
-        self.question = question.map { String($0.suffix(80)) }
+        self.currentTurn = currentTurn
         self.receivedAt = receivedAt
-        self.allowsContinueListening = allowsContinueListening
-        self.canHoldTranscript = canHoldTranscript
     }
-
-    struct Prompt: Sendable {
-        let jevState: String
-        let background: String
-        let latest: String
-        let context: InferenceContext
-        let choices: [InputDisposition]
-        var labels: [String] { choices.indices.map { String($0 + 1) } }
-
-        var text: String { background + "\n\n" + latest }
-    }
-
-    func prompt() throws -> Prompt {
-        let owner = "Assistant/InputDecision"
+    func request() throws -> NoulRequest {
+        struct State: Encodable {
+            enum CodingKeys: String, CodingKey {
+                case currentTurn = "current_turn"
+                case incomingUserInput = "incoming_user_input"
+            }
+            let currentTurn: Exchange?
+            let incomingUserInput: String
+        }
         let encoder = JSONEncoder()
-        encoder.outputFormatting = .withoutEscapingSlashes
-        func quote(_ text: String) throws -> String {
-            String(decoding: try encoder.encode(text), as: UTF8.self)
-                .replacingOccurrences(of: "<", with: "\\u003c")
-                .replacingOccurrences(of: "\u{2028}", with: "\\u2028")
-                .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
-        }
-        let empty = try AgentPrompts.text(owner, "empty")
-        let historyText =
-            try history.map {
-                try AgentPrompts.text(owner, "history", ["user": quote($0.user), "assistant": quote($0.assistant)])
-            } ?? empty
-        let buffer = try bufferedUserInputs.map(quote).joined(separator: "\n")
-        var definitions = try AgentPrompts.text(owner, "definitions")
-        var choices = InputDisposition.standardChoices
-        if allowsContinueListening {
-            definitions += "\n" + (try AgentPrompts.text(owner, "continueDefinition"))
-            choices.append(.continueListening)
-        }
-        let state = try AgentPrompts.text(
-            owner, "state",
-            [
-                "running": AgentPrompts.text(owner, running ? "yes" : "no"),
-                "playing": AgentPrompts.text(owner, playing.map { $0 ? "yes" : "no" } ?? "unknown"),
-                "question": question.map(quote) ?? empty,
-            ])
-        let context = try AgentPrompts.text(
-            owner, "context", ["history": historyText, "buffer": buffer.isEmpty ? empty : buffer])
-        let latest = try AgentPrompts.text(
-            owner, allowsContinueListening ? "latestSpeech" : "latest",
-            [
-                "input": quote(text)
-            ])
-        let jevFields = [
-            "\"utterance\":" + (try quote(text)),
-            "\"assistant_busy\":" + (occupied ? "true" : "false"),
-        ]
-        let jevState = "{" + jevFields.joined(separator: ",") + "}"
-        return .init(
-            jevState: jevState, background: definitions + "\n\n" + state + "\n\n" + context, latest: latest,
-            context: .init(requestID: input.id + ".decision", scopeID: input.sessionID), choices: choices)
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let text = String(
+            decoding: try encoder.encode(State(currentTurn: currentTurn, incomingUserInput: text)), as: UTF8.self)
+        return try NoulRequest(
+            text: text, instructions: AgentPrompts.text("Assistant/InputDecision", "question"),
+            context: .init(requestID: input.id + ".decision", scopeID: input.sessionID))
     }
 }
 
@@ -156,7 +93,7 @@ public actor AssistantInputDecision {
     private var workers: [String: Task<Void, Never>] = [:]
     private var timers: [String: Task<Void, Never>] = [:]
     private enum Attempt: Sendable {
-        case selected(InputDisposition)
+        case selected(Bool)
         case failed(String, InputDecisionOutcome.Failure = .model)
     }
     private var waiters: [String: CheckedContinuation<Attempt, Never>] = [:]
@@ -179,7 +116,7 @@ public actor AssistantInputDecision {
         language: @escaping @Sendable () -> String = { "en" }
     ) {
         self.init(
-            local: local, configuration: configuration, timeout: .seconds(2), localTimeout: .milliseconds(250),
+            local: local, configuration: configuration, timeout: .seconds(2), localTimeout: .seconds(1),
             report: report, language: language)
     }
 
@@ -207,7 +144,7 @@ public actor AssistantInputDecision {
             throw CapabilityError.unavailable("Local Chat Decision is unavailable")
         },
         selectedConfiguration: @escaping @Sendable () async throws -> SelectedConfiguration,
-        timeout: Duration = .seconds(2), localTimeout: Duration = .milliseconds(250),
+        timeout: Duration = .seconds(2), localTimeout: Duration = .seconds(1),
         localChatTimeout: Duration = .milliseconds(500),
         report: @escaping @Sendable (String) async -> Void = { _ in },
         language: @escaping @Sendable () -> String = { "en" }
@@ -276,52 +213,55 @@ public actor AssistantInputDecision {
         let selectedModelName = Mutex<String?>(nil)
         var localFailureReason: String?
         var localFailureKind: InputDecisionOutcome.Failure = .model
-        func fallback(_ reason: String, failure: InputDecisionOutcome.Failure? = nil) -> InputDecisionOutcome {
+        func failedOutcome(_ reason: String, failure: InputDecisionOutcome.Failure? = nil) -> InputDecisionOutcome {
             .init(
-                route: .fallback, modelResult: nil,
-                adopted: .enqueue, reason: reason,
+                route: .failed, modelResult: nil,
+                reason: reason,
                 requests: requests.withLock { $0 }, failure: failure, modelName: selectedModelName.withLock { $0 })
         }
-        guard !stopped, !Task.isCancelled else { return fallback("Classification cancelled") }
+        guard !stopped, !Task.isCancelled else { return failedOutcome("Classification cancelled") }
         let deadline = snapshot.receivedAt.advanced(by: timeout)
-        guard ContinuousClock.now < deadline else { return fallback("Classification timed out", failure: .timedOut) }
+        guard ContinuousClock.now < deadline else {
+            return failedOutcome("Classification timed out", failure: .timedOut)
+        }
         let route: SelectedConfiguration
         do { route = try await configuration() } catch {
             guard !stopped, !Task.isCancelled, !(error is CancellationError) else {
-                return fallback("Classification cancelled")
+                return failedOutcome("Classification cancelled")
             }
             await reportFailure(.settings)
-            return fallback("Could not read Decision settings: \(error.localizedDescription)", failure: .settings)
+            return failedOutcome("Could not read Decision settings: \(error.localizedDescription)", failure: .settings)
         }
         selectedModelName.withLock {
             $0 = route.localID.map { id in
                 switch id {
                 case "d3-edge": "D3 Edge"
                 case "d3-lite": "D3 Lite"
+                case "vela3-fast": "Vela 3 Fast"
                 case "gemma4-e2b": "Gemma 4 E2B"
                 case "apple-system": "Apple System LLM"
                 default: id
                 }
             }
         }
-        let prompt: InputDecisionSnapshot.Prompt
+        let prompt: NoulRequest
         do {
-            prompt = try snapshot.prompt()
+            prompt = try snapshot.request()
         } catch {
             await reportFailure(.request)
-            return fallback("Could not prepare Decision request: \(error.localizedDescription)", failure: .request)
+            return failedOutcome("Could not prepare Decision request: \(error.localizedDescription)", failure: .request)
         }
         if let reason = await selectLocal(route.localID) {
-            guard !stopped, !Task.isCancelled else { return fallback("Classification cancelled") }
+            guard !stopped, !Task.isCancelled else { return failedOutcome("Classification cancelled") }
             await reportFailure(.model)
-            return fallback(reason, failure: .model)
+            return failedOutcome(reason, failure: .model)
         }
         if let id = route.localID, id == "gemma4-e2b" || id == "apple-system" {
             let modelName = id == "apple-system" ? "Apple System LLM" : "Gemma 4 E2B"
             let modelRoute: InputDecisionOutcome.Route = id == "apple-system" ? .apple : .gemma
             guard !localMaintenance.contains(id), activeLocalID == id else {
                 await reportFailure(.unavailable)
-                return fallback("Local Chat model temporarily unavailable", failure: .unavailable)
+                return failedOutcome("Local Chat model temporarily unavailable", failure: .unavailable)
             }
             let resolve = localChatModel
             let result = await race(
@@ -332,7 +272,7 @@ public actor AssistantInputDecision {
                 if case .unavailable(let reason) = await model.availability {
                     throw CapabilityError.unavailable(reason)
                 }
-                return try await AssistantDecisionProtocol.chat(model, modelID: id).classify(prompt) { request in
+                return try await Self.read(ChatDecision(model), request: prompt) { request in
                     requests.withLock { $0.append("Local \(modelName)\n\n" + request) }
                 }
             }
@@ -344,15 +284,16 @@ public actor AssistantInputDecision {
                     modelName: selectedModelName.withLock { $0 })
             case .failed(let reason, let failure):
                 if !stopped, !Task.isCancelled { await reportFailure(failure) }
-                return fallback(reason, failure: failure)
+                return failedOutcome(reason, failure: failure)
             }
         }
-        let modelName = route.localID == "d3-lite" ? "D3 Lite" : "D3"
-        let modelRoute: InputDecisionOutcome.Route = route.localID == "d3-lite" ? .lite : .local
+        let modelName = selectedModelName.withLock { $0 } ?? "Decision"
+        let modelRoute: InputDecisionOutcome.Route =
+            route.localID == "vela3-fast" ? .vela : route.localID == "d3-lite" ? .lite : .local
         if let id = route.localID {
             localFailureReason = localFailure
             if switchingLocal || activeLocalID != id || localMaintenance.contains(id) {
-                localFailureReason = "D3 resources are being released"
+                localFailureReason = "Decision resources are being released"
                 localFailureKind = .notReady
             } else if localModel(id) == nil {
                 localFailureReason = "Selected local Decision model is unavailable"
@@ -364,13 +305,13 @@ public actor AssistantInputDecision {
                 let status = try await local.status()
                 if localMaintenance.contains(id) || activeLocalID != id || switchingLocal || stopped || Task.isCancelled
                 {
-                    localFailureReason = "D3 resources are being released"
+                    localFailureReason = "Decision resources are being released"
                     localFailureKind = .notReady
                 } else if status == .ready {
                     await report(AppLanguage(preferredLanguage: language()).format("Local · %@", modelName))
                     let result = await race("local", until: min(deadline, .now.advanced(by: localTimeout))) {
                         try Task.checkCancellation()
-                        return try await AssistantDecisionProtocol.jev(local).classify(prompt) { request in
+                        return try await Self.read(local, request: prompt) { request in
                             requests.withLock { $0.append("Local \(modelName)\n\n" + request) }
                         }
                     }
@@ -391,7 +332,7 @@ public actor AssistantInputDecision {
                             do { try await local.warmup() } catch
                                 where !Task.isCancelled && !(error is CancellationError)
                             {
-                                self.localFailure = "D3 preparation failed: \(error.localizedDescription)"
+                                self.localFailure = "Decision preparation failed: \(error.localizedDescription)"
                                 await self.reportFailure(.model)
                             } catch {}
                             self.preparation = nil
@@ -399,76 +340,76 @@ public actor AssistantInputDecision {
                     }
                 }
             } catch {
-                localFailureReason = "Could not read D3 status: \(error.localizedDescription)"
+                localFailureReason = "Could not read Decision status: \(error.localizedDescription)"
             }
         }
-        guard !stopped, !Task.isCancelled else { return fallback("Classification cancelled") }
+        guard !stopped, !Task.isCancelled else { return failedOutcome("Classification cancelled") }
         if route.localID != nil {
             let reason = localFailureReason ?? "Selected local Decision model is unavailable"
             await reportFailure(localFailureKind)
-            return fallback(reason, failure: localFailureKind)
+            return failedOutcome(reason, failure: localFailureKind)
         }
         guard ContinuousClock.now < deadline else {
             await reportFailure(.timedOut)
-            return fallback("Classification timed out", failure: .timedOut)
+            return failedOutcome("Classification timed out", failure: .timedOut)
         }
         guard let cloud = route.cloud else {
             await reportFailure(.unavailable)
-            return fallback("Cloud Decision is unconfigured", failure: .unavailable)
+            return failedOutcome("Cloud Decision is unconfigured", failure: .unavailable)
         }
         await report(AppLanguage(preferredLanguage: language()).text("Cloud · Selected Decision model"))
         let result = await race("cloud", until: deadline) {
             let model = try await cloud()
             selectedModelName.withLock { $0 = model.modelName }
-            return try await AssistantDecisionProtocol.chat(model.capability, modelID: model.modelName)
-                .classify(prompt) { request in
-                    requests.withLock { $0.append("Cloud Decision\n\n" + request) }
-                }
+            return try await Self.read(ChatDecision(model.capability), request: prompt) { request in
+                requests.withLock { $0.append("Cloud Decision\n\n" + request) }
+            }
         }
         if case .selected(let action) = result {
             return outcome(
                 action, route: .cloud, snapshot: snapshot, requests: requests.withLock { $0 },
                 modelName: selectedModelName.withLock { $0 })
         }
-        if stopped || Task.isCancelled { return fallback("Classification cancelled") }
+        if stopped || Task.isCancelled { return failedOutcome("Classification cancelled") }
         if case .failed(let reason, let failure) = result {
             await reportFailure(failure)
-            return fallback(reason, failure: failure)
+            return failedOutcome(reason, failure: failure)
         }
-        return fallback("Model returned no valid classification", failure: .model)
+        return failedOutcome("Model returned no valid classification", failure: .model)
     }
 
     private func reportFailure(_ failure: InputDecisionOutcome.Failure) async {
         await report(AppLanguage(preferredLanguage: language()).text(failure.rawValue))
     }
 
+    private static func read(
+        _ model: any DecisionCapability, request: NoulRequest,
+        record: @Sendable (String) -> Void
+    ) async throws -> Bool {
+        record("noul\n\nState:\n" + request.text + "\n\nQuestion:\n" + request.instructions)
+        let session = try await model.noul(request)
+        return try await session.withCleanup {
+            var result: Bool?
+            for try await value in session.events {
+                guard result == nil else { throw CapabilityError.invalidRequest("Multiple boolean results") }
+                result = value.value
+            }
+            guard let result else { throw CapabilityError.invalidRequest("Missing boolean result") }
+            return result
+        }
+    }
     private func outcome(
-        _ action: InputDisposition, route: InputDecisionOutcome.Route, snapshot: InputDecisionSnapshot,
+        _ value: Bool, route: InputDecisionOutcome.Route, snapshot: InputDecisionSnapshot,
         requests: [String], modelName: String?
     ) -> InputDecisionOutcome {
-        let adopted: InputDisposition
-        let reason: String?
-        switch action {
-        case .interrupt where !snapshot.occupied:
-            adopted = .enqueue
-            reason = "No active reply to interrupt"
-        case .continueListening where !snapshot.canHoldTranscript:
-            adopted = .enqueue
-            reason = "Continuation buffer reached its limit; queued the combined input"
-        default:
-            adopted = action
-            reason = nil
-        }
-        return .init(
-            route: route, modelResult: action, adopted: adopted, reason: reason,
-            requests: requests, modelName: modelName)
+        .init(route: route, modelResult: value, reason: nil, requests: requests, modelName: modelName)
     }
 
     private func race(
         _ key: String, until deadline: ContinuousClock.Instant, name: String? = nil,
-        operation: @escaping @Sendable () async throws -> InputDisposition
+        operation: @escaping @Sendable () async throws -> Bool
     ) async -> Attempt {
-        let model = name ?? (key == "local" ? "D3" : "Cloud Decision")
+        let model = name ?? (key == "local" ? "Local Decision" : "Cloud Decision")
         let timeout = Attempt.failed("\(model) timed out", .timedOut)
         guard !stopped, !Task.isCancelled else { return .failed("Classification cancelled") }
         guard workers[key] == nil else { return .failed("\(model) is still cleaning up the previous request") }
@@ -522,25 +463,79 @@ extension InputDecisionOutcome {
     func logItem(for snapshot: InputDecisionSnapshot, duration: Duration) -> DecisionLogItem {
         let route: DecisionLogItem.Route =
             switch self.route {
-            case .local, .lite, .gemma, .apple: .local
+            case .local, .lite, .vela, .gemma, .apple: .local
             case .cloud: .cloud
-            case .fallback: .fallback
+            case .failed: .failed
             }
         return .init(
             id: snapshot.input.id, source: AgentID.assistant.rawValue, inputText: snapshot.text, duration: duration,
             route: route,
-            modelResult: modelResult.map(\.logDisposition), adoptedResult: adopted.logDisposition,
+            modelResult: nil, adoptedResult: .enqueue,
+            booleanResult: modelResult, signalStatus: signalStatus,
             reason: reason, requests: requests, modelName: modelName)
     }
 }
 
-extension InputDisposition {
-    fileprivate var logDisposition: DecisionLogItem.Disposition {
-        switch self {
-        case .enqueue: .enqueue
-        case .discard: .discard
-        case .interrupt: .interrupt
-        case .continueListening: .continueListening
+/// Per-Assistant scheduling, independent of the ordinary input queue and reply cancellation.
+actor AssistantDecisionQueue {
+    struct Job: Sendable {
+        let snapshot: InputDecisionSnapshot
+        let target: UUID?
+        let interrupt: @Sendable (AssistantInterrupt, String) async throws -> AssistantInterruptResult
+        let complete: @Sendable (InputDecisionSnapshot, InputDecisionOutcome, Duration) async -> Void
+        let updated: @Sendable () async -> Void
+    }
+    private var pending: [Job] = []
+    private var worker: Task<Void, Never>?
+    private var cancelling = false
+    var count: Int { pending.count }
+
+    func submit(_ job: Job, using model: AssistantInputDecision) throws {
+        guard !cancelling else { throw CancellationError() }
+        guard pending.count < 32 else { throw CommunicationError.capacityExceeded }
+        pending.append(job)
+        guard worker == nil else { return }
+        worker = Task {
+            defer { worker = nil }
+            while let job = pending.first, !Task.isCancelled {
+                let started = ContinuousClock.now
+                var result = await model.classify(job.snapshot)
+                let duration = started.duration(to: .now)
+                guard !Task.isCancelled else { return }
+                guard pending.first?.snapshot.input.id == job.snapshot.input.id else { continue }
+                if result.modelResult == true {
+                    if let target = job.target {
+                        do {
+                            result.signalStatus = try await job.interrupt(
+                                AssistantInterrupt(target: .reply(target)), job.snapshot.input.sessionID
+                            ).rawValue
+                        } catch {
+                            result.signalStatus = "interrupt_failed"
+                            result.reason = "Interrupt failed: \(error)"
+                        }
+                    } else {
+                        result.signalStatus = "no_target"
+                    }
+                } else if result.modelResult == nil {
+                    result.signalStatus = "decision_failed"
+                }
+                await job.complete(job.snapshot, result, duration)
+                if pending.first?.snapshot.input.id == job.snapshot.input.id { pending.removeFirst() }
+                await job.updated()
+            }
         }
+    }
+
+    func remove(sessionID: String) {
+        pending.removeAll { $0.snapshot.input.sessionID == sessionID }
+    }
+
+    func cancelAndWait() async {
+        cancelling = true
+        pending.removeAll()
+        let active = worker
+        active?.cancel()
+        await active?.value
+        cancelling = false
     }
 }

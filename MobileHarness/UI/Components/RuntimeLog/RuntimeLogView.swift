@@ -198,11 +198,17 @@ import Foundation
                             decision.source + " · " + appCopy.text(decision.route.rawValue)
                                 + (decision.modelName.map { " · " + $0 } ?? "")
                         ).font(.body.weight(.medium))
-                        Text(appCopy.text("Adopted result") + " · " + decision.adoptedResult.rawValue)
-                            .foregroundStyle(decision.modelResult == nil ? .orange : .primary)
+                        Text(
+                            (decision.signalStatus != nil
+                                ? appCopy.text("Interrupt signal") : appCopy.text("Adopted result")) + " · "
+                                + (decision.signalStatus.map { appCopy.text($0) } ?? decision.adoptedResult.rawValue)
+                        )
+                        .foregroundStyle(
+                            decision.modelResult == nil && decision.booleanResult == nil ? .orange : .primary)
                         Text(
                             appCopy.text("Model result") + " · "
-                                + (decision.modelResult?.rawValue ?? appCopy.text("No valid result"))
+                                + (decision.booleanResult.map { $0 ? "true" : "false" } ?? decision.modelResult?
+                                    .rawValue ?? appCopy.text("No valid result"))
                         ).foregroundStyle(.secondary)
                         if let reason = decision.reason {
                             Text(reason).foregroundStyle(.secondary)

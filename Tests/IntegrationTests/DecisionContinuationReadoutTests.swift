@@ -84,7 +84,7 @@ private struct ContinuationReadoutReport: Encodable {
             do {
                 let request = try DecisionRequest(
                     text: item.native.text, candidates: item.native.candidates, instructions: item.native.instructions)
-                let session = try await model.decide(request)
+                let session = try await model.choice(request)
                 let selection = try await session.withCleanup {
                     var prediction: String?
                     var score: Double?

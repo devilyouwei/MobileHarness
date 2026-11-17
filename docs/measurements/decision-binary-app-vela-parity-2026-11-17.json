@@ -1,0 +1,170 @@
+[
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"Beijing is the capital of China. It has\",\"user\":\"Tell me about Beijing.\"},\"incoming_user_input\":\"Stop talking now.\"}",
+    "swift": 0.8541810677332478,
+    "python": 0.8541810677332478,
+    "absolute_error": 0.0
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"Beijing is the capital of China. It has\",\"user\":\"Tell me about Beijing.\"},\"incoming_user_input\":\"Pause for a moment.\"}",
+    "swift": 0.6664198250826107,
+    "python": 0.6664198250826107,
+    "absolute_error": 0.0
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"Beijing is the capital of China. It has\",\"user\":\"Tell me about Beijing.\"},\"incoming_user_input\":\"No, stop that and explain Shanghai instead.\"}",
+    "swift": 0.49826803751105186,
+    "python": 0.49826803751105175,
+    "absolute_error": 1.1102230246251565e-16
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"Beijing is the capital of China. It has\",\"user\":\"Tell me about Beijing.\"},\"incoming_user_input\":\"Cancel what you're doing.\"}",
+    "swift": 0.7265888248462503,
+    "python": 0.7265888248462503,
+    "absolute_error": 0.0
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"Beijing is the capital of China. It has\",\"user\":\"Tell me about Beijing.\"},\"incoming_user_input\":\"Hello.\"}",
+    "swift": 0.06445820150750026,
+    "python": 0.06445820150750038,
+    "absolute_error": 1.249000902703301e-16
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"Beijing is the capital of China. It has\",\"user\":\"Tell me about Beijing.\"},\"incoming_user_input\":\"Open the camera.\"}",
+    "swift": 0.11314163022157553,
+    "python": 0.11314163022157551,
+    "absolute_error": 1.3877787807814457e-17
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"Beijing is the capital of China. It has\",\"user\":\"Tell me about Beijing.\"},\"incoming_user_input\":\"Don't stop, keep going.\"}",
+    "swift": 0.11622766274186935,
+    "python": 0.11622766274186946,
+    "absolute_error": 1.1102230246251565e-16
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"Beijing is the capital of China. It has\",\"user\":\"Tell me about Beijing.\"},\"incoming_user_input\":\"After that, explain Shanghai.\"}",
+    "swift": 0.14624428625982533,
+    "python": 0.1462442862598253,
+    "absolute_error": 2.7755575615628914e-17
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"Beijing is the capital of China. It has\",\"user\":\"Tell me about Beijing.\"},\"incoming_user_input\":\"What does 'stop talking' mean?\"}",
+    "swift": 0.15526698781933568,
+    "python": 0.1552669878193358,
+    "absolute_error": 1.1102230246251565e-16
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"Beijing is the capital of China. It has\",\"user\":\"Tell me about Beijing.\"},\"incoming_user_input\":\"Yes.\"}",
+    "swift": 0.1210237850689102,
+    "python": 0.12102378506891014,
+    "absolute_error": 6.938893903907228e-17
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"Beijing is the capital of China. It has\",\"user\":\"Tell me about Beijing.\"},\"incoming_user_input\":\"Also include the population.\"}",
+    "swift": 0.05447281544575533,
+    "python": 0.0544728154457554,
+    "absolute_error": 6.938893903907228e-17
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"Beijing is the capital of China. It has\",\"user\":\"Tell me about Beijing.\"},\"incoming_user_input\":\"He told me to stop.\"}",
+    "swift": 0.2205409029855132,
+    "python": 0.22054090298551318,
+    "absolute_error": 2.7755575615628914e-17
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"Beijing is the capital of China. It has\",\"user\":\"Tell me about Beijing.\"},\"incoming_user_input\":\"停一下，先别说了。\"}",
+    "swift": 0.6786205630636611,
+    "python": 0.6786205630636611,
+    "absolute_error": 0.0
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"Beijing is the capital of China. It has\",\"user\":\"Tell me about Beijing.\"},\"incoming_user_input\":\"讲完以后再说上海。\"}",
+    "swift": 0.1800079035899358,
+    "python": 0.18000790358993568,
+    "absolute_error": 1.1102230246251565e-16
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"北京是中国的首都，它有\",\"user\":\"介绍一下北京。\"},\"incoming_user_input\":\"停一下，先别说了。\"}",
+    "swift": 0.5861505027392762,
+    "python": 0.5861505027392762,
+    "absolute_error": 0.0
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"北京是中国的首都，它有\",\"user\":\"介绍一下北京。\"},\"incoming_user_input\":\"暂停。\"}",
+    "swift": 0.6385271031165172,
+    "python": 0.6385271031165172,
+    "absolute_error": 0.0
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"北京是中国的首都，它有\",\"user\":\"介绍一下北京。\"},\"incoming_user_input\":\"别讲北京了，现在改讲上海。\"}",
+    "swift": 0.2591874209731089,
+    "python": 0.259187420973109,
+    "absolute_error": 1.1102230246251565e-16
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"北京是中国的首都，它有\",\"user\":\"介绍一下北京。\"},\"incoming_user_input\":\"取消当前任务。\"}",
+    "swift": 0.47812998376100224,
+    "python": 0.47812998376100224,
+    "absolute_error": 0.0
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"北京是中国的首都，它有\",\"user\":\"介绍一下北京。\"},\"incoming_user_input\":\"你好。\"}",
+    "swift": 0.07311089360692613,
+    "python": 0.07311089360692612,
+    "absolute_error": 1.3877787807814457e-17
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"北京是中国的首都，它有\",\"user\":\"介绍一下北京。\"},\"incoming_user_input\":\"打开相机。\"}",
+    "swift": 0.3093603148513593,
+    "python": 0.30936031485135934,
+    "absolute_error": 5.551115123125783e-17
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"北京是中国的首都，它有\",\"user\":\"介绍一下北京。\"},\"incoming_user_input\":\"不用停，继续说。\"}",
+    "swift": 0.09029915802293831,
+    "python": 0.09029915802293832,
+    "absolute_error": 1.3877787807814457e-17
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"北京是中国的首都，它有\",\"user\":\"介绍一下北京。\"},\"incoming_user_input\":\"讲完以后再说上海。\"}",
+    "swift": 0.19233914464019597,
+    "python": 0.192339144640196,
+    "absolute_error": 2.7755575615628914e-17
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"北京是中国的首都，它有\",\"user\":\"介绍一下北京。\"},\"incoming_user_input\":\"解释一下“别说了”的意思。\"}",
+    "swift": 0.08410182047640458,
+    "python": 0.0841018204764046,
+    "absolute_error": 2.7755575615628914e-17
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"北京是中国的首都，它有\",\"user\":\"介绍一下北京。\"},\"incoming_user_input\":\"是的。\"}",
+    "swift": 0.06023875552090863,
+    "python": 0.06023875552090873,
+    "absolute_error": 1.0408340855860843e-16
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"北京是中国的首都，它有\",\"user\":\"介绍一下北京。\"},\"incoming_user_input\":\"再加上人口信息。\"}",
+    "swift": 0.21004453955364244,
+    "python": 0.21004453955364236,
+    "absolute_error": 8.326672684688674e-17
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"北京是中国的首都，它有\",\"user\":\"介绍一下北京。\"},\"incoming_user_input\":\"他昨天让我停下来。\"}",
+    "swift": 0.20458081887164015,
+    "python": 0.2045808188716401,
+    "absolute_error": 5.551115123125783e-17
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"北京是中国的首都，它有\",\"user\":\"介绍一下北京。\"},\"incoming_user_input\":\"Stop talking now.\"}",
+    "swift": 0.37460036041057954,
+    "python": 0.37460036041057965,
+    "absolute_error": 1.1102230246251565e-16
+  },
+  {
+    "text": "{\"current_turn\":{\"assistant\":\"北京是中国的首都，它有\",\"user\":\"介绍一下北京。\"},\"incoming_user_input\":\"Don't stop, keep going.\"}",
+    "swift": 0.17836189529785473,
+    "python": 0.17836189529785476,
+    "absolute_error": 2.7755575615628914e-17
+  }
+]

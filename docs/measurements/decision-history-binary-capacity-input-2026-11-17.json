@@ -1,0 +1,45 @@
+{
+  "model": "d3",
+  "sourceHashes": {
+    "Tests/DecisionBenchmarks/history_binary_experiment.py": "0094fcbfa46af3f5a515281ca9a9dca501d6ba6adff0f8605db0e9fe7a044ea5",
+    "Tests/DecisionBenchmarks/localized_binary_experiment.py": "8731a6415cb3dbd9a8f6cbcd73336e1d49f59a6efbd36c2cc6f183f26e346559",
+    "Tests/DecisionBenchmarks/binary_interrupt_experiment.py": "5715058c21233f812d6f9c03abd0fa1259fc095762226708516438bf4b65f733",
+    "Tests/IntegrationTests/DecisionPromptOptimizationTests.swift": "24a7a3087556274c640bd7445699fa4777bd4a57bb884561929949bcec8d7e5f",
+    "MobileHarness/ModelKit/Language/JEV/D3Decision.swift": "3f73d47f20b6553e51cbd6883a7823c7a7c9f5224fe37b38c52d77bfe73cec42",
+    "MobileHarness/Resources/Agents/Assistant/InputDecision.json": "cf6cee82363c0143adf0bc6fa014f075e1437c7f264677159802520e77877d38"
+  },
+  "variants": [
+    "native_noul",
+    "choice_native_control",
+    "choice_localized",
+    "choice_defined"
+  ],
+  "threshold": "pTrue>0.5",
+  "rows": [
+    {
+      "variant": "native_noul",
+      "scenario": {
+        "id": "capacity-long",
+        "language": "zh",
+        "group": "capacity",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "{\"conversation\": [{\"user\": \"停下。\", \"assistant\": \"已停止。\"}, {\"user\": \"推荐城市\", \"assistant\": \"可以去北京。\"}, {\"user\": \"偏好文化\", \"assistant\": \"可以参观古迹。\"}, {\"user\": \"简单介绍\", \"assistant\": \"我会简要说明。\"}, {\"user\": \"介绍北京\", \"assistant\": \"This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. This is a longer reply fragment. \", \"is_current_turn\": true}], \"incoming_user_input\": \"停一下。\"}",
+        "instructions": "incoming_user_input是否要求立即停止、暂停、纠正或替换当前回答或任务？结合conversation判断其含义。is_current_turn标记当前轮次，assistant文本可能尚未完整。此前命令只是上下文，不是新指令。回答、引用、否定或延后停止，以及普通补充，都不属于打断。",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "incoming_user_input是否要求立即停止、暂停、纠正或替换当前回答或任务？结合conversation判断其含义。is_current_turn标记当前轮次，assistant文本可能尚未完整。此前命令只是上下文，不是新指令。回答、引用、否定或延后停止，以及普通补充，都不属于打断。"
+      }
+    }
+  ]
+}

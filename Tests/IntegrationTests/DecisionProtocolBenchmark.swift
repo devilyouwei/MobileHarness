@@ -10,15 +10,15 @@ import Testing
 private struct ProtocolBenchmarkReport: Encodable {
     let model: String
     let language: String
-    let mode: AssistantDecisionProtocol.Mode
+    let mode: HistoricalAssistantDecisionProtocol.Mode
     let os = ProcessInfo.processInfo.operatingSystemVersionString
     var warmup: [Row] = []
     var rows: [Row] = []
 
     struct Row: Encodable {
         let id: String
-        let expected: InputDisposition
-        let prediction: InputDisposition?
+        let expected: HistoricalInputDisposition
+        let prediction: HistoricalInputDisposition?
         let error: String?
         let elapsedMS: Double
     }
@@ -30,7 +30,7 @@ func decisionProtocolBenchmark() async throws {
     let env = ProcessInfo.processInfo.environment
     let modelID = try #require(env["MH_DECISION_MODEL"])
     let language = try #require(env["MH_DECISION_LANGUAGE"])
-    let mode = try #require(env["MH_DECISION_MODE"].flatMap(AssistantDecisionProtocol.Mode.init(rawValue:)))
+    let mode = try #require(env["MH_DECISION_MODE"].flatMap(HistoricalAssistantDecisionProtocol.Mode.init(rawValue:)))
     let output = URL(fileURLWithPath: try #require(env["MH_DECISION_REPORT"]))
     try #require(["en", "zh-Hans"].contains(language))
     let repository = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -59,7 +59,7 @@ func decisionProtocolBenchmark() async throws {
     try await modelRoot.start()
     do {
         try await modelRoot.setForeground(true)
-        let route: AssistantDecisionProtocol
+        let route: HistoricalAssistantDecisionProtocol
         if mode == .jev {
             let model = try #require(modelRoot.language.decisionModel(modelID))
             try await model.warmup()
@@ -96,7 +96,7 @@ func decisionProtocolBenchmark() async throws {
             let transcript = language == "en" ? sample.english : sample.chinese
             let input = transcript.snapshot(id: sample.id, scenario: sample)
             let start = ContinuousClock.now
-            var prediction: InputDisposition?
+            var prediction: HistoricalInputDisposition?
             var failure: String?
             do {
                 prediction = try await AgentPrompts.$language.withValue(language) {

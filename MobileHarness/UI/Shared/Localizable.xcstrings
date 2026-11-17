@@ -9681,6 +9681,312 @@
           }
         }
       }
+    },
+    "Speech onset: %d windows (%d ms)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech onset: %d windows (%d ms)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "起声确认：%d 个窗口（%d 毫秒）"
+          }
+        }
+      }
+    },
+    "Speech onset windows": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech onset windows"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "起声确认窗口数"
+          }
+        }
+      }
+    },
+    "Speech probability threshold: %.2f": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech probability threshold: %.2f"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语音概率阈值：%.2f"
+          }
+        }
+      }
+    },
+    "Speech probability threshold": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech probability threshold"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语音概率阈值"
+          }
+        }
+      }
+    },
+    "Speech detection": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech detection"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语音检测"
+          }
+        }
+      }
+    },
+    "Higher values reduce false triggers but may delay or miss short speech. Applies the next time listening starts.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Higher values reduce false triggers but may delay or miss short speech. Applies the next time listening starts."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "数值越高，误触发越少，但可能延迟或漏掉短句。下次开启聆听时生效。"
+          }
+        }
+      }
+    },
+    "Invalid speech detection settings.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invalid speech detection settings."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语音检测设置无效。"
+          }
+        }
+      }
+    },
+    "Noise suppression": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语音降噪"
+          }
+        }
+      }
+    },
+    "Download DeepFilterNet3 first. Works with Apple and custom recognition. Applies the next time listening starts and adds about 400 ms of buffering.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先下载 DeepFilterNet3。支持 Apple 和自定义识别模型，下次开启聆听时生效，增加约 400 毫秒缓冲延迟。"
+          }
+        }
+      }
+    },
+    "Loaded at startup when installed. Enable Noise suppression to use it for listening.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装后随 App 启动加载，开启“语音降噪”后用于聆听。"
+          }
+        }
+      }
+    },
+    "Noise suppression will turn off. Your speech recognition model stays selected.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语音降噪将关闭，已选择的语音识别模型保持不变。"
+          }
+        }
+      }
+    },
+    "Download DeepFilterNet3 before enabling noise suppression.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先下载 DeepFilterNet3，再开启语音降噪。"
+          }
+        }
+      }
+    },
+    "DeepFilterNet3 Speech Enhancement": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DeepFilterNet3 语音降噪"
+          }
+        }
+      }
+    },
+    "Download the selected Decision model before using it.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download the selected Decision model before using it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先下载所选的决策模型。"
+          }
+        }
+      }
+    },
+    "Interrupt signal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interrupt signal"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打断信号"
+          }
+        }
+      }
+    },
+    "not_requested": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "not_requested"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无需打断"
+          }
+        }
+      }
+    },
+    "no_target": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "no_target"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有可打断的回复"
+          }
+        }
+      }
+    },
+    "target_expired": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "target_expired"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原回复已结束或更换"
+          }
+        }
+      }
+    },
+    "interrupted": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "interrupted"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已打断"
+          }
+        }
+      }
+    },
+    "interrupt_failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "interrupt_failed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打断失败"
+          }
+        }
+      }
+    },
+    "decision_failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "decision_failed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "决策失败"
+          }
+        }
+      }
     }
   }
 }

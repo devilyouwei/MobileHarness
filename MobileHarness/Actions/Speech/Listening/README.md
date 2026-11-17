@@ -62,3 +62,7 @@ VoiceCaptureRecovery 拥有单 worker 和一个合并的最新故障槽；重复
 对话请求 preferSpatial=false；startInput 使用捕获代的实际 supportsFullDuplex，页面状态区分系统回声消除、语音回声消除和受限模式；不能只依据配置偏好宣称全双工。原生和端点延迟仍独立于 Decision，不以 UI 状态推定回声消除质量。
 
 手机和蓝牙耳机均根据 PlatformKit 确认的 Voice Processing 能力开放全双工。全双工 acquirePlaybackAdmission 不暂停 VAD/ASR，回复中仍可识别与打断；不根据蓝牙类型降级。只有明确受限的其他后端沿用半双工准入与drain恢复。
+
+## 播放时刻事实
+
+VoiceNativeEffects 使用 AudioInputOutput.playStream 的 onStarted（首块 schedule 后）记录单调时刻，再通过 activeChanged/VoiceSessionConnections.playbackChanged(audioID, active, time) 发布；取出首块合成 PCM 不等于已经开始播放。每次播放至多拥有一个开始发布 Task，清理等待该任务完成后发布配对结束时刻；未开始的空流/失败不伪造播放开始。VoiceSessionCoordinator 将事实交给注入的 Agent 回调，不选择 ASR 阈值或冷却策略。

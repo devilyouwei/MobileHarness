@@ -60,7 +60,6 @@
         "repoId": "aufklarer/Silero-VAD-v6.2.1-CoreML",
         "revision": "523876545a57961474fee9df913e833e130560b8",
         "allowPatterns": [
-          "README.md",
           "config.json",
           "silero_vad.mlmodelc/**"
         ]
@@ -122,14 +121,12 @@
         "repoId": "FluidInference/moss-tts-nano-coreml",
         "revision": "408475d01c46c9290b6546edf31e9cc5cbb202cd",
         "allowPatterns": [
-          "LICENSE",
           "MossNano-CodecStep-fp16.mlmodelc/**",
           "MossNano-Frame-fp16.mlmodelc/**",
           "MossNano-Prefill-T512-M1024-fp16.mlmodelc/**",
           "MossNano-Step-M1024-fp16.mlmodelc/**",
           "config.json",
           "tokenizer.model",
-          "tokenizer_test_vectors.json",
           "voices/en_2.json",
           "voices/zh_1.json"
         ]
@@ -145,7 +142,6 @@
         "MossNano-Step-M1024-fp16.mlmodelc/weights/weight.bin",
         "config.json",
         "tokenizer.model",
-        "tokenizer_test_vectors.json",
         "voices/en_2.json",
         "voices/zh_1.json"
       ]
@@ -192,9 +188,7 @@
           "tokenizer_config.json",
           "vocab.json",
           "merges.txt",
-          "chat_template.jinja",
-          "NOTICE",
-          "LICENSE"
+          "chat_template.jinja"
         ]
       },
       "requiredFiles": [
@@ -207,9 +201,7 @@
         "tokenizer_config.json",
         "vocab.json",
         "merges.txt",
-        "chat_template.jinja",
-        "NOTICE",
-        "LICENSE"
+        "chat_template.jinja"
       ]
     },
     {
@@ -235,8 +227,6 @@
           "vocab.json",
           "merges.txt",
           "chat_template.jinja",
-          "NOTICE",
-          "LICENSE",
           "config.json"
         ]
       },
@@ -251,8 +241,6 @@
         "vocab.json",
         "merges.txt",
         "chat_template.jinja",
-        "NOTICE",
-        "LICENSE",
         "config.json"
       ],
       "architectureVariants": {
@@ -267,8 +255,6 @@
             "stripPrefix": "ios/aot-v1/h18p"
           },
           "requiredFiles": [
-            "LICENSE",
-            "NOTICE",
             "aot-build.json",
             "chat_template.jinja",
             "config.json",
@@ -290,6 +276,69 @@
           "estimatedBytes": 2540400645
         }
       }
+    },
+    {
+      "id": "deepfilternet3",
+      "name": "DeepFilterNet3 Speech Enhancement",
+      "capability": "enhancement",
+      "directory": "DeepFilterNet3",
+      "minimumOS": 17,
+      "requiresPhysicalDevice": false,
+      "deviceRequirement": null,
+      "license": "Apache-2.0 / MIT",
+      "estimatedBytes": 2480000,
+      "source": {
+        "kind": "huggingface",
+        "repoId": "aufklarer/DeepFilterNet3-CoreML",
+        "revision": "937bad9811f1ffc1a06ea0d676461b080b2bdc93",
+        "allowPatterns": [
+          "config.json",
+          "auxiliary.npz",
+          "DeepFilterNet3.mlmodelc/**"
+        ]
+      },
+      "requiredFiles": [
+        "DeepFilterNet3.mlmodelc/analytics/coremldata.bin",
+        "DeepFilterNet3.mlmodelc/coremldata.bin",
+        "DeepFilterNet3.mlmodelc/model.mil",
+        "DeepFilterNet3.mlmodelc/weights/weight.bin",
+        "auxiliary.npz",
+        "config.json"
+      ]
+    },
+    {
+      "id": "vela3-fast",
+      "name": "Vela 3 Fast",
+      "capability": "decision",
+      "directory": "Vela3Fast",
+      "minimumOS": 27,
+      "requiresPhysicalDevice": true,
+      "deviceRequirement": null,
+      "license": "Apache-2.0",
+      "estimatedBytes": 1525719066,
+      "source": {
+        "kind": "huggingface",
+        "repoId": "hugging-mac/vela3-fast-CoreAI",
+        "revision": "6aaa9ccd747c4bad65037979e7f9373a76fb7683",
+        "allowPatterns": [
+          "decision.json",
+          "manifest.json",
+          "model.aimodel/main.hash",
+          "model.aimodel/main.mlirb",
+          "model.aimodel/metadata.json",
+          "tokenizer.json",
+          "tokenizer_config.json"
+        ]
+      },
+      "requiredFiles": [
+        "decision.json",
+        "manifest.json",
+        "model.aimodel/main.hash",
+        "model.aimodel/main.mlirb",
+        "model.aimodel/metadata.json",
+        "tokenizer.json",
+        "tokenizer_config.json"
+      ]
     }
   ]
 }

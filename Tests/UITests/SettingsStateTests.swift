@@ -129,7 +129,7 @@ import Testing
 @Test @MainActor func localModelSettingsExposeOnlySupportedRoles() {
     #expect(LocalLanguageModel.allCases.filter { $0.supports(.assistant) } == [.gemma, .apple])
     #expect(LocalLanguageModel.allCases.filter { $0.supports(.writer) } == [.gemma])
-    #expect(LocalLanguageModel.allCases.filter { $0.supports(.decision) } == [.gemma, .apple, .edge, .lite])
+    #expect(LocalLanguageModel.allCases.filter { $0.supports(.decision) } == [.gemma, .apple, .edge, .lite, .vela])
     let resources = ModelResourcesState()
     #expect(!resources.appleSystemAvailable)
     #expect(resources.applySnapshot(.init(items: [], appleSystemAvailable: true), generation: resources.beginRefresh()))
@@ -137,11 +137,8 @@ import Testing
 }
 
 @Test func localModelRecommendationsUseRoleSpecificMeasurements() {
-    #expect(LocalLanguageModel.lite.benchmark(for: .decision)?.halfStars == 8)
-    #expect(LocalLanguageModel.edge.benchmark(for: .decision)?.halfStars == 5)
-    #expect(LocalLanguageModel.apple.benchmark(for: .decision)?.halfStars == 5)
-    #expect(LocalLanguageModel.gemma.benchmark(for: .decision)?.halfStars == 5)
     for model in LocalLanguageModel.allCases {
+        #expect(model.benchmark(for: .decision) == nil)
         #expect(model.benchmark(for: .assistant) == nil)
         #expect(model.benchmark(for: .writer) == nil)
     }

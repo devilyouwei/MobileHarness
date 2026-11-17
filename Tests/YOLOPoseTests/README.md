@@ -17,3 +17,5 @@ Real-model tests and benchmarks load yolo26n-pose only. Tensor fixtures are [1,3
 - Human-image accuracy, cancellation under device load and iPhone performance acceptance.
 
 - These microbenchmarks exclude camera, prediction and UI, and cannot claim phone throughput.
+
+CoreMLTensorTransferTests validates the shared CoreML graph transfer with dense Float16/Float32/Double/Int32 tensors and padded strided storage, including padding preservation.

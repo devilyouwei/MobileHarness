@@ -2,7 +2,7 @@
 
 ## Ownership and interfaces
 
-AssistantAgent binds AssistantChatWorker to AssistantContextState. The worker owns Assistant's conversation schema, Decision/ReACT orchestration, Task controls, input classification, Writer feedback and reply lifecycle. Its generic state seam supports isolated fixtures; it is not a common runtime for other production roles. Shared [Chat](../Support/Chat/README.md) supplies model driving, recording, neutral projection and templates; [Core](../Support/Core/README.md) supplies parsing, permissions and round coordination.
+AssistantAgent binds AssistantChatWorker to AssistantContextState. The worker owns Assistant's conversation schema, Decision/ReACT orchestration, Task controls, Decision submission, Writer feedback and reply lifecycle. Its generic state seam supports isolated fixtures; it is not a common runtime for other production roles. Shared [Chat](../Support/Chat/README.md) supplies model driving, recording, neutral projection and templates; [Core](../Support/Core/README.md) supplies parsing, permissions and round coordination.
 
 AssistantContainer is the stable child capability of AgentContainer. It retains AssistantExecutionSession, private context, registration and bound output workers, and exposes conversation/activity projections. The module root owns startup and joined shutdown; the child neither controls peer roles nor grants execution authority. Static category comes from the role's Agent.json.
 
@@ -37,14 +37,14 @@ Native observations and UI requests have role-owned consumers. Final SpeechPerce
 | [AssistantAgent.swift](AssistantAgent.swift) | Concrete public worker/state binding. |
 | [AssistantChatWorker.swift](AssistantChatWorker.swift) | Actor-owned decision loop, admission, Task/Skill controls, generation, round joins and peer feedback. |
 | [AssistantChatContext.swift](AssistantChatContext.swift) | AssistantChatState, workflow control intent, transactional AssistantHistoryContext and recovery/compression. |
-| [AssistantHistoryProjection.swift](AssistantHistoryProjection.swift) | Decision exchange selection, durable history reconstruction and private request selection. |
+| [AssistantHistoryProjection.swift](AssistantHistoryProjection.swift) | Durable history reconstruction and private request selection. |
 | [AssistantContainer.swift](AssistantContainer.swift) | Stable role capability, UI-facing state/control and resident-state projection. |
 | [AssistantExecutionSession.swift](AssistantExecutionSession.swift) | Registration, output ownership, task/waiting/Decision presentation and joined session cleanup. |
 | [AssistantGenerationTransport.swift](AssistantGenerationTransport.swift) | Ordered output reader, bounded native execution slots and per-round seals. |
 | [AssistantProcessing.swift](AssistantProcessing.swift) | Concrete state, prompt/capability assembly, preprocessing and history binding. |
-| [AssistantSessionControl.swift](AssistantSessionControl.swift) | Host interrupt/close message and typed decoding. |
-| [AssistantDecisionProtocol.swift](AssistantDecisionProtocol.swift) | Mode selection, context projection, wire constraints and classification decoding. |
-| [AssistantInputDecision.swift](AssistantInputDecision.swift) | Input classification, enqueue-on-error, adopted disposition and Decision log projection. |
+| [AssistantSessionControl.swift](AssistantSessionControl.swift) | Runtime cleanup/close message and typed decoding. |
+| [AssistantInterrupt.swift](AssistantInterrupt.swift) | Public interruption target, signal and result contracts. |
+| [AssistantInputDecision.swift](AssistantInputDecision.swift) | Frozen current-turn context, localized interruption question, ModelKit noul invocation, independent bounded classification queue, targeted signal submission and log values. |
 | [AssistantInputBatch.swift](AssistantInputBatch.swift) | Trusted source timeline, batch text, historical marker parsing and input prompt access. |
 | [AssistantStateBindings.swift](AssistantStateBindings.swift) | Business-only exact-path State adaptation. |
 | [AssistantSpeechOutput.swift](AssistantSpeechOutput.swift) | AssistantSpeechProducing contract, audio-handle production and synthesis/playback presentation. |
@@ -52,9 +52,10 @@ Native observations and UI requests have role-owned consumers. Final SpeechPerce
 
 ```mermaid
 flowchart TB
-    Input["Home text / final ASR"] --> Decision["Input Decision"]
+    Input["Home text / final ASR"] --> Queue
+    Input --> Decision["Independent noul inference"]
     Peer["Authenticated peer / execution facts"] --> Queue["Semantic queue"]
-    Decision --> Queue
+    Decision -->|"target-bound interrupt signal"| Worker
     Queue --> Selection["Committed context / history / effective Skills"]
     State["Exact owner State reads"] --> Selection
     Selection --> Worker["AssistantChatWorker"]
@@ -83,7 +84,7 @@ Public Agent introductions are limited to 8,192 bytes and filtered by actual del
 
 System instructions are limited to 64 KiB. Current Assistant Skills expose XML Actions and no native request tools; the native-call machinery remains available for controlled fixtures. Writer owns its independent native tool workflow. Already dispatched requests and recorded evidence are not rewritten when Skills or language change.
 
-Assistant/Prompts.json owns execution evidence, Task-history prefixes, Writer coordination and default reply language. InputProtocol.json owns input guidance and canonical timeline markers. InputDecision.json and its zh-Hans sibling own localized Chat classification templates and identical English JEV speech-state rules and semantic candidates. Shared RequestContext templates render fresh State and image manifests. InputDecisionOutcome's UI log projection stays in Assistant; generic runtime logs retain their existing AppLanguage injection.
+Assistant/Prompts.json owns execution evidence, Task-history prefixes, Writer coordination and default reply language. InputProtocol.json owns input guidance and canonical timeline markers. InputDecision.json and its zh-Hans sibling own localized boolean interruption questions. Shared RequestContext templates render fresh State and image manifests. InputDecisionOutcome's UI log projection stays in Assistant; generic runtime logs retain their existing AppLanguage injection.
 
 ## Task and Skill lifecycle
 
@@ -143,23 +144,17 @@ Shared driver queue and provider lifecycle limits are documented in [Chat](../Su
 
 ## Full-duplex input and Decision
 
-Root composition enables fullDuplex. Only authenticated SpeechPerception final transcripts and local user text enter AssistantInputDecision. Authenticated peer messages and correlated execution facts receive trusted agent/action attribution and bypass user classification; payload text cannot claim a trusted source.
+Authenticated SpeechPerception final transcripts and local user text enter the ordinary queue before Decision runs. Peer reports and correlated Action facts bypass Decision. Queue capacity, attribution, batching and round settlement remain admission/dispatch concerns; classification never gates them.
 
-Assistant exposes a same-session reply activity query to SpeechPerception through runtime composition. Active reply work, uncancelled pending round settlement, or reported playback selects the shorter speech endpoint during normal operation. When an admitted input interrupts the bound speech interaction, Assistant publishes a one-shot marker before cancellation. It retains that marker until the matching final ASR acknowledgement or session closure. A classification snapshots language and committed configuration. Its Chat prompt presents the allowed action definitions, current execution/playback and pending-question facts, the latest earlier dispatched exchange in the same dialog, buffered user input, and a question quoting the latest input. History uses up to 80 characters per side, including a reply still streaming. A merged historical batch uses its latest actual user input. The buffer contains up to three earlier admitted, undispatched inputs from the same session in arrival order, up to 80 characters each. Peer/Action data and media do not enter this prompt. Execution includes pending round settlement; playback is yes, no or unknown, rather than inferred from execution. The captured pending question uses at most its last 80 characters. Question and input text are JSON-quoted and escaped as data. These facts also remain available to Assistant's adoption checks. The Chat enqueue definition makes it the default under uncertainty. The other definitions protect brief answers and distinguish immediate correction from ordinary additions.
+AssistantInputDecision owns the localized interruption question and calls only ModelKit `noul`. A frozen snapshot contains `current_turn` (the current user request and natural-language text admitted to playback, if a reply exists) and `incoming_user_input`. It contains no completed earlier turns, queued messages, busy flag or playback state. Input text is JSON data and is not translated. Only an explicit immediate stop, pause, correction or replacement is true; additions, quotations, answers, negated/deferred stops and new questions are false. ModelKit owns all provider encoding and readout; no keyword rule overrides the boolean.
 
-[AssistantDecisionProtocol](AssistantDecisionProtocol.swift) projects the shared snapshot and returns the same disposition with each protocol. JEV renders a minimal JSON State with only utterance (including newline-joined held fragments) and assistant_busy (execution or playback). Earlier exchanges, queued inputs and pending questions are not sent to JEV. Both App languages use the same short English classification question and Interrupt, Discard, Enqueue and, for final speech only, Continue listening definitions; input text retains its original language. The selected full candidate is validated against the submitted list and mapped by index to interrupt, discard, enqueue or continue_listening. Numeric or unknown candidate output is rejected. Request logs record the actual State, Question and semantic Options. D3 Edge and Lite share this JEV contract. ModelKit enforces the graph's 512-token bound. Tool sends the five sections as one user message, declares only classify_input, and accepts one call with a valid action and a tool completion. Text sends the five sections with a localized single-digit instruction in the same user message and accepts one allowed digit with normal completion. The two Chat paths reserve 128 and 16 output tokens respectively. They carry no action history or assistant tools. Local and cloud Chat use the same capability gate and mode policy. The policy chooses Text for a text-only adapter, uses the measured preference for an exact known model identity, and uses Tool for other tool-capable adapters. Qwen3.7 Flash and Qwen3.8 Flash select Text using the matched [protocol benchmark](../../../docs/validation/Decision-Model-Mac-Comparison.md#assistant-decision-protocol-benchmark). Gemma selects Text on raw accuracy and protocol validity. Both Gemma modes exceeded the local deadline in the benchmark.
+At receipt the worker captures the reply identity before asynchronous admission. Successful queue admission submits a frozen snapshot to AssistantDecisionQueue in AssistantInputDecision.swift. This role-owned actor owns bounded serial Decision work (32 pending including the running item), cancellation and joined cleanup; it runs independently of ordinary queue dispatch. A true result submits an AssistantInterrupt with the captured reply target to the common requestInterrupt entry. It does not cancel execution directly. The worker checks identity and current activity and installs the execution cancellation barrier before crossing actors. Cancellation joins existing model/action/playback cleanup before ordinary queue dispatch resumes. Idle arrivals have no target, so their later result cannot cancel their own reply. Ended or replaced targets and duplicate signals have no effect on successors. Pause/stop cancels Decision; close removes that session's pending jobs and invalidates its target.
 
-Each classification invokes only the committed model and selected protocol. Switching models joins in-flight work and unloads a previous dedicated D3 graph. ModelKit manages local Chat bindings shared with other roles. Removing an active D3 or Gemma package joins Decision work before deletion. Missing configuration, timeout, inference failure, context overflow and invalid output use conservative enqueue with a localized error Toast. No transcript-word, punctuation or filler heuristic overrides the model or changes failure handling. Cancellation and stopped inputs suppress error Toasts. Warm D3 budget is 250 ms, local Chat classification budget is 500 ms, and total budget from queue admission is two seconds. Late results cannot alter adopted decisions. Root shutdown joins cleanup. Preparation failure resets on resource updates. Individual inference failure leaves later classification available.
+Selected models are exclusive: D3 Edge/Lite, Vela, or existing local/cloud Chat through ModelKit's ChatDecision adapter. Switching dedicated models joins work before unloading. Native timeout is one second, local Chat 500 ms and total age budget two seconds. Errors, missing resources, overflow and timeouts remain explicit failures; they never fabricate false, remove queued messages or switch models. A full Decision backlog records a failure while the input remains in the ordinary queue. Native context capacity overflow fails without silently truncating the latest input.
 
-Logs retain the per-classification model name (D3 Edge, D3 Lite, Gemma 4 E2B, Apple System LLM, or the resolved cloud ChatModel.modelName), raw/adopted dispositions, the selected model request and original failure reason; no cloud-fallback field is projected. Failure retains the model identity when already known; unresolved identity remains absent. UI presents model output separately from the policy-adopted result and never reinterprets numeric labels. Measured classification duration starts before playback/history preparation and ends at the final decision; classification queue waiting, decision execution, interruption cleanup and log publication are excluded.
+Logs distinguish the raw boolean from signal status (`not_requested`, `no_target`, `target_expired`, `interrupted`, `interrupt_failed`, `decision_failed`), selected model, submitted semantic request and failure details. The measured duration covers classification, excluding earlier queue waiting and signal application/cleanup. Historical UI dispositions remain readable but are not produced by the new classifier. Only a completed interruption emits transient Island feedback. There is no discard/continue-listening path, held speech buffer or fragment concatenation.
 
-Enqueue retains pending input. Discard completes the candidate and emits transient feedback. Model discard is retained for speech, typed input and bound answers; semantic usefulness does not override it. Interrupt first retains new input; if the original reply was absent or changed generation, it only enqueues. Same-generation interrupt joins old execution cleanup before the next request.
-
-Full-duplex ASR offers continue listening alongside interrupt, discard and enqueue. JEV uses semantic descriptions; Chat Text uses numeric labels 1–4. Typed input offers only the first three actions. Assistant keeps held speech by session outside the main request queue. The next final ASR joins those fragments with newlines in the latest Decision input. Enqueue or interrupt releases all fragments into one admitted batch with their original input attribution. Discard applies to the current fragment and retains earlier held speech. A hold leaves the active reply and VAD policy alone. The same admission budget counts held items, with at most three fragments and 640 UTF-8 bytes per session and a slot reserved for a follow-up. When a meaningful input cannot be held within these limits, model continue-listening is adopted as enqueue; the existing held fragments and current input are released together, with the capacity reason in the Decision log. Session close, pause, and stop retire held fragments. Storage still creates a Message at main model dispatch. Existing model comparisons measure the original three choices.
-
-A single main model request runs at a time. After stream seal, pending rounds retain original identity/capabilities until actual Gateway terminal feedback. Settlement freezes same-session input already being admitted/classified, waits for that set, then atomically takes ready semantic input; later arrivals do not extend the waiting set. Each complete native call/result block appears once. Ordinary Action business values/failures are deduplicated before enqueue; successful Void/internal completion/pure cancellation only settle the original call.
-
-Preparation failure retains the in-memory batch and blocks that session, reports the actual failure and retries only with a new user input. It does not hot-loop or create a historical request before dispatch. Pause/close/stop clears unissued batches; already dispatched failures settle their original Message. Pause cancels classification/current/pending requests and revokes round admission; resume accepts new input rather than replaying old batches. Interrupted missing results are recorded as cancelled with unknown effect. Every batch member settles on completion, failure or cancellation.
+The same-session reply activity query still includes active execution, unsettled rounds and reported playback, and selects the existing dynamic speech endpoint. A successful target claim publishes a one-shot interruption marker until matching final-ASR acknowledgement or session closure. This runtime state is not sent to the model.
 
 ## Input timeline and channels
 
@@ -168,6 +163,8 @@ AssistantInputBatch renders single and multi-source inputs as one timeline: orig
 AssistantGenerationTransport has one ordered reader for Actions and wait boundaries. Reply captions use Display, speech playback uses Speech and task.end uses Control. Each Channel remains FIFO in the session domain; different Channels can run under resource/wait constraints. Native calls retain independent pairing and bounded slots. Stream completion is separate from execution and result-delivery completion. See [Gateway scheduling](../../Gateway/Output/Scheduling/README.md).
 
 Default text segmentation uses first-segment Han/other thresholds of 20/60 and subsequent 60/120, preserving safe word/sentence boundaries. XML/wait boundaries flush without resetting first-segment state; there is no timer flush. A completed text segment produces its caption/synthesis/playback intent.
+
+Full-duplex Action and native Tool result inputs retain their originating conversation turn and task scope while owning distinct input IDs and runtime attribution. Their next model request establishes a fresh Decision identity through beginReplyTurn, so observation-driven replies replace the previous caption and append through the same fenced Display path as direct replies. Inputs without a presentation turn remain without one; stale Decisions and cancelled turns remain rejected by Actions.
 
 ## State and image ownership
 
@@ -185,7 +182,7 @@ Island State exposes activity/title/selection/submission and local presentation 
 
 ## Presentation, speech and cleanup
 
-AssistantExecutionSession owns separate Task, inference-waiting and Decision feedback activities. Waiting facts originate from the worker; content and internal UI.Island calls are role-owned. Confirmed discard or joined same-generation interruption shows approximately three seconds of replaceable local detail. New feedback replaces the timer/content; suspension/stop cancels and ends it. Stop joins final presentation cleanup before role retirement. Presentation failure remains observable and internal receipts do not enter inference.
+AssistantExecutionSession owns separate Task, inference-waiting and Decision feedback activities. Waiting facts originate from the worker; content and internal UI.Island calls are role-owned. A joined same-generation interruption shows approximately three seconds of replaceable local detail. New feedback replaces the timer/content; suspension/stop cancels and ends it. Stop joins final presentation cleanup before role retirement. Presentation failure remains observable and internal receipts do not enter inference.
 
 AssistantSpeechProducing is bound once while idle. prepare reserves an audio handle, not audible completion; an absent producer fails explicitly. AssistantSpeechOutput owns a stable role subcomponent, without Agent registration or Signal intake. Native startup installs ModelKit TTS and AudioCache; playback still uses Gateway and Actions.
 
@@ -196,3 +193,27 @@ Every synthesis request joins provider cleanup before completing/failing cache. 
 Speech presentation has its own identity. Actual audioID playback callbacks prevent old completion from hiding a new activity; synthesis finish cannot hide ongoing playback. Playing takes precedence over producing. Spectrum is a direct player/UI data path. Synthesis admission, provider cleanup and native playback drain are distinct completion boundaries. SpeechPlaybackFailure adapts user-facing copy after actual cleanup while preserving the underlying error.
 
 Worker, speech producer and output scopes outlive pages. Interrupt/pause joins current owned work while retaining unfinished Task/Skills; close ends matching execution/State scopes; root stop joins all workers. AssistantChatState decodes its host-control contract into AssistantChatControl and the worker validates local runtime origin before cleanup. Fixture state does not inherit another role's host-control schema. Listening remains SpeechPerception-owned, and other roles retain their own lifetimes.
+
+AssistantSpeechOutput records paired native playback start/end times separately from synthesis and reply work. Its bounded SpeechPlaybackHistory retains at most 32 intervals and exposes a same-session SpeechPlaybackSnapshot to SpeechPerception through root injection. Late ends cannot close another audio ID; playback state retains its 200 ms tail for onset-threshold selection. Audio-scope shutdown clears the history. The native timestamp describes first scheduled playback, not a measured acoustic arrival.
+
+## Unified interruption control
+
+`AssistantInterrupt.swift` owns the typed `assistant.interrupt` v1 communication contract. Targets are `.current` (lock the same-session reply when received) or `.reply(UUID)` (match an already captured reply). `AssistantChatWorker.requestInterrupt` is the shared entry for Decision, trusted host controls and authorized Agent messages. An idle Decision sends no signal; an external idle request returns `no_target`. A public `currentReplyID(sessionID:)` exposes the opaque target to trusted callers without granting communication authority.
+
+The entry validates the current target, claims it and sets the dispatch barrier on the worker actor before invoking the execution-session cleanup callback. Cleanup joins model, Action and playback cancellation and settlement; only then does dispatch resume. Results are interrupted/no_target/target_expired/duplicate; failures throw. Recent source/session/signal identities use a 128-entry FIFO receipt set, including ignored and failed requests; there is no automatic replay or durable exactly-once promise. Closing a session or stopping the Agent remains a separate lifecycle control.
+
+AgentContracts registers the schema and Agent.json declares an observation input. Gateway enforces sender `sends` and receiver `inputs`; no role gains sending permission merely by this declaration. External device/world events enter through their owning role or a trusted host adapter. The receiver handles interruption before ordinary admission, validates contract/version and provenance, and records a control result; it neither queues the signal as user text nor runs Decision on it. Transport receipts retain admission semantics. Host `interruptConversation` also uses the common entry; its private execution callback is cleanup-only. Internal `assistant.control` remains restricted to the runtime for cleanup and session closure.
+
+```mermaid
+flowchart LR
+ Text[ASR final / user text] --> Queue[Ordinary input queue]
+ Queue --> Dispatch[Normal dispatch]
+ Queue --> Decision[Independent Decision queue and noul]
+ Decision -->|targeted true signal| Entry[requestInterrupt]
+ Host[Host stop request] --> Entry
+ Peer[Authorized Agent] --> Gateway[Gateway / assistant.interrupt]
+ Gateway --> Entry
+ Entry --> Claim[Claim matching reply and fence dispatch]
+ Claim --> Cleanup[Cancel and join execution cleanup]
+ Cleanup --> Dispatch
+```

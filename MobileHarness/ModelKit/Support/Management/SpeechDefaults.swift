@@ -1,6 +1,7 @@
 import Foundation
 import ModelKit
 import ModelKitAppleSpeech
+import ModelKitDeepFilterNet3
 import ModelKitEnergy
 import ModelKitMossNano
 import ModelKitNemotron
@@ -10,6 +11,13 @@ import ModelKitSilero
 extension DefaultModelAssembly {
     @available(iOS 27, macOS 27, *)
     static func registerSpeechModels(manager: ModelManager, resources: URL) async throws {
+        try await manager.register(
+            ModelRegistration(id: ModelID("deepfilternet3"), capabilities: [.enhancement], artifactID: "deepfilternet3")
+            { context in
+                ProvidedCapabilities(
+                    enhancement: try DeepFilterNet3(
+                        context: context, artifacts: resources.appendingPathComponent("DeepFilterNet3")))
+            }, defaults: [.enhancement])
         try await manager.register(
             ModelRegistration(id: ModelID("silero"), capabilities: [.voiceActivity], artifactID: "silero") {
                 context in

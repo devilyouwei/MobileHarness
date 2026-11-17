@@ -21,6 +21,16 @@ extension DefaultModelAssembly {
                 ProvidedCapabilities(
                     decision: try D3Decision(context: context, artifacts: resources.appendingPathComponent("D3Lite")))
             })
+        try await manager.register(
+            ModelRegistration(
+                id: ModelID("vela3-fast"), capabilities: [.decision], memoryPolicy: .retain,
+                artifactID: "vela3-fast"
+            ) { context in
+                ProvidedCapabilities(
+                    decision: try VelaDecision(
+                        context: context,
+                        artifacts: resources.appendingPathComponent("Vela3Fast")))
+            })
     }
     static func registerVision(manager: ModelManager, resources: URL) async throws {
         try await manager.register(

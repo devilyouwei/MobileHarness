@@ -55,6 +55,7 @@ enum LocalLanguageModel: String, CaseIterable {
     case apple = "apple-system"
     case edge = "d3-edge"
     case lite = "d3-lite"
+    case vela = "vela3-fast"
 
     var title: String {
         switch self {
@@ -62,6 +63,7 @@ enum LocalLanguageModel: String, CaseIterable {
         case .apple: "Apple System LLM"
         case .edge: "D3 Edge"
         case .lite: "D3 Lite"
+        case .vela: "Vela 3 Fast"
         }
     }
 
@@ -69,20 +71,13 @@ enum LocalLanguageModel: String, CaseIterable {
         switch self {
         case .gemma: true
         case .apple: brain != .writer
-        case .edge, .lite: brain == .decision
+        case .edge, .lite, .vela: brain == .decision
         }
     }
 
     func benchmark(for brain: AgentBrain) -> LocalModelBenchmark? {
-        // Measured production protocols on matched English and Chinese fixtures (54 requests per model).
-        // Sources: docs/measurements/decision-protocols-local-2026-11-15.json and d3-lite-hugging-mac-2026-11-15.json.
-        switch (brain, self) {
-        case (.decision, .apple): .init(correct: 31, total: 54, p95Milliseconds: 305.21)
-        case (.decision, .edge): .init(correct: 21, total: 54, p95Milliseconds: 53.34)
-        case (.decision, .lite): .init(correct: 41, total: 54, p95Milliseconds: 117.83)
-        case (.decision, .gemma): .init(correct: 32, total: 54, p95Milliseconds: 10203.26)
-        default: nil
-        }
+        // The old multi-class scores do not measure the binary interrupt task.
+        nil
     }
 }
 

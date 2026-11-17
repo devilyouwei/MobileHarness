@@ -92,11 +92,14 @@ extension AgentManager {
         let value: ResourcesInput
         switch intent {
         case .restoreSource: value = .restore
-        case .saveSource(let endpoint, let cellular, let recognition, let synthesis, let decision):
+        case .saveSource(
+            let endpoint, let cellular, let recognition, let synthesis, let decision, let windows, let threshold,
+            let enhancement):
             value = .save(
                 .init(
                     endpoint: endpoint, allowsCellular: cellular,
-                    useCustomRecognition: recognition, useCustomSynthesis: synthesis, useLocalDecision: decision))
+                    useCustomRecognition: recognition, useCustomSynthesis: synthesis, useLocalDecision: decision,
+                    vadOnsetWindows: windows, vadThreshold: threshold, useSpeechEnhancement: enhancement))
         default: throw CommunicationError.unauthorized
         }
         guard case .source(let result) = try await resources.requests.submit(value) else {

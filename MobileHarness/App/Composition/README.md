@@ -118,3 +118,11 @@ Assistant 会话使用角色自身的 UI.Island 权限发布 Decision 反馈。A
 ApplicationActionAssembly 将 ActionsBusinessBindings.readWebScreenshot 直接透传给 AgentBusinessBindings。Actions.Web 拥有当前截图，AgentRuntime 注册 actions.web.screenshot，App 不存储、压缩或解读图片；原 Camera readPhoto 网页桥接已删除。
 
 ApplicationActionAssembly receives the existing selected-language reader from ServiceFactories and passes its current value into ActionActivityItem projection for each execution snapshot. The language preference remains App-owned; projection does not rewrite canonical identities, business return values or producer diagnostic evidence.
+
+ApplicationActionAssembly forwards the Actions-owned speech-detection preference reader to AgentBusinessBindings unchanged. Agents snapshots the returned window count and probability when creating its VAD session; App neither stores nor interprets those settings.
+
+Home preparation appends the selected local Decision step to language, recognition, synthesis, voiceActivity and optional vision. Selection comes from Agents; loading/readiness belongs to ModelKit. Cloud/inherited Decision adds no local load. The same foreground worker serializes preparation and rechecks every step before reporting ready; shared Gemma resources already ready are not loaded again.
+
+Foreground model preparation adds an optional enhancement step: prepare/read artifact inventory, select deepfilternet3 only when installed, then join its normal managed load. This ignores the listening enablement switch; absent models are ready/no-op. The durable denoising preference passes from Actions bindings to Agents; the ModelKit speech enhancement port reaches SpeechPerception through the voice composition.
+
+语音宿主桥透传 playbackChanged(audioID, active, time) 的单调原生播放时刻，不在组合根推断播放开始或执行 ASR 冷却。

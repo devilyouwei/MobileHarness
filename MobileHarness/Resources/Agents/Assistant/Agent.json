@@ -29,6 +29,11 @@
         "contract": "runtime.message.receipt",
         "version": 1,
         "kind": "communicationReceipt"
+      },
+      {
+        "contract": "assistant.interrupt",
+        "version": 1,
+        "kind": "observation"
       }
     ],
     "subscriptions": [

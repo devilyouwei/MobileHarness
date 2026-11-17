@@ -97,3 +97,9 @@ AppleAudioIO保留同图采播、首帧就绪、配置通知事实复核和一�
 文档核对补充：PlatformKit 根README含旧系统回消优先/失败受限描述，随实现改为组合VoiceProcessing必需且失败明确退出；总体README的播放流程同步说明手机/耳机按已确认的组合处理能力全双工，不改变模块边界或生命周期所有权。
 
 本节代码与技术README已同步；16项定向测试、五目标iOS及真机构建通过，已安装启动。完整检查其他失败/停滞记录保留；手机和AirPods分别全双工无误字幕、双讲打断的实机验收仍待完成。蓝牙半双工不再是本项目修复方案。
+
+## 2026-11-16 可配置 VAD 起声检测
+
+在 Speech Recognition 页面添加起声窗口数与概率阈值滑块。窗口 1…16、step 1，每窗为 16 kHz 下 512 样本（32 ms）；概率 0.05…0.95、step 0.05；默认 8 / 0.65。沿 UI 草稿 → ApplicationControl 意图 → Actions 偏好文档保存，旧文档缺字段使用新默认，非法值拒绝。Actions 通过 App 组合的只读配置闭包提供给 SpeechPerception，新采集使用快照，不在音频逐包处理中读磁盘。保留全双工与现有端点静音策略；前滚缓存覆盖最长起声候选，避免丢失句首。修改 UI Settings、Actions ModelResources、Agents ApplicationControl/SpeechPerception 和组合接口，并同步各自 README 与总体流程。验证边界、阈值、候选长度、旧配置解码、持久化传输及构建；真机回声改善单独验收。
+
+上述配置链路、滑块、候选缓存和文档已实现；定向回归及五目标 iOS 构建通过。完整检查的既有失败和未完成阶段见 validation/Listening-Interruption-Recovery.md。手机/AirPods 上用新参数对照误字幕与插话效果仍需实测。

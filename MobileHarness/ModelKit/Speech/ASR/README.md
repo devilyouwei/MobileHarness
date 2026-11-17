@@ -24,7 +24,7 @@ flowchart LR
 
 Recognition input retains AudioFormat/InferenceContext and requested locale. Send preserves sequence/format and provider limits; finishInput closes input and drains final result; cancel stops/join-cleans without inventing a final transcript. Events carry segment/revision/context for consumers to reject stale updates. One provider operation rejects overlap; there is no shared request backlog here.
 
-Defaults selects enabled installed available Nemotron, otherwise modern Apple. Apple includes its native detector but external Silero/Energy supplies acoustic scores for caller-owned endpoint timing. No active-failure system/cloud fallback exists.
+Defaults selects enabled installed available Nemotron, otherwise modern Apple. Apple includes its native detector but external Silero/Energy supplies acoustic scores for caller-owned endpoint timing. No active-failure system/cloud fallback exists. TranscriptionEvent carries text, segment identity, revision and finality; it exposes no noise-label field. Consumers do not treat literal strings such as `[noise]` as provider control tokens.
 
 ## Related design
 

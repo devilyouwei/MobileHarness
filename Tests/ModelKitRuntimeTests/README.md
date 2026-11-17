@@ -56,4 +56,4 @@ Direct-input regressions cover typed request receipts, bounds, cancellation/gene
 
 Catalog architecture tests cover exact variant selection, source retention for unknown/no architecture, revision/required-file/size consistency and rejection of unsafe paths in an unselected variant.
 
-The production D3 catalog test checks that h18p selects pinned compiled-only graph inventories with companion tokenizer/manifest files, while non-iOS assembly retains source graphs.
+The production D3 catalog test checks that Edge selects the pinned hugging-mac source graph on h18p and non-device catalog resolution, while Lite retains its h18p compiled graph inventory and source default.

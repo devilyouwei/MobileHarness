@@ -4,6 +4,10 @@
 
 ## 当前验收入口
 
+[全双工播放保护与 ASR 冷却](Full-Duplex-Playback-Admission.md)：短时 PCM 丢弃、播放态起声、增强时间对齐及自动化/真机验收边界。
+
+[ReACT 回复字幕](ReACT-Reply-Captions.md)：工具结果续轮字幕、旧 Decision/取消轮次拒绝及构建与检查限制。
+
 [Application localization](App-Localization.md) records automated, bundled-resource, and native Simulator evidence separately from device and model acceptance.
 
 [Assistant 执行轮次结算](Assistant-Channel-Settlement.md) 记录相机 ReACT 拆批证据和缓冲回归。
@@ -190,6 +194,7 @@ refactor, Agent-only model recording, current-file recovery and automated/build/
 
 - [D3 Edge Core AI](D3-Edge-CoreAI.md)：本机 Core AI/PyTorch/Swift 对照、全双工文本三分类、性能与实验性发布证据。
 - [Mac 本地 Decision 多分类对照](Decision-Model-Mac-Comparison.md)记录全双工多分类的模型、提示词和时延对照。
+- [Mac 本地 Decision 打断意图二分类实验](Decision-Binary-Interrupt-Mac-Comparison.md)记录 D3 Edge 与 Vela3 Fast 的三波对照，包括单句、中英提示与 noul／choice、历史上下文。
 - [Decision prompt language split](Decision-Model-Mac-Comparison.md#decision-prompt-language-split) compares the current English and Chinese prompts with the pre-split mixed prompt using native D3 and the application adoption policy.
 - [小参数生成模型的 Core AI 对照](Decision-Model-Mac-Comparison.md#小参数生成模型的-core-ai-对照)记录 0.6B 至 1.54B 制品在 100 条中英全双工探测上的分类、延迟和提示词复测。
 
@@ -206,6 +211,12 @@ refactor, Agent-only model recording, current-file recovery and automated/build/
 [Apple system LLM](Apple-System-LLM.md) records standalone provider compilation, contract tests, whole-workspace check failures and native-model acceptance limits.
 
 - [D3 iOS AOT validation](D3-iOS-AOT.md): compiler artifacts, publication, architecture selection and device-acceptance limits.
+
+[Decision 首页预加载](Decision-Startup-Preparation.md)：选中本地模型的启动准备、取消/重检、构建与验收边界。
+
+- [DeepFilterNet3 capability](DeepFilterNet3-Capability.md): independent enhancement DSP and Core ML validation.
+
+[DeepFilterNet3 listening integration](DeepFilterNet3-Listening.md) records optional startup loading, settings/workflow tests, real-model host timing and full-suite/device acceptance limitations.
 
 [D3 Edge 继续聆听四分类实验](Decision-Model-Mac-Comparison.md#d3-edge-继续聆听四分类实验2026-11-16)：最新生产提示、194条双语扩展场景、真实App采纳与独立原生读出，区分低召回、250ms超时及512-token容量。
 

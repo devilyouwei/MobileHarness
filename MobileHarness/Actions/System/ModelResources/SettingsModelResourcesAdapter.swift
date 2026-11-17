@@ -8,12 +8,18 @@ import UI
 public enum SettingsModelResourcesAdapter {
     nonisolated static let invalidSourceMessage = "Enter an HTTPS domain without a path, query, or credentials."
     public static func validatePreferences(_ draft: ModelResourcePreferences) throws -> ModelResourcePreferences {
+        guard (1...16).contains(draft.vadOnsetWindows), draft.vadThreshold.isFinite,
+            (0.05...0.95).contains(draft.vadThreshold),
+            abs(draft.vadThreshold * 20 - (draft.vadThreshold * 20).rounded()) < 0.00001
+        else { throw ModelResourcePreferenceError.invalidDetection }
         do {
             let source = try ModelDownloadSource(endpoint: draft.endpoint, allowsCellular: true)
             return ModelResourcePreferences(
                 endpoint: source.endpoint, allowsCellular: source.allowsCellular,
                 useCustomRecognition: draft.useCustomRecognition, useCustomSynthesis: draft.useCustomSynthesis,
-                useLocalDecision: draft.useLocalDecision)
+                useLocalDecision: draft.useLocalDecision,
+                vadOnsetWindows: draft.vadOnsetWindows, vadThreshold: draft.vadThreshold,
+                useSpeechEnhancement: draft.useSpeechEnhancement)
         } catch { throw ModelResourcePreferenceError.invalidSource }
     }
     public static func items(_ raw: String) throws -> ModelResourceViewSnapshot {

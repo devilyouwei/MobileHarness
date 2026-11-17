@@ -9,7 +9,7 @@ import Testing
 
 struct DecisionLanguageScenario: Codable {
     let id: String
-    let expected: InputDisposition
+    let expected: HistoricalInputDisposition
     let running: Bool
     let playing: Bool
     let english: Transcript
@@ -21,7 +21,7 @@ struct DecisionLanguageScenario: Codable {
         let question: String?
         let latest: String
 
-        func snapshot(id: String, scenario: DecisionLanguageScenario) -> InputDecisionSnapshot {
+        func snapshot(id: String, scenario: DecisionLanguageScenario) -> HistoricalInputDecisionSnapshot {
             .init(
                 input: .init(
                     id: id, sessionID: "decision-language", payload: .observation(.transcript(latest, final: true))),
@@ -36,9 +36,9 @@ private struct DecisionLanguageReport: Encodable {
         let caseID: String
         let inputLanguage: String
         let prompt: String
-        let expected: InputDisposition
-        let model: InputDisposition?
-        let adopted: InputDisposition
+        let expected: HistoricalInputDisposition
+        let model: HistoricalInputDisposition?
+        let adopted: HistoricalInputDisposition
         let route: String
         let reason: String?
         let measurement: MeasuredD3.Sample?
@@ -77,7 +77,7 @@ private actor MeasuredD3: ModelDecisionProviding {
         defer { sample = nil }
         return sample
     }
-    func decide(_ request: DecisionRequest) async throws -> InferenceSession<DecisionResult> {
+    func choice(_ request: DecisionRequest) async throws -> InferenceSession<DecisionResult> {
         let start = ContinuousClock.now
         func makeSample(score: Double? = nil, error: String? = nil) -> Sample {
             let duration = start.duration(to: .now).components
@@ -87,7 +87,7 @@ private actor MeasuredD3: ModelDecisionProviding {
                 score: score, error: error)
         }
         do {
-            let session = try await model.decide(request)
+            let session = try await model.choice(request)
             let result = try await session.withCleanup {
                 var values: [DecisionResult] = []
                 for try await value in session.events { values.append(value) }
@@ -136,7 +136,7 @@ private actor MeasuredD3: ModelDecisionProviding {
         var probes: [DecisionLanguageReport.Row] = []
         for prompt in ["en", "zh-Hans"] {
             let measured = MeasuredD3(model: model)
-            let classifier = AssistantInputDecision(
+            let classifier = HistoricalAssistantInputDecision(
                 local: measured, configuration: { (true, nil) }, language: { prompt })
             for _ in 0..<3 {
                 let warmup = await classifier.classify(first.english.snapshot(id: "warmup", scenario: first))

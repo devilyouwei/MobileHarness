@@ -1,0 +1,60 @@
+{
+  "inputPath" : "/Users/devil/Pro/MobileHarness/docs/measurements/decision-history-binary-capacity-input-2026-11-17.json",
+  "inputSHA256" : "53902bb04f3e4d113e06996a6cabbfafb72f9f33f49eb7f2b6f64a0c02122b64",
+  "mode" : "experiment-only-native-readout-no-adoption-or-250ms-deadline",
+  "model" : "d3-edge",
+  "rows" : [
+    {
+      "error" : "invalidRequest(\"D3 input exceeds 512 tokens; input was not truncated\")",
+      "expected" : "unspecified",
+      "group" : "capacity",
+      "id" : "capacity-long",
+      "inputTokens" : 942,
+      "language" : "zh",
+      "milliseconds" : 20.807,
+      "variant" : "native_noul"
+    }
+  ],
+  "runnerSHA256" : "24a7a3087556274c640bd7445699fa4777bd4a57bb884561929949bcec8d7e5f",
+  "sourceHashes" : {
+    "MobileHarness/ModelKit/Language/JEV/D3Decision.swift" : "3f73d47f20b6553e51cbd6883a7823c7a7c9f5224fe37b38c52d77bfe73cec42",
+    "MobileHarness/Resources/Agents/Assistant/InputDecision.json" : "cf6cee82363c0143adf0bc6fa014f075e1437c7f264677159802520e77877d38",
+    "Tests/DecisionBenchmarks/binary_interrupt_experiment.py" : "5715058c21233f812d6f9c03abd0fa1259fc095762226708516438bf4b65f733",
+    "Tests/DecisionBenchmarks/history_binary_experiment.py" : "0094fcbfa46af3f5a515281ca9a9dca501d6ba6adff0f8605db0e9fe7a044ea5",
+    "Tests/DecisionBenchmarks/localized_binary_experiment.py" : "8731a6415cb3dbd9a8f6cbcd73336e1d49f59a6efbd36c2cc6f183f26e346559",
+    "Tests/IntegrationTests/DecisionPromptOptimizationTests.swift" : "24a7a3087556274c640bd7445699fa4777bd4a57bb884561929949bcec8d7e5f"
+  },
+  "sourcesUnchanged" : true,
+  "warmup" : [
+    {
+      "error" : "invalidRequest(\"D3 input exceeds 512 tokens; input was not truncated\")",
+      "expected" : "unspecified",
+      "group" : "capacity",
+      "id" : "capacity-long",
+      "inputTokens" : 942,
+      "language" : "zh",
+      "milliseconds" : 57.569041,
+      "variant" : "native_noul"
+    },
+    {
+      "error" : "invalidRequest(\"D3 input exceeds 512 tokens; input was not truncated\")",
+      "expected" : "unspecified",
+      "group" : "capacity",
+      "id" : "capacity-long",
+      "inputTokens" : 942,
+      "language" : "zh",
+      "milliseconds" : 29.808792,
+      "variant" : "native_noul"
+    },
+    {
+      "error" : "invalidRequest(\"D3 input exceeds 512 tokens; input was not truncated\")",
+      "expected" : "unspecified",
+      "group" : "capacity",
+      "id" : "capacity-long",
+      "inputTokens" : 942,
+      "language" : "zh",
+      "milliseconds" : 22.215125,
+      "variant" : "native_noul"
+    }
+  ]
+}

@@ -610,6 +610,7 @@ extension LiveRuntimeTests {
         let finals = SoundPublications()
         let speech = try SpeechPerceptionAgent(
             recognition: SoundRecognition(), vad: EndpointVAD(), sessionID: session,
+            speechDetection: { (3, 0.65) },
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString,
                 state: SpeechPerceptionContextState())

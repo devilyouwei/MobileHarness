@@ -892,3 +892,68 @@ Vela的108条本地原生实验已完成，D3当前重测因自动模式磁盘�
 ## 2026-11-17 Hello 原样请求核查
 
 重放用户提供的Hello.最小JEV请求，检查当前手机模型收据/manifest，区分提示误判与端侧制品差异。只读手机模型元数据，不修改模型或App。用现有Mac D3自动模式入口保存三次完全相同请求的原始选择及分数，不以历史模板成绩代替此请求结果。
+
+## 2026-11-17 二分类打断实验
+
+用户要求放弃discard/continue分类，只测interrupt intent布尔：busy且true才打断，否则enqueue。模型预测与动作分开，空闲收到明确停止意图的raw真值仍为true，最终动作入队；不把动作围栏后的正确率冒充模型正确率。新增实验生成/评分脚本到既有DecisionBenchmarks目录，样例和结果仍在docs/measurements。冻结中英配对的立即停止、纠正、切换、问候、问答、未完成句、否定、引用、延后、普通补充及指令注入场景；每条busy/idle配对，模型仅见原文，不把忙闲作为语义标签。比较Yes/No与带定义的false/true两套提示，两模型各使用原生choice编码，直接映射到bool，不要求生成JSON。Vela CPU与D3自动模式串行执行、各条件预热三次。报告原始混淆矩阵、precision/recall/F1、误打断/漏打断、动作指标及端到端推理P50/P95和250ms超标；输入/模型/源码固定，不据结果改标签或提示。本轮只实验，不改App。
+
+本轮512次二分类推理完成；仍有中文漏打断及引用/延后误打断，未迁入App。方法及指标见[对照报告](../validation/Decision-Binary-Interrupt-Mac-Comparison.md#二分类打断意图对照2026-11-17)。
+
+## 2026-11-17 本地化 noul / choice 扩展实验
+
+用户要求完整比较原生noul与choice，中文/英文提示分别服务同语种为主、少量跨语种边界。本轮仍仅实验，不改App。新增既有DecisionBenchmarks目录内独立扩展脚本，冻结80个中英配对明确场景（沿用32回归，新增48），各语言加8跨语言、4混合语言、6歧义诊断。歧义输入不强行标签，不计准确率；同义翻译/重复状态不当独立样本。五条件：原生noul、与noul编码完全相同的choice控制、简短本地化choice、带定义choice及反序choice。固定阈值p(true)>0.5，平分取false，不看结果调阈值；报告精确率/召回率/F1、balanced accuracy、混淆矩阵、概率与latency，分中文英文主集、跨语种、混合及既有/新增。
+
+Vela直接调用发布适配器type=noul/choice；D3依照固定原始版本d3_format构造typed问题和选项，用现有Swift自动模式CoreAI入口执行相同原生代码读出，再按官方to_answer还原类型。记录此桥接而不称调用了完整上游PyTorch模型。D3保留官方英文system/State等协议文本，只有问题与自定义选项本地化；原生noul默认选项保持官方英文。Vela原生noul固定no/yes，不伪造中文原生选项。验证noul与控制choice的编码等价，单列结果差异。输入、源码、模型哈希固定，串行运行，预热排除；CPU Vela与自动D3延迟不宣称同加速器或真机。结果仍保存measurements，更新既有Mac报告与实验README；执行评分/协议校验、check.sh及build-ios.sh。
+
+扩展实验1960次推理已完成，零执行错误；两模型noul/等价choice概率完全一致，中文漏打断与候选偏置仍显著。五条件的双语主集、跨语言及混合边界、歧义输出与选项顺序差异见[验证报告](../validation/Decision-Binary-Interrupt-Mac-Comparison.md#本地化-noul-与-choice-扩展实验2026-11-17)。未改App或安装真机。
+
+## 2026-11-17 有历史上下文的独立二分类实验
+
+用户确认最多4轮已完成对话，另含当前轮次对应user请求、assistant已输出片段及独立incoming_user_input。本轮新增独立history_binary_experiment.py与history命名输入/报告，不混入单句基准、不改App。conversation按时间排序，当前轮次is_current_turn=true只标记语义对象，不传busy/playing/queue。比较0/1/2/3/4轮已完成历史（0轮仍含当前轮次），24个中英配对主场景及各4个对方语言边界；覆盖明确指令、当前回复纠正、否定/引用/未来条件、回答与取消的同句不同上下文、早期约定/指代、旧指令干扰。低轮次缺失判别证据的样例保留unspecified，不拿完整上下文标签强算错；另报所有轮次均可判样例的一致性。
+
+四格式：原生noul、等价choice控制、本地化短choice、定义choice。沿用固定模型及原生模板、pTrue>0.5；业务问题说明只判断新输入，历史命令不是新命令。各模型1120次，串行推理；同语种为主，跨语种单列。冻结前按真实tokenizer检查D3 512上限及Vela输入长度；不截断、不自动摘要。主集尽量用短的人工对话保证同请求可比较，额外长文本容量探针单列，不计语义/延迟主表。输出分语言/轮数/type的混淆矩阵、F1/召回、P50/P95/token，记录历史必要样例的可判覆盖率与上下文对照翻转。更新实验README及既有验证报告、测量索引；执行脚本校验、check.sh、build-ios.sh。
+
+历史独立实验2240次主测量已完成；原生容量探针942 token按预期拒绝。固定场景没有显示历史越多越好，按语言、轮数、格式分别报告，未改App默认上下文。完整证据见[验证报告](../validation/Decision-Binary-Interrupt-Mac-Comparison.md#历史上下文二分类独立实验2026-11-17)。
+
+
+## 2026-11-17 二分类独立打断信号（已批准实施）
+
+以本节替代旧多分类准入策略。有效用户最终文本先进入普通队列，再独立推理；模型失败不撤销接纳。捕获输入到达时的当前回复身份和当前轮用户/assistant 已输出片段，无更早历史、队列或忙闲字段。空闲输入无目标，迟到信号只能取消原目标，不能取消自身或后继回复。目标校验与取消启动由队列所有者隔离；取消后加入原清理，再继续普通队列顺序。
+
+ModelKit Language/JEV 的 DecisionCapability 提供 choice 和 noul 双类型接口；D3 与 Vela 编码、图输入输出、布尔读出内聚 ModelKit。AssistantInputDecision 独立文件只调用 noul，按 App 语言构建问题，成功保留原始布尔值，失败单独记录。现有 Chat provider 通过 ModelKit 布尔适配器接入，不在 Assistant 解码标签或工具。Vela 使用已验证清单的固定 revision/hash，纳入 ModelContainer、模型 catalog 和 Settings 选择、下载、加载与卸载；原 D3 源制品不变。复用现有目录，不新增目录。
+
+AssistantChatWorker 删除继续聆听 buffer、discard/continue 分支、拼接、专用计数及 Decision 对结算的等待；保留普通队列界限、合批、工具结算、全双工与动态音频配置。推理串行、有界（32），会话运行时负责取消并加入清理；失败和超限可见但不删除已入队文本。新日志分别记录布尔值和信号执行状态，旧日志枚举仅保留读取兼容。模型原生容量超限明确失败，不静默截断最新输入。
+
+受影响：ModelKit JEV 契约及适配器、ModelContainer 和资源目录；Assistant 决策、worker、历史/日志投影；UI 模型选择与 Decision 日志；相应本地化提示资源、测试和编译源列表。实现后同步各拥有者 README、总体架构及模型资源说明，历史实验记录不改写。
+
+验收：双模型 choice/noul 编码与实验适配器对齐；空闲自打断、迟到/重复信号、目标切换与连续输入；错误/超限不丢消息；中英文和跨语言当前轮案例及真实推理 P50/P95；分别记录 Mac 和真机结果；执行 scripts/check.sh 和 scripts/build-ios.sh 并如实记录未通过及未执行项。
+
+实施核对：真实 Swift 双模型测试的中文中位耗时超过旧原生250ms预算。保留原有超时/取消机制与接纳起2秒总预算，将单次原生推理预算调整为1秒；不改变模型布尔结果或引入重试。依据见 decision-binary-app-native-2026-11-17.json。
+
+用户收敛：Vela 使用与现有模型相同的 catalog schema，不新增 fileHashes 或逐文件校验。删除本次新增的字段、校验代码和测试。所有生产下载配置的 requiredFiles 与 allowPatterns 移除 LICENSE、NOTICE、README 等非运行文件；保留图本身要求的 main.hash 和 metadata.json 等运行制品。不改写历史实验的溯源证据。
+
+当前轮 assistant 内容取已提交播报的自然语言片段，不把模型流中的 XML/工具语法当作对话回复；沿用既有文本分段，不添加语义清洗规则。
+
+本节核心代码已实现：双接口/Vela下载选择、先入队与目标绑定信号、删除旧多分类/继续聆听路径。定向回归与 iOS 构建证据见二分类验证报告。真机当前 unavailable，安装及双模型手机验收仍待完成；全量检查的范围外失败保留原始记录。
+
+## 多问题 Decision 接口补充（2026-11-17）
+
+按用户要求，仅在 ModelKit 增加与 choice、noul 并列的 decide(MultiDecisionRequest)，Assistant 仍只调用 noul。修改 JEV/DecisionCapability.swift 的公共契约与默认执行、ModelContainer.swift 的提供者转发，以及 ModelKit、Language、JEV README；测试放在现有 ModelKitTests。
+
+请求共享 text、InferenceContext，问题按数组顺序提供唯一非空 ID 和 choice/noul 类型。每批 1–32 个问题，沿用单问题输入限制；结果按 ID 返回对应类型。默认实现串行调用所选提供者的原有接口，每题独立推理，不宣称单次图推理或共享编码。会话拥有执行任务；失败停止后续题，取消加入当前子会话清理；全部成功才发一个聚合结果，不提供默认值或隐式重试。测试覆盖混合问题、共享上下文、顺序、失败、取消和 ID 校验；运行仓库检查与 iOS 构建，记录未通过项。
+
+多问题接口已实现并同步三个 ModelKit 技术 README；4 项契约与生命周期测试、5 个 iOS 模拟器构建通过。全仓检查存在无关失败及未完成的 AppWorkflow 子阶段，详细证据见 `docs/validation/Decision-Binary-Interrupt-Mac-Comparison.md` 的多问题接口补充记录。Assistant 保持 noul 单题调用。
+
+## 统一打断入口与 Decision 代码域（2026-11-17）
+
+用户批准将 Decision 调度与队列控制分离。AssistantInputDecision.swift 内拥有独立的有界串行分类调度器（最多32项含正在执行）；ChatWorker 只提供入队后的冻结上下文，并接收分类证据。分类与普通消息处理并行，不让模型直接操作普通队列。
+
+新增 Assistant 所属的 assistant.interrupt v1 类型契约，支持接收时锁定当前回复或指定回复 UUID；宿主调用、授权 Agent 通信和内部 Decision 均进入 ChatWorker 的统一 requestInterrupt。Decision 仅提交捕获到的指定目标，无目标不发信号。目标与会话在任何异步检查前锁定，校验后在同一 actor 中设置取消屏障，再调用执行会话的底层取消/清理；旧目标、空闲和重复信号不影响后续回复。最近128个来源/会话/信号ID保留去重，淘汰最旧项，不作持久 exactly-once 承诺。失败抛出，不重试、不改队列顺序；原有会话关闭和整个 Agent 生命周期仍独立。
+
+通信 schema 在 AgentContracts 注册，Assistant Agent.json 声明 inputs，来源沿用 Gateway 身份与定向授权，不自动赋予所有 Agent 发送权。外部世界由宿主或已有负责角色转换为该协议。控制输入不进入普通对话队列，不调用 Decision；打断结果作为控制证据，传输回执仍是接纳回执。AssistantExecutionSession 的公开停止回复方法转发统一入口，私有取消执行函数仅作为清理回调。
+
+复用现有目录，不增加模块。实现后同步 Assistant、Agents 和整体 README。测试覆盖空闲、指定旧目标、当前目标、重复、并发信号、保持排队输入、来源/schema，以及 Decision 调度取消清理；执行仓库检查和 iOS 构建。
+
+新增 AssistantInterrupt.swift 同时补入现有 Xcode Assistant 分组的文件引用；保持现有 Swift Package 编译归属，不增加编译目标。
+
+统一打断与独立 Decision 调度已实现：12项定向测试通过，5个 iOS 模拟器目标构建通过，末次修正后主应用构建再次通过。全仓已有失败与中断的 AppWorkflow 子阶段详见二分类验证文档；未做真机验收。外部发送者须显式声明权限，本次不自动为现有 Agent 增加发送行为。

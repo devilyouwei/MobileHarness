@@ -123,6 +123,8 @@ Voice Processing启用状态不是实测声学指标；噪声模式与处理效�
 
 ### 引擎格式失效与启动重建
 
+AudioInputOutput.playStream 的 onStarted 在首个 PCM 块成功 schedule 后调用一次；空流不调用。它是原生调度事实，不是声波到达时刻测量。业务调用方拥有异步事实发布及结束配对，PlatformKit 不选择 ASR 冷却、起声阈值或播放片段合并策略。
+
 NativePlaybackGraph 单独观察当前 AVAudioEngine 实例的 configurationChange，回调只写容量1、保留最新通知的 AsyncStream。单个 actor 观察任务在同步 start 返回后读取 engine.isRunning 和当前输入采样率/声道；仍在运行且格式一致的配置通知不退役采集。停机或格式变化才通过 AudioCaptureConfigurationGate 终止当前 PCM/首帧等待。启动返回前再次检查门。停止先失效门并移除通知，再取消并加入观察任务，最后停止 tap/引擎；旧任务按门身份拒绝替代代。
 
 启动配置失效最多重试一次；保留已配置的 I/O 引擎及有效 AEC，重新安装格式相关 tap/播放连接，不再次启用已生效的 voice processing。每次重新获取实际格式，首帧期限仍为10秒。取消、普通超时和系统中断不自动重试。运行中配置失效通过现有 PCM 失败/业务恢复链传播。完整 stop 仍释放并重建原生引擎。

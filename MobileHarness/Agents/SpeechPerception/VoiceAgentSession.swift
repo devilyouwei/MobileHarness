@@ -19,11 +19,11 @@
         let cancelReply: @MainActor () async throws -> Void
         let startSpeech: (any SpeechSynthesisCapability, AudioCache) async throws -> Void
         let stopSpeech: () async -> Void
-        let playbackChanged: @Sendable (String, Bool) async -> Void
+        let playbackChanged: @Sendable (String, Bool, ContinuousClock.Instant) async -> Void
         let makePerception:
             (
                 any SpeechRecognitionCapability, any VoiceActivityCapability, String, any AudioCaptureObserving,
-                any SpectrumPresenting
+                any SpectrumPresenting, any SpeechEnhancementCapability
             ) throws
                 -> SpeechPerceptionAgent
     }
@@ -48,11 +48,12 @@
         func startInteraction() async throws { try await runtime.startInteraction() }
         func start(
             _ recognition: any SpeechRecognitionCapability, vad: any VoiceActivityCapability,
+            enhancement: any SpeechEnhancementCapability,
             synthesis capability: any SpeechSynthesisCapability, input: any AudioCaptureObserving, store: AudioCache
         ) async throws -> any VoicePerceptionHandling {
             try await runtime.startSpeech(capability, store)
             return try await perception.start(
-                recognition: recognition, vad: vad, input: input,
+                recognition: recognition, vad: vad, enhancement: enhancement, input: input,
                 spectrum: spectrum, runtime: runtime)
         }
         func stop() async throws {

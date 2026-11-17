@@ -453,3 +453,57 @@ func resourceSourceDefaultsFollowSystemLanguageAndKeepSavedChoice(language: Stri
     _ = try await service.saveSource(explicit)
     #expect(try await service.restoreSource() == explicit)
 }
+
+@Test func speechDetectionPreferencesRoundTripAndLegacyDefaults() throws {
+    let old = Data(
+        #"{"endpoint":"https://huggingface.co","allowsCellular":true,"useCustomRecognition":false,"useCustomSynthesis":false}"#
+            .utf8)
+    let defaults = try JSONDecoder().decode(ModelResourcePreferences.self, from: old)
+    #expect(defaults.vadOnsetWindows == 8)
+    #expect(defaults.vadThreshold == 0.65)
+    var changed = defaults
+    changed.vadOnsetWindows = 16
+    changed.vadThreshold = 0.9
+    let draft = try JSONDecoder().decode(ModelResourceSourceDraft.self, from: JSONEncoder().encode(changed))
+    let result = try ApplicationControlResourcePolicy.preferenceValue(changed.encoded())
+    #expect(result.vadOnsetWindows == 16)
+    #expect(result.vadThreshold == 0.9)
+    #expect(draft.vadOnsetWindows == 16)
+    #expect(draft.vadThreshold == 0.9)
+    #expect(try JSONDecoder().decode(ModelResourcePreferences.self, from: JSONEncoder().encode(draft)) == changed)
+    #expect(try SettingsModelResourcesAdapter.validatePreferences(changed) == changed)
+    changed.vadThreshold = 0.66
+    #expect(throws: ModelResourcePreferenceError.invalidDetection) {
+        try SettingsModelResourcesAdapter.validatePreferences(changed)
+    }
+    changed.vadThreshold = 0.65
+    changed.vadOnsetWindows = 17
+    #expect(throws: ModelResourcePreferenceError.invalidDetection) {
+        try SettingsModelResourcesAdapter.validatePreferences(changed)
+    }
+}
+
+@Test func speechEnhancementPreferenceRequiresInstallationAndDisablesAfterRemoval() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = try FileDocumentStore<ModelResourcePreferences>(
+        url: root.appendingPathComponent("source.json"), maximumBytes: 4096)
+    let installed = InstalledPreferenceFixture()
+    let service = preferencesService(store, installed: installed)
+    await #expect(throws: ModelResourcePreferenceError.enhancementRequired) {
+        try await service.saveSource(.init(useSpeechEnhancement: true))
+    }
+    await installed.set(["deepfilternet3"])
+    let saved = try await service.saveSource(.init(useSpeechEnhancement: true))
+    #expect(saved.useSpeechEnhancement && !saved.useCustomRecognition)
+    let draft = try JSONDecoder().decode(ModelResourceSourceDraft.self, from: JSONEncoder().encode(saved))
+    #expect(draft.useSpeechEnhancement)
+    await installed.set([])
+    #expect(try await !service.restoreSource().useSpeechEnhancement)
+    #expect(try await store.refresh()?.value.useSpeechEnhancement == false)
+    let legacy = Data(
+        #"{"endpoint":"https://huggingface.co","allowsCellular":true,"useCustomRecognition":false,"useCustomSynthesis":false}"#
+            .utf8)
+    #expect(try !JSONDecoder().decode(ModelResourcePreferences.self, from: legacy).useSpeechEnhancement)
+    #expect(try !JSONDecoder().decode(ModelResourceSourceDraft.self, from: legacy).useSpeechEnhancement)
+}

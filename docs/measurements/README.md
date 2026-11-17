@@ -105,3 +105,13 @@ Writer 的 2026-11-08 双模型实验保留 [原始基线](writer-prompt-2026-11
 - [第三方D3 Edge制品配置证据](decision-alternative-edge-artifact-2026-11-17.json)：maxffarrell固定版本、五输入接口及远端元数据哈希；[Hello原样回放](decision-hello-phone-replay-results-2026-11-17.json)记录原制品Mac三次discard。
 
 - [discard边界两轮对照](decision-discard-refinement-summary-2026-11-17.json)：自有D3 Edge、440条评分；单条Hello改善不能替代整体质量，本轮无生产提示迁移。
+
+## Decision 打断意图二分类
+
+- [二分类打断输入](decision-binary-input-2026-11-17.json)：[D3汇总](decision-binary-d3-summary-2026-11-17.json)、[Vela汇总](decision-binary-vela-summary-2026-11-17.json)，方法及原始数据见[对照报告](../validation/Decision-Binary-Interrupt-Mac-Comparison.md#二分类打断意图对照2026-11-17)。
+
+- [本地化noul/choice溯源](decision-localized-binary-provenance-2026-11-17.json)：两模型1960次、每语言80主样例及跨语种/混合/歧义边界；[D3汇总](decision-localized-binary-d3-summary-2026-11-17.json)、[Vela汇总](decision-localized-binary-vela-summary-2026-11-17.json)，完整输入/原始数据和指标见[扩展报告](../validation/Decision-Binary-Interrupt-Mac-Comparison.md#本地化-noul-与-choice-扩展实验2026-11-17)。
+
+- [历史上下文二分类溯源](decision-history-binary-provenance-2026-11-17.json)：独立于单句测试，最多4轮历史＋当前轮次，两模型2240次；[D3汇总](decision-history-binary-d3-summary-2026-11-17.json)、[Vela汇总](decision-history-binary-vela-summary-2026-11-17.json)，完整矩阵、原始数据和容量探针见[报告](../validation/Decision-Binary-Interrupt-Mac-Comparison.md#历史上下文二分类独立实验2026-11-17)。
+
+App 二分类 Swift 接入：[原始记录](decision-binary-app-native-2026-11-17.json)、[汇总](decision-binary-app-native-summary-2026-11-17.json)、[Vela Python 对照](decision-binary-app-vela-parity-2026-11-17.json)。解释见[二分类验证](../validation/Decision-Binary-Interrupt-Mac-Comparison.md#2026-11-17-app-二分类-swift-接入验证)，不代表手机验收。

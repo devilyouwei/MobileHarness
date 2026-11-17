@@ -26,6 +26,9 @@ extension SpeechPerceptionAgent {
             try Task.checkCancellation()
             guard nativeInputEpoch == epoch else { throw CancellationError() }
             _ = try admitsMicrophone(sessionID: sessionID)
+            try await configureEnhancement()
+            try Task.checkCancellation()
+            guard nativeInputEpoch == epoch else { throw CancellationError() }
             bindMicrophoneGeneration(capture.generation)
             nativeInput = Task { try await self.consumeMicrophone(capture, sessionID: sessionID, epoch: epoch) }
         } catch {

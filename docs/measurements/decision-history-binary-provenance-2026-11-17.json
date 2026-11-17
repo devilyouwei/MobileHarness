@@ -1,0 +1,38 @@
+{
+  "platform": "macOS-27.2.1-arm64-arm-64bit",
+  "hardware": "Apple A18 Pro",
+  "memoryBytes": 8589934592,
+  "upstreamFormatSHA256": "3badfbc70561bb3f5b8ec16a11d2c455b96ddb32caace0a8a54ca102eae1f3fa",
+  "models": {
+    "d3": {
+      "inputSHA256": "25860e19a84e599dcaa6c4b46316708be920eeadfecbe4914d16a1a213945a6e",
+      "resultsSHA256": "c574c328da0da48f541fdd98d3ca9b2d7947c84453300833f3af74bc8a0ebc08",
+      "summarySHA256": "bfc4dc0a55a4b7d55ba793f2f7f630837a29dc62b0f317c8e87d54d6183ab6ed",
+      "measured": 1120,
+      "labelled": 992,
+      "missingEvidence": 128,
+      "errors": 0,
+      "noulControlMaxProbabilityDelta": 0.0
+    },
+    "vela": {
+      "inputSHA256": "67e864ce2349074549a303cbd7f76499b7c88041fc49d3e17917e7cf44981ca2",
+      "resultsSHA256": "747072d0522d0b2d330c46b2e52f5c1fad259dc7707b93b141a623b723c74bac",
+      "summarySHA256": "c6a913f75b4cc5d20c3d5eaab0adef39e91d912ccab87b948087cea4fddd199a",
+      "measured": 1120,
+      "labelled": 992,
+      "missingEvidence": 128,
+      "errors": 0,
+      "noulControlMaxProbabilityDelta": 0.0
+    }
+  },
+  "d3Artifacts": {
+    "manifest.json": "b0b63b4d97b1eabc6c3f748b4f0f41ca19d25f9a7b025d55a1cf8eb27c70f81b",
+    "decision_config.json": "30b6095b945d5a93697868afdf9be9123ea892085fbaff3078112c48da20dc6b",
+    "tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+    "tokenizer_config.json": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c",
+    "decision.aimodel/main.mlirb": "ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78"
+  },
+  "velaArtifactSpecSHA256": "ab4a38ebb21685b73f7716e1457867f2d7faa1bf9d91ea6daa44d76123c8fe30",
+  "preflightSHA256": "959e92a42260ef2c5e07ba95441f98ee28a4717348bdf7da1681ca355203e552",
+  "capacityResultsSHA256": "60de8d7dddf43396d180b3cb11884072590c1fa7b37ef1a72068968a1df3537a"
+}

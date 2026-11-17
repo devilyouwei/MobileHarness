@@ -1,0 +1,35 @@
+{
+  "platform": "macOS-27.2.1-arm64-arm-64bit",
+  "hardware": "Apple A18 Pro",
+  "memoryBytes": 8589934592,
+  "d3Files": {
+    "manifest.json": "b0b63b4d97b1eabc6c3f748b4f0f41ca19d25f9a7b025d55a1cf8eb27c70f81b",
+    "decision_config.json": "30b6095b945d5a93697868afdf9be9123ea892085fbaff3078112c48da20dc6b",
+    "tokenizer_config.json": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c",
+    "tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+    "decision.aimodel/main.mlirb": "ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78"
+  },
+  "upstreamFormatURL": "https://huggingface.co/vllm-sr/d3-edge/raw/bee5e872f75b9c5d1405767bf244a6948b95c0af/d3_format.py",
+  "upstreamFormatSHA256": "3badfbc70561bb3f5b8ec16a11d2c455b96ddb32caace0a8a54ca102eae1f3fa",
+  "velaSpecSHA256": "ab4a38ebb21685b73f7716e1457867f2d7faa1bf9d91ea6daa44d76123c8fe30",
+  "checks": {
+    "d3": {
+      "inputSHA256": "960be0ebd79f89fc9a4b635482069b464111bde38fb34632bc53c30bd90a0910",
+      "reportSHA256": "fa26b36336c8e34abf925470eda0f3b15018a444de136699447ef05e76deae9c",
+      "summarySHA256": "66c82471533c1ea252b2231474b840360a713be38899d4e9957cb51eeb816aa2",
+      "rows": 980,
+      "errors": 0,
+      "exactHalfTies": 0,
+      "sourceHashesUnchanged": true
+    },
+    "vela": {
+      "inputSHA256": "aa8677ee7831dac044c7e198fc9897f5441ebb4e0e23a60845951bfa4b48d62b",
+      "reportSHA256": "4ac01b155718021f8efffbacb8772f76f2e5f16ebdde2653110edbe4a67f2d30",
+      "summarySHA256": "1f3e7447dd143162b46e2713fa4b19a4aa9aea5da25bb42476e6137673883e7c",
+      "rows": 980,
+      "errors": 0,
+      "exactHalfTies": 0,
+      "sourceHashesUnchanged": true
+    }
+  }
+}

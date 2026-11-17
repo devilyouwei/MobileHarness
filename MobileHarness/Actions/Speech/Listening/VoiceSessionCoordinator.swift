@@ -911,10 +911,10 @@ public enum VoiceReplyCancellation {
                         throw CancellationError()
                     }
                 }, currentSession: { [weak self] in self?.accepts(session: envelope.sessionID) ?? false },
-                activeChanged: { [weak self] active in
+                activeChanged: { [weak self] active, time in
                     guard let self else { return }
                     self.playbackActive = active
-                    await self.runtime.playbackChanged(audioID, active)
+                    await self.runtime.playbackChanged(audioID, active, time)
                 })
         }
         private func accepts(session: String) -> Bool {

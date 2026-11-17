@@ -44,6 +44,7 @@ public protocol ModelSpeechProviding: Sendable {
     var recognition: any SpeechRecognitionCapability { get }
     var synthesis: any SpeechSynthesisCapability { get }
     var voiceActivity: any VoiceActivityCapability { get }
+    var enhancement: any SpeechEnhancementCapability { get }
     func configure(recognition: Bool, synthesis: Bool) async throws
     func load(_ capability: ProvidedCapability) async throws
     func warmup(_ capability: ProvidedCapability) async throws
@@ -125,7 +126,8 @@ public struct ModelArtifactConfiguration: Sendable {
             "model.artifacts": ModelStateSnapshot.reader(of: artifacts) { try await $0.stateSnapshot() },
         ]
         for (component, capabilities) in [
-            ("language", [ProvidedCapability.chat, .decision]), ("speech", [.recognition, .synthesis, .voiceActivity]),
+            ("language", [ProvidedCapability.chat, .decision]),
+            ("speech", [.recognition, .synthesis, .voiceActivity, .enhancement]),
             ("vision", [.pose]),
         ] {
             readers.merge(try await scope.resourceStateReaders(component, capabilities: capabilities)) { _, new in new }
@@ -466,6 +468,7 @@ private actor ModelScope {
             return try await selection.resolve(
                 manager: manager, artifact: "moss-tts-nano", local: DefaultModelAssembly.mossNano,
                 system: ModelID("apple-synthesis"), capability: capability)
+        case .enhancement: return ModelID("deepfilternet3")
         case .voiceActivity:
             return try await selection.resolve(
                 manager: manager, artifact: "silero", local: ModelID("silero"), system: ModelID("energy-vad"),
@@ -553,7 +556,7 @@ public final class ModelLanguageContainer: ModelLanguageProviding, Sendable {
     public func decisionModel(_ id: String) -> (any ModelDecisionProviding)? {
         switch id {
         case "d3-edge": decision
-        case "d3-lite": ModelDecisionContainer(scope: scope, id: ModelID(id))
+        case "d3-lite", "vela3-fast": ModelDecisionContainer(scope: scope, id: ModelID(id))
         default: nil
         }
     }
@@ -610,18 +613,21 @@ public final class ModelLanguageContainer: ModelLanguageProviding, Sendable {
 public final class ModelSpeechContainer: ModelSpeechProviding, Sendable {
     public func stateSnapshot() async throws -> ModelStateSnapshot {
         try Task.checkCancellation()
-        return try await scope.stateSnapshot("speech", capabilities: [.recognition, .synthesis, .voiceActivity])
+        return try await scope.stateSnapshot(
+            "speech", capabilities: [.recognition, .synthesis, .voiceActivity, .enhancement])
     }
 
     private let scope: ModelScope
     public let recognition: any SpeechRecognitionCapability
     public let synthesis: any SpeechSynthesisCapability
+    public let enhancement: any SpeechEnhancementCapability
     public let voiceActivity: any VoiceActivityCapability
     fileprivate init(scope: ModelScope) {
         self.scope = scope
         recognition = RecognitionPort(scope: scope)
         synthesis = SynthesisPort(scope: scope)
         voiceActivity = VoiceActivityPort(scope: scope)
+        enhancement = EnhancementPort(scope: scope)
     }
     public func configure(recognition: Bool, synthesis: Bool) async throws {
         try await scope.configureSpeech(recognition: recognition, synthesis: synthesis)
@@ -632,7 +638,7 @@ public final class ModelSpeechContainer: ModelSpeechProviding, Sendable {
     public func warmup(_ capability: ProvidedCapability, reportLoading: @escaping @Sendable (Bool) async -> Void)
         async throws
     {
-        guard [.recognition, .synthesis, .voiceActivity].contains(capability) else {
+        guard [.recognition, .synthesis, .voiceActivity, .enhancement].contains(capability) else {
             throw CapabilityError.invalidRequest("Not a speech capability")
         }
         try await scope.perform("speech", "warmup") { [scope] manager in
@@ -655,6 +661,7 @@ public final class ModelSpeechContainer: ModelSpeechProviding, Sendable {
         case .recognition: ids = ["nemotron-local"] + SpeechSelection.appleRecognitionModels.map { $0.id.rawValue }
         case .synthesis: ids = ["moss-tts-nano", "apple-synthesis"]
         case .voiceActivity: ids = ["silero", "energy-vad"]
+        case .enhancement: ids = ["deepfilternet3"]
         default: throw CapabilityError.invalidRequest("Not a speech capability")
         }
         try await scope.perform("speech", "unload", inference: false) { manager in
@@ -962,6 +969,35 @@ public enum ModelPreparationRequirement: String, Sendable {
     public let prepare: @MainActor (@escaping @Sendable (Bool) async -> Void) async throws -> Void
 }
 extension ModelContainer {
+    /// The caller owns selection; nil means no local resource is required.
+    @MainActor public func localModelPreparationStep(
+        id: String, selection: @escaping @MainActor () async throws -> String?
+    ) -> ModelPreparationStep {
+        func resource() async throws -> ModelID? {
+            guard let selected = try await selection() else { return nil }
+            switch selected {
+            case "gemma4-e2b": return ModelID("chat")
+            case "d3-edge", "d3-lite", "vela3-fast", "apple-system", "deepfilternet3": return ModelID(selected)
+            default: throw CapabilityError.invalidRequest("Unknown local preparation model: \(selected)")
+            }
+        }
+        return ModelPreparationStep(
+            id: id,
+            isReady: {
+                guard let model = try await resource() else { return true }
+                let state = try await self.scope.perform("preparation", "status", inference: false) {
+                    try await $0.status(model)
+                }
+                return state == .ready || state == .unmanaged
+            },
+            prepare: { report in
+                guard let model = try await resource() else { return }
+                try await self.scope.perform("preparation", "warmup") {
+                    try await $0.warmup(model, reportLoading: report)
+                }
+            })
+    }
+
     @MainActor public func preparationSteps(for requirements: [ModelPreparationRequirement]) -> [ModelPreparationStep] {
         var seen: Set<String> = []
         return requirements.filter { seen.insert($0.rawValue).inserted }.map { requirement in
@@ -1011,8 +1047,14 @@ public final class ModelDecisionContainer: ModelDecisionProviding, Sendable {
             } catch { return .unavailable(reason: String(describing: error)) }
         }
     }
-    public func decide(_ request: DecisionRequest) async throws -> InferenceSession<DecisionResult> {
+    public func decide(_ request: MultiDecisionRequest) async throws -> InferenceSession<MultiDecisionResult> {
         try await scope.perform("decision", "decide") { try await $0.get(self.id, as: .decision).decide(request) }
+    }
+    public func noul(_ request: NoulRequest) async throws -> InferenceSession<NoulResult> {
+        try await scope.perform("decision", "noul") { try await $0.get(self.id, as: .decision).noul(request) }
+    }
+    public func choice(_ request: DecisionRequest) async throws -> InferenceSession<DecisionResult> {
+        try await scope.perform("decision", "decide") { try await $0.get(self.id, as: .decision).choice(request) }
     }
     public func warmup() async throws { try await warmup(reportLoading: { _ in }) }
     public func warmup(reportLoading: @escaping @Sendable (Bool) async -> Void) async throws {
@@ -1024,5 +1066,23 @@ public final class ModelDecisionContainer: ModelDecisionProviding, Sendable {
     }
     public func status() async throws -> ModelState {
         try await scope.perform("decision", "status", inference: false) { try await $0.status(self.id) }
+    }
+}
+
+private struct EnhancementPort: SpeechEnhancementCapability {
+    let scope: ModelScope
+    var availability: CapabilityAvailability {
+        get async {
+            do {
+                return try await scope.perform("speech", "enhancement.availability") {
+                    try await $0.availability(.enhancement)
+                }
+            } catch { return .unavailable(reason: String(describing: error)) }
+        }
+    }
+    func enhance(_ audio: AudioFrame) async throws -> AudioFrame {
+        try await scope.perform("speech", "enhancement") {
+            try await (try await $0.get(.enhancement, load: false)).enhance(audio)
+        }
     }
 }

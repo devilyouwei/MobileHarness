@@ -204,6 +204,84 @@ private actor RoundLog {
         if let failure = result.failure { failures.append(failure) }
     }
 }
+
+private actor ReACTCaptionSink {
+    private var policy = ConversationPresentation()
+    private var reply = ""
+    private var begins: [ActionExecutionContext] = []
+    func present(_ invocation: any FunctionInput) -> ActionCompletion {
+        switch invocation.call.actionPath.description {
+        case "UI.Caption.beginReplyTurn":
+            if policy.accept(invocation.context, update: .beginReply) {
+                begins.append(invocation.context)
+                reply = ""
+            }
+        case "UI.Caption.print":
+            if policy.accept(invocation.context, update: .reply) {
+                reply += invocation.call.parameters["text"] ?? ""
+            }
+        default: break
+        }
+        return .completed
+    }
+    func snapshot() -> (String, [ActionExecutionContext]) { (reply, begins) }
+    func rejectsStaleAndCancelledReplies() -> Bool {
+        guard let first = begins.first, let last = begins.last else { return false }
+        func later(_ context: ActionExecutionContext) -> ActionExecutionContext {
+            .init(
+                source: context.source, sessionID: context.sessionID, inputID: context.inputID,
+                sequence: last.sequence + 100, correlationID: context.correlationID, ordinal: context.ordinal,
+                decisionID: context.decisionID, taskID: context.taskID)
+        }
+        let staleRejected = !policy.accept(later(first), update: .reply)
+        policy.suspendReplies()
+        policy.beginRecognitionScope()
+        return staleRejected && !policy.accept(later(last), update: .reply)
+    }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
+func fullDuplexReACTRepliesReachCaptions(native: Bool) async throws {
+    let captions = ReACTCaptionSink()
+    let harness = try await roundHarness(
+        action: !native, toolCount: native ? 1 : 0, fullDuplex: true,
+        speakBeforeAction: true, runtimeHandler: { await captions.present($0) },
+        handler: { _ in .value("Observed web page result") })
+    try await harness.agent.start()
+    let pump = Task {
+        try await AssistantGenerationTransport.consume(fixtureOutputs(harness.agent)) { output in
+            let result = try await harness.gateway.execute(output)
+            await harness.log.record(output, result: result)
+        }
+    }
+    let turn = AgentTurn(id: UUID().uuidString, ordinal: 1)
+    try await harness.agent.receive(
+        .init(
+            id: UUID().uuidString, sessionID: UUID().uuidString,
+            payload: .text("Read the page and answer"), turn: turn))
+    for _ in 0..<1000 {
+        if await captions.snapshot().0 == "已观察真实结果。" { break }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    let (reply, begins) = await captions.snapshot()
+    let failures = await harness.log.failures
+    let errors = await harness.log.outputs.compactMap { output -> String? in
+        if case .control(let value) = output.output, value.hasPrefix("agent.error:") { return value }
+        return nil
+    }
+    #expect(failures.isEmpty)
+    #expect(errors.isEmpty)
+    #expect(await harness.model.requests.count == 2)
+    #expect(reply == "已观察真实结果。")
+    #expect(begins.count == 2)
+    #expect(begins.allSatisfy { $0.correlationID == turn.id && $0.ordinal == turn.ordinal })
+    #expect(Set(begins.compactMap(\.decisionID)).count == 2)
+    #expect(await captions.rejectsStaleAndCancelledReplies())
+    await harness.close()
+    pump.cancel()
+    _ = await pump.result
+}
+
 private struct RoundHarness {
     let agent: any Agent
     let model: RoundModel
@@ -1970,8 +2048,7 @@ func fullDuplexMergesReadyNativeResultsAndQueuedUserInput() async throws {
 func fullDuplexInterruptSettlesOldActionAndRetainsQueuedInput() async throws {
     let gate = DuplexActionGate()
     let classifier = DecisionCloudFixture(events: [
-        .toolCall(.init(id: "classification", name: "classify_input", argumentsJSON: #"{"action":"interrupt"}"#)),
-        .finished(.toolCalls),
+        .text("true"), .finished(.stop),
     ])
     let decision = AssistantInputDecision(local: UnavailableDecision(), selection: { false }, cloud: { classifier })
     let session = UUID().uuidString
@@ -2000,8 +2077,7 @@ func fullDuplexInterruptSettlesOldActionAndRetainsQueuedInput() async throws {
     #expect(await gate.entered)
     let next = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("stop and answer this"))
     let feedback = DecisionFeedbackProbe()
-    await agent.bindInputDecisionFeedback { disposition, id in
-        #expect(disposition == .interrupt)
+    await agent.bindInputDecisionFeedback { id in
         #expect(await gate.exited)
         await feedback.receive(id)
     }
@@ -2160,9 +2236,11 @@ private actor StaggeredBusinessResults {
 func multiSourceActionResultsAndUserInputShareOneRequestAfterSettlement(fail: Bool) async throws {
     let gate = StaggeredBusinessResults()
     let classifier = DecisionCloudFixture(events: [
-        .toolCall(.init(id: "classify", name: "classify_input", argumentsJSON: #"{"action":"enqueue"}"#))
+        .text("false"), .finished(.stop),
     ])
-    let decision = AssistantInputDecision(local: UnavailableDecision(), selection: { false }, cloud: { classifier })
+    let decision = AssistantInputDecision(
+        local: UnavailableDecision(), configuration: { (false, { classifier }) },
+        timeout: .seconds(30), localTimeout: .seconds(5))
     let harness = try await roundHarness(
         action: true, toolCount: 0, fullDuplex: true, decision: decision, actionCount: 2
     ) { _ in
@@ -2203,6 +2281,10 @@ func multiSourceActionResultsAndUserInputShareOneRequestAfterSettlement(fail: Bo
         try await Task.sleep(for: .milliseconds(5))
     }
     #expect(await harness.model.requests.count == 2)
+    for _ in 0..<1000 {
+        if await classifier.requests.count == 2 { break }
+        try await Task.sleep(for: .milliseconds(5))
+    }
     #expect(await classifier.requests.count == 2)
     await decision.stop()
     await harness.close()

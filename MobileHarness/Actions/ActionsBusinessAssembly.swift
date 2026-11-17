@@ -318,6 +318,11 @@
                     }
                 }, observeTranscript: { text, session in try presentation.observeTranscript(text, sessionID: session) },
                 output: { await presentation.output($0) },
+                speechEnhancementEnabled: { try await preferences.restoreSource().useSpeechEnhancement },
+                speechDetection: {
+                    let value = try await preferences.restoreSource()
+                    return (value.vadOnsetWindows, value.vadThreshold)
+                },
                 decodeResources: { try SettingsModelResourcesAdapter.items($0) },
                 makeVoice: { [self] in try makeVoice($0) })
         }

@@ -137,7 +137,21 @@ import UI
         let home = uiContainer.home
         let homePreparation = ForegroundPreparation(
             steps: {
-                model.preparationSteps(for: agents.foregroundModelRequirements).map { step in
+                let steps =
+                    model.preparationSteps(for: agents.foregroundModelRequirements)
+                    + [
+                        model.localModelPreparationStep(id: "decision") {
+                            try await agents.foregroundDecisionModelID()
+                        },
+                        model.localModelPreparationStep(id: "enhancement") {
+                            try await model.artifacts.prepare()
+                            let installed = try await model.artifacts.artifactSnapshots().contains {
+                                $0.artifact.id == "deepfilternet3" && $0.phase == .installed
+                            }
+                            return installed ? "deepfilternet3" : nil
+                        },
+                    ]
+                return steps.map { step in
                     ForegroundPreparation.Step(
                         id: step.id, isReady: step.isReady,
                         prepare: { report in

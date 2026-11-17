@@ -157,3 +157,9 @@ Decision 瞬时反馈由 Assistant 通过已有 UI.Island 工具发布。Actions
 WebExecutionService 拥有单槽当前网页截图，经 ActionsBusinessBindings.readWebScreenshot 对外提供 scope 隔离的多模态快照。App 透传至 Agents；Actions 不依赖 Agent 或 Resources。截图不写入 MediaStore，Actions 树中的 actions.web.screenshot 只投影元数据，详细生命周期见 [Web](Web/README.md)。
 
 Provider 设置事务按制品身份校验新增本地模型选择，分别保存 Writer 本地模式与 Decision 的独占选择。组合端只暴露所选 Decision 模型的工厂，不提供本地失败后的云端备用。详见 [Provider](System/Provider/README.md)。
+
+Speech detection preferences are persisted by System/ModelResources and exposed through an injected read-only composition port; Actions does not implement VAD segmentation. See [ModelResources](System/ModelResources/README.md).
+
+Model resource preferences include independent speech denoising enablement. Actions owns installed-resource validation, persistence and settings transactions, and exposes a read-only preference to Agents through App. PCM remains inside SpeechPerception and ModelKit.
+
+Speech 的播放事实回调携带 audioID、active 和原生单调时刻，经 ActionsBusinessBindings 与宿主装配转交角色；Actions 负责配对开始/结束及清理加入，语音识别的动态起声门槛由 Agents 拥有。

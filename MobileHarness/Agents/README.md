@@ -166,7 +166,7 @@ Assistant 通过 task.start/task.end 管理前台任务，通过 task.send 向 W
 
 ## Prompt ownership and discovery
 
-The App supplies the default prompt language through the existing Agent root. The chat worker retains it in suspended and continued rounds, Writer retains it for the delegation, and Decision and title generation capture it when starting their requests. Request assembly selects matching natural-language instructions, examples and function descriptions. The model uses explicit requests and trusted user text to determine output language, with the application language as its fallback. Assistant recording and restoration share canonical source markers across both languages.
+The App supplies the default prompt language through the existing Agent root. The chat worker retains it in suspended and continued rounds, Writer retains it for the delegation, and Decision and title generation capture it when starting their requests. Request assembly selects matching natural-language instructions, examples and function descriptions. Assistant JEV Decision uses fixed English speech-state rules and semantic candidates in both languages; user facts retain their original language. The model uses explicit requests and trusted user text to determine output language, with the application language as its fallback. Assistant recording and restoration share canonical source markers across both languages.
 
 Each role owns its public description in Resources/Agents/<Role>/Agent.json and its private model instructions in its own resource directory. Support validates resource schema v10 and projects the v8 compiled contract. Assistant assembles System protocols, its own identity, Skill instructions and a public peer directory filtered by the actual instance communication policy and the shared executable delegation adapter. AgentCore renders the supplied output templates. Writer owns its content-format templates. See [resource contracts](../Resources/Agents/README.md).
 
@@ -185,3 +185,13 @@ AgentRuntime 通过 AgentBusinessBindings.readWebScreenshot 将 Actions 的当�
 Runtime log projection resolves app-owned status and issue copy through UI.AppLanguage using the App-supplied language reader. The shared adapters preserve canonical function identity, raw result values and producer diagnostics. File ownership and bounded presentation delivery are documented in [Support](Support/README.md).
 
 Decision 的当前独占模型失败由 Assistant 生成类型化呈现值；AgentRuntime 将其投影为带输入身份的本地化错误 Toast 和日志。取消与过期输入不提示。模型选择与入队兜底契约见 [Assistant](Assistant/README.md#full-duplex-input-and-decision)。
+
+SpeechPerception consumes a saved detection-settings snapshot through its injected host port when creating a VAD session. ApplicationControl transports settings edits through authorized resource functions; see [SpeechPerception](SpeechPerception/README.md).
+
+AgentContainer exposes foregroundDecisionModelID by reading the saved Decision route through the existing business configuration port. A selected local model is returned explicitly; cloud or inherited routing returns nil. App uses this read-only fact for foreground preparation; first-request Decision recovery remains a bounded fallback for later resource loss.
+
+SpeechPerception receives a read-only denoising preference and ModelKit enhancement capability through root composition. Its capture-owned PCM preparation runs optional windowed denoising before VAD/ASR; role shutdown and model maintenance join the same native consumer. See [speech processing](SpeechPerception/README.md#optional-speech-enhancement).
+
+语音跨角色协作通过带单调原生播放时刻的窄回调连接 AssistantSpeechOutput 与 SpeechPerception。前者拥有有界播放区间事实；后者按播放事实调整动态起声门槛，不施加起播保护或ASR结束后的冷却窗口。AgentRuntime 仅注入同会话只读快照，未将播放接纳策略放入基础模块。详细参数见 [SpeechPerception](SpeechPerception/README.md)。
+
+Assistant owns the `assistant.interrupt` communication contract and unified target-bound interruption entry. Its independent Decision scheduler emits the same control request used by authorized peers and trusted host adapters; Gateway retains communication authorization and the execution session joins cleanup. See [Assistant interruption](Assistant/README.md#unified-interruption-control).

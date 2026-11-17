@@ -74,7 +74,12 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     private let recognition: any SpeechRecognitionCapability
     private let vad: any VoiceActivityCapability
     private let speechEndpointActivity: @Sendable (UUID?) async -> (replyActive: Bool, interruptionID: UUID?)
-    private let resampler: StreamingMonoPCMResampler
+    private let speechDetection: @Sendable () async throws -> (windows: Int, threshold: Double)
+    private var detectionSettings = (windows: 8, threshold: 0.65)
+    private let speechPlayback: @Sendable () async -> SpeechPlaybackSnapshot
+    private var speechFrameSequence: UInt64 = 0
+    private let pcmPreparation: SpeechPCMPreparation
+    private let speechEnhancementEnabled: @Sendable () async throws -> Bool
     private var sessionID: String
     private let interactionSessionID: String?
     private let residentListening: Bool
@@ -109,6 +114,8 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
 
     public init(
         recognition: any SpeechRecognitionCapability, vad: any VoiceActivityCapability,
+        enhancement: (any SpeechEnhancementCapability)? = nil,
+        speechEnhancementEnabled: @escaping @Sendable () async throws -> Bool = { false },
         sessionID: String, interactionSessionID: String? = nil, configuration: AgentConfiguration? = nil,
         mode: Mode = .speechAndSoundSource, residentListening: Bool = false,
         uiHome: UIHomeContainer? = nil, microphoneInput: (any AudioCaptureObserving)? = nil,
@@ -117,6 +124,8 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         speechEndpointActivity: @escaping @Sendable (UUID?) async -> (replyActive: Bool, interruptionID: UUID?) = {
             _ in (false, nil)
         },
+        speechPlayback: @escaping @Sendable () async -> SpeechPlaybackSnapshot = { .init() },
+        speechDetection: @escaping @Sendable () async throws -> (windows: Int, threshold: Double) = { (8, 0.65) },
         context: AgentContextRepository<SpeechPerceptionContextState>
     ) throws {
         if residentListening {
@@ -131,9 +140,12 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         guard contextRepository.agentID == .speechPerception else { throw AgentConfigurationError.identityMismatch }
         let configuration = try configuration ?? AgentConfigurations.load(named: "SpeechPerception")
         guard configuration.agentID == .speechPerception else { throw AgentConfigurationError.identityMismatch }
-        self.resampler = try StreamingMonoPCMResampler(outputSampleRate: 16000)
+        self.pcmPreparation = try SpeechPCMPreparation(enhancement: enhancement)
+        self.speechEnhancementEnabled = speechEnhancementEnabled
         self.recognition = recognition
         self.vad = vad
+        self.speechDetection = speechDetection
+        self.speechPlayback = speechPlayback
         self.speechEndpointActivity = speechEndpointActivity
         self.sessionID = sessionID
         self.interactionSessionID = interactionSessionID
@@ -174,6 +186,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             await refreshIsland()
             return
         }
+        detectionSettings = try await speechDetection()
         let session = try await vad.detectVoiceActivity(
             format: AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32))
         guard lifecycle == .registered, !Task.isCancelled else {
@@ -310,7 +323,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         lastSequence = nil
         lastTimestamp = nil
         soundEstimator.reset()
-        await resampler.reset()
+        await pcmPreparation.reset()
     }
 
     private func receiveListening(_ input: AgentInput, message: AgentMessage) async throws {
@@ -523,8 +536,13 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             && (!residentListening
                 || (captureOpen && listeningPolicy.enabled))
     }
+    func configureEnhancement() async throws {
+        let enabled = mode == .speechAndSoundSource ? try await speechEnhancementEnabled() : false
+        try await pcmPreparation.configure(enabled: enabled)
+    }
     func bindMicrophoneGeneration(_ generation: String?) {
         nativeCaptureGeneration = generation
+        speechFrameSequence = 0
         lastSequence = nil
         lastTimestamp = nil
         soundEstimator.reset()
@@ -588,10 +606,12 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         let captureSession = sessionID
         let captureGeneration = nativeCaptureGeneration
         let admission = playbackAdmission
-        soundEstimator.reset()
-        soundLayout = nil
-        soundRate = nil
-        await resampler.reset()
+        if discardEarlierPCM {
+            soundEstimator.reset()
+            soundLayout = nil
+            soundRate = nil
+            await pcmPreparation.reset()
+        }
         try await segmenter?.reset()
         try Task.checkCancellation()
         guard lifecycle == .running, sessionID == captureSession, nativeCaptureGeneration == captureGeneration else {
@@ -612,6 +632,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         guard case .audio(let audio) = decision.input.payload else { throw HarnessError.unsupportedInput }
         guard !input.metadata.expired else { throw CommunicationError.expired }
         if mode == .speechAndSoundSource, segmenter == nil {
+            detectionSettings = try await speechDetection()
             let session = try await vad.detectVoiceActivity(
                 format: AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32))
             guard lifecycle == .running, !Task.isCancelled else {
@@ -625,7 +646,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         if mode == .soundSourceOnly { activeInput = input }
         if soundLayout != audio.layout || soundRate != audio.sampleRate {
             soundEstimator.reset()
-            await resampler.reset()
+            await pcmPreparation.reset()
             soundLayout = audio.layout
             soundRate = audio.sampleRate
             if audio.layout == .mono {
@@ -652,29 +673,38 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             processed += 1
             return
         }
-        guard let segmenter, let recognitionTurn else { throw HarnessError.invalidTransition }
         let mono = audio.layout == .mono ? samples : stride(from: 0, to: samples.count, by: 4).map { samples[$0] }
-        var timestamp = audio.timestamp
-        for offset in stride(from: 0, to: mono.count, by: 8192) {
-            let packets = try await resampler.process(
+        let step = max(1, min(8192, audio.sampleRate * 32 / 1000))
+        for offset in stride(from: 0, to: mono.count, by: step) {
+            let end = min(offset + step, mono.count)
+            let packets = try await pcmPreparation.process(
                 MicrophoneFrame(
-                    samples: Array(mono[offset..<min(offset + 8192, mono.count)]),
-                    sampleRate: audio.sampleRate, sequence: audio.sequence))
+                    samples: Array(mono[offset..<end]),
+                    sampleRate: audio.sampleRate, sequence: audio.sequence),
+                timestamp: audio.timestamp + Double(offset) / Double(audio.sampleRate))
             for packet in packets {
-                guard !recognitionSuspended else { break }
-                let frame = try AudioFrame(
-                    data: packet.samples.withUnsafeBytes { Data($0) },
-                    format: AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32),
-                    sequence: packet.sequence, timestamp: timestamp)
-                try await processFrame(
-                    frame, input: input, segmenter: segmenter, recognitionTurn: recognitionTurn)
-                timestamp += packet.duration
+                // Preserve bounded slices and capture-time playback facts for onset thresholds.
+                for sample in stride(from: 0, to: packet.sampleCount, by: 512) {
+                    guard !recognitionSuspended else { break }
+                    guard let segmenter, let recognitionTurn else { throw HarnessError.invalidTransition }
+                    let count = min(512, packet.sampleCount - sample)
+                    let frame = try AudioFrame(
+                        data: packet.data.subdata(in: sample * 4..<(sample + count) * 4), format: packet.format,
+                        sequence: speechFrameSequence, timestamp: packet.timestamp + Double(sample) / 16000)
+                    speechFrameSequence += 1
+                    let start = audio.capturedAt.advanced(by: .seconds(frame.timestamp - audio.timestamp))
+                    let latestPlayback = await speechPlayback()
+                    try await processFrame(
+                        frame, input: input, segmenter: segmenter, recognitionTurn: recognitionTurn,
+                        playing: latestPlayback.state(at: start).playing)
+                }
             }
         }
     }
+
     private func processFrame(
         _ frame: AudioFrame, input acceptedInput: AgentInput, segmenter: VoiceActivitySegmenter,
-        recognitionTurn: SpeechRecognitionTurn
+        recognitionTurn: SpeechRecognitionTurn, playing: Bool
     ) async throws {
         var input = acceptedInput
         activeInput = AgentInput(
@@ -683,7 +713,11 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         let activity = await speechEndpointActivity(nil)
         try Task.checkCancellation()
         let result = try await segmenter.process(
-            frame, useShortEndpoint: activity.replyActive && activity.interruptionID == nil)
+            frame, threshold: Float(detectionSettings.threshold),
+            onsetWindows: playing && (1...16).contains(detectionSettings.windows)
+                ? min(16, detectionSettings.windows + 2) : detectionSettings.windows,
+            useShortEndpoint: activity.replyActive && activity.interruptionID == nil,
+            onsetThreshold: min(0.95, Float(detectionSettings.threshold) + (playing ? 0.15 : 0)))
         try Task.checkCancellation()
         let beganTurn =
             currentTurn == nil
@@ -738,6 +772,10 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         try await transition(to: .processing, input: input)
         let text = try await recognitionTurn.finish()
         try Task.checkCancellation()
+        // A completed utterance resets preprocessing history without a timed admission delay.
+        if input.turn != nil {
+            await pcmPreparation.reset()
+        }
         try emit(.toolCall(Self.transcript.call(["text": String(text.suffix(320))])), input: input)
         try emit(.toolCall(Self.finishTranscript.call([:])), input: input)
         try emit(.control("agent.finished"), input: input)
@@ -771,7 +809,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             return
         }
         segmenter = nil
-        await resampler.reset()
+        await pcmPreparation.reset()
         guard lifecycle == .running, sessionID == failedSession, nativeCaptureGeneration == failedGeneration else {
             return
         }
