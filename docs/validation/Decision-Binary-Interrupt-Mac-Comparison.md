@@ -768,3 +768,19 @@ iOS构建脚本退出0，MobileHarnessSimulator、ModelKitRuntime、ModelKitNemo
 用户随后要求安装真机。当前工作区MobileHarness Debug iPhoneOS签名构建成功（/tmp/decision-busy-device-graph-refresh.log）；严格深层签名、73项Agent/Skill资源、Live Activity及中英本地化校验通过。初次构建受模拟器遗留依赖图影响，ModelKitDefaults未关联Gemma4；刷新可重建的清单及XCBuildData缓存后正确生成真机依赖，无业务代码变更。中间一次指定设备构建因Xcode等待连接超时，最终使用generic iOS目标。
 
 devicectl覆盖安装至Youwei’s iPhone 17 Pro成功（dev.mobileharness.app，databaseSequenceNumber 7328，/tmp/decision-busy-device-install.log），未卸载或清除应用数据。启动被锁屏拒绝（CoreDevice10002、FBS Locked，/tmp/decision-busy-device-launch.log）；这里只确认安装，不宣称已启动或通过真机推理/功耗验收。
+
+## Assistant角色提示词回应约束（2026-11-18）
+
+按用户要求，将无明确交流含义时不强行口语回复、可只给当前目录表情或不回应，以及可理解半句话按需追问的规则加入Assistant英文/简体中文Instructions末尾。角色负责是否回应，ExpressionInteraction负责合法表情执行。未改Decision和队列；未新增表情参数或加载流程。同步Assistant README。
+
+4项已有定向测试通过：localizedPromptsPreserveTechnicalMarkersAndToolSchema、assistantPromptUsesSharedGrammarAndLoadedSkillInstructions、allOwnedPromptResourcesArePackagedAndCompile、promptResourcesUnloadReloadsWithoutChangingAnExistingSnapshot；覆盖双语资源、提示词组装与加载快照。日志/tmp/assistant-meaning-prompt-tests.log，git diff --check通过。本轮仅Markdown提示词/文档修改，未重跑全仓检查或iOS构建，未安装真机；测试不证明真实Assistant模型会按预期选择沉默或表情。
+
+用户随后要求安装真机：MobileHarness Debug iPhoneOS签名构建成功（/tmp/assistant-meaning-device-build.log），严格深层签名、73项Agent/Skill资源与源码字节一致性、Live Activity和中英本地化校验全部通过。覆盖安装至Youwei’s iPhone 17 Pro成功（dev.mobileharness.app，databaseSequenceNumber 7336，/tmp/assistant-meaning-device-install.log），系统启动成功（/tmp/assistant-meaning-device-launch.log）。未卸载或清空应用数据；包含本节中英文角色规则，不代表真实对话的沉默/表情选择已验收。
+
+### ASR与朗读约束细化
+
+按反馈替换双语角色末段，明确User (ASR)来自自动录音转写，可能含错词、噪声、背景对话及无意录入；先结合上下文判断可理解意图与回应必要性。无意义、不可恢复的误识别、噪声或无明确意图的无关录入只给目录允许的短表情，不附文字/语音；无合适表情可静默。可恢复错误、可理解半句话及明确新话题保留正常理解/澄清。没有加入噪声词表或前置丢弃代码。plain text段解释自然文字会被转成语音及字幕，因此避免Markdown、装饰字符、emoji等朗读干扰，表情使用Action。
+
+4项既有提示词资源/双语/组装/快照测试通过，日志/tmp/assistant-asr-guidance-tests.log；git diff --check通过。本轮仅Markdown提示词与设计/验证文档，不重跑全仓检查/iOS构建；未执行真实模型对话、未重新安装，上一手机安装不含这次细化。
+
+用户再次要求安装：ASR与朗读约束细化后的MobileHarness Debug iPhoneOS构建成功（/tmp/assistant-asr-device-build.log），严格深层签名、73项Agent/Skill资源与源码字节一致性、Live Activity及双语资源校验通过。devicectl覆盖安装至Youwei’s iPhone 17 Pro成功（安装序号7344，/tmp/assistant-asr-device-install.log），系统启动成功（/tmp/assistant-asr-device-launch.log）。未卸载或清除应用数据；此安装包含本节细化后的中英文角色提示词，真实ASR输入的回应/表情选择仍待实际体验。

@@ -1043,3 +1043,15 @@ Laya原生对照首轮发现概率不一致。源码检查显示发布tokenizer�
 GenerationRoundTests的动作结算回归也需同步：首条空闲输入不再分类，等待动作结算期间的follow-up仍算忙并分类一次，两个动作结果及用户输入仍合批为一个后续请求。
 
 实施完成：空闲输入不构造Decision快照/任务；忙时沿用原回复身份和并行推理。5项定向回归通过（工具结算包含成功/失败case），五个iOS scheme构建通过。全仓检查仍有此前NexArm/声源时序失败及AppWorkflow缺声明停滞，详细证据见[二分类验证记录](../validation/Decision-Binary-Interrupt-Mac-Comparison.md)。未安装或测量真机。
+
+## Assistant对无明确交流含义输入的回应（2026-11-18）
+
+在Assistant/Instructions.md与Instructions.zh-Hans.md的角色沟通规则末尾加入常驻说明：结合当前对话理解输入；无法理解且没有明确交流含义时不猜测、不强行口语回复，可只用当前目录允许的简短表情或不回应；意图可理解但未说完时按需简短追问，不因不完整就忽略。该规则由角色Instructions拥有，ExpressionInteraction保留表情执行协议，不复制规则、不编造表情参数。不修改队列、Decision、Skill加载或模型配置。更新Assistant README说明职责，检查双语资源及角色提示词组装，不把提示词发布当真实模型行为验收。
+
+角色提示词规则已加入中英文Instructions并同步Assistant设计说明。4项既有提示词资源/组装/快照测试通过；未运行真实Assistant模型或安装真机，证据见二分类验证报告的角色提示词节。
+
+## ASR输入判断及语音输出说明细化（2026-11-18）
+
+按用户反馈替换Assistant双语Instructions原回应约束：明确User (ASR)是录音识别转写，可能混入错词、杂音、背景对话及无意录入；结合上下文先判断是否有可理解且值得回应的交流意图。无意义、明显不可恢复的识别错误、噪声或与当前交流无关且无明确用户意图的内容仅给合法表情，不附口语。可恢复错误按上下文理解；可理解片段按需追问；明确新问题/话题不因与旧上下文无关而忽略。plain speech段解释自然文字会转语音，使用适合朗读的纯文本，避免装饰符号、Markdown、emoji、源码；XML Action仍遵守协议。同步Assistant设计说明，不修改ASR、Decision、队列或表情词表，复用提示词资源与组装测试。
+
+细化已完成，双语Instructions与Assistant README对齐，4项提示词资源/组装测试通过。真实对话效果及重新安装尚未执行，见验证报告。
