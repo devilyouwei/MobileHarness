@@ -1,0 +1,182 @@
+{
+  "referenceSHA256": "5410440d13fdfb46ddfc13339d2c59dd1395f51c8a38ec75f478506de5548d6d",
+  "sourceDigest": "6e896981529bab30520290064cb3e17a033d7958f322e9de72764a02e19b3308",
+  "rows": [
+    {
+      "case": {
+        "id": "decision-multilingual",
+        "state": "Ma carte a été débitée deux fois, je veux être remboursée.",
+        "questions": {
+          "topic": {
+            "type": "choice",
+            "instructions": "What is the request about?",
+            "criteria": {
+              "coding": "Software development",
+              "cooking": "Food preparation",
+              "billing": "Payments"
+            }
+          }
+        }
+      },
+      "expected": {
+        "model": "vllm-sr/vela3.1-fast",
+        "answers": {
+          "topic": {
+            "type": "choice",
+            "choice": "billing",
+            "probabilities": {
+              "coding": 0.006983466847096165,
+              "cooking": 0.005595160504910836,
+              "billing": 0.9874213726479929
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 54,
+          "output_tokens": 0
+        }
+      },
+      "actual": {
+        "model": "vllm-sr/vela3.1-fast",
+        "answers": {
+          "topic": {
+            "type": "choice",
+            "choice": "billing",
+            "probabilities": {
+              "coding": 0.006983465569742593,
+              "cooking": 0.00559516214947448,
+              "billing": 0.987421372280783
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 54,
+          "output_tokens": 0
+        }
+      },
+      "maxAbsoluteError": 1.6445636441195233e-09
+    },
+    {
+      "case": {
+        "id": "decision-structured-multiple",
+        "state": {
+          "request": "Please explain Python lists",
+          "priority": 2
+        },
+        "questions": {
+          "topic": {
+            "type": "choice",
+            "instructions": "What is the request about?",
+            "criteria": {
+              "coding": "Software development",
+              "cooking": "Food preparation",
+              "billing": "Payments"
+            }
+          },
+          "urgent": {
+            "type": "noul",
+            "instructions": "Is urgent action needed?",
+            "criteria": {
+              "true": "An urgent deadline",
+              "false": "No urgency"
+            }
+          }
+        }
+      },
+      "expected": {
+        "model": "vllm-sr/vela3.1-fast",
+        "answers": {
+          "topic": {
+            "type": "choice",
+            "choice": "coding",
+            "probabilities": {
+              "coding": 0.9929144215626791,
+              "cooking": 0.005943931619219483,
+              "billing": 0.0011416468181014694
+            }
+          },
+          "urgent": {
+            "type": "noul",
+            "noul": 0.040307705508638846
+          }
+        },
+        "usage": {
+          "input_tokens": 73,
+          "output_tokens": 0
+        }
+      },
+      "actual": {
+        "model": "vllm-sr/vela3.1-fast",
+        "answers": {
+          "topic": {
+            "type": "choice",
+            "choice": "coding",
+            "probabilities": {
+              "coding": 0.9929144059912508,
+              "cooking": 0.005943946051744252,
+              "billing": 0.001141647957004808
+            }
+          },
+          "urgent": {
+            "type": "noul",
+            "noul": 0.04030780234756814
+          }
+        },
+        "usage": {
+          "input_tokens": 73,
+          "output_tokens": 0
+        }
+      },
+      "maxAbsoluteError": 9.683892929213123e-08
+    },
+    {
+      "case": {
+        "id": "decision-single-option",
+        "state": "Python programming",
+        "questions": {
+          "topic": {
+            "type": "choice",
+            "instructions": "What is the request about?",
+            "criteria": {
+              "coding": "Software"
+            }
+          }
+        }
+      },
+      "expected": {
+        "model": "vllm-sr/vela3.1-fast",
+        "answers": {
+          "topic": {
+            "type": "choice",
+            "choice": "coding",
+            "probabilities": {
+              "coding": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 17,
+          "output_tokens": 0
+        }
+      },
+      "actual": {
+        "model": "vllm-sr/vela3.1-fast",
+        "answers": {
+          "topic": {
+            "type": "choice",
+            "choice": "coding",
+            "probabilities": {
+              "coding": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 17,
+          "output_tokens": 0
+        }
+      },
+      "maxAbsoluteError": 0.0
+    }
+  ],
+  "passed": true
+}

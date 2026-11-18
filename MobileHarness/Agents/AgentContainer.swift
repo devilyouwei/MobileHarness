@@ -227,10 +227,10 @@ import StorageFiles
             return languageModels
         }
         private func quiesceForModelRemoval(_ id: String) async {
-            if ["d3-edge", "vela3-fast", "gemma4-e2b"].contains(id) {
+            if ["d3-edge", "vela3-fast", "vela3.1-fast", "laya-multilingual", "gemma4-e2b"].contains(id) {
                 await inputDecisionService?.quiesceLocal(id)
             }
-            if id == "d3-edge" || id == "vela3-fast" { return }
+            if ["d3-edge", "vela3-fast", "vela3.1-fast", "laya-multilingual"].contains(id) { return }
             if id == "yolo26n-pose" {
                 await camera.pauseVisionForModelMaintenance()
             } else {

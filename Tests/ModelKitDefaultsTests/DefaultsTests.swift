@@ -146,10 +146,13 @@ import Testing
 func localPreparationUsesSelectedResourceAndRejectsStoppedScope() async throws {
     let root = ModelContainer(resources: URL.temporaryDirectory.appendingPathComponent(UUID().uuidString))
     try await root.start()
-    for id in ["d3-edge", "gemma4-e2b", "apple-system"] {
+    for id in ["d3-edge", "vela3-fast", "vela3.1-fast", "laya-multilingual", "gemma4-e2b", "apple-system"] {
         let step = root.localModelPreparationStep(id: "decision") { id }
         #expect(step.id == "decision")
         #expect(try await !step.isReady())
+    }
+    for id in ["d3-edge", "vela3-fast", "vela3.1-fast", "laya-multilingual"] {
+        #expect(root.language.decisionModel(id) != nil)
     }
     #expect(root.language.decisionModel("d3-lite") == nil)
     let removed = root.localModelPreparationStep(id: "decision") { "d3-lite" }

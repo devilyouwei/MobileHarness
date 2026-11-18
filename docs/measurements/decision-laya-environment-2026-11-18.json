@@ -1,0 +1,8 @@
+{
+  "capturedAt": "2026-11-18T02:11:58.931411+00:00",
+  "stage": "after-model-inference-during-repository-checks",
+  "disk": "Filesystem      Size    Used   Avail Capacity iused ifree %iused  Mounted on\n/dev/disk3s5   228Gi   196Gi   273Mi   100%    1.6M  2.8M   36%   /System/Volumes/Data\n",
+  "memory": "hw.memsize: 8589934592\nvm.swapusage: total = 7424.00M  used = 6040.06M  free = 1383.94M  (encrypted)\n",
+  "note": "Not an inference-time sampling trace. During setup the run hit an explicit disk-full error; only task-created unused artifacts were removed. GPU debug-enabled specialization was reused.",
+  "chip": "Apple A18 Pro"
+}

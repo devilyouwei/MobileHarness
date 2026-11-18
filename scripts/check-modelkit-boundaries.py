@@ -176,8 +176,7 @@ for name, target in model_targets.items():
 for source in KIT.rglob('*.swift'):
     if source not in owners:
         errors.append(f'Unowned ModelKit source: {source.relative_to(ROOT)}')
-management = 'MobileHarness/ModelKit/Support/Management'
-for name, path in (('ModelKitRuntime', management), ('ModelKitDefaults', 'MobileHarness/ModelKit')):
+for name, path in (('ModelKitRuntime', 'MobileHarness/ModelKit/Support'), ('ModelKitDefaults', 'MobileHarness/ModelKit')):
     if model_targets[name]['path'] != path or not model_targets[name].get('sources'):
         errors.append(f'{name} requires an explicit source list at {path}')
 for source, name in owners.items():
@@ -1235,11 +1234,11 @@ if 'prepareArtifacts:' in app_container or 'Models/installed' in app_container:
     errors.append('App must not inject model filesystem space or adapters')
 if 'public let models:' in (ROOT / 'MobileHarness/Storage/Files/FilesContainer.swift').read_text():
     errors.append('Storage must not own a model file namespace')
-model_catalog = ROOT / 'MobileHarness/ModelKit/Support/Management/model-catalog.json'
+model_catalog = ROOT / 'MobileHarness/ModelKit/Support/Config/model-catalog.json'
 if not model_catalog.is_file():
     raise SystemExit('Missing runtime model catalog')
 catalog = json.loads(model_catalog.read_text())
-if catalog.get('schemaVersion') != 2 or {entry.get('id') for entry in catalog.get('packages', [])} != {'moss-tts-nano', 'silero', 'gemma4-e2b', 'yolo26n-pose', 'nemotron', 'd3-edge', 'vela3-fast', 'deepfilternet3'}:
+if catalog.get('schemaVersion') != 2 or {entry.get('id') for entry in catalog.get('packages', [])} != {'moss-tts-nano', 'silero', 'gemma4-e2b', 'yolo26n-pose', 'nemotron', 'd3-edge', 'vela3-fast', 'vela3.1-fast', 'laya-multilingual', 'deepfilternet3'}:
     raise SystemExit('Invalid production model catalog')
 for entry in catalog['packages']:
     source = entry['source']
@@ -1252,8 +1251,8 @@ for entry in catalog['packages']:
         raise SystemExit('Invalid archive source')
 for platform in ('iphoneos', 'iphonesimulator'):
     content = (ROOT / f'Config/Voice-Models-{platform}-Inputs.xcfilelist').read_text()
-    model_inputs = [line for line in content.splitlines() if '/ModelKit/Support/Management/' in line]
-    if model_inputs != ['$(SRCROOT)/MobileHarness/ModelKit/Support/Management/model-catalog.json']:
+    model_inputs = [line for line in content.splitlines() if '/ModelKit/Support/Config/' in line]
+    if model_inputs != ['$(SRCROOT)/MobileHarness/ModelKit/Support/Config/model-catalog.json']:
         raise SystemExit('App staging must not depend on model weights')
 print('Model resources: declarative catalog and metadata-only App staging passed.')
 

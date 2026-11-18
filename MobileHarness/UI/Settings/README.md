@@ -178,7 +178,7 @@ Assistant 历史仅呈现实际发起的模型请求。列表和详情可显示�
 
 ## 设置文案
 
-模型评分显示“推荐指数”（Recommendation），评分数据不随标题变化。设置说明只呈现下载前提、保存步骤、删除影响和必要使用提示；普通模型列表显示状态、大小与许可证，不显示 revision 哈希。模型页不解释内部思考档位、工具调用、上下文容量或消息队列。中英文文案由共享 String Catalog 同步维护，历史记录与执行证据保留原始内容。
+模型评分显示“推荐指数”（Recommendation），Decision四模型的星级是人工审阅的打断任务推荐等级，优先少误打断，再参考召回、延迟和跨模板稳定性；不是准确率或置信度。Vela 3 Fast为3星、D3 Edge为2.5星、Vela 3.1 Fast为2星、Laya为1.5星，界面标注仅供Mac实验参考，中文可靠性与真机表现仍待验证。依据见[二分类验证](../../../docs/validation/Decision-Binary-Interrupt-Mac-Comparison.md)。设置说明只呈现下载前提、保存步骤、删除影响和必要使用提示；普通模型列表显示状态、大小与许可证，不显示 revision 哈希。模型页不解释内部思考档位、工具调用、上下文容量或消息队列。中英文文案由共享 String Catalog 同步维护，历史记录与执行证据保留原始内容。
 
 Speech Recognition includes persisted speech-onset (1…16 windows, step 1) and probability (0.05…0.95, step 0.05) sliders, defaulting to 8 and 0.65. Slider release submits both values through ModelResourcesControlling; saving disables editing, failures remain visible and restore confirmed values. Labels show onset duration at 32 ms/window and next-listening activation.
 

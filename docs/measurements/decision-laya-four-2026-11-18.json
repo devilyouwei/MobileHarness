@@ -1,0 +1,7433 @@
+{
+  "model": "laya",
+  "suite": "four",
+  "provenance": {
+    "repository": "mlboydaisuke/Laya-Multilingual-CoreAI",
+    "revision": "3fe58a5ed7857b41f5c7ba8c0f46ce420b42cf02",
+    "device": "gpu",
+    "specializationDebug": true,
+    "platform": "macOS-27.2.1-arm64-arm-64bit",
+    "runnerSHA256": "ac5ef10952b85fbfc2f28b2aed36a907e6df76d7fe061d4d76a016e849497ad8",
+    "specSHA256": "ae008ecd497acea673568ce946dc6d236e2d42337f7405e58c98882d1d99dfe8",
+    "runtimeVersions": {
+      "coreai-core": "1.0.0b2",
+      "numpy": "2.3.5",
+      "torch": "2.7.0",
+      "transformers": "5.14.1",
+      "tokenizers": "0.22.2"
+    },
+    "hostPackage": {
+      "filename": "laya-0.4.2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/a6/d1/8d1d18b6645c729612a2e3008cba79b6b1fa1420b6a5df026650df2a7321/laya-0.4.2-py3-none-any.whl",
+      "sha256": "126284550840e8fc2445f9cd4c808e505d25d457242e7de5658b2cb9f9155b26"
+    },
+    "temperature": [
+      2.042901414492613,
+      3.684653192472766,
+      3.629100511692587
+    ],
+    "adapterSHA256": "8adea23fe5641b3e2ade738c47ec7259c840232fac55cae53a9988cd8db03606",
+    "temperatureByOptions": {
+      "choice:2": 1.397546128996061,
+      "choice:3-5": 1.3591985667953796,
+      "choice:6-10": 1.0,
+      "choice:11+": 2.445877143176841,
+      "score:3-5": 3.684653192472766,
+      "noul:2": 3.629100511692587
+    }
+  },
+  "inputFile": "decision-vela-d3-input-2026-11-17.json",
+  "inputSHA256": "c41c18f208d479587209bcba1f6222b45ae4da36f2fe4fb341df92bafcb51de6",
+  "loadMilliseconds": 7998.92179100425,
+  "preflight": [
+    {
+      "variant": "utterance_status",
+      "id": "holdout-alarm-unfinished-en",
+      "inputTokens": 232,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 43,
+        "state_tokens_used": 43,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-alarm-unfinished-en",
+      "inputTokens": 119,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 16,
+        "state_tokens_used": 16,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-alarm-unfinished-zh-Hans",
+      "inputTokens": 235,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 46,
+        "state_tokens_used": 46,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-alarm-unfinished-zh-Hans",
+      "inputTokens": 122,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 19,
+        "state_tokens_used": 19,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-alarm-complete-en",
+      "inputTokens": 237,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 48,
+        "state_tokens_used": 48,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-alarm-complete-en",
+      "inputTokens": 124,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 21,
+        "state_tokens_used": 21,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-alarm-complete-zh-Hans",
+      "inputTokens": 241,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 52,
+        "state_tokens_used": 52,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-alarm-complete-zh-Hans",
+      "inputTokens": 128,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 25,
+        "state_tokens_used": 25,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-brightness-unfinished-en",
+      "inputTokens": 231,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 42,
+        "state_tokens_used": 42,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-brightness-unfinished-en",
+      "inputTokens": 118,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 15,
+        "state_tokens_used": 15,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-brightness-unfinished-zh-Hans",
+      "inputTokens": 232,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 43,
+        "state_tokens_used": 43,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-brightness-unfinished-zh-Hans",
+      "inputTokens": 119,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 16,
+        "state_tokens_used": 16,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-brightness-complete-en",
+      "inputTokens": 237,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 48,
+        "state_tokens_used": 48,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-brightness-complete-en",
+      "inputTokens": 124,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 21,
+        "state_tokens_used": 21,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-brightness-complete-zh-Hans",
+      "inputTokens": 237,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 48,
+        "state_tokens_used": 48,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-brightness-complete-zh-Hans",
+      "inputTokens": 124,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 21,
+        "state_tokens_used": 21,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-attachment-unfinished-en",
+      "inputTokens": 229,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 40,
+        "state_tokens_used": 40,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-attachment-unfinished-en",
+      "inputTokens": 116,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 13,
+        "state_tokens_used": 13,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-attachment-unfinished-zh-Hans",
+      "inputTokens": 231,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 42,
+        "state_tokens_used": 42,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-attachment-unfinished-zh-Hans",
+      "inputTokens": 118,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 15,
+        "state_tokens_used": 15,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-attachment-complete-en",
+      "inputTokens": 235,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 46,
+        "state_tokens_used": 46,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-attachment-complete-en",
+      "inputTokens": 122,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 19,
+        "state_tokens_used": 19,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-attachment-complete-zh-Hans",
+      "inputTokens": 236,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 47,
+        "state_tokens_used": 47,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-attachment-complete-zh-Hans",
+      "inputTokens": 123,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 20,
+        "state_tokens_used": 20,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-unless-unfinished-en",
+      "inputTokens": 233,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 44,
+        "state_tokens_used": 44,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-unless-unfinished-en",
+      "inputTokens": 120,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 17,
+        "state_tokens_used": 17,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-unless-unfinished-zh-Hans",
+      "inputTokens": 234,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 45,
+        "state_tokens_used": 45,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-unless-unfinished-zh-Hans",
+      "inputTokens": 121,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 18,
+        "state_tokens_used": 18,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-unless-complete-en",
+      "inputTokens": 240,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 51,
+        "state_tokens_used": 51,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-unless-complete-en",
+      "inputTokens": 127,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 24,
+        "state_tokens_used": 24,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-unless-complete-zh-Hans",
+      "inputTokens": 241,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 52,
+        "state_tokens_used": 52,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-unless-complete-zh-Hans",
+      "inputTokens": 128,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 25,
+        "state_tokens_used": 25,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-route-unfinished-en",
+      "inputTokens": 234,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 45,
+        "state_tokens_used": 45,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-route-unfinished-en",
+      "inputTokens": 121,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 18,
+        "state_tokens_used": 18,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-route-unfinished-zh-Hans",
+      "inputTokens": 231,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 42,
+        "state_tokens_used": 42,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-route-unfinished-zh-Hans",
+      "inputTokens": 118,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 15,
+        "state_tokens_used": 15,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-route-complete-en",
+      "inputTokens": 238,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 49,
+        "state_tokens_used": 49,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-route-complete-en",
+      "inputTokens": 125,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 22,
+        "state_tokens_used": 22,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-route-complete-zh-Hans",
+      "inputTokens": 237,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 48,
+        "state_tokens_used": 48,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-route-complete-zh-Hans",
+      "inputTokens": 124,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 21,
+        "state_tokens_used": 21,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-rewrite-unfinished-en",
+      "inputTokens": 232,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 43,
+        "state_tokens_used": 43,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-rewrite-unfinished-en",
+      "inputTokens": 119,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 16,
+        "state_tokens_used": 16,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-rewrite-unfinished-zh-Hans",
+      "inputTokens": 231,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 42,
+        "state_tokens_used": 42,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-rewrite-unfinished-zh-Hans",
+      "inputTokens": 118,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 15,
+        "state_tokens_used": 15,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-rewrite-complete-en",
+      "inputTokens": 239,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 50,
+        "state_tokens_used": 50,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-rewrite-complete-en",
+      "inputTokens": 126,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 23,
+        "state_tokens_used": 23,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-rewrite-complete-zh-Hans",
+      "inputTokens": 237,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 48,
+        "state_tokens_used": 48,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-rewrite-complete-zh-Hans",
+      "inputTokens": 124,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 21,
+        "state_tokens_used": 21,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-list-unfinished-en",
+      "inputTokens": 233,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 44,
+        "state_tokens_used": 44,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-list-unfinished-en",
+      "inputTokens": 120,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 17,
+        "state_tokens_used": 17,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-list-unfinished-zh-Hans",
+      "inputTokens": 234,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 45,
+        "state_tokens_used": 45,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-list-unfinished-zh-Hans",
+      "inputTokens": 121,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 18,
+        "state_tokens_used": 18,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-list-complete-en",
+      "inputTokens": 237,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 48,
+        "state_tokens_used": 48,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-list-complete-en",
+      "inputTokens": 124,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 21,
+        "state_tokens_used": 21,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-list-complete-zh-Hans",
+      "inputTokens": 240,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 51,
+        "state_tokens_used": 51,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-list-complete-zh-Hans",
+      "inputTokens": 127,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 24,
+        "state_tokens_used": 24,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-purpose-unfinished-en",
+      "inputTokens": 233,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 44,
+        "state_tokens_used": 44,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-purpose-unfinished-en",
+      "inputTokens": 120,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 17,
+        "state_tokens_used": 17,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-purpose-unfinished-zh-Hans",
+      "inputTokens": 235,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 46,
+        "state_tokens_used": 46,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-purpose-unfinished-zh-Hans",
+      "inputTokens": 122,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 19,
+        "state_tokens_used": 19,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-purpose-complete-en",
+      "inputTokens": 240,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 51,
+        "state_tokens_used": 51,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-purpose-complete-en",
+      "inputTokens": 127,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 24,
+        "state_tokens_used": 24,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-purpose-complete-zh-Hans",
+      "inputTokens": 241,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 52,
+        "state_tokens_used": 52,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-purpose-complete-zh-Hans",
+      "inputTokens": 128,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 25,
+        "state_tokens_used": 25,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-short-answer-en",
+      "inputTokens": 233,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 44,
+        "state_tokens_used": 44,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-short-answer-en",
+      "inputTokens": 118,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 15,
+        "state_tokens_used": 15,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-short-answer-zh-Hans",
+      "inputTokens": 233,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 44,
+        "state_tokens_used": 44,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-short-answer-zh-Hans",
+      "inputTokens": 117,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 14,
+        "state_tokens_used": 14,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-short-command-en",
+      "inputTokens": 231,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 42,
+        "state_tokens_used": 42,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-short-command-en",
+      "inputTokens": 118,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 15,
+        "state_tokens_used": 15,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-short-command-zh-Hans",
+      "inputTokens": 232,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 43,
+        "state_tokens_used": 43,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-short-command-zh-Hans",
+      "inputTokens": 119,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 16,
+        "state_tokens_used": 16,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-stop-en",
+      "inputTokens": 231,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 42,
+        "state_tokens_used": 42,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-stop-en",
+      "inputTokens": 118,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 15,
+        "state_tokens_used": 15,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-stop-zh-Hans",
+      "inputTokens": 232,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 43,
+        "state_tokens_used": 43,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-stop-zh-Hans",
+      "inputTokens": 119,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 16,
+        "state_tokens_used": 16,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-switch-en",
+      "inputTokens": 235,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 46,
+        "state_tokens_used": 46,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-switch-en",
+      "inputTokens": 122,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 19,
+        "state_tokens_used": 19,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-switch-zh-Hans",
+      "inputTokens": 236,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 47,
+        "state_tokens_used": 47,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-switch-zh-Hans",
+      "inputTokens": 123,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 20,
+        "state_tokens_used": 20,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-negated-en",
+      "inputTokens": 234,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 45,
+        "state_tokens_used": 45,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-negated-en",
+      "inputTokens": 121,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 18,
+        "state_tokens_used": 18,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-negated-zh-Hans",
+      "inputTokens": 233,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 44,
+        "state_tokens_used": 44,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-negated-zh-Hans",
+      "inputTokens": 120,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 17,
+        "state_tokens_used": 17,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-quoted-en",
+      "inputTokens": 233,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 44,
+        "state_tokens_used": 44,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-quoted-en",
+      "inputTokens": 120,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 17,
+        "state_tokens_used": 17,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-quoted-zh-Hans",
+      "inputTokens": 236,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 47,
+        "state_tokens_used": 47,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-quoted-zh-Hans",
+      "inputTokens": 123,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 20,
+        "state_tokens_used": 20,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-noise-en",
+      "inputTokens": 230,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 41,
+        "state_tokens_used": 41,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-noise-en",
+      "inputTokens": 117,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 14,
+        "state_tokens_used": 14,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-noise-zh-Hans",
+      "inputTokens": 231,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 42,
+        "state_tokens_used": 42,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-noise-zh-Hans",
+      "inputTokens": 118,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 15,
+        "state_tokens_used": 15,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-filler-en",
+      "inputTokens": 228,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 39,
+        "state_tokens_used": 39,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-filler-en",
+      "inputTokens": 115,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 12,
+        "state_tokens_used": 12,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-filler-zh-Hans",
+      "inputTokens": 228,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 39,
+        "state_tokens_used": 39,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-filler-zh-Hans",
+      "inputTokens": 115,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 12,
+        "state_tokens_used": 12,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "probe-00-empty",
+      "inputTokens": 120,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 17,
+        "state_tokens_used": 17,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "probe-01-empty",
+      "inputTokens": 120,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 17,
+        "state_tokens_used": 17,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "probe-02-empty",
+      "inputTokens": 118,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 15,
+        "state_tokens_used": 15,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "probe-03-empty",
+      "inputTokens": 119,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 16,
+        "state_tokens_used": 16,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "probe-04-empty",
+      "inputTokens": 117,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 14,
+        "state_tokens_used": 14,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "minimal",
+      "id": "probe-05-empty",
+      "inputTokens": 117,
+      "markers": [
+        19,
+        44,
+        57,
+        80
+      ],
+      "optionTokenLengths": [
+        24,
+        12,
+        22,
+        20
+      ],
+      "instructionTokens": 17,
+      "instructionTokensUsed": 17,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 14,
+        "state_tokens_used": 14,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "probe-00-empty",
+      "inputTokens": 233,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 44,
+        "state_tokens_used": 44,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "probe-01-empty",
+      "inputTokens": 233,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 44,
+        "state_tokens_used": 44,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "probe-02-empty",
+      "inputTokens": 231,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 42,
+        "state_tokens_used": 42,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "probe-03-empty",
+      "inputTokens": 232,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 43,
+        "state_tokens_used": 43,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "probe-04-empty",
+      "inputTokens": 230,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 41,
+        "state_tokens_used": 41,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    },
+    {
+      "variant": "utterance_status",
+      "id": "probe-05-empty",
+      "inputTokens": 230,
+      "markers": [
+        59,
+        88,
+        116,
+        152
+      ],
+      "optionTokenLengths": [
+        28,
+        27,
+        35,
+        34
+      ],
+      "instructionTokens": 57,
+      "instructionTokensUsed": 57,
+      "options": {
+        "options": 4,
+        "options_distinct": 4,
+        "tokens_per_option": null
+      },
+      "truncation": {
+        "state_tokens": 41,
+        "state_tokens_used": 41,
+        "state_tokens_dropped": 0,
+        "truncated": false
+      },
+      "inputComplete": true
+    }
+  ],
+  "warmup": [
+    {
+      "id": "holdout-alarm-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Wake me on Monday at",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 119,
+      "milliseconds": 222.49987500254065,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3109,
+          "B": 0.2904,
+          "C": 0.1233,
+          "D": 0.2754
+        },
+        "confidence": 0.0366,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3109
+    },
+    {
+      "id": "holdout-alarm-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Wake me on Monday at",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 119,
+      "milliseconds": 139.8599579988513,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3109,
+          "B": 0.2904,
+          "C": 0.1233,
+          "D": 0.2754
+        },
+        "confidence": 0.0366,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3109
+    },
+    {
+      "id": "holdout-alarm-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Wake me on Monday at",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 119,
+      "milliseconds": 140.75270798639394,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3109,
+          "B": 0.2904,
+          "C": 0.1233,
+          "D": 0.2754
+        },
+        "confidence": 0.0366,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3109
+    },
+    {
+      "id": "holdout-alarm-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Wake me on Monday at",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 232,
+      "milliseconds": 141.10933302436024,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1921,
+          "B": 0.1637,
+          "C": 0.235,
+          "D": 0.4092
+        },
+        "confidence": 0.0484,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.4092
+    },
+    {
+      "id": "holdout-alarm-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Wake me on Monday at",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 232,
+      "milliseconds": 143.04808399174362,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1921,
+          "B": 0.1637,
+          "C": 0.235,
+          "D": 0.4092
+        },
+        "confidence": 0.0484,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.4092
+    },
+    {
+      "id": "holdout-alarm-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Wake me on Monday at",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 232,
+      "milliseconds": 146.45100000780076,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1921,
+          "B": 0.1637,
+          "C": 0.235,
+          "D": 0.4092
+        },
+        "confidence": 0.0484,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.4092
+    }
+  ],
+  "rows": [
+    {
+      "id": "holdout-alarm-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "six thirty.",
+      "held": [
+        "Wake me on Monday at"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 124,
+      "milliseconds": 143.89633398968726,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3303,
+          "B": 0.2504,
+          "C": 0.1236,
+          "D": 0.2957
+        },
+        "confidence": 0.0397,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3303
+    },
+    {
+      "id": "holdout-alarm-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "six thirty.",
+      "held": [
+        "Wake me on Monday at"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 237,
+      "milliseconds": 141.37979201041162,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1401,
+          "B": 0.1665,
+          "C": 0.1903,
+          "D": 0.5031
+        },
+        "confidence": 0.109,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.5031
+    },
+    {
+      "id": "holdout-alarm-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "六点半。",
+      "held": [
+        "周一叫醒我，时间定在"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 241,
+      "milliseconds": 142.1378749946598,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1413,
+          "B": 0.2418,
+          "C": 0.1482,
+          "D": 0.4687
+        },
+        "confidence": 0.0926,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.4687
+    },
+    {
+      "id": "holdout-alarm-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "六点半。",
+      "held": [
+        "周一叫醒我，时间定在"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 128,
+      "milliseconds": 144.82308298465796,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3776,
+          "B": 0.277,
+          "C": 0.0898,
+          "D": 0.2556
+        },
+        "confidence": 0.0705,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3776
+    },
+    {
+      "id": "holdout-alarm-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Wake me on Monday at",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 119,
+      "milliseconds": 144.64108299580403,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3109,
+          "B": 0.2904,
+          "C": 0.1233,
+          "D": 0.2754
+        },
+        "confidence": 0.0366,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3109
+    },
+    {
+      "id": "holdout-alarm-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Wake me on Monday at",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 232,
+      "milliseconds": 145.39783401414752,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1921,
+          "B": 0.1637,
+          "C": 0.235,
+          "D": 0.4092
+        },
+        "confidence": 0.0484,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.4092
+    },
+    {
+      "id": "holdout-alarm-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "周一叫醒我，时间定在",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 235,
+      "milliseconds": 144.83141698292457,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1756,
+          "B": 0.2653,
+          "C": 0.1804,
+          "D": 0.3786
+        },
+        "confidence": 0.0376,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.3786
+    },
+    {
+      "id": "holdout-alarm-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "周一叫醒我，时间定在",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 122,
+      "milliseconds": 144.2429169837851,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.3103,
+          "B": 0.328,
+          "C": 0.0973,
+          "D": 0.2644
+        },
+        "confidence": 0.057,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "discard",
+      "score": 0.328
+    },
+    {
+      "id": "holdout-attachment-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "budget spreadsheet.",
+      "held": [
+        "Attach the"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 122,
+      "milliseconds": 147.1949160040822,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.313,
+          "B": 0.3688,
+          "C": 0.1396,
+          "D": 0.1787
+        },
+        "confidence": 0.0522,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "discard",
+      "score": 0.3688
+    },
+    {
+      "id": "holdout-attachment-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "budget spreadsheet.",
+      "held": [
+        "Attach the"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 235,
+      "milliseconds": 146.38033299706876,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.2354,
+          "B": 0.3591,
+          "C": 0.1431,
+          "D": 0.2624
+        },
+        "confidence": 0.0352,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "discard",
+      "score": 0.3591
+    },
+    {
+      "id": "holdout-attachment-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "预算表。",
+      "held": [
+        "附上那份"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 236,
+      "milliseconds": 145.35912501742132,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1625,
+          "B": 0.2828,
+          "C": 0.1049,
+          "D": 0.4499
+        },
+        "confidence": 0.0995,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.4499
+    },
+    {
+      "id": "holdout-attachment-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "预算表。",
+      "held": [
+        "附上那份"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 123,
+      "milliseconds": 146.52691601077095,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.364,
+          "B": 0.286,
+          "C": 0.1371,
+          "D": 0.2128
+        },
+        "confidence": 0.0423,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.364
+    },
+    {
+      "id": "holdout-attachment-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Attach the",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 116,
+      "milliseconds": 146.44241600763053,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.4844,
+          "B": 0.3783,
+          "C": 0.0277,
+          "D": 0.1097
+        },
+        "confidence": 0.2349,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.4844
+    },
+    {
+      "id": "holdout-attachment-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Attach the",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 229,
+      "milliseconds": 147.462208988145,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.219,
+          "B": 0.2001,
+          "C": 0.2198,
+          "D": 0.3612
+        },
+        "confidence": 0.0224,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.3612
+    },
+    {
+      "id": "holdout-attachment-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "附上那份",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 231,
+      "milliseconds": 148.31270900322124,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.0872,
+          "B": 0.1685,
+          "C": 0.0907,
+          "D": 0.6536
+        },
+        "confidence": 0.2726,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.6536
+    },
+    {
+      "id": "holdout-attachment-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "附上那份",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 118,
+      "milliseconds": 153.23941700626165,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3619,
+          "B": 0.3506,
+          "C": 0.0715,
+          "D": 0.216
+        },
+        "confidence": 0.0948,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3619
+    },
+    {
+      "id": "holdout-brightness-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "twenty percent.",
+      "held": [
+        "Change the brightness to"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 124,
+      "milliseconds": 151.39991699834354,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.3069,
+          "B": 0.3596,
+          "C": 0.1163,
+          "D": 0.2171
+        },
+        "confidence": 0.0535,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "discard",
+      "score": 0.3596
+    },
+    {
+      "id": "holdout-brightness-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "twenty percent.",
+      "held": [
+        "Change the brightness to"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 237,
+      "milliseconds": 151.3297499914188,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1755,
+          "B": 0.2608,
+          "C": 0.1905,
+          "D": 0.3733
+        },
+        "confidence": 0.0337,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.3733
+    },
+    {
+      "id": "holdout-brightness-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "百分之二十。",
+      "held": [
+        "把亮度调成"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 237,
+      "milliseconds": 153.17199999117292,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.2047,
+          "B": 0.2979,
+          "C": 0.1688,
+          "D": 0.3286
+        },
+        "confidence": 0.0251,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.3286
+    },
+    {
+      "id": "holdout-brightness-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "百分之二十。",
+      "held": [
+        "把亮度调成"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 124,
+      "milliseconds": 151.29654100746848,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3218,
+          "B": 0.3102,
+          "C": 0.1079,
+          "D": 0.2601
+        },
+        "confidence": 0.0489,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3218
+    },
+    {
+      "id": "holdout-brightness-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Change the brightness to",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 118,
+      "milliseconds": 150.9024999977555,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.3303,
+          "B": 0.3708,
+          "C": 0.1003,
+          "D": 0.1987
+        },
+        "confidence": 0.0727,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "discard",
+      "score": 0.3708
+    },
+    {
+      "id": "holdout-brightness-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Change the brightness to",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 231,
+      "milliseconds": 156.31179200136103,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.0998,
+          "B": 0.1252,
+          "C": 0.0844,
+          "D": 0.6906
+        },
+        "confidence": 0.3115,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.6906
+    },
+    {
+      "id": "holdout-brightness-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "把亮度调成",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 232,
+      "milliseconds": 149.36774998204783,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1543,
+          "B": 0.2711,
+          "C": 0.1343,
+          "D": 0.4403
+        },
+        "confidence": 0.0817,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.4403
+    },
+    {
+      "id": "holdout-brightness-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "把亮度调成",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 119,
+      "milliseconds": 152.80133299529552,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.4285,
+          "B": 0.3212,
+          "C": 0.0755,
+          "D": 0.1748
+        },
+        "confidence": 0.1143,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.4285
+    },
+    {
+      "id": "holdout-filler-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "discard",
+      "expectedAdopted": "discard",
+      "running": false,
+      "playing": false,
+      "latest": "er",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 115,
+      "milliseconds": 157.47525001643226,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.2724,
+          "B": 0.2867,
+          "C": 0.123,
+          "D": 0.3179
+        },
+        "confidence": 0.0374,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.3179
+    },
+    {
+      "id": "holdout-filler-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "discard",
+      "expectedAdopted": "discard",
+      "running": false,
+      "playing": false,
+      "latest": "er",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 228,
+      "milliseconds": 152.43608300806955,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1077,
+          "B": 0.18,
+          "C": 0.1948,
+          "D": 0.5175
+        },
+        "confidence": 0.1285,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.5175
+    },
+    {
+      "id": "holdout-filler-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "discard",
+      "expectedAdopted": "discard",
+      "running": false,
+      "playing": false,
+      "latest": "呃",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 228,
+      "milliseconds": 153.70529200299643,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.0579,
+          "B": 0.2273,
+          "C": 0.06,
+          "D": 0.6548
+        },
+        "confidence": 0.3163,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.6548
+    },
+    {
+      "id": "holdout-filler-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "discard",
+      "expectedAdopted": "discard",
+      "running": false,
+      "playing": false,
+      "latest": "呃",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 115,
+      "milliseconds": 155.1475829910487,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.2966,
+          "B": 0.3867,
+          "C": 0.0683,
+          "D": 0.2484
+        },
+        "confidence": 0.0932,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "discard",
+      "score": 0.3867
+    },
+    {
+      "id": "holdout-list-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "a jacket.",
+      "held": [
+        "Pack socks, shoes, and"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 124,
+      "milliseconds": 150.4110420064535,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.2813,
+          "B": 0.2863,
+          "C": 0.192,
+          "D": 0.2404
+        },
+        "confidence": 0.0086,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "discard",
+      "score": 0.2863
+    },
+    {
+      "id": "holdout-list-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "a jacket.",
+      "held": [
+        "Pack socks, shoes, and"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 237,
+      "milliseconds": 150.5765000183601,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1478,
+          "B": 0.1763,
+          "C": 0.1484,
+          "D": 0.5276
+        },
+        "confidence": 0.1279,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.5276
+    },
+    {
+      "id": "holdout-list-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "一件夹克。",
+      "held": [
+        "打包袜子、鞋子，还有"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 240,
+      "milliseconds": 152.51058401190676,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.2289,
+          "B": 0.3134,
+          "C": 0.1606,
+          "D": 0.2971
+        },
+        "confidence": 0.0223,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "discard",
+      "score": 0.3134
+    },
+    {
+      "id": "holdout-list-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "一件夹克。",
+      "held": [
+        "打包袜子、鞋子，还有"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 127,
+      "milliseconds": 155.5872090102639,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3503,
+          "B": 0.2294,
+          "C": 0.1201,
+          "D": 0.3003
+        },
+        "confidence": 0.0471,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3503
+    },
+    {
+      "id": "holdout-list-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Pack socks, shoes, and",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 120,
+      "milliseconds": 155.69366599083878,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.2699,
+          "B": 0.3041,
+          "C": 0.1842,
+          "D": 0.2417
+        },
+        "confidence": 0.0115,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "discard",
+      "score": 0.3041
+    },
+    {
+      "id": "holdout-list-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Pack socks, shoes, and",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 233,
+      "milliseconds": 160.33858401351608,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1807,
+          "B": 0.1614,
+          "C": 0.1863,
+          "D": 0.4715
+        },
+        "confidence": 0.0831,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.4715
+    },
+    {
+      "id": "holdout-list-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "打包袜子、鞋子，还有",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 234,
+      "milliseconds": 154.92795800673775,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.2149,
+          "B": 0.1931,
+          "C": 0.182,
+          "D": 0.41
+        },
+        "confidence": 0.0452,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.41
+    },
+    {
+      "id": "holdout-list-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "打包袜子、鞋子，还有",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 121,
+      "milliseconds": 154.19745800318196,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.2644,
+          "B": 0.3246,
+          "C": 0.1803,
+          "D": 0.2308
+        },
+        "confidence": 0.0159,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "discard",
+      "score": 0.3246
+    },
+    {
+      "id": "holdout-negated-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": true,
+      "playing": true,
+      "latest": "Keep going, do not stop.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 121,
+      "milliseconds": 154.78295800858177,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.2659,
+          "B": 0.2188,
+          "C": 0.1873,
+          "D": 0.328
+        },
+        "confidence": 0.016,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.328
+    },
+    {
+      "id": "holdout-negated-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": true,
+      "playing": true,
+      "latest": "Keep going, do not stop.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 234,
+      "milliseconds": 154.19641602784395,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.2772,
+          "B": 0.2008,
+          "C": 0.1908,
+          "D": 0.3311
+        },
+        "confidence": 0.0189,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.3311
+    },
+    {
+      "id": "holdout-negated-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": true,
+      "playing": true,
+      "latest": "接着说，不要停。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 233,
+      "milliseconds": 153.03745798883028,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.2015,
+          "B": 0.1582,
+          "C": 0.1639,
+          "D": 0.4765
+        },
+        "confidence": 0.0881,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.4765
+    },
+    {
+      "id": "holdout-negated-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": true,
+      "playing": true,
+      "latest": "接着说，不要停。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 120,
+      "milliseconds": 154.34154198737815,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.2871,
+          "B": 0.2118,
+          "C": 0.242,
+          "D": 0.259
+        },
+        "confidence": 0.0043,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.2871
+    },
+    {
+      "id": "holdout-noise-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "discard",
+      "expectedAdopted": "discard",
+      "running": false,
+      "playing": false,
+      "latest": "[inaudible]",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 117,
+      "milliseconds": 156.32337497663684,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.2566,
+          "B": 0.2916,
+          "C": 0.1316,
+          "D": 0.3202
+        },
+        "confidence": 0.0335,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.3202
+    },
+    {
+      "id": "holdout-noise-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "discard",
+      "expectedAdopted": "discard",
+      "running": false,
+      "playing": false,
+      "latest": "[inaudible]",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 230,
+      "milliseconds": 156.4456250052899,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1206,
+          "B": 0.1609,
+          "C": 0.1386,
+          "D": 0.5799
+        },
+        "confidence": 0.1784,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.5799
+    },
+    {
+      "id": "holdout-noise-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "discard",
+      "expectedAdopted": "discard",
+      "running": false,
+      "playing": false,
+      "latest": "[听不清]",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 231,
+      "milliseconds": 156.5402910055127,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1108,
+          "B": 0.2444,
+          "C": 0.1037,
+          "D": 0.5411
+        },
+        "confidence": 0.1665,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.5411
+    },
+    {
+      "id": "holdout-noise-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "discard",
+      "expectedAdopted": "discard",
+      "running": false,
+      "playing": false,
+      "latest": "[听不清]",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 118,
+      "milliseconds": 153.9726250048261,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1868,
+          "B": 0.2872,
+          "C": 0.1305,
+          "D": 0.3955
+        },
+        "confidence": 0.0592,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.3955
+    },
+    {
+      "id": "holdout-purpose-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "Please close the door.",
+      "held": [
+        "I need a note that says"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 127,
+      "milliseconds": 156.56029200181365,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3574,
+          "B": 0.2379,
+          "C": 0.1296,
+          "D": 0.2751
+        },
+        "confidence": 0.0412,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3574
+    },
+    {
+      "id": "holdout-purpose-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "Please close the door.",
+      "held": [
+        "I need a note that says"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 240,
+      "milliseconds": 156.79887498845346,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1842,
+          "B": 0.2638,
+          "C": 0.1429,
+          "D": 0.4091
+        },
+        "confidence": 0.0573,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.4091
+    },
+    {
+      "id": "holdout-purpose-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "请关门。",
+      "held": [
+        "我需要一张便条，上面写"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 241,
+      "milliseconds": 156.57054199255072,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.2791,
+          "B": 0.2309,
+          "C": 0.133,
+          "D": 0.357
+        },
+        "confidence": 0.0401,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.357
+    },
+    {
+      "id": "holdout-purpose-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "请关门。",
+      "held": [
+        "我需要一张便条，上面写"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 128,
+      "milliseconds": 157.79925000970252,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3996,
+          "B": 0.2447,
+          "C": 0.1396,
+          "D": 0.2161
+        },
+        "confidence": 0.05,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3996
+    },
+    {
+      "id": "holdout-purpose-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "I need a note that says",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 120,
+      "milliseconds": 153.966332989512,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3699,
+          "B": 0.2243,
+          "C": 0.1107,
+          "D": 0.2951
+        },
+        "confidence": 0.0572,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3699
+    },
+    {
+      "id": "holdout-purpose-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "I need a note that says",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 233,
+      "milliseconds": 153.71670798049308,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1127,
+          "B": 0.1658,
+          "C": 0.2014,
+          "D": 0.5201
+        },
+        "confidence": 0.1296,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.5201
+    },
+    {
+      "id": "holdout-purpose-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "我需要一张便条，上面写",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 235,
+      "milliseconds": 158.41795798041858,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1789,
+          "B": 0.2428,
+          "C": 0.1333,
+          "D": 0.445
+        },
+        "confidence": 0.0763,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.445
+    },
+    {
+      "id": "holdout-purpose-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "我需要一张便条，上面写",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 122,
+      "milliseconds": 157.84400000120513,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.2636,
+          "B": 0.3097,
+          "C": 0.1789,
+          "D": 0.2477
+        },
+        "confidence": 0.0131,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "discard",
+      "score": 0.3097
+    },
+    {
+      "id": "holdout-quoted-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": true,
+      "playing": true,
+      "latest": "Write the words stop now.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 120,
+      "milliseconds": 157.68566701444797,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3436,
+          "B": 0.2175,
+          "C": 0.1922,
+          "D": 0.2466
+        },
+        "confidence": 0.0181,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3436
+    },
+    {
+      "id": "holdout-quoted-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": true,
+      "playing": true,
+      "latest": "Write the words stop now.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 233,
+      "milliseconds": 157.35812499769963,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.44,
+          "B": 0.2049,
+          "C": 0.1706,
+          "D": 0.1846
+        },
+        "confidence": 0.0626,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.44
+    },
+    {
+      "id": "holdout-quoted-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": true,
+      "playing": true,
+      "latest": "写下“现在停止”四个字。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 236,
+      "milliseconds": 158.47829202539288,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.2337,
+          "B": 0.1417,
+          "C": 0.1334,
+          "D": 0.4911
+        },
+        "confidence": 0.1094,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.4911
+    },
+    {
+      "id": "holdout-quoted-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": true,
+      "playing": true,
+      "latest": "写下“现在停止”四个字。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 123,
+      "milliseconds": 158.5051250003744,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3658,
+          "B": 0.3066,
+          "C": 0.1405,
+          "D": 0.187
+        },
+        "confidence": 0.0481,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3658
+    },
+    {
+      "id": "holdout-rewrite-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "See you next week.",
+      "held": [
+        "Rewrite the last sentence as"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 126,
+      "milliseconds": 156.61879099207,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3467,
+          "B": 0.2878,
+          "C": 0.1317,
+          "D": 0.2337
+        },
+        "confidence": 0.0388,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3467
+    },
+    {
+      "id": "holdout-rewrite-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "See you next week.",
+      "held": [
+        "Rewrite the last sentence as"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 239,
+      "milliseconds": 157.56787499412894,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.2514,
+          "B": 0.2953,
+          "C": 0.1646,
+          "D": 0.2886
+        },
+        "confidence": 0.0168,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "discard",
+      "score": 0.2953
+    },
+    {
+      "id": "holdout-rewrite-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "下周见。",
+      "held": [
+        "把最后一句改为"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 237,
+      "milliseconds": 162.3996249982156,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1495,
+          "B": 0.2993,
+          "C": 0.1419,
+          "D": 0.4093
+        },
+        "confidence": 0.071,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.4093
+    },
+    {
+      "id": "holdout-rewrite-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "下周见。",
+      "held": [
+        "把最后一句改为"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 124,
+      "milliseconds": 154.48308299528435,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3486,
+          "B": 0.2774,
+          "C": 0.1017,
+          "D": 0.2722
+        },
+        "confidence": 0.0552,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3486
+    },
+    {
+      "id": "holdout-rewrite-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Rewrite the last sentence as",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 119,
+      "milliseconds": 157.71408399450593,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.2165,
+          "B": 0.3534,
+          "C": 0.152,
+          "D": 0.2781
+        },
+        "confidence": 0.0326,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "discard",
+      "score": 0.3534
+    },
+    {
+      "id": "holdout-rewrite-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Rewrite the last sentence as",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 232,
+      "milliseconds": 159.46745898691006,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.2266,
+          "B": 0.2619,
+          "C": 0.1814,
+          "D": 0.3301
+        },
+        "confidence": 0.0169,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.3301
+    },
+    {
+      "id": "holdout-rewrite-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "把最后一句改为",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 231,
+      "milliseconds": 156.23987501021475,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.162,
+          "B": 0.174,
+          "C": 0.273,
+          "D": 0.391
+        },
+        "confidence": 0.0473,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.391
+    },
+    {
+      "id": "holdout-rewrite-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "把最后一句改为",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 118,
+      "milliseconds": 156.61516599357128,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3033,
+          "B": 0.2997,
+          "C": 0.1069,
+          "D": 0.2901
+        },
+        "confidence": 0.0471,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3033
+    },
+    {
+      "id": "holdout-route-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "the library.",
+      "held": [
+        "Show the route from the museum to"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 125,
+      "milliseconds": 160.77866600244306,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.5388,
+          "B": 0.1862,
+          "C": 0.1438,
+          "D": 0.1311
+        },
+        "confidence": 0.1405,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.5388
+    },
+    {
+      "id": "holdout-route-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "the library.",
+      "held": [
+        "Show the route from the museum to"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 238,
+      "milliseconds": 158.2969999872148,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1143,
+          "B": 0.1396,
+          "C": 0.1254,
+          "D": 0.6207
+        },
+        "confidence": 0.2216,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.6207
+    },
+    {
+      "id": "holdout-route-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "图书馆的路线。",
+      "held": [
+        "显示从博物馆到"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 237,
+      "milliseconds": 156.04745800374076,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1086,
+          "B": 0.2687,
+          "C": 0.1589,
+          "D": 0.4637
+        },
+        "confidence": 0.1034,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.4637
+    },
+    {
+      "id": "holdout-route-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "图书馆的路线。",
+      "held": [
+        "显示从博物馆到"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 124,
+      "milliseconds": 158.5406249796506,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3144,
+          "B": 0.2753,
+          "C": 0.114,
+          "D": 0.2963
+        },
+        "confidence": 0.0429,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3144
+    },
+    {
+      "id": "holdout-route-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Show the route from the museum to",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 121,
+      "milliseconds": 161.074917006772,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.4239,
+          "B": 0.2179,
+          "C": 0.1952,
+          "D": 0.1629
+        },
+        "confidence": 0.0548,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.4239
+    },
+    {
+      "id": "holdout-route-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Show the route from the museum to",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 234,
+      "milliseconds": 158.5533749894239,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1499,
+          "B": 0.1358,
+          "C": 0.1162,
+          "D": 0.5981
+        },
+        "confidence": 0.1971,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.5981
+    },
+    {
+      "id": "holdout-route-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "显示从博物馆到",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 231,
+      "milliseconds": 159.463959018467,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1667,
+          "B": 0.264,
+          "C": 0.1935,
+          "D": 0.3758
+        },
+        "confidence": 0.0364,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.3758
+    },
+    {
+      "id": "holdout-route-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "显示从博物馆到",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 118,
+      "milliseconds": 165.7698749913834,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.2855,
+          "B": 0.2663,
+          "C": 0.1232,
+          "D": 0.325
+        },
+        "confidence": 0.0381,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.325
+    },
+    {
+      "id": "holdout-short-answer-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "The smaller one.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": "Which size?",
+      "variant": "minimal",
+      "inputTokens": 118,
+      "milliseconds": 158.4741669939831,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.2749,
+          "B": 0.2862,
+          "C": 0.1287,
+          "D": 0.3102
+        },
+        "confidence": 0.0334,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.3102
+    },
+    {
+      "id": "holdout-short-answer-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "The smaller one.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": "Which size?",
+      "variant": "utterance_status",
+      "inputTokens": 233,
+      "milliseconds": 160.26866697939113,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1158,
+          "B": 0.2617,
+          "C": 0.1533,
+          "D": 0.4693
+        },
+        "confidence": 0.1034,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.4693
+    },
+    {
+      "id": "holdout-short-answer-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "小的那个。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": "哪种尺寸？",
+      "variant": "utterance_status",
+      "inputTokens": 233,
+      "milliseconds": 161.1209590046201,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1291,
+          "B": 0.3511,
+          "C": 0.1559,
+          "D": 0.364
+        },
+        "confidence": 0.07,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.364
+    },
+    {
+      "id": "holdout-short-answer-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "小的那个。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": "哪种尺寸？",
+      "variant": "minimal",
+      "inputTokens": 117,
+      "milliseconds": 167.61212499113753,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.255,
+          "B": 0.3576,
+          "C": 0.1194,
+          "D": 0.268
+        },
+        "confidence": 0.0458,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "discard",
+      "score": 0.3576
+    },
+    {
+      "id": "holdout-short-command-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "Take a selfie.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 118,
+      "milliseconds": 156.55833299388178,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3524,
+          "B": 0.2825,
+          "C": 0.1666,
+          "D": 0.1985
+        },
+        "confidence": 0.0304,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3524
+    },
+    {
+      "id": "holdout-short-command-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "Take a selfie.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 231,
+      "milliseconds": 156.93225001450628,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.251,
+          "B": 0.2627,
+          "C": 0.1859,
+          "D": 0.3004
+        },
+        "confidence": 0.0102,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.3004
+    },
+    {
+      "id": "holdout-short-command-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "拍张自拍。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 232,
+      "milliseconds": 158.1644999969285,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1898,
+          "B": 0.2362,
+          "C": 0.2845,
+          "D": 0.2894
+        },
+        "confidence": 0.0098,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.2894
+    },
+    {
+      "id": "holdout-short-command-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "拍张自拍。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 119,
+      "milliseconds": 162.17308398336172,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.2917,
+          "B": 0.4087,
+          "C": 0.1133,
+          "D": 0.1863
+        },
+        "confidence": 0.0732,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "discard",
+      "score": 0.4087
+    },
+    {
+      "id": "holdout-stop-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "interrupt",
+      "expectedAdopted": "interrupt",
+      "running": true,
+      "playing": true,
+      "latest": "Be quiet now.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 118,
+      "milliseconds": 160.58349999366328,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3384,
+          "B": 0.2184,
+          "C": 0.1967,
+          "D": 0.2465
+        },
+        "confidence": 0.0161,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3384
+    },
+    {
+      "id": "holdout-stop-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "interrupt",
+      "expectedAdopted": "interrupt",
+      "running": true,
+      "playing": true,
+      "latest": "Be quiet now.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 231,
+      "milliseconds": 160.4327090026345,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3881,
+          "B": 0.1953,
+          "C": 0.1972,
+          "D": 0.2193
+        },
+        "confidence": 0.0339,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3881
+    },
+    {
+      "id": "holdout-stop-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "interrupt",
+      "expectedAdopted": "interrupt",
+      "running": true,
+      "playing": true,
+      "latest": "现在别出声了。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 232,
+      "milliseconds": 164.2548330128193,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.2164,
+          "B": 0.1887,
+          "C": 0.157,
+          "D": 0.4379
+        },
+        "confidence": 0.0635,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.4379
+    },
+    {
+      "id": "holdout-stop-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "interrupt",
+      "expectedAdopted": "interrupt",
+      "running": true,
+      "playing": true,
+      "latest": "现在别出声了。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 119,
+      "milliseconds": 160.60895900591277,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.4954,
+          "B": 0.1921,
+          "C": 0.1371,
+          "D": 0.1754
+        },
+        "confidence": 0.1036,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.4954
+    },
+    {
+      "id": "holdout-switch-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "interrupt",
+      "expectedAdopted": "interrupt",
+      "running": true,
+      "playing": true,
+      "latest": "Stop this and read my calendar instead.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 122,
+      "milliseconds": 161.59341699676588,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.4246,
+          "B": 0.245,
+          "C": 0.1176,
+          "D": 0.2128
+        },
+        "confidence": 0.07,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.4246
+    },
+    {
+      "id": "holdout-switch-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "interrupt",
+      "expectedAdopted": "interrupt",
+      "running": true,
+      "playing": true,
+      "latest": "Stop this and read my calendar instead.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 235,
+      "milliseconds": 166.23004199936986,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.4721,
+          "B": 0.1719,
+          "C": 0.1431,
+          "D": 0.213
+        },
+        "confidence": 0.0878,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.4721
+    },
+    {
+      "id": "holdout-switch-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "interrupt",
+      "expectedAdopted": "interrupt",
+      "running": true,
+      "playing": true,
+      "latest": "先停下，改读我的日历。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 236,
+      "milliseconds": 158.23383402312174,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.2946,
+          "B": 0.2472,
+          "C": 0.14,
+          "D": 0.3182
+        },
+        "confidence": 0.0297,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.3182
+    },
+    {
+      "id": "holdout-switch-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "interrupt",
+      "expectedAdopted": "interrupt",
+      "running": true,
+      "playing": true,
+      "latest": "先停下，改读我的日历。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 123,
+      "milliseconds": 162.51387499505654,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.4173,
+          "B": 0.2284,
+          "C": 0.1448,
+          "D": 0.2095
+        },
+        "confidence": 0.0556,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.4173
+    },
+    {
+      "id": "holdout-unless-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "remind me to buy bread.",
+      "held": [
+        "Unless the shop is closed,"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 127,
+      "milliseconds": 160.10295902378857,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.3121,
+          "B": 0.2195,
+          "C": 0.1534,
+          "D": 0.315
+        },
+        "confidence": 0.0278,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.315
+    },
+    {
+      "id": "holdout-unless-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "remind me to buy bread.",
+      "held": [
+        "Unless the shop is closed,"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 240,
+      "milliseconds": 158.0815409834031,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1925,
+          "B": 0.2838,
+          "C": 0.1752,
+          "D": 0.3485
+        },
+        "confidence": 0.0282,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.3485
+    },
+    {
+      "id": "holdout-unless-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "提醒我买面包。",
+      "held": [
+        "除非商店关门了，否则"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 241,
+      "milliseconds": 161.16591700119898,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.2599,
+          "B": 0.2415,
+          "C": 0.1397,
+          "D": 0.3589
+        },
+        "confidence": 0.0362,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.3589
+    },
+    {
+      "id": "holdout-unless-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "提醒我买面包。",
+      "held": [
+        "除非商店关门了，否则"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 128,
+      "milliseconds": 163.07700000470504,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.321,
+          "B": 0.2415,
+          "C": 0.1254,
+          "D": 0.3121
+        },
+        "confidence": 0.0394,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.321
+    },
+    {
+      "id": "holdout-unless-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Unless the shop is closed,",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 120,
+      "milliseconds": 171.47387500153854,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3025,
+          "B": 0.2541,
+          "C": 0.1699,
+          "D": 0.2735
+        },
+        "confidence": 0.015,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3025
+    },
+    {
+      "id": "holdout-unless-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Unless the shop is closed,",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 233,
+      "milliseconds": 161.18520800955594,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.2933,
+          "B": 0.2551,
+          "C": 0.1856,
+          "D": 0.266
+        },
+        "confidence": 0.0095,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.2933
+    },
+    {
+      "id": "holdout-unless-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "除非商店关门了，否则",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "utterance_status",
+      "inputTokens": 234,
+      "milliseconds": 162.38062499905936,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.2466,
+          "B": 0.2127,
+          "C": 0.1535,
+          "D": 0.3872
+        },
+        "confidence": 0.0409,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.3872
+    },
+    {
+      "id": "holdout-unless-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "除非商店关门了，否则",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "variant": "minimal",
+      "inputTokens": 121,
+      "milliseconds": 161.74854099517688,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3415,
+          "B": 0.2764,
+          "C": 0.1442,
+          "D": 0.2379
+        },
+        "confidence": 0.0311,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3415
+    },
+    {
+      "id": "probe-00-empty",
+      "language": "en",
+      "group": "diagnostic",
+      "expected": "enqueue",
+      "variant": "minimal",
+      "inputTokens": 120,
+      "milliseconds": 162.2438750055153,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3116,
+          "B": 0.274,
+          "C": 0.1689,
+          "D": 0.2455
+        },
+        "confidence": 0.0166,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3116
+    },
+    {
+      "id": "probe-00-empty",
+      "language": "en",
+      "group": "diagnostic",
+      "expected": "enqueue",
+      "variant": "utterance_status",
+      "inputTokens": 233,
+      "milliseconds": 162.54254197701812,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3584,
+          "B": 0.2136,
+          "C": 0.1671,
+          "D": 0.2608
+        },
+        "confidence": 0.0283,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3584
+    },
+    {
+      "id": "probe-01-empty",
+      "language": "en",
+      "group": "diagnostic",
+      "expected": "enqueue",
+      "variant": "utterance_status",
+      "inputTokens": 233,
+      "milliseconds": 160.2760830137413,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.2091,
+          "B": 0.2381,
+          "C": 0.1688,
+          "D": 0.384
+        },
+        "confidence": 0.0357,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.384
+    },
+    {
+      "id": "probe-01-empty",
+      "language": "en",
+      "group": "diagnostic",
+      "expected": "enqueue",
+      "variant": "minimal",
+      "inputTokens": 120,
+      "milliseconds": 161.9749170204159,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.294,
+          "B": 0.255,
+          "C": 0.1643,
+          "D": 0.2867
+        },
+        "confidence": 0.0166,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.294
+    },
+    {
+      "id": "probe-02-empty",
+      "language": "en",
+      "group": "diagnostic",
+      "expected": "enqueue",
+      "variant": "minimal",
+      "inputTokens": 118,
+      "milliseconds": 163.5772080044262,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.3032,
+          "B": 0.3143,
+          "C": 0.1932,
+          "D": 0.1893
+        },
+        "confidence": 0.0202,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "discard",
+      "score": 0.3143
+    },
+    {
+      "id": "probe-02-empty",
+      "language": "en",
+      "group": "diagnostic",
+      "expected": "enqueue",
+      "variant": "utterance_status",
+      "inputTokens": 231,
+      "milliseconds": 160.647707991302,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1528,
+          "B": 0.1741,
+          "C": 0.1598,
+          "D": 0.5133
+        },
+        "confidence": 0.1151,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.5133
+    },
+    {
+      "id": "probe-03-empty",
+      "language": "zh",
+      "group": "diagnostic",
+      "expected": "enqueue",
+      "variant": "utterance_status",
+      "inputTokens": 232,
+      "milliseconds": 161.13633397617377,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1677,
+          "B": 0.273,
+          "C": 0.1418,
+          "D": 0.4175
+        },
+        "confidence": 0.0654,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.4175
+    },
+    {
+      "id": "probe-03-empty",
+      "language": "zh",
+      "group": "diagnostic",
+      "expected": "enqueue",
+      "variant": "minimal",
+      "inputTokens": 119,
+      "milliseconds": 157.95141700073145,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3292,
+          "B": 0.2873,
+          "C": 0.1854,
+          "D": 0.1981
+        },
+        "confidence": 0.0209,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3292
+    },
+    {
+      "id": "probe-04-empty",
+      "language": "zh",
+      "group": "diagnostic",
+      "expected": "enqueue",
+      "variant": "minimal",
+      "inputTokens": 117,
+      "milliseconds": 157.1621659968514,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.207,
+          "B": 0.341,
+          "C": 0.122,
+          "D": 0.33
+        },
+        "confidence": 0.0511,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "discard",
+      "score": 0.341
+    },
+    {
+      "id": "probe-04-empty",
+      "language": "zh",
+      "group": "diagnostic",
+      "expected": "enqueue",
+      "variant": "utterance_status",
+      "inputTokens": 230,
+      "milliseconds": 157.25049999309704,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.1393,
+          "B": 0.197,
+          "C": 0.2179,
+          "D": 0.4459
+        },
+        "confidence": 0.0718,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "continue_listening",
+      "score": 0.4459
+    },
+    {
+      "id": "probe-05-empty",
+      "language": "en",
+      "group": "diagnostic",
+      "expected": "continue_listening",
+      "variant": "utterance_status",
+      "inputTokens": 230,
+      "milliseconds": 159.80799999670126,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.382,
+          "B": 0.2078,
+          "C": 0.1418,
+          "D": 0.2685
+        },
+        "confidence": 0.0449,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.382
+    },
+    {
+      "id": "probe-05-empty",
+      "language": "en",
+      "group": "diagnostic",
+      "expected": "continue_listening",
+      "variant": "minimal",
+      "inputTokens": 117,
+      "milliseconds": 159.9453340168111,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.3112,
+          "B": 0.2757,
+          "C": 0.1547,
+          "D": 0.2584
+        },
+        "confidence": 0.0212,
+        "action": {
+          "act_probability": 1.0
+        }
+      },
+      "prediction": "interrupt",
+      "score": 0.3112
+    }
+  ],
+  "complete": true
+}

@@ -6,7 +6,7 @@
 
 ## Purpose and boundaries
 
-Support groups shared SDK code while preserving independent compilation and ownership. Core owns neutral data/concurrency mechanisms; Backends owns reusable native graph/tensor execution; Management owns lifecycle/artifacts and default assembly in separate targets; Speech owns helpers shared within its capability domain. Concrete providers remain in Language, Speech and Vision.
+Support groups shared SDK code while preserving independent compilation and ownership. Config owns bundled artifact declarations and parsing/validation; Core owns neutral data/concurrency mechanisms; Backends owns reusable native graph/tensor execution; Management owns lifecycle/artifacts and default assembly in separate targets; Speech owns helpers shared within its capability domain. Concrete providers remain in Language, Speech and Vision.
 
 ## Dependencies and ownership
 
@@ -14,6 +14,7 @@ Support groups shared SDK code while preserving independent compilation and owne
 | --- | --- |
 | Core | Base ModelKit; neutral mechanisms do not require capability-domain contracts, management or providers |
 | Backends/CoreAI, CoreML | Independent ModelKitCoreAI/ModelKitCoreML; native frameworks only |
+| [Config](Config/README.md) | ModelKitRuntime; bundled catalog, declaration types and validation shared with Management |
 | Management | ModelKitRuntime → ModelKit; ModelKitDefaults → Runtime, ModelKit and registered concrete providers |
 | Management/HuggingFace | ModelKitHub → Runtime and HuggingFace; implements Runtime's downloader protocol |
 | Speech/Apple | PCMCodec in ModelKitAppleSpeech together with Apple ASR/TTS; ModelKit and native audio frameworks |
@@ -26,6 +27,7 @@ The diagram shows lifecycle/data relationships, not compilation dependencies. So
 
 ```mermaid
 flowchart LR
+ Config[Catalog declarations and validation] --> Runtime
  Assembly[Default assembly] -.->|Registrations and factories| Runtime[Generic management]
  Runtime -.->|Load gate and waiter limits| Core[Core contexts and resources]
  Provider[Concrete provider] -->|Acquire and release lease| Core

@@ -1,0 +1,3631 @@
+{
+  "model": "vela31",
+  "suite": "four",
+  "provenance": {
+    "repository": "hugging-mac/vela3.1-fast",
+    "revision": "108e385769cbd0da463706b24cac5a535604d2c6",
+    "artifactSpecSHA256": "b424d9ee431b8ac59001226f924043e7a8c33ce7e94b2e2faa1ebe5b0225e0e6",
+    "sdkCommit": "2a240f4bc48d90d0ef23fa8ab915e21011b0563b",
+    "sdkSourceHashes": {
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/instance.py": "c872a0fe7d31c31a09d044839f90ed7ffa6285a77c92e3b394e1a5d22343d6bb",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/config.py": "a9044aacb8413df4e258aa2af282c180e472c61f139f8781dfa1467f7a9e096a",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/coreai.py": "17fb859c9ae171316c617451a3ec8dbc67d82f67e2eb90540a47dda3c6e7f29a",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/converter.py": "9b31039299d36b70f9dbe6cb5b88e9b2db9daf21555a701dd83670ce4bada2a4",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/__init__.py": "f85b69c5a37c78c3cdfc709704ebb420f1e360ec952951fa234f518a566b992e",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/full.py": "f16162c684dff93f4905e865742d94c146290c86a3f7e2ea1840c48391f95b57",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/definition.py": "f5fdbe03f4c2e4c2be207e8f65e153b845b69522b09753e7d38c8214a5e9d5a8",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/resources.py": "c3fb654d2930b388f5d4e712553b945d4cbc7d6d174e33063f357e719bde321b",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/torch.py": "5743d1dcd8d9f30a192c29842e739b090bf0e132e5e3cf80a39bf8d200173072",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/execution.py": "2d98affb915b59cdd11ff666d4135ddea3dc7033c2cd71de1b5e93013f4815e6",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/preprocess.py": "df747bd83459201973ce9e06e37f50cae21f2bed59805f6c2113dd1a5d9f1f69",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/full_upstream.py": "c95d72bd376587907e0387af43cdd076d13e82077f21c2c121cda61521d2192a",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/__init__.py": "6ea941aeca158e7fd098236b6598d5aa59a4c3ba83225b681c784ed17e21a65f",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/native.py": "bb155197ed25da82604c494852214fbc37ab6a1dbc4ef5d7da28a9a31b6abdde",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/types.py": "b5ac400b9f391c4d1be8e839daa049673b2dafdaa85afbdd7fe42cc5178ff874",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/coreai_export.py": "4da2451fe809c78a39badfd5c2c413ced281211383ed4327cc8a017dd7757c4f",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/packing.py": "ab14cb5a5ba74239afc6170e5d0f912e76eb023f60d266251b76e1e98427fb68",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/upstream.py": "9343e7f16f3594a8783575aeb298ecab48df53e61c52b664d438543e79f80eda",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/full_host.py": "aa85a5dcba562e1ad3d943dfc890c79d2f4ad20caefb19fce40049025ab4b409",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/validation.py": "0d3403f818858182c82600c11534a1197e87d0db4ed0cbae705e722e6d72a4bf",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/runtime/coreai.py": "eb616878e66abfd96a14f5ba86bc4de9bf7b6ee21454bb1e67722a4e1721c779"
+    },
+    "runtimeVersions": {
+      "numpy": "2.3.5",
+      "tokenizers": "0.22.2",
+      "coreai-core": "1.0.0b2"
+    },
+    "platform": "macOS-27.2.1-arm64-arm-64bit",
+    "processor": "arm",
+    "device": "cpu",
+    "threads": 1,
+    "runnerSHA256": "02b8b02031572af4f0c2367e71b1a367753e60890fa89a2b3da54e3eb4bdf0b5"
+  },
+  "inputFile": "decision-vela-d3-input-2026-11-17.json",
+  "inputSHA256": "c41c18f208d479587209bcba1f6222b45ae4da36f2fe4fb341df92bafcb51de6",
+  "loadMilliseconds": 3747.1081250114366,
+  "warmup": [
+    {
+      "variant": "minimal",
+      "id": "holdout-alarm-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Wake me on Monday at",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.04711230107334511,
+          "B": 0.6460926634575287,
+          "C": 0.28362254925855734,
+          "D": 0.02317248621056889
+        }
+      },
+      "inputTokens": 125,
+      "milliseconds": 1508.277042012196,
+      "prediction": "discard",
+      "score": 0.6460926634575287
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-alarm-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Wake me on Monday at",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.04711230107334511,
+          "B": 0.6460926634575287,
+          "C": 0.28362254925855734,
+          "D": 0.02317248621056889
+        }
+      },
+      "inputTokens": 125,
+      "milliseconds": 816.6488750139251,
+      "prediction": "discard",
+      "score": 0.6460926634575287
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-alarm-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Wake me on Monday at",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.04711230107334511,
+          "B": 0.6460926634575287,
+          "C": 0.28362254925855734,
+          "D": 0.02317248621056889
+        }
+      },
+      "inputTokens": 125,
+      "milliseconds": 685.0659170013387,
+      "prediction": "discard",
+      "score": 0.6460926634575287
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-alarm-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Wake me on Monday at",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.007505515118018602,
+          "B": 0.9682984559935792,
+          "C": 0.012993878782969176,
+          "D": 0.01120215010543271
+        }
+      },
+      "inputTokens": 242,
+      "milliseconds": 851.7719590163324,
+      "prediction": "discard",
+      "score": 0.9682984559935792
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-alarm-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Wake me on Monday at",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.007505515118018602,
+          "B": 0.9682984559935792,
+          "C": 0.012993878782969176,
+          "D": 0.01120215010543271
+        }
+      },
+      "inputTokens": 242,
+      "milliseconds": 793.4407090069726,
+      "prediction": "discard",
+      "score": 0.9682984559935792
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-alarm-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Wake me on Monday at",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.007505515118018602,
+          "B": 0.9682984559935792,
+          "C": 0.012993878782969176,
+          "D": 0.01120215010543271
+        }
+      },
+      "inputTokens": 242,
+      "milliseconds": 743.3610830048565,
+      "prediction": "discard",
+      "score": 0.9682984559935792
+    }
+  ],
+  "rows": [
+    {
+      "variant": "minimal",
+      "id": "holdout-alarm-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "six thirty.",
+      "held": [
+        "Wake me on Monday at"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.02858783288821289,
+          "B": 0.6266432555480771,
+          "C": 0.326404584419835,
+          "D": 0.01836432714387501
+        }
+      },
+      "inputTokens": 130,
+      "milliseconds": 395.6637500086799,
+      "prediction": "discard",
+      "score": 0.6266432555480771
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-alarm-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "six thirty.",
+      "held": [
+        "Wake me on Monday at"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.009508167681439968,
+          "B": 0.9494213438310244,
+          "C": 0.020358280843736407,
+          "D": 0.02071220764379933
+        }
+      },
+      "inputTokens": 247,
+      "milliseconds": 617.0982919866219,
+      "prediction": "discard",
+      "score": 0.9494213438310244
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-alarm-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "六点半。",
+      "held": [
+        "周一叫醒我，时间定在"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.011842268073791622,
+          "B": 0.9229236310612992,
+          "C": 0.03279938827042331,
+          "D": 0.03243471259448602
+        }
+      },
+      "inputTokens": 259,
+      "milliseconds": 660.5929579818621,
+      "prediction": "discard",
+      "score": 0.9229236310612992
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-alarm-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "六点半。",
+      "held": [
+        "周一叫醒我，时间定在"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.037196090556580234,
+          "B": 0.6440959310499822,
+          "C": 0.2520372953277386,
+          "D": 0.06667068306569902
+        }
+      },
+      "inputTokens": 142,
+      "milliseconds": 362.25512498640455,
+      "prediction": "discard",
+      "score": 0.6440959310499822
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-alarm-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Wake me on Monday at",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.04711230107334511,
+          "B": 0.6460926634575287,
+          "C": 0.28362254925855734,
+          "D": 0.02317248621056889
+        }
+      },
+      "inputTokens": 125,
+      "milliseconds": 397.3489999771118,
+      "prediction": "discard",
+      "score": 0.6460926634575287
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-alarm-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Wake me on Monday at",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.007505515118018602,
+          "B": 0.9682984559935792,
+          "C": 0.012993878782969176,
+          "D": 0.01120215010543271
+        }
+      },
+      "inputTokens": 242,
+      "milliseconds": 715.9669589891564,
+      "prediction": "discard",
+      "score": 0.9682984559935792
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-alarm-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "周一叫醒我，时间定在",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.021561050097317673,
+          "B": 0.9172821539120728,
+          "C": 0.025045465780512505,
+          "D": 0.03611133021009699
+        }
+      },
+      "inputTokens": 251,
+      "milliseconds": 612.6924160053022,
+      "prediction": "discard",
+      "score": 0.9172821539120728
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-alarm-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "周一叫醒我，时间定在",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.06693796383046414,
+          "B": 0.6570214203454623,
+          "C": 0.17473814251233524,
+          "D": 0.10130247331173825
+        }
+      },
+      "inputTokens": 134,
+      "milliseconds": 356.0473330144305,
+      "prediction": "discard",
+      "score": 0.6570214203454623
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-attachment-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "budget spreadsheet.",
+      "held": [
+        "Attach the"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.0525227246560587,
+          "B": 0.5793288056215711,
+          "C": 0.32196242204824,
+          "D": 0.04618604767413023
+        }
+      },
+      "inputTokens": 128,
+      "milliseconds": 331.7412089963909,
+      "prediction": "discard",
+      "score": 0.5793288056215711
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-attachment-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "budget spreadsheet.",
+      "held": [
+        "Attach the"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.011762299517429414,
+          "B": 0.9009153348020302,
+          "C": 0.02376631110245261,
+          "D": 0.06355605457808772
+        }
+      },
+      "inputTokens": 245,
+      "milliseconds": 581.9839590112679,
+      "prediction": "discard",
+      "score": 0.9009153348020302
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-attachment-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "预算表。",
+      "held": [
+        "附上那份"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.005489272810967322,
+          "B": 0.9408448048003863,
+          "C": 0.02767605651528951,
+          "D": 0.025989865873356752
+        }
+      },
+      "inputTokens": 252,
+      "milliseconds": 585.7577080023475,
+      "prediction": "discard",
+      "score": 0.9408448048003863
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-attachment-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "预算表。",
+      "held": [
+        "附上那份"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.03999986875334529,
+          "B": 0.6345276037089922,
+          "C": 0.26413704317206754,
+          "D": 0.06133548436559496
+        }
+      },
+      "inputTokens": 135,
+      "milliseconds": 344.0259170019999,
+      "prediction": "discard",
+      "score": 0.6345276037089922
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-attachment-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Attach the",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.11522050485579508,
+          "B": 0.7904867883804917,
+          "C": 0.04982487501725623,
+          "D": 0.04446783174645713
+        }
+      },
+      "inputTokens": 122,
+      "milliseconds": 300.44545797863975,
+      "prediction": "discard",
+      "score": 0.7904867883804917
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-attachment-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Attach the",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.015816333013114758,
+          "B": 0.9514795833957955,
+          "C": 0.010407215102794735,
+          "D": 0.022296868488295117
+        }
+      },
+      "inputTokens": 239,
+      "milliseconds": 558.1532910000533,
+      "prediction": "discard",
+      "score": 0.9514795833957955
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-attachment-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "附上那份",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.010444066625482796,
+          "B": 0.9478783883650566,
+          "C": 0.018904183532407193,
+          "D": 0.0227733614770536
+        }
+      },
+      "inputTokens": 244,
+      "milliseconds": 552.6464580034371,
+      "prediction": "discard",
+      "score": 0.9478783883650566
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-attachment-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "附上那份",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.06835937854234073,
+          "B": 0.6847578125325225,
+          "C": 0.1627944956280343,
+          "D": 0.08408831329710251
+        }
+      },
+      "inputTokens": 127,
+      "milliseconds": 301.3912500173319,
+      "prediction": "discard",
+      "score": 0.6847578125325225
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-brightness-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "twenty percent.",
+      "held": [
+        "Change the brightness to"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "C",
+        "probabilities": {
+          "A": 0.2800598030003125,
+          "B": 0.3166397744965619,
+          "C": 0.3908421666476514,
+          "D": 0.012458255855474205
+        }
+      },
+      "inputTokens": 129,
+      "milliseconds": 321.2219160050154,
+      "prediction": "enqueue",
+      "score": 0.3908421666476514
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-brightness-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "twenty percent.",
+      "held": [
+        "Change the brightness to"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.01600354008407662,
+          "B": 0.8606409280020317,
+          "C": 0.0341217202359148,
+          "D": 0.08923381167797698
+        }
+      },
+      "inputTokens": 246,
+      "milliseconds": 525.9506249858532,
+      "prediction": "discard",
+      "score": 0.8606409280020317
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-brightness-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "百分之二十。",
+      "held": [
+        "把亮度调成"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.009723760859215095,
+          "B": 0.7859333529902894,
+          "C": 0.051404905010247484,
+          "D": 0.15293798114024812
+        }
+      },
+      "inputTokens": 258,
+      "milliseconds": 611.6739170101937,
+      "prediction": "discard",
+      "score": 0.7859333529902894
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-brightness-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "百分之二十。",
+      "held": [
+        "把亮度调成"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.033547793094561185,
+          "B": 0.4940631045759592,
+          "C": 0.40460563721919046,
+          "D": 0.06778346511028908
+        }
+      },
+      "inputTokens": 141,
+      "milliseconds": 519.7376669966616,
+      "prediction": "discard",
+      "score": 0.4940631045759592
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-brightness-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Change the brightness to",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.23350400116355838,
+          "B": 0.4348975883888542,
+          "C": 0.3128753725484003,
+          "D": 0.01872303789918718
+        }
+      },
+      "inputTokens": 123,
+      "milliseconds": 408.3765840041451,
+      "prediction": "discard",
+      "score": 0.4348975883888542
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-brightness-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Change the brightness to",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.025552586469571585,
+          "B": 0.9339645388536126,
+          "C": 0.017027939064376406,
+          "D": 0.02345493561243921
+        }
+      },
+      "inputTokens": 240,
+      "milliseconds": 694.6643749834038,
+      "prediction": "discard",
+      "score": 0.9339645388536126
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-brightness-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "把亮度调成",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.011755467071176015,
+          "B": 0.9224434650484292,
+          "C": 0.022997579948141385,
+          "D": 0.04280348793225328
+        }
+      },
+      "inputTokens": 245,
+      "milliseconds": 709.6571669972036,
+      "prediction": "discard",
+      "score": 0.9224434650484292
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-brightness-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "把亮度调成",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.054989522755976364,
+          "B": 0.6248230333356034,
+          "C": 0.2642192668493662,
+          "D": 0.05596817705905407
+        }
+      },
+      "inputTokens": 128,
+      "milliseconds": 430.08587500662543,
+      "prediction": "discard",
+      "score": 0.6248230333356034
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-filler-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "discard",
+      "expectedAdopted": "discard",
+      "running": false,
+      "playing": false,
+      "latest": "er",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.008613823044193608,
+          "B": 0.8672036315978234,
+          "C": 0.04948546196518085,
+          "D": 0.0746970833928022
+        }
+      },
+      "inputTokens": 120,
+      "milliseconds": 447.08924999576993,
+      "prediction": "discard",
+      "score": 0.8672036315978234
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-filler-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "discard",
+      "expectedAdopted": "discard",
+      "running": false,
+      "playing": false,
+      "latest": "er",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.006587006278473375,
+          "B": 0.9472783335913657,
+          "C": 0.026781686776256933,
+          "D": 0.019352973353904058
+        }
+      },
+      "inputTokens": 237,
+      "milliseconds": 665.3242079773918,
+      "prediction": "discard",
+      "score": 0.9472783335913657
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-filler-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "discard",
+      "expectedAdopted": "discard",
+      "running": false,
+      "playing": false,
+      "latest": "呃",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.006152998298982435,
+          "B": 0.9685566230577856,
+          "C": 0.016358224537155613,
+          "D": 0.008932154106076264
+        }
+      },
+      "inputTokens": 238,
+      "milliseconds": 583.6712919990532,
+      "prediction": "discard",
+      "score": 0.9685566230577856
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-filler-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "discard",
+      "expectedAdopted": "discard",
+      "running": false,
+      "playing": false,
+      "latest": "呃",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.03650264547159107,
+          "B": 0.8378820889209707,
+          "C": 0.10042285565830086,
+          "D": 0.025192409949137202
+        }
+      },
+      "inputTokens": 121,
+      "milliseconds": 326.013709011022,
+      "prediction": "discard",
+      "score": 0.8378820889209707
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-list-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "a jacket.",
+      "held": [
+        "Pack socks, shoes, and"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.016662721016525366,
+          "B": 0.6069514024208758,
+          "C": 0.35310819077490785,
+          "D": 0.023277685787690967
+        }
+      },
+      "inputTokens": 129,
+      "milliseconds": 354.4751669978723,
+      "prediction": "discard",
+      "score": 0.6069514024208758
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-list-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "a jacket.",
+      "held": [
+        "Pack socks, shoes, and"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.008521002844636092,
+          "B": 0.9337336714935658,
+          "C": 0.027964403558117672,
+          "D": 0.02978092210368041
+        }
+      },
+      "inputTokens": 246,
+      "milliseconds": 1195.4687079996802,
+      "prediction": "discard",
+      "score": 0.9337336714935658
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-list-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "一件夹克。",
+      "held": [
+        "打包袜子、鞋子，还有"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.0068309100426314495,
+          "B": 0.9183593490179429,
+          "C": 0.023770249056666463,
+          "D": 0.051039491882759275
+        }
+      },
+      "inputTokens": 261,
+      "milliseconds": 674.4421669864096,
+      "prediction": "discard",
+      "score": 0.9183593490179429
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-list-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "一件夹克。",
+      "held": [
+        "打包袜子、鞋子，还有"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.022298507877725048,
+          "B": 0.7699421913810033,
+          "C": 0.165972806140147,
+          "D": 0.0417864946011247
+        }
+      },
+      "inputTokens": 144,
+      "milliseconds": 367.61554097756743,
+      "prediction": "discard",
+      "score": 0.7699421913810033
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-list-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Pack socks, shoes, and",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.018815427926924096,
+          "B": 0.5306655468894056,
+          "C": 0.42721435472537717,
+          "D": 0.023304670458293177
+        }
+      },
+      "inputTokens": 125,
+      "milliseconds": 314.7660839895252,
+      "prediction": "discard",
+      "score": 0.5306655468894056
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-list-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Pack socks, shoes, and",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.007425317715275295,
+          "B": 0.966846087034074,
+          "C": 0.012354560131756339,
+          "D": 0.013374035118894314
+        }
+      },
+      "inputTokens": 242,
+      "milliseconds": 552.6909579930361,
+      "prediction": "discard",
+      "score": 0.966846087034074
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-list-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "打包袜子、鞋子，还有",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.005498883293457639,
+          "B": 0.9549186572867399,
+          "C": 0.02166933621334298,
+          "D": 0.017913123206459495
+        }
+      },
+      "inputTokens": 252,
+      "milliseconds": 542.4428750120569,
+      "prediction": "discard",
+      "score": 0.9549186572867399
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-list-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "打包袜子、鞋子，还有",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.02225435081995163,
+          "B": 0.6829975916019744,
+          "C": 0.2622396000482141,
+          "D": 0.03250845752985988
+        }
+      },
+      "inputTokens": 135,
+      "milliseconds": 330.6184579851106,
+      "prediction": "discard",
+      "score": 0.6829975916019744
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-negated-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": true,
+      "playing": true,
+      "latest": "Keep going, do not stop.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.02419209343867254,
+          "B": 0.13135132070386235,
+          "C": 0.057556264917729597,
+          "D": 0.7869003209397355
+        }
+      },
+      "inputTokens": 126,
+      "milliseconds": 315.31337500200607,
+      "prediction": "continue_listening",
+      "score": 0.7869003209397355
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-negated-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": true,
+      "playing": true,
+      "latest": "Keep going, do not stop.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.021798636918347308,
+          "B": 0.9049671840446005,
+          "C": 0.022579556958813855,
+          "D": 0.05065462207823845
+        }
+      },
+      "inputTokens": 243,
+      "milliseconds": 531.2078339920845,
+      "prediction": "discard",
+      "score": 0.9049671840446005
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-negated-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": true,
+      "playing": true,
+      "latest": "接着说，不要停。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.05065955322222632,
+          "B": 0.870056978579089,
+          "C": 0.027720914012038182,
+          "D": 0.05156255418664637
+        }
+      },
+      "inputTokens": 249,
+      "milliseconds": 553.4241250134073,
+      "prediction": "discard",
+      "score": 0.870056978579089
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-negated-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": true,
+      "playing": true,
+      "latest": "接着说，不要停。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "D",
+        "probabilities": {
+          "A": 0.058882950402526606,
+          "B": 0.15766158429033222,
+          "C": 0.0537627232402856,
+          "D": 0.7296927420668555
+        }
+      },
+      "inputTokens": 132,
+      "milliseconds": 350.2880420128349,
+      "prediction": "continue_listening",
+      "score": 0.7296927420668555
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-noise-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "discard",
+      "expectedAdopted": "discard",
+      "running": false,
+      "playing": false,
+      "latest": "[inaudible]",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.01285939648710752,
+          "B": 0.9342214216124578,
+          "C": 0.026596335024311444,
+          "D": 0.02632284687612327
+        }
+      },
+      "inputTokens": 124,
+      "milliseconds": 315.9743750002235,
+      "prediction": "discard",
+      "score": 0.9342214216124578
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-noise-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "discard",
+      "expectedAdopted": "discard",
+      "running": false,
+      "playing": false,
+      "latest": "[inaudible]",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.004787029161092614,
+          "B": 0.9826107235172413,
+          "C": 0.0059474026451379015,
+          "D": 0.006654844676528091
+        }
+      },
+      "inputTokens": 241,
+      "milliseconds": 534.962584002642,
+      "prediction": "discard",
+      "score": 0.9826107235172413
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-noise-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "discard",
+      "expectedAdopted": "discard",
+      "running": false,
+      "playing": false,
+      "latest": "[听不清]",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.013820346751887027,
+          "B": 0.923771942902911,
+          "C": 0.014652706059860863,
+          "D": 0.04775500428534095
+        }
+      },
+      "inputTokens": 244,
+      "milliseconds": 528.7000829994213,
+      "prediction": "discard",
+      "score": 0.923771942902911
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-noise-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "discard",
+      "expectedAdopted": "discard",
+      "running": false,
+      "playing": false,
+      "latest": "[听不清]",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.04073184389908981,
+          "B": 0.6007901672431682,
+          "C": 0.11229479953916541,
+          "D": 0.24618318931857647
+        }
+      },
+      "inputTokens": 127,
+      "milliseconds": 293.73595799552277,
+      "prediction": "discard",
+      "score": 0.6007901672431682
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-purpose-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "Please close the door.",
+      "held": [
+        "I need a note that says"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.03890166098276396,
+          "B": 0.5299683690570618,
+          "C": 0.4136443113983878,
+          "D": 0.017485658561786493
+        }
+      },
+      "inputTokens": 132,
+      "milliseconds": 331.43925000331365,
+      "prediction": "discard",
+      "score": 0.5299683690570618
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-purpose-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "Please close the door.",
+      "held": [
+        "I need a note that says"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.01061243814908165,
+          "B": 0.946699642131988,
+          "C": 0.017791236604173317,
+          "D": 0.02489668311475715
+        }
+      },
+      "inputTokens": 249,
+      "milliseconds": 643.3532919909339,
+      "prediction": "discard",
+      "score": 0.946699642131988
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-purpose-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "请关门。",
+      "held": [
+        "我需要一张便条，上面写"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.018174006447812485,
+          "B": 0.90074928610902,
+          "C": 0.039206748260246546,
+          "D": 0.041869959182920725
+        }
+      },
+      "inputTokens": 264,
+      "milliseconds": 990.5962080229074,
+      "prediction": "discard",
+      "score": 0.90074928610902
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-purpose-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "请关门。",
+      "held": [
+        "我需要一张便条，上面写"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "C",
+        "probabilities": {
+          "A": 0.05612936752194078,
+          "B": 0.2892732901423654,
+          "C": 0.6227988386902026,
+          "D": 0.031798503645491166
+        }
+      },
+      "inputTokens": 147,
+      "milliseconds": 479.02800000156276,
+      "prediction": "enqueue",
+      "score": 0.6227988386902026
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-purpose-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "I need a note that says",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.023722414553113656,
+          "B": 0.5695306634483653,
+          "C": 0.380886552126692,
+          "D": 0.025860369871829093
+        }
+      },
+      "inputTokens": 125,
+      "milliseconds": 338.4120420087129,
+      "prediction": "discard",
+      "score": 0.5695306634483653
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-purpose-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "I need a note that says",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.008393248772013594,
+          "B": 0.9647938714956394,
+          "C": 0.01221198844088192,
+          "D": 0.014600891291464873
+        }
+      },
+      "inputTokens": 242,
+      "milliseconds": 554.332458996214,
+      "prediction": "discard",
+      "score": 0.9647938714956394
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-purpose-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "我需要一张便条，上面写",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.006697689390607541,
+          "B": 0.9369983509086133,
+          "C": 0.01978207321472881,
+          "D": 0.0365218864860503
+        }
+      },
+      "inputTokens": 255,
+      "milliseconds": 645.1249580131844,
+      "prediction": "discard",
+      "score": 0.9369983509086133
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-purpose-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "我需要一张便条，上面写",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "C",
+        "probabilities": {
+          "A": 0.017303032310303525,
+          "B": 0.3355406553192637,
+          "C": 0.6201828851054486,
+          "D": 0.026973427264984032
+        }
+      },
+      "inputTokens": 138,
+      "milliseconds": 393.94579202053137,
+      "prediction": "enqueue",
+      "score": 0.6201828851054486
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-quoted-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": true,
+      "playing": true,
+      "latest": "Write the words stop now.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9311150447276388,
+          "B": 0.048513306335383255,
+          "C": 0.010172500566818543,
+          "D": 0.010199148370159472
+        }
+      },
+      "inputTokens": 125,
+      "milliseconds": 364.5720829954371,
+      "prediction": "interrupt",
+      "score": 0.9311150447276388
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-quoted-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": true,
+      "playing": true,
+      "latest": "Write the words stop now.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9327752149350718,
+          "B": 0.053698835675346425,
+          "C": 0.0035679898631805567,
+          "D": 0.009957959526401347
+        }
+      },
+      "inputTokens": 242,
+      "milliseconds": 592.8208749974146,
+      "prediction": "interrupt",
+      "score": 0.9327752149350718
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-quoted-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": true,
+      "playing": true,
+      "latest": "写下“现在停止”四个字。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.38578589887514303,
+          "B": 0.4333656982435967,
+          "C": 0.05883068075560528,
+          "D": 0.12201772212565487
+        }
+      },
+      "inputTokens": 254,
+      "milliseconds": 619.6973329933826,
+      "prediction": "discard",
+      "score": 0.4333656982435967
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-quoted-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": true,
+      "playing": true,
+      "latest": "写下“现在停止”四个字。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.4293983868883892,
+          "B": 0.34139592589224826,
+          "C": 0.14820023812580685,
+          "D": 0.08100544909355548
+        }
+      },
+      "inputTokens": 137,
+      "milliseconds": 338.88404100434855,
+      "prediction": "interrupt",
+      "score": 0.4293983868883892
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-rewrite-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "See you next week.",
+      "held": [
+        "Rewrite the last sentence as"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.035782023781393724,
+          "B": 0.6348575757062842,
+          "C": 0.2539364389753755,
+          "D": 0.07542396153694651
+        }
+      },
+      "inputTokens": 133,
+      "milliseconds": 360.9509159869049,
+      "prediction": "discard",
+      "score": 0.6348575757062842
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-rewrite-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "See you next week.",
+      "held": [
+        "Rewrite the last sentence as"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.006777986230181703,
+          "B": 0.9242280365701251,
+          "C": 0.023472267537771173,
+          "D": 0.045521709661921955
+        }
+      },
+      "inputTokens": 250,
+      "milliseconds": 653.5780419944786,
+      "prediction": "discard",
+      "score": 0.9242280365701251
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-rewrite-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "下周见。",
+      "held": [
+        "把最后一句改为"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.009990095841986433,
+          "B": 0.9244380788011207,
+          "C": 0.02338538978859683,
+          "D": 0.04218643556829591
+        }
+      },
+      "inputTokens": 254,
+      "milliseconds": 579.3191670090891,
+      "prediction": "discard",
+      "score": 0.9244380788011207
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-rewrite-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "下周见。",
+      "held": [
+        "把最后一句改为"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.10450300999354073,
+          "B": 0.608347514740926,
+          "C": 0.21729713389729,
+          "D": 0.06985234136824318
+        }
+      },
+      "inputTokens": 137,
+      "milliseconds": 348.4454590070527,
+      "prediction": "discard",
+      "score": 0.608347514740926
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-rewrite-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Rewrite the last sentence as",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.04616206798342108,
+          "B": 0.7020726931253833,
+          "C": 0.18577075001762083,
+          "D": 0.06599448887357473
+        }
+      },
+      "inputTokens": 126,
+      "milliseconds": 303.14679199364036,
+      "prediction": "discard",
+      "score": 0.7020726931253833
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-rewrite-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Rewrite the last sentence as",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.007457791103606034,
+          "B": 0.93956618415336,
+          "C": 0.04204129195192404,
+          "D": 0.01093473279110958
+        }
+      },
+      "inputTokens": 243,
+      "milliseconds": 527.9144579835702,
+      "prediction": "discard",
+      "score": 0.93956618415336
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-rewrite-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "把最后一句改为",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.00594662494759466,
+          "B": 0.9621840332762,
+          "C": 0.018650888868226478,
+          "D": 0.013218452907978946
+        }
+      },
+      "inputTokens": 246,
+      "milliseconds": 563.58704197919,
+      "prediction": "discard",
+      "score": 0.9621840332762
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-rewrite-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "把最后一句改为",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.09100970853612952,
+          "B": 0.6628225999838276,
+          "C": 0.13446375921697504,
+          "D": 0.11170393226306798
+        }
+      },
+      "inputTokens": 129,
+      "milliseconds": 323.86849998147227,
+      "prediction": "discard",
+      "score": 0.6628225999838276
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-route-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "the library.",
+      "held": [
+        "Show the route from the museum to"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "C",
+        "probabilities": {
+          "A": 0.00966975254308448,
+          "B": 0.3068515985307385,
+          "C": 0.6650418317494837,
+          "D": 0.018436817176693234
+        }
+      },
+      "inputTokens": 131,
+      "milliseconds": 339.6006670081988,
+      "prediction": "enqueue",
+      "score": 0.6650418317494837
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-route-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "the library.",
+      "held": [
+        "Show the route from the museum to"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.005950608514994351,
+          "B": 0.8761555874910745,
+          "C": 0.09477945062824875,
+          "D": 0.023114353365682395
+        }
+      },
+      "inputTokens": 248,
+      "milliseconds": 586.0339170030784,
+      "prediction": "discard",
+      "score": 0.8761555874910745
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-route-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "图书馆的路线。",
+      "held": [
+        "显示从博物馆到"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.007911090065821186,
+          "B": 0.8244305816851348,
+          "C": 0.07797140992186821,
+          "D": 0.08968691832717578
+        }
+      },
+      "inputTokens": 264,
+      "milliseconds": 562.0378750027157,
+      "prediction": "discard",
+      "score": 0.8244305816851348
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-route-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "图书馆的路线。",
+      "held": [
+        "显示从博物馆到"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "C",
+        "probabilities": {
+          "A": 0.02577038473096164,
+          "B": 0.40918074473225147,
+          "C": 0.5383939601425698,
+          "D": 0.026654910394217152
+        }
+      },
+      "inputTokens": 147,
+      "milliseconds": 421.88700000406243,
+      "prediction": "enqueue",
+      "score": 0.5383939601425698
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-route-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Show the route from the museum to",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "C",
+        "probabilities": {
+          "A": 0.010448886218833078,
+          "B": 0.38346720279870516,
+          "C": 0.5876258644226604,
+          "D": 0.01845804655980141
+        }
+      },
+      "inputTokens": 126,
+      "milliseconds": 511.66879100492224,
+      "prediction": "enqueue",
+      "score": 0.5876258644226604
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-route-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Show the route from the museum to",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.005964505203848219,
+          "B": 0.9576632347545362,
+          "C": 0.02813170604340501,
+          "D": 0.008240553998210526
+        }
+      },
+      "inputTokens": 243,
+      "milliseconds": 660.7373750011902,
+      "prediction": "discard",
+      "score": 0.9576632347545362
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-route-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "显示从博物馆到",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.004791738927892679,
+          "B": 0.9735419866851011,
+          "C": 0.014455581871345548,
+          "D": 0.007210692515660655
+        }
+      },
+      "inputTokens": 249,
+      "milliseconds": 573.6397079890594,
+      "prediction": "discard",
+      "score": 0.9735419866851011
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-route-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "显示从博物馆到",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.05666779047931265,
+          "B": 0.6349982656286843,
+          "C": 0.26678739103676385,
+          "D": 0.041546552855239005
+        }
+      },
+      "inputTokens": 132,
+      "milliseconds": 387.89208300295286,
+      "prediction": "discard",
+      "score": 0.6349982656286843
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-short-answer-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "The smaller one.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": "Which size?",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.021921795801186233,
+          "B": 0.547216328010079,
+          "C": 0.3899456677400836,
+          "D": 0.04091620844865115
+        }
+      },
+      "inputTokens": 123,
+      "milliseconds": 573.0237090028822,
+      "prediction": "discard",
+      "score": 0.547216328010079
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-short-answer-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "The smaller one.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": "Which size?",
+      "rawResult": {
+        "type": "choice",
+        "choice": "C",
+        "probabilities": {
+          "A": 0.011695127812389523,
+          "B": 0.28219564762630595,
+          "C": 0.6277641264085464,
+          "D": 0.07834509815275818
+        }
+      },
+      "inputTokens": 242,
+      "milliseconds": 1324.5704589935485,
+      "prediction": "enqueue",
+      "score": 0.6277641264085464
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-short-answer-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "小的那个。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": "哪种尺寸？",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.020060604576842958,
+          "B": 0.5737032720123681,
+          "C": 0.26760836545985645,
+          "D": 0.13862775795093252
+        }
+      },
+      "inputTokens": 254,
+      "milliseconds": 866.3614999968559,
+      "prediction": "discard",
+      "score": 0.5737032720123681
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-short-answer-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "小的那个。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": "哪种尺寸？",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.028430536080084733,
+          "B": 0.7950691736610278,
+          "C": 0.1182546741760334,
+          "D": 0.058245616082854106
+        }
+      },
+      "inputTokens": 127,
+      "milliseconds": 367.32958399807103,
+      "prediction": "discard",
+      "score": 0.7950691736610278
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-short-command-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "Take a selfie.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "C",
+        "probabilities": {
+          "A": 0.05497829750401003,
+          "B": 0.3687116151064124,
+          "C": 0.5475116507028512,
+          "D": 0.028798436686726273
+        }
+      },
+      "inputTokens": 124,
+      "milliseconds": 320.23800001479685,
+      "prediction": "enqueue",
+      "score": 0.5475116507028512
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-short-command-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "Take a selfie.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.004479906440650175,
+          "B": 0.9639562510953057,
+          "C": 0.01754102752984414,
+          "D": 0.014022814934199908
+        }
+      },
+      "inputTokens": 241,
+      "milliseconds": 556.3454579969402,
+      "prediction": "discard",
+      "score": 0.9639562510953057
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-short-command-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "拍张自拍。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.013548105568349726,
+          "B": 0.9386355190675965,
+          "C": 0.024490087180965896,
+          "D": 0.02332628818308807
+        }
+      },
+      "inputTokens": 245,
+      "milliseconds": 531.3262499985285,
+      "prediction": "discard",
+      "score": 0.9386355190675965
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-short-command-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "拍张自拍。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.06197742719201687,
+          "B": 0.7566390965818754,
+          "C": 0.14443065884895898,
+          "D": 0.03695281737714877
+        }
+      },
+      "inputTokens": 128,
+      "milliseconds": 305.4772089817561,
+      "prediction": "discard",
+      "score": 0.7566390965818754
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-stop-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "interrupt",
+      "expectedAdopted": "interrupt",
+      "running": true,
+      "playing": true,
+      "latest": "Be quiet now.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9589083189633824,
+          "B": 0.02153149002920216,
+          "C": 0.014377214431306556,
+          "D": 0.005182976576109123
+        }
+      },
+      "inputTokens": 123,
+      "milliseconds": 296.06095800409093,
+      "prediction": "interrupt",
+      "score": 0.9589083189633824
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-stop-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "interrupt",
+      "expectedAdopted": "interrupt",
+      "running": true,
+      "playing": true,
+      "latest": "Be quiet now.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.2902829982619065,
+          "B": 0.7054051592550105,
+          "C": 0.00230084077179657,
+          "D": 0.0020110017112864144
+        }
+      },
+      "inputTokens": 240,
+      "milliseconds": 528.1861670082435,
+      "prediction": "discard",
+      "score": 0.7054051592550105
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-stop-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "interrupt",
+      "expectedAdopted": "interrupt",
+      "running": true,
+      "playing": true,
+      "latest": "现在别出声了。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.04907159992468396,
+          "B": 0.8563290780680967,
+          "C": 0.029025990926152285,
+          "D": 0.06557333108106711
+        }
+      },
+      "inputTokens": 247,
+      "milliseconds": 604.156540997792,
+      "prediction": "discard",
+      "score": 0.8563290780680967
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-stop-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "interrupt",
+      "expectedAdopted": "interrupt",
+      "running": true,
+      "playing": true,
+      "latest": "现在别出声了。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.12830041547633694,
+          "B": 0.5756150812271049,
+          "C": 0.1677394810100697,
+          "D": 0.1283450222864883
+        }
+      },
+      "inputTokens": 130,
+      "milliseconds": 336.3634169800207,
+      "prediction": "discard",
+      "score": 0.5756150812271049
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-switch-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "interrupt",
+      "expectedAdopted": "interrupt",
+      "running": true,
+      "playing": true,
+      "latest": "Stop this and read my calendar instead.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9697870865904233,
+          "B": 0.011187184224612427,
+          "C": 0.012436103545186653,
+          "D": 0.00658962563977755
+        }
+      },
+      "inputTokens": 127,
+      "milliseconds": 335.3367499948945,
+      "prediction": "interrupt",
+      "score": 0.9697870865904233
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-switch-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "interrupt",
+      "expectedAdopted": "interrupt",
+      "running": true,
+      "playing": true,
+      "latest": "Stop this and read my calendar instead.",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9731181032165735,
+          "B": 0.017422148904102264,
+          "C": 0.0031665358850753627,
+          "D": 0.006293211994248718
+        }
+      },
+      "inputTokens": 244,
+      "milliseconds": 572.7345839841291,
+      "prediction": "interrupt",
+      "score": 0.9731181032165735
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-switch-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "interrupt",
+      "expectedAdopted": "interrupt",
+      "running": true,
+      "playing": true,
+      "latest": "先停下，改读我的日历。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.8560664666793012,
+          "B": 0.10416324511049932,
+          "C": 0.021341917005052655,
+          "D": 0.018428371205146857
+        }
+      },
+      "inputTokens": 255,
+      "milliseconds": 545.4310000059195,
+      "prediction": "interrupt",
+      "score": 0.8560664666793012
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-switch-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "interrupt",
+      "expectedAdopted": "interrupt",
+      "running": true,
+      "playing": true,
+      "latest": "先停下，改读我的日历。",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9346581188925335,
+          "B": 0.0225092235078129,
+          "C": 0.02260681171104202,
+          "D": 0.02022584588861183
+        }
+      },
+      "inputTokens": 138,
+      "milliseconds": 325.40133301517926,
+      "prediction": "interrupt",
+      "score": 0.9346581188925335
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-unless-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "remind me to buy bread.",
+      "held": [
+        "Unless the shop is closed,"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "C",
+        "probabilities": {
+          "A": 0.021270580471282843,
+          "B": 0.2553300987869336,
+          "C": 0.6793546464480978,
+          "D": 0.044044674293685825
+        }
+      },
+      "inputTokens": 133,
+      "milliseconds": 332.38899998832494,
+      "prediction": "enqueue",
+      "score": 0.6793546464480978
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-unless-complete-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "remind me to buy bread.",
+      "held": [
+        "Unless the shop is closed,"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.013725737178363001,
+          "B": 0.8389248403225166,
+          "C": 0.03742890200440965,
+          "D": 0.10992052049471085
+        }
+      },
+      "inputTokens": 250,
+      "milliseconds": 520.7463749975432,
+      "prediction": "discard",
+      "score": 0.8389248403225166
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-unless-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "提醒我买面包。",
+      "held": [
+        "除非商店关门了，否则"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.009207018289129208,
+          "B": 0.8919885824377942,
+          "C": 0.031501448921211574,
+          "D": 0.06730295035186508
+        }
+      },
+      "inputTokens": 271,
+      "milliseconds": 586.7419170099311,
+      "prediction": "discard",
+      "score": 0.8919885824377942
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-unless-complete-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "enqueue",
+      "expectedAdopted": "enqueue",
+      "running": false,
+      "playing": false,
+      "latest": "提醒我买面包。",
+      "held": [
+        "除非商店关门了，否则"
+      ],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "C",
+        "probabilities": {
+          "A": 0.03034341096838185,
+          "B": 0.20119636847345454,
+          "C": 0.7138888612392258,
+          "D": 0.05457135931893798
+        }
+      },
+      "inputTokens": 154,
+      "milliseconds": 343.26520800823346,
+      "prediction": "enqueue",
+      "score": 0.7138888612392258
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-unless-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Unless the shop is closed,",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.08632913093846707,
+          "B": 0.5816275484646011,
+          "C": 0.24980912748599263,
+          "D": 0.08223419311093923
+        }
+      },
+      "inputTokens": 125,
+      "milliseconds": 291.16824999800883,
+      "prediction": "discard",
+      "score": 0.5816275484646011
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-unless-unfinished-en",
+      "group": "holdout",
+      "language": "en",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "Unless the shop is closed,",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.010000429839081499,
+          "B": 0.9539105179718186,
+          "C": 0.013062313748937657,
+          "D": 0.02302673844016216
+        }
+      },
+      "inputTokens": 242,
+      "milliseconds": 583.6504999897443,
+      "prediction": "discard",
+      "score": 0.9539105179718186
+    },
+    {
+      "variant": "utterance_status",
+      "id": "holdout-unless-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "除非商店关门了，否则",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.01841570712735017,
+          "B": 0.930839052503363,
+          "C": 0.02243431895088983,
+          "D": 0.02831092141839713
+        }
+      },
+      "inputTokens": 255,
+      "milliseconds": 749.6323749946896,
+      "prediction": "discard",
+      "score": 0.930839052503363
+    },
+    {
+      "variant": "minimal",
+      "id": "holdout-unless-unfinished-zh-Hans",
+      "group": "holdout",
+      "language": "zh-Hans",
+      "expected": "continue_listening",
+      "expectedAdopted": "continue_listening",
+      "running": false,
+      "playing": false,
+      "latest": "除非商店关门了，否则",
+      "held": [],
+      "buffer": [],
+      "speech": true,
+      "canHold": true,
+      "user": "",
+      "assistant": "",
+      "question": null,
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.06848157616751857,
+          "B": 0.47857868411950966,
+          "C": 0.40985671341444885,
+          "D": 0.04308302629852293
+        }
+      },
+      "inputTokens": 138,
+      "milliseconds": 352.9445409949403,
+      "prediction": "discard",
+      "score": 0.47857868411950966
+    },
+    {
+      "variant": "minimal",
+      "id": "probe-00-empty",
+      "language": "en",
+      "group": "diagnostic",
+      "expected": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.030135884196143423,
+          "B": 0.7134459105293165,
+          "C": 0.19013643771140973,
+          "D": 0.06628176756313042
+        }
+      },
+      "inputTokens": 125,
+      "milliseconds": 295.19999999320135,
+      "prediction": "discard",
+      "score": 0.7134459105293165
+    },
+    {
+      "variant": "utterance_status",
+      "id": "probe-00-empty",
+      "language": "en",
+      "group": "diagnostic",
+      "expected": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.010867076648571077,
+          "B": 0.9550204856286395,
+          "C": 0.01857631658701143,
+          "D": 0.015536121135777967
+        }
+      },
+      "inputTokens": 242,
+      "milliseconds": 532.2942089987919,
+      "prediction": "discard",
+      "score": 0.9550204856286395
+    },
+    {
+      "variant": "utterance_status",
+      "id": "probe-01-empty",
+      "language": "en",
+      "group": "diagnostic",
+      "expected": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.008071075237833411,
+          "B": 0.9667281184133649,
+          "C": 0.014139578211040832,
+          "D": 0.011061228137760956
+        }
+      },
+      "inputTokens": 242,
+      "milliseconds": 517.3006660188548,
+      "prediction": "discard",
+      "score": 0.9667281184133649
+    },
+    {
+      "variant": "minimal",
+      "id": "probe-01-empty",
+      "language": "en",
+      "group": "diagnostic",
+      "expected": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.041207473871319546,
+          "B": 0.7403727041091814,
+          "C": 0.16024180223761159,
+          "D": 0.058178019781887365
+        }
+      },
+      "inputTokens": 125,
+      "milliseconds": 299.68058300437406,
+      "prediction": "discard",
+      "score": 0.7403727041091814
+    },
+    {
+      "variant": "minimal",
+      "id": "probe-02-empty",
+      "language": "en",
+      "group": "diagnostic",
+      "expected": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "C",
+        "probabilities": {
+          "A": 0.0366098017077748,
+          "B": 0.2814760920183703,
+          "C": 0.6574628124532303,
+          "D": 0.02445129382062462
+        }
+      },
+      "inputTokens": 123,
+      "milliseconds": 323.03191599203274,
+      "prediction": "enqueue",
+      "score": 0.6574628124532303
+    },
+    {
+      "variant": "utterance_status",
+      "id": "probe-02-empty",
+      "language": "en",
+      "group": "diagnostic",
+      "expected": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.006443277691892611,
+          "B": 0.94393473499535,
+          "C": 0.024298727595970827,
+          "D": 0.025323259716786638
+        }
+      },
+      "inputTokens": 240,
+      "milliseconds": 556.5763750055339,
+      "prediction": "discard",
+      "score": 0.94393473499535
+    },
+    {
+      "variant": "utterance_status",
+      "id": "probe-03-empty",
+      "language": "zh",
+      "group": "diagnostic",
+      "expected": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.005913873212772449,
+          "B": 0.9666477537163223,
+          "C": 0.015342613026301842,
+          "D": 0.012095760044603315
+        }
+      },
+      "inputTokens": 251,
+      "milliseconds": 552.5707500055432,
+      "prediction": "discard",
+      "score": 0.9666477537163223
+    },
+    {
+      "variant": "minimal",
+      "id": "probe-03-empty",
+      "language": "zh",
+      "group": "diagnostic",
+      "expected": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.024848358343631766,
+          "B": 0.8280873148670651,
+          "C": 0.09373706979676727,
+          "D": 0.053327256992536015
+        }
+      },
+      "inputTokens": 134,
+      "milliseconds": 326.09862502431497,
+      "prediction": "discard",
+      "score": 0.8280873148670651
+    },
+    {
+      "variant": "minimal",
+      "id": "probe-04-empty",
+      "language": "zh",
+      "group": "diagnostic",
+      "expected": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.062151274047276724,
+          "B": 0.6727313924163754,
+          "C": 0.23031825373579504,
+          "D": 0.03479907980055279
+        }
+      },
+      "inputTokens": 128,
+      "milliseconds": 307.49575002118945,
+      "prediction": "discard",
+      "score": 0.6727313924163754
+    },
+    {
+      "variant": "utterance_status",
+      "id": "probe-04-empty",
+      "language": "zh",
+      "group": "diagnostic",
+      "expected": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.007433190288697189,
+          "B": 0.9632888046020904,
+          "C": 0.016194716734685817,
+          "D": 0.013083288374526537
+        }
+      },
+      "inputTokens": 245,
+      "milliseconds": 627.4315000046045,
+      "prediction": "discard",
+      "score": 0.9632888046020904
+    },
+    {
+      "variant": "utterance_status",
+      "id": "probe-05-empty",
+      "language": "en",
+      "group": "diagnostic",
+      "expected": "continue_listening",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.007376884253797265,
+          "B": 0.9357997243719313,
+          "C": 0.016219239569265295,
+          "D": 0.04060415180500623
+        }
+      },
+      "inputTokens": 239,
+      "milliseconds": 624.6803329850081,
+      "prediction": "discard",
+      "score": 0.9357997243719313
+    },
+    {
+      "variant": "minimal",
+      "id": "probe-05-empty",
+      "language": "en",
+      "group": "diagnostic",
+      "expected": "continue_listening",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.02411752536543813,
+          "B": 0.5977649847714372,
+          "C": 0.33405000475627494,
+          "D": 0.04406748510684963
+        }
+      },
+      "inputTokens": 122,
+      "milliseconds": 357.5971660029609,
+      "prediction": "discard",
+      "score": 0.5977649847714372
+    }
+  ],
+  "complete": true
+}

@@ -1,0 +1,2635 @@
+{
+  "referenceSHA256": "b4e1ac0de94d27799a73d1ae518a91132887e9b75ccef2595a0e70249d0cb027",
+  "fixturesSHA256": "f3b6528d5cb88c0ddca988276cb33d23e0ca5382deb3bae68fdb412973e2f8b0",
+  "adapterSHA256": "8adea23fe5641b3e2ade738c47ec7259c840232fac55cae53a9988cd8db03606",
+  "rows": [
+    {
+      "id": "ML_A01/department",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.2453150450019166e-12,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        12.993934631347656,
+        -3.665794849395752,
+        -4.52462911605835,
+        -3.6038432121276855
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A01/urgency",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.384185791015625e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -2.2645411491394043,
+        -0.05815255641937256,
+        1.105063557624817
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A01/churn_risk",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 7.916241884231567e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        4.807539463043213,
+        -0.6828185319900513
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A01/refund_requested",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 5.513429641723633e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -1.294999122619629,
+        0.44037044048309326
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A02/department",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.0132789611816406e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -4.579795837402344,
+        0.7442376017570496,
+        -3.6617231369018555,
+        -1.7931454181671143
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A02/urgency",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 7.450580596923828e-08,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -2.7801764011383057,
+        0.15553690493106842,
+        1.840346097946167
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A02/churn_risk",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.166496753692627e-08,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        3.7650976181030273,
+        -0.328605592250824
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A02/refund_requested",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 8.32369551062584e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        6.372128486633301,
+        -0.6713763475418091
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A03/department",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.9802322387695312e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -4.054049015045166,
+        -2.0413057804107666,
+        -0.683227002620697,
+        -1.7275826930999756
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A03/urgency",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.086162567138672e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -2.104316234588623,
+        1.7998090982437134,
+        2.6830902099609375
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A03/churn_risk",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 0.0,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        6.040367126464844,
+        -0.8649640083312988
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A03/refund_requested",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 5.3660187404602766e-11,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        12.313758850097656,
+        -1.2324509620666504
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A04/department",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.3445969671010971e-08,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        7.643054962158203,
+        -4.5210771560668945,
+        0.46446993947029114,
+        -3.553011655807495
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A04/urgency",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.5762786865234375e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -2.7175729274749756,
+        -0.020599529147148132,
+        1.6423765420913696
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A04/churn_risk",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.862645149230957e-08,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        4.319343566894531,
+        -0.02371188998222351
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A04/refund_requested",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.4901161193847656e-08,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -3.814561605453491,
+        0.7631375789642334
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A05/department",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 6.556510925292969e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -4.426429748535156,
+        -1.7899646759033203,
+        -3.412017345428467,
+        -1.8277027606964111
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A05/urgency",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 8.940696716308594e-08,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -2.6476669311523438,
+        1.1233612298965454,
+        2.664083480834961
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A05/churn_risk",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 6.984919309616089e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        5.328622341156006,
+        -0.8339105844497681
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A05/refund_requested",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.0372681319713593e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        7.038376331329346,
+        -0.9083830118179321
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A06/department",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.1920928955078125e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -4.375278472900391,
+        -3.0457448959350586,
+        -3.6163601875305176,
+        -2.710503578186035
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A06/urgency",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.2782554626464844e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -2.3721349239349365,
+        1.2940622568130493,
+        2.285776376724243
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A06/churn_risk",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.2789769243681803e-12,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        13.073888778686523,
+        -1.847895860671997
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_A06/refund_requested",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.5652192309498787e-10,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        8.553632736206055,
+        -1.528342843055725
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B01/category",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.2079226507921703e-12,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        12.0858154296875,
+        -4.304627418518066,
+        -4.526286602020264,
+        -4.586758613586426,
+        -4.58905029296875,
+        -3.5761287212371826
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B01/is_spam",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 8.149072527885437e-10,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        8.283995628356934,
+        -1.6106866598129272
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B01/is_phishing",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.7462298274040222e-10,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        6.686466693878174,
+        -4.228616714477539
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B01/urgency",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.129243850708008e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -3.4125168323516846,
+        0.44835060834884644,
+        1.810909390449524
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B01/needs_reply",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.470348358154297e-08,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        2.268251419067383,
+        -0.2594265639781952
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B02/category",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.7881393432617188e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -3.2603023052215576,
+        -1.2903878688812256,
+        -2.122382402420044,
+        -4.033688545227051,
+        -1.8945913314819336,
+        1.883395791053772
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B02/is_spam",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 0.0,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        17.626087188720703,
+        -1.3654823303222656
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B02/is_phishing",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.2656542480726785e-14,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        16.7346134185791,
+        -3.4861385822296143
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B02/urgency",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 8.344650268554688e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -0.9312520027160645,
+        1.4995825290679932,
+        2.008798122406006
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B02/needs_reply",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.6093254089355469e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        1.1615495681762695,
+        0.1309739053249359
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B03/category",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.950429916381836e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -4.575351715087891,
+        -2.043560266494751,
+        -3.0794198513031006,
+        -4.548881530761719,
+        1.2337043285369873,
+        1.8816888332366943
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B03/is_spam",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.4424906541753444e-14,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        17.138519287109375,
+        -1.730521321296692
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B03/is_phishing",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.7755575615628914e-15,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        17.44312286376953,
+        -4.295745849609375
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B03/urgency",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 7.748603820800781e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -1.1800382137298584,
+        2.808638572692871,
+        2.0474188327789307
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B03/needs_reply",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.430511474609375e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        0.15583252906799316,
+        0.1815154254436493
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B04/category",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 5.960464477539063e-08,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        1.7357771396636963,
+        -2.9216573238372803,
+        1.7813804149627686,
+        -3.6334073543548584,
+        -3.9704771041870117,
+        -2.381098747253418
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B04/is_spam",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.939486876130104e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -4.810565948486328,
+        3.2720162868499756
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B04/is_phishing",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.8189894035458565e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -6.850348472595215,
+        2.0536088943481445
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B04/urgency",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.7881393432617188e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -2.6155567169189453,
+        0.24176277220249176,
+        1.730506181716919
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B04/needs_reply",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.7567148208618164e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -0.9993157386779785,
+        0.5133551955223083
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B05/category",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.725290298461914e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -1.4638638496398926,
+        -2.0866048336029053,
+        -3.2246603965759277,
+        -0.3452410101890564,
+        -1.2571048736572266,
+        -0.3996412754058838
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B05/is_spam",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.730349362740526e-13,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        15.869144439697266,
+        -1.1864805221557617
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B05/is_phishing",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.0745362639427185e-10,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        5.770097732543945,
+        -1.3882182836532593
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B05/urgency",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.5762786865234375e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -2.138948917388916,
+        0.9576488137245178,
+        2.340977191925049
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B05/needs_reply",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.5762786865234375e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -2.0703792572021484,
+        0.47468286752700806
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B06/category",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 6.556510925292969e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        5.120882511138916,
+        -3.56296706199646,
+        -3.3956968784332275,
+        -2.502729892730713,
+        -1.4210683107376099,
+        1.336820125579834
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B06/is_spam",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.688693712116219e-11,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        12.338602066040039,
+        -3.128587007522583
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B06/is_phishing",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 0.0,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        4.659265518188477,
+        -3.812932014465332
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B06/urgency",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.86102294921875e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        0.5053991079330444,
+        1.4070061445236206,
+        0.8050968050956726
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B06/needs_reply",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.5762786865234375e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        2.506023645401001,
+        0.5753405690193176
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B07/category",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.3113021850585938e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -2.995941400527954,
+        -1.3477790355682373,
+        -2.705019950866699,
+        -0.8112146854400635,
+        -0.3940852880477905,
+        -1.123368501663208
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B07/is_spam",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.427267074584961e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -2.4526052474975586,
+        0.1417670100927353
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B07/is_phishing",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 8.106231689453125e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -0.715653657913208,
+        -0.5171897411346436
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B07/urgency",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.172325134277344e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -1.7356650829315186,
+        1.350860595703125,
+        2.704549551010132
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B07/needs_reply",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.5762786865234375e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        2.9593417644500732,
+        -0.0030166953802108765
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B08/category",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.9669532775878906e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        1.8776229619979858,
+        -4.534907341003418,
+        -4.490890026092529,
+        -4.592715263366699,
+        5.0080790519714355,
+        -1.1975911855697632
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B08/is_spam",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 0.0,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        17.009784698486328,
+        -4.626297473907471
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B08/is_phishing",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 0.0,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        17.459318161010742,
+        -6.794836044311523
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B08/urgency",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.6226043701171875e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        0.2012018859386444,
+        1.459756851196289,
+        1.9200241565704346
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B08/needs_reply",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.905726432800293e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        3.1492433547973633,
+        -0.19597944617271423
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B09/category",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 6.794929504394531e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -1.735656976699829,
+        -4.24405574798584,
+        1.3448117971420288,
+        -3.1167030334472656,
+        -2.368438243865967,
+        0.7191596627235413
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B09/is_spam",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.6391277313232422e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -0.749542236328125,
+        0.16122254729270935
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B09/is_phishing",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.9744038581848145e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        2.565471887588501,
+        -2.2205843925476074
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B09/urgency",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.7881393432617188e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -1.6912486553192139,
+        -0.10680291056632996,
+        1.026906132698059
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B09/needs_reply",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.814697265625e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        2.672074556350708,
+        1.2546741962432861
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B10/category",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.841705620288849e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -4.567408084869385,
+        -1.0229730606079102,
+        -4.575458526611328,
+        5.743448257446289,
+        -3.2213199138641357,
+        -3.5284910202026367
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B10/is_spam",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 6.51925802230835e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -3.512648582458496,
+        0.7328076958656311
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B10/is_phishing",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.1920928955078125e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -6.869068145751953,
+        1.8740108013153076
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B10/urgency",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.7881393432617188e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -2.9535794258117676,
+        0.4079016447067261,
+        2.1210503578186035
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_B10/needs_reply",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 6.183981895446777e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -1.5301698446273804,
+        0.6762586236000061
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C01/intent",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.2631062418222427e-08,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        4.816755771636963,
+        -4.562373161315918,
+        -4.211209297180176,
+        -3.2457475662231445,
+        -4.364229202270508,
+        -2.684004306793213
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C01/is_urgent",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.3387762010097504e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        5.908829689025879,
+        -1.0623900890350342
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C01/frustration",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.0728836059570312e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        1.7140836715698242,
+        1.6376314163208008,
+        1.5974493026733398,
+        0.8754243850708008
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C01/refund_requested",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.4901161193847656e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -0.9856013059616089,
+        -0.2694200873374939
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C01/churn_risk",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.307366907596588e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        6.173693656921387,
+        -0.8388043642044067
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C02/intent",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.0132789611816406e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -0.4327924847602844,
+        -2.1542587280273438,
+        -4.579728126525879,
+        -3.6124331951141357,
+        -2.4784984588623047,
+        -0.8919022083282471
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C02/is_urgent",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 5.3551048040390015e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        5.044790744781494,
+        -0.5226109623908997
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C02/frustration",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.8743019104003906e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -0.6439757347106934,
+        1.455540657043457,
+        2.05916690826416,
+        2.0133209228515625
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C02/refund_requested",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.0372681319713593e-10,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        10.015368461608887,
+        -0.8311854004859924
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C02/churn_risk",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.1641532182693481e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        7.696967124938965,
+        -0.3982071280479431
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C03/intent",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 8.242295734817162e-13,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -4.568935394287109,
+        -4.581401824951172,
+        11.963377952575684,
+        -4.5847930908203125,
+        -4.552439212799072,
+        -4.299984455108643
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C03/is_urgent",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.979060471057892e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        6.108318328857422,
+        -0.8061849474906921
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C03/frustration",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.682209014892578e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -2.182115316390991,
+        0.12515687942504883,
+        0.7856439352035522,
+        0.2577148675918579
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C03/refund_requested",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 6.332993507385254e-08,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        4.259392738342285,
+        -0.647943913936615
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C03/churn_risk",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 0.0,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        7.021279335021973,
+        -0.9459381103515625
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C04/intent",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.5762786865234375e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -4.040943622589111,
+        -2.270167112350464,
+        -4.037315368652344,
+        0.8375622034072876,
+        -1.6178627014160156,
+        -0.4225861132144928
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C04/is_urgent",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.1920928955078125e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        5.069260120391846,
+        -0.8765392303466797
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C04/frustration",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.1324882507324219e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        1.3885703086853027,
+        1.1031601428985596,
+        0.9863191843032837,
+        0.16946157813072205
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C04/refund_requested",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 6.83940015733242e-10,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        7.596558570861816,
+        -1.023165225982666
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C04/churn_risk",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.307366907596588e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        5.89980411529541,
+        -0.6046565175056458
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C05/intent",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.218847493575595e-15,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -4.088521480560303,
+        -4.556604385375977,
+        -4.889710903167725,
+        -4.76684045791626,
+        15.873106002807617,
+        -4.50455904006958
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C05/is_urgent",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.129243850708008e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        2.63503098487854,
+        -0.09655460715293884
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C05/frustration",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.1026859283447266e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -3.0410115718841553,
+        -1.6510860919952393,
+        0.20037782192230225,
+        0.22784939408302307
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C05/refund_requested",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.1920928955078125e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -3.370354175567627,
+        0.2923467755317688
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C05/churn_risk",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.725290298461914e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -5.443864822387695,
+        1.193253517150879
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C06/intent",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.1550582712516189e-10,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        7.969277381896973,
+        -4.499270439147949,
+        -4.500248432159424,
+        -4.564932823181152,
+        -4.568785667419434,
+        -4.308389186859131
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C06/is_urgent",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.190951585769653e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        4.849555969238281,
+        -0.577244758605957
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C06/frustration",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 7.152557373046875e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -1.3491058349609375,
+        -1.4430201053619385,
+        0.12185811996459961,
+        0.05403418838977814
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C06/refund_requested",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.172325134277344e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -1.720505714416504,
+        0.6253257989883423
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C06/churn_risk",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.1920928955078125e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        3.8308639526367188,
+        -0.37114447355270386
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C07/intent",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.1920928955078125e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -3.1898465156555176,
+        -2.9258742332458496,
+        -4.549979209899902,
+        -3.5335803031921387,
+        1.8156415224075317,
+        -1.9579966068267822
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C07/is_urgent",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 5.238689482212067e-10,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        6.395174026489258,
+        -1.1627320051193237
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C07/frustration",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.948807716369629e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -0.6560747623443604,
+        -0.5055913329124451,
+        0.8042683601379395,
+        0.6219708919525146
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C07/refund_requested",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 6.582467904081568e-11,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        11.927642822265625,
+        -1.4824135303497314
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C07/churn_risk",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.584420144557953e-08,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        5.030980587005615,
+        -0.6608306169509888
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C08/intent",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.149569576838985e-11,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        11.958547592163086,
+        -4.513806343078613,
+        -2.681657314300537,
+        -4.516023635864258,
+        -3.8257131576538086,
+        -1.995744228363037
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C08/is_urgent",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.3928594095632434e-10,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        10.191730499267578,
+        -0.9247613549232483
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C08/frustration",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.980232238769531e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -1.7570971250534058,
+        -0.4444371461868286,
+        0.7583544850349426,
+        0.3364741802215576
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C08/refund_requested",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.76837158203125e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -0.3815005421638489,
+        -0.3543674349784851
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C08/churn_risk",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 9.022187441587448e-10,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        7.527344703674316,
+        -0.5353391766548157
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C09/intent",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.190951585769653e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -4.590078353881836,
+        0.24071940779685974,
+        -4.504561901092529,
+        -4.581940650939941,
+        7.1601786613464355,
+        -4.397060394287109
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C09/is_urgent",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.7418136596679688e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -0.31441766023635864,
+        -0.40707895159721375
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C09/frustration",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 5.364418029785156e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -3.8938815593719482,
+        -2.6922430992126465,
+        -0.7380651235580444,
+        -1.0536938905715942
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C09/refund_requested",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.5762786865234375e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        0.5949349403381348,
+        -0.7921022176742554
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C09/churn_risk",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.2945383787155151e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -3.979151725769043,
+        0.19216680526733398
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C10/intent",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 8.195638656616211e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -0.8487160801887512,
+        -4.055583477020264,
+        -4.559422492980957,
+        -3.196277141571045,
+        -0.28113898634910583,
+        1.452752947807312
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C10/is_urgent",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.1009327610954642e-10,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        11.133198738098145,
+        -0.975699782371521
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C10/frustration",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 5.364418029785156e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -0.22060012817382812,
+        -0.12459756433963776,
+        1.5901293754577637,
+        1.041719913482666
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C10/refund_requested",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.360867140145274e-12,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        15.195659637451172,
+        -1.0978482961654663
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_C10/churn_risk",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 8.640199666842818e-12,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        11.318954467773438,
+        -1.0065710544586182
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E01/toxic",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 5.3551048040390015e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        6.250614166259766,
+        -0.5408579111099243
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E01/harassment",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 5.384208634495735e-10,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        7.655801296234131,
+        -0.9244915246963501
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E01/threat",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 7.8580342233181e-10,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        7.8195366859436035,
+        -0.6644049882888794
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E01/spam",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.218847493575595e-15,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        17.733558654785156,
+        -2.1990299224853516
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E01/severity",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.172325134277344e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        1.1834499835968018,
+        2.9822468757629395,
+        2.7315945625305176,
+        3.6114509105682373
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E02/toxic",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.190951585769653e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        4.871049404144287,
+        -0.5972528457641602
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E02/harassment",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.0943040251731873e-08,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        5.004211902618408,
+        -0.7210020422935486
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E02/threat",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.3760443329811096e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        5.8582353591918945,
+        -0.6949893832206726
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E02/spam",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.0954757928848267e-08,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        5.377625465393066,
+        -0.8292897343635559
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E02/severity",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.4901161193847656e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -0.7382545471191406,
+        1.9823408126831055,
+        2.076559066772461,
+        2.623471736907959
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E03/toxic",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.341104507446289e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        1.8677703142166138,
+        -0.1675879955291748
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E03/harassment",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.1920928955078125e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        3.3521995544433594,
+        -0.5045585632324219
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E03/threat",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.4924596548080444e-10,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        6.2793097496032715,
+        -0.8984639644622803
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E03/spam",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 7.247535904753022e-12,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        13.424301147460938,
+        -1.5804897546768188
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E03/severity",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.0132789611816406e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -1.605854868888855,
+        2.44301438331604,
+        1.0816893577575684,
+        1.5700724124908447
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E04/toxic",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 7.916241884231567e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        4.845996856689453,
+        -0.3854648768901825
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E04/harassment",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.3271346688270569e-08,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        5.7467756271362305,
+        -0.3320003151893616
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E04/threat",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.029992174357176e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        8.596644401550293,
+        -0.6445984840393066
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E04/spam",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.1920928955078125e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -3.1198463439941406,
+        1.3141101598739624
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E04/severity",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 7.599592208862305e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -0.32222193479537964,
+        2.043818950653076,
+        1.7875056266784668,
+        1.4607044458389282
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E05/toxic",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.979060471057892e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        6.151584625244141,
+        -0.7396439909934998
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E05/harassment",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.598405212163925e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        6.1524200439453125,
+        -1.2627850770950317
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E05/threat",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.2223608791828156e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        7.2068939208984375,
+        -1.060178518295288
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E05/spam",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.091837814077735e-11,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        10.96827507019043,
+        -1.830842137336731
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E05/severity",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 5.960464477539062e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        1.7507209777832031,
+        2.824350357055664,
+        1.9793174266815186,
+        2.699964761734009
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E06/toxic",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 0.0,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        4.108384132385254,
+        -0.3097906708717346
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E06/harassment",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.60770320892334e-08,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        3.892939567565918,
+        -0.16623066365718842
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E06/threat",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 0.0,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        7.024663925170898,
+        -0.8736045360565186
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E06/spam",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 9.313225746154785e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        6.559232234954834,
+        -0.7404251098632812
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E06/severity",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 5.066394805908203e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -0.9703328609466553,
+        2.2081191539764404,
+        1.466064214706421,
+        1.0922353267669678
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E07/toxic",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.2118911147117615e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        6.822925567626953,
+        -0.6360262036323547
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E07/harassment",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.3387762010097504e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        6.5806565284729,
+        -0.9056216478347778
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E07/threat",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.2505552149377763e-11,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        11.500551223754883,
+        -1.120999813079834
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E07/spam",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.3298697960381105e-15,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        17.70258903503418,
+        -3.589871406555176
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E07/severity",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.470348358154297e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -0.43810713291168213,
+        2.8195629119873047,
+        2.4043617248535156,
+        2.6833267211914062
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E08/toxic",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.9103830456733704e-10,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        6.896636009216309,
+        -0.5374360084533691
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E08/harassment",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 5.820766091346741e-10,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        7.239490032196045,
+        -0.8263352513313293
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E08/threat",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.775333657860756e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        7.736832618713379,
+        -0.7418572902679443
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E08/spam",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.086162567138672e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -2.127636194229126,
+        -0.2366807460784912
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_E08/severity",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.8775463104248047e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -1.6602199077606201,
+        0.4878643751144409,
+        1.1437978744506836,
+        0.8530988097190857
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F01/difficulty",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 8.344650268554688e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -1.994131326675415,
+        2.4495902061462402,
+        0.8207501769065857,
+        -0.13701455295085907
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F01/domain",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 6.556510925292969e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        3.4041481018066406,
+        0.44895660877227783,
+        0.8385494351387024,
+        -3.0017991065979004,
+        -2.3533058166503906,
+        -2.3574390411376953
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F01/needs_tools",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.0132789611816406e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        2.2316737174987793,
+        -0.2710416913032532
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F01/is_sensitive",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.2096279533579946e-10,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        11.516155242919922,
+        -0.8220400810241699
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F02/difficulty",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.129243850708008e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -4.2431206703186035,
+        0.920160710811615,
+        2.409367322921753,
+        1.0269989967346191
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F02/domain",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.9103830456733704e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -3.308380126953125,
+        5.267673492431641,
+        -3.0654296875,
+        -2.2910470962524414,
+        -2.5450282096862793,
+        -3.4944028854370117
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F02/needs_tools",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.5497207641601562e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        0.5647032260894775,
+        0.2720714807510376
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F02/is_sensitive",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.0459189070388675e-11,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        14.2105712890625,
+        -0.10134690999984741
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F03/difficulty",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.470348358154297e-08,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -1.4620823860168457,
+        2.461901903152466,
+        0.5503873229026794,
+        -0.885911226272583
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F03/domain",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.4437904357910156e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -1.2445545196533203,
+        -4.576979637145996,
+        0.9057229161262512,
+        -3.798488140106201,
+        -4.5830302238464355,
+        1.261488914489746
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F03/needs_tools",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.4901161193847656e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        1.2640820741653442,
+        -0.09679451584815979
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F03/is_sensitive",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.280568540096283e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        5.881800174713135,
+        -0.6766752004623413
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F04/difficulty",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.682209014892578e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -1.8855297565460205,
+        0.9109341502189636,
+        2.0273375511169434,
+        0.19224107265472412
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F04/domain",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.341104507446289e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -2.844127893447876,
+        3.6636083126068115,
+        -3.2564988136291504,
+        1.443145990371704,
+        -3.056849956512451,
+        -0.7389723658561707
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F04/needs_tools",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.1795009413617663e-11,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        13.940591812133789,
+        -0.6922132968902588
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F04/is_sensitive",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 7.312337402254343e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        8.645557403564453,
+        -0.5165259838104248
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F05/difficulty",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.172325134277344e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -3.623523235321045,
+        0.5406334400177002,
+        1.7882975339889526,
+        0.8357383012771606
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F05/domain",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.172325134277344e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -2.436608076095581,
+        -4.299301624298096,
+        -3.1936771869659424,
+        -3.3346261978149414,
+        -2.155775785446167,
+        -3.149348735809326
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F05/needs_tools",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.7939677238464355e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        4.578131198883057,
+        -0.5820072889328003
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F05/is_sensitive",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.2434497875801753e-13,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        16.820877075195312,
+        -0.8274154663085938
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F06/difficulty",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 4.76837158203125e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -1.6404330730438232,
+        0.9108577966690063,
+        1.0780971050262451,
+        -0.38300275802612305
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F06/domain",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.2351741790771484e-08,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -3.2288081645965576,
+        -4.567235946655273,
+        -2.3507003784179688,
+        -4.150723934173584,
+        -4.578134059906006,
+        1.998586654663086
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F06/needs_tools",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.1920928955078125e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        4.203007698059082,
+        -0.4324309527873993
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_F06/is_sensitive",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 8.731149137020111e-11,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        8.299028396606445,
+        -0.9702543020248413
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_G01/resolution",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.980232238769531e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        3.542174816131592,
+        -0.6428439617156982,
+        -0.30289337038993835
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_G01/helpfulness",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.0994415283203125e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        1.316974401473999,
+        0.1984226256608963,
+        -1.1656322479248047,
+        -0.8272308111190796,
+        1.0970308780670166
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_G01/follow_up",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 5.662441253662109e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -0.11679978668689728,
+        0.94842928647995
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_G02/resolution",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 7.450580596923828e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -1.3928427696228027,
+        -1.883798599243164,
+        -3.0192952156066895
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_G02/helpfulness",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.043081283569336e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -0.8282947540283203,
+        0.6482936143875122,
+        0.8653595447540283,
+        1.2090599536895752,
+        1.7883937358856201
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_G02/follow_up",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.7881393432617188e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -1.9855353832244873,
+        -0.10999542474746704
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_G02/label",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.026798367500305e-09,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -3.2729480266571045,
+        6.730008602142334,
+        -3.0406227111816406,
+        -3.6613786220550537,
+        -2.474372148513794,
+        -1.322401762008667,
+        -2.9395132064819336,
+        -3.371753215789795,
+        -3.4558091163635254,
+        -3.1911940574645996,
+        -3.4431662559509277,
+        -3.8183629512786865,
+        -2.404855728149414,
+        -0.3950439989566803,
+        -4.016842842102051,
+        -4.121406555175781,
+        -3.9007833003997803,
+        -4.583503723144531,
+        -4.348884582519531,
+        -4.0932722091674805
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_G03/resolution",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 3.129243850708008e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        0.9010482430458069,
+        -0.8263278007507324,
+        -1.106755256652832
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_G03/helpfulness",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.682209014892578e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        0.8611525893211365,
+        0.7086546421051025,
+        -0.08882443606853485,
+        0.45655930042266846,
+        1.2824788093566895
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_G03/follow_up",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.384185791015625e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -0.5286480188369751,
+        -0.16955125331878662
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_G04/resolution",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 1.043081283569336e-06,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -2.381511688232422,
+        -2.7883639335632324,
+        -3.091545581817627
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_G04/helpfulness",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 2.384185791015625e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -1.2719378471374512,
+        -0.2590940594673157,
+        0.22594588994979858,
+        1.4786717891693115,
+        1.925920009613037
+      ],
+      "passed": true
+    },
+    {
+      "id": "ML_G04/follow_up",
+      "tokensMatch": true,
+      "maxProbabilityDelta": 5.364418029785156e-07,
+      "actProbabilityDelta": 0.0,
+      "selectionMatch": true,
+      "logits": [
+        -2.4976675510406494,
+        -0.01267668604850769
+      ],
+      "passed": true
+    }
+  ],
+  "complete": true,
+  "passed": true
+}

@@ -115,3 +115,44 @@ Writer 的 2026-11-08 双模型实验保留 [原始基线](writer-prompt-2026-11
 - [历史上下文二分类溯源](decision-history-binary-provenance-2026-11-17.json)：独立于单句测试，最多4轮历史＋当前轮次，两模型2240次；[D3汇总](decision-history-binary-d3-summary-2026-11-17.json)、[Vela汇总](decision-history-binary-vela-summary-2026-11-17.json)，完整矩阵、原始数据和容量探针见[报告](../validation/Decision-Binary-Interrupt-Mac-Comparison.md#历史上下文二分类独立实验2026-11-17)。
 
 App 二分类 Swift 接入：[原始记录](decision-binary-app-native-2026-11-17.json)、[汇总](decision-binary-app-native-summary-2026-11-17.json)、[Vela Python 对照](decision-binary-app-vela-parity-2026-11-17.json)。解释见[二分类验证](../validation/Decision-Binary-Interrupt-Mac-Comparison.md#2026-11-17-app-二分类-swift-接入验证)，不代表手机验收。
+
+## Vela 3.1 固定矩阵对照（2026-11-18）
+
+`decision-vela31-comparison-{vela31,vela3}-{four,binary,localized,history}-2026-11-18.json` 保存两版模型同环境串行重测的逐条结果；`summary` 保存本轮分组指标，`paired` 同时引用冻结的 D3/旧 Vela 历史数据并保存逐例差异。四分类与二分类的输入、分母、报告仍分别维护，不汇成一个“总准确率”。
+
+- [四分类报告](../validation/Decision-Model-Mac-Comparison.md#vela-31-fast-固定矩阵对照2026-11-18)
+- [二分类报告](../validation/Decision-Binary-Interrupt-Mac-Comparison.md#vela-31-fast-固定矩阵对照2026-11-18)
+- [原模型参考输出对齐](decision-vela31-native-parity-2026-11-18.json)
+- [带定义 noul 探索输入](decision-vela31-described-noul-input-2026-11-18.json)、[结果](decision-vela31-described-noul-results-2026-11-18.json)
+- [运行时内存/交换空间记录](decision-vela31-environment-2026-11-18.json)
+
+D3 为历史参照，未在本轮重跑。所有延迟为 Mac CPU 测量，不代表 iPhone；机器存在交换空间压力。无 App 模型配置、提示词或下载目录修改。
+
+
+## Laya Multilingual CoreAI 对照（2026-11-18）
+
+`decision-laya-{four,binary,localized,history,described}-2026-11-18.json` 保存独立原始结果、实际输入长度/截断预检、校准温度、环境、预热与逐条延迟。`decision-laya-summary-2026-11-18.json` 保存分语言/type/深度指标及与冻结D3/Vela结果的逐例差异，四分类和二分类分别解释。
+
+- [四分类报告](../validation/Decision-Model-Mac-Comparison.md#laya-multilingual-coreai-固定矩阵2026-11-18)
+- [二分类报告](../validation/Decision-Binary-Interrupt-Mac-Comparison.md#laya-multilingual-coreai-固定矩阵2026-11-18)
+- [201条发布参考对齐](decision-laya-parity-2026-11-18.json)
+- [失败制品与加载尝试](decision-laya-load-failures-2026-11-18.json)：失败不是分类错误或准确率0%。
+
+Laya正式路径是macOS wfp16-s512、显式GPU、debug-enabled specialization；旧Vela为CPU，D3为历史记录，不作同计算单元速度排名。App、真机未修改。
+
+Laya工程检查期间的[主机快照](decision-laya-environment-2026-11-18.json)记录Apple A18 Pro、8 GiB内存及磁盘/交换空间；不是推理期间连续采样，也不是iPhone测试。
+
+
+## 用户精简意图模板（2026-11-18）
+
+`decision-concise-intent-{shared,d3}-{four,single,current}-input-2026-11-18.json` 是运行前冻结的新版输入；三模型结果分别保存为 `decision-concise-intent-{laya,vela31,d3}-{four,single,current}-results-2026-11-18.json`。558次/模型，四分类与单句/当前轮二分类不混算总分。`summary` 保留分语言/type/partition指标及全部逐条输出；`d3-preflight` 保存实际token长度，`environment` 记录构建缓存清理后的主机快照。
+
+解释分别见[四分类报告](../validation/Decision-Model-Mac-Comparison.md#用户精简意图模板2026-11-18)和[二分类报告](../validation/Decision-Binary-Interrupt-Mac-Comparison.md#用户精简意图模板2026-11-18)。本轮D3为实际重测，非历史替代；旧成绩仅用作明确标注的回归对照。模型计算路径、运行时点及环境变化不同，不以延迟排名证明同硬件性能差异。
+
+## Laya精简提示词补充定义（2026-11-18）
+
+`decision-defined-intent-*`保存仅补充分类定义的中英文独立提示词实验：shared输入、Laya的four/single/current结果以及新旧配对summary。沿用558条请求，只有instructions改变；旧结果仍在`decision-concise-intent-*`。详情见[二分类报告](../validation/Decision-Binary-Interrupt-Mac-Comparison.md)及[四分类报告](../validation/Decision-Model-Mac-Comparison.md)。
+
+## Decision Swift适配对照（2026-11-18）
+
+`decision-swift-adapters-*`保存新增Vela3.1/Laya provider的冻结Python参考输入和Swift输出，`decision-laya-swift-token-input-*`保存独立token段参考。Laya首次输出不一致的结果保留，corrected结果区分tokenizer兼容修正后的执行；不得只删除失败证据。原生读出对齐不等于语义准确率改善或真机验收。

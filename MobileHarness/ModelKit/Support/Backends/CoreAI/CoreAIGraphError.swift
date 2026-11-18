@@ -1,4 +1,5 @@
 public enum CoreAIGraphError: Error, Sendable {
+    case invalidWeights(String)
     case functionNotFound(String)
     case statefulGraphUnsupported([String])
     case unknownInput(String)

@@ -352,3 +352,419 @@ Does incoming_user_input ask to immediately stop, pause, correct or replace the 
 ### 真机安装与用户反馈（2026-11-17）
 
 最新 Debug 真机版本构建成功并安装至 Youwei’s iPhone 17 Pro（dev.mobileharness.app）。自动启动当时因锁屏被系统拒绝；用户随后反馈“没啥问题”，并要求提交全部修改。这是用户的实际使用反馈，不替代两模型逐项量化指标或完整自动化验收。
+
+
+## Vela 3.1 Fast 固定矩阵对照（2026-11-18）
+
+### 范围与可比性
+
+本轮仅实验，App提示、模型列表及下载配置未变。使用固定 [Vela 3.1 CoreAI制品](https://huggingface.co/hugging-mac/vela3.1-fast/tree/108e385769cbd0da463706b24cac5a535604d2c6)，原样重放既有输入。Vela 3与3.1在同一环境串行执行，各2464条：四分类108、初始二分类256、本地化单句980、当前轮/历史1120。四分类结果单独记录，绝不合并成一个总分。二分类阈值仍为pTrue>0.5，无新增覆盖、兜底或针对结果调阈值。
+
+单句本地化每语言80条主例（40需打断/40不需打断），另有跨语种8、混语4、歧义6；五种type/选项形式分别评分。上下文矩阵保留当前用户请求、assistant已输出片段、最新输入；h0没有更早历史，h1–h4增加对应轮数历史；四种type条件。需要缺失历史才能判断的样本不计分，深度对比另外固定16条始终可判主例（8正/8负），避免不同分母造成假改善。歧义探针只记录输出。
+
+同轮Vela运行环境为Python3.12、coreai-core1.0.0b2、numpy2.3.5、tokenizers0.22.2，CPU路径，OMP_NUM_THREADS/MKL_NUM_THREADS均设为1（不宣称控制了运行时内部所有线程）。D3保留11-17历史实测，并非本轮同环境重测。3.1的SDK工作树存在未提交内容，因此记录具体源文件哈希而不只记录Git提交号。当前本地SDK是实验依赖，不是新的App依赖。
+
+延迟为预热后单次编码+推理+读出的P50/P95（nearest-rank），不含加载/排队/ASR/音频取消。8 GiB主机有交换空间压力，3.1部分阶段出现长尾；同机串行不能保证相同时段负载，不能当成纯模型速度或手机延迟。没有执行iOS真模型测试。
+
+### 单句：普通 noul 主对照
+
+| 条件 | 计分数 | 误打断FP | 漏打断FN | 召回 | F1 | P50/P95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| D3（历史） / zh | 80 | 1 | 24 | 40.0% | 0.561 | 238 / 262 |
+| Vela 3 / zh | 80 | 1 | 33 | 17.5% | 0.292 | 255 / 306 |
+| Vela 3.1 / zh | 80 | 1 | 29 | 27.5% | 0.423 | 267 / 293 |
+| D3（历史） / en | 80 | 13 | 2 | 95.0% | 0.835 | 229 / 254 |
+| Vela 3 / en | 80 | 4 | 8 | 80.0% | 0.842 | 146 / 168 |
+| Vela 3.1 / en | 80 | 5 | 4 | 90.0% | 0.889 | 165 / 869 |
+
+每语言40条负例与40条正例，因此FP/40为误打断率。旧Vela本轮全部2464条预测与历史逐条相同；延迟为本轮值。中文3.1减少4条漏打断但仍漏29/40；英文少漏4条但多误打断1条。样本量不足以把这些差异外推为线上流量收益。
+
+### 单句：其他选项形式
+
+| 条件 | 计分数 | 误打断FP | 漏打断FN | 召回 | F1 | P50/P95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Vela 3 / zh / choice_localized | 80 | 35 | 3 | 92.5% | 0.661 | 261 / 293 |
+| Vela 3.1 / zh / choice_localized | 80 | 7 | 21 | 47.5% | 0.576 | 268 / 286 |
+| Vela 3 / zh / choice_defined | 80 | 6 | 22 | 45.0% | 0.562 | 349 / 416 |
+| Vela 3.1 / zh / choice_defined | 80 | 7 | 20 | 50.0% | 0.597 | 349 / 387 |
+| Vela 3 / zh / choice_defined_reversed | 80 | 6 | 21 | 47.5% | 0.585 | 347 / 387 |
+| Vela 3.1 / zh / choice_defined_reversed | 80 | 7 | 19 | 52.5% | 0.618 | 348 / 396 |
+| Vela 3 / en / choice_localized | 80 | 4 | 8 | 80.0% | 0.842 | 144 / 163 |
+| Vela 3.1 / en / choice_localized | 80 | 5 | 4 | 90.0% | 0.889 | 161 / 623 |
+| Vela 3 / en / choice_defined | 80 | 4 | 6 | 85.0% | 0.872 | 178 / 212 |
+| Vela 3.1 / en / choice_defined | 80 | 4 | 9 | 77.5% | 0.827 | 199 / 1391 |
+| Vela 3 / en / choice_defined_reversed | 80 | 6 | 6 | 85.0% | 0.850 | 176 / 207 |
+| Vela 3.1 / en / choice_defined_reversed | 80 | 5 | 6 | 85.0% | 0.861 | 195 / 826 |
+
+所有模型的普通noul与choice_native_control在单句196组、历史280组上均为0个预测差异、最大概率差0。这里接口名不是独立的质量增益；带定义或本地化候选改变了输入，不能混称为同一提示。
+
+### 当前轮与历史：固定可判主例
+
+| 条件 | 计分数 | 误打断FP | 漏打断FN | 召回 | F1 | P50/P95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Vela 3 / zh / h0 / noul | 16 | 1 | 5 | 37.5% | 0.500 | 267 / 289 |
+| Vela 3.1 / zh / h0 / noul | 16 | 1 | 5 | 37.5% | 0.500 | 294 / 390 |
+| Vela 3 / zh / h1 / noul | 16 | 1 | 4 | 50.0% | 0.615 | 297 / 460 |
+| Vela 3.1 / zh / h1 / noul | 16 | 1 | 5 | 37.5% | 0.500 | 334 / 473 |
+| Vela 3 / zh / h4 / noul | 16 | 2 | 4 | 50.0% | 0.571 | 375 / 396 |
+| Vela 3.1 / zh / h4 / noul | 16 | 2 | 3 | 62.5% | 0.667 | 411 / 472 |
+| Vela 3 / en / h0 / noul | 16 | 2 | 1 | 87.5% | 0.824 | 158 / 186 |
+| Vela 3.1 / en / h0 / noul | 16 | 1 | 4 | 50.0% | 0.615 | 178 / 192 |
+| Vela 3 / en / h1 / noul | 16 | 4 | 2 | 75.0% | 0.667 | 181 / 190 |
+| Vela 3.1 / en / h1 / noul | 16 | 3 | 3 | 62.5% | 0.625 | 201 / 292 |
+| Vela 3 / en / h4 / noul | 16 | 3 | 2 | 75.0% | 0.706 | 213 / 234 |
+| Vela 3.1 / en / h4 / noul | 16 | 3 | 2 | 75.0% | 0.706 | 244 / 523 |
+
+h0=当前用户请求+assistant已输出内容+最新输入，没有更早历史；不是单句。每行16条，8正8负。h2/h3及全部可判样本、跨语言、其他type详见配对JSON，未混入此固定队列。英文h0的3.1把误打断2条降为1条，却把漏打断1条增为4条；中文h0预测相同。增加历史没有稳定改善“少误打断且保持明确打断召回”，并增加编码长度与延迟。
+
+### 跨语言与混合输入（单句 noul）
+
+| 条件 | 计分数 | 误打断FP | 漏打断FN | 召回 | F1 | P50/P95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Vela 3 / 提示zh / cross | 8 | 0 | 4 | 0.0% | 0.000 | 250 / 264 |
+| Vela 3.1 / 提示zh / cross | 8 | 0 | 2 | 50.0% | 0.667 | 284 / 708 |
+| Vela 3 / 提示en / cross | 8 | 0 | 2 | 50.0% | 0.667 | 157 / 169 |
+| Vela 3.1 / 提示en / cross | 8 | 0 | 1 | 75.0% | 0.857 | 261 / 307 |
+| Vela 3 / 提示zh / mixed | 4 | 0 | 1 | 50.0% | 0.667 | 246 / 249 |
+| Vela 3.1 / 提示zh / mixed | 4 | 1 | 0 | 100.0% | 0.800 | 256 / 260 |
+| Vela 3 / 提示en / mixed | 4 | 0 | 0 | 100.0% | 1.000 | 148 / 152 |
+| Vela 3.1 / 提示en / mixed | 4 | 0 | 0 | 100.0% | 1.000 | 151 / 159 |
+
+### 初始二分类（含busy/idle重复元数据）
+
+| 条件 | 计分数 | 误打断FP | 漏打断FN | 召回 | F1 | P50/P95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Vela 3 / yes_no | 128 | 2 | 16 | 60.0% | 0.727 | 142 / 167 |
+| Vela 3.1 / yes_no | 128 | 6 | 12 | 70.0% | 0.757 | 473 / 2463 |
+| Vela 3 / defined_bool | 128 | 2 | 18 | 55.0% | 0.688 | 174 / 211 |
+| Vela 3.1 / defined_bool | 128 | 4 | 16 | 60.0% | 0.706 | 628 / 2448 |
+
+每条件128次不是128个独立语义案例：busy/idle不发给模型。同准确率下FP/FN可能变化，因此不能只用总准确率选型。
+
+### 3.1新特性：带定义 noul（独立探索）
+
+复用choice_defined的true/false描述，仅改为3.1的noul.criteria；单句196条、当前轮56条。252条全部完成，全部与相同描述no/yes choice的输入张量相同。此组是在主结果后根据上游新特性补充，未宣称独立留出验证，也未调参优化后回写主组。
+
+| 条件 | 计分数 | 误打断FP | 漏打断FN | 召回 | F1 | P50/P95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Vela 3.1 / zh / localized / noul_defined | 80 | 7 | 20 | 50.0% | 0.597 | 333 / 566 |
+| Vela 3.1 / en / localized / noul_defined | 80 | 4 | 8 | 80.0% | 0.842 | 182 / 214 |
+| Vela 3.1 / zh / history / noul_defined | 16 | 2 | 4 | 50.0% | 0.571 | 443 / 482 |
+| Vela 3.1 / en / history / noul_defined | 16 | 2 | 2 | 75.0% | 0.750 | 221 / 243 |
+
+中文单句相对普通noul，召回27.5%→50%，但误打断1→7；英文单句召回90%→80%，误打断5→4。当前轮英文召回50%→75%，误打断1→2。依然是权衡，未发现同时更保守、更能识别明确打断、更快的组合。
+
+### 结论与证据
+
+不建议仅因版本升级替换当前App模型。四分类未改善；二分类单句英文有局部召回收益，但误打断增加，当前轮英文又明显漏掉更多打断。以“优先入队、明确要求才打断、延迟尽量低”为目标，本轮没有证明3.1是比旧Vela更合适的整体替代。也不能将此结论解释为旧模型已达到可上线准确率；中文召回和小样本下误打断仍需真实交互样本验证。保持当前配置；不增加历史来追求本组分数。
+
+本轮主矩阵两版合计4928条、独立描述noul252条，共5180条正式推理，另有3条原模型参考对齐及预热；正式推理没有执行错误。输入/源码/制品溯源在原始报告，固定case可逐条追溯。参考对齐最大分数差9.69e-8以内，不能代替手机验收。
+
+证据：[全部分组与逐例差异](../measurements/decision-vela31-comparison-paired-2026-11-18.json)、[本轮汇总](../measurements/decision-vela31-comparison-summary-2026-11-18.json)、[描述noul汇总](../measurements/decision-vela31-described-noul-summary-2026-11-18.json)、[原始记录索引](../measurements/README.md#vela-31-固定矩阵对照2026-11-18)、[运行方式](../../Tests/DecisionBenchmarks/README.md#vela31-fast-frozen-matrix-comparison)。
+
+记录中的runner哈希对应实际执行版本；实验完成后仅将summarize输入枚举改为八个明确的原始结果路径，避免再次汇总时把summary/paired当作原始推理记录。不改变推理路径或已保存结果。
+
+
+### 本次工程验证
+
+实验脚本AST解析、八份主结果完整性/零执行错误检查、最终summarize逐项复算、报告新增本地链接、git diff --check均通过；noul控制和参考对齐证据见上文。没有修改生产Swift代码，原有签名工作区改动保留。
+
+`env -u SDKROOT ./scripts/check.sh` 最终退出1（`/tmp/vela31-check.log`）。边界检查、8项下载脚本测试、严格Swift格式和plist通过。首阶段IntegrationTests的1194项报告1个NexArmAim时序问题；AppWorkflow报告缺失injected Action declarations及旧语音偏好断言。AppWorkflow错误后近两分钟日志不再推进，结束本次启动的该helper以继续第二阶段，因此首阶段未完整执行。第二阶段228项运行结束，soundSourceSlowSubscriberDoesNotBlockFollowingDirections失败，不能记为全仓通过。这些是此前报告中已有的范围外失败，本轮未修改。
+
+`env -u SDKROOT ./scripts/build-ios.sh` 五个模拟器scheme全部构建通过，退出0（`/tmp/vela31-ios.log`）。没有安装或测量物理iPhone，不能据此确认Vela3.1手机性能。
+
+
+## Laya Multilingual CoreAI 固定矩阵（2026-11-18）
+
+### 制品与方法
+
+正式制品为 [mlboydaisuke/Laya-Multilingual-CoreAI](https://huggingface.co/mlboydaisuke/Laya-Multilingual-CoreAI/tree/3fe58a5ed7857b41f5c7ba8c0f46ce420b42cf02) macOS wfp16-s512；来源固定为 convaiinnovations/laya@1c5edc17a7acd8701df6fc341c0d179f1c62c982/multilingual。显式GPU、debug-enabled specialization，FP16权重存储/FP32计算，coreai-core1.0.0b2。与前轮Vela CPU/D3历史数据不同计算路径/时段，不能宣称同环境速度排名。当前主机磁盘空间与交换内存紧张，延迟只描述本次执行。
+
+先选的1024图未能加载；替代图CPU失败、GPU成功后又遇到明确磁盘不足，最终复用已生成的GPU缓存。失败和清理仅涉及本任务下载的图/运行时/重复tokenizer，不删除旧D3/Vela；失败日志独立保存，不计为语义错例。没有升级共享Python环境，Laya0.4.2从本地wheel导入。模型权重不提交，App没有变化。
+
+正式业务实验前，发布201条参考的token/marker、选择全部一致；T=1最大概率差8.11e-6。正式实验使用bundle发布校准温度（noul:2为3.629100511692587，choice:2为1.397546128996061），保留四位小数原生响应，以pTrue>0.5计分类；不针对本任务拟合阈值或重写结果。act仅作为原生响应字段，不用于接纳/丢弃/打断覆盖。
+
+复用四分类108、初始二分类256、本地化单句980、当前轮/历史1120，以及独立带定义noul252条矩阵。单句每语言80主例（40正/40负）；当前轮固定可判主例每语言16条（8正/8负）；跨语言/混语另计，歧义与缺少所需历史时不计语义分。h0包含当前用户请求、assistant已输出片段和最新输入，不是单句；h1–h4另加已完成历史。所有输入预检token、instruction和option截断，不默默截取后声称完整上下文比较。
+
+Laya的类型文字和learned type输入不同。冻结矩阵中的choice_native_control是旧Vela/D3控制组的名字，不代表Laya的noul/choice等价。本轮保留其输入，以免事后变更比较条件。
+
+### 单句主例：原生 noul
+
+| 条件 | 计分数 | 误打断FP | 漏打断FN | 召回 | F1 | P50/P95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| D3（历史） / zh | 80 | 1 | 24 | 40.0% | 0.561 | 238 / 262 |
+| Vela 3 CPU（前轮） / zh | 80 | 1 | 33 | 17.5% | 0.292 | 255 / 306 |
+| Vela 3.1 CPU（前轮） / zh | 80 | 1 | 29 | 27.5% | 0.423 | 267 / 293 |
+| Laya GPU / zh | 80 | 38 | 0 | 100.0% | 0.678 | 169 / 195 |
+| D3（历史） / en | 80 | 13 | 2 | 95.0% | 0.835 | 229 / 254 |
+| Vela 3 CPU（前轮） / en | 80 | 4 | 8 | 80.0% | 0.842 | 146 / 168 |
+| Vela 3.1 CPU（前轮） / en | 80 | 5 | 4 | 90.0% | 0.889 | 165 / 869 |
+| Laya GPU / en | 80 | 33 | 2 | 95.0% | 0.685 | 169 / 194 |
+
+Laya中文误打断率38/40=95%，英文33/40=82.5%。高召回并不表示更适合打断判定；这里几乎把不应打断也判为true。
+
+### 单句主例：choice与独立带定义noul
+
+| 条件 | 计分数 | 误打断FP | 漏打断FN | 召回 | F1 | P50/P95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Laya / zh / choice_native_control | 80 | 24 | 5 | 87.5% | 0.707 | 168 / 183 |
+| Laya / zh / choice_localized | 80 | 31 | 3 | 92.5% | 0.685 | 167 / 182 |
+| Laya / zh / choice_defined | 80 | 28 | 5 | 87.5% | 0.680 | 170 / 193 |
+| Laya / zh / choice_defined_reversed | 80 | 36 | 2 | 95.0% | 0.667 | 168 / 185 |
+| Laya / zh / noul_defined | 80 | 32 | 3 | 92.5% | 0.679 | 172 / 189 |
+| Laya / en / choice_native_control | 80 | 22 | 3 | 92.5% | 0.747 | 168 / 179 |
+| Laya / en / choice_localized | 80 | 33 | 1 | 97.5% | 0.696 | 166 / 186 |
+| Laya / en / choice_defined | 80 | 35 | 1 | 97.5% | 0.684 | 170 / 200 |
+| Laya / en / choice_defined_reversed | 80 | 38 | 0 | 100.0% | 0.678 | 168 / 191 |
+| Laya / en / noul_defined | 80 | 35 | 1 | 97.5% | 0.684 | 171 / 188 |
+
+### 当前轮：h0原生 noul
+
+| 条件 | 计分数 | 误打断FP | 漏打断FN | 召回 | F1 | P50/P95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| D3（历史） / zh / h0 | 16 | 5 | 1 | 87.5% | 0.700 | 251 / 285 |
+| Vela 3 CPU（前轮） / zh / h0 | 16 | 1 | 5 | 37.5% | 0.500 | 267 / 289 |
+| Vela 3.1 CPU（前轮） / zh / h0 | 16 | 1 | 5 | 37.5% | 0.500 | 294 / 390 |
+| Laya GPU / zh / h0 | 16 | 8 | 0 | 100.0% | 0.667 | 169 / 201 |
+| D3（历史） / en / h0 | 16 | 6 | 2 | 75.0% | 0.600 | 235 / 248 |
+| Vela 3 CPU（前轮） / en / h0 | 16 | 2 | 1 | 87.5% | 0.824 | 158 / 186 |
+| Vela 3.1 CPU（前轮） / en / h0 | 16 | 1 | 4 | 50.0% | 0.615 | 178 / 192 |
+| Laya GPU / en / h0 | 16 | 7 | 0 | 100.0% | 0.696 | 171 / 210 |
+
+每语言8条负例、8条正例。Laya中文8/8负例、英文7/8负例被误判为打断，明显不符合优先入队。该结论仅针对这批冻结模板/case，不推断Laya所有任务的通用能力。
+
+### 历史深度：固定16条可判主例，原生 noul
+
+| 条件 | 计分数 | 误打断FP | 漏打断FN | 召回 | F1 | P50/P95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Laya / zh / h0 | 16 | 8 | 0 | 100.0% | 0.667 | 169 / 201 |
+| Laya / zh / h1 | 16 | 6 | 0 | 100.0% | 0.727 | 168 / 207 |
+| Laya / zh / h2 | 16 | 8 | 0 | 100.0% | 0.667 | 168 / 196 |
+| Laya / zh / h3 | 16 | 7 | 0 | 100.0% | 0.696 | 174 / 204 |
+| Laya / zh / h4 | 16 | 8 | 2 | 75.0% | 0.545 | 170 / 202 |
+| Laya / en / h0 | 16 | 7 | 0 | 100.0% | 0.696 | 171 / 210 |
+| Laya / en / h1 | 16 | 7 | 0 | 100.0% | 0.696 | 169 / 194 |
+| Laya / en / h2 | 16 | 7 | 0 | 100.0% | 0.696 | 168 / 192 |
+| Laya / en / h3 | 16 | 8 | 0 | 100.0% | 0.667 | 175 / 183 |
+| Laya / en / h4 | 16 | 8 | 0 | 100.0% | 0.667 | 173 / 182 |
+
+深度0–4的全部type/跨语言及变化分母的可判指标保留在JSON；这里固定每语言16条，避免把新增可判样本当成历史增益。历史矩阵最大223 tokens，1120个输入均未截断。
+
+### 边界与初始矩阵
+
+| 条件 | 计分数 | 误打断FP | 漏打断FN | 召回 | F1 | P50/P95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Laya / 提示zh / cross / noul | 8 | 4 | 0 | 100.0% | 0.667 | 167 / 179 |
+| Laya / 提示zh / mixed / noul | 4 | 2 | 0 | 100.0% | 0.667 | 168 / 180 |
+| Laya / 提示en / cross / noul | 8 | 3 | 0 | 100.0% | 0.727 | 168 / 218 |
+| Laya / 提示en / mixed / noul | 4 | 1 | 0 | 100.0% | 0.800 | 180 / 201 |
+| Laya / 初始二分类 / yes_no | 128 | 56 | 8 | 80.0% | 0.500 | 170 / 180 |
+| Laya / 初始二分类 / defined_bool | 128 | 20 | 14 | 65.0% | 0.605 | 170 / 179 |
+| Laya / zh / h0 / noul_defined | 16 | 7 | 1 | 87.5% | 0.636 | 174 / 187 |
+| Laya / en / h0 / noul_defined | 16 | 8 | 0 | 100.0% | 0.667 | 174 / 187 |
+
+初始二分类含busy/idle重复元数据，每条件128次不是128个独立语义案例；busy不发送给模型。所有歧义样本仅保留输出，不计入准确率。没有为Laya另调提示词、标签或阈值后再回测。
+
+### 结论与证据
+
+不建议在当前App中替换为该Laya制品。四分类仍不能正确识别enqueue；二分类在原生noul、choice及带定义noul下都有较高误打断，当前轮也未改善。若未来研究Laya专用提示词，应作为新实验并另设留出数据，不将本轮结果改写为成功。
+
+正式矩阵2716次全部完成、无推理错误，预检无state/instruction/option截断；另有201次发布参考对齐和预热。实际最长输入、温度、返回概率及load/warmup均保留在原始报告。选择对照沿用冻结D3/Vela结果，时间/计算单元不同，不能作公平硬件性能排名。未安装或验证物理iPhone。
+
+证据：[分组指标与逐例差异](../measurements/decision-laya-summary-2026-11-18.json)、[原始文件索引](../measurements/README.md#laya-multilingual-coreai-对照2026-11-18)、[201条对齐](../measurements/decision-laya-parity-2026-11-18.json)、[加载失败](../measurements/decision-laya-load-failures-2026-11-18.json)、[脚本入口](../../Tests/DecisionBenchmarks/README.md#laya-multilingual-coreai-comparison)。
+
+
+### Laya 工程验证
+
+Python3.12下新脚本AST、原始2716条完整性/无错误/无截断、汇总逐项复算、报告新增链接及git diff --check通过。参考对齐201条通过；不将这些结果等同于手机验收。
+
+`env -u SDKROOT ./scripts/check.sh` 退出1，日志 `/tmp/laya-check.log`。边界、8项下载脚本测试、严格Swift格式及plist通过。首阶段1194项IntegrationTests出现1项NexArmAim时序失败；AppWorkflow缺失injected Action declarations、旧语音偏好集合断言失败，并在日志停滞约90秒后结束本次启动的helper，故首阶段未完整执行。第二阶段228项运行结束，soundSourceSlowSubscriberDoesNotBlockFollowingDirections失败。均为此前已有的范围外问题，本次没有修改生产代码或宣称全仓通过。
+
+`env -u SDKROOT ./scripts/build-ios.sh` 五个模拟器目标全部构建成功，退出0（`/tmp/laya-ios.log`）。未安装或运行Laya物理设备测试；原有签名工作区改动保留。
+
+
+## 用户精简意图模板（2026-11-18）
+
+实验设计、完整中英文提示词、协议差异和环境限制见[四分类报告同轮方法](Decision-Model-Mac-Comparison.md#用户精简意图模板2026-11-18)。本节只记录二分类；单句与当前轮分开，缺少所需历史及歧义case不计入主指标。
+
+### 单句主例（每语言40正/40负）
+
+| 模型/接口 | 语言 | 误打断FP | 漏打断FN | 打断召回 | F1 | P50/P95 ms |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Laya / noul | zh | 15 | 11 | 72.5% | 0.690 | 166 / 189 |
+| Laya / choice | zh | 14 | 8 | 80.0% | 0.744 | 166 / 188 |
+| Laya / noul | en | 18 | 6 | 85.0% | 0.739 | 172 / 181 |
+| Laya / choice | en | 21 | 1 | 97.5% | 0.780 | 172 / 185 |
+| Vela 3.1 / noul | zh | 0 | 38 | 5.0% | 0.095 | 133 / 176 |
+| Vela 3.1 / choice | zh | 1 | 37 | 7.5% | 0.136 | 135 / 154 |
+| Vela 3.1 / noul | en | 26 | 0 | 100.0% | 0.755 | 121 / 156 |
+| Vela 3.1 / choice | en | 25 | 0 | 100.0% | 0.762 | 120 / 160 |
+| D3 Edge / noul | zh | 11 | 1 | 97.5% | 0.867 | 242 / 269 |
+| D3 Edge / choice | zh | 11 | 1 | 97.5% | 0.867 | 242 / 269 |
+| D3 Edge / noul | en | 11 | 2 | 95.0% | 0.854 | 237 / 245 |
+| D3 Edge / choice | en | 11 | 2 | 95.0% | 0.854 | 237 / 244 |
+
+### 当前轮主例（h0，每语言8正/8负）
+
+| 模型/接口 | 语言 | 误打断FP | 漏打断FN | 打断召回 | F1 | P50/P95 ms |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Laya / noul | zh | 4 | 6 | 25.0% | 0.286 | 172 / 200 |
+| Laya / choice | zh | 3 | 2 | 75.0% | 0.706 | 170 / 231 |
+| Laya / noul | en | 1 | 5 | 37.5% | 0.500 | 168 / 181 |
+| Laya / choice | en | 2 | 1 | 87.5% | 0.824 | 167 / 190 |
+| Vela 3.1 / noul | zh | 0 | 8 | 0.0% | 0.000 | 146 / 163 |
+| Vela 3.1 / choice | zh | 0 | 8 | 0.0% | 0.000 | 144 / 162 |
+| Vela 3.1 / noul | en | 4 | 0 | 100.0% | 0.800 | 92 / 113 |
+| Vela 3.1 / choice | en | 4 | 0 | 100.0% | 0.800 | 93 / 113 |
+| D3 Edge / noul | zh | 5 | 0 | 100.0% | 0.762 | 241 / 260 |
+| D3 Edge / choice | zh | 5 | 0 | 100.0% | 0.762 | 241 / 249 |
+| D3 Edge / noul | en | 4 | 1 | 87.5% | 0.737 | 228 / 234 |
+| D3 Edge / choice | en | 3 | 1 | 87.5% | 0.778 | 228 / 235 |
+
+这里h0有完整的当前用户请求和assistant已输出片段。原56条输入中的16条需要更早历史而未给出，保留unspecified并排除主评分；不是把它们重新标为false。
+
+### 与旧原生noul对比
+
+| 模型/语言/场景 | 旧误打断→新误打断 | 旧召回→新召回 |
+| --- | ---: | ---: |
+| Laya / zh / single | 38 → 15 | 100.0% → 72.5% |
+| Laya / en / single | 33 → 18 | 95.0% → 85.0% |
+| Laya / zh / current | 8 → 4 | 100.0% → 25.0% |
+| Laya / en / current | 7 → 1 | 100.0% → 37.5% |
+| Vela 3.1 / zh / single | 1 → 0 | 27.5% → 5.0% |
+| Vela 3.1 / en / single | 5 → 26 | 90.0% → 100.0% |
+| Vela 3.1 / zh / current | 1 → 0 | 37.5% → 0.0% |
+| Vela 3.1 / en / current | 1 → 4 | 50.0% → 100.0% |
+| D3 Edge / zh / single | 1 → 11 | 40.0% → 97.5% |
+| D3 Edge / en / single | 13 → 11 | 95.0% → 95.0% |
+| D3 Edge / zh / current | 5 → 5 | 87.5% → 100.0% |
+| D3 Edge / en / current | 6 → 4 | 75.0% → 87.5% |
+
+### 结论与边界
+
+用户提出的自然语言分段值得保留为一个实验方向，但并非三模型统一改善：Laya单句误打断明显下降，当前轮英文choice较noul更均衡；Vela3.1中文几乎全判false、英文又明显偏true；D3单句中文召回大幅提高，但以更多误打断为代价。当前轮英文Laya choice为2/8误打断、7/8召回；D3 choice为3/8误打断、7/8召回。小样本且反复使用，不能以此断言线上优胜。
+
+对“优先入队、明确要求才打断”的需求，没有一个组合同时在中文、英文和当前轮稳定满足低误打断及较高召回。尤其Vela3.1中文当前轮0误打断同时0召回，不是理想的保守判断。建议暂不把这一版整体应用到App；本轮也没有这样做。二分类与四分类不同，不能因某个二分类分组提升便推断四分类问题解决。
+
+三模型1674条全部完成且无推理错误；Laya输入预检无截断，Vela原生packer拒绝超限，本轮均正常；D3预检范围109–143 tokens，未超过512。三模型语义state、question、actions逐项一致，noul的原生候选文本/特殊标记由适配器保留。阈值保持>0.5；未增加覆盖结果的规则。跨语言、混语、诊断输出均保留在汇总JSON，未混入上表同语言主例。
+
+D3首次skip-build启动时遇到其他测试包签名错误；直接调用旧评测入口先缺少XCTest搜索路径，随后原有构建产物消失。重建后通过原有Swift test入口完整完成三组，各1项原生评测通过。没有以失败启动或历史结果替代本轮D3评分，也没有修改项目签名设置来绕过问题。
+
+证据：[完整分组和逐条结果](../measurements/decision-concise-intent-summary-2026-11-18.json)、[单句输入](../measurements/decision-concise-intent-shared-single-input-2026-11-18.json)、[当前轮输入](../measurements/decision-concise-intent-shared-current-input-2026-11-18.json)、[D3长度预检](../measurements/decision-concise-intent-d3-preflight-2026-11-18.json)、[环境快照](../measurements/decision-concise-intent-environment-2026-11-18.json)。运行入口见[实验README](../../Tests/DecisionBenchmarks/README.md#concise-current-conversation-intent-experiment)。
+
+误打断并不全来自省略“立即”：单句noul中，D3中文11条FP仅3条属于延后/条件停止，其余8条包括否定、引用、普通词义、纠正和提问；英文11条FP中3条为延后停止。Laya中文15条FP中延后/条件4条、英文18条中5条；Vela3.1英文26条中6条。这些分组来自冻结case的group字段，未重新标注。
+
+
+### 本轮工程验证
+
+- 实验脚本AST、输入语义一致性、1674条结果完整性、指标重算、报告链接及`git diff --check`通过。D3三组原生评测分别通过，实际token数逐条与预检一致。
+- `./scripts/check.sh`退出1。普通IntegrationTests执行1194项，`slowTrackingDispatchExecutesOnlyTheNewestPendingTarget`失败；原生串行阶段执行228项，`soundSourceSlowSubscriberDoesNotBlockFollowingDirections`失败。两项均为此前记录过的测试失败，本次未修改其实现。
+- AppWorkflowTests多项报`resourceMissing("injected Action declarations")`，随后停滞约90秒；手动终止本次检查所属的该子进程以继续原生阶段。因此第一阶段未完整完成，不能声称全仓测试通过。未修改其他正在进行的模型管理/资源组织工作。
+- 检查日志：`/tmp/concise-check.log`；D3评测日志：`/tmp/concise-d3-{four,single,current}-rebuilt.log`。本轮没有真机运行或安装，Mac结果不代表手机验收。
+
+- `env -u SDKROOT DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./scripts/build-ios.sh`退出0，MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero、ModelKitAppleLLM五个scheme均构建成功；日志`/tmp/concise-ios.log`。这是模拟器目标构建，不是物理设备验收。
+
+
+## Laya精简提示词补充定义（2026-11-18）
+
+仅实验，App未修改。沿用上一轮的全部case、上下文、候选文字/顺序、标签和>0.5阈值，仅变更instructions。中英文提示词分别编写；单句无当前对话，current仅当前用户请求、assistant已输出内容及最新输入，没有更早历史、busy或queue。558条正式请求全部完成、零错误，输入预检均完整无截断；Laya仍用同一GPU debug-enabled制品和适配器。三次预热/条件不计入时延。旧版时延来自上一轮，非同时交错运行，不能将波动归因于提示词长度。
+
+### 完整问题文本
+
+自然语言上下文分段沿用上一轮；以下问题同时用于noul与choice，choice仍分别为“否/是”和“No/Yes”。
+
+```text
+请问用户是否要求立即停止或改变当前正在进行的回复？
+仅追加问题、补充信息或要求稍后处理，不算打断。
+```
+
+```text
+Does the user ask to immediately stop or change the response currently in progress?
+Merely adding a question, providing more information, or requesting something for later does not count as an interruption.
+```
+
+### 单句
+
+每语言主评分包含40个应打断、40个不应打断案例。
+
+| 语言/type | 误打断（旧→新） | 召回（旧→新） | 新F1 | 新P50/P95 ms |
+| --- | ---: | ---: | ---: | ---: |
+| zh/noul | 15/40 → 27/40 | 72.5% → 97.5% | 0.736 | 167.5/175.9 |
+| zh/choice | 14/40 → 16/40 | 80.0% → 72.5% | 0.682 | 166.9/176.9 |
+| en/noul | 18/40 → 19/40 | 85.0% → 90.0% | 0.758 | 160.3/164.4 |
+| en/choice | 21/40 → 24/40 | 97.5% → 100.0% | 0.769 | 160.2/165.3 |
+
+### 当前轮＋最新输入
+
+每语言主评分包含8个应打断、8个不应打断案例。 每语言另有8条缺少更早历史而无法确定标签的案例，从主评分排除，原始输出保留。
+
+| 语言/type | 误打断（旧→新） | 召回（旧→新） | 新F1 | 新P50/P95 ms |
+| --- | ---: | ---: | ---: | ---: |
+| zh/noul | 4/8 → 5/8 | 25.0% → 75.0% | 0.632 | 166.5/175.8 |
+| zh/choice | 3/8 → 7/8 | 75.0% → 87.5% | 0.636 | 165.9/171.0 |
+| en/noul | 1/8 → 4/8 | 37.5% → 75.0% | 0.667 | 165.6/170.7 |
+| en/choice | 2/8 → 6/8 | 87.5% → 75.0% | 0.600 | 166.3/170.6 |
+
+### 结论
+
+补充定义未达到降低误打断的目的：上述8个同语言主分组误打断均增加。当前轮choice中英文均明显退化；noul有召回提升，但误打断随之增加，不符合优先入队目标。不能将更清晰的人类措辞当作模型更可靠的证据，此版不建议进入App。完整cross/mixed分组及未定标签数据保留，未混入主分组。
+
+
+原始输入、输出及逐例配对见[汇总](../measurements/decision-defined-intent-summary-2026-11-18.json)，输入及模型结果使用同目录decision-defined-intent前缀，未覆盖旧数据。脚本见[defined_intent_experiment.py](../../Tests/DecisionBenchmarks/defined_intent_experiment.py)。本轮仍为反复使用的回归案例，不是新holdout，未做真机验证，也未据结果调整阈值或覆盖模型输出。
+
+具体退化案例（旧false→新true）：当前轮choice中，中英文“你喜欢什么颜色？→蓝色/Blue.”以及“别停，继续/Don't stop. Continue.”均由正确的不打断变为误打断。英文noul“讲完三个再停/Stop after you describe all three.”也变为true。说明这版定义并未稳定解决回答、否定与延后停止边界，不能只看召回增加。
+
+### 本轮工程验证
+
+AST、558条结果完整性、逐条输入完整无截断、新旧仅instructions变化、指标精确复算、报告链接和git diff --check通过。最长输入为four 159、single 105、current 115 tokens。
+
+check.sh退出1：普通IntegrationTests的1194项中，slowTrackingDispatchExecutesOnlyTheNewestPendingTarget失败；原生串行228项中，soundSourceSlowSubscriberDoesNotBlockFollowingDirections失败，均为此前记录过的失败。AppWorkflowTests多项resourceMissing("injected Action declarations")后停滞约100秒，手动终止本次检查的子进程以继续后续阶段；全仓检查未完整通过。未修改这些无关实现。日志为/tmp/defined-check.log，模型运行日志为/tmp/defined-laya.log。
+
+iOS构建脚本退出0，MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero、ModelKitAppleLLM五个scheme均成功（/tmp/defined-ios.log）。这是模拟器目标构建，本轮未安装真机。
+
+## 四模型ModelKit接入与推荐指数（2026-11-18）
+
+D3 Edge、Vela 3 Fast、Vela 3.1 Fast和Laya Multilingual均通过现有DecisionCapability暴露choice/noul/decide；Assistant上下文、提示词与队列/信号逻辑保持原样。新增模型纳入注册、下载、保存选择、资源预备、删除前quiesce和卸载；默认选择未更改。下载配置使用固定已实验revision和现有schema，仅声明运行必需文件，无新增fileHashes或README/license/reference下载。Laya采用发布仓库的iOS portable JIT wfp16-s512并stripPrefix安装，Mac评测显式使用对应macOS bundle，不能混用平台图。
+
+### 推荐等级的含义
+
+| 模型 | 推荐指数 | 依据与限制 |
+| --- | --- | --- |
+| Vela 3 Fast | 3/5 | 旧提示词英文当前轮noul误打断2/8、召回87.5%，延迟较低；中文召回仍不足。 |
+| D3 Edge | 2.5/5 | 中文识别有优势，但高召回模板误打断多，保守模板漏打断多。 |
+| Vela 3.1 Fast | 2/5 | 英文单句局部改善，当前轮、中文和尾延迟未稳定超过Vela3。 |
+| Laya Multilingual | 1.5/5 | 部分英文choice有改善，中文及跨提示词稳定性不足，补定义后退化。 |
+
+这些是结合本报告所有实验人工审阅的任务推荐等级，优先少误打断，再参考召回、延迟和稳定性，不是由准确率换算的星级，也不是置信度、综合模型能力或真机评分。没有模型获五星认证。UI仅在Decision显示，并以中英文说明实验范围；Gemma/Apple不编造此项分数。未按模型分别切换业务提示词。
+
+### 原生适配对照
+
+冻结同一批四分类/单句/当前轮的30条输入/模型，涵盖中英文、choice及noul，比较Swift读出与已完成的Python实验。Vela3.1全部30条通过，最大概率差1.11e-16。Laya首次30条读出不一致，最大概率差0.2151；独立132个token段对照出现60处差异。原因是swift-transformers的Metaspace需要旧字段add_prefix_space=true才能遵守制品的prepend_scheme=always。Laya专属兼容层在内存中映射该字段，不改下载文件或业务分类。
+
+修正后132个token段全部一致，30条Laya原生分类及概率全部一致（最大差0）。Swift使用公开GPU specialization，Python参考为GPU debug-enabled；本组读出证明这批样本的一致性，不证明所有形状或设备等价。Laya过长输入显式失败；未新增分类覆盖或false兜底。四模型Assistant定向回归证明只调用选中noul、不可用时不伪造false或切云端；权重归档边界测试通过。
+
+证据：[冻结输入](../measurements/decision-swift-adapters-input-2026-11-18.json)、[Vela3.1 Swift结果](../measurements/decision-swift-adapters-vela31-results-2026-11-18.json)、[Laya初次失败](../measurements/decision-swift-adapters-laya-results-2026-11-18.json)、[Laya修正结果](../measurements/decision-swift-adapters-laya-corrected-results-2026-11-18.json)、[token参考](../measurements/decision-laya-swift-token-input-2026-11-18.json)。原生日志/tmp/decision-native-vela31.log、/tmp/decision-native-laya.log、/tmp/decision-adapter-corrected.log。本轮未进行新增两模型的真机下载/运行，不把Mac对齐或iOS编译冒充物理设备验收。
+
+### 工程验收
+
+最终代码再跑两模型共60条原生对照及132个token段全部通过，最大概率差仍为Vela3.1 1.11e-16、Laya 0；包含Laya超长输入失败检查。结果见[最终Swift输出](../measurements/decision-swift-adapters-final-results-2026-11-18.json)，日志/tmp/decision-adapter-final.log。
+
+check.sh退出1。模块/制品边界检查、8项Python下载测试、Swift严格格式检查通过；四模型制品声明、星级、四模型选择/不可用、预备与权重归档定向测试通过。普通IntegrationTests共1197项，已有slowTrackingDispatchExecutesOnlyTheNewestPendingTarget失败；原生串行228项，已有soundSourceSlowSubscriberDoesNotBlockFollowingDirections失败。AppWorkflowTests仍多项resourceMissing("injected Action declarations")后停滞约90秒，手动终止本次检查所属该子进程才继续后续阶段，因此全仓检查未完整通过。日志/tmp/decision-models-check.log。未修复或回滚其他正在进行的资源组织变更。
+
+iOS构建脚本退出0：MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero、ModelKitAppleLLM五个scheme均成功（/tmp/decision-models-ios.log）。制品资源与本地化检查随脚本通过。这里只验证模拟器目标编译；新模型实际手机下载和推理仍未执行。
+
+## 空闲输入跳过Decision（2026-11-18）
+
+AssistantChatWorker按输入到达时、队列调度之前捕获的同会话活动状态决定是否提交Decision：生成回复、等待本轮工具结算或仍在播报时正常请求；空闲ASR final和用户文本只进入普通队列，不构造Decision快照、不启动模型调用、不写入伪造false或Decision失败。全双工、动态音频、队列合批、模型提示词和外部interrupt入口不变。忙时请求仍绑定原回复，迟到结果只能过期，不能打断后继回复。
+
+定向回归5项（其中动作结算含成功/失败两个case）全部通过：空闲首条输入模型调用数为0；暂停时两段ASR、文本及peer消息保留来源后合批，Decision调用0且历史decision/route保持nil；忙时输入正常分类；等待工具结算的follow-up仅分类一次；迟到和重复信号不误取消后继、保留队列输入。日志/tmp/decision-busy-tests.log。这里验证请求次数和行为，不宣称已测得真机功耗或端到端延迟收益。
+
+本轮check.sh退出1：模块/制品边界、8项Python下载测试、严格格式与plist检查通过。普通集成1197项仍有NexArmAimTests.swift:812的slowTrackingDispatchExecutesOnlyTheNewestPendingTarget失败；串行原生228项仍有SoundSourceTests.swift:181的soundSourceSlowSubscriberDoesNotBlockFollowingDirections失败。AppWorkflow多项缺少injected Action declarations，输出停滞约96秒后手动终止本次检查所属子进程才继续原生阶段，故全仓检查未完整通过。上述问题与前轮记录一致，未在本次范围修改。日志/tmp/decision-busy-check.log。
+
+iOS构建脚本退出0，MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero、ModelKitAppleLLM五个scheme均成功（/tmp/decision-busy-ios.log）。本轮未安装真机，未进行物理设备功耗或端到端延迟测量。git diff --check通过。
+
+### 本轮真机安装
+
+用户随后要求安装真机。当前工作区MobileHarness Debug iPhoneOS签名构建成功（/tmp/decision-busy-device-graph-refresh.log）；严格深层签名、73项Agent/Skill资源、Live Activity及中英本地化校验通过。初次构建受模拟器遗留依赖图影响，ModelKitDefaults未关联Gemma4；刷新可重建的清单及XCBuildData缓存后正确生成真机依赖，无业务代码变更。中间一次指定设备构建因Xcode等待连接超时，最终使用generic iOS目标。
+
+devicectl覆盖安装至Youwei’s iPhone 17 Pro成功（dev.mobileharness.app，databaseSequenceNumber 7328，/tmp/decision-busy-device-install.log），未卸载或清除应用数据。启动被锁屏拒绝（CoreDevice10002、FBS Locked，/tmp/decision-busy-device-launch.log）；这里只确认安装，不宣称已启动或通过真机推理/功耗验收。

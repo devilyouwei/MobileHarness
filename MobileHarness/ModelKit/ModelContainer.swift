@@ -580,7 +580,7 @@ public final class ModelLanguageContainer: ModelLanguageProviding, Sendable {
     public func decisionModel(_ id: String) -> (any ModelDecisionProviding)? {
         switch id {
         case "d3-edge": decision
-        case "vela3-fast": ModelDecisionContainer(scope: scope, id: ModelID(id))
+        case "vela3-fast", "vela3.1-fast", "laya-multilingual": ModelDecisionContainer(scope: scope, id: ModelID(id))
         default: nil
         }
     }
@@ -1004,7 +1004,8 @@ extension ModelContainer {
             guard let selected = try await selection() else { return nil }
             switch selected {
             case "gemma4-e2b": return ModelID("chat")
-            case "d3-edge", "vela3-fast", "apple-system", "deepfilternet3": return ModelID(selected)
+            case "d3-edge", "vela3-fast", "vela3.1-fast", "laya-multilingual", "apple-system", "deepfilternet3":
+                return ModelID(selected)
             default: throw CapabilityError.invalidRequest("Unknown local preparation model: \(selected)")
             }
         }

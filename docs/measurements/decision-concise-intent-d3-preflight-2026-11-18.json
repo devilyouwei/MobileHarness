@@ -1,0 +1,2807 @@
+{
+  "four": {
+    "inputSHA256": "b43997429e491b4c62b0a8a1e71eeabf3a0222a9ce8a508749ad943f7f0d3363",
+    "rows": [
+      {
+        "id": "holdout-alarm-unfinished-en",
+        "variant": "concise_choice",
+        "tokens": 125
+      },
+      {
+        "id": "holdout-alarm-unfinished-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 125
+      },
+      {
+        "id": "holdout-alarm-complete-en",
+        "variant": "concise_choice",
+        "tokens": 129
+      },
+      {
+        "id": "holdout-alarm-complete-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 129
+      },
+      {
+        "id": "holdout-brightness-unfinished-en",
+        "variant": "concise_choice",
+        "tokens": 124
+      },
+      {
+        "id": "holdout-brightness-unfinished-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "holdout-brightness-complete-en",
+        "variant": "concise_choice",
+        "tokens": 128
+      },
+      {
+        "id": "holdout-brightness-complete-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 126
+      },
+      {
+        "id": "holdout-attachment-unfinished-en",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "holdout-attachment-unfinished-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 120
+      },
+      {
+        "id": "holdout-attachment-complete-en",
+        "variant": "concise_choice",
+        "tokens": 126
+      },
+      {
+        "id": "holdout-attachment-complete-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 124
+      },
+      {
+        "id": "holdout-unless-unfinished-en",
+        "variant": "concise_choice",
+        "tokens": 126
+      },
+      {
+        "id": "holdout-unless-unfinished-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 124
+      },
+      {
+        "id": "holdout-unless-complete-en",
+        "variant": "concise_choice",
+        "tokens": 134
+      },
+      {
+        "id": "holdout-unless-complete-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 130
+      },
+      {
+        "id": "holdout-route-unfinished-en",
+        "variant": "concise_choice",
+        "tokens": 127
+      },
+      {
+        "id": "holdout-route-unfinished-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "holdout-route-complete-en",
+        "variant": "concise_choice",
+        "tokens": 131
+      },
+      {
+        "id": "holdout-route-complete-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 127
+      },
+      {
+        "id": "holdout-rewrite-unfinished-en",
+        "variant": "concise_choice",
+        "tokens": 126
+      },
+      {
+        "id": "holdout-rewrite-unfinished-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "holdout-rewrite-complete-en",
+        "variant": "concise_choice",
+        "tokens": 132
+      },
+      {
+        "id": "holdout-rewrite-complete-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 126
+      },
+      {
+        "id": "holdout-list-unfinished-en",
+        "variant": "concise_choice",
+        "tokens": 126
+      },
+      {
+        "id": "holdout-list-unfinished-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 124
+      },
+      {
+        "id": "holdout-list-complete-en",
+        "variant": "concise_choice",
+        "tokens": 130
+      },
+      {
+        "id": "holdout-list-complete-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 128
+      },
+      {
+        "id": "holdout-purpose-unfinished-en",
+        "variant": "concise_choice",
+        "tokens": 126
+      },
+      {
+        "id": "holdout-purpose-unfinished-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 125
+      },
+      {
+        "id": "holdout-purpose-complete-en",
+        "variant": "concise_choice",
+        "tokens": 132
+      },
+      {
+        "id": "holdout-purpose-complete-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 129
+      },
+      {
+        "id": "holdout-short-answer-en",
+        "variant": "concise_choice",
+        "tokens": 127
+      },
+      {
+        "id": "holdout-short-answer-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 123
+      },
+      {
+        "id": "holdout-short-command-en",
+        "variant": "concise_choice",
+        "tokens": 124
+      },
+      {
+        "id": "holdout-short-command-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "holdout-stop-en",
+        "variant": "concise_choice",
+        "tokens": 124
+      },
+      {
+        "id": "holdout-stop-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 123
+      },
+      {
+        "id": "holdout-switch-en",
+        "variant": "concise_choice",
+        "tokens": 128
+      },
+      {
+        "id": "holdout-switch-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 126
+      },
+      {
+        "id": "holdout-negated-en",
+        "variant": "concise_choice",
+        "tokens": 127
+      },
+      {
+        "id": "holdout-negated-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 124
+      },
+      {
+        "id": "holdout-quoted-en",
+        "variant": "concise_choice",
+        "tokens": 126
+      },
+      {
+        "id": "holdout-quoted-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 125
+      },
+      {
+        "id": "holdout-noise-en",
+        "variant": "concise_choice",
+        "tokens": 125
+      },
+      {
+        "id": "holdout-noise-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "holdout-filler-en",
+        "variant": "concise_choice",
+        "tokens": 121
+      },
+      {
+        "id": "holdout-filler-zh-Hans",
+        "variant": "concise_choice",
+        "tokens": 119
+      },
+      {
+        "id": "probe-00-empty",
+        "variant": "concise_choice",
+        "tokens": 126
+      },
+      {
+        "id": "probe-01-empty",
+        "variant": "concise_choice",
+        "tokens": 126
+      },
+      {
+        "id": "probe-02-empty",
+        "variant": "concise_choice",
+        "tokens": 124
+      },
+      {
+        "id": "probe-03-empty",
+        "variant": "concise_choice",
+        "tokens": 123
+      },
+      {
+        "id": "probe-04-empty",
+        "variant": "concise_choice",
+        "tokens": 121
+      },
+      {
+        "id": "probe-05-empty",
+        "variant": "concise_choice",
+        "tokens": 123
+      }
+    ]
+  },
+  "single": {
+    "inputSHA256": "bbdddb551a59513fb395b5c27af86b4e7c49656b6c8994a7264d2ee05de9a214",
+    "rows": [
+      {
+        "id": "zh-main-00",
+        "variant": "concise_noul",
+        "tokens": 112
+      },
+      {
+        "id": "zh-main-00",
+        "variant": "concise_choice",
+        "tokens": 110
+      },
+      {
+        "id": "zh-main-01",
+        "variant": "concise_noul",
+        "tokens": 112
+      },
+      {
+        "id": "zh-main-01",
+        "variant": "concise_choice",
+        "tokens": 110
+      },
+      {
+        "id": "zh-main-02",
+        "variant": "concise_noul",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-02",
+        "variant": "concise_choice",
+        "tokens": 112
+      },
+      {
+        "id": "zh-main-03",
+        "variant": "concise_noul",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-03",
+        "variant": "concise_choice",
+        "tokens": 112
+      },
+      {
+        "id": "zh-main-04",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-04",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-05",
+        "variant": "concise_noul",
+        "tokens": 120
+      },
+      {
+        "id": "zh-main-05",
+        "variant": "concise_choice",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-06",
+        "variant": "concise_noul",
+        "tokens": 119
+      },
+      {
+        "id": "zh-main-06",
+        "variant": "concise_choice",
+        "tokens": 117
+      },
+      {
+        "id": "zh-main-07",
+        "variant": "concise_noul",
+        "tokens": 117
+      },
+      {
+        "id": "zh-main-07",
+        "variant": "concise_choice",
+        "tokens": 115
+      },
+      {
+        "id": "zh-main-08",
+        "variant": "concise_noul",
+        "tokens": 119
+      },
+      {
+        "id": "zh-main-08",
+        "variant": "concise_choice",
+        "tokens": 117
+      },
+      {
+        "id": "zh-main-09",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-09",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-10",
+        "variant": "concise_noul",
+        "tokens": 111
+      },
+      {
+        "id": "zh-main-10",
+        "variant": "concise_choice",
+        "tokens": 109
+      },
+      {
+        "id": "zh-main-11",
+        "variant": "concise_noul",
+        "tokens": 111
+      },
+      {
+        "id": "zh-main-11",
+        "variant": "concise_choice",
+        "tokens": 109
+      },
+      {
+        "id": "zh-main-12",
+        "variant": "concise_noul",
+        "tokens": 112
+      },
+      {
+        "id": "zh-main-12",
+        "variant": "concise_choice",
+        "tokens": 110
+      },
+      {
+        "id": "zh-main-13",
+        "variant": "concise_noul",
+        "tokens": 115
+      },
+      {
+        "id": "zh-main-13",
+        "variant": "concise_choice",
+        "tokens": 113
+      },
+      {
+        "id": "zh-main-14",
+        "variant": "concise_noul",
+        "tokens": 113
+      },
+      {
+        "id": "zh-main-14",
+        "variant": "concise_choice",
+        "tokens": 111
+      },
+      {
+        "id": "zh-main-15",
+        "variant": "concise_noul",
+        "tokens": 111
+      },
+      {
+        "id": "zh-main-15",
+        "variant": "concise_choice",
+        "tokens": 109
+      },
+      {
+        "id": "zh-main-16",
+        "variant": "concise_noul",
+        "tokens": 111
+      },
+      {
+        "id": "zh-main-16",
+        "variant": "concise_choice",
+        "tokens": 109
+      },
+      {
+        "id": "zh-main-17",
+        "variant": "concise_noul",
+        "tokens": 113
+      },
+      {
+        "id": "zh-main-17",
+        "variant": "concise_choice",
+        "tokens": 111
+      },
+      {
+        "id": "zh-main-18",
+        "variant": "concise_noul",
+        "tokens": 111
+      },
+      {
+        "id": "zh-main-18",
+        "variant": "concise_choice",
+        "tokens": 109
+      },
+      {
+        "id": "zh-main-19",
+        "variant": "concise_noul",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-19",
+        "variant": "concise_choice",
+        "tokens": 112
+      },
+      {
+        "id": "zh-main-20",
+        "variant": "concise_noul",
+        "tokens": 115
+      },
+      {
+        "id": "zh-main-20",
+        "variant": "concise_choice",
+        "tokens": 113
+      },
+      {
+        "id": "zh-main-21",
+        "variant": "concise_noul",
+        "tokens": 113
+      },
+      {
+        "id": "zh-main-21",
+        "variant": "concise_choice",
+        "tokens": 111
+      },
+      {
+        "id": "zh-main-22",
+        "variant": "concise_noul",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-22",
+        "variant": "concise_choice",
+        "tokens": 112
+      },
+      {
+        "id": "zh-main-23",
+        "variant": "concise_noul",
+        "tokens": 117
+      },
+      {
+        "id": "zh-main-23",
+        "variant": "concise_choice",
+        "tokens": 115
+      },
+      {
+        "id": "zh-main-24",
+        "variant": "concise_noul",
+        "tokens": 117
+      },
+      {
+        "id": "zh-main-24",
+        "variant": "concise_choice",
+        "tokens": 115
+      },
+      {
+        "id": "zh-main-25",
+        "variant": "concise_noul",
+        "tokens": 117
+      },
+      {
+        "id": "zh-main-25",
+        "variant": "concise_choice",
+        "tokens": 115
+      },
+      {
+        "id": "zh-main-26",
+        "variant": "concise_noul",
+        "tokens": 115
+      },
+      {
+        "id": "zh-main-26",
+        "variant": "concise_choice",
+        "tokens": 113
+      },
+      {
+        "id": "zh-main-27",
+        "variant": "concise_noul",
+        "tokens": 117
+      },
+      {
+        "id": "zh-main-27",
+        "variant": "concise_choice",
+        "tokens": 115
+      },
+      {
+        "id": "zh-main-28",
+        "variant": "concise_noul",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-28",
+        "variant": "concise_choice",
+        "tokens": 112
+      },
+      {
+        "id": "zh-main-29",
+        "variant": "concise_noul",
+        "tokens": 113
+      },
+      {
+        "id": "zh-main-29",
+        "variant": "concise_choice",
+        "tokens": 111
+      },
+      {
+        "id": "zh-main-30",
+        "variant": "concise_noul",
+        "tokens": 115
+      },
+      {
+        "id": "zh-main-30",
+        "variant": "concise_choice",
+        "tokens": 113
+      },
+      {
+        "id": "zh-main-31",
+        "variant": "concise_noul",
+        "tokens": 119
+      },
+      {
+        "id": "zh-main-31",
+        "variant": "concise_choice",
+        "tokens": 117
+      },
+      {
+        "id": "zh-main-32",
+        "variant": "concise_noul",
+        "tokens": 112
+      },
+      {
+        "id": "zh-main-32",
+        "variant": "concise_choice",
+        "tokens": 110
+      },
+      {
+        "id": "zh-main-33",
+        "variant": "concise_noul",
+        "tokens": 112
+      },
+      {
+        "id": "zh-main-33",
+        "variant": "concise_choice",
+        "tokens": 110
+      },
+      {
+        "id": "zh-main-34",
+        "variant": "concise_noul",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-34",
+        "variant": "concise_choice",
+        "tokens": 112
+      },
+      {
+        "id": "zh-main-35",
+        "variant": "concise_noul",
+        "tokens": 113
+      },
+      {
+        "id": "zh-main-35",
+        "variant": "concise_choice",
+        "tokens": 111
+      },
+      {
+        "id": "zh-main-36",
+        "variant": "concise_noul",
+        "tokens": 112
+      },
+      {
+        "id": "zh-main-36",
+        "variant": "concise_choice",
+        "tokens": 110
+      },
+      {
+        "id": "zh-main-37",
+        "variant": "concise_noul",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-37",
+        "variant": "concise_choice",
+        "tokens": 112
+      },
+      {
+        "id": "zh-main-38",
+        "variant": "concise_noul",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-38",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-39",
+        "variant": "concise_noul",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-39",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-40",
+        "variant": "concise_noul",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-40",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-41",
+        "variant": "concise_noul",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-41",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-42",
+        "variant": "concise_noul",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-42",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-43",
+        "variant": "concise_noul",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-43",
+        "variant": "concise_choice",
+        "tokens": 112
+      },
+      {
+        "id": "zh-main-44",
+        "variant": "concise_noul",
+        "tokens": 119
+      },
+      {
+        "id": "zh-main-44",
+        "variant": "concise_choice",
+        "tokens": 117
+      },
+      {
+        "id": "zh-main-45",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-45",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-46",
+        "variant": "concise_noul",
+        "tokens": 120
+      },
+      {
+        "id": "zh-main-46",
+        "variant": "concise_choice",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-47",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-47",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-48",
+        "variant": "concise_noul",
+        "tokens": 121
+      },
+      {
+        "id": "zh-main-48",
+        "variant": "concise_choice",
+        "tokens": 119
+      },
+      {
+        "id": "zh-main-49",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-49",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-50",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-50",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-51",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-51",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-52",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-52",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-53",
+        "variant": "concise_noul",
+        "tokens": 119
+      },
+      {
+        "id": "zh-main-53",
+        "variant": "concise_choice",
+        "tokens": 117
+      },
+      {
+        "id": "zh-main-54",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-54",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-55",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-55",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-56",
+        "variant": "concise_noul",
+        "tokens": 117
+      },
+      {
+        "id": "zh-main-56",
+        "variant": "concise_choice",
+        "tokens": 115
+      },
+      {
+        "id": "zh-main-57",
+        "variant": "concise_noul",
+        "tokens": 119
+      },
+      {
+        "id": "zh-main-57",
+        "variant": "concise_choice",
+        "tokens": 117
+      },
+      {
+        "id": "zh-main-58",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-58",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-59",
+        "variant": "concise_noul",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-59",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-60",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-60",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-61",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-61",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-62",
+        "variant": "concise_noul",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-62",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-63",
+        "variant": "concise_noul",
+        "tokens": 115
+      },
+      {
+        "id": "zh-main-63",
+        "variant": "concise_choice",
+        "tokens": 113
+      },
+      {
+        "id": "zh-main-64",
+        "variant": "concise_noul",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-64",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-65",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-65",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-66",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-66",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-67",
+        "variant": "concise_noul",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-67",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-68",
+        "variant": "concise_noul",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-68",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-69",
+        "variant": "concise_noul",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-69",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-70",
+        "variant": "concise_noul",
+        "tokens": 117
+      },
+      {
+        "id": "zh-main-70",
+        "variant": "concise_choice",
+        "tokens": 115
+      },
+      {
+        "id": "zh-main-71",
+        "variant": "concise_noul",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-71",
+        "variant": "concise_choice",
+        "tokens": 112
+      },
+      {
+        "id": "zh-main-72",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-72",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-73",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-73",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-74",
+        "variant": "concise_noul",
+        "tokens": 113
+      },
+      {
+        "id": "zh-main-74",
+        "variant": "concise_choice",
+        "tokens": 111
+      },
+      {
+        "id": "zh-main-75",
+        "variant": "concise_noul",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-75",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-76",
+        "variant": "concise_noul",
+        "tokens": 113
+      },
+      {
+        "id": "zh-main-76",
+        "variant": "concise_choice",
+        "tokens": 111
+      },
+      {
+        "id": "zh-main-77",
+        "variant": "concise_noul",
+        "tokens": 123
+      },
+      {
+        "id": "zh-main-77",
+        "variant": "concise_choice",
+        "tokens": 121
+      },
+      {
+        "id": "zh-main-78",
+        "variant": "concise_noul",
+        "tokens": 112
+      },
+      {
+        "id": "zh-main-78",
+        "variant": "concise_choice",
+        "tokens": 110
+      },
+      {
+        "id": "zh-main-79",
+        "variant": "concise_noul",
+        "tokens": 114
+      },
+      {
+        "id": "zh-main-79",
+        "variant": "concise_choice",
+        "tokens": 112
+      },
+      {
+        "id": "zh-cross-00",
+        "variant": "concise_noul",
+        "tokens": 111
+      },
+      {
+        "id": "zh-cross-00",
+        "variant": "concise_choice",
+        "tokens": 109
+      },
+      {
+        "id": "zh-cross-02",
+        "variant": "concise_noul",
+        "tokens": 114
+      },
+      {
+        "id": "zh-cross-02",
+        "variant": "concise_choice",
+        "tokens": 112
+      },
+      {
+        "id": "zh-cross-06",
+        "variant": "concise_noul",
+        "tokens": 120
+      },
+      {
+        "id": "zh-cross-06",
+        "variant": "concise_choice",
+        "tokens": 118
+      },
+      {
+        "id": "zh-cross-07",
+        "variant": "concise_noul",
+        "tokens": 119
+      },
+      {
+        "id": "zh-cross-07",
+        "variant": "concise_choice",
+        "tokens": 117
+      },
+      {
+        "id": "zh-cross-10",
+        "variant": "concise_noul",
+        "tokens": 111
+      },
+      {
+        "id": "zh-cross-10",
+        "variant": "concise_choice",
+        "tokens": 109
+      },
+      {
+        "id": "zh-cross-20",
+        "variant": "concise_noul",
+        "tokens": 116
+      },
+      {
+        "id": "zh-cross-20",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "zh-cross-23",
+        "variant": "concise_noul",
+        "tokens": 117
+      },
+      {
+        "id": "zh-cross-23",
+        "variant": "concise_choice",
+        "tokens": 115
+      },
+      {
+        "id": "zh-cross-26",
+        "variant": "concise_noul",
+        "tokens": 116
+      },
+      {
+        "id": "zh-cross-26",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "zh-mixed-0",
+        "variant": "concise_noul",
+        "tokens": 117
+      },
+      {
+        "id": "zh-mixed-0",
+        "variant": "concise_choice",
+        "tokens": 115
+      },
+      {
+        "id": "zh-mixed-1",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-mixed-1",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-mixed-2",
+        "variant": "concise_noul",
+        "tokens": 116
+      },
+      {
+        "id": "zh-mixed-2",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "zh-mixed-3",
+        "variant": "concise_noul",
+        "tokens": 116
+      },
+      {
+        "id": "zh-mixed-3",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "zh-ambiguous-0",
+        "variant": "concise_noul",
+        "tokens": 111
+      },
+      {
+        "id": "zh-ambiguous-0",
+        "variant": "concise_choice",
+        "tokens": 109
+      },
+      {
+        "id": "zh-ambiguous-1",
+        "variant": "concise_noul",
+        "tokens": 111
+      },
+      {
+        "id": "zh-ambiguous-1",
+        "variant": "concise_choice",
+        "tokens": 109
+      },
+      {
+        "id": "zh-ambiguous-2",
+        "variant": "concise_noul",
+        "tokens": 111
+      },
+      {
+        "id": "zh-ambiguous-2",
+        "variant": "concise_choice",
+        "tokens": 109
+      },
+      {
+        "id": "zh-ambiguous-3",
+        "variant": "concise_noul",
+        "tokens": 111
+      },
+      {
+        "id": "zh-ambiguous-3",
+        "variant": "concise_choice",
+        "tokens": 109
+      },
+      {
+        "id": "zh-ambiguous-4",
+        "variant": "concise_noul",
+        "tokens": 111
+      },
+      {
+        "id": "zh-ambiguous-4",
+        "variant": "concise_choice",
+        "tokens": 109
+      },
+      {
+        "id": "zh-ambiguous-5",
+        "variant": "concise_noul",
+        "tokens": 113
+      },
+      {
+        "id": "zh-ambiguous-5",
+        "variant": "concise_choice",
+        "tokens": 111
+      },
+      {
+        "id": "en-main-00",
+        "variant": "concise_noul",
+        "tokens": 117
+      },
+      {
+        "id": "en-main-00",
+        "variant": "concise_choice",
+        "tokens": 113
+      },
+      {
+        "id": "en-main-01",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "en-main-01",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "en-main-02",
+        "variant": "concise_noul",
+        "tokens": 120
+      },
+      {
+        "id": "en-main-02",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "en-main-03",
+        "variant": "concise_noul",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-03",
+        "variant": "concise_choice",
+        "tokens": 118
+      },
+      {
+        "id": "en-main-04",
+        "variant": "concise_noul",
+        "tokens": 123
+      },
+      {
+        "id": "en-main-04",
+        "variant": "concise_choice",
+        "tokens": 119
+      },
+      {
+        "id": "en-main-05",
+        "variant": "concise_noul",
+        "tokens": 126
+      },
+      {
+        "id": "en-main-05",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-06",
+        "variant": "concise_noul",
+        "tokens": 126
+      },
+      {
+        "id": "en-main-06",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-07",
+        "variant": "concise_noul",
+        "tokens": 125
+      },
+      {
+        "id": "en-main-07",
+        "variant": "concise_choice",
+        "tokens": 121
+      },
+      {
+        "id": "en-main-08",
+        "variant": "concise_noul",
+        "tokens": 126
+      },
+      {
+        "id": "en-main-08",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-09",
+        "variant": "concise_noul",
+        "tokens": 124
+      },
+      {
+        "id": "en-main-09",
+        "variant": "concise_choice",
+        "tokens": 120
+      },
+      {
+        "id": "en-main-10",
+        "variant": "concise_noul",
+        "tokens": 117
+      },
+      {
+        "id": "en-main-10",
+        "variant": "concise_choice",
+        "tokens": 113
+      },
+      {
+        "id": "en-main-11",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "en-main-11",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "en-main-12",
+        "variant": "concise_noul",
+        "tokens": 119
+      },
+      {
+        "id": "en-main-12",
+        "variant": "concise_choice",
+        "tokens": 115
+      },
+      {
+        "id": "en-main-13",
+        "variant": "concise_noul",
+        "tokens": 120
+      },
+      {
+        "id": "en-main-13",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "en-main-14",
+        "variant": "concise_noul",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-14",
+        "variant": "concise_choice",
+        "tokens": 118
+      },
+      {
+        "id": "en-main-15",
+        "variant": "concise_noul",
+        "tokens": 117
+      },
+      {
+        "id": "en-main-15",
+        "variant": "concise_choice",
+        "tokens": 113
+      },
+      {
+        "id": "en-main-16",
+        "variant": "concise_noul",
+        "tokens": 117
+      },
+      {
+        "id": "en-main-16",
+        "variant": "concise_choice",
+        "tokens": 113
+      },
+      {
+        "id": "en-main-17",
+        "variant": "concise_noul",
+        "tokens": 119
+      },
+      {
+        "id": "en-main-17",
+        "variant": "concise_choice",
+        "tokens": 115
+      },
+      {
+        "id": "en-main-18",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "en-main-18",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "en-main-19",
+        "variant": "concise_noul",
+        "tokens": 119
+      },
+      {
+        "id": "en-main-19",
+        "variant": "concise_choice",
+        "tokens": 115
+      },
+      {
+        "id": "en-main-20",
+        "variant": "concise_noul",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-20",
+        "variant": "concise_choice",
+        "tokens": 118
+      },
+      {
+        "id": "en-main-21",
+        "variant": "concise_noul",
+        "tokens": 123
+      },
+      {
+        "id": "en-main-21",
+        "variant": "concise_choice",
+        "tokens": 119
+      },
+      {
+        "id": "en-main-22",
+        "variant": "concise_noul",
+        "tokens": 121
+      },
+      {
+        "id": "en-main-22",
+        "variant": "concise_choice",
+        "tokens": 117
+      },
+      {
+        "id": "en-main-23",
+        "variant": "concise_noul",
+        "tokens": 123
+      },
+      {
+        "id": "en-main-23",
+        "variant": "concise_choice",
+        "tokens": 119
+      },
+      {
+        "id": "en-main-24",
+        "variant": "concise_noul",
+        "tokens": 124
+      },
+      {
+        "id": "en-main-24",
+        "variant": "concise_choice",
+        "tokens": 120
+      },
+      {
+        "id": "en-main-25",
+        "variant": "concise_noul",
+        "tokens": 125
+      },
+      {
+        "id": "en-main-25",
+        "variant": "concise_choice",
+        "tokens": 121
+      },
+      {
+        "id": "en-main-26",
+        "variant": "concise_noul",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-26",
+        "variant": "concise_choice",
+        "tokens": 118
+      },
+      {
+        "id": "en-main-27",
+        "variant": "concise_noul",
+        "tokens": 126
+      },
+      {
+        "id": "en-main-27",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-28",
+        "variant": "concise_noul",
+        "tokens": 120
+      },
+      {
+        "id": "en-main-28",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "en-main-29",
+        "variant": "concise_noul",
+        "tokens": 121
+      },
+      {
+        "id": "en-main-29",
+        "variant": "concise_choice",
+        "tokens": 117
+      },
+      {
+        "id": "en-main-30",
+        "variant": "concise_noul",
+        "tokens": 121
+      },
+      {
+        "id": "en-main-30",
+        "variant": "concise_choice",
+        "tokens": 117
+      },
+      {
+        "id": "en-main-31",
+        "variant": "concise_noul",
+        "tokens": 126
+      },
+      {
+        "id": "en-main-31",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-32",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "en-main-32",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "en-main-33",
+        "variant": "concise_noul",
+        "tokens": 119
+      },
+      {
+        "id": "en-main-33",
+        "variant": "concise_choice",
+        "tokens": 115
+      },
+      {
+        "id": "en-main-34",
+        "variant": "concise_noul",
+        "tokens": 120
+      },
+      {
+        "id": "en-main-34",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "en-main-35",
+        "variant": "concise_noul",
+        "tokens": 120
+      },
+      {
+        "id": "en-main-35",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "en-main-36",
+        "variant": "concise_noul",
+        "tokens": 119
+      },
+      {
+        "id": "en-main-36",
+        "variant": "concise_choice",
+        "tokens": 115
+      },
+      {
+        "id": "en-main-37",
+        "variant": "concise_noul",
+        "tokens": 121
+      },
+      {
+        "id": "en-main-37",
+        "variant": "concise_choice",
+        "tokens": 117
+      },
+      {
+        "id": "en-main-38",
+        "variant": "concise_noul",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-38",
+        "variant": "concise_choice",
+        "tokens": 118
+      },
+      {
+        "id": "en-main-39",
+        "variant": "concise_noul",
+        "tokens": 125
+      },
+      {
+        "id": "en-main-39",
+        "variant": "concise_choice",
+        "tokens": 121
+      },
+      {
+        "id": "en-main-40",
+        "variant": "concise_noul",
+        "tokens": 125
+      },
+      {
+        "id": "en-main-40",
+        "variant": "concise_choice",
+        "tokens": 121
+      },
+      {
+        "id": "en-main-41",
+        "variant": "concise_noul",
+        "tokens": 125
+      },
+      {
+        "id": "en-main-41",
+        "variant": "concise_choice",
+        "tokens": 121
+      },
+      {
+        "id": "en-main-42",
+        "variant": "concise_noul",
+        "tokens": 124
+      },
+      {
+        "id": "en-main-42",
+        "variant": "concise_choice",
+        "tokens": 120
+      },
+      {
+        "id": "en-main-43",
+        "variant": "concise_noul",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-43",
+        "variant": "concise_choice",
+        "tokens": 118
+      },
+      {
+        "id": "en-main-44",
+        "variant": "concise_noul",
+        "tokens": 127
+      },
+      {
+        "id": "en-main-44",
+        "variant": "concise_choice",
+        "tokens": 123
+      },
+      {
+        "id": "en-main-45",
+        "variant": "concise_noul",
+        "tokens": 125
+      },
+      {
+        "id": "en-main-45",
+        "variant": "concise_choice",
+        "tokens": 121
+      },
+      {
+        "id": "en-main-46",
+        "variant": "concise_noul",
+        "tokens": 127
+      },
+      {
+        "id": "en-main-46",
+        "variant": "concise_choice",
+        "tokens": 123
+      },
+      {
+        "id": "en-main-47",
+        "variant": "concise_noul",
+        "tokens": 127
+      },
+      {
+        "id": "en-main-47",
+        "variant": "concise_choice",
+        "tokens": 123
+      },
+      {
+        "id": "en-main-48",
+        "variant": "concise_noul",
+        "tokens": 124
+      },
+      {
+        "id": "en-main-48",
+        "variant": "concise_choice",
+        "tokens": 120
+      },
+      {
+        "id": "en-main-49",
+        "variant": "concise_noul",
+        "tokens": 125
+      },
+      {
+        "id": "en-main-49",
+        "variant": "concise_choice",
+        "tokens": 121
+      },
+      {
+        "id": "en-main-50",
+        "variant": "concise_noul",
+        "tokens": 126
+      },
+      {
+        "id": "en-main-50",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-51",
+        "variant": "concise_noul",
+        "tokens": 126
+      },
+      {
+        "id": "en-main-51",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-52",
+        "variant": "concise_noul",
+        "tokens": 125
+      },
+      {
+        "id": "en-main-52",
+        "variant": "concise_choice",
+        "tokens": 121
+      },
+      {
+        "id": "en-main-53",
+        "variant": "concise_noul",
+        "tokens": 128
+      },
+      {
+        "id": "en-main-53",
+        "variant": "concise_choice",
+        "tokens": 124
+      },
+      {
+        "id": "en-main-54",
+        "variant": "concise_noul",
+        "tokens": 126
+      },
+      {
+        "id": "en-main-54",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-55",
+        "variant": "concise_noul",
+        "tokens": 126
+      },
+      {
+        "id": "en-main-55",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-56",
+        "variant": "concise_noul",
+        "tokens": 124
+      },
+      {
+        "id": "en-main-56",
+        "variant": "concise_choice",
+        "tokens": 120
+      },
+      {
+        "id": "en-main-57",
+        "variant": "concise_noul",
+        "tokens": 126
+      },
+      {
+        "id": "en-main-57",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-58",
+        "variant": "concise_noul",
+        "tokens": 121
+      },
+      {
+        "id": "en-main-58",
+        "variant": "concise_choice",
+        "tokens": 117
+      },
+      {
+        "id": "en-main-59",
+        "variant": "concise_noul",
+        "tokens": 126
+      },
+      {
+        "id": "en-main-59",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-60",
+        "variant": "concise_noul",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-60",
+        "variant": "concise_choice",
+        "tokens": 118
+      },
+      {
+        "id": "en-main-61",
+        "variant": "concise_noul",
+        "tokens": 129
+      },
+      {
+        "id": "en-main-61",
+        "variant": "concise_choice",
+        "tokens": 125
+      },
+      {
+        "id": "en-main-62",
+        "variant": "concise_noul",
+        "tokens": 124
+      },
+      {
+        "id": "en-main-62",
+        "variant": "concise_choice",
+        "tokens": 120
+      },
+      {
+        "id": "en-main-63",
+        "variant": "concise_noul",
+        "tokens": 123
+      },
+      {
+        "id": "en-main-63",
+        "variant": "concise_choice",
+        "tokens": 119
+      },
+      {
+        "id": "en-main-64",
+        "variant": "concise_noul",
+        "tokens": 130
+      },
+      {
+        "id": "en-main-64",
+        "variant": "concise_choice",
+        "tokens": 126
+      },
+      {
+        "id": "en-main-65",
+        "variant": "concise_noul",
+        "tokens": 125
+      },
+      {
+        "id": "en-main-65",
+        "variant": "concise_choice",
+        "tokens": 121
+      },
+      {
+        "id": "en-main-66",
+        "variant": "concise_noul",
+        "tokens": 123
+      },
+      {
+        "id": "en-main-66",
+        "variant": "concise_choice",
+        "tokens": 119
+      },
+      {
+        "id": "en-main-67",
+        "variant": "concise_noul",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-67",
+        "variant": "concise_choice",
+        "tokens": 118
+      },
+      {
+        "id": "en-main-68",
+        "variant": "concise_noul",
+        "tokens": 123
+      },
+      {
+        "id": "en-main-68",
+        "variant": "concise_choice",
+        "tokens": 119
+      },
+      {
+        "id": "en-main-69",
+        "variant": "concise_noul",
+        "tokens": 126
+      },
+      {
+        "id": "en-main-69",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-70",
+        "variant": "concise_noul",
+        "tokens": 124
+      },
+      {
+        "id": "en-main-70",
+        "variant": "concise_choice",
+        "tokens": 120
+      },
+      {
+        "id": "en-main-71",
+        "variant": "concise_noul",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-71",
+        "variant": "concise_choice",
+        "tokens": 118
+      },
+      {
+        "id": "en-main-72",
+        "variant": "concise_noul",
+        "tokens": 125
+      },
+      {
+        "id": "en-main-72",
+        "variant": "concise_choice",
+        "tokens": 121
+      },
+      {
+        "id": "en-main-73",
+        "variant": "concise_noul",
+        "tokens": 126
+      },
+      {
+        "id": "en-main-73",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-74",
+        "variant": "concise_noul",
+        "tokens": 121
+      },
+      {
+        "id": "en-main-74",
+        "variant": "concise_choice",
+        "tokens": 117
+      },
+      {
+        "id": "en-main-75",
+        "variant": "concise_noul",
+        "tokens": 126
+      },
+      {
+        "id": "en-main-75",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "en-main-76",
+        "variant": "concise_noul",
+        "tokens": 121
+      },
+      {
+        "id": "en-main-76",
+        "variant": "concise_choice",
+        "tokens": 117
+      },
+      {
+        "id": "en-main-77",
+        "variant": "concise_noul",
+        "tokens": 132
+      },
+      {
+        "id": "en-main-77",
+        "variant": "concise_choice",
+        "tokens": 128
+      },
+      {
+        "id": "en-main-78",
+        "variant": "concise_noul",
+        "tokens": 121
+      },
+      {
+        "id": "en-main-78",
+        "variant": "concise_choice",
+        "tokens": 117
+      },
+      {
+        "id": "en-main-79",
+        "variant": "concise_noul",
+        "tokens": 123
+      },
+      {
+        "id": "en-main-79",
+        "variant": "concise_choice",
+        "tokens": 119
+      },
+      {
+        "id": "en-cross-00",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "en-cross-00",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "en-cross-02",
+        "variant": "concise_noul",
+        "tokens": 120
+      },
+      {
+        "id": "en-cross-02",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "en-cross-06",
+        "variant": "concise_noul",
+        "tokens": 125
+      },
+      {
+        "id": "en-cross-06",
+        "variant": "concise_choice",
+        "tokens": 121
+      },
+      {
+        "id": "en-cross-07",
+        "variant": "concise_noul",
+        "tokens": 123
+      },
+      {
+        "id": "en-cross-07",
+        "variant": "concise_choice",
+        "tokens": 119
+      },
+      {
+        "id": "en-cross-10",
+        "variant": "concise_noul",
+        "tokens": 117
+      },
+      {
+        "id": "en-cross-10",
+        "variant": "concise_choice",
+        "tokens": 113
+      },
+      {
+        "id": "en-cross-20",
+        "variant": "concise_noul",
+        "tokens": 121
+      },
+      {
+        "id": "en-cross-20",
+        "variant": "concise_choice",
+        "tokens": 117
+      },
+      {
+        "id": "en-cross-23",
+        "variant": "concise_noul",
+        "tokens": 123
+      },
+      {
+        "id": "en-cross-23",
+        "variant": "concise_choice",
+        "tokens": 119
+      },
+      {
+        "id": "en-cross-26",
+        "variant": "concise_noul",
+        "tokens": 121
+      },
+      {
+        "id": "en-cross-26",
+        "variant": "concise_choice",
+        "tokens": 117
+      },
+      {
+        "id": "en-mixed-0",
+        "variant": "concise_noul",
+        "tokens": 126
+      },
+      {
+        "id": "en-mixed-0",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "en-mixed-1",
+        "variant": "concise_noul",
+        "tokens": 125
+      },
+      {
+        "id": "en-mixed-1",
+        "variant": "concise_choice",
+        "tokens": 121
+      },
+      {
+        "id": "en-mixed-2",
+        "variant": "concise_noul",
+        "tokens": 122
+      },
+      {
+        "id": "en-mixed-2",
+        "variant": "concise_choice",
+        "tokens": 118
+      },
+      {
+        "id": "en-mixed-3",
+        "variant": "concise_noul",
+        "tokens": 121
+      },
+      {
+        "id": "en-mixed-3",
+        "variant": "concise_choice",
+        "tokens": 117
+      },
+      {
+        "id": "en-ambiguous-0",
+        "variant": "concise_noul",
+        "tokens": 117
+      },
+      {
+        "id": "en-ambiguous-0",
+        "variant": "concise_choice",
+        "tokens": 113
+      },
+      {
+        "id": "en-ambiguous-1",
+        "variant": "concise_noul",
+        "tokens": 117
+      },
+      {
+        "id": "en-ambiguous-1",
+        "variant": "concise_choice",
+        "tokens": 113
+      },
+      {
+        "id": "en-ambiguous-2",
+        "variant": "concise_noul",
+        "tokens": 117
+      },
+      {
+        "id": "en-ambiguous-2",
+        "variant": "concise_choice",
+        "tokens": 113
+      },
+      {
+        "id": "en-ambiguous-3",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "en-ambiguous-3",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "en-ambiguous-4",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "en-ambiguous-4",
+        "variant": "concise_choice",
+        "tokens": 114
+      },
+      {
+        "id": "en-ambiguous-5",
+        "variant": "concise_noul",
+        "tokens": 119
+      },
+      {
+        "id": "en-ambiguous-5",
+        "variant": "concise_choice",
+        "tokens": 115
+      }
+    ]
+  },
+  "current": {
+    "inputSHA256": "aa515f6304331e44b4bf4d6c8f9f0d6830810e0d974abe53918c4e59909f5c85",
+    "rows": [
+      {
+        "id": "zh-main-00-h0",
+        "variant": "concise_noul",
+        "tokens": 120
+      },
+      {
+        "id": "zh-main-00-h0",
+        "variant": "concise_choice",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-01-h0",
+        "variant": "concise_noul",
+        "tokens": 124
+      },
+      {
+        "id": "zh-main-01-h0",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "zh-main-02-h0",
+        "variant": "concise_noul",
+        "tokens": 126
+      },
+      {
+        "id": "zh-main-02-h0",
+        "variant": "concise_choice",
+        "tokens": 124
+      },
+      {
+        "id": "zh-main-03-h0",
+        "variant": "concise_noul",
+        "tokens": 125
+      },
+      {
+        "id": "zh-main-03-h0",
+        "variant": "concise_choice",
+        "tokens": 123
+      },
+      {
+        "id": "zh-main-04-h0",
+        "variant": "concise_noul",
+        "tokens": 123
+      },
+      {
+        "id": "zh-main-04-h0",
+        "variant": "concise_choice",
+        "tokens": 121
+      },
+      {
+        "id": "zh-main-05-h0",
+        "variant": "concise_noul",
+        "tokens": 122
+      },
+      {
+        "id": "zh-main-05-h0",
+        "variant": "concise_choice",
+        "tokens": 120
+      },
+      {
+        "id": "zh-main-06-h0",
+        "variant": "concise_noul",
+        "tokens": 121
+      },
+      {
+        "id": "zh-main-06-h0",
+        "variant": "concise_choice",
+        "tokens": 119
+      },
+      {
+        "id": "zh-main-07-h0",
+        "variant": "concise_noul",
+        "tokens": 123
+      },
+      {
+        "id": "zh-main-07-h0",
+        "variant": "concise_choice",
+        "tokens": 121
+      },
+      {
+        "id": "zh-main-08-h0",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-08-h0",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-09-h0",
+        "variant": "concise_noul",
+        "tokens": 119
+      },
+      {
+        "id": "zh-main-09-h0",
+        "variant": "concise_choice",
+        "tokens": 117
+      },
+      {
+        "id": "zh-main-10-h0",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-10-h0",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-11-h0",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-11-h0",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-12-h0",
+        "variant": "concise_noul",
+        "tokens": 120
+      },
+      {
+        "id": "zh-main-12-h0",
+        "variant": "concise_choice",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-13-h0",
+        "variant": "concise_noul",
+        "tokens": 122
+      },
+      {
+        "id": "zh-main-13-h0",
+        "variant": "concise_choice",
+        "tokens": 120
+      },
+      {
+        "id": "zh-main-14-h0",
+        "variant": "concise_noul",
+        "tokens": 124
+      },
+      {
+        "id": "zh-main-14-h0",
+        "variant": "concise_choice",
+        "tokens": 122
+      },
+      {
+        "id": "zh-main-15-h0",
+        "variant": "concise_noul",
+        "tokens": 120
+      },
+      {
+        "id": "zh-main-15-h0",
+        "variant": "concise_choice",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-16-h0",
+        "variant": "concise_noul",
+        "tokens": 123
+      },
+      {
+        "id": "zh-main-16-h0",
+        "variant": "concise_choice",
+        "tokens": 121
+      },
+      {
+        "id": "zh-main-17-h0",
+        "variant": "concise_noul",
+        "tokens": 129
+      },
+      {
+        "id": "zh-main-17-h0",
+        "variant": "concise_choice",
+        "tokens": 127
+      },
+      {
+        "id": "zh-main-18-h0",
+        "variant": "concise_noul",
+        "tokens": 123
+      },
+      {
+        "id": "zh-main-18-h0",
+        "variant": "concise_choice",
+        "tokens": 121
+      },
+      {
+        "id": "zh-main-19-h0",
+        "variant": "concise_noul",
+        "tokens": 123
+      },
+      {
+        "id": "zh-main-19-h0",
+        "variant": "concise_choice",
+        "tokens": 121
+      },
+      {
+        "id": "zh-main-20-h0",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-20-h0",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-21-h0",
+        "variant": "concise_noul",
+        "tokens": 119
+      },
+      {
+        "id": "zh-main-21-h0",
+        "variant": "concise_choice",
+        "tokens": 117
+      },
+      {
+        "id": "zh-main-22-h0",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-22-h0",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-main-23-h0",
+        "variant": "concise_noul",
+        "tokens": 118
+      },
+      {
+        "id": "zh-main-23-h0",
+        "variant": "concise_choice",
+        "tokens": 116
+      },
+      {
+        "id": "zh-cross-00-h0",
+        "variant": "concise_noul",
+        "tokens": 121
+      },
+      {
+        "id": "zh-cross-00-h0",
+        "variant": "concise_choice",
+        "tokens": 119
+      },
+      {
+        "id": "zh-cross-04-h0",
+        "variant": "concise_noul",
+        "tokens": 122
+      },
+      {
+        "id": "zh-cross-04-h0",
+        "variant": "concise_choice",
+        "tokens": 120
+      },
+      {
+        "id": "zh-cross-14-h0",
+        "variant": "concise_noul",
+        "tokens": 125
+      },
+      {
+        "id": "zh-cross-14-h0",
+        "variant": "concise_choice",
+        "tokens": 123
+      },
+      {
+        "id": "zh-cross-16-h0",
+        "variant": "concise_noul",
+        "tokens": 125
+      },
+      {
+        "id": "zh-cross-16-h0",
+        "variant": "concise_choice",
+        "tokens": 123
+      },
+      {
+        "id": "en-main-00-h0",
+        "variant": "concise_noul",
+        "tokens": 127
+      },
+      {
+        "id": "en-main-00-h0",
+        "variant": "concise_choice",
+        "tokens": 123
+      },
+      {
+        "id": "en-main-01-h0",
+        "variant": "concise_noul",
+        "tokens": 133
+      },
+      {
+        "id": "en-main-01-h0",
+        "variant": "concise_choice",
+        "tokens": 129
+      },
+      {
+        "id": "en-main-02-h0",
+        "variant": "concise_noul",
+        "tokens": 133
+      },
+      {
+        "id": "en-main-02-h0",
+        "variant": "concise_choice",
+        "tokens": 129
+      },
+      {
+        "id": "en-main-03-h0",
+        "variant": "concise_noul",
+        "tokens": 135
+      },
+      {
+        "id": "en-main-03-h0",
+        "variant": "concise_choice",
+        "tokens": 131
+      },
+      {
+        "id": "en-main-04-h0",
+        "variant": "concise_noul",
+        "tokens": 129
+      },
+      {
+        "id": "en-main-04-h0",
+        "variant": "concise_choice",
+        "tokens": 125
+      },
+      {
+        "id": "en-main-05-h0",
+        "variant": "concise_noul",
+        "tokens": 135
+      },
+      {
+        "id": "en-main-05-h0",
+        "variant": "concise_choice",
+        "tokens": 131
+      },
+      {
+        "id": "en-main-06-h0",
+        "variant": "concise_noul",
+        "tokens": 133
+      },
+      {
+        "id": "en-main-06-h0",
+        "variant": "concise_choice",
+        "tokens": 129
+      },
+      {
+        "id": "en-main-07-h0",
+        "variant": "concise_noul",
+        "tokens": 132
+      },
+      {
+        "id": "en-main-07-h0",
+        "variant": "concise_choice",
+        "tokens": 128
+      },
+      {
+        "id": "en-main-08-h0",
+        "variant": "concise_noul",
+        "tokens": 128
+      },
+      {
+        "id": "en-main-08-h0",
+        "variant": "concise_choice",
+        "tokens": 124
+      },
+      {
+        "id": "en-main-09-h0",
+        "variant": "concise_noul",
+        "tokens": 128
+      },
+      {
+        "id": "en-main-09-h0",
+        "variant": "concise_choice",
+        "tokens": 124
+      },
+      {
+        "id": "en-main-10-h0",
+        "variant": "concise_noul",
+        "tokens": 129
+      },
+      {
+        "id": "en-main-10-h0",
+        "variant": "concise_choice",
+        "tokens": 125
+      },
+      {
+        "id": "en-main-11-h0",
+        "variant": "concise_noul",
+        "tokens": 129
+      },
+      {
+        "id": "en-main-11-h0",
+        "variant": "concise_choice",
+        "tokens": 125
+      },
+      {
+        "id": "en-main-12-h0",
+        "variant": "concise_noul",
+        "tokens": 130
+      },
+      {
+        "id": "en-main-12-h0",
+        "variant": "concise_choice",
+        "tokens": 126
+      },
+      {
+        "id": "en-main-13-h0",
+        "variant": "concise_noul",
+        "tokens": 133
+      },
+      {
+        "id": "en-main-13-h0",
+        "variant": "concise_choice",
+        "tokens": 129
+      },
+      {
+        "id": "en-main-14-h0",
+        "variant": "concise_noul",
+        "tokens": 132
+      },
+      {
+        "id": "en-main-14-h0",
+        "variant": "concise_choice",
+        "tokens": 128
+      },
+      {
+        "id": "en-main-15-h0",
+        "variant": "concise_noul",
+        "tokens": 131
+      },
+      {
+        "id": "en-main-15-h0",
+        "variant": "concise_choice",
+        "tokens": 127
+      },
+      {
+        "id": "en-main-16-h0",
+        "variant": "concise_noul",
+        "tokens": 132
+      },
+      {
+        "id": "en-main-16-h0",
+        "variant": "concise_choice",
+        "tokens": 128
+      },
+      {
+        "id": "en-main-17-h0",
+        "variant": "concise_noul",
+        "tokens": 143
+      },
+      {
+        "id": "en-main-17-h0",
+        "variant": "concise_choice",
+        "tokens": 139
+      },
+      {
+        "id": "en-main-18-h0",
+        "variant": "concise_noul",
+        "tokens": 132
+      },
+      {
+        "id": "en-main-18-h0",
+        "variant": "concise_choice",
+        "tokens": 128
+      },
+      {
+        "id": "en-main-19-h0",
+        "variant": "concise_noul",
+        "tokens": 133
+      },
+      {
+        "id": "en-main-19-h0",
+        "variant": "concise_choice",
+        "tokens": 129
+      },
+      {
+        "id": "en-main-20-h0",
+        "variant": "concise_noul",
+        "tokens": 128
+      },
+      {
+        "id": "en-main-20-h0",
+        "variant": "concise_choice",
+        "tokens": 124
+      },
+      {
+        "id": "en-main-21-h0",
+        "variant": "concise_noul",
+        "tokens": 128
+      },
+      {
+        "id": "en-main-21-h0",
+        "variant": "concise_choice",
+        "tokens": 124
+      },
+      {
+        "id": "en-main-22-h0",
+        "variant": "concise_noul",
+        "tokens": 129
+      },
+      {
+        "id": "en-main-22-h0",
+        "variant": "concise_choice",
+        "tokens": 125
+      },
+      {
+        "id": "en-main-23-h0",
+        "variant": "concise_noul",
+        "tokens": 129
+      },
+      {
+        "id": "en-main-23-h0",
+        "variant": "concise_choice",
+        "tokens": 125
+      },
+      {
+        "id": "en-cross-00-h0",
+        "variant": "concise_noul",
+        "tokens": 129
+      },
+      {
+        "id": "en-cross-00-h0",
+        "variant": "concise_choice",
+        "tokens": 125
+      },
+      {
+        "id": "en-cross-04-h0",
+        "variant": "concise_noul",
+        "tokens": 132
+      },
+      {
+        "id": "en-cross-04-h0",
+        "variant": "concise_choice",
+        "tokens": 128
+      },
+      {
+        "id": "en-cross-14-h0",
+        "variant": "concise_noul",
+        "tokens": 133
+      },
+      {
+        "id": "en-cross-14-h0",
+        "variant": "concise_choice",
+        "tokens": 129
+      },
+      {
+        "id": "en-cross-16-h0",
+        "variant": "concise_noul",
+        "tokens": 132
+      },
+      {
+        "id": "en-cross-16-h0",
+        "variant": "concise_choice",
+        "tokens": 128
+      }
+    ]
+  }
+}

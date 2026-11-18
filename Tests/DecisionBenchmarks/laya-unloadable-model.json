@@ -1,0 +1,62 @@
+{
+  "repository": "ahmedandaloes/laya-multilingual-CoreAI",
+  "revision": "b347e24ceca82f2bf8ee185de282fea28c2c64cf",
+  "directory": "LayaMultilingual",
+  "files": [
+    {
+      "path": "config.json",
+      "size": 160,
+      "sha256": "7add7c041b53f7091e65908553af79ab3f077946e5f2312d510ae13b17c7c134"
+    },
+    {
+      "path": "decision.aimodel/main.hash",
+      "size": 32,
+      "sha256": "389eb150db9a942fb9ab0419e7e24415222b12f22eddfe51a19faca7f2523b6b"
+    },
+    {
+      "path": "decision.aimodel/main.mlirb",
+      "size": 1288452883,
+      "sha256": "a9b06d2c22e0155b04862e8cf17ffa14f6bb2e3ae761c5f0f83fd4e2955994f2"
+    },
+    {
+      "path": "decision.aimodel/metadata.json",
+      "size": 105,
+      "sha256": "e0a16c0a1ff756009fca7a3c87e4abe86c6f169a4c2403aa68a8a9ba03d7ddd3"
+    },
+    {
+      "path": "encoder/config.json",
+      "size": 1938,
+      "sha256": "83f6916d13ef0f556ac461f28308dc2bffa7ebeadee8ec9e2db5812020ea5bb4"
+    },
+    {
+      "path": "laya_coreai.py",
+      "size": 8500,
+      "sha256": "358bb5b7df07a41895fa9f6e88b7704b802ef99b2511c368c3b2454f8845be21"
+    },
+    {
+      "path": "manifest.json",
+      "size": 696,
+      "sha256": "eda2531ab0668aa8e77f006432e79b27d0b7f31895e3245cf9fdb80a812067d4"
+    },
+    {
+      "path": "rl_agent_config.json",
+      "size": 472,
+      "sha256": "25061739243b617ad88d1219ba6f8a9c86c5881ca28df024fa2d9b3b2fcc30c6"
+    },
+    {
+      "path": "tokenizer/tokenizer.json",
+      "size": 34363188,
+      "sha256": "609d8f4c067cd3950f88594c5a802616cea245823836ef5848ee4fc40aab5b6f"
+    },
+    {
+      "path": "tokenizer/tokenizer_config.json",
+      "size": 524,
+      "sha256": "6c6b2d8e3c84ce0e671c129cd6b374b235d6f9863042a5836358d00a89bbb5a1"
+    }
+  ],
+  "hostPackage": {
+    "filename": "laya-0.4.2-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/a6/d1/8d1d18b6645c729612a2e3008cba79b6b1fa1420b6a5df026650df2a7321/laya-0.4.2-py3-none-any.whl",
+    "sha256": "126284550840e8fc2445f9cd4c808e505d25d457242e7de5658b2cb9f9155b26"
+  }
+}

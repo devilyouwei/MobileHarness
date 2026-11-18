@@ -2259,6 +2259,7 @@ func multiSourceActionResultsAndUserInputShareOneRequestAfterSettlement(fail: Bo
         try await Task.sleep(for: .milliseconds(5))
     }
     try #require(await gate.count == 2)
+    #expect(await classifier.requests.isEmpty)
     try await harness.agent.receive(.init(id: "follow-up", sessionID: "settlement", payload: .text("补充要求")))
     try await Task.sleep(for: .milliseconds(150))
     #expect(await harness.model.requests.count == 1)
@@ -2282,10 +2283,10 @@ func multiSourceActionResultsAndUserInputShareOneRequestAfterSettlement(fail: Bo
     }
     #expect(await harness.model.requests.count == 2)
     for _ in 0..<1000 {
-        if await classifier.requests.count == 2 { break }
+        if await classifier.requests.count == 1 { break }
         try await Task.sleep(for: .milliseconds(5))
     }
-    #expect(await classifier.requests.count == 2)
+    #expect(await classifier.requests.count == 1)
     await decision.stop()
     await harness.close()
     pump.cancel()

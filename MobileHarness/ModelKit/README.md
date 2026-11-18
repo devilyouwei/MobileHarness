@@ -30,6 +30,7 @@ flowchart LR
 | Language, Speech, Vision contracts | Typed capability requests/results; part of ModelKit |
 | Support/Backends/CoreAI | Generic stateless graph/tensor runtime; ModelKitCoreAI |
 | Support/Backends/CoreML | Generic named tensor runtime; ModelKitCoreML |
+| [Support/Config](Support/Config/README.md) | Single bundled artifact catalog and declaration parsing/validation; ModelKitRuntime |
 | Support/Management | Generic registration/lifecycle/artifacts in ModelKitRuntime; model registration and selection in ModelKitDefaults; disjoint explicit source lists |
 | Support/Management/HuggingFace | Hugging Face downloader; ModelKitHub |
 | Support/Speech/Apple | PCMCodec shared by Apple ASR/TTS in ModelKitAppleSpeech |
@@ -130,7 +131,7 @@ The existing speech selector accepts a host-provided locale reader for automatic
 | Synthesis | Enabled, installed and available MOSS Nano; otherwise Apple PCM TTS |
 | Voice activity | Installed and available Silero; otherwise Energy, independent of ASR preference |
 | Pose | YOLO26n-Pose |
-| Decision | D3 Edge and Vela 3 Fast when the selected artifact and platform are available. Agents owns the exclusive local or cloud selection and enqueues with an error notice on failure; ModelKit never switches providers. |
+| Decision | D3 Edge, Vela 3 Fast, Vela 3.1 Fast and Laya Multilingual when the selected artifact and platform are available. Agents owns the exclusive local or cloud selection and enqueues with an error notice on failure; ModelKit never switches providers. |
 
 Custom ASR/TTS switches default off and are independent. Kokoro is an explicitly provisioned optional provider without Defaults registration. Selection occurs before admission; failure during active inference never switches provider. Local inference never initiates artifact downloads. The simulator local-chat binding reports unavailable; the Gemma package's native framework requirements still apply at compilation.
 
@@ -213,7 +214,7 @@ ModelLanguageProviding.chatModel(configuration:) 返回固定配置的轻量 Cha
 
 ## Decision 能力
 
-language.decision 默认 D3 Edge；decisionModel(id) 可选 Vela 3 Fast。DecisionCapability 同时提供 choice 和 noul，ModelKitD3 封装 D3/Vela 原生格式，基础 ModelKit 的 ChatDecision 提供通用聊天布尔/候选适配。ModelKit 不执行上层打断策略，不自动切换模型。独立资源租约及取消清理见 [JEV](Language/JEV/README.md)。
+language.decision 默认 D3 Edge；decisionModel(id) 可选 Vela 3 Fast、Vela 3.1 Fast 和 Laya Multilingual。DecisionCapability 同时提供 choice 和 noul，ModelKitD3 封装 D3/Vela/Laya 原生格式，基础 ModelKit 的 ChatDecision 提供通用聊天布尔/候选适配。ModelKit 不执行上层打断策略，不自动切换模型。独立资源租约及取消清理见 [JEV](Language/JEV/README.md)。
 
 Chat 的可选 onDispatch 回调报告实际 HTTP/本地推理开始边界，供上层原子持久化请求；详见 [LLM](Language/LLM/README.md)。
 

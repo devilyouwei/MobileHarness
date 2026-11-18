@@ -27,7 +27,7 @@ D3 的 noul 编码使用官方 No / false、Yes / true；Vela 使用 no、yes。
 
 `decide(MultiDecisionRequest)` 与 choice、noul 并列，共享 text 和 InferenceContext；questions 按数组排列，1–32 题，ID 唯一且非空。DecisionQuestion.Kind 可混合 choice(instructions:candidates:) 与 noul(instructions:)。MultiDecisionResult.answers 按问题 ID 返回 DecisionAnswer.choice / .noul。
 
-默认实现顺序调用提供者自身的单题接口，各题独立推理，不共享编码或合并成一次图执行。会话拥有任务，输出容量为一个聚合结果；任一题失败停止后续题并传播错误，不发部分结果。取消会加入当前子会话清理，不再开始后续题。每题必须恰好返回一个结果。D3、Vela、ChatDecision 共用此执行机制，保留各自单题格式。ModelDecisionContainer 转发给所选 provider；Assistant 只使用 noul，不调用此接口。
+默认实现顺序调用提供者自身的单题接口，各题独立推理，不共享编码或合并成一次图执行。会话拥有任务，输出容量为一个聚合结果；任一题失败停止后续题并传播错误，不发部分结果。取消会加入当前子会话清理，不再开始后续题。每题必须恰好返回一个结果。D3、Vela 3/3.1、Laya、ChatDecision 共用此执行机制，保留各自单题格式。ModelDecisionContainer 转发给所选 provider；Assistant 只使用 noul，不调用此接口。
 
 ```swift
 let request = try MultiDecisionRequest(text: "请停一下，改成中文。", questions: [
@@ -41,3 +41,16 @@ try await session.withCleanup {
     }
 }
 ```
+
+
+## Vela 3.1 与 Laya
+
+同一DecisionCapability还由Vela31Decision（vela3.1-fast/Vela31Fast）和LayaDecision（laya-multilingual/LayaMultilingual）提供。注册、下载、选中、资源保留、取消加入及卸载沿用既有模型生命周期，失败不切换其他模型。Assistant只调用noul，所有provider支持默认顺序多问题decide。
+
+Vela31Decision解析full-coreai/1 manifest中的decision组件，按F32 safetensors的映射绑定只读weight输入；CPU-only图接收input_ids、attention_mask、q_index、opt_index、unit_index、ent_index，返回候选logits。q_index保留Q位置及正文pool区间，候选按O位置读出。noul保持no/yes两项，32768 token容量超限抛错，不截断。
+
+LayaDecision接收平台对应bundle根目录；App下载iOS portable JIT wfp16-s512源图，用stripPrefix安装到LayaMultilingual。Mac实验直接传入macos/wfp16-s512目录，不能加载iOS图。GPU公开specialization加载一次模型并共享main/act函数。序列为CLS/type question/instructions/SEP/MASK options/SEP/state/SEP，右填充512。候选至多48 token、问题及候选head预算256；凡上游会截掉正文/问题/选项的请求明确拒绝。按发布协议处理文本中的mask字面量，不加入业务噪声词表。
+
+Laya的choice与noul具有不同qtype_onehot和原生选项；noul用false/true解释文本，并从true概率读取布尔值。main输出token_logits及pooled_cls，host在marker处取值并构造act四维特征；act输出验证后不作为上层路由覆盖。候选温度先按type/候选数量分桶，再用制品声明的type温度；按发布协议四位小数、noul严格>0.5。choice保持argmax。输入失败、加载失败、取消或非法输出均传播错误，不制造false或代替分类。
+
+LayaTokenizer在内存中将发布Metaspace的prepend_scheme=always映射为当前swift-transformers所需的add_prefix_space=true；不修改下载文件。该兼容层仅适用于声明了该契约的Laya tokenizer，防止词首token差异改变模型语义。

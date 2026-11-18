@@ -1,0 +1,7651 @@
+{
+  "model": "vela31",
+  "variant": "noul_defined",
+  "inputSHA256": "33bd58453577d497e963fa46228e9ec46ec33c828911150721cbd0eb105d3be3",
+  "rows": [
+    {
+      "id": "zh-main-00",
+      "locale": "zh",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8988993956470264,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8988993956470264
+          }
+        },
+        "usage": {
+          "input_tokens": 297,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 297,
+      "milliseconds": 304.44637502660044
+    },
+    {
+      "id": "zh-main-01",
+      "locale": "zh",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.002800320377151978,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.002800320377151978
+          }
+        },
+        "usage": {
+          "input_tokens": 297,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 297,
+      "milliseconds": 300.95004200120457
+    },
+    {
+      "id": "zh-main-02",
+      "locale": "zh",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9931896412853826,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9931896412853826
+          }
+        },
+        "usage": {
+          "input_tokens": 307,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 307,
+      "milliseconds": 317.08937499206513
+    },
+    {
+      "id": "zh-main-03",
+      "locale": "zh",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.18427901118774928,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.18427901118774928
+          }
+        },
+        "usage": {
+          "input_tokens": 304,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 304,
+      "milliseconds": 310.01766698318534
+    },
+    {
+      "id": "zh-main-04",
+      "locale": "zh",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.7479858943175596,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.7479858943175596
+          }
+        },
+        "usage": {
+          "input_tokens": 311,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 311,
+      "milliseconds": 326.417375006713
+    },
+    {
+      "id": "zh-main-05",
+      "locale": "zh",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8824149058893451,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8824149058893451
+          }
+        },
+        "usage": {
+          "input_tokens": 318,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 318,
+      "milliseconds": 332.4850420176517
+    },
+    {
+      "id": "zh-main-06",
+      "locale": "zh",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.003374819651343512,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.003374819651343512
+          }
+        },
+        "usage": {
+          "input_tokens": 315,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 315,
+      "milliseconds": 319.45816698134877
+    },
+    {
+      "id": "zh-main-07",
+      "locale": "zh",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.23139492399833247,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.23139492399833247
+          }
+        },
+        "usage": {
+          "input_tokens": 317,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 317,
+      "milliseconds": 318.021332990611
+    },
+    {
+      "id": "zh-main-08",
+      "locale": "zh",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0033599003076211303,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0033599003076211303
+          }
+        },
+        "usage": {
+          "input_tokens": 315,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 315,
+      "milliseconds": 319.36491598025896
+    },
+    {
+      "id": "zh-main-09",
+      "locale": "zh",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.02132413560720863,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.02132413560720863
+          }
+        },
+        "usage": {
+          "input_tokens": 314,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 314,
+      "milliseconds": 318.4349579969421
+    },
+    {
+      "id": "zh-main-10",
+      "locale": "zh",
+      "language": "zh",
+      "group": "greeting",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.004389526484408972,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.004389526484408972
+          }
+        },
+        "usage": {
+          "input_tokens": 296,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 296,
+      "milliseconds": 306.60625000018626
+    },
+    {
+      "id": "zh-main-11",
+      "locale": "zh",
+      "language": "zh",
+      "group": "greeting",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.006537559742750599,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.006537559742750599
+          }
+        },
+        "usage": {
+          "input_tokens": 297,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 297,
+      "milliseconds": 310.1667079899926
+    },
+    {
+      "id": "zh-main-12",
+      "locale": "zh",
+      "language": "zh",
+      "group": "request",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.012074577355676746,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.012074577355676746
+          }
+        },
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 300,
+      "milliseconds": 321.40729200909846
+    },
+    {
+      "id": "zh-main-13",
+      "locale": "zh",
+      "language": "zh",
+      "group": "request",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.011190571221558282,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.011190571221558282
+          }
+        },
+        "usage": {
+          "input_tokens": 313,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 313,
+      "milliseconds": 320.33637500717305
+    },
+    {
+      "id": "zh-main-14",
+      "locale": "zh",
+      "language": "zh",
+      "group": "question",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0026284793813493063,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0026284793813493063
+          }
+        },
+        "usage": {
+          "input_tokens": 309,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 309,
+      "milliseconds": 318.2346249814145
+    },
+    {
+      "id": "zh-main-15",
+      "locale": "zh",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.005870164339599631,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.005870164339599631
+          }
+        },
+        "usage": {
+          "input_tokens": 298,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 298,
+      "milliseconds": 314.66045801062137
+    },
+    {
+      "id": "zh-main-16",
+      "locale": "zh",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.005641916525309074,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.005641916525309074
+          }
+        },
+        "usage": {
+          "input_tokens": 294,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 294,
+      "milliseconds": 316.7020829860121
+    },
+    {
+      "id": "zh-main-17",
+      "locale": "zh",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.003030159845737626,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.003030159845737626
+          }
+        },
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 300,
+      "milliseconds": 365.10225001256913
+    },
+    {
+      "id": "zh-main-18",
+      "locale": "zh",
+      "language": "zh",
+      "group": "unfinished",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.015734466020826784,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.015734466020826784
+          }
+        },
+        "usage": {
+          "input_tokens": 298,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 298,
+      "milliseconds": 355.8020410127938
+    },
+    {
+      "id": "zh-main-19",
+      "locale": "zh",
+      "language": "zh",
+      "group": "unfinished",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.02119090576708306,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.02119090576708306
+          }
+        },
+        "usage": {
+          "input_tokens": 304,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 304,
+      "milliseconds": 326.60949998535216
+    },
+    {
+      "id": "zh-main-20",
+      "locale": "zh",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0078548261471263,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0078548261471263
+          }
+        },
+        "usage": {
+          "input_tokens": 304,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 304,
+      "milliseconds": 323.4712080156896
+    },
+    {
+      "id": "zh-main-21",
+      "locale": "zh",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.04362470447589385,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.04362470447589385
+          }
+        },
+        "usage": {
+          "input_tokens": 305,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 305,
+      "milliseconds": 325.22229201276787
+    },
+    {
+      "id": "zh-main-22",
+      "locale": "zh",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.010770531190434586,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.010770531190434586
+          }
+        },
+        "usage": {
+          "input_tokens": 306,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 306,
+      "milliseconds": 328.491666004993
+    },
+    {
+      "id": "zh-main-23",
+      "locale": "zh",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.1395313530886186,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.1395313530886186
+          }
+        },
+        "usage": {
+          "input_tokens": 311,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 311,
+      "milliseconds": 326.8028750026133
+    },
+    {
+      "id": "zh-main-24",
+      "locale": "zh",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.11237086350190953,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.11237086350190953
+          }
+        },
+        "usage": {
+          "input_tokens": 312,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 312,
+      "milliseconds": 343.13624998321757
+    },
+    {
+      "id": "zh-main-25",
+      "locale": "zh",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.6167673436692094,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.6167673436692094
+          }
+        },
+        "usage": {
+          "input_tokens": 314,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 314,
+      "milliseconds": 333.83445799699984
+    },
+    {
+      "id": "zh-main-26",
+      "locale": "zh",
+      "language": "zh",
+      "group": "deferred",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.7290277384935917,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.7290277384935917
+          }
+        },
+        "usage": {
+          "input_tokens": 306,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 306,
+      "milliseconds": 325.62233300996013
+    },
+    {
+      "id": "zh-main-27",
+      "locale": "zh",
+      "language": "zh",
+      "group": "deferred",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0060966823069185236,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0060966823069185236
+          }
+        },
+        "usage": {
+          "input_tokens": 311,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 311,
+      "milliseconds": 327.5584170187358
+    },
+    {
+      "id": "zh-main-28",
+      "locale": "zh",
+      "language": "zh",
+      "group": "addition",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0065882032740116276,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0065882032740116276
+          }
+        },
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 300,
+      "milliseconds": 323.28720900113694
+    },
+    {
+      "id": "zh-main-29",
+      "locale": "zh",
+      "language": "zh",
+      "group": "addition",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.004044486907460527,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.004044486907460527
+          }
+        },
+        "usage": {
+          "input_tokens": 306,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 306,
+      "milliseconds": 323.70229202206247
+    },
+    {
+      "id": "zh-main-30",
+      "locale": "zh",
+      "language": "zh",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.7597146860154913,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.7597146860154913
+          }
+        },
+        "usage": {
+          "input_tokens": 311,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 311,
+      "milliseconds": 326.04712501051836
+    },
+    {
+      "id": "zh-main-31",
+      "locale": "zh",
+      "language": "zh",
+      "group": "injection",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.002712074969897591,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.002712074969897591
+          }
+        },
+        "usage": {
+          "input_tokens": 314,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 314,
+      "milliseconds": 329.7584160172846
+    },
+    {
+      "id": "zh-main-32",
+      "locale": "zh",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.7165035373700774,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.7165035373700774
+          }
+        },
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 300,
+      "milliseconds": 322.0151249843184
+    },
+    {
+      "id": "zh-main-33",
+      "locale": "zh",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9422301827665989,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9422301827665989
+          }
+        },
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 300,
+      "milliseconds": 322.5292499992065
+    },
+    {
+      "id": "zh-main-34",
+      "locale": "zh",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.10338811039962366,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.10338811039962366
+          }
+        },
+        "usage": {
+          "input_tokens": 307,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 307,
+      "milliseconds": 327.10645798943006
+    },
+    {
+      "id": "zh-main-35",
+      "locale": "zh",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.10248527189863024,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.10248527189863024
+          }
+        },
+        "usage": {
+          "input_tokens": 304,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 304,
+      "milliseconds": 322.165124991443
+    },
+    {
+      "id": "zh-main-36",
+      "locale": "zh",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.05803967181345522,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.05803967181345522
+          }
+        },
+        "usage": {
+          "input_tokens": 297,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 297,
+      "milliseconds": 323.90175000182353
+    },
+    {
+      "id": "zh-main-37",
+      "locale": "zh",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.014799222676276189,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.014799222676276189
+          }
+        },
+        "usage": {
+          "input_tokens": 304,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 304,
+      "milliseconds": 326.5281670028344
+    },
+    {
+      "id": "zh-main-38",
+      "locale": "zh",
+      "language": "zh",
+      "group": "pause",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8277057788832373,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8277057788832373
+          }
+        },
+        "usage": {
+          "input_tokens": 310,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 310,
+      "milliseconds": 325.7337079849094
+    },
+    {
+      "id": "zh-main-39",
+      "locale": "zh",
+      "language": "zh",
+      "group": "pause",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.010610580317066428,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.010610580317066428
+          }
+        },
+        "usage": {
+          "input_tokens": 306,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 306,
+      "milliseconds": 325.97762500518
+    },
+    {
+      "id": "zh-main-40",
+      "locale": "zh",
+      "language": "zh",
+      "group": "pause",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9847661366028333,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9847661366028333
+          }
+        },
+        "usage": {
+          "input_tokens": 310,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 310,
+      "milliseconds": 329.0663329826202
+    },
+    {
+      "id": "zh-main-41",
+      "locale": "zh",
+      "language": "zh",
+      "group": "pause",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9860497938241686,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9860497938241686
+          }
+        },
+        "usage": {
+          "input_tokens": 312,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 312,
+      "milliseconds": 327.10841702646576
+    },
+    {
+      "id": "zh-main-42",
+      "locale": "zh",
+      "language": "zh",
+      "group": "pause",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9601480223901152,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9601480223901152
+          }
+        },
+        "usage": {
+          "input_tokens": 310,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 310,
+      "milliseconds": 328.0589160276577
+    },
+    {
+      "id": "zh-main-43",
+      "locale": "zh",
+      "language": "zh",
+      "group": "pause",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.3318624927851189,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.3318624927851189
+          }
+        },
+        "usage": {
+          "input_tokens": 308,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 308,
+      "milliseconds": 328.9000410004519
+    },
+    {
+      "id": "zh-main-44",
+      "locale": "zh",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.868799710750345,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.868799710750345
+          }
+        },
+        "usage": {
+          "input_tokens": 316,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 316,
+      "milliseconds": 347.5360420125071
+    },
+    {
+      "id": "zh-main-45",
+      "locale": "zh",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.004246894242136251,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.004246894242136251
+          }
+        },
+        "usage": {
+          "input_tokens": 311,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 311,
+      "milliseconds": 333.3036669937428
+    },
+    {
+      "id": "zh-main-46",
+      "locale": "zh",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.015885757289647834,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.015885757289647834
+          }
+        },
+        "usage": {
+          "input_tokens": 318,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 318,
+      "milliseconds": 339.8964999942109
+    },
+    {
+      "id": "zh-main-47",
+      "locale": "zh",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9866788107507671,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9866788107507671
+          }
+        },
+        "usage": {
+          "input_tokens": 317,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 317,
+      "milliseconds": 344.8055420012679
+    },
+    {
+      "id": "zh-main-48",
+      "locale": "zh",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9858243273439878,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9858243273439878
+          }
+        },
+        "usage": {
+          "input_tokens": 314,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 314,
+      "milliseconds": 392.64270800049417
+    },
+    {
+      "id": "zh-main-49",
+      "locale": "zh",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.08272175310906102,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.08272175310906102
+          }
+        },
+        "usage": {
+          "input_tokens": 315,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 315,
+      "milliseconds": 405.95354200922884
+    },
+    {
+      "id": "zh-main-50",
+      "locale": "zh",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8713380256809455,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8713380256809455
+          }
+        },
+        "usage": {
+          "input_tokens": 319,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 319,
+      "milliseconds": 465.5423750227783
+    },
+    {
+      "id": "zh-main-51",
+      "locale": "zh",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.013286584228024834,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.013286584228024834
+          }
+        },
+        "usage": {
+          "input_tokens": 321,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 321,
+      "milliseconds": 524.2630419961642
+    },
+    {
+      "id": "zh-main-52",
+      "locale": "zh",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.021395191582394762,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.021395191582394762
+          }
+        },
+        "usage": {
+          "input_tokens": 317,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 317,
+      "milliseconds": 471.6068750130944
+    },
+    {
+      "id": "zh-main-53",
+      "locale": "zh",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.06929972231635985,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.06929972231635985
+          }
+        },
+        "usage": {
+          "input_tokens": 317,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 317,
+      "milliseconds": 454.54929198604077
+    },
+    {
+      "id": "zh-main-54",
+      "locale": "zh",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9820611627123763,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9820611627123763
+          }
+        },
+        "usage": {
+          "input_tokens": 317,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 317,
+      "milliseconds": 491.65920898667537
+    },
+    {
+      "id": "zh-main-55",
+      "locale": "zh",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8465420617531372,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8465420617531372
+          }
+        },
+        "usage": {
+          "input_tokens": 318,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 318,
+      "milliseconds": 440.7434159948025
+    },
+    {
+      "id": "zh-main-56",
+      "locale": "zh",
+      "language": "zh",
+      "group": "self_correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.7031166349065433,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.7031166349065433
+          }
+        },
+        "usage": {
+          "input_tokens": 309,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 309,
+      "milliseconds": 467.2120419854764
+    },
+    {
+      "id": "zh-main-57",
+      "locale": "zh",
+      "language": "zh",
+      "group": "self_correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.41584635748698257,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.41584635748698257
+          }
+        },
+        "usage": {
+          "input_tokens": 317,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 317,
+      "milliseconds": 517.3107920272741
+    },
+    {
+      "id": "zh-main-58",
+      "locale": "zh",
+      "language": "zh",
+      "group": "negation_scope",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.584590072728768,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.584590072728768
+          }
+        },
+        "usage": {
+          "input_tokens": 314,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 314,
+      "milliseconds": 530.7332079974003
+    },
+    {
+      "id": "zh-main-59",
+      "locale": "zh",
+      "language": "zh",
+      "group": "negation_scope",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.661248295174733,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.661248295174733
+          }
+        },
+        "usage": {
+          "input_tokens": 312,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 312,
+      "milliseconds": 671.9622499949764
+    },
+    {
+      "id": "zh-main-60",
+      "locale": "zh",
+      "language": "zh",
+      "group": "asr_style",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.11706790303099376,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.11706790303099376
+          }
+        },
+        "usage": {
+          "input_tokens": 308,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 308,
+      "milliseconds": 705.6597500049975
+    },
+    {
+      "id": "zh-main-61",
+      "locale": "zh",
+      "language": "zh",
+      "group": "quote_then_command",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8610093402305093,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8610093402305093
+          }
+        },
+        "usage": {
+          "input_tokens": 318,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 318,
+      "milliseconds": 478.40391701902263
+    },
+    {
+      "id": "zh-main-62",
+      "locale": "zh",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.007157751390860113,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.007157751390860113
+          }
+        },
+        "usage": {
+          "input_tokens": 312,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 312,
+      "milliseconds": 496.4849160169251
+    },
+    {
+      "id": "zh-main-63",
+      "locale": "zh",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.005094022325363988,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.005094022325363988
+          }
+        },
+        "usage": {
+          "input_tokens": 306,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 306,
+      "milliseconds": 632.9171670076903
+    },
+    {
+      "id": "zh-main-64",
+      "locale": "zh",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.059697096949103176,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.059697096949103176
+          }
+        },
+        "usage": {
+          "input_tokens": 311,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 311,
+      "milliseconds": 462.74049999192357
+    },
+    {
+      "id": "zh-main-65",
+      "locale": "zh",
+      "language": "zh",
+      "group": "self_correction",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.6264362431122132,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.6264362431122132
+          }
+        },
+        "usage": {
+          "input_tokens": 310,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 310,
+      "milliseconds": 438.8507920084521
+    },
+    {
+      "id": "zh-main-66",
+      "locale": "zh",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.06172819895354376,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.06172819895354376
+          }
+        },
+        "usage": {
+          "input_tokens": 313,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 313,
+      "milliseconds": 447.8965839953162
+    },
+    {
+      "id": "zh-main-67",
+      "locale": "zh",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8533262696733962,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8533262696733962
+          }
+        },
+        "usage": {
+          "input_tokens": 307,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 307,
+      "milliseconds": 565.8031250059139
+    },
+    {
+      "id": "zh-main-68",
+      "locale": "zh",
+      "language": "zh",
+      "group": "reported",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.07779944140375539,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.07779944140375539
+          }
+        },
+        "usage": {
+          "input_tokens": 313,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 313,
+      "milliseconds": 581.1766250117216
+    },
+    {
+      "id": "zh-main-69",
+      "locale": "zh",
+      "language": "zh",
+      "group": "reported",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.1627918949475184,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.1627918949475184
+          }
+        },
+        "usage": {
+          "input_tokens": 314,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 314,
+      "milliseconds": 488.62666700733826
+    },
+    {
+      "id": "zh-main-70",
+      "locale": "zh",
+      "language": "zh",
+      "group": "conditional",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.6739151928110833,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.6739151928110833
+          }
+        },
+        "usage": {
+          "input_tokens": 314,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 314,
+      "milliseconds": 428.2181249873247
+    },
+    {
+      "id": "zh-main-71",
+      "locale": "zh",
+      "language": "zh",
+      "group": "conditional",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9674483212505385,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9674483212505385
+          }
+        },
+        "usage": {
+          "input_tokens": 310,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 310,
+      "milliseconds": 406.85866700368933
+    },
+    {
+      "id": "zh-main-72",
+      "locale": "zh",
+      "language": "zh",
+      "group": "deferred",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.1013915717449944,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.1013915717449944
+          }
+        },
+        "usage": {
+          "input_tokens": 311,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 311,
+      "milliseconds": 416.6033339861315
+    },
+    {
+      "id": "zh-main-73",
+      "locale": "zh",
+      "language": "zh",
+      "group": "deferred",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.04588840408706379,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.04588840408706379
+          }
+        },
+        "usage": {
+          "input_tokens": 317,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 317,
+      "milliseconds": 454.8623329901602
+    },
+    {
+      "id": "zh-main-74",
+      "locale": "zh",
+      "language": "zh",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.06784369996966946,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.06784369996966946
+          }
+        },
+        "usage": {
+          "input_tokens": 309,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 309,
+      "milliseconds": 462.58533297805116
+    },
+    {
+      "id": "zh-main-75",
+      "locale": "zh",
+      "language": "zh",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.008807499188944155,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.008807499188944155
+          }
+        },
+        "usage": {
+          "input_tokens": 317,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 317,
+      "milliseconds": 519.2670410033315
+    },
+    {
+      "id": "zh-main-76",
+      "locale": "zh",
+      "language": "zh",
+      "group": "question",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.129852408476033,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.129852408476033
+          }
+        },
+        "usage": {
+          "input_tokens": 309,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 309,
+      "milliseconds": 415.92579198186286
+    },
+    {
+      "id": "zh-main-77",
+      "locale": "zh",
+      "language": "zh",
+      "group": "injection",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.04832805409997272,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.04832805409997272
+          }
+        },
+        "usage": {
+          "input_tokens": 322,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 322,
+      "milliseconds": 410.2032500086352
+    },
+    {
+      "id": "zh-main-78",
+      "locale": "zh",
+      "language": "zh",
+      "group": "unfinished",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.03269611671143872,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.03269611671143872
+          }
+        },
+        "usage": {
+          "input_tokens": 302,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 302,
+      "milliseconds": 399.84958298737183
+    },
+    {
+      "id": "zh-main-79",
+      "locale": "zh",
+      "language": "zh",
+      "group": "addition",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.002962983734569285,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.002962983734569285
+          }
+        },
+        "usage": {
+          "input_tokens": 308,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 308,
+      "milliseconds": 404.6843329851981
+    },
+    {
+      "id": "zh-cross-00",
+      "locale": "zh",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "partition": "cross",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.14251108004644764,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.14251108004644764
+          }
+        },
+        "usage": {
+          "input_tokens": 293,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 293,
+      "milliseconds": 381.9812909932807
+    },
+    {
+      "id": "zh-cross-02",
+      "locale": "zh",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "partition": "cross",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.6112040165802718,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.6112040165802718
+          }
+        },
+        "usage": {
+          "input_tokens": 297,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 297,
+      "milliseconds": 391.36687500285916
+    },
+    {
+      "id": "zh-cross-06",
+      "locale": "zh",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "partition": "cross",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.012271002494215281,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.012271002494215281
+          }
+        },
+        "usage": {
+          "input_tokens": 302,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 302,
+      "milliseconds": 459.29554200847633
+    },
+    {
+      "id": "zh-cross-07",
+      "locale": "zh",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "partition": "cross",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.42040706189995514,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.42040706189995514
+          }
+        },
+        "usage": {
+          "input_tokens": 302,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 302,
+      "milliseconds": 400.2952919981908
+    },
+    {
+      "id": "zh-cross-10",
+      "locale": "zh",
+      "language": "en",
+      "group": "greeting",
+      "expected": "false",
+      "partition": "cross",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.001862046304368618,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.001862046304368618
+          }
+        },
+        "usage": {
+          "input_tokens": 293,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 293,
+      "milliseconds": 403.5230840090662
+    },
+    {
+      "id": "zh-cross-20",
+      "locale": "zh",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "partition": "cross",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.003340514326462939,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.003340514326462939
+          }
+        },
+        "usage": {
+          "input_tokens": 298,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 298,
+      "milliseconds": 368.70674998499453
+    },
+    {
+      "id": "zh-cross-23",
+      "locale": "zh",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "partition": "cross",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.36762394930102554,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.36762394930102554
+          }
+        },
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 300,
+      "milliseconds": 388.44791700830683
+    },
+    {
+      "id": "zh-cross-26",
+      "locale": "zh",
+      "language": "en",
+      "group": "deferred",
+      "expected": "false",
+      "partition": "cross",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.14017160839260032,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.14017160839260032
+          }
+        },
+        "usage": {
+          "input_tokens": 298,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 298,
+      "milliseconds": 385.1598750043195
+    },
+    {
+      "id": "zh-mixed-0",
+      "locale": "zh",
+      "language": "mixed",
+      "group": "mixed",
+      "expected": "true",
+      "partition": "mixed",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9873513298503103,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9873513298503103
+          }
+        },
+        "usage": {
+          "input_tokens": 306,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 306,
+      "milliseconds": 380.10170799680054
+    },
+    {
+      "id": "zh-mixed-1",
+      "locale": "zh",
+      "language": "mixed",
+      "group": "mixed",
+      "expected": "true",
+      "partition": "mixed",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.7305916992307493,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.7305916992307493
+          }
+        },
+        "usage": {
+          "input_tokens": 311,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 311,
+      "milliseconds": 377.0196669793222
+    },
+    {
+      "id": "zh-mixed-2",
+      "locale": "zh",
+      "language": "mixed",
+      "group": "mixed",
+      "expected": "false",
+      "partition": "mixed",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.1558618020790642,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.1558618020790642
+          }
+        },
+        "usage": {
+          "input_tokens": 307,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 307,
+      "milliseconds": 383.4120000246912
+    },
+    {
+      "id": "zh-mixed-3",
+      "locale": "zh",
+      "language": "mixed",
+      "group": "mixed",
+      "expected": "false",
+      "partition": "mixed",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.010399321465108769,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.010399321465108769
+          }
+        },
+        "usage": {
+          "input_tokens": 302,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 302,
+      "milliseconds": 378.67295800242573
+    },
+    {
+      "id": "zh-ambiguous-0",
+      "locale": "zh",
+      "language": "zh",
+      "group": "ambiguous",
+      "expected": "unspecified",
+      "partition": "ambiguous",
+      "origin": "diagnostic",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.00908897029211766,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.00908897029211766
+          }
+        },
+        "usage": {
+          "input_tokens": 296,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 296,
+      "milliseconds": 371.53966701589525
+    },
+    {
+      "id": "zh-ambiguous-1",
+      "locale": "zh",
+      "language": "zh",
+      "group": "ambiguous",
+      "expected": "unspecified",
+      "partition": "ambiguous",
+      "origin": "diagnostic",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0032760928062500827,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0032760928062500827
+          }
+        },
+        "usage": {
+          "input_tokens": 294,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 294,
+      "milliseconds": 360.31416701735
+    },
+    {
+      "id": "zh-ambiguous-2",
+      "locale": "zh",
+      "language": "zh",
+      "group": "ambiguous",
+      "expected": "unspecified",
+      "partition": "ambiguous",
+      "origin": "diagnostic",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.015084971735048525,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.015084971735048525
+          }
+        },
+        "usage": {
+          "input_tokens": 295,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 295,
+      "milliseconds": 358.4759999939706
+    },
+    {
+      "id": "zh-ambiguous-3",
+      "locale": "zh",
+      "language": "zh",
+      "group": "ambiguous",
+      "expected": "unspecified",
+      "partition": "ambiguous",
+      "origin": "diagnostic",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.01428572384958305,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.01428572384958305
+          }
+        },
+        "usage": {
+          "input_tokens": 295,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 295,
+      "milliseconds": 360.07216601865366
+    },
+    {
+      "id": "zh-ambiguous-4",
+      "locale": "zh",
+      "language": "zh",
+      "group": "ambiguous",
+      "expected": "unspecified",
+      "partition": "ambiguous",
+      "origin": "diagnostic",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.023081843630002194,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.023081843630002194
+          }
+        },
+        "usage": {
+          "input_tokens": 295,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 295,
+      "milliseconds": 368.54062500060536
+    },
+    {
+      "id": "zh-ambiguous-5",
+      "locale": "zh",
+      "language": "zh",
+      "group": "ambiguous",
+      "expected": "unspecified",
+      "partition": "ambiguous",
+      "origin": "diagnostic",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.10615512341678243,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.10615512341678243
+          }
+        },
+        "usage": {
+          "input_tokens": 298,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 298,
+      "milliseconds": 361.35812499560416
+    },
+    {
+      "id": "en-main-00",
+      "locale": "en",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8467057599003093,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8467057599003093
+          }
+        },
+        "usage": {
+          "input_tokens": 106,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 106,
+      "milliseconds": 162.1744169970043
+    },
+    {
+      "id": "en-main-01",
+      "locale": "en",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.7866808748371596,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.7866808748371596
+          }
+        },
+        "usage": {
+          "input_tokens": 107,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 107,
+      "milliseconds": 171.34820800856687
+    },
+    {
+      "id": "en-main-02",
+      "locale": "en",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9640857336830113,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9640857336830113
+          }
+        },
+        "usage": {
+          "input_tokens": 110,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 110,
+      "milliseconds": 173.0112920049578
+    },
+    {
+      "id": "en-main-03",
+      "locale": "en",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9174924936719658,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9174924936719658
+          }
+        },
+        "usage": {
+          "input_tokens": 111,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 111,
+      "milliseconds": 170.58225002256222
+    },
+    {
+      "id": "en-main-04",
+      "locale": "en",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.5960039144570937,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.5960039144570937
+          }
+        },
+        "usage": {
+          "input_tokens": 112,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 112,
+      "milliseconds": 176.33674998069182
+    },
+    {
+      "id": "en-main-05",
+      "locale": "en",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.7951440415705473,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.7951440415705473
+          }
+        },
+        "usage": {
+          "input_tokens": 115,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 189.89304199931212
+    },
+    {
+      "id": "en-main-06",
+      "locale": "en",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.10319788045091756,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.10319788045091756
+          }
+        },
+        "usage": {
+          "input_tokens": 115,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 181.03516701376066
+    },
+    {
+      "id": "en-main-07",
+      "locale": "en",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8253058262045996,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8253058262045996
+          }
+        },
+        "usage": {
+          "input_tokens": 115,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 172.1754579921253
+    },
+    {
+      "id": "en-main-08",
+      "locale": "en",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8047504266140182,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8047504266140182
+          }
+        },
+        "usage": {
+          "input_tokens": 115,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 183.5255410114769
+    },
+    {
+      "id": "en-main-09",
+      "locale": "en",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9150147211183437,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9150147211183437
+          }
+        },
+        "usage": {
+          "input_tokens": 113,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 113,
+      "milliseconds": 187.73162498837337
+    },
+    {
+      "id": "en-main-10",
+      "locale": "en",
+      "language": "en",
+      "group": "greeting",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0014078226041467881,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0014078226041467881
+          }
+        },
+        "usage": {
+          "input_tokens": 106,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 106,
+      "milliseconds": 189.72258298890665
+    },
+    {
+      "id": "en-main-11",
+      "locale": "en",
+      "language": "en",
+      "group": "greeting",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0013564618679994585,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0013564618679994585
+          }
+        },
+        "usage": {
+          "input_tokens": 107,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 107,
+      "milliseconds": 183.47325001377612
+    },
+    {
+      "id": "en-main-12",
+      "locale": "en",
+      "language": "en",
+      "group": "request",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.001835322258102623,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.001835322258102623
+          }
+        },
+        "usage": {
+          "input_tokens": 108,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 108,
+      "milliseconds": 175.47625000588596
+    },
+    {
+      "id": "en-main-13",
+      "locale": "en",
+      "language": "en",
+      "group": "request",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.005068241424623851,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.005068241424623851
+          }
+        },
+        "usage": {
+          "input_tokens": 109,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 109,
+      "milliseconds": 170.97741598263383
+    },
+    {
+      "id": "en-main-14",
+      "locale": "en",
+      "language": "en",
+      "group": "question",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.00047778110046748,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.00047778110046748
+          }
+        },
+        "usage": {
+          "input_tokens": 111,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 111,
+      "milliseconds": 185.0440829875879
+    },
+    {
+      "id": "en-main-15",
+      "locale": "en",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.012034764580194956,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.012034764580194956
+          }
+        },
+        "usage": {
+          "input_tokens": 106,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 106,
+      "milliseconds": 173.2468330010306
+    },
+    {
+      "id": "en-main-16",
+      "locale": "en",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0019623445136340597,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0019623445136340597
+          }
+        },
+        "usage": {
+          "input_tokens": 106,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 106,
+      "milliseconds": 168.3693749946542
+    },
+    {
+      "id": "en-main-17",
+      "locale": "en",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0028621795566109477,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0028621795566109477
+          }
+        },
+        "usage": {
+          "input_tokens": 108,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 108,
+      "milliseconds": 171.88729101326317
+    },
+    {
+      "id": "en-main-18",
+      "locale": "en",
+      "language": "en",
+      "group": "unfinished",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.006066924546260546,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.006066924546260546
+          }
+        },
+        "usage": {
+          "input_tokens": 107,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 107,
+      "milliseconds": 178.63787501119077
+    },
+    {
+      "id": "en-main-19",
+      "locale": "en",
+      "language": "en",
+      "group": "unfinished",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0013044588131057998,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0013044588131057998
+          }
+        },
+        "usage": {
+          "input_tokens": 108,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 108,
+      "milliseconds": 191.7630419775378
+    },
+    {
+      "id": "en-main-20",
+      "locale": "en",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.016374925751809905,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.016374925751809905
+          }
+        },
+        "usage": {
+          "input_tokens": 111,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 111,
+      "milliseconds": 179.31062501156703
+    },
+    {
+      "id": "en-main-21",
+      "locale": "en",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.05438929901439197,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.05438929901439197
+          }
+        },
+        "usage": {
+          "input_tokens": 112,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 112,
+      "milliseconds": 176.722999982303
+    },
+    {
+      "id": "en-main-22",
+      "locale": "en",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.036977804994998836,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.036977804994998836
+          }
+        },
+        "usage": {
+          "input_tokens": 110,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 110,
+      "milliseconds": 173.85016600019298
+    },
+    {
+      "id": "en-main-23",
+      "locale": "en",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.3918001074597203,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.3918001074597203
+          }
+        },
+        "usage": {
+          "input_tokens": 113,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 113,
+      "milliseconds": 173.11787500511855
+    },
+    {
+      "id": "en-main-24",
+      "locale": "en",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.06819471369228945,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.06819471369228945
+          }
+        },
+        "usage": {
+          "input_tokens": 113,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 113,
+      "milliseconds": 175.21116600255482
+    },
+    {
+      "id": "en-main-25",
+      "locale": "en",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.1381815484050971,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.1381815484050971
+          }
+        },
+        "usage": {
+          "input_tokens": 115,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 177.4299999815412
+    },
+    {
+      "id": "en-main-26",
+      "locale": "en",
+      "language": "en",
+      "group": "deferred",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.5879320793306538,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.5879320793306538
+          }
+        },
+        "usage": {
+          "input_tokens": 111,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 111,
+      "milliseconds": 173.6888749874197
+    },
+    {
+      "id": "en-main-27",
+      "locale": "en",
+      "language": "en",
+      "group": "deferred",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.017506998192088508,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.017506998192088508
+          }
+        },
+        "usage": {
+          "input_tokens": 115,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 178.05225000483915
+    },
+    {
+      "id": "en-main-28",
+      "locale": "en",
+      "language": "en",
+      "group": "addition",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.00146863327272891,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.00146863327272891
+          }
+        },
+        "usage": {
+          "input_tokens": 109,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 109,
+      "milliseconds": 180.2231670008041
+    },
+    {
+      "id": "en-main-29",
+      "locale": "en",
+      "language": "en",
+      "group": "addition",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0007408869557986466,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0007408869557986466
+          }
+        },
+        "usage": {
+          "input_tokens": 110,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 110,
+      "milliseconds": 178.6688749853056
+    },
+    {
+      "id": "en-main-30",
+      "locale": "en",
+      "language": "en",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.03941711412655941,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.03941711412655941
+          }
+        },
+        "usage": {
+          "input_tokens": 110,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 110,
+      "milliseconds": 193.49920901004225
+    },
+    {
+      "id": "en-main-31",
+      "locale": "en",
+      "language": "en",
+      "group": "injection",
+      "expected": "false",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.007339393385300634,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.007339393385300634
+          }
+        },
+        "usage": {
+          "input_tokens": 115,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 179.84079199959524
+    },
+    {
+      "id": "en-main-32",
+      "locale": "en",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.745747803070922,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.745747803070922
+          }
+        },
+        "usage": {
+          "input_tokens": 107,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 107,
+      "milliseconds": 177.98537499038503
+    },
+    {
+      "id": "en-main-33",
+      "locale": "en",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9555552042215941,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9555552042215941
+          }
+        },
+        "usage": {
+          "input_tokens": 108,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 108,
+      "milliseconds": 180.5756670073606
+    },
+    {
+      "id": "en-main-34",
+      "locale": "en",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.7551213273368448,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.7551213273368448
+          }
+        },
+        "usage": {
+          "input_tokens": 109,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 109,
+      "milliseconds": 178.81737498100847
+    },
+    {
+      "id": "en-main-35",
+      "locale": "en",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.5028561639061849,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.5028561639061849
+          }
+        },
+        "usage": {
+          "input_tokens": 109,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 109,
+      "milliseconds": 175.5640830087941
+    },
+    {
+      "id": "en-main-36",
+      "locale": "en",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.3300755135324225,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.3300755135324225
+          }
+        },
+        "usage": {
+          "input_tokens": 108,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 108,
+      "milliseconds": 173.93008299404755
+    },
+    {
+      "id": "en-main-37",
+      "locale": "en",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8166396621276537,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8166396621276537
+          }
+        },
+        "usage": {
+          "input_tokens": 110,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 110,
+      "milliseconds": 174.1213329951279
+    },
+    {
+      "id": "en-main-38",
+      "locale": "en",
+      "language": "en",
+      "group": "pause",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8262232512243909,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8262232512243909
+          }
+        },
+        "usage": {
+          "input_tokens": 112,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 112,
+      "milliseconds": 171.1097919906024
+    },
+    {
+      "id": "en-main-39",
+      "locale": "en",
+      "language": "en",
+      "group": "pause",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.4217845333687144,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.4217845333687144
+          }
+        },
+        "usage": {
+          "input_tokens": 114,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 175.1029169827234
+    },
+    {
+      "id": "en-main-40",
+      "locale": "en",
+      "language": "en",
+      "group": "pause",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.7266353275533228,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.7266353275533228
+          }
+        },
+        "usage": {
+          "input_tokens": 114,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 172.40541701903567
+    },
+    {
+      "id": "en-main-41",
+      "locale": "en",
+      "language": "en",
+      "group": "pause",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9019298715827052,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9019298715827052
+          }
+        },
+        "usage": {
+          "input_tokens": 115,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 174.16595900431275
+    },
+    {
+      "id": "en-main-42",
+      "locale": "en",
+      "language": "en",
+      "group": "pause",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9668428650152535,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9668428650152535
+          }
+        },
+        "usage": {
+          "input_tokens": 113,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 113,
+      "milliseconds": 185.83762500202283
+    },
+    {
+      "id": "en-main-43",
+      "locale": "en",
+      "language": "en",
+      "group": "pause",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9388370161401778,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9388370161401778
+          }
+        },
+        "usage": {
+          "input_tokens": 111,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 111,
+      "milliseconds": 206.58475000527687
+    },
+    {
+      "id": "en-main-44",
+      "locale": "en",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8836687348025581,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8836687348025581
+          }
+        },
+        "usage": {
+          "input_tokens": 116,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 116,
+      "milliseconds": 197.61820798157714
+    },
+    {
+      "id": "en-main-45",
+      "locale": "en",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.04078100194816289,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.04078100194816289
+          }
+        },
+        "usage": {
+          "input_tokens": 114,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 194.5546250208281
+    },
+    {
+      "id": "en-main-46",
+      "locale": "en",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.48702990073330804,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.48702990073330804
+          }
+        },
+        "usage": {
+          "input_tokens": 116,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 116,
+      "milliseconds": 204.7186249983497
+    },
+    {
+      "id": "en-main-47",
+      "locale": "en",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9759806426460822,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9759806426460822
+          }
+        },
+        "usage": {
+          "input_tokens": 117,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 117,
+      "milliseconds": 191.2657909851987
+    },
+    {
+      "id": "en-main-48",
+      "locale": "en",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.3865293393343781,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.3865293393343781
+          }
+        },
+        "usage": {
+          "input_tokens": 113,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 113,
+      "milliseconds": 213.70158300851472
+    },
+    {
+      "id": "en-main-49",
+      "locale": "en",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.3572143690118112,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.3572143690118112
+          }
+        },
+        "usage": {
+          "input_tokens": 114,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 242.4665830039885
+    },
+    {
+      "id": "en-main-50",
+      "locale": "en",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9822930536809713,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9822930536809713
+          }
+        },
+        "usage": {
+          "input_tokens": 115,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 253.086082986556
+    },
+    {
+      "id": "en-main-51",
+      "locale": "en",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9506955102613771,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9506955102613771
+          }
+        },
+        "usage": {
+          "input_tokens": 116,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 116,
+      "milliseconds": 306.44145800033584
+    },
+    {
+      "id": "en-main-52",
+      "locale": "en",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.6149516087629135,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.6149516087629135
+          }
+        },
+        "usage": {
+          "input_tokens": 114,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 241.8539999925997
+    },
+    {
+      "id": "en-main-53",
+      "locale": "en",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.23120936195034078,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.23120936195034078
+          }
+        },
+        "usage": {
+          "input_tokens": 117,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 117,
+      "milliseconds": 204.9388340092264
+    },
+    {
+      "id": "en-main-54",
+      "locale": "en",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9257915889823085,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9257915889823085
+          }
+        },
+        "usage": {
+          "input_tokens": 116,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 116,
+      "milliseconds": 191.63450002088211
+    },
+    {
+      "id": "en-main-55",
+      "locale": "en",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9809720374404092,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9809720374404092
+          }
+        },
+        "usage": {
+          "input_tokens": 116,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 116,
+      "milliseconds": 206.1319590138737
+    },
+    {
+      "id": "en-main-56",
+      "locale": "en",
+      "language": "en",
+      "group": "self_correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.6632258099835099,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.6632258099835099
+          }
+        },
+        "usage": {
+          "input_tokens": 113,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 113,
+      "milliseconds": 203.279500012286
+    },
+    {
+      "id": "en-main-57",
+      "locale": "en",
+      "language": "en",
+      "group": "self_correction",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9720871820956808,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9720871820956808
+          }
+        },
+        "usage": {
+          "input_tokens": 115,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 200.8614999940619
+    },
+    {
+      "id": "en-main-58",
+      "locale": "en",
+      "language": "en",
+      "group": "negation_scope",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8795340047986843,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8795340047986843
+          }
+        },
+        "usage": {
+          "input_tokens": 110,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 110,
+      "milliseconds": 180.8995000028517
+    },
+    {
+      "id": "en-main-59",
+      "locale": "en",
+      "language": "en",
+      "group": "negation_scope",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8567447966317236,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8567447966317236
+          }
+        },
+        "usage": {
+          "input_tokens": 115,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 182.2575840051286
+    },
+    {
+      "id": "en-main-60",
+      "locale": "en",
+      "language": "en",
+      "group": "asr_style",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8263014825503273,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8263014825503273
+          }
+        },
+        "usage": {
+          "input_tokens": 111,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 111,
+      "milliseconds": 181.333500018809
+    },
+    {
+      "id": "en-main-61",
+      "locale": "en",
+      "language": "en",
+      "group": "quote_then_command",
+      "expected": "true",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9254727231662966,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9254727231662966
+          }
+        },
+        "usage": {
+          "input_tokens": 118,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 118,
+      "milliseconds": 187.225750007201
+    },
+    {
+      "id": "en-main-62",
+      "locale": "en",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.029028552258273273,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.029028552258273273
+          }
+        },
+        "usage": {
+          "input_tokens": 113,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 113,
+      "milliseconds": 194.94112499523908
+    },
+    {
+      "id": "en-main-63",
+      "locale": "en",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.018022033117283315,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.018022033117283315
+          }
+        },
+        "usage": {
+          "input_tokens": 112,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 112,
+      "milliseconds": 190.5333329923451
+    },
+    {
+      "id": "en-main-64",
+      "locale": "en",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.04947058805437782,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.04947058805437782
+          }
+        },
+        "usage": {
+          "input_tokens": 119,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 119,
+      "milliseconds": 206.89245901303366
+    },
+    {
+      "id": "en-main-65",
+      "locale": "en",
+      "language": "en",
+      "group": "self_correction",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.15799398026831774,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.15799398026831774
+          }
+        },
+        "usage": {
+          "input_tokens": 114,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 198.38799998979084
+    },
+    {
+      "id": "en-main-66",
+      "locale": "en",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.08240002484373242,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.08240002484373242
+          }
+        },
+        "usage": {
+          "input_tokens": 111,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 111,
+      "milliseconds": 185.97462499747053
+    },
+    {
+      "id": "en-main-67",
+      "locale": "en",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9255373035002675,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9255373035002675
+          }
+        },
+        "usage": {
+          "input_tokens": 111,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 111,
+      "milliseconds": 180.75133301317692
+    },
+    {
+      "id": "en-main-68",
+      "locale": "en",
+      "language": "en",
+      "group": "reported",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.13321360562017603,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.13321360562017603
+          }
+        },
+        "usage": {
+          "input_tokens": 113,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 113,
+      "milliseconds": 185.2254169934895
+    },
+    {
+      "id": "en-main-69",
+      "locale": "en",
+      "language": "en",
+      "group": "reported",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.15133727429824342,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.15133727429824342
+          }
+        },
+        "usage": {
+          "input_tokens": 115,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 211.1165000242181
+    },
+    {
+      "id": "en-main-70",
+      "locale": "en",
+      "language": "en",
+      "group": "conditional",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.32924732558762626,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.32924732558762626
+          }
+        },
+        "usage": {
+          "input_tokens": 113,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 113,
+      "milliseconds": 205.62100000097416
+    },
+    {
+      "id": "en-main-71",
+      "locale": "en",
+      "language": "en",
+      "group": "conditional",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8469165969782766,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8469165969782766
+          }
+        },
+        "usage": {
+          "input_tokens": 112,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 112,
+      "milliseconds": 192.5761250022333
+    },
+    {
+      "id": "en-main-72",
+      "locale": "en",
+      "language": "en",
+      "group": "deferred",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.3276826531754079,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.3276826531754079
+          }
+        },
+        "usage": {
+          "input_tokens": 114,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 197.22079098573886
+    },
+    {
+      "id": "en-main-73",
+      "locale": "en",
+      "language": "en",
+      "group": "deferred",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.7781753065632244,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.7781753065632244
+          }
+        },
+        "usage": {
+          "input_tokens": 115,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 191.18287501623854
+    },
+    {
+      "id": "en-main-74",
+      "locale": "en",
+      "language": "en",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.1133673071705439,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.1133673071705439
+          }
+        },
+        "usage": {
+          "input_tokens": 110,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 110,
+      "milliseconds": 179.70824998337775
+    },
+    {
+      "id": "en-main-75",
+      "locale": "en",
+      "language": "en",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0015992039102147053,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0015992039102147053
+          }
+        },
+        "usage": {
+          "input_tokens": 115,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 181.68620800133795
+    },
+    {
+      "id": "en-main-76",
+      "locale": "en",
+      "language": "en",
+      "group": "question",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.013330982510828648,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.013330982510828648
+          }
+        },
+        "usage": {
+          "input_tokens": 110,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 110,
+      "milliseconds": 186.20725002256222
+    },
+    {
+      "id": "en-main-77",
+      "locale": "en",
+      "language": "en",
+      "group": "injection",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.05215905969784168,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.05215905969784168
+          }
+        },
+        "usage": {
+          "input_tokens": 121,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 121,
+      "milliseconds": 183.77612499170937
+    },
+    {
+      "id": "en-main-78",
+      "locale": "en",
+      "language": "en",
+      "group": "unfinished",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0167378607877264,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0167378607877264
+          }
+        },
+        "usage": {
+          "input_tokens": 110,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 110,
+      "milliseconds": 176.3149169855751
+    },
+    {
+      "id": "en-main-79",
+      "locale": "en",
+      "language": "en",
+      "group": "addition",
+      "expected": "false",
+      "partition": "main",
+      "origin": "new",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.001551995217395613,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.001551995217395613
+          }
+        },
+        "usage": {
+          "input_tokens": 112,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 112,
+      "milliseconds": 201.95908300229348
+    },
+    {
+      "id": "en-cross-00",
+      "locale": "en",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "partition": "cross",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8101729278435151,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8101729278435151
+          }
+        },
+        "usage": {
+          "input_tokens": 110,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 110,
+      "milliseconds": 193.22762498632073
+    },
+    {
+      "id": "en-cross-02",
+      "locale": "en",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "partition": "cross",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.549052101347522,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.549052101347522
+          }
+        },
+        "usage": {
+          "input_tokens": 120,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 120,
+      "milliseconds": 191.88133301213384
+    },
+    {
+      "id": "en-cross-06",
+      "locale": "en",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "partition": "cross",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.2095250774918804,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.2095250774918804
+          }
+        },
+        "usage": {
+          "input_tokens": 128,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 128,
+      "milliseconds": 186.32154099759646
+    },
+    {
+      "id": "en-cross-07",
+      "locale": "en",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "partition": "cross",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.25661750257809907,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.25661750257809907
+          }
+        },
+        "usage": {
+          "input_tokens": 130,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 130,
+      "milliseconds": 203.91983300214633
+    },
+    {
+      "id": "en-cross-10",
+      "locale": "en",
+      "language": "zh",
+      "group": "greeting",
+      "expected": "false",
+      "partition": "cross",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.006592595698114912,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.006592595698114912
+          }
+        },
+        "usage": {
+          "input_tokens": 109,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 109,
+      "milliseconds": 185.7010829844512
+    },
+    {
+      "id": "en-cross-20",
+      "locale": "en",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "partition": "cross",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.02528905760585361,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.02528905760585361
+          }
+        },
+        "usage": {
+          "input_tokens": 117,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 117,
+      "milliseconds": 196.99454100918956
+    },
+    {
+      "id": "en-cross-23",
+      "locale": "en",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "partition": "cross",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0133183112427289,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0133183112427289
+          }
+        },
+        "usage": {
+          "input_tokens": 124,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 124,
+      "milliseconds": 194.50308301020414
+    },
+    {
+      "id": "en-cross-26",
+      "locale": "en",
+      "language": "zh",
+      "group": "deferred",
+      "expected": "false",
+      "partition": "cross",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.3020691877092894,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.3020691877092894
+          }
+        },
+        "usage": {
+          "input_tokens": 119,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 119,
+      "milliseconds": 191.38937498792075
+    },
+    {
+      "id": "en-mixed-0",
+      "locale": "en",
+      "language": "mixed",
+      "group": "mixed",
+      "expected": "true",
+      "partition": "mixed",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9204804349491627,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9204804349491627
+          }
+        },
+        "usage": {
+          "input_tokens": 117,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 117,
+      "milliseconds": 182.67312500393018
+    },
+    {
+      "id": "en-mixed-1",
+      "locale": "en",
+      "language": "mixed",
+      "group": "mixed",
+      "expected": "true",
+      "partition": "mixed",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.7397696820862877,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.7397696820862877
+          }
+        },
+        "usage": {
+          "input_tokens": 122,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 122,
+      "milliseconds": 232.17804200248793
+    },
+    {
+      "id": "en-mixed-2",
+      "locale": "en",
+      "language": "mixed",
+      "group": "mixed",
+      "expected": "false",
+      "partition": "mixed",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0036994220139139637,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0036994220139139637
+          }
+        },
+        "usage": {
+          "input_tokens": 114,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 224.94991699932143
+    },
+    {
+      "id": "en-mixed-3",
+      "locale": "en",
+      "language": "mixed",
+      "group": "mixed",
+      "expected": "false",
+      "partition": "mixed",
+      "origin": "boundary",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.02558922302531829,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.02558922302531829
+          }
+        },
+        "usage": {
+          "input_tokens": 113,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 113,
+      "milliseconds": 227.92350000236183
+    },
+    {
+      "id": "en-ambiguous-0",
+      "locale": "en",
+      "language": "en",
+      "group": "ambiguous",
+      "expected": "unspecified",
+      "partition": "ambiguous",
+      "origin": "diagnostic",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.029572052027191414,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.029572052027191414
+          }
+        },
+        "usage": {
+          "input_tokens": 106,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 106,
+      "milliseconds": 215.8956670027692
+    },
+    {
+      "id": "en-ambiguous-1",
+      "locale": "en",
+      "language": "en",
+      "group": "ambiguous",
+      "expected": "unspecified",
+      "partition": "ambiguous",
+      "origin": "diagnostic",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0070724425365382045,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0070724425365382045
+          }
+        },
+        "usage": {
+          "input_tokens": 106,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 106,
+      "milliseconds": 197.51170801464468
+    },
+    {
+      "id": "en-ambiguous-2",
+      "locale": "en",
+      "language": "en",
+      "group": "ambiguous",
+      "expected": "unspecified",
+      "partition": "ambiguous",
+      "origin": "diagnostic",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.2211617919978941,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.2211617919978941
+          }
+        },
+        "usage": {
+          "input_tokens": 107,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 107,
+      "milliseconds": 181.40920798759907
+    },
+    {
+      "id": "en-ambiguous-3",
+      "locale": "en",
+      "language": "en",
+      "group": "ambiguous",
+      "expected": "unspecified",
+      "partition": "ambiguous",
+      "origin": "diagnostic",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.03437157357290193,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.03437157357290193
+          }
+        },
+        "usage": {
+          "input_tokens": 107,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 107,
+      "milliseconds": 198.54908299748786
+    },
+    {
+      "id": "en-ambiguous-4",
+      "locale": "en",
+      "language": "en",
+      "group": "ambiguous",
+      "expected": "unspecified",
+      "partition": "ambiguous",
+      "origin": "diagnostic",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.010748983385125761,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.010748983385125761
+          }
+        },
+        "usage": {
+          "input_tokens": 107,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 107,
+      "milliseconds": 192.31904100161046
+    },
+    {
+      "id": "en-ambiguous-5",
+      "locale": "en",
+      "language": "en",
+      "group": "ambiguous",
+      "expected": "unspecified",
+      "partition": "ambiguous",
+      "origin": "diagnostic",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.2596443925599542,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.2596443925599542
+          }
+        },
+        "usage": {
+          "input_tokens": 108,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 108,
+      "milliseconds": 186.80808300268836
+    },
+    {
+      "id": "zh-main-00-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.7647089164877796,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.7647089164877796
+          }
+        },
+        "usage": {
+          "input_tokens": 327,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 327,
+      "milliseconds": 478.1317499873694
+    },
+    {
+      "id": "zh-main-01-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "pause",
+      "origin": "new",
+      "caseIndex": 1,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8805519932829173,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8805519932829173
+          }
+        },
+        "usage": {
+          "input_tokens": 340,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 340,
+      "milliseconds": 463.784957973985
+    },
+    {
+      "id": "zh-main-02-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "task_switch",
+      "origin": "new",
+      "caseIndex": 2,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.12963473770127928,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.12963473770127928
+          }
+        },
+        "usage": {
+          "input_tokens": 336,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 336,
+      "milliseconds": 429.4547500030603
+    },
+    {
+      "id": "zh-main-03-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "correction",
+      "origin": "new",
+      "caseIndex": 3,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9685271643313641,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9685271643313641
+          }
+        },
+        "usage": {
+          "input_tokens": 338,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 338,
+      "milliseconds": 442.5267089973204
+    },
+    {
+      "id": "zh-main-04-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 4,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.02447379330053322,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.02447379330053322
+          }
+        },
+        "usage": {
+          "input_tokens": 322,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 322,
+      "milliseconds": 429.7562080028001
+    },
+    {
+      "id": "zh-main-05-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 5,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.187166281153495,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.187166281153495
+          }
+        },
+        "usage": {
+          "input_tokens": 336,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 336,
+      "milliseconds": 467.26229100022465
+    },
+    {
+      "id": "zh-main-06-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "polite_stop",
+      "origin": "new",
+      "caseIndex": 6,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.3016519112079395,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.3016519112079395
+          }
+        },
+        "usage": {
+          "input_tokens": 333,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 333,
+      "milliseconds": 429.53562500770204
+    },
+    {
+      "id": "zh-main-07-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "self_correction",
+      "origin": "new",
+      "caseIndex": 7,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9396500421605785,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9396500421605785
+          }
+        },
+        "usage": {
+          "input_tokens": 326,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 326,
+      "milliseconds": 409.75695801898837
+    },
+    {
+      "id": "zh-main-08-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_code_1",
+      "origin": "new",
+      "caseIndex": 8,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0630068270651865,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0630068270651865
+          }
+        },
+        "usage": {
+          "input_tokens": 320,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 320,
+      "milliseconds": 381.1217499896884
+    },
+    {
+      "id": "zh-main-09-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_code_2",
+      "origin": "new",
+      "caseIndex": 9,
+      "historyDepth": 0,
+      "requiredHistory": 2,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0296642334157179,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0296642334157179
+          }
+        },
+        "usage": {
+          "input_tokens": 322,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 322,
+      "milliseconds": 403.1674579891842
+    },
+    {
+      "id": "zh-main-10-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_code_4",
+      "origin": "new",
+      "caseIndex": 10,
+      "historyDepth": 0,
+      "requiredHistory": 4,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.03729290314900299,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.03729290314900299
+          }
+        },
+        "usage": {
+          "input_tokens": 321,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 321,
+      "milliseconds": 395.6232919881586
+    },
+    {
+      "id": "zh-main-11-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_override",
+      "origin": "new",
+      "caseIndex": 11,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.04256805324131823,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.04256805324131823
+          }
+        },
+        "usage": {
+          "input_tokens": 322,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 322,
+      "milliseconds": 507.1016250003595
+    },
+    {
+      "id": "zh-main-12-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "answer",
+      "origin": "new",
+      "caseIndex": 12,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.006921504779151654,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.006921504779151654
+          }
+        },
+        "usage": {
+          "input_tokens": 341,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 341,
+      "milliseconds": 481.78187501616776
+    },
+    {
+      "id": "zh-main-13-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "addition",
+      "origin": "new",
+      "caseIndex": 13,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.009060829373115262,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.009060829373115262
+          }
+        },
+        "usage": {
+          "input_tokens": 332,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 332,
+      "milliseconds": 442.63458301429637
+    },
+    {
+      "id": "zh-main-14-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "quotation",
+      "origin": "new",
+      "caseIndex": 14,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9692522548632466,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9692522548632466
+          }
+        },
+        "usage": {
+          "input_tokens": 340,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 340,
+      "milliseconds": 444.25137498183176
+    },
+    {
+      "id": "zh-main-15-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "negation",
+      "origin": "new",
+      "caseIndex": 15,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.09727873714836895,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.09727873714836895
+          }
+        },
+        "usage": {
+          "input_tokens": 325,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 325,
+      "milliseconds": 448.4824170067441
+    },
+    {
+      "id": "zh-main-16-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 16,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.01699283123031437,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.01699283123031437
+          }
+        },
+        "usage": {
+          "input_tokens": 330,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 330,
+      "milliseconds": 430.2044580108486
+    },
+    {
+      "id": "zh-main-17-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 17,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.1367482027900649,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.1367482027900649
+          }
+        },
+        "usage": {
+          "input_tokens": 350,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 350,
+      "milliseconds": 434.76454200572334
+    },
+    {
+      "id": "zh-main-18-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "deferred",
+      "origin": "new",
+      "caseIndex": 18,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.1591191700043223,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.1591191700043223
+          }
+        },
+        "usage": {
+          "input_tokens": 332,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 332,
+      "milliseconds": 411.909333022777
+    },
+    {
+      "id": "zh-main-19-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "self_correction",
+      "origin": "new",
+      "caseIndex": 19,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.750767016518141,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.750767016518141
+          }
+        },
+        "usage": {
+          "input_tokens": 330,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 330,
+      "milliseconds": 457.0172499807086
+    },
+    {
+      "id": "zh-main-20-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_code_1",
+      "origin": "new",
+      "caseIndex": 20,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0630068270651865,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0630068270651865
+          }
+        },
+        "usage": {
+          "input_tokens": 320,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 320,
+      "milliseconds": 644.5789160206914
+    },
+    {
+      "id": "zh-main-21-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_code_2",
+      "origin": "new",
+      "caseIndex": 21,
+      "historyDepth": 0,
+      "requiredHistory": 2,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0296642334157179,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0296642334157179
+          }
+        },
+        "usage": {
+          "input_tokens": 322,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 322,
+      "milliseconds": 578.1905839976389
+    },
+    {
+      "id": "zh-main-22-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_code_4",
+      "origin": "new",
+      "caseIndex": 22,
+      "historyDepth": 0,
+      "requiredHistory": 4,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.03729290314900299,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.03729290314900299
+          }
+        },
+        "usage": {
+          "input_tokens": 321,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 321,
+      "milliseconds": 429.37312499270774
+    },
+    {
+      "id": "zh-main-23-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_override",
+      "origin": "new",
+      "caseIndex": 23,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.04256805324131823,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.04256805324131823
+          }
+        },
+        "usage": {
+          "input_tokens": 322,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 322,
+      "milliseconds": 412.8003749938216
+    },
+    {
+      "id": "zh-cross-00-h0",
+      "locale": "zh",
+      "language": "en",
+      "partition": "cross",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.36694316816587835,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.36694316816587835
+          }
+        },
+        "usage": {
+          "input_tokens": 309,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 309,
+      "milliseconds": 392.91925000725314
+    },
+    {
+      "id": "zh-cross-04-h0",
+      "locale": "zh",
+      "language": "en",
+      "partition": "cross",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 4,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.025960498009030417,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.025960498009030417
+          }
+        },
+        "usage": {
+          "input_tokens": 311,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 311,
+      "milliseconds": 432.10624999483116
+    },
+    {
+      "id": "zh-cross-14-h0",
+      "locale": "zh",
+      "language": "en",
+      "partition": "cross",
+      "group": "quotation",
+      "origin": "new",
+      "caseIndex": 14,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.7711086499101184,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.7711086499101184
+          }
+        },
+        "usage": {
+          "input_tokens": 314,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 314,
+      "milliseconds": 438.9704999921378
+    },
+    {
+      "id": "zh-cross-16-h0",
+      "locale": "zh",
+      "language": "en",
+      "partition": "cross",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 16,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.006934408276222525,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.006934408276222525
+          }
+        },
+        "usage": {
+          "input_tokens": 314,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 314,
+      "milliseconds": 498.81870800163597
+    },
+    {
+      "id": "en-main-00-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.762396400731676,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.762396400731676
+          }
+        },
+        "usage": {
+          "input_tokens": 154,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 154,
+      "milliseconds": 232.62079199776053
+    },
+    {
+      "id": "en-main-01-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "pause",
+      "origin": "new",
+      "caseIndex": 1,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8200396444118228,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8200396444118228
+          }
+        },
+        "usage": {
+          "input_tokens": 160,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 160,
+      "milliseconds": 224.28883300744928
+    },
+    {
+      "id": "en-main-02-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "task_switch",
+      "origin": "new",
+      "caseIndex": 2,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.7199139307198824,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.7199139307198824
+          }
+        },
+        "usage": {
+          "input_tokens": 159,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 159,
+      "milliseconds": 230.87195798871107
+    },
+    {
+      "id": "en-main-03-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "correction",
+      "origin": "new",
+      "caseIndex": 3,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8378828067978651,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8378828067978651
+          }
+        },
+        "usage": {
+          "input_tokens": 162,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 162,
+      "milliseconds": 243.45216699293815
+    },
+    {
+      "id": "en-main-04-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 4,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.0756295731617316,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.0756295731617316
+          }
+        },
+        "usage": {
+          "input_tokens": 156,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 156,
+      "milliseconds": 216.2795839831233
+    },
+    {
+      "id": "en-main-05-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 5,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.4605588617865722,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.4605588617865722
+          }
+        },
+        "usage": {
+          "input_tokens": 161,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 161,
+      "milliseconds": 237.23245799192227
+    },
+    {
+      "id": "en-main-06-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "polite_stop",
+      "origin": "new",
+      "caseIndex": 6,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8583064703613962,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8583064703613962
+          }
+        },
+        "usage": {
+          "input_tokens": 159,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 159,
+      "milliseconds": 217.173457989702
+    },
+    {
+      "id": "en-main-07-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "self_correction",
+      "origin": "new",
+      "caseIndex": 7,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8810388415979338,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8810388415979338
+          }
+        },
+        "usage": {
+          "input_tokens": 158,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 158,
+      "milliseconds": 241.23720798525028
+    },
+    {
+      "id": "en-main-08-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_code_1",
+      "origin": "new",
+      "caseIndex": 8,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.008109019722032344,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.008109019722032344
+          }
+        },
+        "usage": {
+          "input_tokens": 154,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 154,
+      "milliseconds": 231.26583301927894
+    },
+    {
+      "id": "en-main-09-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_code_2",
+      "origin": "new",
+      "caseIndex": 9,
+      "historyDepth": 0,
+      "requiredHistory": 2,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.013357738516930067,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.013357738516930067
+          }
+        },
+        "usage": {
+          "input_tokens": 154,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 154,
+      "milliseconds": 222.05987499910407
+    },
+    {
+      "id": "en-main-10-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_code_4",
+      "origin": "new",
+      "caseIndex": 10,
+      "historyDepth": 0,
+      "requiredHistory": 4,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.005994366197472324,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.005994366197472324
+          }
+        },
+        "usage": {
+          "input_tokens": 155,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 155,
+      "milliseconds": 219.2617499968037
+    },
+    {
+      "id": "en-main-11-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_override",
+      "origin": "new",
+      "caseIndex": 11,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.04633353317945505,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.04633353317945505
+          }
+        },
+        "usage": {
+          "input_tokens": 155,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 155,
+      "milliseconds": 216.20616599102505
+    },
+    {
+      "id": "en-main-12-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "answer",
+      "origin": "new",
+      "caseIndex": 12,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.011646949258757549,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.011646949258757549
+          }
+        },
+        "usage": {
+          "input_tokens": 156,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 156,
+      "milliseconds": 212.38779101986438
+    },
+    {
+      "id": "en-main-13-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "addition",
+      "origin": "new",
+      "caseIndex": 13,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.02024641365941713,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.02024641365941713
+          }
+        },
+        "usage": {
+          "input_tokens": 160,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 160,
+      "milliseconds": 211.99891599826515
+    },
+    {
+      "id": "en-main-14-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "quotation",
+      "origin": "new",
+      "caseIndex": 14,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9645112773132718,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9645112773132718
+          }
+        },
+        "usage": {
+          "input_tokens": 159,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 159,
+      "milliseconds": 213.86987500591204
+    },
+    {
+      "id": "en-main-15-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "negation",
+      "origin": "new",
+      "caseIndex": 15,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.036107289541182454,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.036107289541182454
+          }
+        },
+        "usage": {
+          "input_tokens": 157,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 157,
+      "milliseconds": 212.33579100226052
+    },
+    {
+      "id": "en-main-16-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 16,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.037504262405463576,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.037504262405463576
+          }
+        },
+        "usage": {
+          "input_tokens": 159,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 159,
+      "milliseconds": 217.47079101623967
+    },
+    {
+      "id": "en-main-17-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 17,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.4116853759969881,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.4116853759969881
+          }
+        },
+        "usage": {
+          "input_tokens": 169,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 169,
+      "milliseconds": 235.11716700159013
+    },
+    {
+      "id": "en-main-18-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "deferred",
+      "origin": "new",
+      "caseIndex": 18,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.710234527664649,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.710234527664649
+          }
+        },
+        "usage": {
+          "input_tokens": 158,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 158,
+      "milliseconds": 212.23508298862725
+    },
+    {
+      "id": "en-main-19-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "self_correction",
+      "origin": "new",
+      "caseIndex": 19,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.35190454856192155,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.35190454856192155
+          }
+        },
+        "usage": {
+          "input_tokens": 159,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 159,
+      "milliseconds": 227.2427499992773
+    },
+    {
+      "id": "en-main-20-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_code_1",
+      "origin": "new",
+      "caseIndex": 20,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.008109019722032344,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.008109019722032344
+          }
+        },
+        "usage": {
+          "input_tokens": 154,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 154,
+      "milliseconds": 265.5535409867298
+    },
+    {
+      "id": "en-main-21-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_code_2",
+      "origin": "new",
+      "caseIndex": 21,
+      "historyDepth": 0,
+      "requiredHistory": 2,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.013357738516930067,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.013357738516930067
+          }
+        },
+        "usage": {
+          "input_tokens": 154,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 154,
+      "milliseconds": 228.10462498455308
+    },
+    {
+      "id": "en-main-22-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_code_4",
+      "origin": "new",
+      "caseIndex": 22,
+      "historyDepth": 0,
+      "requiredHistory": 4,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.005994366197472324,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.005994366197472324
+          }
+        },
+        "usage": {
+          "input_tokens": 155,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 155,
+      "milliseconds": 237.09749997942708
+    },
+    {
+      "id": "en-main-23-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_override",
+      "origin": "new",
+      "caseIndex": 23,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.04633353317945505,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.04633353317945505
+          }
+        },
+        "usage": {
+          "input_tokens": 155,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 155,
+      "milliseconds": 227.07329198601656
+    },
+    {
+      "id": "en-cross-00-h0",
+      "locale": "en",
+      "language": "zh",
+      "partition": "cross",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8789981705901192,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8789981705901192
+          }
+        },
+        "usage": {
+          "input_tokens": 172,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 172,
+      "milliseconds": 276.59045899054036
+    },
+    {
+      "id": "en-cross-04-h0",
+      "locale": "en",
+      "language": "zh",
+      "partition": "cross",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 4,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.07746787953109772,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.07746787953109772
+          }
+        },
+        "usage": {
+          "input_tokens": 167,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 167,
+      "milliseconds": 247.7052499889396
+    },
+    {
+      "id": "en-cross-14-h0",
+      "locale": "en",
+      "language": "zh",
+      "partition": "cross",
+      "group": "quotation",
+      "origin": "new",
+      "caseIndex": 14,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.9324866830855545,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.9324866830855545
+          }
+        },
+        "usage": {
+          "input_tokens": 185,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 185,
+      "milliseconds": 249.7598750051111
+    },
+    {
+      "id": "en-cross-16-h0",
+      "locale": "en",
+      "language": "zh",
+      "partition": "cross",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 16,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "false",
+      "pTrue": 0.035968779500229586,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.035968779500229586
+          }
+        },
+        "usage": {
+          "input_tokens": 175,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 175,
+      "milliseconds": 249.73012498230673
+    }
+  ],
+  "warmup": [
+    {
+      "id": "zh-main-00",
+      "locale": "zh",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8988993956470264,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8988993956470264
+          }
+        },
+        "usage": {
+          "input_tokens": 297,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 297,
+      "milliseconds": 444.47112499619834
+    },
+    {
+      "id": "zh-main-00",
+      "locale": "zh",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8988993956470264,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8988993956470264
+          }
+        },
+        "usage": {
+          "input_tokens": 297,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 297,
+      "milliseconds": 295.83024999010377
+    },
+    {
+      "id": "zh-main-00",
+      "locale": "zh",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8988993956470264,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8988993956470264
+          }
+        },
+        "usage": {
+          "input_tokens": 297,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 297,
+      "milliseconds": 295.5953330092598
+    },
+    {
+      "id": "en-main-00",
+      "locale": "en",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8467057599003093,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8467057599003093
+          }
+        },
+        "usage": {
+          "input_tokens": 106,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 106,
+      "milliseconds": 137.60791698587127
+    },
+    {
+      "id": "en-main-00",
+      "locale": "en",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8467057599003093,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8467057599003093
+          }
+        },
+        "usage": {
+          "input_tokens": 106,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 106,
+      "milliseconds": 148.96537500317208
+    },
+    {
+      "id": "en-main-00",
+      "locale": "en",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "partition": "main",
+      "origin": "regression",
+      "suite": "localized",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.8467057599003093,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.8467057599003093
+          }
+        },
+        "usage": {
+          "input_tokens": 106,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 106,
+      "milliseconds": 155.98358298302628
+    },
+    {
+      "id": "zh-main-00-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.7647089164877796,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.7647089164877796
+          }
+        },
+        "usage": {
+          "input_tokens": 327,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 327,
+      "milliseconds": 373.145666992059
+    },
+    {
+      "id": "zh-main-00-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.7647089164877796,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.7647089164877796
+          }
+        },
+        "usage": {
+          "input_tokens": 327,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 327,
+      "milliseconds": 333.91904199379496
+    },
+    {
+      "id": "zh-main-00-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.7647089164877796,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.7647089164877796
+          }
+        },
+        "usage": {
+          "input_tokens": 327,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 327,
+      "milliseconds": 326.4271249936428
+    },
+    {
+      "id": "en-main-00-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.762396400731676,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.762396400731676
+          }
+        },
+        "usage": {
+          "input_tokens": 154,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 154,
+      "milliseconds": 167.57575000519864
+    },
+    {
+      "id": "en-main-00-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.762396400731676,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.762396400731676
+          }
+        },
+        "usage": {
+          "input_tokens": 154,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 154,
+      "milliseconds": 168.2244580006227
+    },
+    {
+      "id": "en-main-00-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "suite": "history",
+      "variant": "noul_defined",
+      "prediction": "true",
+      "pTrue": 0.762396400731676,
+      "rawResult": {
+        "model": "vela3.1-fast",
+        "answers": {
+          "decision": {
+            "type": "noul",
+            "noul": 0.762396400731676
+          }
+        },
+        "usage": {
+          "input_tokens": 154,
+          "output_tokens": 0
+        }
+      },
+      "inputTokens": 154,
+      "milliseconds": 168.7450000026729
+    }
+  ],
+  "complete": true,
+  "tensorParityCases": 252
+}

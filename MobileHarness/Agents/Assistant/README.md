@@ -144,11 +144,11 @@ Shared driver queue and provider lifecycle limits are documented in [Chat](../Su
 
 ## Full-duplex input and Decision
 
-Authenticated SpeechPerception final transcripts and local user text enter the ordinary queue before Decision runs. Peer reports and correlated Action facts bypass Decision. Queue capacity, attribution, batching and round settlement remain admission/dispatch concerns; classification never gates them.
+Authenticated SpeechPerception final transcripts and local user text enter the ordinary queue before any eligible Decision runs. Only arrivals during same-session reply work (including tool settlement) or playback submit Decision; idle arrivals dispatch without a Decision request or fabricated result. Peer reports and correlated Action facts bypass Decision. Queue capacity, attribution, batching and round settlement remain admission/dispatch concerns; classification never gates them.
 
 AssistantInputDecision owns the localized interruption question and calls only ModelKit `noul`. A frozen snapshot contains `current_turn` (the current user request and natural-language text admitted to playback, if a reply exists) and `incoming_user_input`. It contains no completed earlier turns, queued messages, busy flag or playback state. Input text is JSON data and is not translated. Only an explicit immediate stop, pause, correction or replacement is true; additions, quotations, answers, negated/deferred stops and new questions are false. ModelKit owns all provider encoding and readout; no keyword rule overrides the boolean.
 
-At receipt the worker captures the reply identity before asynchronous admission. Successful queue admission submits a frozen snapshot to AssistantDecisionQueue in AssistantInputDecision.swift. This role-owned actor owns bounded serial Decision work (32 pending including the running item), cancellation and joined cleanup; it runs independently of ordinary queue dispatch. A true result submits an AssistantInterrupt with the captured reply target to the common requestInterrupt entry. It does not cancel execution directly. The worker checks identity and current activity and installs the execution cancellation barrier before crossing actors. Cancellation joins existing model/action/playback cleanup before ordinary queue dispatch resumes. Idle arrivals have no target, so their later result cannot cancel their own reply. Ended or replaced targets and duplicate signals have no effect on successors. Pause/stop cancels Decision; close removes that session's pending jobs and invalidates its target.
+At receipt the worker captures the reply identity and same-session reply work/playback state before asynchronous admission. After successful queue admission, only inputs captured as busy submit a frozen snapshot to AssistantDecisionQueue in AssistantInputDecision.swift. This role-owned actor owns bounded serial Decision work (32 pending including the running item), cancellation and joined cleanup; it runs independently of ordinary queue dispatch. A true result submits an AssistantInterrupt with the captured reply target to the common requestInterrupt entry. It does not cancel execution directly. The worker checks identity and current activity and installs the execution cancellation barrier before crossing actors. Cancellation joins existing model/action/playback cleanup before ordinary queue dispatch resumes. Idle arrivals create no Decision snapshot or job; becoming busy during admission/dispatch does not retroactively classify that input. Ended or replaced targets and duplicate signals have no effect on successors. Pause/stop cancels Decision; close removes that session's pending jobs and invalidates its target.
 
 Selected models are exclusive: D3 Edge, Vela, or existing local/cloud Chat through ModelKit's ChatDecision adapter. Switching dedicated models joins work before unloading. Native timeout is one second, local Chat 500 ms and total age budget two seconds. Errors, missing resources, overflow and timeouts remain explicit failures; they never fabricate false, remove queued messages or switch models. A full Decision backlog records a failure while the input remains in the ordinary queue. Native context capacity overflow fails without silently truncating the latest input.
 
@@ -198,7 +198,7 @@ AssistantSpeechOutput records paired native playback start/end times separately 
 
 ## Unified interruption control
 
-`AssistantInterrupt.swift` owns the typed `assistant.interrupt` v1 communication contract. Targets are `.current` (lock the same-session reply when received) or `.reply(UUID)` (match an already captured reply). `AssistantChatWorker.requestInterrupt` is the shared entry for Decision, trusted host controls and authorized Agent messages. An idle Decision sends no signal; an external idle request returns `no_target`. A public `currentReplyID(sessionID:)` exposes the opaque target to trusted callers without granting communication authority.
+`AssistantInterrupt.swift` owns the typed `assistant.interrupt` v1 communication contract. Targets are `.current` (lock the same-session reply when received) or `.reply(UUID)` (match an already captured reply). `AssistantChatWorker.requestInterrupt` is the shared entry for Decision, trusted host controls and authorized Agent messages. Idle user input never invokes Decision; an external idle request returns `no_target`. A public `currentReplyID(sessionID:)` exposes the opaque target to trusted callers without granting communication authority.
 
 The entry validates the current target, claims it and sets the dispatch barrier on the worker actor before invoking the execution-session cleanup callback. Cleanup joins model, Action and playback cancellation and settlement; only then does dispatch resume. Results are interrupted/no_target/target_expired/duplicate; failures throw. Recent source/session/signal identities use a 128-entry FIFO receipt set, including ignored and failed requests; there is no automatic replay or durable exactly-once promise. Closing a session or stopping the Agent remains a separate lifecycle control.
 
@@ -208,7 +208,7 @@ AgentContracts registers the schema and Agent.json declares an observation input
 flowchart LR
  Text[ASR final / user text] --> Queue[Ordinary input queue]
  Queue --> Dispatch[Normal dispatch]
- Queue --> Decision[Independent Decision queue and noul]
+ Queue -->|Busy at arrival only| Decision[Independent Decision queue and noul]
  Decision -->|targeted true signal| Entry[requestInterrupt]
  Host[Host stop request] --> Entry
  Peer[Authorized Agent] --> Gateway[Gateway / assistant.interrupt]
@@ -217,3 +217,5 @@ flowchart LR
  Claim --> Cleanup[Cancel and join execution cleanup]
  Cleanup --> Dispatch
 ```
+
+Decision模型切换支持D3 Edge、Vela 3 Fast/3.1 Fast及Laya Multilingual；上下文和noul请求不随模型变化。根模块删除上述任一制品前，停止并加入该ID的Decision调用；模型名称仅用于日志呈现。

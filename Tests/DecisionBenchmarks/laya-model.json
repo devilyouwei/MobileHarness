@@ -1,0 +1,60 @@
+{
+  "repository": "mlboydaisuke/Laya-Multilingual-CoreAI",
+  "revision": "3fe58a5ed7857b41f5c7ba8c0f46ce420b42cf02",
+  "directory": "LayaMultilingual",
+  "bundle": "macos/wfp16-s512",
+  "files": [
+    {
+      "path": "macos/wfp16-s512/laya_ml_wfp16_s512.aimodel/main.hash",
+      "size": 32,
+      "sha256": "b48956aff570cdd07f363dd243d965818879011dfd94cb187b414a1d35067aaf"
+    },
+    {
+      "path": "macos/wfp16-s512/laya_ml_wfp16_s512.aimodel/main.mlirb",
+      "size": 645772283,
+      "sha256": "3dd13911fa46cb7794f9b5527e63665817d1e757309c4cd92bf7397cf2617a06"
+    },
+    {
+      "path": "macos/wfp16-s512/laya_ml_wfp16_s512.aimodel/metadata.json",
+      "size": 422,
+      "sha256": "845279c73db455938feced18892a13eda5528cda50d2968f83affa1ac5301f30"
+    },
+    {
+      "path": "macos/wfp16-s512/metadata.json",
+      "size": 2465,
+      "sha256": "39838a0ef8606f56bceca30fbad4ccc36dc1bead2d1e22b07537d6a2954708f9"
+    },
+    {
+      "path": "macos/wfp16-s512/reference.json",
+      "size": 646002,
+      "sha256": "b4e1ac0de94d27799a73d1ae518a91132887e9b75ccef2595a0e70249d0cb027"
+    },
+    {
+      "path": "macos/wfp16-s512/tokenizer/tokenizer.json",
+      "size": 34363188,
+      "sha256": "609d8f4c067cd3950f88594c5a802616cea245823836ef5848ee4fc40aab5b6f"
+    },
+    {
+      "path": "macos/wfp16-s512/tokenizer/tokenizer_config.json",
+      "size": 524,
+      "sha256": "6c6b2d8e3c84ce0e671c129cd6b374b235d6f9863042a5836358d00a89bbb5a1"
+    },
+    {
+      "path": "_laya_host.py",
+      "size": 3864,
+      "sha256": "c6a7240b27ae5af081daaba86a39486e70dcaa6db8e29f2845291ef94b7b8c80",
+      "source": "https://raw.githubusercontent.com/john-rocky/coreai-model-zoo/main/conversion/laya/_laya_host.py"
+    },
+    {
+      "path": "fixtures-laya-multilingual.json",
+      "size": 831677,
+      "sha256": "f3b6528d5cb88c0ddca988276cb33d23e0ca5382deb3bae68fdb412973e2f8b0",
+      "source": "https://raw.githubusercontent.com/john-rocky/coreai-model-zoo/main/models/laya-multilingual/fixtures-laya-multilingual.json"
+    }
+  ],
+  "hostPackage": {
+    "filename": "laya-0.4.2-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/a6/d1/8d1d18b6645c729612a2e3008cba79b6b1fa1420b6a5df026650df2a7321/laya-0.4.2-py3-none-any.whl",
+    "sha256": "126284550840e8fc2445f9cd4c808e505d25d457242e7de5658b2cb9f9155b26"
+  }
+}

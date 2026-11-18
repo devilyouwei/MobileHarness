@@ -1,0 +1,272 @@
+[
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-alarm-unfinished-zh-Hans\/concise_choice",
+    "milliseconds" : 497.762416,
+    "model" : "vela31",
+    "prediction" : "无意义消息",
+    "reference" : 0.5472835529994435,
+    "score" : 0.5472835529994435
+  },
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-alarm-complete-zh-Hans\/concise_choice",
+    "milliseconds" : 182.521959,
+    "model" : "vela31",
+    "prediction" : "无意义消息",
+    "reference" : 0.6113638018381572,
+    "score" : 0.6113638018381572
+  },
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-brightness-unfinished-zh-Hans\/concise_choice",
+    "milliseconds" : 153.113709,
+    "model" : "vela31",
+    "prediction" : "无意义消息",
+    "reference" : 0.5518639053907461,
+    "score" : 0.5518639053907461
+  },
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-alarm-unfinished-en\/concise_choice",
+    "milliseconds" : 92.620667,
+    "model" : "vela31",
+    "prediction" : "Meaningless message",
+    "reference" : 0.5033240303892978,
+    "score" : 0.5033240303892978
+  },
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-alarm-complete-en\/concise_choice",
+    "milliseconds" : 95.153417,
+    "model" : "vela31",
+    "prediction" : "Meaningless message",
+    "reference" : 0.6198562499044813,
+    "score" : 0.6198562499044813
+  },
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-brightness-unfinished-en\/concise_choice",
+    "milliseconds" : 95.21975,
+    "model" : "vela31",
+    "prediction" : "Meaningless message",
+    "reference" : 0.4124924350908597,
+    "score" : 0.4124924350908597
+  },
+  {
+    "delta" : 2.7755575615628914e-17,
+    "id" : "single\/zh-main-00\/concise_noul",
+    "milliseconds" : 145.700208,
+    "model" : "vela31",
+    "prediction" : "false",
+    "reference" : 0.16787365004281649,
+    "score" : 0.1678736500428165
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/zh-main-00\/concise_choice",
+    "milliseconds" : 183.643875,
+    "model" : "vela31",
+    "prediction" : "否",
+    "reference" : 0.6406643417851272,
+    "score" : 0.6406643417851272
+  },
+  {
+    "delta" : 2.7755575615628914e-17,
+    "id" : "single\/zh-main-01\/concise_noul",
+    "milliseconds" : 181.159958,
+    "model" : "vela31",
+    "prediction" : "false",
+    "reference" : 0.17351225363419834,
+    "score" : 0.1735122536341983
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/zh-main-01\/concise_choice",
+    "milliseconds" : 175.235333,
+    "model" : "vela31",
+    "prediction" : "否",
+    "reference" : 0.6042315263410347,
+    "score" : 0.6042315263410347
+  },
+  {
+    "delta" : 8.326672684688674e-17,
+    "id" : "single\/zh-main-02\/concise_noul",
+    "milliseconds" : 187.324083,
+    "model" : "vela31",
+    "prediction" : "false",
+    "reference" : 0.20824610250204764,
+    "score" : 0.20824610250204756
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/zh-main-02\/concise_choice",
+    "milliseconds" : 228.31475,
+    "model" : "vela31",
+    "prediction" : "否",
+    "reference" : 0.6167331609296828,
+    "score" : 0.6167331609296828
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-00\/concise_noul",
+    "milliseconds" : 134.582375,
+    "model" : "vela31",
+    "prediction" : "true",
+    "reference" : 0.9939590923936603,
+    "score" : 0.9939590923936603
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-00\/concise_choice",
+    "milliseconds" : 141.787417,
+    "model" : "vela31",
+    "prediction" : "Yes",
+    "reference" : 0.9938170855221596,
+    "score" : 0.9938170855221596
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-01\/concise_noul",
+    "milliseconds" : 158.772167,
+    "model" : "vela31",
+    "prediction" : "true",
+    "reference" : 0.9950649331908644,
+    "score" : 0.9950649331908644
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-01\/concise_choice",
+    "milliseconds" : 150.388875,
+    "model" : "vela31",
+    "prediction" : "Yes",
+    "reference" : 0.9951593670290128,
+    "score" : 0.9951593670290128
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-02\/concise_noul",
+    "milliseconds" : 144.470667,
+    "model" : "vela31",
+    "prediction" : "true",
+    "reference" : 0.9919637966236557,
+    "score" : 0.9919637966236557
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-02\/concise_choice",
+    "milliseconds" : 139.180917,
+    "model" : "vela31",
+    "prediction" : "Yes",
+    "reference" : 0.9921992344510315,
+    "score" : 0.9921992344510315
+  },
+  {
+    "delta" : 4.163336342344337e-17,
+    "id" : "current\/zh-main-00-h0\/concise_noul",
+    "milliseconds" : 238.277834,
+    "model" : "vela31",
+    "prediction" : "false",
+    "reference" : 0.11252347170195746,
+    "score" : 0.11252347170195742
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/zh-main-00-h0\/concise_choice",
+    "milliseconds" : 215.167417,
+    "model" : "vela31",
+    "prediction" : "否",
+    "reference" : 0.7302574400446382,
+    "score" : 0.7302574400446382
+  },
+  {
+    "delta" : 1.1102230246251565e-16,
+    "id" : "current\/zh-main-01-h0\/concise_noul",
+    "milliseconds" : 185.448459,
+    "model" : "vela31",
+    "prediction" : "false",
+    "reference" : 0.254268132399297,
+    "score" : 0.25426813239929713
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/zh-main-01-h0\/concise_choice",
+    "milliseconds" : 179.230708,
+    "model" : "vela31",
+    "prediction" : "否",
+    "reference" : 0.6283717922418182,
+    "score" : 0.6283717922418182
+  },
+  {
+    "delta" : 5.551115123125783e-17,
+    "id" : "current\/zh-main-02-h0\/concise_noul",
+    "milliseconds" : 204.497416,
+    "model" : "vela31",
+    "prediction" : "false",
+    "reference" : 0.26941857504420025,
+    "score" : 0.2694185750442002
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/zh-main-02-h0\/concise_choice",
+    "milliseconds" : 181.97375,
+    "model" : "vela31",
+    "prediction" : "否",
+    "reference" : 0.645243842850313,
+    "score" : 0.645243842850313
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-00-h0\/concise_noul",
+    "milliseconds" : 101.162792,
+    "model" : "vela31",
+    "prediction" : "true",
+    "reference" : 0.9910275570905988,
+    "score" : 0.9910275570905988
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-00-h0\/concise_choice",
+    "milliseconds" : 102.160542,
+    "model" : "vela31",
+    "prediction" : "Yes",
+    "reference" : 0.9911068394880248,
+    "score" : 0.9911068394880248
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-01-h0\/concise_noul",
+    "milliseconds" : 100.620375,
+    "model" : "vela31",
+    "prediction" : "true",
+    "reference" : 0.9656373948572174,
+    "score" : 0.9656373948572174
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-01-h0\/concise_choice",
+    "milliseconds" : 101.396542,
+    "model" : "vela31",
+    "prediction" : "Yes",
+    "reference" : 0.9677417696371996,
+    "score" : 0.9677417696371996
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-02-h0\/concise_noul",
+    "milliseconds" : 124.042834,
+    "model" : "vela31",
+    "prediction" : "true",
+    "reference" : 0.9860157238486323,
+    "score" : 0.9860157238486323
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-02-h0\/concise_choice",
+    "milliseconds" : 129.97625,
+    "model" : "vela31",
+    "prediction" : "Yes",
+    "reference" : 0.9854324250995776,
+    "score" : 0.9854324250995776
+  }
+]

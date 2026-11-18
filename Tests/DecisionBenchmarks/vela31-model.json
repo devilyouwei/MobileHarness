@@ -1,0 +1,53 @@
+{
+  "repository": "hugging-mac/vela3.1-fast",
+  "revision": "108e385769cbd0da463706b24cac5a535604d2c6",
+  "directory": "Vela31Fast",
+  "runtime": "cpu",
+  "files": [
+    {
+      "path": "config.json",
+      "size": 2099,
+      "sha256": "8678694242f9545f1f6cac7d3e318718b267c29908e71a5e1804fd76bdadb787"
+    },
+    {
+      "path": "graphs/decision/graph.json",
+      "size": 31283,
+      "sha256": "5259cab7e0d4cb1155b21e597d806951eed077373971f28ccf85a497a69d7a38"
+    },
+    {
+      "path": "graphs/decision/model.aimodel/main.hash",
+      "size": 32,
+      "sha256": "a4ce3cdfbba0410a4884f3ef1d6e2ea9a9e2bbb01f718b9363f30914110243c4"
+    },
+    {
+      "path": "graphs/decision/model.aimodel/main.mlirb",
+      "size": 429680,
+      "sha256": "c11baa383bfdc72e64213194a1d5f6f6ef54debd2b29cb1be1f6658ab728de30"
+    },
+    {
+      "path": "graphs/decision/model.aimodel/metadata.json",
+      "size": 105,
+      "sha256": "ecabd67c838f403df0855dc10303a7b944d122eeb2e1baa3b10f5c12f2818cc8"
+    },
+    {
+      "path": "manifest.json",
+      "size": 1133684,
+      "sha256": "9dcb27d4369f01bff54a00648f2632c9610f8a244387a02d1ece08c2cffa1871"
+    },
+    {
+      "path": "tokenizer.json",
+      "size": 3523470,
+      "sha256": "38734bb17ef19f84c67b5eb5692bea19801ffd02cb5c5ffc11429e76b0242e08"
+    },
+    {
+      "path": "tokenizer_config.json",
+      "size": 764,
+      "sha256": "649781df90d51837dd6ba951a89fae07c985a9eacfd781d84002d480c3cb0b6e"
+    },
+    {
+      "path": "weights/model.safetensors",
+      "size": 1521771536,
+      "sha256": "3693b2866eb44cb5334367c8808f3f0891cc5b20052ccc2a35f54087f468b36c"
+    }
+  ]
+}

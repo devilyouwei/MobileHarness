@@ -1,0 +1,807 @@
+{
+  "sources": {
+    "decision-concise-intent-shared-four-input-2026-11-18.json": "b43997429e491b4c62b0a8a1e71eeabf3a0222a9ce8a508749ad943f7f0d3363",
+    "decision-concise-intent-vela31-four-results-2026-11-18.json": "3c0a6f6b76993856b85923f287f89a8ea9716fedd124b2cdebd9fa0adb525f51",
+    "decision-concise-intent-shared-single-input-2026-11-18.json": "6d2c4998871247ff31aefaa6a445c893484fa8ee5f8d7577088a9a5f5e0920d4",
+    "decision-concise-intent-vela31-single-results-2026-11-18.json": "f1a73499c8330060b5d5e6cd01d266ba82337b12074858dc49d3bb1a11507cb8",
+    "decision-concise-intent-shared-current-input-2026-11-18.json": "c32808ea41142f7c4425248440b5dc7b2ee8dba2df856b9f301bd3237c0d929e",
+    "decision-concise-intent-vela31-current-results-2026-11-18.json": "72493e130aac8f4ab00d511248e3c2c687881ddb820393b53f938e9db9938e74",
+    "decision-concise-intent-laya-four-results-2026-11-18.json": "9d514b2fb319b4f6e918908fd3845ebe111264819ad0ed2ec0a162a9fb3e689f",
+    "decision-concise-intent-laya-single-results-2026-11-18.json": "d3cb8657a73de97dd2775488e7fce5c041c36d45321ef4b23d2238c4151c648f",
+    "decision-concise-intent-laya-current-results-2026-11-18.json": "6be42ce11e068f599e56b2a9d0a3f5e138c76af9f9f56db17412fbd8196a0f1e"
+  },
+  "rows": [
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "four/holdout-alarm-unfinished-zh-Hans/concise_choice",
+      "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n周一叫醒我，时间定在",
+      "instructions": "请问用户的意图是什么？",
+      "kind": "choice",
+      "candidates": [
+        "打断",
+        "未说完",
+        "无意义消息",
+        "等待"
+      ],
+      "prediction": "无意义消息",
+      "score": 0.5472835529994435
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "four/holdout-alarm-complete-zh-Hans/concise_choice",
+      "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n周一叫醒我，时间定在\n六点半。",
+      "instructions": "请问用户的意图是什么？",
+      "kind": "choice",
+      "candidates": [
+        "打断",
+        "未说完",
+        "无意义消息",
+        "等待"
+      ],
+      "prediction": "无意义消息",
+      "score": 0.6113638018381572
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "four/holdout-brightness-unfinished-zh-Hans/concise_choice",
+      "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n把亮度调成",
+      "instructions": "请问用户的意图是什么？",
+      "kind": "choice",
+      "candidates": [
+        "打断",
+        "未说完",
+        "无意义消息",
+        "等待"
+      ],
+      "prediction": "无意义消息",
+      "score": 0.5518639053907461
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "four/holdout-alarm-unfinished-en/concise_choice",
+      "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nWake me on Monday at",
+      "instructions": "What is the user's intent?",
+      "kind": "choice",
+      "candidates": [
+        "Interrupt",
+        "Unfinished",
+        "Meaningless message",
+        "Wait"
+      ],
+      "prediction": "Meaningless message",
+      "score": 0.5033240303892978
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "four/holdout-alarm-complete-en/concise_choice",
+      "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nWake me on Monday at\nsix thirty.",
+      "instructions": "What is the user's intent?",
+      "kind": "choice",
+      "candidates": [
+        "Interrupt",
+        "Unfinished",
+        "Meaningless message",
+        "Wait"
+      ],
+      "prediction": "Meaningless message",
+      "score": 0.6198562499044813
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "four/holdout-brightness-unfinished-en/concise_choice",
+      "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nChange the brightness to",
+      "instructions": "What is the user's intent?",
+      "kind": "choice",
+      "candidates": [
+        "Interrupt",
+        "Unfinished",
+        "Meaningless message",
+        "Wait"
+      ],
+      "prediction": "Meaningless message",
+      "score": 0.4124924350908597
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "single/zh-main-00/concise_noul",
+      "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n停一下。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "false",
+      "score": 0.16787365004281649
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "single/zh-main-00/concise_choice",
+      "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n停一下。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "choice",
+      "candidates": [
+        "否",
+        "是"
+      ],
+      "prediction": "否",
+      "score": 0.6406643417851272
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "single/zh-main-01/concise_noul",
+      "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n别说了。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "false",
+      "score": 0.17351225363419834
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "single/zh-main-01/concise_choice",
+      "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n别说了。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "choice",
+      "candidates": [
+        "否",
+        "是"
+      ],
+      "prediction": "否",
+      "score": 0.6042315263410347
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "single/zh-main-02/concise_noul",
+      "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n暂停你现在的回答。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "false",
+      "score": 0.20824610250204764
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "single/zh-main-02/concise_choice",
+      "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n暂停你现在的回答。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "choice",
+      "candidates": [
+        "否",
+        "是"
+      ],
+      "prediction": "否",
+      "score": 0.6167331609296828
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "single/en-main-00/concise_noul",
+      "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nStop.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "true",
+      "score": 0.9939590923936603
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "single/en-main-00/concise_choice",
+      "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nStop.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "choice",
+      "candidates": [
+        "No",
+        "Yes"
+      ],
+      "prediction": "Yes",
+      "score": 0.9938170855221596
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "single/en-main-01/concise_noul",
+      "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nStop talking.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "true",
+      "score": 0.9950649331908644
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "single/en-main-01/concise_choice",
+      "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nStop talking.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "choice",
+      "candidates": [
+        "No",
+        "Yes"
+      ],
+      "prediction": "Yes",
+      "score": 0.9951593670290128
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "single/en-main-02/concise_noul",
+      "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nPause your current answer.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "true",
+      "score": 0.9919637966236557
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "single/en-main-02/concise_choice",
+      "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nPause your current answer.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "choice",
+      "candidates": [
+        "No",
+        "Yes"
+      ],
+      "prediction": "Yes",
+      "score": 0.9921992344510315
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "current/zh-main-00-h0/concise_noul",
+      "text": "以下是当前正在进行的对话：\n用户：介绍北京\n助手：北京有很多景点。\n\n以下是用户发送的最新消息：\n停一下。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "false",
+      "score": 0.11252347170195746
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "current/zh-main-00-h0/concise_choice",
+      "text": "以下是当前正在进行的对话：\n用户：介绍北京\n助手：北京有很多景点。\n\n以下是用户发送的最新消息：\n停一下。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "choice",
+      "candidates": [
+        "否",
+        "是"
+      ],
+      "prediction": "否",
+      "score": 0.7302574400446382
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "current/zh-main-01-h0/concise_noul",
+      "text": "以下是当前正在进行的对话：\n用户：解释步骤\n助手：第一步，打开页面。\n\n以下是用户发送的最新消息：\n暂停，我先记下来。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "false",
+      "score": 0.254268132399297
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "current/zh-main-01-h0/concise_choice",
+      "text": "以下是当前正在进行的对话：\n用户：解释步骤\n助手：第一步，打开页面。\n\n以下是用户发送的最新消息：\n暂停，我先记下来。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "choice",
+      "candidates": [
+        "否",
+        "是"
+      ],
+      "prediction": "否",
+      "score": 0.6283717922418182
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "current/zh-main-02-h0/concise_noul",
+      "text": "以下是当前正在进行的对话：\n用户：介绍北京\n助手：先介绍历史。\n\n以下是用户发送的最新消息：\n别讲北京了，改讲上海。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "false",
+      "score": 0.26941857504420025
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "current/zh-main-02-h0/concise_choice",
+      "text": "以下是当前正在进行的对话：\n用户：介绍北京\n助手：先介绍历史。\n\n以下是用户发送的最新消息：\n别讲北京了，改讲上海。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "choice",
+      "candidates": [
+        "否",
+        "是"
+      ],
+      "prediction": "否",
+      "score": 0.645243842850313
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "current/en-main-00-h0/concise_noul",
+      "text": "The following conversation is currently in progress:\nUser: Describe Beijing\nAssistant: Beijing has many sights.\n\nThe following is the user's latest message:\nStop.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "true",
+      "score": 0.9910275570905988
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "current/en-main-00-h0/concise_choice",
+      "text": "The following conversation is currently in progress:\nUser: Describe Beijing\nAssistant: Beijing has many sights.\n\nThe following is the user's latest message:\nStop.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "choice",
+      "candidates": [
+        "No",
+        "Yes"
+      ],
+      "prediction": "Yes",
+      "score": 0.9911068394880248
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "current/en-main-01-h0/concise_noul",
+      "text": "The following conversation is currently in progress:\nUser: Explain the steps\nAssistant: First, open the page.\n\nThe following is the user's latest message:\nPause while I take notes.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "true",
+      "score": 0.9656373948572174
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "current/en-main-01-h0/concise_choice",
+      "text": "The following conversation is currently in progress:\nUser: Explain the steps\nAssistant: First, open the page.\n\nThe following is the user's latest message:\nPause while I take notes.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "choice",
+      "candidates": [
+        "No",
+        "Yes"
+      ],
+      "prediction": "Yes",
+      "score": 0.9677417696371996
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "current/en-main-02-h0/concise_noul",
+      "text": "The following conversation is currently in progress:\nUser: Describe Beijing\nAssistant: First, its history.\n\nThe following is the user's latest message:\nStop describing Beijing. Switch to Shanghai.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "true",
+      "score": 0.9860157238486323
+    },
+    {
+      "model": "vela31",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/Vela31Fast",
+      "id": "current/en-main-02-h0/concise_choice",
+      "text": "The following conversation is currently in progress:\nUser: Describe Beijing\nAssistant: First, its history.\n\nThe following is the user's latest message:\nStop describing Beijing. Switch to Shanghai.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "choice",
+      "candidates": [
+        "No",
+        "Yes"
+      ],
+      "prediction": "Yes",
+      "score": 0.9854324250995776
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "four/holdout-alarm-unfinished-zh-Hans/concise_choice",
+      "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n周一叫醒我，时间定在",
+      "instructions": "请问用户的意图是什么？",
+      "kind": "choice",
+      "candidates": [
+        "打断",
+        "未说完",
+        "无意义消息",
+        "等待"
+      ],
+      "prediction": "未说完",
+      "score": 0.4103
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "four/holdout-alarm-complete-zh-Hans/concise_choice",
+      "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n周一叫醒我，时间定在\n六点半。",
+      "instructions": "请问用户的意图是什么？",
+      "kind": "choice",
+      "candidates": [
+        "打断",
+        "未说完",
+        "无意义消息",
+        "等待"
+      ],
+      "prediction": "等待",
+      "score": 0.3218
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "four/holdout-brightness-unfinished-zh-Hans/concise_choice",
+      "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n把亮度调成",
+      "instructions": "请问用户的意图是什么？",
+      "kind": "choice",
+      "candidates": [
+        "打断",
+        "未说完",
+        "无意义消息",
+        "等待"
+      ],
+      "prediction": "无意义消息",
+      "score": 0.4336
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "four/holdout-alarm-unfinished-en/concise_choice",
+      "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nWake me on Monday at",
+      "instructions": "What is the user's intent?",
+      "kind": "choice",
+      "candidates": [
+        "Interrupt",
+        "Unfinished",
+        "Meaningless message",
+        "Wait"
+      ],
+      "prediction": "Wait",
+      "score": 0.5053
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "four/holdout-alarm-complete-en/concise_choice",
+      "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nWake me on Monday at\nsix thirty.",
+      "instructions": "What is the user's intent?",
+      "kind": "choice",
+      "candidates": [
+        "Interrupt",
+        "Unfinished",
+        "Meaningless message",
+        "Wait"
+      ],
+      "prediction": "Wait",
+      "score": 0.5036
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "four/holdout-brightness-unfinished-en/concise_choice",
+      "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nChange the brightness to",
+      "instructions": "What is the user's intent?",
+      "kind": "choice",
+      "candidates": [
+        "Interrupt",
+        "Unfinished",
+        "Meaningless message",
+        "Wait"
+      ],
+      "prediction": "Unfinished",
+      "score": 0.4145
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "single/zh-main-00/concise_noul",
+      "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n停一下。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "true",
+      "score": 0.706
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "single/zh-main-00/concise_choice",
+      "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n停一下。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "choice",
+      "candidates": [
+        "否",
+        "是"
+      ],
+      "prediction": "是",
+      "score": 0.8861
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "single/zh-main-01/concise_noul",
+      "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n别说了。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "false",
+      "score": 0.3824
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "single/zh-main-01/concise_choice",
+      "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n别说了。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "choice",
+      "candidates": [
+        "否",
+        "是"
+      ],
+      "prediction": "否",
+      "score": 0.9259
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "single/zh-main-02/concise_noul",
+      "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n暂停你现在的回答。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "true",
+      "score": 0.6943
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "single/zh-main-02/concise_choice",
+      "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n暂停你现在的回答。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "choice",
+      "candidates": [
+        "否",
+        "是"
+      ],
+      "prediction": "是",
+      "score": 0.886
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "single/en-main-00/concise_noul",
+      "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nStop.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "true",
+      "score": 0.7299
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "single/en-main-00/concise_choice",
+      "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nStop.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "choice",
+      "candidates": [
+        "No",
+        "Yes"
+      ],
+      "prediction": "Yes",
+      "score": 0.9706
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "single/en-main-01/concise_noul",
+      "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nStop talking.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "true",
+      "score": 0.7616
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "single/en-main-01/concise_choice",
+      "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nStop talking.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "choice",
+      "candidates": [
+        "No",
+        "Yes"
+      ],
+      "prediction": "Yes",
+      "score": 0.9749
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "single/en-main-02/concise_noul",
+      "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nPause your current answer.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "true",
+      "score": 0.721
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "single/en-main-02/concise_choice",
+      "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nPause your current answer.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "choice",
+      "candidates": [
+        "No",
+        "Yes"
+      ],
+      "prediction": "Yes",
+      "score": 0.9816
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "current/zh-main-00-h0/concise_noul",
+      "text": "以下是当前正在进行的对话：\n用户：介绍北京\n助手：北京有很多景点。\n\n以下是用户发送的最新消息：\n停一下。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "false",
+      "score": 0.4276
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "current/zh-main-00-h0/concise_choice",
+      "text": "以下是当前正在进行的对话：\n用户：介绍北京\n助手：北京有很多景点。\n\n以下是用户发送的最新消息：\n停一下。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "choice",
+      "candidates": [
+        "否",
+        "是"
+      ],
+      "prediction": "是",
+      "score": 0.7528
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "current/zh-main-01-h0/concise_noul",
+      "text": "以下是当前正在进行的对话：\n用户：解释步骤\n助手：第一步，打开页面。\n\n以下是用户发送的最新消息：\n暂停，我先记下来。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "false",
+      "score": 0.4017
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "current/zh-main-01-h0/concise_choice",
+      "text": "以下是当前正在进行的对话：\n用户：解释步骤\n助手：第一步，打开页面。\n\n以下是用户发送的最新消息：\n暂停，我先记下来。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "choice",
+      "candidates": [
+        "否",
+        "是"
+      ],
+      "prediction": "是",
+      "score": 0.7684
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "current/zh-main-02-h0/concise_noul",
+      "text": "以下是当前正在进行的对话：\n用户：介绍北京\n助手：先介绍历史。\n\n以下是用户发送的最新消息：\n别讲北京了，改讲上海。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "false",
+      "score": 0.4557
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "current/zh-main-02-h0/concise_choice",
+      "text": "以下是当前正在进行的对话：\n用户：介绍北京\n助手：先介绍历史。\n\n以下是用户发送的最新消息：\n别讲北京了，改讲上海。",
+      "instructions": "请问用户的意图是否表达打断？",
+      "kind": "choice",
+      "candidates": [
+        "否",
+        "是"
+      ],
+      "prediction": "否",
+      "score": 0.5256
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "current/en-main-00-h0/concise_noul",
+      "text": "The following conversation is currently in progress:\nUser: Describe Beijing\nAssistant: Beijing has many sights.\n\nThe following is the user's latest message:\nStop.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "false",
+      "score": 0.315
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "current/en-main-00-h0/concise_choice",
+      "text": "The following conversation is currently in progress:\nUser: Describe Beijing\nAssistant: Beijing has many sights.\n\nThe following is the user's latest message:\nStop.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "choice",
+      "candidates": [
+        "No",
+        "Yes"
+      ],
+      "prediction": "Yes",
+      "score": 0.8019
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "current/en-main-01-h0/concise_noul",
+      "text": "The following conversation is currently in progress:\nUser: Explain the steps\nAssistant: First, open the page.\n\nThe following is the user's latest message:\nPause while I take notes.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "true",
+      "score": 0.6457
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "current/en-main-01-h0/concise_choice",
+      "text": "The following conversation is currently in progress:\nUser: Explain the steps\nAssistant: First, open the page.\n\nThe following is the user's latest message:\nPause while I take notes.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "choice",
+      "candidates": [
+        "No",
+        "Yes"
+      ],
+      "prediction": "Yes",
+      "score": 0.9288
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "current/en-main-02-h0/concise_noul",
+      "text": "The following conversation is currently in progress:\nUser: Describe Beijing\nAssistant: First, its history.\n\nThe following is the user's latest message:\nStop describing Beijing. Switch to Shanghai.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "noul",
+      "candidates": [],
+      "prediction": "false",
+      "score": 0.4361
+    },
+    {
+      "model": "laya",
+      "artifacts": "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512",
+      "id": "current/en-main-02-h0/concise_choice",
+      "text": "The following conversation is currently in progress:\nUser: Describe Beijing\nAssistant: First, its history.\n\nThe following is the user's latest message:\nStop describing Beijing. Switch to Shanghai.",
+      "instructions": "Does the user's intent express an interruption?",
+      "kind": "choice",
+      "candidates": [
+        "No",
+        "Yes"
+      ],
+      "prediction": "Yes",
+      "score": 0.8293
+    }
+  ]
+}

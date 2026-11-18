@@ -1,0 +1,3821 @@
+{
+  "sourceFile": "decision-history-binary-vela-input-2026-11-17.json",
+  "sourceSHA256": "67e864ce2349074549a303cbd7f76499b7c88041fc49d3e17917e7cf44981ca2",
+  "sourceHashes": {
+    "Tests/IntegrationTests/DecisionPromptOptimizationTests.swift": "118e3357dc3230a634d4737cddebe50e859843ba7c3952f7eb71a1f3ee01d163",
+    "MobileHarness/ModelKit/Language/JEV/D3Decision.swift": "b871e1ac8d9ca518969ca0ebc6b96035a1948f128aa1dcbc4e81b6f61755e1ad",
+    "Tests/DecisionBenchmarks/concise_intent_experiment.py": "7ac342b13ab49ee24b4e2f7d2d701f3bce59108e3f4414974dfc9da37180bdbe"
+  },
+  "formatterSHA256": "3badfbc70561bb3f5b8ec16a11d2c455b96ddb32caace0a8a54ca102eae1f3fa",
+  "rows": [
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-00-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "explicit_stop",
+        "origin": "new",
+        "caseIndex": 0,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍北京\n助手：北京有很多景点。\n\n以下是用户发送的最新消息：\n停一下。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-00-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "explicit_stop",
+        "origin": "new",
+        "caseIndex": 0,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍北京\n助手：北京有很多景点。\n\n以下是用户发送的最新消息：\n停一下。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-01-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "pause",
+        "origin": "new",
+        "caseIndex": 1,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：解释步骤\n助手：第一步，打开页面。\n\n以下是用户发送的最新消息：\n暂停，我先记下来。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-01-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "pause",
+        "origin": "new",
+        "caseIndex": 1,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：解释步骤\n助手：第一步，打开页面。\n\n以下是用户发送的最新消息：\n暂停，我先记下来。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-02-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "task_switch",
+        "origin": "new",
+        "caseIndex": 2,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍北京\n助手：先介绍历史。\n\n以下是用户发送的最新消息：\n别讲北京了，改讲上海。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-02-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "task_switch",
+        "origin": "new",
+        "caseIndex": 2,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍北京\n助手：先介绍历史。\n\n以下是用户发送的最新消息：\n别讲北京了，改讲上海。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-03-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "correction",
+        "origin": "new",
+        "caseIndex": 3,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：说说上海\n助手：北京的交通主要有\n\n以下是用户发送的最新消息：\n不对，我问的是上海，先停。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-03-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "correction",
+        "origin": "new",
+        "caseIndex": 3,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：说说上海\n助手：北京的交通主要有\n\n以下是用户发送的最新消息：\n不对，我问的是上海，先停。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-04-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 4,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：多举些例子\n助手：再举一个例子，还有\n\n以下是用户发送的最新消息：\n够了。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-04-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 4,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：多举些例子\n助手：再举一个例子，还有\n\n以下是用户发送的最新消息：\n够了。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-05-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 5,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：继续介绍方案\n助手：接着介绍第三个方案\n\n以下是用户发送的最新消息：\n不用继续了。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-05-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 5,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：继续介绍方案\n助手：接着介绍第三个方案\n\n以下是用户发送的最新消息：\n不用继续了。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-06-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "polite_stop",
+        "origin": "new",
+        "caseIndex": 6,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：读这段说明\n助手：本产品适用于\n\n以下是用户发送的最新消息：\n可以先停一下吗？",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-06-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "polite_stop",
+        "origin": "new",
+        "caseIndex": 6,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：读这段说明\n助手：本产品适用于\n\n以下是用户发送的最新消息：\n可以先停一下吗？",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-07-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "self_correction",
+        "origin": "new",
+        "caseIndex": 7,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：继续讲\n助手：下一点是\n\n以下是用户发送的最新消息：\n继续，不，还是现在停。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-07-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "self_correction",
+        "origin": "new",
+        "caseIndex": 7,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：继续讲\n助手：下一点是\n\n以下是用户发送的最新消息：\n继续，不，还是现在停。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-08-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "history_code_1",
+        "origin": "new",
+        "caseIndex": 8,
+        "historyDepth": 0,
+        "requiredHistory": 1,
+        "fullExpected": "true",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍景点\n助手：第一个景点是\n\n以下是用户发送的最新消息：\n青松。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-08-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "history_code_1",
+        "origin": "new",
+        "caseIndex": 8,
+        "historyDepth": 0,
+        "requiredHistory": 1,
+        "fullExpected": "true",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍景点\n助手：第一个景点是\n\n以下是用户发送的最新消息：\n青松。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-09-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "history_code_2",
+        "origin": "new",
+        "caseIndex": 9,
+        "historyDepth": 0,
+        "requiredHistory": 2,
+        "fullExpected": "true",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍景点\n助手：第一个景点是\n\n以下是用户发送的最新消息：\n蓝鲸。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-09-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "history_code_2",
+        "origin": "new",
+        "caseIndex": 9,
+        "historyDepth": 0,
+        "requiredHistory": 2,
+        "fullExpected": "true",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍景点\n助手：第一个景点是\n\n以下是用户发送的最新消息：\n蓝鲸。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-10-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "history_code_4",
+        "origin": "new",
+        "caseIndex": 10,
+        "historyDepth": 0,
+        "requiredHistory": 4,
+        "fullExpected": "true",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍景点\n助手：第一个景点是\n\n以下是用户发送的最新消息：\n银杏。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-10-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "history_code_4",
+        "origin": "new",
+        "caseIndex": 10,
+        "historyDepth": 0,
+        "requiredHistory": 4,
+        "fullExpected": "true",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍景点\n助手：第一个景点是\n\n以下是用户发送的最新消息：\n银杏。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-11-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "history_override",
+        "origin": "new",
+        "caseIndex": 11,
+        "historyDepth": 0,
+        "requiredHistory": 1,
+        "fullExpected": "true",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍景点\n助手：第一个景点是\n\n以下是用户发送的最新消息：\n白鹭。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-11-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "history_override",
+        "origin": "new",
+        "caseIndex": 11,
+        "historyDepth": 0,
+        "requiredHistory": 1,
+        "fullExpected": "true",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍景点\n助手：第一个景点是\n\n以下是用户发送的最新消息：\n白鹭。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-12-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "answer",
+        "origin": "new",
+        "caseIndex": 12,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：问我喜欢的颜色\n助手：你喜欢什么颜色？\n\n以下是用户发送的最新消息：\n蓝色。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-12-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "answer",
+        "origin": "new",
+        "caseIndex": 12,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：问我喜欢的颜色\n助手：你喜欢什么颜色？\n\n以下是用户发送的最新消息：\n蓝色。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-13-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "addition",
+        "origin": "new",
+        "caseIndex": 13,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍景点\n助手：北京有很多景点。\n\n以下是用户发送的最新消息：\n最后加上交通方式。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-13-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "addition",
+        "origin": "new",
+        "caseIndex": 13,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍景点\n助手：北京有很多景点。\n\n以下是用户发送的最新消息：\n最后加上交通方式。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-14-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "quotation",
+        "origin": "new",
+        "caseIndex": 14,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：练习翻译\n助手：请给出要翻译的句子。\n\n以下是用户发送的最新消息：\n翻译：立即停止。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-14-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "quotation",
+        "origin": "new",
+        "caseIndex": 14,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：练习翻译\n助手：请给出要翻译的句子。\n\n以下是用户发送的最新消息：\n翻译：立即停止。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-15-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "negation",
+        "origin": "new",
+        "caseIndex": 15,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：解释步骤\n助手：第一步是\n\n以下是用户发送的最新消息：\n别停，继续。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-15-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "negation",
+        "origin": "new",
+        "caseIndex": 15,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：解释步骤\n助手：第一步是\n\n以下是用户发送的最新消息：\n别停，继续。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-16-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 16,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：问我杯子里的水量\n助手：这些水够了吗？\n\n以下是用户发送的最新消息：\n够了。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-16-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 16,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：问我杯子里的水量\n助手：这些水够了吗？\n\n以下是用户发送的最新消息：\n够了。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-17-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 17,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：帮我回复朋友\n助手：朋友问要不要继续练琴。你想怎么回复？\n\n以下是用户发送的最新消息：\n不用继续了。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-17-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 17,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：帮我回复朋友\n助手：朋友问要不要继续练琴。你想怎么回复？\n\n以下是用户发送的最新消息：\n不用继续了。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-18-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "deferred",
+        "origin": "new",
+        "caseIndex": 18,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍三个景点\n助手：第一个景点是\n\n以下是用户发送的最新消息：\n讲完这三个再停。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-18-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "deferred",
+        "origin": "new",
+        "caseIndex": 18,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍三个景点\n助手：第一个景点是\n\n以下是用户发送的最新消息：\n讲完这三个再停。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-19-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "self_correction",
+        "origin": "new",
+        "caseIndex": 19,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍景点\n助手：第一个景点是\n\n以下是用户发送的最新消息：\n停，算了，你继续。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-19-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "self_correction",
+        "origin": "new",
+        "caseIndex": 19,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍景点\n助手：第一个景点是\n\n以下是用户发送的最新消息：\n停，算了，你继续。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-20-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "history_code_1",
+        "origin": "new",
+        "caseIndex": 20,
+        "historyDepth": 0,
+        "requiredHistory": 1,
+        "fullExpected": "false",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍景点\n助手：第一个景点是\n\n以下是用户发送的最新消息：\n青松。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-20-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "history_code_1",
+        "origin": "new",
+        "caseIndex": 20,
+        "historyDepth": 0,
+        "requiredHistory": 1,
+        "fullExpected": "false",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍景点\n助手：第一个景点是\n\n以下是用户发送的最新消息：\n青松。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-21-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "history_code_2",
+        "origin": "new",
+        "caseIndex": 21,
+        "historyDepth": 0,
+        "requiredHistory": 2,
+        "fullExpected": "false",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍景点\n助手：第一个景点是\n\n以下是用户发送的最新消息：\n蓝鲸。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-21-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "history_code_2",
+        "origin": "new",
+        "caseIndex": 21,
+        "historyDepth": 0,
+        "requiredHistory": 2,
+        "fullExpected": "false",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍景点\n助手：第一个景点是\n\n以下是用户发送的最新消息：\n蓝鲸。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-22-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "history_code_4",
+        "origin": "new",
+        "caseIndex": 22,
+        "historyDepth": 0,
+        "requiredHistory": 4,
+        "fullExpected": "false",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍景点\n助手：第一个景点是\n\n以下是用户发送的最新消息：\n银杏。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-22-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "history_code_4",
+        "origin": "new",
+        "caseIndex": 22,
+        "historyDepth": 0,
+        "requiredHistory": 4,
+        "fullExpected": "false",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍景点\n助手：第一个景点是\n\n以下是用户发送的最新消息：\n银杏。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-main-23-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "history_override",
+        "origin": "new",
+        "caseIndex": 23,
+        "historyDepth": 0,
+        "requiredHistory": 1,
+        "fullExpected": "false",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍景点\n助手：第一个景点是\n\n以下是用户发送的最新消息：\n白鹭。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-main-23-h0",
+        "locale": "zh",
+        "language": "zh",
+        "partition": "main",
+        "group": "history_override",
+        "origin": "new",
+        "caseIndex": 23,
+        "historyDepth": 0,
+        "requiredHistory": 1,
+        "fullExpected": "false",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：介绍景点\n助手：第一个景点是\n\n以下是用户发送的最新消息：\n白鹭。",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-cross-00-h0",
+        "locale": "zh",
+        "language": "en",
+        "partition": "cross",
+        "group": "explicit_stop",
+        "origin": "new",
+        "caseIndex": 0,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：Describe Beijing\n助手：Beijing has many sights.\n\n以下是用户发送的最新消息：\nStop.",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-cross-00-h0",
+        "locale": "zh",
+        "language": "en",
+        "partition": "cross",
+        "group": "explicit_stop",
+        "origin": "new",
+        "caseIndex": 0,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：Describe Beijing\n助手：Beijing has many sights.\n\n以下是用户发送的最新消息：\nStop.",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-cross-04-h0",
+        "locale": "zh",
+        "language": "en",
+        "partition": "cross",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 4,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：Give more examples\n助手：Another example is, and also\n\n以下是用户发送的最新消息：\nEnough.",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-cross-04-h0",
+        "locale": "zh",
+        "language": "en",
+        "partition": "cross",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 4,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：Give more examples\n助手：Another example is, and also\n\n以下是用户发送的最新消息：\nEnough.",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-cross-14-h0",
+        "locale": "zh",
+        "language": "en",
+        "partition": "cross",
+        "group": "quotation",
+        "origin": "new",
+        "caseIndex": 14,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：Practice translation\n助手：Give me a sentence to translate.\n\n以下是用户发送的最新消息：\nTranslate: Stop immediately.",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-cross-14-h0",
+        "locale": "zh",
+        "language": "en",
+        "partition": "cross",
+        "group": "quotation",
+        "origin": "new",
+        "caseIndex": 14,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：Practice translation\n助手：Give me a sentence to translate.\n\n以下是用户发送的最新消息：\nTranslate: Stop immediately.",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "zh-cross-16-h0",
+        "locale": "zh",
+        "language": "en",
+        "partition": "cross",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 16,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：Ask about the water in my cup\n助手：Is that enough water?\n\n以下是用户发送的最新消息：\nEnough.",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "请问用户的意图是否表达打断？"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "zh-cross-16-h0",
+        "locale": "zh",
+        "language": "en",
+        "partition": "cross",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 16,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n用户：Ask about the water in my cup\n助手：Is that enough water?\n\n以下是用户发送的最新消息：\nEnough.",
+        "instructions": "请问用户的意图是否表达打断？",
+        "candidates": [
+          "否",
+          "是"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是否表达打断？",
+        "criteria": {
+          "否": null,
+          "是": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-00-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "explicit_stop",
+        "origin": "new",
+        "caseIndex": 0,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe Beijing\nAssistant: Beijing has many sights.\n\nThe following is the user's latest message:\nStop.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-00-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "explicit_stop",
+        "origin": "new",
+        "caseIndex": 0,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe Beijing\nAssistant: Beijing has many sights.\n\nThe following is the user's latest message:\nStop.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-01-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "pause",
+        "origin": "new",
+        "caseIndex": 1,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Explain the steps\nAssistant: First, open the page.\n\nThe following is the user's latest message:\nPause while I take notes.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-01-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "pause",
+        "origin": "new",
+        "caseIndex": 1,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Explain the steps\nAssistant: First, open the page.\n\nThe following is the user's latest message:\nPause while I take notes.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-02-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "task_switch",
+        "origin": "new",
+        "caseIndex": 2,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe Beijing\nAssistant: First, its history.\n\nThe following is the user's latest message:\nStop describing Beijing. Switch to Shanghai.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-02-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "task_switch",
+        "origin": "new",
+        "caseIndex": 2,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe Beijing\nAssistant: First, its history.\n\nThe following is the user's latest message:\nStop describing Beijing. Switch to Shanghai.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-03-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "correction",
+        "origin": "new",
+        "caseIndex": 3,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Tell me about Shanghai\nAssistant: Beijing's transport includes\n\nThe following is the user's latest message:\nNo, I asked about Shanghai. Stop.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-03-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "correction",
+        "origin": "new",
+        "caseIndex": 3,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Tell me about Shanghai\nAssistant: Beijing's transport includes\n\nThe following is the user's latest message:\nNo, I asked about Shanghai. Stop.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-04-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 4,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Give more examples\nAssistant: Another example is, and also\n\nThe following is the user's latest message:\nEnough.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-04-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 4,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Give more examples\nAssistant: Another example is, and also\n\nThe following is the user's latest message:\nEnough.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-05-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 5,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Continue describing the plan\nAssistant: Next, the third part of the plan\n\nThe following is the user's latest message:\nNo need to continue.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-05-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 5,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Continue describing the plan\nAssistant: Next, the third part of the plan\n\nThe following is the user's latest message:\nNo need to continue.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-06-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "polite_stop",
+        "origin": "new",
+        "caseIndex": 6,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Read these instructions\nAssistant: This product is suitable for\n\nThe following is the user's latest message:\nCould you stop for a moment?",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-06-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "polite_stop",
+        "origin": "new",
+        "caseIndex": 6,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Read these instructions\nAssistant: This product is suitable for\n\nThe following is the user's latest message:\nCould you stop for a moment?",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-07-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "self_correction",
+        "origin": "new",
+        "caseIndex": 7,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Keep explaining\nAssistant: The next point is\n\nThe following is the user's latest message:\nContinue, no, stop now instead.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-07-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "self_correction",
+        "origin": "new",
+        "caseIndex": 7,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Keep explaining\nAssistant: The next point is\n\nThe following is the user's latest message:\nContinue, no, stop now instead.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-08-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "history_code_1",
+        "origin": "new",
+        "caseIndex": 8,
+        "historyDepth": 0,
+        "requiredHistory": 1,
+        "fullExpected": "true",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe the sights\nAssistant: The first sight is\n\nThe following is the user's latest message:\nPine.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-08-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "history_code_1",
+        "origin": "new",
+        "caseIndex": 8,
+        "historyDepth": 0,
+        "requiredHistory": 1,
+        "fullExpected": "true",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe the sights\nAssistant: The first sight is\n\nThe following is the user's latest message:\nPine.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-09-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "history_code_2",
+        "origin": "new",
+        "caseIndex": 9,
+        "historyDepth": 0,
+        "requiredHistory": 2,
+        "fullExpected": "true",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe the sights\nAssistant: The first sight is\n\nThe following is the user's latest message:\nWhale.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-09-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "history_code_2",
+        "origin": "new",
+        "caseIndex": 9,
+        "historyDepth": 0,
+        "requiredHistory": 2,
+        "fullExpected": "true",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe the sights\nAssistant: The first sight is\n\nThe following is the user's latest message:\nWhale.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-10-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "history_code_4",
+        "origin": "new",
+        "caseIndex": 10,
+        "historyDepth": 0,
+        "requiredHistory": 4,
+        "fullExpected": "true",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe the sights\nAssistant: The first sight is\n\nThe following is the user's latest message:\nGinkgo.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-10-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "history_code_4",
+        "origin": "new",
+        "caseIndex": 10,
+        "historyDepth": 0,
+        "requiredHistory": 4,
+        "fullExpected": "true",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe the sights\nAssistant: The first sight is\n\nThe following is the user's latest message:\nGinkgo.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-11-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "history_override",
+        "origin": "new",
+        "caseIndex": 11,
+        "historyDepth": 0,
+        "requiredHistory": 1,
+        "fullExpected": "true",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe the sights\nAssistant: The first sight is\n\nThe following is the user's latest message:\nEgret.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-11-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "history_override",
+        "origin": "new",
+        "caseIndex": 11,
+        "historyDepth": 0,
+        "requiredHistory": 1,
+        "fullExpected": "true",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe the sights\nAssistant: The first sight is\n\nThe following is the user's latest message:\nEgret.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-12-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "answer",
+        "origin": "new",
+        "caseIndex": 12,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Ask my favorite color\nAssistant: What color do you like?\n\nThe following is the user's latest message:\nBlue.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-12-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "answer",
+        "origin": "new",
+        "caseIndex": 12,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Ask my favorite color\nAssistant: What color do you like?\n\nThe following is the user's latest message:\nBlue.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-13-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "addition",
+        "origin": "new",
+        "caseIndex": 13,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe the sights\nAssistant: Beijing has many sights.\n\nThe following is the user's latest message:\nAdd transport options at the end.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-13-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "addition",
+        "origin": "new",
+        "caseIndex": 13,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe the sights\nAssistant: Beijing has many sights.\n\nThe following is the user's latest message:\nAdd transport options at the end.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-14-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "quotation",
+        "origin": "new",
+        "caseIndex": 14,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Practice translation\nAssistant: Give me a sentence to translate.\n\nThe following is the user's latest message:\nTranslate: Stop immediately.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-14-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "quotation",
+        "origin": "new",
+        "caseIndex": 14,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Practice translation\nAssistant: Give me a sentence to translate.\n\nThe following is the user's latest message:\nTranslate: Stop immediately.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-15-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "negation",
+        "origin": "new",
+        "caseIndex": 15,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Explain the steps\nAssistant: The first step is\n\nThe following is the user's latest message:\nDon't stop. Continue.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-15-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "negation",
+        "origin": "new",
+        "caseIndex": 15,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Explain the steps\nAssistant: The first step is\n\nThe following is the user's latest message:\nDon't stop. Continue.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-16-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 16,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Ask about the water in my cup\nAssistant: Is that enough water?\n\nThe following is the user's latest message:\nEnough.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-16-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 16,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Ask about the water in my cup\nAssistant: Is that enough water?\n\nThe following is the user's latest message:\nEnough.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-17-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 17,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Help me reply to a friend\nAssistant: Your friend asks whether to keep practicing piano. What is your reply?\n\nThe following is the user's latest message:\nNo need to continue.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-17-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 17,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Help me reply to a friend\nAssistant: Your friend asks whether to keep practicing piano. What is your reply?\n\nThe following is the user's latest message:\nNo need to continue.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-18-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "deferred",
+        "origin": "new",
+        "caseIndex": 18,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe three sights\nAssistant: The first sight is\n\nThe following is the user's latest message:\nStop after you describe all three.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-18-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "deferred",
+        "origin": "new",
+        "caseIndex": 18,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe three sights\nAssistant: The first sight is\n\nThe following is the user's latest message:\nStop after you describe all three.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-19-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "self_correction",
+        "origin": "new",
+        "caseIndex": 19,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe the sights\nAssistant: The first sight is\n\nThe following is the user's latest message:\nStop, never mind, keep going.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-19-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "self_correction",
+        "origin": "new",
+        "caseIndex": 19,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe the sights\nAssistant: The first sight is\n\nThe following is the user's latest message:\nStop, never mind, keep going.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-20-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "history_code_1",
+        "origin": "new",
+        "caseIndex": 20,
+        "historyDepth": 0,
+        "requiredHistory": 1,
+        "fullExpected": "false",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe the sights\nAssistant: The first sight is\n\nThe following is the user's latest message:\nPine.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-20-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "history_code_1",
+        "origin": "new",
+        "caseIndex": 20,
+        "historyDepth": 0,
+        "requiredHistory": 1,
+        "fullExpected": "false",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe the sights\nAssistant: The first sight is\n\nThe following is the user's latest message:\nPine.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-21-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "history_code_2",
+        "origin": "new",
+        "caseIndex": 21,
+        "historyDepth": 0,
+        "requiredHistory": 2,
+        "fullExpected": "false",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe the sights\nAssistant: The first sight is\n\nThe following is the user's latest message:\nWhale.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-21-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "history_code_2",
+        "origin": "new",
+        "caseIndex": 21,
+        "historyDepth": 0,
+        "requiredHistory": 2,
+        "fullExpected": "false",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe the sights\nAssistant: The first sight is\n\nThe following is the user's latest message:\nWhale.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-22-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "history_code_4",
+        "origin": "new",
+        "caseIndex": 22,
+        "historyDepth": 0,
+        "requiredHistory": 4,
+        "fullExpected": "false",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe the sights\nAssistant: The first sight is\n\nThe following is the user's latest message:\nGinkgo.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-22-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "history_code_4",
+        "origin": "new",
+        "caseIndex": 22,
+        "historyDepth": 0,
+        "requiredHistory": 4,
+        "fullExpected": "false",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe the sights\nAssistant: The first sight is\n\nThe following is the user's latest message:\nGinkgo.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-main-23-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "history_override",
+        "origin": "new",
+        "caseIndex": 23,
+        "historyDepth": 0,
+        "requiredHistory": 1,
+        "fullExpected": "false",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe the sights\nAssistant: The first sight is\n\nThe following is the user's latest message:\nEgret.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-main-23-h0",
+        "locale": "en",
+        "language": "en",
+        "partition": "main",
+        "group": "history_override",
+        "origin": "new",
+        "caseIndex": 23,
+        "historyDepth": 0,
+        "requiredHistory": 1,
+        "fullExpected": "false",
+        "expected": "unspecified"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: Describe the sights\nAssistant: The first sight is\n\nThe following is the user's latest message:\nEgret.",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-cross-00-h0",
+        "locale": "en",
+        "language": "zh",
+        "partition": "cross",
+        "group": "explicit_stop",
+        "origin": "new",
+        "caseIndex": 0,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: 介绍北京\nAssistant: 北京有很多景点。\n\nThe following is the user's latest message:\n停一下。",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-cross-00-h0",
+        "locale": "en",
+        "language": "zh",
+        "partition": "cross",
+        "group": "explicit_stop",
+        "origin": "new",
+        "caseIndex": 0,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: 介绍北京\nAssistant: 北京有很多景点。\n\nThe following is the user's latest message:\n停一下。",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-cross-04-h0",
+        "locale": "en",
+        "language": "zh",
+        "partition": "cross",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 4,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: 多举些例子\nAssistant: 再举一个例子，还有\n\nThe following is the user's latest message:\n够了。",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-cross-04-h0",
+        "locale": "en",
+        "language": "zh",
+        "partition": "cross",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 4,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "true",
+        "expected": "true"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: 多举些例子\nAssistant: 再举一个例子，还有\n\nThe following is the user's latest message:\n够了。",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-cross-14-h0",
+        "locale": "en",
+        "language": "zh",
+        "partition": "cross",
+        "group": "quotation",
+        "origin": "new",
+        "caseIndex": 14,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: 练习翻译\nAssistant: 请给出要翻译的句子。\n\nThe following is the user's latest message:\n翻译：立即停止。",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-cross-14-h0",
+        "locale": "en",
+        "language": "zh",
+        "partition": "cross",
+        "group": "quotation",
+        "origin": "new",
+        "caseIndex": 14,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: 练习翻译\nAssistant: 请给出要翻译的句子。\n\nThe following is the user's latest message:\n翻译：立即停止。",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    },
+    {
+      "variant": "concise_noul",
+      "scenario": {
+        "id": "en-cross-16-h0",
+        "locale": "en",
+        "language": "zh",
+        "partition": "cross",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 16,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: 问我杯子里的水量\nAssistant: 这些水够了吗？\n\nThe following is the user's latest message:\n够了。",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No / false",
+          "Yes / true"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "noul",
+        "instructions": "Does the user's intent express an interruption?"
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "en-cross-16-h0",
+        "locale": "en",
+        "language": "zh",
+        "partition": "cross",
+        "group": "short_counterfactual",
+        "origin": "new",
+        "caseIndex": 16,
+        "historyDepth": 0,
+        "requiredHistory": 0,
+        "fullExpected": "false",
+        "expected": "false"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nUser: 问我杯子里的水量\nAssistant: 这些水够了吗？\n\nThe following is the user's latest message:\n够了。",
+        "instructions": "Does the user's intent express an interruption?",
+        "candidates": [
+          "No",
+          "Yes"
+        ],
+        "actions": [
+          "false",
+          "true"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Does the user's intent express an interruption?",
+        "criteria": {
+          "No": null,
+          "Yes": null
+        }
+      }
+    }
+  ],
+  "note": "Waiting maps to enqueue for evaluation; no business-state fields or earlier history."
+}

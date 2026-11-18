@@ -440,6 +440,12 @@
                 }
             } footer: {
                 if let detail = details(choice) { Text(detail) }
+                if brain == .decision, choice.usesLocal {
+                    Text(
+                        appCopy.text(
+                            "Mac interrupt experiments only. Recommendation favors fewer false interruptions; Chinese reliability and device performance still need validation."
+                        ))
+                }
             }
             if brain == .decision {
                 Section(appCopy.text("Latest decision")) {

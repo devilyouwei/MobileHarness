@@ -41,6 +41,8 @@
             }
         }
 
+        private let model: AIModel
+        private let constants: [String: NDArray]
         private let function: InferenceFunction
         private let descriptor: InferenceFunctionDescriptor
         public let inputNames: [String]
@@ -49,9 +51,13 @@
         /// Loads a source `.aimodel` or AOT `.aimodelc`; remaining device specialization is cached.
         public init(
             contentsOf url: URL, function name: String = "main",
-            computeUnits: ComputeUnits = .gpu
+            computeUnits: ComputeUnits = .gpu, constantInputs: [String: TensorValue] = [:]
         ) async throws {
             let model = try await AIModel(contentsOf: url, options: computeUnits.specializationOptions)
+            try self.init(model: model, name: name, constantInputs: constantInputs)
+        }
+
+        private init(model: AIModel, name: String, constantInputs: [String: TensorValue]) throws {
             guard let descriptor = model.functionDescriptor(for: name) else {
                 throw CoreAIGraphError.functionNotFound(name)
             }
@@ -61,10 +67,27 @@
             guard let function = try model.loadFunction(named: name) else {
                 throw CoreAIGraphError.functionNotFound(name)
             }
+            var constants: [String: NDArray] = [:]
+            for (key, value) in constantInputs {
+                guard case .ndArray(let d) = descriptor.inputDescriptor(of: key) else {
+                    throw CoreAIGraphError.unknownInput(key)
+                }
+                guard d.shape == value.shape else {
+                    throw CoreAIGraphError.shapeMismatch(input: key, expected: d.shape, got: value.shape)
+                }
+                constants[key] = try value.makeNDArray(descriptor: d, inputName: key)
+            }
+            self.model = model
+            self.constants = constants
             self.descriptor = descriptor
             self.function = function
-            self.inputNames = descriptor.inputNames
+            self.inputNames = descriptor.inputNames.filter { constants[$0] == nil }
             self.outputNames = descriptor.outputNames
+        }
+
+        /// Loads another stateless function without specializing a second model.
+        public func function(named name: String) throws -> GraphModel {
+            try GraphModel(model: model, name: name, constantInputs: [:])
         }
 
         /// Declared input shape (dynamic dimensions are negative), or nil for unknown names.
@@ -84,7 +107,7 @@
         public func run(_ inputs: [String: TensorValue]) async throws -> [String: TensorValue] {
             try Task.checkCancellation()
             guard Set(inputs.keys) == Set(inputNames) else { throw CoreAIGraphError.inputSetMismatch }
-            var ndInputs: [String: NDArray] = [:]
+            var ndInputs = constants
             for (name, value) in inputs {
                 guard case .ndArray(let d) = descriptor.inputDescriptor(of: name) else {
                     throw CoreAIGraphError.unknownInput(name)

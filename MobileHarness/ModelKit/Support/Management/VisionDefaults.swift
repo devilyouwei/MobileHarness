@@ -24,6 +24,24 @@ extension DefaultModelAssembly {
                         context: context,
                         artifacts: resources.appendingPathComponent("Vela3Fast")))
             })
+        try await manager.register(
+            ModelRegistration(
+                id: ModelID("vela3.1-fast"), capabilities: [.decision], memoryPolicy: .retain,
+                artifactID: "vela3.1-fast"
+            ) { context in
+                ProvidedCapabilities(
+                    decision: try Vela31Decision(
+                        context: context, artifacts: resources.appendingPathComponent("Vela31Fast")))
+            })
+        try await manager.register(
+            ModelRegistration(
+                id: ModelID("laya-multilingual"), capabilities: [.decision], memoryPolicy: .retain,
+                artifactID: "laya-multilingual"
+            ) { context in
+                ProvidedCapabilities(
+                    decision: try LayaDecision(
+                        context: context, artifacts: resources.appendingPathComponent("LayaMultilingual")))
+            })
     }
     static func registerVision(manager: ModelManager, resources: URL) async throws {
         try await manager.register(

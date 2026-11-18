@@ -9,6 +9,8 @@ public struct InputDecisionOutcome: Sendable, Equatable {
     public enum Route: String, Sendable {
         case local = "local:d3-edge"
         case vela = "local:vela3-fast"
+        case vela31 = "local:vela3.1-fast"
+        case laya = "local:laya-multilingual"
         case gemma = "local:gemma4-e2b"
         case apple = "local:apple-system"
         case cloud = "cloud:decision"
@@ -236,6 +238,8 @@ public actor AssistantInputDecision {
                 switch id {
                 case "d3-edge": "D3 Edge"
                 case "vela3-fast": "Vela 3 Fast"
+                case "vela3.1-fast": "Vela 3.1 Fast"
+                case "laya-multilingual": "Laya Multilingual"
                 case "gemma4-e2b": "Gemma 4 E2B"
                 case "apple-system": "Apple System LLM"
                 default: id
@@ -287,7 +291,12 @@ public actor AssistantInputDecision {
         }
         let modelName = selectedModelName.withLock { $0 } ?? "Decision"
         let modelRoute: InputDecisionOutcome.Route =
-            route.localID == "vela3-fast" ? .vela : .local
+            switch route.localID {
+            case "vela3-fast": .vela
+            case "vela3.1-fast": .vela31
+            case "laya-multilingual": .laya
+            default: .local
+            }
         if let id = route.localID {
             localFailureReason = localFailure
             if switchingLocal || activeLocalID != id || localMaintenance.contains(id) {
@@ -461,7 +470,7 @@ extension InputDecisionOutcome {
     func logItem(for snapshot: InputDecisionSnapshot, duration: Duration) -> DecisionLogItem {
         let route: DecisionLogItem.Route =
             switch self.route {
-            case .local, .vela, .gemma, .apple: .local
+            case .local, .vela, .vela31, .laya, .gemma, .apple: .local
             case .cloud: .cloud
             case .failed: .failed
             }

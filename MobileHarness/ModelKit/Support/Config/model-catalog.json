@@ -266,6 +266,75 @@
         "tokenizer.json",
         "tokenizer_config.json"
       ]
+    },
+    {
+      "id": "vela3.1-fast",
+      "name": "Vela 3.1 Fast",
+      "capability": "decision",
+      "directory": "Vela31Fast",
+      "minimumOS": 27,
+      "requiresPhysicalDevice": true,
+      "deviceRequirement": null,
+      "license": "Apache-2.0",
+      "estimatedBytes": 1526861370,
+      "source": {
+        "kind": "huggingface",
+        "repoId": "hugging-mac/vela3.1-fast",
+        "revision": "108e385769cbd0da463706b24cac5a535604d2c6",
+        "allowPatterns": [
+          "config.json",
+          "graphs/decision/model.aimodel/main.hash",
+          "graphs/decision/model.aimodel/main.mlirb",
+          "graphs/decision/model.aimodel/metadata.json",
+          "manifest.json",
+          "tokenizer.json",
+          "tokenizer_config.json",
+          "weights/model.safetensors"
+        ]
+      },
+      "requiredFiles": [
+        "config.json",
+        "graphs/decision/model.aimodel/main.hash",
+        "graphs/decision/model.aimodel/main.mlirb",
+        "graphs/decision/model.aimodel/metadata.json",
+        "manifest.json",
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "weights/model.safetensors"
+      ]
+    },
+    {
+      "id": "laya-multilingual",
+      "name": "Laya Multilingual",
+      "capability": "decision",
+      "directory": "LayaMultilingual",
+      "minimumOS": 27,
+      "requiresPhysicalDevice": true,
+      "deviceRequirement": null,
+      "license": "Apache-2.0",
+      "estimatedBytes": 680138914,
+      "source": {
+        "kind": "huggingface",
+        "repoId": "mlboydaisuke/Laya-Multilingual-CoreAI",
+        "revision": "3fe58a5ed7857b41f5c7ba8c0f46ce420b42cf02",
+        "allowPatterns": [
+          "ios/wfp16-s512/laya_ml_wfp16_s512.aimodel/main.hash",
+          "ios/wfp16-s512/laya_ml_wfp16_s512.aimodel/main.mlirb",
+          "ios/wfp16-s512/laya_ml_wfp16_s512.aimodel/metadata.json",
+          "ios/wfp16-s512/metadata.json",
+          "ios/wfp16-s512/tokenizer/tokenizer.json",
+          "ios/wfp16-s512/tokenizer/tokenizer_config.json"
+        ],
+        "stripPrefix": "ios/wfp16-s512"
+      },
+      "requiredFiles": [
+        "laya_ml_wfp16_s512.aimodel/main.hash",
+        "laya_ml_wfp16_s512.aimodel/main.mlirb",
+        "laya_ml_wfp16_s512.aimodel/metadata.json",
+        "metadata.json",
+        "tokenizer/tokenizer.json",
+        "tokenizer/tokenizer_config.json"
+      ]
     }
   ]
 }

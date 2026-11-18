@@ -1,0 +1,7 @@
+{
+  "capturedAt": "2026-11-18T02:55:05.192397+00:00",
+  "stage": "D3 current-turn inference after rebuild",
+  "disk": "Filesystem      Size    Used   Avail Capacity iused ifree %iused  Mounted on\n/dev/disk3s5   228Gi   136Gi    59Gi    70%    1.3M  621M    0%   /System/Volumes/Data\n",
+  "memory": "hw.memsize: 8589934592\nvm.swapusage: total = 8448.00M  used = 6759.88M  free = 1688.12M  (encrypted)\nmachdep.cpu.brand_string: Apple A18 Pro\n",
+  "note": "Observed independent cleanup of build outputs during this task; first Laya/Vela runs preceded D3 rebuild. Not an inference-time continuous trace."
+}

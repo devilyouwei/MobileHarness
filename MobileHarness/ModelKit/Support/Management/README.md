@@ -12,11 +12,11 @@ ModelKitRuntime depends only on ModelKit. Management owns ModelState (including 
 
 | Target | Explicit root source ownership |
 | --- | --- |
-| ModelKitRuntime | ModelManager.swift, ModelRegistration.swift, ModelArtifactContracts.swift, ModelArtifactStore.swift, ArtifactDownloadTransport.swift, ModelArtifactDiskStorage.swift, ModelDownloadBackgroundService.swift; model-catalog.json resource |
+| ModelKitRuntime | ModelManager.swift, ModelRegistration.swift, ModelArtifactContracts.swift, ModelArtifactStore.swift, ArtifactDownloadTransport.swift, ModelArtifactDiskStorage.swift, ModelDownloadBackgroundService.swift; Config/ModelArtifactCatalog.swift and Config/model-catalog.json in the sibling directory |
 | ModelKitDefaults | 模块根 ModelContainer.swift；本目录 ChatDefaults.swift, SpeechDefaults.swift, VisionDefaults.swift, SpeechProviderSelection.swift |
 | ModelKitHub | HuggingFace/ source files |
 
-The two targets use explicit disjoint sources/excludes; Defaults is rooted at ModelKit to include the public entry file, while Runtime remains rooted in this directory. Registration and artifact contracts are separated by file; native archive transfer remains Runtime-owned. Each ModelContainer owns its manager/configuration; Chat, Decision, Speech and Vision have separate capability registrations. SpeechProviderSelection chooses once before admission; it never retries failed active inference on another provider.
+The two targets use explicit disjoint sources/excludes; Defaults is rooted at ModelKit to include the public entry file, while Runtime is rooted at Support to include Config and Management. Registration and artifact contracts are separated by file; native archive transfer remains Runtime-owned. Each ModelContainer owns its manager/configuration; Chat, Decision, Speech and Vision have separate capability registrations. SpeechProviderSelection chooses once before admission; it never retries failed active inference on another provider.
 
 ## External relationships and data flow
 
@@ -151,7 +151,7 @@ HF 只使用当前传输计划和完成文件；不从 .hub-snapshot 搬迁旧 S
 
 SerialChat forwards full native calls through the existing 128-event queued session without a single-event byte ceiling. Local pending-request bounds and cancellation/cleanup FIFO are independent of argument size; backend capability and token-window errors remain explicit.
 
-The default assembly registers d3-edge and vela3-fast as decision providers with independent retained resources and matching artifact IDs. D3Edge and Vela3Fast contain their respective graphs, manifests and tokenizers. Vela uses the same catalog schema and required-runtime-file checks as other packages. Removing a package fences and joins its provider before deleting files.
+The default assembly registers d3-edge, vela3-fast, vela3.1-fast and laya-multilingual as decision providers with independent retained resources and matching artifact IDs. D3Edge, Vela3Fast, Vela31Fast and LayaMultilingual contain their respective graphs, weights, configurations and tokenizers. Laya uses the portable iOS source graph with its download prefix stripped. Vela uses the same catalog schema and required-runtime-file checks as other packages. Removing a package fences and joins its provider before deleting files.
 
 Catalog schema v2 optionally declares architectureVariants per package, overriding source, requiredFiles and estimatedBytes. Decode validates every variant, including variants for other devices, with the existing bounds and path rules; at most 16 architecture keys are allowed. Default assembly resolves the physical iOS architecture before configuring the artifact store. Packages without a matching variant retain their source declaration. Resolved catalogs omit variants so downloads, required-file checks and receipts share one revision and file contract. Runtime consumes architecture strings without importing CoreAI.
 
@@ -161,7 +161,7 @@ Catalog schema v2 optionally declares architectureVariants per package, overridi
 
 ## Catalog, disk and URL ownership
 
-[model-catalog.json](model-catalog.json) is a ModelKitRuntime package resource, read through `ModelArtifactCatalog.bundled()`. It describes acquisition and compatibility only. The host owns the selected/default model, inference parameters and persisted business preferences.
+[model-catalog.json](../Config/model-catalog.json) is owned with its parsing and validation by [Config](../Config/README.md), compiled as a ModelKitRuntime package resource and read through `ModelArtifactCatalog.bundled()`. It describes acquisition and compatibility only. The host owns the selected/default model, inference parameters and persisted business preferences.
 
 `ModelArtifactDiskStorage` implements the SDK storage port with bounded JSON reads, confined relative paths, symlink rejection, disk reservations, backup exclusion, after-first-unlock protection on iOS, receipts and no-overwrite directory publication. Transfer indexes retain the version-1 envelope for compatibility. Metadata and weights use the same ModelKit root, independent of Storage lifecycle.
 

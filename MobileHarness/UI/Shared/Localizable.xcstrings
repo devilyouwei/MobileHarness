@@ -9954,6 +9954,54 @@
           }
         }
       }
+    },
+    "Vela 3.1 Fast": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vela 3.1 Fast"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vela 3.1 Fast"
+          }
+        }
+      }
+    },
+    "Laya Multilingual": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laya Multilingual"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laya Multilingual"
+          }
+        }
+      }
+    },
+    "Mac interrupt experiments only. Recommendation favors fewer false interruptions; Chinese reliability and device performance still need validation.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac interrupt experiments only. Recommendation favors fewer false interruptions; Chinese reliability and device performance still need validation."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅供 Mac 打断实验参考。推荐优先考虑少误打断；中文可靠性和真机表现仍待验证。"
+          }
+        }
+      }
     }
   }
 }

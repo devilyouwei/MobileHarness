@@ -1099,7 +1099,8 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         // Freeze context and target before enqueue can trigger this input's own reply.
         let occupied = replyAtArrival || playbackAtArrival == true
         let turn = occupied ? turnAtArrival.flatMap { $0.sessionID == input.sessionID ? $0 : nil } : nil
-        let snapshot = userText.map { text in
+        // Idle arrivals never need an interrupt signal, even if admission starts a new reply.
+        let snapshot = (occupied ? userText : nil).map { text in
             InputDecisionSnapshot(
                 input: input, text: text,
                 currentTurn: turn.map { .init(user: $0.user, assistant: $0.assistant) }, receivedAt: arrivedAt)

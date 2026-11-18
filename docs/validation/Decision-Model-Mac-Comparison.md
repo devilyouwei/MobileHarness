@@ -827,3 +827,124 @@ Vela完成后磁盘耗尽。本轮复制的大图已改为APFS克隆并重新验
 补问候定义让Hello进入enqueue，但使总体准确率下降；不能把单条修正当成整体改善。仅收窄discard虽减少误丢弃，仍未恢复继续聆听能力。历史结构hesitation条件回归正确29/48，但7条诊断仅I want to正确继续聆听，Hello及中英文相机命令等仍discard。因此本轮没有可上线的新候选，也未自动应用分数最高项。现有证据支持模型对候选文字高度敏感，不能单凭这两轮推断内部原因或宣布纯提示工程能达到目标。
 
 两轮无推理错误，源文件和输入哈希前后相同。证据：[第一轮输入](../measurements/decision-discard-boundary-input-2026-11-17.json)、[第一轮结果](../measurements/decision-discard-boundary-results-2026-11-17.json)、[第二轮输入](../measurements/decision-discard-status-refinement-input-2026-11-17.json)、[第二轮结果](../measurements/decision-discard-status-refinement-results-2026-11-17.json)、[汇总](../measurements/decision-discard-refinement-summary-2026-11-17.json)。
+
+
+## Vela 3.1 Fast 固定矩阵对照（2026-11-18）
+
+结论：在本项目冻结的四分类模板上没有改善。minimal 比旧 Vela 少正确5条，误丢弃增加9条；utterance_status 两版结果相同；继续聆听均为0/16。不能依据新模型的公开通用基准提升推断本任务改善。
+
+### 制品、方法和范围
+
+使用 [hugging-mac/vela3.1-fast](https://huggingface.co/hugging-mac/vela3.1-fast)，revision `108e385769cbd0da463706b24cac5a535604d2c6`，SDK decision-only CoreAI CPU 路径。仅准备决策图、权重与配置/tokenizer九个必要文件，保留原目录中的旧 Vela/D3。原始权重来源为 vllm-sr/vela3.1-fast。[上游模型说明](https://huggingface.co/vllm-sr/vela3.1-fast#why-31)声称增加多语言训练、问题/选项格式扰动及带定义的 noul；这些不等于本任务实测结论。具体制品见 [模型说明](../../Tests/DecisionBenchmarks/vela31-model.json)。
+
+原样复用108条请求：两种模板各48条既有回归样本和6条诊断；这批样本已多次使用，不再视为新的独立留出集。候选顺序、定义、预期标签不调整。Vela 3与3.1在同一Mac、同一 Python 3.12/coreai-core 1.0.0b2 环境串行运行；每条件3次预热。D3只引用逐项请求一致的历史结果，未重跑。
+
+| 模型/模板 | 正确/48 | macro-F1 | 误discard | 继续聆听命中/16 | P50/P95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Vela 3 minimal，本轮 | 19 (39.6%) | 0.401 | 19 | 0 | 179 / 200 |
+| Vela 3.1 minimal，本轮 | 14 (29.2%) | 0.328 | 28 | 0 | 341 / 512 |
+| Vela 3 utterance_status，本轮 | 7 (14.6%) | 0.205 | 40 | 0 | 290 / 332 |
+| Vela 3.1 utterance_status，本轮 | 7 (14.6%) | 0.205 | 40 | 0 | 585 / 991 |
+| D3 utterance_status，11-16历史 | 29 (60.4%) | 0.658 | 3 | 13 | 不作本轮速度比较 |
+
+两版各108条正式推理均无执行错误。诊断与回归集分别计分，详见原始数据。额外用3条原始 checkpoint 参考请求检查3.1的完整输出/usage/标签，最大绝对分数差9.69e-8以内；包括多语言、多问题和单选项。这支持所用加载/读出路径在这些案例上与原模型一致，不代表所有输入都已验证，也不是iOS数值验收。
+
+8 GiB主机存在约7.6 GiB交换空间使用，记录于环境文件。时延包含编码、推理与解码，不含加载/预热；固定串行执行也不能消除不同时段的内存压力，不能把所有延迟差归因于模型架构。新制品使用外部FP32主干权重，旧制品布局不同。初次普通复制因磁盘空间不足失败，删除本任务的残缺目标后改用APFS克隆并核对内容；未删其他项目文件。
+
+证据：[Vela 3.1逐条结果](../measurements/decision-vela31-comparison-vela31-four-2026-11-18.json)、[Vela 3复测](../measurements/decision-vela31-comparison-vela3-four-2026-11-18.json)、[配对汇总](../measurements/decision-vela31-comparison-paired-2026-11-18.json)、[参考输出对齐](../measurements/decision-vela31-native-parity-2026-11-18.json)、[主机记录](../measurements/decision-vela31-environment-2026-11-18.json)。二分类另见[独立报告](Decision-Binary-Interrupt-Mac-Comparison.md#vela-31-fast-固定矩阵对照2026-11-18)。本轮不修改App，不安装真机，不将Mac结果当作手机效果。
+
+本轮脚本/汇总/工程检查记录统一见[二分类报告本次工程验证](Decision-Binary-Interrupt-Mac-Comparison.md#本次工程验证)，不以工程构建代替模型或手机验收。
+
+
+## Laya Multilingual CoreAI 固定矩阵（2026-11-18）
+
+使用 [mlboydaisuke/Laya-Multilingual-CoreAI](https://huggingface.co/mlboydaisuke/Laya-Multilingual-CoreAI/tree/3fe58a5ed7857b41f5c7ba8c0f46ce420b42cf02) 的 macOS wfp16-s512 源图，固定revision `3fe58a5ed7857b41f5c7ba8c0f46ce420b42cf02`；来源为 convaiinnovations/laya 的multilingual子目录 `1c5edc17a7acd8701df6fc341c0d179f1c62c982`。FP16仅为权重存储，计算FP32；正式运行显式GPU、debug-enabled specialization。发布host完成marker读出、act调用和温度解码，act不参与分类覆盖。App未改。
+
+先试的 ahmedandaloes/laya-multilingual-CoreAI 1024图未能加载，b2 CPU、默认模式及隔离b3 CPU均无评分。该失败图已删除以释放空间，制品说明/失败日志保留。替代512图CPU亦加载失败，GPU成功；随后遇到明确磁盘不足，改为复用本任务已生成的GPU specialization，未删除其他模型或用户文件。不能据此断言首轮通用加载错误全部源于磁盘，也不能把它们计为分类错误。
+
+正式运行前完成发布201条reference：输入token/marker全部一致，选择全部一致，T=1最大概率误差8.11e-6，小于1e-3门槛。这同时检验Laya0.4.2 host与发布者0.3.4 fixture的兼容性；不代表iOS或所有可能输入验证。正式业务case使用bundle自带校准温度，不针对本任务拟合。
+
+| 模型/模板 | 正确/48 | macro-F1 | 误discard | 误interrupt | 继续聆听命中/16 | P50/P95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Laya minimal | 6 (12.5%) | 0.114 | 11 | 25 | 1 | 157 / 166 |
+| Laya utterance_status | 17 (35.4%) | 0.257 | 3 | 2 | 15 | 157 / 162 |
+| Vela 3 minimal，前轮CPU | 19 (39.6%) | 0.401 | 19 | 1 | 0 | 179 / 200 |
+| Vela 3.1 minimal，前轮CPU | 14 (29.2%) | 0.328 | 28 | 2 | 0 | 341 / 512 |
+| Vela 3 utterance_status，前轮CPU | 7 (14.6%) | 0.205 | 40 | 1 | 0 | 290 / 332 |
+| Vela 3.1 utterance_status，前轮CPU | 7 (14.6%) | 0.205 | 40 | 1 | 0 | 585 / 991 |
+| D3 utterance_status，11-16历史 | 29 (60.4%) | 0.658 | 3 | 2 | 13 | 不作本轮速度比较 |
+
+Laya两模板对24条完整表达的enqueue命中均为0。utterance_status虽然继续聆听召回15/16，但把20/24完整表达误判为继续聆听，不能视为可替换方案。两条件共108条（含各6条另计诊断）无执行错误；token、instruction、option预检无截断。病例此前已多次使用，属于冻结回归集而非新留出集。
+
+不同GPU/CPU、不同时间段及磁盘/内存压力下的时延不可作同计算单元性能排名。数据：[逐条四分类](../measurements/decision-laya-four-2026-11-18.json)、[201条参考对齐](../measurements/decision-laya-parity-2026-11-18.json)、[加载失败](../measurements/decision-laya-load-failures-2026-11-18.json)。二分类、最终工程检查另见[二分类报告](Decision-Binary-Interrupt-Mac-Comparison.md#laya-multilingual-coreai-固定矩阵2026-11-18)。
+
+本次工程收尾见[二分类报告Laya工程验证](Decision-Binary-Interrupt-Mac-Comparison.md#laya-工程验证)：5个iOS构建通过，完整检查有既有失败及中断阶段，未做Laya手机验收。
+
+
+## 用户精简意图模板（2026-11-18）
+
+按用户提出的结构，state改为“以下是当前正在进行的对话”+用户/助手原文，再给“以下是用户发送的最新消息”；问题和候选通过各模型原生协议传入，不添加长定义。没有当前对话时明确写“（无）”；二分类只使用当前轮h0，不放更早历史、busy或queue。英文本地化对应结构。三模型业务内容相同，原生token/特殊标记并不相同。
+
+四分类问题为“请问用户的意图是什么？”，候选按用户顺序“打断／未说完／无意义消息／等待”；英文为“What is the user's intent?”与“Interrupt / Unfinished / Meaningless message / Wait”。二分类中文问题为“请问用户的意图是否表达打断？”，英文为“Does the user's intent express an interruption?”；分别测试noul和裸否/是（No/Yes）choice。D3 noul按固定官方formatter展开成No / false、Yes / true，再走既有原生code readout，原生chat/system包装未改。
+
+仅实验，不修改App。四分类54例（48回归+6诊断），二分类单句196例和当前轮56例各跑两种type；每模型558次，三次预热/条件另计。所有输入在运行前冻结，不按结果调标签/阈值。四分类“等待”仅在评估映射原enqueue；旧case的同句分片维持原拼接，已有question_to_user原文作为assistant问题，不虚构对话。二分类依旧评估即时打断信号，延后/条件停止为false；新问题省略了“立即”，该语义边界可能影响结果，不事后改标签。旧实验是回归参照；结构、提示长度、语言和类别文字/顺序同时改变，不能分离各因素的因果贡献。
+
+Laya沿用GPU debug-enabled路径，Vela3.1沿用CPU，D3为Swift自动计算路径。期间观察到构建产物被清理，空闲磁盘由不足1GiB升至约64GiB；D3入口必须重建。模型间不作同计算单元的公平速度排名，端到端耗时仅描述实测。模型制品及既有适配器不换版本，Vela SDK源码与上一轮已验证版本一致。
+
+### 四分类结果
+
+| 模型 | 正确/48 | macro-F1 | 误丢弃 | 误打断 | 未说完命中/16 | 等待命中/24 | P50/P95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Laya | 18 (37.5%) | 0.382 | 14 | 4 | 9 | 4 | 151 / 162 |
+| Vela 3.1 | 8 (16.7%) | 0.204 | 31 | 4 | 1 | 3 | 137 / 186 |
+| D3 Edge | 10 (20.8%) | 0.287 | 30 | 3 | 2 | 1 | 227 / 238 |
+
+旧固定minimal / utterance_status模板的Laya成绩为6/48、17/48，Vela3.1为14/48、7/48；D3历史utterance_status为29/48。新模板对Laya宏F1有所提升，但正确数仅略高于其旧utterance_status；Vela3.1和D3仍有大量误丢弃，没有形成可直接替换的四分类方案。旧留出已反复观察，本轮称回归集。
+
+| 模型 | 中文正确/24 | 英文正确/24 | 诊断正确/6 |
+| --- | ---: | ---: | ---: |
+| Laya | 7 | 11 | 1 |
+| Vela 3.1 | 2 | 6 | 0 |
+| D3 Edge | 5 | 5 | 0 |
+
+证据：[新四分类完整输入](../measurements/decision-concise-intent-shared-four-input-2026-11-18.json)、[三模型汇总](../measurements/decision-concise-intent-summary-2026-11-18.json)。二分类和工程验证见[同轮二分类报告](Decision-Binary-Interrupt-Mac-Comparison.md#用户精简意图模板2026-11-18)。没有改App。
+
+
+## Laya精简提示词补充定义（2026-11-18）
+
+仅实验，App未修改。沿用上一轮的全部case、上下文、候选文字/顺序、标签和>0.5阈值，仅变更instructions。中英文提示词分别编写；单句无当前对话，current仅当前用户请求、assistant已输出内容及最新输入，没有更早历史、busy或queue。558条正式请求全部完成、零错误，输入预检均完整无截断；Laya仍用同一GPU debug-enabled制品和适配器。三次预热/条件不计入时延。旧版时延来自上一轮，非同时交错运行，不能将波动归因于提示词长度。
+
+### 完整问题与定义
+
+```text
+请问用户的意图是什么？
+打断：要求立即停止或改变当前正在进行的回复；仅追加问题、补充信息或要求稍后处理不算打断。
+未说完：话语尚未完整，需要更多内容才能理解意图。
+无意义消息：没有可理解的交流含义。
+等待：有完整意义、可正常入队处理且不要求立即打断的消息，并非指用户说了“等一下”。
+```
+
+```text
+What is the user's intent?
+Interrupt: Ask to immediately stop or change the response currently in progress; merely adding a question, providing more information, or requesting something for later does not count.
+Unfinished: The utterance is incomplete and needs more words before its intent can be understood.
+Meaningless message: The message has no understandable communicative meaning.
+Wait: A complete, meaningful message that can enter the normal queue without an immediate interruption; this does not mean the user said "wait a moment".
+```
+
+候选仍为打断/未说完/无意义消息/等待及对应英文，不把定义塞入候选标签。等待仅在评分时映射enqueue。
+
+| 指标（48条回归例） | 旧版 | 补定义 |
+| --- | ---: | ---: |
+| 正确数 | 18.000 | 17.000 |
+| macro-F1 | 0.382 | 0.355 |
+| 误丢弃 | 14.000 | 6.000 |
+| 误打断 | 4.000 | 4.000 |
+| 未说完识别数/16 | 9.000 | 5.000 |
+| P50 ms | 151.211 | 144.655 |
+| P95 ms | 161.546 | 148.397 |
+
+误丢弃由14降至6，但未说完识别从9/16降到5/16，正确总数18降到17；没有整体提升。6条诊断case另列于汇总，不能并入48条主评分。
+
+
+原始输入、输出及逐例配对见[汇总](../measurements/decision-defined-intent-summary-2026-11-18.json)，输入及模型结果使用同目录decision-defined-intent前缀，未覆盖旧数据。脚本见[defined_intent_experiment.py](../../Tests/DecisionBenchmarks/defined_intent_experiment.py)。本轮仍为反复使用的回归案例，不是新holdout，未做真机验证，也未据结果调整阈值或覆盖模型输出。

@@ -16,7 +16,7 @@ flowchart LR
     Gemma -->|ChatEvent stream| Caller
     Cloud -->|ChatEvent stream| Caller
     Caller -->|"choice / noul / decide"| Decision["DecisionCapability"]
-    Decision --> D3["D3 / Vela / ChatDecision"]
+    Decision --> D3["D3 / Vela 3・3.1 / Laya / ChatDecision"]
     D3 -->|candidate / boolean / error| Caller
 ```
 
@@ -24,7 +24,7 @@ flowchart LR
 
 [LLM](LLM/README.md) defines messages, images, native function declarations and results, text and usage events, dispatch timing and caller-owned transport observations. Providers publish capability constraints before native work. The local [Gemma4](LLM/Gemma4/README.md) fits an inference copy to its effective window. [OpenAI Responses](LLM/OpenAI/README.md) supports the configured cloud wire protocol and required tool choice.
 
-[JEV](JEV/README.md) owns choice/noul/decide contracts, generic ChatDecision, and D3/Vela native implementations in ModelKitD3. Candidate selection and boolean decisions have separate typed requests and results. The caller interprets it and owns routing, interruption and fallback.
+[JEV](JEV/README.md) owns choice/noul/decide contracts, generic ChatDecision, and D3/Vela 3/Vela 3.1/Laya native implementations in ModelKitD3. Candidate selection and boolean decisions have separate typed requests and results. The caller interprets it and owns routing, interruption and fallback.
 
 [ModelKit](../README.md)
 

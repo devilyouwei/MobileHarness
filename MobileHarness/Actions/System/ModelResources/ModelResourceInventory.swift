@@ -9,7 +9,7 @@ public enum ResourceModelGroup: String, Codable, Sendable, CaseIterable {
         case .synthesis: ["moss-tts-nano"]
         case .language: ["gemma4-e2b"]
         case .vision: ["yolo26n-pose"]
-        case .decision: ["d3-edge", "vela3-fast"]
+        case .decision: ["d3-edge", "vela3-fast", "vela3.1-fast", "laya-multilingual"]
         }
     }
     public func isInstalled(in ids: Set<String>) -> Bool {

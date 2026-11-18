@@ -36,3 +36,11 @@ ModelArtifactTests 覆盖临时磁盘安装/收据、篡改检测、路径穿越
 ## 真机安装
 
 2026-11-17：MobileHarness 真机 scheme 的 Debug 签名构建通过；Live Activity 扩展通过构建参数复用主应用现有开发团队，未改写签名设置。签名、73 项 Agent/Skill 资源、Live Activity 及中英文资源检查通过。目标为 iPhone 17 Pro（iOS 27.0.1）。无线安装两次失败：首次 RemoteConnectError，刷新连接后仍出现远端 Connection interrupted。用户连接设备并解锁后，重试安装成功；设备应用列表确认 Mobile Harness，bundle ID 为 dev.mobileharness.app，版本 0.1.0（1）。仅执行覆盖安装并保留应用数据，未执行卸载。此次证据覆盖签名构建、资源校验和真机安装，不代表后台下载或模型推理功能验收。
+
+## 配置目录迁移验证（2026-11-18）
+
+- 单个清单及 ModelArtifactCatalog/制品声明类型迁入 Support/Config；保持 ModelKitRuntime 目标与公开接口。对照提交前内容确认 JSON 字节及提取的解析/校验代码不变；模拟器 Runtime bundle 中的清单与源码逐字节一致。
+- 架构边界检查、8 项 Python 下载测试、Swift 格式检查、plist 检查、修改文档的本地链接和 git diff --check 通过。
+- `./scripts/build-ios.sh` 的五个 scheme 全部通过，App 资源校验通过。
+- `./scripts/check.sh` 已执行但未通过：两个 Swift 测试阶段均在静态库链接时出现 write64 errno=28（磁盘空间不足），当时可用空间约 220 MiB，未执行新的 Swift 测试。不能将此前测试证据算作本次复测通过。日志：本机 /tmp/modelkit-config-check.log、/tmp/modelkit-config-ios.log。
+- 此次为配置组织迁移，无新的真机安装或真实下载验收；原有验收缺口不变。

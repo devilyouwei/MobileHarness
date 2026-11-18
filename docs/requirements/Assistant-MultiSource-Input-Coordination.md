@@ -957,3 +957,89 @@ AssistantChatWorker 删除继续聆听 buffer、discard/continue 分支、拼接
 新增 AssistantInterrupt.swift 同时补入现有 Xcode Assistant 分组的文件引用；保持现有 Swift Package 编译归属，不增加编译目标。
 
 统一打断与独立 Decision 调度已实现：12项定向测试通过，5个 iOS 模拟器目标构建通过，末次修正后主应用构建再次通过。全仓已有失败与中断的 AppWorkflow 子阶段详见二分类验证文档；未做真机验收。外部发送者须显式声明权限，本次不自动为现有 Agent 增加发送行为。
+
+## Vela3.1 Fast 对照实验（2026-11-18）
+
+用户要求将 hugging-mac/vela3.1-fast 加入既有四分类和二分类对照，并批准 `.local/models/Vela31Fast` 及制品子目录。仅实验，不修改 App 配置。固定远端 revision 108e385769cbd0da463706b24cac5a535604d2c6，复用原四分类配对矩阵、单轮中英文 noul/choice 矩阵及历史上下文矩阵；不覆盖旧脚本、输入、结果。新增实验 runner/模型说明放 Tests/DecisionBenchmarks，逐条结果放 docs/measurements，报告分别追加多分类和二分类原验证文档。
+
+采用 Hugging Mac SDK 的3.1决策专用 CoreAI 路径，CPU，与旧Vela路径区分；仅准备决策图、主干权重和 tokenizer/配置等运行必要文件，不下载无关任务 adapter 或将 LICENSE/README 列为模型必要文件。固定提示词、标签语义和0.5阈值；四分类报告宏F1、误丢弃及继续聆听召回，二分类报告误打断、召回、F1、分语言/上下文/type表现及P50/P95。错误保留为错误，歧义样本不计入主指标。优先复用既有同机冻结D3/Vela结果，明确历史延迟不是本轮同时测量；在条件允许时对旧Vela做同轮复测。
+
+补充3.1专属探索组：上游3.1明确支持带true/false描述的noul。复用现有单轮196条及当前轮h0的56条原样case，仅把已有choice_defined描述放入noul.criteria；问题/上下文/期望和0.5阈值不变。单独保存输入和结果，不与原五条件混算，不声称旧Vela的noul支持该新特性。记录与等价no/yes描述choice的张量一致性。
+
+实验已完成：Vela3.1与旧Vela同环境各2464条正式推理，描述noul探索252条，三条原checkpoint完整输出对齐通过；无推理错误。旧Vela全部逐例预测与历史一致。四分类没有改善；二分类有局部召回提升及误打断/漏打断权衡，不支持直接替换App，当前轮/历史和语言/type分组证据分别写入两份Decision验证报告。未修改App或安装真机；工程检查结果在二分类报告的本次收尾记录。
+
+
+## Laya Multilingual CoreAI 对照（2026-11-18）
+
+用户要求加入Laya多语言CoreAI实验，并批准 `.local/models/LayaMultilingual` 及制品子目录。选用 ahmedandaloes/laya-multilingual-CoreAI 固定revision b347e24ceca82f2bf8ee185de282fea28c2c64cf，1024-token FP32图及发布适配器；仅下载运行必要文件，模型说明和验证资料用于研究溯源，不加入App requiredFiles。使用已有环境做兼容性预检，明确记录与发布环境的版本差异；不隐式替换其他项目环境依赖。
+
+新增实验脚本与模型说明放Tests/DecisionBenchmarks，复用四分类108、初始二分类256、本地化980、历史1120条冻结矩阵。先核对上游问题标准化、sequence构造和布尔概率；超长或隐式截断需显式检查，不能算成完整上下文测试。原生noul和choice独立运行，记录温度、输入长度、概率、错误及端到端P50/P95；不根据结果调整标签/阈值。新报告与旧模型按case配对，历史延迟明确标记，四分类/二分类报告分开追加。仅实验，不改变App或模型管理，不安装真机。
+
+同时原样重放既有252条带定义noul探索fixture，独立于主矩阵记录。发布适配器返回四位小数概率，保留其原生输出，不另加阈值优化；Laya类型输入不同，不强求noul/choice概率相同。
+
+首选1024图在b2 CPU、默认模式及隔离b3 CPU均未能加载，尚无语义评分。保留制品说明/失败记录，删除本任务下载的失败main.mlirb以释放空间。改试 mlboydaisuke/Laya-Multilingual-CoreAI 的macOS wfp16-s512（revision 3fe58a5ed7857b41f5c7ba8c0f46ce420b42cf02），CPU；沿用发布者host读出及参考fixture核对，再执行原矩阵。512容量不够的输入必须明确报告，不声称完整重放；不可隐藏截断。该图来自不同的上游固定checkpoint，报告明确区别，不能混为同一制品结果。
+
+替代制品增加Tests/DecisionBenchmarks/laya_artifact_adapter.py实验适配器：严格按发布host的main→marker gather→act→temperature decode执行，复用发布_laya_host.py，不修改分类。仍使用隔离Laya0.4.2的host sequence builder，并以制品201条参考的原始tokens/marker及输出核对兼容性；全部通过才进入业务实验。
+
+替代图CPU加载亦失败，显式GPU加载成功。正式实验固定GPU（不作自动运行时回退），使用201条参考门槛验证该路径；与旧Vela CPU数据的时延不能视为同计算单元比较。
+
+GPU对齐启动时明确报No space left on device。复用本次已成功生成的debug-enabled GPU specialization（相同图和数值路径），避免再生成一份约619MB编译缓存；正式报告标记debug-enabled。若仍不足，不清理其他模型/用户文件来伪装成功。
+
+正式GPU实验已完成：2716条业务请求全部完成，无推理错误、无输入截断；201条发布参考对齐全部通过，最大概率差8.11e-6。结果及全部type/语言/上下文分组分别追加四分类和二分类验证报告，误打断明显不符合当前需求，不建议替换App。报告汇总复算、脚本AST、结果完整性及链接检查通过，工程检查另外记录。未做Laya真机验收。
+
+
+## 用户精简意图提示词对照（2026-11-18）
+
+用户要求按“以下是当前正在进行的对话；以下是用户发送的最新消息；用户意图是什么/是否表达打断”测试Laya、Vela3.1、D3 Edge，仅实验。四分类候选按用户顺序：打断、未说完、无意义消息、等待；等待在评分中映射原enqueue（不打断、排队处理），不修改旧case预期标签。二分类原生noul与简短否/是choice分开。中英文提示词各用对应语言，不额外加入长定义或调阈值。
+
+新增Tests/DecisionBenchmarks/concise_intent_experiment.py，复用既有模型位置/适配器，不建目录、不改App。冻结四分类54例（48回归+6诊断）、二分类单句196例、当前轮h0的56例；不额外带更早历史。四分类旧case已有同一句分片维持原拼接内容，question_to_user按现有文本呈现为assistant问题；不虚构缺失的当前轮，缺省显示无。新状态只用自然语言角色与段落分隔，不传busy/queue等元数据。三模型同一语义state/question/candidates；协议格式保留原生适配，D3使用固定上游formatter生成noul的等价候选，并复用既有原生Swift评测入口。
+
+每模型54+196×2+56×2=558次，三模型共1674次，三次预热/条件另计；顺序执行，不与编译/检查竞争。全部case/提示词在运行前冻结，不按结果改标签；旧实验作为带日期的回归参照，新的整体模板、语言和标签同时变化，不声称分离各因素的因果贡献。错误、输入超限明确记录，不能伪装为false。报告仍分别追加四分类/二分类原验证文档，保存逐例结果、误打断、召回、macro-F1与P50/P95，并明确运行时差异。运行仓库检查/iOS构建，保留其他正在进行的模型管理修改。
+
+评分语义保留此前“是否应发出当前回复的即时打断信号”：延后/有条件停止仍按原标签false；新问题未显式写“立即”，这是模板省略后的语义边界，报告需披露，不能事后改标签来提高成绩。
+
+三模型正式实验已全部完成：Laya/Vela3.1各558条，D3重建原生评测入口后三组各1项测试通过、共558条；总1674条无推理错误。新输入及各模型结果、分语言/type/单句或当前轮指标分别保存在新prefix中；四分类和二分类报告已更新。结果显示改善依赖模型/语言/type，未形成统一可替换方案，App未修改。D3启动构建产物问题及观察到的环境清理、完整工程检查结果单独记录，不混入语义评分。
+
+本轮工程验证完成：五个iOS模拟器scheme构建通过；check.sh退出1，包含此前的NexArm/声源时序失败及Action声明缺失，AppWorkflow子进程停滞后被手动终止。完整记录见二分类验证报告“本轮工程验证”，不将不完整检查标为通过。
+
+## Laya精简提示词补充定义实验（2026-11-18）
+
+按用户确认，保留上一轮自然语言分段，分别使用中文、英文提示词，仅补充语义定义；不修改App。二分类问题改为是否要求立即停止或改变当前回复，并明确仅追加问题、补充信息、要求稍后处理不算打断。四分类每类补一句短定义，等待表示完整且可正常入队的消息，不能因出现“等一下”归为等待。
+
+在现有Tests/DecisionBenchmarks新增defined_intent_experiment.py，复用concise_intent_experiment的Laya推理入口/既有GPU路径，复制冻结输入只变更instructions，保持候选文字和顺序、上下文、case标签、阈值不变。四分类54条、单句196×2条、当前轮56×2条，共558条，二分类分别测noul与choice。中英单独评分，跨语言边界单列；与上一轮作配对对照，记录误打断、召回、四分类准确率及P50/P95。使用decision-defined-intent新前缀保存，不覆盖旧结果、不新建目录。报告追加原四分类及二分类验证文档，更新实验与测量索引；执行实验校验、check.sh及iOS构建，区分真实模型结果与工程失败。此轮是已见回归case，不能当独立泛化验证。
+
+本轮558条已完成，零推理错误、输入完整。与冻结旧输入逐项核对，除instructions外完全相同；配对汇总复算、AST及链接检查通过。四分类正确数18→17/48，误丢弃14→6但未说完识别9→5/16。二分类8个同语言主分组误打断均增加，不建议进入App；完整结果追加原四/二分类报告。工程检查另记。
+
+工程验证已结束：五个iOS模拟器scheme构建通过；check.sh存在此前时序失败、Action声明缺失及手动终止的停滞子进程，未完整通过。完整证据记于二分类验证报告本节；未安装真机、未修改App。
+
+## Decision四模型统一接入与推荐指数（2026-11-18）
+
+用户要求将上述D3 Edge、Vela 3 Fast、Vela 3.1 Fast、Laya Multilingual统一支持到ModelKit及现有下载/选择列表。保留现有两个provider和默认选择，不自动切换、不改Assistant提示词/队列。复用Language/JEV及现有ModelKitD3目标，新增Vela31Decision.swift和LayaDecision.swift；三接口choice/noul/decide遵循现有契约、资源租约、取消加入及失败显式抛出。原生张量/布尔编码由provider拥有，不能用choice伪装Laya的noul。
+
+Vela3.1复用实验固定源制品，支持外置safetensors权重绑定及六个动态输入；Laya复用已实验固定wfp16-s512源图、main/act函数、原生type头与温度读出，输入超过完整编码预算明确失败，不静默截断。通用CoreAI层支持常量权重输入与同模型多函数复用；通用机制不解释业务。加入匹配Python适配器的输入/输出回归及真实制品Swift parity，iOS只按实际构建/设备结果声明支持范围。
+
+沿用Support/Config/model-catalog.json统一配置，新增vela3.1-fast/Vela31Fast、laya-multilingual/LayaMultilingual；固定已实验revision，仅required权重、配置、tokenizer和源图，不新增fileHashes、不下载README/license/实验Python/reference等非运行时文件。沿用既有下载/安装/加载/卸载机制。ModelContainer、VisionDefaults、UI Settings/ModelResources同时补齐ID，不新增源码目录。保留其他进行中的模型配置整理。
+
+推荐指数复用现有星级UI，但删除过时的四分类accuracy公式，改为人工审阅的任务推荐等级，非准确率/概率。以少误打断优先、召回、延迟和跨提示词稳定性综合，Vela3=3/5、D3=2.5/5、Vela3.1=2/5、Laya=1.5/5；说明为Mac打断实验参考，中文/真机仍待验证，没有五星上线认证。明确不因新模型可下载就提高推荐。不改其他模型评分。UI文字中英同步。
+
+实施后更新JEV、CoreAI、Management、ModelKit及UI Settings文档，当前设计只描述实现。验证统一选择/注册/制品文件、两接口编码及多问题顺序调用、失败/取消契约，执行check.sh与build-ios.sh，原有失败与未完成项单列；不擅自安装真机或commit。
+
+制品核对补充：Laya发布仓库明确禁止Mac加载iOS图。下载配置选择ios/wfp16-s512并用既有stripPrefix安装为LayaMultilingual根；Mac原生评测直接传入既有macos/wfp16-s512目录。使用公开Swift GPU specialization（公开接口无Python debug开关），单独做读出parity，不能把Python debug路径视为Swift已验证。Vela3.1发布者只声明CPU验证，iOS执行仍需本项目实测，报告不得冒充已有真机通过。
+
+接入检查发现上层还有显式ID白名单：Actions/System/Provider保存校验、ModelResources资源分组、Agents删除前quiesce及日志名称需同步补齐两个ID，否则UI可选但不能保存/卸载。仅扩展已有模型路由与生命周期名单，不变更业务判断或模块依赖；同步对应README与现有InputDecision/Settings测试。
+
+Laya原生对照首轮发现概率不一致。源码检查显示发布tokenizer声明Metaspace prepend_scheme=always，但当前swift-transformers实现还要求旧字段add_prefix_space=true（缺省false）。在JEV内部增加Laya专属tokenizer加载兼容层，把该制品的既有prepend语义映射到库所需字段，不改权重/原文件/业务提示词，不给其他模型套用。以Python逐段token序列及30条原生输出共同验证后再认定适配通过；初次失败证据保留。
+
+实现结果：四个ID已统一注册并进入下载/设置列表、保存白名单、资源预备和删除前Decision清理。推荐指数及中英范围说明已呈现。新增Swift原生适配对照：Vela3.1 30条概率差<=1.11e-16；Laya修复Metaspace前缀映射后132个token段一致、30条概率完全一致，超长输入明确失败。最初Laya失败读出保留。仓库检查与iOS构建最终证据见二分类验证报告本节；未更改App提示词、默认选择，未安装真机或提交。
+
+最终验证：60条Swift读出与132个token段对齐再跑通过；五个iOS模拟器scheme构建通过。check.sh的边界、下载、格式及相关模型/设置测试通过，仍有已记录的NexArm/声源时序失败和AppWorkflow缺声明停滞，不能标为全仓通过。新增模型真机下载/推理未执行，已在推荐说明与验证报告标明。
+
+## 仅忙碌时运行打断Decision（2026-11-18）
+
+用户要求空闲时不因每段ASR启动Decision。修改AssistantChatWorker.receiveSignal的Decision提交条件：沿用输入到达时、普通队列调度之前捕获的同会话reply work/播报活动；只有occupied才构造Decision snapshot并提交独立队列。空闲的ASR final和用户文本正常入队、正常调度，不加载/调用Decision，不伪造false或产生推理失败日志。忙碌涵盖当前回复执行/等待工具及仍在播报；排队输入本身不算忙。
+
+不修改模型协议、提示词、普通队列、动态音频配置或外部interrupt入口。忙时请求仍绑定到达时的原回复，迟到结果不得打断后继回复。更新InputDecisionTests：空闲输入零Decision请求，暂停期间多来源入队不分类，忙时正常请求，迟到及重复信号仍保持队列和身份围栏。更新Assistant和整体技术设计的流程描述，执行定向回归、check.sh和iOS构建，保留其他未提交修改。
+
+GenerationRoundTests的动作结算回归也需同步：首条空闲输入不再分类，等待动作结算期间的follow-up仍算忙并分类一次，两个动作结果及用户输入仍合批为一个后续请求。
+
+实施完成：空闲输入不构造Decision快照/任务；忙时沿用原回复身份和并行推理。5项定向回归通过（工具结算包含成功/失败case），五个iOS scheme构建通过。全仓检查仍有此前NexArm/声源时序失败及AppWorkflow缺声明停滞，详细证据见[二分类验证记录](../validation/Decision-Binary-Interrupt-Mac-Comparison.md)。未安装或测量真机。

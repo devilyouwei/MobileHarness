@@ -317,7 +317,7 @@ func productionYOLOArchiveInstallsWithNativeExtractor() async throws {
     let archive = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["HARNESS_TEST_YOLO_ARCHIVE"]))
     let catalogURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent().appendingPathComponent(
-            "MobileHarness/ModelKit/Support/Management/model-catalog.json")
+            "MobileHarness/ModelKit/Support/Config/model-catalog.json")
     var declaration = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: catalogURL)) as? [String: Any])
     let packages = try #require(declaration["packages"] as? [[String: Any]])
     declaration["packages"] = packages.filter { $0["id"] as? String == "yolo26n-pose" }
@@ -476,7 +476,7 @@ private actor ResumableHubFixture: ModelArtifactDownloader {
 @Test func productionDecisionCatalogUsesEdgeSourceWithoutRemovedLite() throws {
     let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent().appendingPathComponent(
-            "MobileHarness/ModelKit/Support/Management/model-catalog.json")
+            "MobileHarness/ModelKit/Support/Config/model-catalog.json")
     let catalog = try ModelArtifactCatalog.read(url)
     let compiled = try catalog.resolvingArchitecture("h18p")
     let source = try catalog.resolvingArchitecture(nil)
@@ -634,4 +634,23 @@ private actor ResumableHubFixture: ModelArtifactDownloader {
 
 private final class ArtifactFailureProbe: Sendable {
     let ids = Mutex<[String]>([])
+}
+
+@Test func decisionCatalogIncludesFourNativeModelsWithRuntimeFilesOnly() throws {
+    let catalog = try ModelArtifactCatalog.bundled()
+    let decisions = catalog.packages.filter { $0.capability == "decision" }
+    #expect(Set(decisions.map(\.id)) == Set(["d3-edge", "vela3-fast", "vela3.1-fast", "laya-multilingual"]))
+    for artifact in decisions {
+        #expect(
+            !artifact.requiredFiles.contains { path in
+                ["readme", "license", "reference", ".py"].contains { path.lowercased().contains($0) }
+            })
+    }
+    let laya = try #require(decisions.first { $0.id == "laya-multilingual" })
+    #expect(laya.source.stripPrefix == "ios/wfp16-s512")
+    #expect(laya.requiredFiles.contains("tokenizer/tokenizer.json"))
+    #expect(laya.requiredFiles.contains("laya_ml_wfp16_s512.aimodel/main.mlirb"))
+    let vela = try #require(decisions.first { $0.id == "vela3.1-fast" })
+    #expect(vela.requiredFiles.contains("weights/model.safetensors"))
+    #expect(vela.requiredFiles.contains("graphs/decision/model.aimodel/main.mlirb"))
 }

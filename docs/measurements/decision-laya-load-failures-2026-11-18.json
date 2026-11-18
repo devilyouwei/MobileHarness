@@ -1,0 +1,42 @@
+{
+  "repository": "ahmedandaloes/laya-multilingual-CoreAI",
+  "revision": "b347e24ceca82f2bf8ee185de282fea28c2c64cf",
+  "rows": [
+    {
+      "attempt": "laya-smoke",
+      "stage": "load",
+      "exitCode": 1,
+      "log": "Traceback (most recent call last):\n  File \"/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/laya_comparison.py\", line 155, in <module>\n    asyncio.run(run(p.parse_args()))\n  File \"/Users/devil/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/asyncio/runners.py\", line 195, in run\n    return runner.run(main)\n           ^^^^^^^^^^^^^^^^\n  File \"/Users/devil/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/asyncio/runners.py\", line 118, in run\n    return self._loop.run_until_complete(task)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/devil/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/asyncio/base_events.py\", line 691, in run_until_complete\n    return future.result()\n           ^^^^^^^^^^^^^^^\n  File \"/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/laya_comparison.py\", line 65, in run\n    engine = await module.LayaCoreAI.load(ROOT, cpu_only=True)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/laya_coreai.py\", line 48, in load\n    self.model = await AIModel.load(self.root / \"decision.aimodel\", opts)\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/devil/Pro/hugging-mac/.venv/lib/python3.12/site-packages/coreai/runtime/_aimodel.py\", line 50, in load\n    instance._model = await _AIModel.load_with_specialization(  # noqa: SLF001\n                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nRuntimeError: Failed to load model with specialization from '/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/decision.aimodel': The operation couldn\u2019t be completed. (CoreAIDelegates.AIModelError error 1.).\n"
+    },
+    {
+      "attempt": "laya-load-default",
+      "stage": "load",
+      "exitCode": 1,
+      "log": ""
+    },
+    {
+      "attempt": "laya-smoke-b3",
+      "stage": "load",
+      "exitCode": 1,
+      "log": "Traceback (most recent call last):\n  File \"/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/laya_comparison.py\", line 155, in <module>\n    asyncio.run(run(p.parse_args()))\n  File \"/Users/devil/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/asyncio/runners.py\", line 195, in run\n    return runner.run(main)\n           ^^^^^^^^^^^^^^^^\n  File \"/Users/devil/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/asyncio/runners.py\", line 118, in run\n    return self._loop.run_until_complete(task)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/devil/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/asyncio/base_events.py\", line 691, in run_until_complete\n    return future.result()\n           ^^^^^^^^^^^^^^^\n  File \"/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/laya_comparison.py\", line 65, in run\n    engine = await module.LayaCoreAI.load(ROOT, cpu_only=True)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/laya_coreai.py\", line 48, in load\n    self.model = await AIModel.load(self.root / \"decision.aimodel\", opts)\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/coreai/runtime/_aimodel.py\", line 52, in load\n    instance._model = await _AIModel.load_with_specialization(  # noqa: SLF001\n                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nRuntimeError: Failed to load model with specialization from '/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/decision.aimodel': The operation couldn\u2019t be completed. (CoreAIDelegates.AIModelError error 1.).\n"
+    },
+    {
+      "attempt": "laya-parity",
+      "stage": "load",
+      "exitCode": 1,
+      "log": "Traceback (most recent call last):\n  File \"/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/laya_parity.py\", line 50, in <module>\n    asyncio.run(main())\n  File \"/Users/devil/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/asyncio/runners.py\", line 195, in run\n    return runner.run(main)\n           ^^^^^^^^^^^^^^^^\n  File \"/Users/devil/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/asyncio/runners.py\", line 118, in run\n    return self._loop.run_until_complete(task)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/devil/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/asyncio/base_events.py\", line 691, in run_until_complete\n    return future.result()\n           ^^^^^^^^^^^^^^^\n  File \"/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/laya_parity.py\", line 16, in main\n    engine = await LayaArtifact.load(ROOT)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/laya_artifact_adapter.py\", line 25, in load\n    self.model = await AIModel.load(bundle / self.metadata['assets']['main'],\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/devil/Pro/hugging-mac/.venv/lib/python3.12/site-packages/coreai/runtime/_aimodel.py\", line 50, in load\n    instance._model = await _AIModel.load_with_specialization(  # noqa: SLF001\n                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nRuntimeError: Failed to load model with specialization from '/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/.local/models/LayaMultilingual/macos/wfp16-s512/laya_ml_wfp16_s512.aimodel': The operation couldn\u2019t be completed. (CoreAIDelegates.AIModelError error 1.).\n"
+    },
+    {
+      "attempt": "laya-parity-gpu",
+      "stage": "load",
+      "exitCode": 1,
+      "log": "LLVM ERROR: IO failure on output stream: No space left on device\n"
+    }
+  ],
+  "note": "0 scored requests; empty default-mode log is preserved as empty, not a fabricated cause.",
+  "isolatedRuntimeWheel": {
+    "filename": "coreai_core-1.0.0b3-cp312-cp312-macosx_26_0_arm64.whl",
+    "sha256": "8db70074eb049b0a86bd263e137ea173f3298f7f1b60ec1a7f7c592f4c26c4a9",
+    "removedAfterFailedLoad": true
+  }
+}

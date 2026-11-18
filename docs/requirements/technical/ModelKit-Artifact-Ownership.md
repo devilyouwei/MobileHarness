@@ -26,3 +26,11 @@
 ## 启动依赖图同步
 
 按当前 ModuleRegistration 更新总体设计的 Dependencies and startup 图：四个基础根分别依赖 diagnostics，移除 Storage → ModelKit；executionBindings 等待四个基础根。说明 ApplicationLifecycle 仍按注册顺序选择已就绪节点并串行启动，图区分就绪依赖与当前执行顺序。本次仅修改文档，验证图中全部边与注册代码一致。
+
+## 配置目录独立管理
+
+用户已批准新增 ModelKit/Support/Config。将单个 model-catalog.json 与 ModelArtifactCatalog、制品声明类型及解析校验迁入该目录；Management 保留下载、存储、状态和生命周期契约。保持 ModelKitRuntime 编译目标与公开 API 不变，将目标源码根扩大到 Support 并显式列出源码/资源。同步 Package.swift、Xcode 导航、构建输入、下载脚本、边界检查及 ModelKit/Support/Management 设计说明，新增 Config README。随包清单继续单文件管理，持久化自定义模型仍由存储负责；业务选择、默认模型和推理参数保持外部所有权。运行完整检查、iOS 构建与现有清单解析回归，记录实际结果。
+
+迁移检查同时清理已删除 Resources/Models 的 Package exclude 与 Xcode 空分组/失效 README 引用，避免资源解析警告。
+
+配置目录迁移已实现；单文件内容与解析逻辑保持不变，五个 iOS scheme 构建通过。完整检查中的 Swift 测试被磁盘空间不足阻断，见验证记录的配置目录迁移章节。

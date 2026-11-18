@@ -54,3 +54,5 @@ Resource preferences also persist vadOnsetWindows (1…16) and vadThreshold (0.0
 `useSpeechEnhancement` is independent of the custom-ASR switch and defaults false when absent in stored records. Enabling requires an installed `deepfilternet3` artifact; restore disables and persists it after removal. The workflow preserves confirmed state on failed saves and does not save unfinished endpoint edits when toggling denoising. Existing bounded resource commands handle download/progress/cancel/delete; removal quiesces the voice owner before artifact deletion. The read-only enablement closure crosses App composition into Agents; Actions never processes PCM.
 
 Actions 只拥有用户意图、UI 投影和模型选择／下载源／语音参数偏好。偏好文档位于 Storage settings 命名空间；模型目录、制品存储、传输恢复与后台交接均由 [ModelKit Management](../../../ModelKit/Support/Management/README.md) 拥有。
+
+Decision原生模型ID包括d3-edge、vela3-fast、vela3.1-fast和laya-multilingual；保存选择和资源分组使用同一集合，安装资格仍由ModelKit制品快照判定。下载不自动切换选择。

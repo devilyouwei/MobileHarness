@@ -55,6 +55,8 @@ enum LocalLanguageModel: String, CaseIterable {
     case apple = "apple-system"
     case edge = "d3-edge"
     case vela = "vela3-fast"
+    case vela31 = "vela3.1-fast"
+    case laya = "laya-multilingual"
 
     var title: String {
         switch self {
@@ -62,6 +64,8 @@ enum LocalLanguageModel: String, CaseIterable {
         case .apple: "Apple System LLM"
         case .edge: "D3 Edge"
         case .vela: "Vela 3 Fast"
+        case .vela31: "Vela 3.1 Fast"
+        case .laya: "Laya Multilingual"
         }
     }
 
@@ -69,26 +73,25 @@ enum LocalLanguageModel: String, CaseIterable {
         switch self {
         case .gemma: true
         case .apple: brain != .writer
-        case .edge, .vela: brain == .decision
+        case .edge, .vela, .vela31, .laya: brain == .decision
         }
     }
 
     func benchmark(for brain: AgentBrain) -> LocalModelBenchmark? {
-        // The old multi-class scores do not measure the binary interrupt task.
-        nil
+        guard brain == .decision else { return nil }
+        // Editorial task recommendation from Mac interrupt experiments, not accuracy or confidence.
+        switch self {
+        case .vela: return LocalModelBenchmark(halfStars: 6)
+        case .edge: return LocalModelBenchmark(halfStars: 5)
+        case .vela31: return LocalModelBenchmark(halfStars: 4)
+        case .laya: return LocalModelBenchmark(halfStars: 3)
+        case .gemma, .apple: return nil
+        }
     }
 }
 
 struct LocalModelBenchmark {
-    let correct: Int
-    let total: Int
-    let p95Milliseconds: Double
-
-    var halfStars: Int {
-        let accuracy = Double(correct) / Double(total)
-        let speed = max(0, 1 - p95Milliseconds / 500)
-        return Int((10 * (0.8 * accuracy + 0.2 * speed)).rounded())
-    }
+    let halfStars: Int
 }
 
 public struct AgentBrainDraft: Equatable, Sendable {

@@ -129,7 +129,8 @@ import Testing
 @Test @MainActor func localModelSettingsExposeOnlySupportedRoles() {
     #expect(LocalLanguageModel.allCases.filter { $0.supports(.assistant) } == [.gemma, .apple])
     #expect(LocalLanguageModel.allCases.filter { $0.supports(.writer) } == [.gemma])
-    #expect(LocalLanguageModel.allCases.filter { $0.supports(.decision) } == [.gemma, .apple, .edge, .vela])
+    #expect(
+        LocalLanguageModel.allCases.filter { $0.supports(.decision) } == [.gemma, .apple, .edge, .vela, .vela31, .laya])
     let resources = ModelResourcesState()
     #expect(!resources.appleSystemAvailable)
     #expect(resources.applySnapshot(.init(items: [], appleSystemAvailable: true), generation: resources.beginRefresh()))
@@ -137,18 +138,14 @@ import Testing
 }
 
 @Test func localModelRecommendationsUseRoleSpecificMeasurements() {
+    #expect(LocalLanguageModel.vela.benchmark(for: .decision)?.halfStars == 6)
+    #expect(LocalLanguageModel.edge.benchmark(for: .decision)?.halfStars == 5)
+    #expect(LocalLanguageModel.vela31.benchmark(for: .decision)?.halfStars == 4)
+    #expect(LocalLanguageModel.laya.benchmark(for: .decision)?.halfStars == 3)
     for model in LocalLanguageModel.allCases {
-        #expect(model.benchmark(for: .decision) == nil)
         #expect(model.benchmark(for: .assistant) == nil)
         #expect(model.benchmark(for: .writer) == nil)
     }
-}
-
-@Test func localModelRecommendationWeightsAccuracyAndLatency() {
-    #expect(LocalModelBenchmark(correct: 10, total: 10, p95Milliseconds: 0).halfStars == 10)
-    #expect(LocalModelBenchmark(correct: 10, total: 10, p95Milliseconds: 250).halfStars == 9)
-    #expect(LocalModelBenchmark(correct: 10, total: 10, p95Milliseconds: 500).halfStars == 8)
-    #expect(LocalModelBenchmark(correct: 10, total: 10, p95Milliseconds: 700).halfStars == 8)
-    #expect(LocalModelBenchmark(correct: 5, total: 10, p95Milliseconds: 0).halfStars == 6)
-    #expect(LocalModelBenchmark(correct: 0, total: 10, p95Milliseconds: 500).halfStars == 0)
+    #expect(LocalLanguageModel.gemma.benchmark(for: .decision) == nil)
+    #expect(LocalLanguageModel.apple.benchmark(for: .decision) == nil)
 }

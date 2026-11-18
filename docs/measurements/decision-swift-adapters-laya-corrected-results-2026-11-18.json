@@ -1,0 +1,272 @@
+[
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-alarm-unfinished-zh-Hans\/concise_choice",
+    "milliseconds" : 222.888791,
+    "model" : "laya",
+    "prediction" : "未说完",
+    "reference" : 0.4103,
+    "score" : 0.4103
+  },
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-alarm-complete-zh-Hans\/concise_choice",
+    "milliseconds" : 143.73175,
+    "model" : "laya",
+    "prediction" : "等待",
+    "reference" : 0.3218,
+    "score" : 0.3218
+  },
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-brightness-unfinished-zh-Hans\/concise_choice",
+    "milliseconds" : 149.294542,
+    "model" : "laya",
+    "prediction" : "无意义消息",
+    "reference" : 0.4336,
+    "score" : 0.4336
+  },
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-alarm-unfinished-en\/concise_choice",
+    "milliseconds" : 154.692042,
+    "model" : "laya",
+    "prediction" : "Wait",
+    "reference" : 0.5053,
+    "score" : 0.5053
+  },
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-alarm-complete-en\/concise_choice",
+    "milliseconds" : 154.273708,
+    "model" : "laya",
+    "prediction" : "Wait",
+    "reference" : 0.5036,
+    "score" : 0.5036
+  },
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-brightness-unfinished-en\/concise_choice",
+    "milliseconds" : 153.485167,
+    "model" : "laya",
+    "prediction" : "Unfinished",
+    "reference" : 0.4145,
+    "score" : 0.4145
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/zh-main-00\/concise_noul",
+    "milliseconds" : 150.2125,
+    "model" : "laya",
+    "prediction" : "true",
+    "reference" : 0.706,
+    "score" : 0.706
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/zh-main-00\/concise_choice",
+    "milliseconds" : 146.359625,
+    "model" : "laya",
+    "prediction" : "是",
+    "reference" : 0.8861,
+    "score" : 0.8861
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/zh-main-01\/concise_noul",
+    "milliseconds" : 145.487708,
+    "model" : "laya",
+    "prediction" : "false",
+    "reference" : 0.3824,
+    "score" : 0.3824
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/zh-main-01\/concise_choice",
+    "milliseconds" : 142.9485,
+    "model" : "laya",
+    "prediction" : "否",
+    "reference" : 0.9259,
+    "score" : 0.9259
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/zh-main-02\/concise_noul",
+    "milliseconds" : 145.90675,
+    "model" : "laya",
+    "prediction" : "true",
+    "reference" : 0.6943,
+    "score" : 0.6943
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/zh-main-02\/concise_choice",
+    "milliseconds" : 145.735625,
+    "model" : "laya",
+    "prediction" : "是",
+    "reference" : 0.886,
+    "score" : 0.886
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-00\/concise_noul",
+    "milliseconds" : 157.36775,
+    "model" : "laya",
+    "prediction" : "true",
+    "reference" : 0.7299,
+    "score" : 0.7299
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-00\/concise_choice",
+    "milliseconds" : 152.197917,
+    "model" : "laya",
+    "prediction" : "Yes",
+    "reference" : 0.9706,
+    "score" : 0.9706
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-01\/concise_noul",
+    "milliseconds" : 151.586,
+    "model" : "laya",
+    "prediction" : "true",
+    "reference" : 0.7616,
+    "score" : 0.7616
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-01\/concise_choice",
+    "milliseconds" : 150.106541,
+    "model" : "laya",
+    "prediction" : "Yes",
+    "reference" : 0.9749,
+    "score" : 0.9749
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-02\/concise_noul",
+    "milliseconds" : 152.823875,
+    "model" : "laya",
+    "prediction" : "true",
+    "reference" : 0.721,
+    "score" : 0.721
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-02\/concise_choice",
+    "milliseconds" : 150.804166,
+    "model" : "laya",
+    "prediction" : "Yes",
+    "reference" : 0.9816,
+    "score" : 0.9816
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/zh-main-00-h0\/concise_noul",
+    "milliseconds" : 153.641,
+    "model" : "laya",
+    "prediction" : "false",
+    "reference" : 0.4276,
+    "score" : 0.4276
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/zh-main-00-h0\/concise_choice",
+    "milliseconds" : 158.449042,
+    "model" : "laya",
+    "prediction" : "是",
+    "reference" : 0.7528,
+    "score" : 0.7528
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/zh-main-01-h0\/concise_noul",
+    "milliseconds" : 161.310125,
+    "model" : "laya",
+    "prediction" : "false",
+    "reference" : 0.4017,
+    "score" : 0.4017
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/zh-main-01-h0\/concise_choice",
+    "milliseconds" : 153.103417,
+    "model" : "laya",
+    "prediction" : "是",
+    "reference" : 0.7684,
+    "score" : 0.7684
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/zh-main-02-h0\/concise_noul",
+    "milliseconds" : 154.518,
+    "model" : "laya",
+    "prediction" : "false",
+    "reference" : 0.4557,
+    "score" : 0.4557
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/zh-main-02-h0\/concise_choice",
+    "milliseconds" : 152.829042,
+    "model" : "laya",
+    "prediction" : "否",
+    "reference" : 0.5256,
+    "score" : 0.5256
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-00-h0\/concise_noul",
+    "milliseconds" : 155.8825,
+    "model" : "laya",
+    "prediction" : "false",
+    "reference" : 0.315,
+    "score" : 0.315
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-00-h0\/concise_choice",
+    "milliseconds" : 167.676542,
+    "model" : "laya",
+    "prediction" : "Yes",
+    "reference" : 0.8019,
+    "score" : 0.8019
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-01-h0\/concise_noul",
+    "milliseconds" : 170.890042,
+    "model" : "laya",
+    "prediction" : "true",
+    "reference" : 0.6457,
+    "score" : 0.6457
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-01-h0\/concise_choice",
+    "milliseconds" : 166.200042,
+    "model" : "laya",
+    "prediction" : "Yes",
+    "reference" : 0.9288,
+    "score" : 0.9288
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-02-h0\/concise_noul",
+    "milliseconds" : 174.725292,
+    "model" : "laya",
+    "prediction" : "false",
+    "reference" : 0.4361,
+    "score" : 0.4361
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-02-h0\/concise_choice",
+    "milliseconds" : 164.154333,
+    "model" : "laya",
+    "prediction" : "Yes",
+    "reference" : 0.8293,
+    "score" : 0.8293
+  }
+]

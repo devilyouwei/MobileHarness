@@ -1,0 +1,3550 @@
+{
+  "model": "vela31",
+  "suite": "current",
+  "inputSHA256": "c32808ea41142f7c4425248440b5dc7b2ee8dba2df856b9f301bd3237c0d929e",
+  "provenance": {
+    "specSHA256": "b424d9ee431b8ac59001226f924043e7a8c33ce7e94b2e2faa1ebe5b0225e0e6",
+    "sourceHashes": {
+      "/Users/devil/Pro/MobileHarness/Tests/DecisionBenchmarks/concise_intent_experiment.py": "7ac342b13ab49ee24b4e2f7d2d701f3bce59108e3f4414974dfc9da37180bdbe",
+      "/Users/devil/Pro/hugging-mac/packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/instance.py": "c872a0fe7d31c31a09d044839f90ed7ffa6285a77c92e3b394e1a5d22343d6bb",
+      "/Users/devil/Pro/hugging-mac/packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/config.py": "a9044aacb8413df4e258aa2af282c180e472c61f139f8781dfa1467f7a9e096a",
+      "/Users/devil/Pro/hugging-mac/packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/coreai.py": "17fb859c9ae171316c617451a3ec8dbc67d82f67e2eb90540a47dda3c6e7f29a",
+      "/Users/devil/Pro/hugging-mac/packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/converter.py": "9b31039299d36b70f9dbe6cb5b88e9b2db9daf21555a701dd83670ce4bada2a4",
+      "/Users/devil/Pro/hugging-mac/packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/__init__.py": "f85b69c5a37c78c3cdfc709704ebb420f1e360ec952951fa234f518a566b992e",
+      "/Users/devil/Pro/hugging-mac/packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/full.py": "f16162c684dff93f4905e865742d94c146290c86a3f7e2ea1840c48391f95b57",
+      "/Users/devil/Pro/hugging-mac/packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/definition.py": "f5fdbe03f4c2e4c2be207e8f65e153b845b69522b09753e7d38c8214a5e9d5a8",
+      "/Users/devil/Pro/hugging-mac/packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/resources.py": "c3fb654d2930b388f5d4e712553b945d4cbc7d6d174e33063f357e719bde321b",
+      "/Users/devil/Pro/hugging-mac/packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/torch.py": "5743d1dcd8d9f30a192c29842e739b090bf0e132e5e3cf80a39bf8d200173072",
+      "/Users/devil/Pro/hugging-mac/packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/execution.py": "2d98affb915b59cdd11ff666d4135ddea3dc7033c2cd71de1b5e93013f4815e6",
+      "/Users/devil/Pro/hugging-mac/packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/preprocess.py": "df747bd83459201973ce9e06e37f50cae21f2bed59805f6c2113dd1a5d9f1f69",
+      "/Users/devil/Pro/hugging-mac/packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/full_upstream.py": "c95d72bd376587907e0387af43cdd076d13e82077f21c2c121cda61521d2192a",
+      "/Users/devil/Pro/hugging-mac/packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/__init__.py": "6ea941aeca158e7fd098236b6598d5aa59a4c3ba83225b681c784ed17e21a65f",
+      "/Users/devil/Pro/hugging-mac/packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/native.py": "bb155197ed25da82604c494852214fbc37ab6a1dbc4ef5d7da28a9a31b6abdde",
+      "/Users/devil/Pro/hugging-mac/packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/types.py": "b5ac400b9f391c4d1be8e839daa049673b2dafdaa85afbdd7fe42cc5178ff874",
+      "/Users/devil/Pro/hugging-mac/packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/coreai_export.py": "4da2451fe809c78a39badfd5c2c413ced281211383ed4327cc8a017dd7757c4f",
+      "/Users/devil/Pro/hugging-mac/packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/packing.py": "ab14cb5a5ba74239afc6170e5d0f912e76eb023f60d266251b76e1e98427fb68",
+      "/Users/devil/Pro/hugging-mac/packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/upstream.py": "9343e7f16f3594a8783575aeb298ecab48df53e61c52b664d438543e79f80eda",
+      "/Users/devil/Pro/hugging-mac/packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/full_host.py": "aa85a5dcba562e1ad3d943dfc890c79d2f4ad20caefb19fce40049025ab4b409",
+      "/Users/devil/Pro/hugging-mac/packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/validation.py": "0d3403f818858182c82600c11534a1197e87d0db4ed0cbae705e722e6d72a4bf",
+      "/Users/devil/Pro/hugging-mac/packages/hugging_mac_sdk/src/hugging_mac_sdk/runtime/coreai.py": "eb616878e66abfd96a14f5ba86bc4de9bf7b6ee21454bb1e67722a4e1721c779"
+    },
+    "device": "cpu",
+    "runtimeVersions": {
+      "coreai-core": "1.0.0b2",
+      "numpy": "2.3.5",
+      "tokenizers": "0.22.2"
+    }
+  },
+  "loadMilliseconds": 7016.699292027624,
+  "preflight": [
+    {
+      "id": "zh-main-00-h0",
+      "variant": "concise_noul",
+      "inputTokens": 107,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-00-h0",
+      "variant": "concise_choice",
+      "inputTokens": 108,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-01-h0",
+      "variant": "concise_noul",
+      "inputTokens": 120,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-01-h0",
+      "variant": "concise_choice",
+      "inputTokens": 121,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-02-h0",
+      "variant": "concise_noul",
+      "inputTokens": 116,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-02-h0",
+      "variant": "concise_choice",
+      "inputTokens": 117,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-03-h0",
+      "variant": "concise_noul",
+      "inputTokens": 118,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-03-h0",
+      "variant": "concise_choice",
+      "inputTokens": 119,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-04-h0",
+      "variant": "concise_noul",
+      "inputTokens": 102,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-04-h0",
+      "variant": "concise_choice",
+      "inputTokens": 103,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-05-h0",
+      "variant": "concise_noul",
+      "inputTokens": 116,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-05-h0",
+      "variant": "concise_choice",
+      "inputTokens": 117,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-06-h0",
+      "variant": "concise_noul",
+      "inputTokens": 113,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-06-h0",
+      "variant": "concise_choice",
+      "inputTokens": 114,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-07-h0",
+      "variant": "concise_noul",
+      "inputTokens": 106,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-07-h0",
+      "variant": "concise_choice",
+      "inputTokens": 107,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-08-h0",
+      "variant": "concise_noul",
+      "inputTokens": 100,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-08-h0",
+      "variant": "concise_choice",
+      "inputTokens": 101,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-09-h0",
+      "variant": "concise_noul",
+      "inputTokens": 102,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-09-h0",
+      "variant": "concise_choice",
+      "inputTokens": 103,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-10-h0",
+      "variant": "concise_noul",
+      "inputTokens": 101,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-10-h0",
+      "variant": "concise_choice",
+      "inputTokens": 102,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-11-h0",
+      "variant": "concise_noul",
+      "inputTokens": 102,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-11-h0",
+      "variant": "concise_choice",
+      "inputTokens": 103,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-12-h0",
+      "variant": "concise_noul",
+      "inputTokens": 121,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-12-h0",
+      "variant": "concise_choice",
+      "inputTokens": 122,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-13-h0",
+      "variant": "concise_noul",
+      "inputTokens": 112,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-13-h0",
+      "variant": "concise_choice",
+      "inputTokens": 113,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-14-h0",
+      "variant": "concise_noul",
+      "inputTokens": 120,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-14-h0",
+      "variant": "concise_choice",
+      "inputTokens": 121,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-15-h0",
+      "variant": "concise_noul",
+      "inputTokens": 105,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-15-h0",
+      "variant": "concise_choice",
+      "inputTokens": 106,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-16-h0",
+      "variant": "concise_noul",
+      "inputTokens": 110,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-16-h0",
+      "variant": "concise_choice",
+      "inputTokens": 111,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-17-h0",
+      "variant": "concise_noul",
+      "inputTokens": 130,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-17-h0",
+      "variant": "concise_choice",
+      "inputTokens": 131,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-18-h0",
+      "variant": "concise_noul",
+      "inputTokens": 112,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-18-h0",
+      "variant": "concise_choice",
+      "inputTokens": 113,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-19-h0",
+      "variant": "concise_noul",
+      "inputTokens": 110,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-19-h0",
+      "variant": "concise_choice",
+      "inputTokens": 111,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-20-h0",
+      "variant": "concise_noul",
+      "inputTokens": 100,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-20-h0",
+      "variant": "concise_choice",
+      "inputTokens": 101,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-21-h0",
+      "variant": "concise_noul",
+      "inputTokens": 102,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-21-h0",
+      "variant": "concise_choice",
+      "inputTokens": 103,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-22-h0",
+      "variant": "concise_noul",
+      "inputTokens": 101,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-22-h0",
+      "variant": "concise_choice",
+      "inputTokens": 102,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-23-h0",
+      "variant": "concise_noul",
+      "inputTokens": 102,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-main-23-h0",
+      "variant": "concise_choice",
+      "inputTokens": 103,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-cross-00-h0",
+      "variant": "concise_noul",
+      "inputTokens": 89,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-cross-00-h0",
+      "variant": "concise_choice",
+      "inputTokens": 90,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-cross-04-h0",
+      "variant": "concise_noul",
+      "inputTokens": 91,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-cross-04-h0",
+      "variant": "concise_choice",
+      "inputTokens": 92,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-cross-14-h0",
+      "variant": "concise_noul",
+      "inputTokens": 94,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-cross-14-h0",
+      "variant": "concise_choice",
+      "inputTokens": 95,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-cross-16-h0",
+      "variant": "concise_noul",
+      "inputTokens": 94,
+      "inputComplete": true
+    },
+    {
+      "id": "zh-cross-16-h0",
+      "variant": "concise_choice",
+      "inputTokens": 95,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-00-h0",
+      "variant": "concise_noul",
+      "inputTokens": 54,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-00-h0",
+      "variant": "concise_choice",
+      "inputTokens": 54,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-01-h0",
+      "variant": "concise_noul",
+      "inputTokens": 61,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-01-h0",
+      "variant": "concise_choice",
+      "inputTokens": 61,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-02-h0",
+      "variant": "concise_noul",
+      "inputTokens": 60,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-02-h0",
+      "variant": "concise_choice",
+      "inputTokens": 60,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-03-h0",
+      "variant": "concise_noul",
+      "inputTokens": 62,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-03-h0",
+      "variant": "concise_choice",
+      "inputTokens": 62,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-04-h0",
+      "variant": "concise_noul",
+      "inputTokens": 57,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-04-h0",
+      "variant": "concise_choice",
+      "inputTokens": 57,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-05-h0",
+      "variant": "concise_noul",
+      "inputTokens": 62,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-05-h0",
+      "variant": "concise_choice",
+      "inputTokens": 62,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-06-h0",
+      "variant": "concise_noul",
+      "inputTokens": 60,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-06-h0",
+      "variant": "concise_choice",
+      "inputTokens": 60,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-07-h0",
+      "variant": "concise_noul",
+      "inputTokens": 59,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-07-h0",
+      "variant": "concise_choice",
+      "inputTokens": 59,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-08-h0",
+      "variant": "concise_noul",
+      "inputTokens": 55,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-08-h0",
+      "variant": "concise_choice",
+      "inputTokens": 55,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-09-h0",
+      "variant": "concise_noul",
+      "inputTokens": 55,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-09-h0",
+      "variant": "concise_choice",
+      "inputTokens": 55,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-10-h0",
+      "variant": "concise_noul",
+      "inputTokens": 56,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-10-h0",
+      "variant": "concise_choice",
+      "inputTokens": 56,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-11-h0",
+      "variant": "concise_noul",
+      "inputTokens": 56,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-11-h0",
+      "variant": "concise_choice",
+      "inputTokens": 56,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-12-h0",
+      "variant": "concise_noul",
+      "inputTokens": 57,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-12-h0",
+      "variant": "concise_choice",
+      "inputTokens": 57,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-13-h0",
+      "variant": "concise_noul",
+      "inputTokens": 60,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-13-h0",
+      "variant": "concise_choice",
+      "inputTokens": 60,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-14-h0",
+      "variant": "concise_noul",
+      "inputTokens": 60,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-14-h0",
+      "variant": "concise_choice",
+      "inputTokens": 60,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-15-h0",
+      "variant": "concise_noul",
+      "inputTokens": 58,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-15-h0",
+      "variant": "concise_choice",
+      "inputTokens": 58,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-16-h0",
+      "variant": "concise_noul",
+      "inputTokens": 60,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-16-h0",
+      "variant": "concise_choice",
+      "inputTokens": 60,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-17-h0",
+      "variant": "concise_noul",
+      "inputTokens": 70,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-17-h0",
+      "variant": "concise_choice",
+      "inputTokens": 70,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-18-h0",
+      "variant": "concise_noul",
+      "inputTokens": 59,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-18-h0",
+      "variant": "concise_choice",
+      "inputTokens": 59,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-19-h0",
+      "variant": "concise_noul",
+      "inputTokens": 60,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-19-h0",
+      "variant": "concise_choice",
+      "inputTokens": 60,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-20-h0",
+      "variant": "concise_noul",
+      "inputTokens": 55,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-20-h0",
+      "variant": "concise_choice",
+      "inputTokens": 55,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-21-h0",
+      "variant": "concise_noul",
+      "inputTokens": 55,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-21-h0",
+      "variant": "concise_choice",
+      "inputTokens": 55,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-22-h0",
+      "variant": "concise_noul",
+      "inputTokens": 56,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-22-h0",
+      "variant": "concise_choice",
+      "inputTokens": 56,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-23-h0",
+      "variant": "concise_noul",
+      "inputTokens": 56,
+      "inputComplete": true
+    },
+    {
+      "id": "en-main-23-h0",
+      "variant": "concise_choice",
+      "inputTokens": 56,
+      "inputComplete": true
+    },
+    {
+      "id": "en-cross-00-h0",
+      "variant": "concise_noul",
+      "inputTokens": 75,
+      "inputComplete": true
+    },
+    {
+      "id": "en-cross-00-h0",
+      "variant": "concise_choice",
+      "inputTokens": 75,
+      "inputComplete": true
+    },
+    {
+      "id": "en-cross-04-h0",
+      "variant": "concise_noul",
+      "inputTokens": 70,
+      "inputComplete": true
+    },
+    {
+      "id": "en-cross-04-h0",
+      "variant": "concise_choice",
+      "inputTokens": 70,
+      "inputComplete": true
+    },
+    {
+      "id": "en-cross-14-h0",
+      "variant": "concise_noul",
+      "inputTokens": 88,
+      "inputComplete": true
+    },
+    {
+      "id": "en-cross-14-h0",
+      "variant": "concise_choice",
+      "inputTokens": 88,
+      "inputComplete": true
+    },
+    {
+      "id": "en-cross-16-h0",
+      "variant": "concise_noul",
+      "inputTokens": 78,
+      "inputComplete": true
+    },
+    {
+      "id": "en-cross-16-h0",
+      "variant": "concise_choice",
+      "inputTokens": 78,
+      "inputComplete": true
+    }
+  ],
+  "warmup": [
+    {
+      "id": "zh-main-00-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 108,
+      "milliseconds": 158.60741600045003,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.7302574400446382,
+          "是": 0.26974255995536167
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.26974255995536167
+    },
+    {
+      "id": "zh-main-00-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 108,
+      "milliseconds": 148.1793329876382,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.7302574400446382,
+          "是": 0.26974255995536167
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.26974255995536167
+    },
+    {
+      "id": "zh-main-00-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 108,
+      "milliseconds": 146.34045801358297,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.7302574400446382,
+          "是": 0.26974255995536167
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.26974255995536167
+    },
+    {
+      "id": "zh-main-00-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 107,
+      "milliseconds": 143.25925000593998,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.11252347170195746
+      },
+      "pTrue": 0.11252347170195746,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-00-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 107,
+      "milliseconds": 147.41754200076684,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.11252347170195746
+      },
+      "pTrue": 0.11252347170195746,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-00-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 107,
+      "milliseconds": 143.54691599146463,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.11252347170195746
+      },
+      "pTrue": 0.11252347170195746,
+      "prediction": "false"
+    }
+  ],
+  "rows": [
+    {
+      "id": "en-cross-00-h0",
+      "locale": "en",
+      "language": "zh",
+      "partition": "cross",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 75,
+      "milliseconds": 119.90770901320502,
+      "rawResult": {
+        "type": "choice",
+        "choice": "Yes",
+        "probabilities": {
+          "No": 0.019094090686347685,
+          "Yes": 0.9809059093136524
+        }
+      },
+      "prediction": "true",
+      "pTrue": 0.9809059093136524
+    },
+    {
+      "id": "en-cross-00-h0",
+      "locale": "en",
+      "language": "zh",
+      "partition": "cross",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 75,
+      "milliseconds": 128.89595801243559,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.9792291762506468
+      },
+      "pTrue": 0.9792291762506468,
+      "prediction": "true"
+    },
+    {
+      "id": "en-cross-04-h0",
+      "locale": "en",
+      "language": "zh",
+      "partition": "cross",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 4,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 70,
+      "milliseconds": 136.67779200477526,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.689295934349659
+      },
+      "pTrue": 0.689295934349659,
+      "prediction": "true"
+    },
+    {
+      "id": "en-cross-04-h0",
+      "locale": "en",
+      "language": "zh",
+      "partition": "cross",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 4,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 70,
+      "milliseconds": 129.72987501416355,
+      "rawResult": {
+        "type": "choice",
+        "choice": "Yes",
+        "probabilities": {
+          "No": 0.31865955864454837,
+          "Yes": 0.6813404413554516
+        }
+      },
+      "prediction": "true",
+      "pTrue": 0.6813404413554516
+    },
+    {
+      "id": "en-cross-14-h0",
+      "locale": "en",
+      "language": "zh",
+      "partition": "cross",
+      "group": "quotation",
+      "origin": "new",
+      "caseIndex": 14,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_choice",
+      "inputTokens": 88,
+      "milliseconds": 131.3576670072507,
+      "rawResult": {
+        "type": "choice",
+        "choice": "Yes",
+        "probabilities": {
+          "No": 0.054778295612366516,
+          "Yes": 0.9452217043876334
+        }
+      },
+      "prediction": "true",
+      "pTrue": 0.9452217043876334
+    },
+    {
+      "id": "en-cross-14-h0",
+      "locale": "en",
+      "language": "zh",
+      "partition": "cross",
+      "group": "quotation",
+      "origin": "new",
+      "caseIndex": 14,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_noul",
+      "inputTokens": 88,
+      "milliseconds": 123.04516701260582,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.9448115053874109
+      },
+      "pTrue": 0.9448115053874109,
+      "prediction": "true"
+    },
+    {
+      "id": "en-cross-16-h0",
+      "locale": "en",
+      "language": "zh",
+      "partition": "cross",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 16,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_noul",
+      "inputTokens": 78,
+      "milliseconds": 120.0778330094181,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.10763992518618858
+      },
+      "pTrue": 0.10763992518618858,
+      "prediction": "false"
+    },
+    {
+      "id": "en-cross-16-h0",
+      "locale": "en",
+      "language": "zh",
+      "partition": "cross",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 16,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_choice",
+      "inputTokens": 78,
+      "milliseconds": 116.91616699681617,
+      "rawResult": {
+        "type": "choice",
+        "choice": "No",
+        "probabilities": {
+          "No": 0.8974852501210258,
+          "Yes": 0.10251474987897417
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.10251474987897417
+    },
+    {
+      "id": "en-main-00-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 54,
+      "milliseconds": 92.59925002697855,
+      "rawResult": {
+        "type": "choice",
+        "choice": "Yes",
+        "probabilities": {
+          "No": 0.00889316051197518,
+          "Yes": 0.9911068394880248
+        }
+      },
+      "prediction": "true",
+      "pTrue": 0.9911068394880248
+    },
+    {
+      "id": "en-main-00-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 54,
+      "milliseconds": 89.65350000653416,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.9910275570905988
+      },
+      "pTrue": 0.9910275570905988,
+      "prediction": "true"
+    },
+    {
+      "id": "en-main-01-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "pause",
+      "origin": "new",
+      "caseIndex": 1,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 61,
+      "milliseconds": 96.53016700758599,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.9656373948572174
+      },
+      "pTrue": 0.9656373948572174,
+      "prediction": "true"
+    },
+    {
+      "id": "en-main-01-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "pause",
+      "origin": "new",
+      "caseIndex": 1,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 61,
+      "milliseconds": 97.37516698078252,
+      "rawResult": {
+        "type": "choice",
+        "choice": "Yes",
+        "probabilities": {
+          "No": 0.03225823036280043,
+          "Yes": 0.9677417696371996
+        }
+      },
+      "prediction": "true",
+      "pTrue": 0.9677417696371996
+    },
+    {
+      "id": "en-main-02-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "task_switch",
+      "origin": "new",
+      "caseIndex": 2,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 60,
+      "milliseconds": 96.87091698287986,
+      "rawResult": {
+        "type": "choice",
+        "choice": "Yes",
+        "probabilities": {
+          "No": 0.01456757490042233,
+          "Yes": 0.9854324250995776
+        }
+      },
+      "prediction": "true",
+      "pTrue": 0.9854324250995776
+    },
+    {
+      "id": "en-main-02-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "task_switch",
+      "origin": "new",
+      "caseIndex": 2,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 60,
+      "milliseconds": 109.89929200150073,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.9860157238486323
+      },
+      "pTrue": 0.9860157238486323,
+      "prediction": "true"
+    },
+    {
+      "id": "en-main-03-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "correction",
+      "origin": "new",
+      "caseIndex": 3,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 62,
+      "milliseconds": 106.08262501773424,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.9212254824660799
+      },
+      "pTrue": 0.9212254824660799,
+      "prediction": "true"
+    },
+    {
+      "id": "en-main-03-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "correction",
+      "origin": "new",
+      "caseIndex": 3,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 62,
+      "milliseconds": 98.87541699572466,
+      "rawResult": {
+        "type": "choice",
+        "choice": "Yes",
+        "probabilities": {
+          "No": 0.08034883585321889,
+          "Yes": 0.9196511641467812
+        }
+      },
+      "prediction": "true",
+      "pTrue": 0.9196511641467812
+    },
+    {
+      "id": "en-main-04-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 4,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 57,
+      "milliseconds": 96.28362499643117,
+      "rawResult": {
+        "type": "choice",
+        "choice": "Yes",
+        "probabilities": {
+          "No": 0.26975565432053905,
+          "Yes": 0.7302443456794611
+        }
+      },
+      "prediction": "true",
+      "pTrue": 0.7302443456794611
+    },
+    {
+      "id": "en-main-04-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 4,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 57,
+      "milliseconds": 90.80499998526648,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.7496095168994514
+      },
+      "pTrue": 0.7496095168994514,
+      "prediction": "true"
+    },
+    {
+      "id": "en-main-05-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 5,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 62,
+      "milliseconds": 94.82008300255984,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.9786124920578598
+      },
+      "pTrue": 0.9786124920578598,
+      "prediction": "true"
+    },
+    {
+      "id": "en-main-05-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 5,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 62,
+      "milliseconds": 93.17504198406823,
+      "rawResult": {
+        "type": "choice",
+        "choice": "Yes",
+        "probabilities": {
+          "No": 0.01915365933300045,
+          "Yes": 0.9808463406669996
+        }
+      },
+      "prediction": "true",
+      "pTrue": 0.9808463406669996
+    },
+    {
+      "id": "en-main-06-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "polite_stop",
+      "origin": "new",
+      "caseIndex": 6,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 60,
+      "milliseconds": 93.01995902205817,
+      "rawResult": {
+        "type": "choice",
+        "choice": "Yes",
+        "probabilities": {
+          "No": 0.007345351974776097,
+          "Yes": 0.992654648025224
+        }
+      },
+      "prediction": "true",
+      "pTrue": 0.992654648025224
+    },
+    {
+      "id": "en-main-06-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "polite_stop",
+      "origin": "new",
+      "caseIndex": 6,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 60,
+      "milliseconds": 102.55912502179854,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.9916988271060307
+      },
+      "pTrue": 0.9916988271060307,
+      "prediction": "true"
+    },
+    {
+      "id": "en-main-07-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "self_correction",
+      "origin": "new",
+      "caseIndex": 7,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 59,
+      "milliseconds": 91.0919590096455,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.9769254748212549
+      },
+      "pTrue": 0.9769254748212549,
+      "prediction": "true"
+    },
+    {
+      "id": "en-main-07-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "self_correction",
+      "origin": "new",
+      "caseIndex": 7,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 59,
+      "milliseconds": 92.59912499692291,
+      "rawResult": {
+        "type": "choice",
+        "choice": "Yes",
+        "probabilities": {
+          "No": 0.024608832682545576,
+          "Yes": 0.9753911673174545
+        }
+      },
+      "prediction": "true",
+      "pTrue": 0.9753911673174545
+    },
+    {
+      "id": "en-main-08-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_code_1",
+      "origin": "new",
+      "caseIndex": 8,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "variant": "concise_choice",
+      "inputTokens": 55,
+      "milliseconds": 90.14995797770098,
+      "rawResult": {
+        "type": "choice",
+        "choice": "No",
+        "probabilities": {
+          "No": 0.946404597460695,
+          "Yes": 0.05359540253930483
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.05359540253930483
+    },
+    {
+      "id": "en-main-08-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_code_1",
+      "origin": "new",
+      "caseIndex": 8,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "variant": "concise_noul",
+      "inputTokens": 55,
+      "milliseconds": 93.1624159857165,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.0546239938364924
+      },
+      "pTrue": 0.0546239938364924,
+      "prediction": "false"
+    },
+    {
+      "id": "en-main-09-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_code_2",
+      "origin": "new",
+      "caseIndex": 9,
+      "historyDepth": 0,
+      "requiredHistory": 2,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "variant": "concise_noul",
+      "inputTokens": 55,
+      "milliseconds": 92.70470900810324,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.06531947957943161
+      },
+      "pTrue": 0.06531947957943161,
+      "prediction": "false"
+    },
+    {
+      "id": "en-main-09-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_code_2",
+      "origin": "new",
+      "caseIndex": 9,
+      "historyDepth": 0,
+      "requiredHistory": 2,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "variant": "concise_choice",
+      "inputTokens": 55,
+      "milliseconds": 91.30958298919722,
+      "rawResult": {
+        "type": "choice",
+        "choice": "No",
+        "probabilities": {
+          "No": 0.9343767193268813,
+          "Yes": 0.06562328067311884
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.06562328067311884
+    },
+    {
+      "id": "en-main-10-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_code_4",
+      "origin": "new",
+      "caseIndex": 10,
+      "historyDepth": 0,
+      "requiredHistory": 4,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "variant": "concise_choice",
+      "inputTokens": 56,
+      "milliseconds": 91.79987502284348,
+      "rawResult": {
+        "type": "choice",
+        "choice": "No",
+        "probabilities": {
+          "No": 0.9473781703563422,
+          "Yes": 0.0526218296436579
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.0526218296436579
+    },
+    {
+      "id": "en-main-10-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_code_4",
+      "origin": "new",
+      "caseIndex": 10,
+      "historyDepth": 0,
+      "requiredHistory": 4,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "variant": "concise_noul",
+      "inputTokens": 56,
+      "milliseconds": 102.73716601659544,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.05414850560153835
+      },
+      "pTrue": 0.05414850560153835,
+      "prediction": "false"
+    },
+    {
+      "id": "en-main-11-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_override",
+      "origin": "new",
+      "caseIndex": 11,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "variant": "concise_noul",
+      "inputTokens": 56,
+      "milliseconds": 95.39491598843597,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.21220852242717245
+      },
+      "pTrue": 0.21220852242717245,
+      "prediction": "false"
+    },
+    {
+      "id": "en-main-11-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_override",
+      "origin": "new",
+      "caseIndex": 11,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "variant": "concise_choice",
+      "inputTokens": 56,
+      "milliseconds": 89.8488330130931,
+      "rawResult": {
+        "type": "choice",
+        "choice": "No",
+        "probabilities": {
+          "No": 0.7959162024776522,
+          "Yes": 0.20408379752234776
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.20408379752234776
+    },
+    {
+      "id": "en-main-12-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "answer",
+      "origin": "new",
+      "caseIndex": 12,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_choice",
+      "inputTokens": 57,
+      "milliseconds": 90.03470800234936,
+      "rawResult": {
+        "type": "choice",
+        "choice": "No",
+        "probabilities": {
+          "No": 0.9651540621999212,
+          "Yes": 0.03484593780007878
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.03484593780007878
+    },
+    {
+      "id": "en-main-12-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "answer",
+      "origin": "new",
+      "caseIndex": 12,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_noul",
+      "inputTokens": 57,
+      "milliseconds": 92.30350001598708,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.036391755644579665
+      },
+      "pTrue": 0.036391755644579665,
+      "prediction": "false"
+    },
+    {
+      "id": "en-main-13-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "addition",
+      "origin": "new",
+      "caseIndex": 13,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_noul",
+      "inputTokens": 60,
+      "milliseconds": 95.10924998903647,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.04991112858489538
+      },
+      "pTrue": 0.04991112858489538,
+      "prediction": "false"
+    },
+    {
+      "id": "en-main-13-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "addition",
+      "origin": "new",
+      "caseIndex": 13,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_choice",
+      "inputTokens": 60,
+      "milliseconds": 98.44162501394749,
+      "rawResult": {
+        "type": "choice",
+        "choice": "No",
+        "probabilities": {
+          "No": 0.9486515299675496,
+          "Yes": 0.05134847003245049
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.05134847003245049
+    },
+    {
+      "id": "en-main-14-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "quotation",
+      "origin": "new",
+      "caseIndex": 14,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_choice",
+      "inputTokens": 60,
+      "milliseconds": 92.58887500618584,
+      "rawResult": {
+        "type": "choice",
+        "choice": "Yes",
+        "probabilities": {
+          "No": 0.00920034849420725,
+          "Yes": 0.9907996515057929
+        }
+      },
+      "prediction": "true",
+      "pTrue": 0.9907996515057929
+    },
+    {
+      "id": "en-main-14-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "quotation",
+      "origin": "new",
+      "caseIndex": 14,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_noul",
+      "inputTokens": 60,
+      "milliseconds": 90.00250001554377,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.9907851656904453
+      },
+      "pTrue": 0.9907851656904453,
+      "prediction": "true"
+    },
+    {
+      "id": "en-main-15-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "negation",
+      "origin": "new",
+      "caseIndex": 15,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_noul",
+      "inputTokens": 58,
+      "milliseconds": 88.98208400933072,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.3189536154090673
+      },
+      "pTrue": 0.3189536154090673,
+      "prediction": "false"
+    },
+    {
+      "id": "en-main-15-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "negation",
+      "origin": "new",
+      "caseIndex": 15,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_choice",
+      "inputTokens": 58,
+      "milliseconds": 88.4967919846531,
+      "rawResult": {
+        "type": "choice",
+        "choice": "No",
+        "probabilities": {
+          "No": 0.6932912297446485,
+          "Yes": 0.30670877025535137
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.30670877025535137
+    },
+    {
+      "id": "en-main-16-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 16,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_choice",
+      "inputTokens": 60,
+      "milliseconds": 90.70645901374519,
+      "rawResult": {
+        "type": "choice",
+        "choice": "No",
+        "probabilities": {
+          "No": 0.9603913866172593,
+          "Yes": 0.03960861338274067
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.03960861338274067
+    },
+    {
+      "id": "en-main-16-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 16,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_noul",
+      "inputTokens": 60,
+      "milliseconds": 91.07299998868257,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.039655163281881914
+      },
+      "pTrue": 0.039655163281881914,
+      "prediction": "false"
+    },
+    {
+      "id": "en-main-17-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 17,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_noul",
+      "inputTokens": 70,
+      "milliseconds": 112.75825000484474,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.8478980386061564
+      },
+      "pTrue": 0.8478980386061564,
+      "prediction": "true"
+    },
+    {
+      "id": "en-main-17-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 17,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_choice",
+      "inputTokens": 70,
+      "milliseconds": 112.79949999880046,
+      "rawResult": {
+        "type": "choice",
+        "choice": "Yes",
+        "probabilities": {
+          "No": 0.13739984161559712,
+          "Yes": 0.8626001583844028
+        }
+      },
+      "prediction": "true",
+      "pTrue": 0.8626001583844028
+    },
+    {
+      "id": "en-main-18-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "deferred",
+      "origin": "new",
+      "caseIndex": 18,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_choice",
+      "inputTokens": 59,
+      "milliseconds": 90.43683399795555,
+      "rawResult": {
+        "type": "choice",
+        "choice": "Yes",
+        "probabilities": {
+          "No": 0.044142410744916226,
+          "Yes": 0.9558575892550838
+        }
+      },
+      "prediction": "true",
+      "pTrue": 0.9558575892550838
+    },
+    {
+      "id": "en-main-18-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "deferred",
+      "origin": "new",
+      "caseIndex": 18,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_noul",
+      "inputTokens": 59,
+      "milliseconds": 91.1045000248123,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.9487687490489235
+      },
+      "pTrue": 0.9487687490489235,
+      "prediction": "true"
+    },
+    {
+      "id": "en-main-19-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "self_correction",
+      "origin": "new",
+      "caseIndex": 19,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_noul",
+      "inputTokens": 60,
+      "milliseconds": 91.26745900721289,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.9419806751058009
+      },
+      "pTrue": 0.9419806751058009,
+      "prediction": "true"
+    },
+    {
+      "id": "en-main-19-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "self_correction",
+      "origin": "new",
+      "caseIndex": 19,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_choice",
+      "inputTokens": 60,
+      "milliseconds": 92.03420902485959,
+      "rawResult": {
+        "type": "choice",
+        "choice": "Yes",
+        "probabilities": {
+          "No": 0.05761016201668321,
+          "Yes": 0.9423898379833168
+        }
+      },
+      "prediction": "true",
+      "pTrue": 0.9423898379833168
+    },
+    {
+      "id": "en-main-20-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_code_1",
+      "origin": "new",
+      "caseIndex": 20,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "variant": "concise_choice",
+      "inputTokens": 55,
+      "milliseconds": 96.73120899242349,
+      "rawResult": {
+        "type": "choice",
+        "choice": "No",
+        "probabilities": {
+          "No": 0.946404597460695,
+          "Yes": 0.05359540253930483
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.05359540253930483
+    },
+    {
+      "id": "en-main-20-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_code_1",
+      "origin": "new",
+      "caseIndex": 20,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "variant": "concise_noul",
+      "inputTokens": 55,
+      "milliseconds": 95.1866660034284,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.0546239938364924
+      },
+      "pTrue": 0.0546239938364924,
+      "prediction": "false"
+    },
+    {
+      "id": "en-main-21-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_code_2",
+      "origin": "new",
+      "caseIndex": 21,
+      "historyDepth": 0,
+      "requiredHistory": 2,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "variant": "concise_noul",
+      "inputTokens": 55,
+      "milliseconds": 88.06174999335781,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.06531947957943161
+      },
+      "pTrue": 0.06531947957943161,
+      "prediction": "false"
+    },
+    {
+      "id": "en-main-21-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_code_2",
+      "origin": "new",
+      "caseIndex": 21,
+      "historyDepth": 0,
+      "requiredHistory": 2,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "variant": "concise_choice",
+      "inputTokens": 55,
+      "milliseconds": 88.3038750034757,
+      "rawResult": {
+        "type": "choice",
+        "choice": "No",
+        "probabilities": {
+          "No": 0.9343767193268813,
+          "Yes": 0.06562328067311884
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.06562328067311884
+    },
+    {
+      "id": "en-main-22-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_code_4",
+      "origin": "new",
+      "caseIndex": 22,
+      "historyDepth": 0,
+      "requiredHistory": 4,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "variant": "concise_choice",
+      "inputTokens": 56,
+      "milliseconds": 93.91754199168645,
+      "rawResult": {
+        "type": "choice",
+        "choice": "No",
+        "probabilities": {
+          "No": 0.9473781703563422,
+          "Yes": 0.0526218296436579
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.0526218296436579
+    },
+    {
+      "id": "en-main-22-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_code_4",
+      "origin": "new",
+      "caseIndex": 22,
+      "historyDepth": 0,
+      "requiredHistory": 4,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "variant": "concise_noul",
+      "inputTokens": 56,
+      "milliseconds": 90.90562499477528,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.05414850560153835
+      },
+      "pTrue": 0.05414850560153835,
+      "prediction": "false"
+    },
+    {
+      "id": "en-main-23-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_override",
+      "origin": "new",
+      "caseIndex": 23,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "variant": "concise_noul",
+      "inputTokens": 56,
+      "milliseconds": 96.57812499790452,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.21220852242717245
+      },
+      "pTrue": 0.21220852242717245,
+      "prediction": "false"
+    },
+    {
+      "id": "en-main-23-h0",
+      "locale": "en",
+      "language": "en",
+      "partition": "main",
+      "group": "history_override",
+      "origin": "new",
+      "caseIndex": 23,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "variant": "concise_choice",
+      "inputTokens": 56,
+      "milliseconds": 94.8109999881126,
+      "rawResult": {
+        "type": "choice",
+        "choice": "No",
+        "probabilities": {
+          "No": 0.7959162024776522,
+          "Yes": 0.20408379752234776
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.20408379752234776
+    },
+    {
+      "id": "zh-cross-00-h0",
+      "locale": "zh",
+      "language": "en",
+      "partition": "cross",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 90,
+      "milliseconds": 124.43445902317762,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.5061475591278263,
+          "是": 0.4938524408721738
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.4938524408721738
+    },
+    {
+      "id": "zh-cross-00-h0",
+      "locale": "zh",
+      "language": "en",
+      "partition": "cross",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 89,
+      "milliseconds": 124.46574997738935,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.33254088442343926
+      },
+      "pTrue": 0.33254088442343926,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-cross-04-h0",
+      "locale": "zh",
+      "language": "en",
+      "partition": "cross",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 4,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 91,
+      "milliseconds": 123.9215410023462,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.1570225616306879
+      },
+      "pTrue": 0.1570225616306879,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-cross-04-h0",
+      "locale": "zh",
+      "language": "en",
+      "partition": "cross",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 4,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 92,
+      "milliseconds": 123.72562501695938,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.821275550099309,
+          "是": 0.17872444990069095
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.17872444990069095
+    },
+    {
+      "id": "zh-cross-14-h0",
+      "locale": "zh",
+      "language": "en",
+      "partition": "cross",
+      "group": "quotation",
+      "origin": "new",
+      "caseIndex": 14,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_choice",
+      "inputTokens": 95,
+      "milliseconds": 142.82120898133144,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.6569110402033547,
+          "是": 0.3430889597966454
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.3430889597966454
+    },
+    {
+      "id": "zh-cross-14-h0",
+      "locale": "zh",
+      "language": "en",
+      "partition": "cross",
+      "group": "quotation",
+      "origin": "new",
+      "caseIndex": 14,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_noul",
+      "inputTokens": 94,
+      "milliseconds": 174.42699999082834,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.4990685741946747
+      },
+      "pTrue": 0.4990685741946747,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-cross-16-h0",
+      "locale": "zh",
+      "language": "en",
+      "partition": "cross",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 16,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_noul",
+      "inputTokens": 94,
+      "milliseconds": 132.8105420107022,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.10303345643387032
+      },
+      "pTrue": 0.10303345643387032,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-cross-16-h0",
+      "locale": "zh",
+      "language": "en",
+      "partition": "cross",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 16,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_choice",
+      "inputTokens": 95,
+      "milliseconds": 125.20224999752827,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.8769688793825956,
+          "是": 0.1230311206174043
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.1230311206174043
+    },
+    {
+      "id": "zh-main-00-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 108,
+      "milliseconds": 147.3426250158809,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.7302574400446382,
+          "是": 0.26974255995536167
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.26974255995536167
+    },
+    {
+      "id": "zh-main-00-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "explicit_stop",
+      "origin": "new",
+      "caseIndex": 0,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 107,
+      "milliseconds": 145.47112499712966,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.11252347170195746
+      },
+      "pTrue": 0.11252347170195746,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-01-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "pause",
+      "origin": "new",
+      "caseIndex": 1,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 120,
+      "milliseconds": 151.3942499877885,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.254268132399297
+      },
+      "pTrue": 0.254268132399297,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-01-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "pause",
+      "origin": "new",
+      "caseIndex": 1,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 121,
+      "milliseconds": 147.86508298129775,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.6283717922418182,
+          "是": 0.3716282077581818
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.3716282077581818
+    },
+    {
+      "id": "zh-main-02-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "task_switch",
+      "origin": "new",
+      "caseIndex": 2,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 117,
+      "milliseconds": 144.52362500014715,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.645243842850313,
+          "是": 0.3547561571496869
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.3547561571496869
+    },
+    {
+      "id": "zh-main-02-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "task_switch",
+      "origin": "new",
+      "caseIndex": 2,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 116,
+      "milliseconds": 146.7523750034161,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.26941857504420025
+      },
+      "pTrue": 0.26941857504420025,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-03-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "correction",
+      "origin": "new",
+      "caseIndex": 3,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 118,
+      "milliseconds": 154.17358401464298,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.3835300367968747
+      },
+      "pTrue": 0.3835300367968747,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-03-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "correction",
+      "origin": "new",
+      "caseIndex": 3,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 119,
+      "milliseconds": 148.79029098665342,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.524486577303495,
+          "是": 0.475513422696505
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.475513422696505
+    },
+    {
+      "id": "zh-main-04-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 4,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 103,
+      "milliseconds": 141.14175000577234,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.6813752955782182,
+          "是": 0.3186247044217819
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.3186247044217819
+    },
+    {
+      "id": "zh-main-04-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 4,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 102,
+      "milliseconds": 143.69116601301357,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.18159646053770326
+      },
+      "pTrue": 0.18159646053770326,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-05-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 5,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 116,
+      "milliseconds": 147.13708401541226,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.2681410545106191
+      },
+      "pTrue": 0.2681410545106191,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-05-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 5,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 117,
+      "milliseconds": 145.70399999502115,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.626717096831773,
+          "是": 0.373282903168227
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.373282903168227
+    },
+    {
+      "id": "zh-main-06-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "polite_stop",
+      "origin": "new",
+      "caseIndex": 6,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 114,
+      "milliseconds": 152.10324997315183,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.7602909944367837,
+          "是": 0.23970900556321642
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.23970900556321642
+    },
+    {
+      "id": "zh-main-06-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "polite_stop",
+      "origin": "new",
+      "caseIndex": 6,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 113,
+      "milliseconds": 145.57049999712035,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.15293949960928754
+      },
+      "pTrue": 0.15293949960928754,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-07-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "self_correction",
+      "origin": "new",
+      "caseIndex": 7,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_noul",
+      "inputTokens": 106,
+      "milliseconds": 140.80129101057537,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.1340281111930356
+      },
+      "pTrue": 0.1340281111930356,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-07-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "self_correction",
+      "origin": "new",
+      "caseIndex": 7,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "true",
+      "expected": "true",
+      "variant": "concise_choice",
+      "inputTokens": 107,
+      "milliseconds": 141.5292089805007,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.8254164450468707,
+          "是": 0.1745835549531292
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.1745835549531292
+    },
+    {
+      "id": "zh-main-08-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_code_1",
+      "origin": "new",
+      "caseIndex": 8,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "variant": "concise_choice",
+      "inputTokens": 101,
+      "milliseconds": 137.50729098683223,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.6681675401742161,
+          "是": 0.33183245982578385
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.33183245982578385
+    },
+    {
+      "id": "zh-main-08-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_code_1",
+      "origin": "new",
+      "caseIndex": 8,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "variant": "concise_noul",
+      "inputTokens": 100,
+      "milliseconds": 135.41141702444293,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.22714032430586234
+      },
+      "pTrue": 0.22714032430586234,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-09-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_code_2",
+      "origin": "new",
+      "caseIndex": 9,
+      "historyDepth": 0,
+      "requiredHistory": 2,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "variant": "concise_noul",
+      "inputTokens": 102,
+      "milliseconds": 137.81208300497383,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.2285697874323659
+      },
+      "pTrue": 0.2285697874323659,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-09-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_code_2",
+      "origin": "new",
+      "caseIndex": 9,
+      "historyDepth": 0,
+      "requiredHistory": 2,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "variant": "concise_choice",
+      "inputTokens": 103,
+      "milliseconds": 138.84291698923334,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.6530900350779237,
+          "是": 0.3469099649220762
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.3469099649220762
+    },
+    {
+      "id": "zh-main-10-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_code_4",
+      "origin": "new",
+      "caseIndex": 10,
+      "historyDepth": 0,
+      "requiredHistory": 4,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "variant": "concise_choice",
+      "inputTokens": 102,
+      "milliseconds": 139.33833400369622,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.6418463928711012,
+          "是": 0.3581536071288987
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.3581536071288987
+    },
+    {
+      "id": "zh-main-10-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_code_4",
+      "origin": "new",
+      "caseIndex": 10,
+      "historyDepth": 0,
+      "requiredHistory": 4,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "variant": "concise_noul",
+      "inputTokens": 101,
+      "milliseconds": 136.98862498858944,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.23224442185320496
+      },
+      "pTrue": 0.23224442185320496,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-11-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_override",
+      "origin": "new",
+      "caseIndex": 11,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "variant": "concise_noul",
+      "inputTokens": 102,
+      "milliseconds": 134.93562501389533,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.21481257801620507
+      },
+      "pTrue": 0.21481257801620507,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-11-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_override",
+      "origin": "new",
+      "caseIndex": 11,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "true",
+      "expected": "unspecified",
+      "variant": "concise_choice",
+      "inputTokens": 103,
+      "milliseconds": 136.0360000107903,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.6604546740951124,
+          "是": 0.33954532590488773
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.33954532590488773
+    },
+    {
+      "id": "zh-main-12-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "answer",
+      "origin": "new",
+      "caseIndex": 12,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_choice",
+      "inputTokens": 122,
+      "milliseconds": 143.95033399341628,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.6446941662836575,
+          "是": 0.35530583371634245
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.35530583371634245
+    },
+    {
+      "id": "zh-main-12-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "answer",
+      "origin": "new",
+      "caseIndex": 12,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_noul",
+      "inputTokens": 121,
+      "milliseconds": 149.9967080017086,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.47459953494353296
+      },
+      "pTrue": 0.47459953494353296,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-13-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "addition",
+      "origin": "new",
+      "caseIndex": 13,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_noul",
+      "inputTokens": 112,
+      "milliseconds": 148.45508302096277,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.17953643808955197
+      },
+      "pTrue": 0.17953643808955197,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-13-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "addition",
+      "origin": "new",
+      "caseIndex": 13,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_choice",
+      "inputTokens": 113,
+      "milliseconds": 144.31462498032488,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.7196577900472321,
+          "是": 0.28034220995276804
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.28034220995276804
+    },
+    {
+      "id": "zh-main-14-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "quotation",
+      "origin": "new",
+      "caseIndex": 14,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_choice",
+      "inputTokens": 121,
+      "milliseconds": 152.69587497459725,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.6886509618235337,
+          "是": 0.3113490381764664
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.3113490381764664
+    },
+    {
+      "id": "zh-main-14-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "quotation",
+      "origin": "new",
+      "caseIndex": 14,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_noul",
+      "inputTokens": 120,
+      "milliseconds": 144.33812501374632,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.2270886337741028
+      },
+      "pTrue": 0.2270886337741028,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-15-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "negation",
+      "origin": "new",
+      "caseIndex": 15,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_noul",
+      "inputTokens": 105,
+      "milliseconds": 140.5278749880381,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.2547249518105715
+      },
+      "pTrue": 0.2547249518105715,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-15-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "negation",
+      "origin": "new",
+      "caseIndex": 15,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_choice",
+      "inputTokens": 106,
+      "milliseconds": 137.16641700011678,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.6609761591394494,
+          "是": 0.33902384086055065
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.33902384086055065
+    },
+    {
+      "id": "zh-main-16-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 16,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_choice",
+      "inputTokens": 111,
+      "milliseconds": 139.280208008131,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.7522880808636885,
+          "是": 0.24771191913631152
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.24771191913631152
+    },
+    {
+      "id": "zh-main-16-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 16,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_noul",
+      "inputTokens": 110,
+      "milliseconds": 137.67866700072773,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.1404749458631647
+      },
+      "pTrue": 0.1404749458631647,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-17-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 17,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_noul",
+      "inputTokens": 130,
+      "milliseconds": 163.491791987326,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.17771564271956794
+      },
+      "pTrue": 0.17771564271956794,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-17-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "short_counterfactual",
+      "origin": "new",
+      "caseIndex": 17,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_choice",
+      "inputTokens": 131,
+      "milliseconds": 162.2306669887621,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.7133027584319447,
+          "是": 0.28669724156805526
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.28669724156805526
+    },
+    {
+      "id": "zh-main-18-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "deferred",
+      "origin": "new",
+      "caseIndex": 18,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_choice",
+      "inputTokens": 113,
+      "milliseconds": 141.2994590064045,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.581716538356684,
+          "是": 0.4182834616433161
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.4182834616433161
+    },
+    {
+      "id": "zh-main-18-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "deferred",
+      "origin": "new",
+      "caseIndex": 18,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_noul",
+      "inputTokens": 112,
+      "milliseconds": 140.86170800146647,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.27906008973389074
+      },
+      "pTrue": 0.27906008973389074,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-19-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "self_correction",
+      "origin": "new",
+      "caseIndex": 19,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_noul",
+      "inputTokens": 110,
+      "milliseconds": 141.7505830177106,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.1725540919738157
+      },
+      "pTrue": 0.1725540919738157,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-19-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "self_correction",
+      "origin": "new",
+      "caseIndex": 19,
+      "historyDepth": 0,
+      "requiredHistory": 0,
+      "fullExpected": "false",
+      "expected": "false",
+      "variant": "concise_choice",
+      "inputTokens": 111,
+      "milliseconds": 140.64462500391528,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.7487000047805776,
+          "是": 0.25129999521942226
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.25129999521942226
+    },
+    {
+      "id": "zh-main-20-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_code_1",
+      "origin": "new",
+      "caseIndex": 20,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "variant": "concise_choice",
+      "inputTokens": 101,
+      "milliseconds": 137.82716600690037,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.6681675401742161,
+          "是": 0.33183245982578385
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.33183245982578385
+    },
+    {
+      "id": "zh-main-20-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_code_1",
+      "origin": "new",
+      "caseIndex": 20,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "variant": "concise_noul",
+      "inputTokens": 100,
+      "milliseconds": 136.5714159910567,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.22714032430586234
+      },
+      "pTrue": 0.22714032430586234,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-21-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_code_2",
+      "origin": "new",
+      "caseIndex": 21,
+      "historyDepth": 0,
+      "requiredHistory": 2,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "variant": "concise_noul",
+      "inputTokens": 102,
+      "milliseconds": 136.3628749968484,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.2285697874323659
+      },
+      "pTrue": 0.2285697874323659,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-21-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_code_2",
+      "origin": "new",
+      "caseIndex": 21,
+      "historyDepth": 0,
+      "requiredHistory": 2,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "variant": "concise_choice",
+      "inputTokens": 103,
+      "milliseconds": 142.4096670234576,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.6530900350779237,
+          "是": 0.3469099649220762
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.3469099649220762
+    },
+    {
+      "id": "zh-main-22-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_code_4",
+      "origin": "new",
+      "caseIndex": 22,
+      "historyDepth": 0,
+      "requiredHistory": 4,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "variant": "concise_choice",
+      "inputTokens": 102,
+      "milliseconds": 134.69658300164156,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.6418463928711012,
+          "是": 0.3581536071288987
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.3581536071288987
+    },
+    {
+      "id": "zh-main-22-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_code_4",
+      "origin": "new",
+      "caseIndex": 22,
+      "historyDepth": 0,
+      "requiredHistory": 4,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "variant": "concise_noul",
+      "inputTokens": 101,
+      "milliseconds": 140.84775000810623,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.23224442185320496
+      },
+      "pTrue": 0.23224442185320496,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-23-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_override",
+      "origin": "new",
+      "caseIndex": 23,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "variant": "concise_noul",
+      "inputTokens": 102,
+      "milliseconds": 143.69454100960866,
+      "rawResult": {
+        "type": "noul",
+        "noul": 0.21481257801620507
+      },
+      "pTrue": 0.21481257801620507,
+      "prediction": "false"
+    },
+    {
+      "id": "zh-main-23-h0",
+      "locale": "zh",
+      "language": "zh",
+      "partition": "main",
+      "group": "history_override",
+      "origin": "new",
+      "caseIndex": 23,
+      "historyDepth": 0,
+      "requiredHistory": 1,
+      "fullExpected": "false",
+      "expected": "unspecified",
+      "variant": "concise_choice",
+      "inputTokens": 103,
+      "milliseconds": 139.7579170006793,
+      "rawResult": {
+        "type": "choice",
+        "choice": "否",
+        "probabilities": {
+          "否": 0.6604546740951124,
+          "是": 0.33954532590488773
+        }
+      },
+      "prediction": "false",
+      "pTrue": 0.33954532590488773
+    }
+  ],
+  "complete": true
+}

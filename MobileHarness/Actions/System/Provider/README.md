@@ -81,3 +81,5 @@ Writer配置的writerThinking是独立选择，默认false；可选持久覆盖�
 Decision 在同一 Provider 设置文档提交 decisionUsesLocal、decisionLocalModelID、decisionProviderID 和 decisionModel。旧文档缺模式时读取下载设置历史模式，本地 ID 缺失解析为 Edge。启用或切换本地模型时校验目标制品是否已安装，Apple 系统模型改用系统可用性查询。Writer 启用本地时校验支持工具调用的 Gemma。资源未就绪时事务拒绝保存。云端 Provider 的模型发现接口仅返回模型 ID，Writer 执行仍要求 Chat 能力声明支持工具调用。已选资源后来缺失不会因无关设置保存而静默切换。每次分类读取一份已提交快照；本地模式只提供本地 ID，云端模式只提供已选 Provider/Model 工厂。旧本地配置残留云端引用不执行，保存时清空。执行失败由 Assistant 提示错误并入队，不调用备用模型。
 
 已移除的 D3 Lite ID 不出现在选择列表、库存资格或保存白名单中。旧偏好保留原值供用户修正；执行失败明确报告，不自动切换到 Edge 或云端。
+
+Decision原生模型ID包括d3-edge、vela3-fast、vela3.1-fast和laya-multilingual；保存选择和资源分组使用同一集合，安装资格仍由ModelKit制品快照判定。下载不自动切换选择。

@@ -1,0 +1,5815 @@
+{
+  "model": "vela31",
+  "suite": "binary",
+  "provenance": {
+    "repository": "hugging-mac/vela3.1-fast",
+    "revision": "108e385769cbd0da463706b24cac5a535604d2c6",
+    "artifactSpecSHA256": "b424d9ee431b8ac59001226f924043e7a8c33ce7e94b2e2faa1ebe5b0225e0e6",
+    "sdkCommit": "2a240f4bc48d90d0ef23fa8ab915e21011b0563b",
+    "sdkSourceHashes": {
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/instance.py": "c872a0fe7d31c31a09d044839f90ed7ffa6285a77c92e3b394e1a5d22343d6bb",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/config.py": "a9044aacb8413df4e258aa2af282c180e472c61f139f8781dfa1467f7a9e096a",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/coreai.py": "17fb859c9ae171316c617451a3ec8dbc67d82f67e2eb90540a47dda3c6e7f29a",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/converter.py": "9b31039299d36b70f9dbe6cb5b88e9b2db9daf21555a701dd83670ce4bada2a4",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/__init__.py": "f85b69c5a37c78c3cdfc709704ebb420f1e360ec952951fa234f518a566b992e",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/full.py": "f16162c684dff93f4905e865742d94c146290c86a3f7e2ea1840c48391f95b57",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/definition.py": "f5fdbe03f4c2e4c2be207e8f65e153b845b69522b09753e7d38c8214a5e9d5a8",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/resources.py": "c3fb654d2930b388f5d4e712553b945d4cbc7d6d174e33063f357e719bde321b",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/torch.py": "5743d1dcd8d9f30a192c29842e739b090bf0e132e5e3cf80a39bf8d200173072",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/execution.py": "2d98affb915b59cdd11ff666d4135ddea3dc7033c2cd71de1b5e93013f4815e6",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/preprocess.py": "df747bd83459201973ce9e06e37f50cae21f2bed59805f6c2113dd1a5d9f1f69",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/full_upstream.py": "c95d72bd376587907e0387af43cdd076d13e82077f21c2c121cda61521d2192a",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/__init__.py": "6ea941aeca158e7fd098236b6598d5aa59a4c3ba83225b681c784ed17e21a65f",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/native.py": "bb155197ed25da82604c494852214fbc37ab6a1dbc4ef5d7da28a9a31b6abdde",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/types.py": "b5ac400b9f391c4d1be8e839daa049673b2dafdaa85afbdd7fe42cc5178ff874",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/coreai_export.py": "4da2451fe809c78a39badfd5c2c413ced281211383ed4327cc8a017dd7757c4f",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/packing.py": "ab14cb5a5ba74239afc6170e5d0f912e76eb023f60d266251b76e1e98427fb68",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/upstream.py": "9343e7f16f3594a8783575aeb298ecab48df53e61c52b664d438543e79f80eda",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/full_host.py": "aa85a5dcba562e1ad3d943dfc890c79d2f4ad20caefb19fce40049025ab4b409",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/models/vela/utils/validation.py": "0d3403f818858182c82600c11534a1197e87d0db4ed0cbae705e722e6d72a4bf",
+      "packages/hugging_mac_sdk/src/hugging_mac_sdk/runtime/coreai.py": "eb616878e66abfd96a14f5ba86bc4de9bf7b6ee21454bb1e67722a4e1721c779"
+    },
+    "runtimeVersions": {
+      "numpy": "2.3.5",
+      "tokenizers": "0.22.2",
+      "coreai-core": "1.0.0b2"
+    },
+    "platform": "macOS-27.2.1-arm64-arm-64bit",
+    "processor": "arm",
+    "device": "cpu",
+    "threads": 1,
+    "runnerSHA256": "02b8b02031572af4f0c2367e71b1a367753e60890fa89a2b3da54e3eb4bdf0b5"
+  },
+  "inputFile": "decision-binary-input-2026-11-17.json",
+  "inputSHA256": "f7f62d8f5e7bb736c6b3419d2227d750f928b9d705d7a7f958a512ec60f58fd8",
+  "loadMilliseconds": 3747.1081250114366,
+  "warmup": [
+    {
+      "variant": "defined_bool",
+      "id": "00-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.2011083459154409,
+          "B": 0.7988916540845591
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 332.13770799920894,
+      "prediction": "true",
+      "score": 0.7988916540845591,
+      "pTrue": 0.7988916540845591
+    },
+    {
+      "variant": "defined_bool",
+      "id": "00-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.2011083459154409,
+          "B": 0.7988916540845591
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 340.7975419831928,
+      "prediction": "true",
+      "score": 0.7988916540845591,
+      "pTrue": 0.7988916540845591
+    },
+    {
+      "variant": "defined_bool",
+      "id": "00-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.2011083459154409,
+          "B": 0.7988916540845591
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 310.8136250230018,
+      "prediction": "true",
+      "score": 0.7988916540845591,
+      "pTrue": 0.7988916540845591
+    },
+    {
+      "variant": "yes_no",
+      "id": "00-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.12722716269951342,
+          "B": 0.8727728373004865
+        }
+      },
+      "inputTokens": 81,
+      "milliseconds": 274.47079098783433,
+      "prediction": "true",
+      "score": 0.8727728373004865,
+      "pTrue": 0.8727728373004865
+    },
+    {
+      "variant": "yes_no",
+      "id": "00-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.12722716269951342,
+          "B": 0.8727728373004865
+        }
+      },
+      "inputTokens": 81,
+      "milliseconds": 309.39179100096226,
+      "prediction": "true",
+      "score": 0.8727728373004865,
+      "pTrue": 0.8727728373004865
+    },
+    {
+      "variant": "yes_no",
+      "id": "00-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.12722716269951342,
+          "B": 0.8727728373004865
+        }
+      },
+      "inputTokens": 81,
+      "milliseconds": 463.8734170002863,
+      "prediction": "true",
+      "score": 0.8727728373004865,
+      "pTrue": 0.8727728373004865
+    }
+  ],
+  "rows": [
+    {
+      "variant": "defined_bool",
+      "id": "00-en-busy",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.1581952431840824,
+          "B": 0.8418047568159176
+        }
+      },
+      "inputTokens": 110,
+      "milliseconds": 3101.213916990673,
+      "prediction": "true",
+      "score": 0.8418047568159176,
+      "pTrue": 0.8418047568159176
+    },
+    {
+      "variant": "yes_no",
+      "id": "00-en-busy",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.20636536252775545,
+          "B": 0.7936346374722446
+        }
+      },
+      "inputTokens": 77,
+      "milliseconds": 1710.1280839997344,
+      "prediction": "true",
+      "score": 0.7936346374722446,
+      "pTrue": 0.7936346374722446
+    },
+    {
+      "variant": "yes_no",
+      "id": "00-en-idle",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.20636536252775545,
+          "B": 0.7936346374722446
+        }
+      },
+      "inputTokens": 77,
+      "milliseconds": 1579.5690410013776,
+      "prediction": "true",
+      "score": 0.7936346374722446,
+      "pTrue": 0.7936346374722446
+    },
+    {
+      "variant": "defined_bool",
+      "id": "00-en-idle",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.1581952431840824,
+          "B": 0.8418047568159176
+        }
+      },
+      "inputTokens": 110,
+      "milliseconds": 1317.5589159945957,
+      "prediction": "true",
+      "score": 0.8418047568159176,
+      "pTrue": 0.8418047568159176
+    },
+    {
+      "variant": "defined_bool",
+      "id": "00-zh-busy",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.2011083459154409,
+          "B": 0.7988916540845591
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 1462.8729170071892,
+      "prediction": "true",
+      "score": 0.7988916540845591,
+      "pTrue": 0.7988916540845591
+    },
+    {
+      "variant": "yes_no",
+      "id": "00-zh-busy",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.12722716269951342,
+          "B": 0.8727728373004865
+        }
+      },
+      "inputTokens": 81,
+      "milliseconds": 1494.2374170059338,
+      "prediction": "true",
+      "score": 0.8727728373004865,
+      "pTrue": 0.8727728373004865
+    },
+    {
+      "variant": "yes_no",
+      "id": "00-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.12722716269951342,
+          "B": 0.8727728373004865
+        }
+      },
+      "inputTokens": 81,
+      "milliseconds": 949.8616250057239,
+      "prediction": "true",
+      "score": 0.8727728373004865,
+      "pTrue": 0.8727728373004865
+    },
+    {
+      "variant": "defined_bool",
+      "id": "00-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.2011083459154409,
+          "B": 0.7988916540845591
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 1131.4340829849243,
+      "prediction": "true",
+      "score": 0.7988916540845591,
+      "pTrue": 0.7988916540845591
+    },
+    {
+      "variant": "defined_bool",
+      "id": "01-en-busy",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.24992242141187315,
+          "B": 0.750077578588127
+        }
+      },
+      "inputTokens": 111,
+      "milliseconds": 2068.656749994261,
+      "prediction": "true",
+      "score": 0.750077578588127,
+      "pTrue": 0.750077578588127
+    },
+    {
+      "variant": "yes_no",
+      "id": "01-en-busy",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.21166379832792684,
+          "B": 0.7883362016720732
+        }
+      },
+      "inputTokens": 78,
+      "milliseconds": 2107.5433749938384,
+      "prediction": "true",
+      "score": 0.7883362016720732,
+      "pTrue": 0.7883362016720732
+    },
+    {
+      "variant": "yes_no",
+      "id": "01-en-idle",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.21166379832792684,
+          "B": 0.7883362016720732
+        }
+      },
+      "inputTokens": 78,
+      "milliseconds": 3404.0909169998486,
+      "prediction": "true",
+      "score": 0.7883362016720732,
+      "pTrue": 0.7883362016720732
+    },
+    {
+      "variant": "defined_bool",
+      "id": "01-en-idle",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.24992242141187315,
+          "B": 0.750077578588127
+        }
+      },
+      "inputTokens": 111,
+      "milliseconds": 5296.099250001134,
+      "prediction": "true",
+      "score": 0.750077578588127,
+      "pTrue": 0.750077578588127
+    },
+    {
+      "variant": "defined_bool",
+      "id": "01-zh-busy",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9645298223580991,
+          "B": 0.035470177641900816
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 4004.59320799564,
+      "prediction": "false",
+      "score": 0.9645298223580991,
+      "pTrue": 0.035470177641900816
+    },
+    {
+      "variant": "yes_no",
+      "id": "01-zh-busy",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9376333587356168,
+          "B": 0.062366641264383176
+        }
+      },
+      "inputTokens": 81,
+      "milliseconds": 2630.439958011266,
+      "prediction": "false",
+      "score": 0.9376333587356168,
+      "pTrue": 0.062366641264383176
+    },
+    {
+      "variant": "yes_no",
+      "id": "01-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9376333587356168,
+          "B": 0.062366641264383176
+        }
+      },
+      "inputTokens": 81,
+      "milliseconds": 1872.5748749857303,
+      "prediction": "false",
+      "score": 0.9376333587356168,
+      "pTrue": 0.062366641264383176
+    },
+    {
+      "variant": "defined_bool",
+      "id": "01-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9645298223580991,
+          "B": 0.035470177641900816
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 1541.021582990652,
+      "prediction": "false",
+      "score": 0.9645298223580991,
+      "pTrue": 0.035470177641900816
+    },
+    {
+      "variant": "defined_bool",
+      "id": "02-en-busy",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.03582435702404283,
+          "B": 0.9641756429759571
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 1164.4940840196796,
+      "prediction": "true",
+      "score": 0.9641756429759571,
+      "pTrue": 0.9641756429759571
+    },
+    {
+      "variant": "yes_no",
+      "id": "02-en-busy",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.029596997993957087,
+          "B": 0.9704030020060429
+        }
+      },
+      "inputTokens": 81,
+      "milliseconds": 1552.0998749998398,
+      "prediction": "true",
+      "score": 0.9704030020060429,
+      "pTrue": 0.9704030020060429
+    },
+    {
+      "variant": "yes_no",
+      "id": "02-en-idle",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.029596997993957087,
+          "B": 0.9704030020060429
+        }
+      },
+      "inputTokens": 81,
+      "milliseconds": 907.4661250051577,
+      "prediction": "true",
+      "score": 0.9704030020060429,
+      "pTrue": 0.9704030020060429
+    },
+    {
+      "variant": "defined_bool",
+      "id": "02-en-idle",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.03582435702404283,
+          "B": 0.9641756429759571
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 898.1825830123853,
+      "prediction": "true",
+      "score": 0.9641756429759571,
+      "pTrue": 0.9641756429759571
+    },
+    {
+      "variant": "defined_bool",
+      "id": "02-zh-busy",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.4292888850596378,
+          "B": 0.5707111149403622
+        }
+      },
+      "inputTokens": 124,
+      "milliseconds": 1092.2623750229832,
+      "prediction": "true",
+      "score": 0.5707111149403622,
+      "pTrue": 0.5707111149403622
+    },
+    {
+      "variant": "yes_no",
+      "id": "02-zh-busy",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.19485441803504683,
+          "B": 0.8051455819649531
+        }
+      },
+      "inputTokens": 91,
+      "milliseconds": 760.876249987632,
+      "prediction": "true",
+      "score": 0.8051455819649531,
+      "pTrue": 0.8051455819649531
+    },
+    {
+      "variant": "yes_no",
+      "id": "02-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.19485441803504683,
+          "B": 0.8051455819649531
+        }
+      },
+      "inputTokens": 91,
+      "milliseconds": 536.2508750113193,
+      "prediction": "true",
+      "score": 0.8051455819649531,
+      "pTrue": 0.8051455819649531
+    },
+    {
+      "variant": "defined_bool",
+      "id": "02-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.4292888850596378,
+          "B": 0.5707111149403622
+        }
+      },
+      "inputTokens": 124,
+      "milliseconds": 579.9162919865921,
+      "prediction": "true",
+      "score": 0.5707111149403622,
+      "pTrue": 0.5707111149403622
+    },
+    {
+      "variant": "defined_bool",
+      "id": "03-en-busy",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.07165242356716117,
+          "B": 0.9283475764328387
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 656.4498749794438,
+      "prediction": "true",
+      "score": 0.9283475764328387,
+      "pTrue": 0.9283475764328387
+    },
+    {
+      "variant": "yes_no",
+      "id": "03-en-busy",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.06006714237420743,
+          "B": 0.9399328576257926
+        }
+      },
+      "inputTokens": 82,
+      "milliseconds": 455.43983299285173,
+      "prediction": "true",
+      "score": 0.9399328576257926,
+      "pTrue": 0.9399328576257926
+    },
+    {
+      "variant": "yes_no",
+      "id": "03-en-idle",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.06006714237420743,
+          "B": 0.9399328576257926
+        }
+      },
+      "inputTokens": 82,
+      "milliseconds": 394.13987498846836,
+      "prediction": "true",
+      "score": 0.9399328576257926,
+      "pTrue": 0.9399328576257926
+    },
+    {
+      "variant": "defined_bool",
+      "id": "03-en-idle",
+      "language": "en",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.07165242356716117,
+          "B": 0.9283475764328387
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 475.4594590049237,
+      "prediction": "true",
+      "score": 0.9283475764328387,
+      "pTrue": 0.9283475764328387
+    },
+    {
+      "variant": "defined_bool",
+      "id": "03-zh-busy",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.8372745204727309,
+          "B": 0.16272547952726918
+        }
+      },
+      "inputTokens": 121,
+      "milliseconds": 490.9085419785697,
+      "prediction": "false",
+      "score": 0.8372745204727309,
+      "pTrue": 0.16272547952726918
+    },
+    {
+      "variant": "yes_no",
+      "id": "03-zh-busy",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.6740805048386967,
+          "B": 0.3259194951613032
+        }
+      },
+      "inputTokens": 88,
+      "milliseconds": 555.1739579823334,
+      "prediction": "false",
+      "score": 0.6740805048386967,
+      "pTrue": 0.3259194951613032
+    },
+    {
+      "variant": "yes_no",
+      "id": "03-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.6740805048386967,
+          "B": 0.3259194951613032
+        }
+      },
+      "inputTokens": 88,
+      "milliseconds": 664.7613340173848,
+      "prediction": "false",
+      "score": 0.6740805048386967,
+      "pTrue": 0.3259194951613032
+    },
+    {
+      "variant": "defined_bool",
+      "id": "03-zh-idle",
+      "language": "zh",
+      "group": "stop",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.8372745204727309,
+          "B": 0.16272547952726918
+        }
+      },
+      "inputTokens": 121,
+      "milliseconds": 557.2399999946356,
+      "prediction": "false",
+      "score": 0.8372745204727309,
+      "pTrue": 0.16272547952726918
+    },
+    {
+      "variant": "defined_bool",
+      "id": "04-en-busy",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.43226821323038167,
+          "B": 0.5677317867696183
+        }
+      },
+      "inputTokens": 116,
+      "milliseconds": 490.8277500071563,
+      "prediction": "true",
+      "score": 0.5677317867696183,
+      "pTrue": 0.5677317867696183
+    },
+    {
+      "variant": "yes_no",
+      "id": "04-en-busy",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.31222899265241516,
+          "B": 0.6877710073475848
+        }
+      },
+      "inputTokens": 83,
+      "milliseconds": 373.14787501236424,
+      "prediction": "true",
+      "score": 0.6877710073475848,
+      "pTrue": 0.6877710073475848
+    },
+    {
+      "variant": "yes_no",
+      "id": "04-en-idle",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.31222899265241516,
+          "B": 0.6877710073475848
+        }
+      },
+      "inputTokens": 83,
+      "milliseconds": 360.39187500136904,
+      "prediction": "true",
+      "score": 0.6877710073475848,
+      "pTrue": 0.6877710073475848
+    },
+    {
+      "variant": "defined_bool",
+      "id": "04-en-idle",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.43226821323038167,
+          "B": 0.5677317867696183
+        }
+      },
+      "inputTokens": 116,
+      "milliseconds": 490.0859999761451,
+      "prediction": "true",
+      "score": 0.5677317867696183,
+      "pTrue": 0.5677317867696183
+    },
+    {
+      "variant": "defined_bool",
+      "id": "04-zh-busy",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.1856772740598668,
+          "B": 0.8143227259401332
+        }
+      },
+      "inputTokens": 128,
+      "milliseconds": 715.5994170170743,
+      "prediction": "true",
+      "score": 0.8143227259401332,
+      "pTrue": 0.8143227259401332
+    },
+    {
+      "variant": "yes_no",
+      "id": "04-zh-busy",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.2170085479125366,
+          "B": 0.7829914520874635
+        }
+      },
+      "inputTokens": 95,
+      "milliseconds": 563.3956670062616,
+      "prediction": "true",
+      "score": 0.7829914520874635,
+      "pTrue": 0.7829914520874635
+    },
+    {
+      "variant": "yes_no",
+      "id": "04-zh-idle",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.2170085479125366,
+          "B": 0.7829914520874635
+        }
+      },
+      "inputTokens": 95,
+      "milliseconds": 448.9767080231104,
+      "prediction": "true",
+      "score": 0.7829914520874635,
+      "pTrue": 0.7829914520874635
+    },
+    {
+      "variant": "defined_bool",
+      "id": "04-zh-idle",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.1856772740598668,
+          "B": 0.8143227259401332
+        }
+      },
+      "inputTokens": 128,
+      "milliseconds": 1279.78054099367,
+      "prediction": "true",
+      "score": 0.8143227259401332,
+      "pTrue": 0.8143227259401332
+    },
+    {
+      "variant": "defined_bool",
+      "id": "05-en-busy",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.18084058787142535,
+          "B": 0.8191594121285747
+        }
+      },
+      "inputTokens": 119,
+      "milliseconds": 998.616791999666,
+      "prediction": "true",
+      "score": 0.8191594121285747,
+      "pTrue": 0.8191594121285747
+    },
+    {
+      "variant": "yes_no",
+      "id": "05-en-busy",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.15262705490492415,
+          "B": 0.8473729450950758
+        }
+      },
+      "inputTokens": 86,
+      "milliseconds": 849.644542002352,
+      "prediction": "true",
+      "score": 0.8473729450950758,
+      "pTrue": 0.8473729450950758
+    },
+    {
+      "variant": "yes_no",
+      "id": "05-en-idle",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.15262705490492415,
+          "B": 0.8473729450950758
+        }
+      },
+      "inputTokens": 86,
+      "milliseconds": 2959.4821659848094,
+      "prediction": "true",
+      "score": 0.8473729450950758,
+      "pTrue": 0.8473729450950758
+    },
+    {
+      "variant": "defined_bool",
+      "id": "05-en-idle",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.18084058787142535,
+          "B": 0.8191594121285747
+        }
+      },
+      "inputTokens": 119,
+      "milliseconds": 2449.985042010667,
+      "prediction": "true",
+      "score": 0.8191594121285747,
+      "pTrue": 0.8191594121285747
+    },
+    {
+      "variant": "defined_bool",
+      "id": "05-zh-busy",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.8159351253755122,
+          "B": 0.18406487462448784
+        }
+      },
+      "inputTokens": 135,
+      "milliseconds": 2308.781917003216,
+      "prediction": "false",
+      "score": 0.8159351253755122,
+      "pTrue": 0.18406487462448784
+    },
+    {
+      "variant": "yes_no",
+      "id": "05-zh-busy",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.4069645710699308,
+          "B": 0.5930354289300691
+        }
+      },
+      "inputTokens": 102,
+      "milliseconds": 1302.787124994211,
+      "prediction": "true",
+      "score": 0.5930354289300691,
+      "pTrue": 0.5930354289300691
+    },
+    {
+      "variant": "yes_no",
+      "id": "05-zh-idle",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.4069645710699308,
+          "B": 0.5930354289300691
+        }
+      },
+      "inputTokens": 102,
+      "milliseconds": 808.989917015424,
+      "prediction": "true",
+      "score": 0.5930354289300691,
+      "pTrue": 0.5930354289300691
+    },
+    {
+      "variant": "defined_bool",
+      "id": "05-zh-idle",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.8159351253755122,
+          "B": 0.18406487462448784
+        }
+      },
+      "inputTokens": 135,
+      "milliseconds": 695.2384580217768,
+      "prediction": "false",
+      "score": 0.8159351253755122,
+      "pTrue": 0.18406487462448784
+    },
+    {
+      "variant": "defined_bool",
+      "id": "06-en-busy",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9114044795753036,
+          "B": 0.08859552042469647
+        }
+      },
+      "inputTokens": 119,
+      "milliseconds": 553.1234169902746,
+      "prediction": "false",
+      "score": 0.9114044795753036,
+      "pTrue": 0.08859552042469647
+    },
+    {
+      "variant": "yes_no",
+      "id": "06-en-busy",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.8509224895369017,
+          "B": 0.14907751046309828
+        }
+      },
+      "inputTokens": 86,
+      "milliseconds": 544.0781249781139,
+      "prediction": "false",
+      "score": 0.8509224895369017,
+      "pTrue": 0.14907751046309828
+    },
+    {
+      "variant": "yes_no",
+      "id": "06-en-idle",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.8509224895369017,
+          "B": 0.14907751046309828
+        }
+      },
+      "inputTokens": 86,
+      "milliseconds": 1013.9334999839775,
+      "prediction": "false",
+      "score": 0.8509224895369017,
+      "pTrue": 0.14907751046309828
+    },
+    {
+      "variant": "defined_bool",
+      "id": "06-en-idle",
+      "language": "en",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9114044795753036,
+          "B": 0.08859552042469647
+        }
+      },
+      "inputTokens": 119,
+      "milliseconds": 1481.101084005786,
+      "prediction": "false",
+      "score": 0.9114044795753036,
+      "pTrue": 0.08859552042469647
+    },
+    {
+      "variant": "defined_bool",
+      "id": "06-zh-busy",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.7931578903911253,
+          "B": 0.20684210960887464
+        }
+      },
+      "inputTokens": 132,
+      "milliseconds": 1341.1827920062933,
+      "prediction": "false",
+      "score": 0.7931578903911253,
+      "pTrue": 0.20684210960887464
+    },
+    {
+      "variant": "yes_no",
+      "id": "06-zh-busy",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.92755288261277,
+          "B": 0.07244711738722988
+        }
+      },
+      "inputTokens": 99,
+      "milliseconds": 831.1306670075282,
+      "prediction": "false",
+      "score": 0.92755288261277,
+      "pTrue": 0.07244711738722988
+    },
+    {
+      "variant": "yes_no",
+      "id": "06-zh-idle",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.92755288261277,
+          "B": 0.07244711738722988
+        }
+      },
+      "inputTokens": 99,
+      "milliseconds": 779.1693750186823,
+      "prediction": "false",
+      "score": 0.92755288261277,
+      "pTrue": 0.07244711738722988
+    },
+    {
+      "variant": "defined_bool",
+      "id": "06-zh-idle",
+      "language": "zh",
+      "group": "correction",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.7931578903911253,
+          "B": 0.20684210960887464
+        }
+      },
+      "inputTokens": 132,
+      "milliseconds": 755.7339999766555,
+      "prediction": "false",
+      "score": 0.7931578903911253,
+      "pTrue": 0.20684210960887464
+    },
+    {
+      "variant": "defined_bool",
+      "id": "07-en-busy",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.1651171128445863,
+          "B": 0.8348828871554138
+        }
+      },
+      "inputTokens": 119,
+      "milliseconds": 788.3772500208579,
+      "prediction": "true",
+      "score": 0.8348828871554138,
+      "pTrue": 0.8348828871554138
+    },
+    {
+      "variant": "yes_no",
+      "id": "07-en-busy",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.05179981257075566,
+          "B": 0.9482001874292444
+        }
+      },
+      "inputTokens": 86,
+      "milliseconds": 850.3312499960884,
+      "prediction": "true",
+      "score": 0.9482001874292444,
+      "pTrue": 0.9482001874292444
+    },
+    {
+      "variant": "yes_no",
+      "id": "07-en-idle",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.05179981257075566,
+          "B": 0.9482001874292444
+        }
+      },
+      "inputTokens": 86,
+      "milliseconds": 467.04166699782945,
+      "prediction": "true",
+      "score": 0.9482001874292444,
+      "pTrue": 0.9482001874292444
+    },
+    {
+      "variant": "defined_bool",
+      "id": "07-en-idle",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.1651171128445863,
+          "B": 0.8348828871554138
+        }
+      },
+      "inputTokens": 119,
+      "milliseconds": 543.3452500146814,
+      "prediction": "true",
+      "score": 0.8348828871554138,
+      "pTrue": 0.8348828871554138
+    },
+    {
+      "variant": "defined_bool",
+      "id": "07-zh-busy",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.6137592771822252,
+          "B": 0.38624072281777483
+        }
+      },
+      "inputTokens": 134,
+      "milliseconds": 535.781374986982,
+      "prediction": "false",
+      "score": 0.6137592771822252,
+      "pTrue": 0.38624072281777483
+    },
+    {
+      "variant": "yes_no",
+      "id": "07-zh-busy",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.48591451604981273,
+          "B": 0.5140854839501873
+        }
+      },
+      "inputTokens": 101,
+      "milliseconds": 436.76616600714624,
+      "prediction": "true",
+      "score": 0.5140854839501873,
+      "pTrue": 0.5140854839501873
+    },
+    {
+      "variant": "yes_no",
+      "id": "07-zh-idle",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.48591451604981273,
+          "B": 0.5140854839501873
+        }
+      },
+      "inputTokens": 101,
+      "milliseconds": 426.94283300079405,
+      "prediction": "true",
+      "score": 0.5140854839501873,
+      "pTrue": 0.5140854839501873
+    },
+    {
+      "variant": "defined_bool",
+      "id": "07-zh-idle",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.6137592771822252,
+          "B": 0.38624072281777483
+        }
+      },
+      "inputTokens": 134,
+      "milliseconds": 667.029750009533,
+      "prediction": "false",
+      "score": 0.6137592771822252,
+      "pTrue": 0.38624072281777483
+    },
+    {
+      "variant": "defined_bool",
+      "id": "08-en-busy",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.2107991784622758,
+          "B": 0.7892008215377243
+        }
+      },
+      "inputTokens": 119,
+      "milliseconds": 2368.6784579767846,
+      "prediction": "true",
+      "score": 0.7892008215377243,
+      "pTrue": 0.7892008215377243
+    },
+    {
+      "variant": "yes_no",
+      "id": "08-en-busy",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.12630932177678086,
+          "B": 0.8736906782232192
+        }
+      },
+      "inputTokens": 86,
+      "milliseconds": 2663.2397080247756,
+      "prediction": "true",
+      "score": 0.8736906782232192,
+      "pTrue": 0.8736906782232192
+    },
+    {
+      "variant": "yes_no",
+      "id": "08-en-idle",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.12630932177678086,
+          "B": 0.8736906782232192
+        }
+      },
+      "inputTokens": 86,
+      "milliseconds": 743.7364170036744,
+      "prediction": "true",
+      "score": 0.8736906782232192,
+      "pTrue": 0.8736906782232192
+    },
+    {
+      "variant": "defined_bool",
+      "id": "08-en-idle",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.2107991784622758,
+          "B": 0.7892008215377243
+        }
+      },
+      "inputTokens": 119,
+      "milliseconds": 801.0737909935415,
+      "prediction": "true",
+      "score": 0.7892008215377243,
+      "pTrue": 0.7892008215377243
+    },
+    {
+      "variant": "defined_bool",
+      "id": "08-zh-busy",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.8988613577572986,
+          "B": 0.10113864224270143
+        }
+      },
+      "inputTokens": 132,
+      "milliseconds": 649.3133749754634,
+      "prediction": "false",
+      "score": 0.8988613577572986,
+      "pTrue": 0.10113864224270143
+    },
+    {
+      "variant": "yes_no",
+      "id": "08-zh-busy",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.8780481692104264,
+          "B": 0.12195183078957351
+        }
+      },
+      "inputTokens": 99,
+      "milliseconds": 473.61733301659115,
+      "prediction": "false",
+      "score": 0.8780481692104264,
+      "pTrue": 0.12195183078957351
+    },
+    {
+      "variant": "yes_no",
+      "id": "08-zh-idle",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.8780481692104264,
+          "B": 0.12195183078957351
+        }
+      },
+      "inputTokens": 99,
+      "milliseconds": 523.2821670069825,
+      "prediction": "false",
+      "score": 0.8780481692104264,
+      "pTrue": 0.12195183078957351
+    },
+    {
+      "variant": "defined_bool",
+      "id": "08-zh-idle",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.8988613577572986,
+          "B": 0.10113864224270143
+        }
+      },
+      "inputTokens": 132,
+      "milliseconds": 548.8303750171326,
+      "prediction": "false",
+      "score": 0.8988613577572986,
+      "pTrue": 0.10113864224270143
+    },
+    {
+      "variant": "defined_bool",
+      "id": "09-en-busy",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.09952467568061454,
+          "B": 0.9004753243193855
+        }
+      },
+      "inputTokens": 117,
+      "milliseconds": 466.0364169976674,
+      "prediction": "true",
+      "score": 0.9004753243193855,
+      "pTrue": 0.9004753243193855
+    },
+    {
+      "variant": "yes_no",
+      "id": "09-en-busy",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.16123180034755424,
+          "B": 0.8387681996524458
+        }
+      },
+      "inputTokens": 84,
+      "milliseconds": 375.69849999272265,
+      "prediction": "true",
+      "score": 0.8387681996524458,
+      "pTrue": 0.8387681996524458
+    },
+    {
+      "variant": "yes_no",
+      "id": "09-en-idle",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.16123180034755424,
+          "B": 0.8387681996524458
+        }
+      },
+      "inputTokens": 84,
+      "milliseconds": 360.1469580025878,
+      "prediction": "true",
+      "score": 0.8387681996524458,
+      "pTrue": 0.8387681996524458
+    },
+    {
+      "variant": "defined_bool",
+      "id": "09-en-idle",
+      "language": "en",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.09952467568061454,
+          "B": 0.9004753243193855
+        }
+      },
+      "inputTokens": 117,
+      "milliseconds": 450.71958398330025,
+      "prediction": "true",
+      "score": 0.9004753243193855,
+      "pTrue": 0.9004753243193855
+    },
+    {
+      "variant": "defined_bool",
+      "id": "09-zh-busy",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.6638356503694698,
+          "B": 0.33616434963053027
+        }
+      },
+      "inputTokens": 131,
+      "milliseconds": 1602.3354579810984,
+      "prediction": "false",
+      "score": 0.6638356503694698,
+      "pTrue": 0.33616434963053027
+    },
+    {
+      "variant": "yes_no",
+      "id": "09-zh-busy",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": true,
+      "expectedAction": "interrupt",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.69294911536747,
+          "B": 0.30705088463253005
+        }
+      },
+      "inputTokens": 98,
+      "milliseconds": 1997.581750008976,
+      "prediction": "false",
+      "score": 0.69294911536747,
+      "pTrue": 0.30705088463253005
+    },
+    {
+      "variant": "yes_no",
+      "id": "09-zh-idle",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.69294911536747,
+          "B": 0.30705088463253005
+        }
+      },
+      "inputTokens": 98,
+      "milliseconds": 1180.935458978638,
+      "prediction": "false",
+      "score": 0.69294911536747,
+      "pTrue": 0.30705088463253005
+    },
+    {
+      "variant": "defined_bool",
+      "id": "09-zh-idle",
+      "language": "zh",
+      "group": "switch",
+      "expected": "true",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.6638356503694698,
+          "B": 0.33616434963053027
+        }
+      },
+      "inputTokens": 131,
+      "milliseconds": 950.1589160063304,
+      "prediction": "false",
+      "score": 0.6638356503694698,
+      "pTrue": 0.33616434963053027
+    },
+    {
+      "variant": "defined_bool",
+      "id": "10-en-busy",
+      "language": "en",
+      "group": "greeting",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9983355667374616,
+          "B": 0.0016644332625383692
+        }
+      },
+      "inputTokens": 110,
+      "milliseconds": 1004.6561670023948,
+      "prediction": "false",
+      "score": 0.9983355667374616,
+      "pTrue": 0.0016644332625383692
+    },
+    {
+      "variant": "yes_no",
+      "id": "10-en-busy",
+      "language": "en",
+      "group": "greeting",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9943710041733126,
+          "B": 0.0056289958266874775
+        }
+      },
+      "inputTokens": 77,
+      "milliseconds": 757.130333018722,
+      "prediction": "false",
+      "score": 0.9943710041733126,
+      "pTrue": 0.0056289958266874775
+    },
+    {
+      "variant": "yes_no",
+      "id": "10-en-idle",
+      "language": "en",
+      "group": "greeting",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9943710041733126,
+          "B": 0.0056289958266874775
+        }
+      },
+      "inputTokens": 77,
+      "milliseconds": 2012.3792080266867,
+      "prediction": "false",
+      "score": 0.9943710041733126,
+      "pTrue": 0.0056289958266874775
+    },
+    {
+      "variant": "defined_bool",
+      "id": "10-en-idle",
+      "language": "en",
+      "group": "greeting",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9983355667374616,
+          "B": 0.0016644332625383692
+        }
+      },
+      "inputTokens": 110,
+      "milliseconds": 2269.0938749874476,
+      "prediction": "false",
+      "score": 0.9983355667374616,
+      "pTrue": 0.0016644332625383692
+    },
+    {
+      "variant": "defined_bool",
+      "id": "10-zh-busy",
+      "language": "zh",
+      "group": "greeting",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9922504512968046,
+          "B": 0.007749548703195526
+        }
+      },
+      "inputTokens": 113,
+      "milliseconds": 2275.383625004906,
+      "prediction": "false",
+      "score": 0.9922504512968046,
+      "pTrue": 0.007749548703195526
+    },
+    {
+      "variant": "yes_no",
+      "id": "10-zh-busy",
+      "language": "zh",
+      "group": "greeting",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9831399170475918,
+          "B": 0.016860082952408133
+        }
+      },
+      "inputTokens": 80,
+      "milliseconds": 1784.7397080040537,
+      "prediction": "false",
+      "score": 0.9831399170475918,
+      "pTrue": 0.016860082952408133
+    },
+    {
+      "variant": "yes_no",
+      "id": "10-zh-idle",
+      "language": "zh",
+      "group": "greeting",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9831399170475918,
+          "B": 0.016860082952408133
+        }
+      },
+      "inputTokens": 80,
+      "milliseconds": 1171.3684579881374,
+      "prediction": "false",
+      "score": 0.9831399170475918,
+      "pTrue": 0.016860082952408133
+    },
+    {
+      "variant": "defined_bool",
+      "id": "10-zh-idle",
+      "language": "zh",
+      "group": "greeting",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9922504512968046,
+          "B": 0.007749548703195526
+        }
+      },
+      "inputTokens": 113,
+      "milliseconds": 1155.6499589933082,
+      "prediction": "false",
+      "score": 0.9922504512968046,
+      "pTrue": 0.007749548703195526
+    },
+    {
+      "variant": "defined_bool",
+      "id": "11-en-busy",
+      "language": "en",
+      "group": "greeting",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9984410784610388,
+          "B": 0.0015589215389611307
+        }
+      },
+      "inputTokens": 111,
+      "milliseconds": 1332.4974169954658,
+      "prediction": "false",
+      "score": 0.9984410784610388,
+      "pTrue": 0.0015589215389611307
+    },
+    {
+      "variant": "yes_no",
+      "id": "11-en-busy",
+      "language": "en",
+      "group": "greeting",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9960854432128549,
+          "B": 0.003914556787145107
+        }
+      },
+      "inputTokens": 78,
+      "milliseconds": 1158.4748330060393,
+      "prediction": "false",
+      "score": 0.9960854432128549,
+      "pTrue": 0.003914556787145107
+    },
+    {
+      "variant": "yes_no",
+      "id": "11-en-idle",
+      "language": "en",
+      "group": "greeting",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9960854432128549,
+          "B": 0.003914556787145107
+        }
+      },
+      "inputTokens": 78,
+      "milliseconds": 1789.9151250021532,
+      "prediction": "false",
+      "score": 0.9960854432128549,
+      "pTrue": 0.003914556787145107
+    },
+    {
+      "variant": "defined_bool",
+      "id": "11-en-idle",
+      "language": "en",
+      "group": "greeting",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9984410784610388,
+          "B": 0.0015589215389611307
+        }
+      },
+      "inputTokens": 111,
+      "milliseconds": 1038.9871250081342,
+      "prediction": "false",
+      "score": 0.9984410784610388,
+      "pTrue": 0.0015589215389611307
+    },
+    {
+      "variant": "defined_bool",
+      "id": "11-zh-busy",
+      "language": "zh",
+      "group": "greeting",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9486287331013591,
+          "B": 0.0513712668986409
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 600.0714580004569,
+      "prediction": "false",
+      "score": 0.9486287331013591,
+      "pTrue": 0.0513712668986409
+    },
+    {
+      "variant": "yes_no",
+      "id": "11-zh-busy",
+      "language": "zh",
+      "group": "greeting",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9694163811248095,
+          "B": 0.030583618875190594
+        }
+      },
+      "inputTokens": 81,
+      "milliseconds": 361.16266599856317,
+      "prediction": "false",
+      "score": 0.9694163811248095,
+      "pTrue": 0.030583618875190594
+    },
+    {
+      "variant": "yes_no",
+      "id": "11-zh-idle",
+      "language": "zh",
+      "group": "greeting",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9694163811248095,
+          "B": 0.030583618875190594
+        }
+      },
+      "inputTokens": 81,
+      "milliseconds": 427.1728330058977,
+      "prediction": "false",
+      "score": 0.9694163811248095,
+      "pTrue": 0.030583618875190594
+    },
+    {
+      "variant": "defined_bool",
+      "id": "11-zh-idle",
+      "language": "zh",
+      "group": "greeting",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9486287331013591,
+          "B": 0.0513712668986409
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 950.6576669809874,
+      "prediction": "false",
+      "score": 0.9486287331013591,
+      "pTrue": 0.0513712668986409
+    },
+    {
+      "variant": "defined_bool",
+      "id": "12-en-busy",
+      "language": "en",
+      "group": "request",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.997796089548201,
+          "B": 0.0022039104517990716
+        }
+      },
+      "inputTokens": 112,
+      "milliseconds": 1353.330250014551,
+      "prediction": "false",
+      "score": 0.997796089548201,
+      "pTrue": 0.0022039104517990716
+    },
+    {
+      "variant": "yes_no",
+      "id": "12-en-busy",
+      "language": "en",
+      "group": "request",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.991882260810094,
+          "B": 0.008117739189905939
+        }
+      },
+      "inputTokens": 79,
+      "milliseconds": 628.713540994795,
+      "prediction": "false",
+      "score": 0.991882260810094,
+      "pTrue": 0.008117739189905939
+    },
+    {
+      "variant": "yes_no",
+      "id": "12-en-idle",
+      "language": "en",
+      "group": "request",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.991882260810094,
+          "B": 0.008117739189905939
+        }
+      },
+      "inputTokens": 79,
+      "milliseconds": 379.1393749997951,
+      "prediction": "false",
+      "score": 0.991882260810094,
+      "pTrue": 0.008117739189905939
+    },
+    {
+      "variant": "defined_bool",
+      "id": "12-en-idle",
+      "language": "en",
+      "group": "request",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.997796089548201,
+          "B": 0.0022039104517990716
+        }
+      },
+      "inputTokens": 112,
+      "milliseconds": 439.60225000046194,
+      "prediction": "false",
+      "score": 0.997796089548201,
+      "pTrue": 0.0022039104517990716
+    },
+    {
+      "variant": "defined_bool",
+      "id": "12-zh-busy",
+      "language": "zh",
+      "group": "request",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.8838175199281608,
+          "B": 0.11618248007183914
+        }
+      },
+      "inputTokens": 117,
+      "milliseconds": 673.3333749871235,
+      "prediction": "false",
+      "score": 0.8838175199281608,
+      "pTrue": 0.11618248007183914
+    },
+    {
+      "variant": "yes_no",
+      "id": "12-zh-busy",
+      "language": "zh",
+      "group": "request",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9474938299762485,
+          "B": 0.052506170023751415
+        }
+      },
+      "inputTokens": 84,
+      "milliseconds": 3485.7054160092957,
+      "prediction": "false",
+      "score": 0.9474938299762485,
+      "pTrue": 0.052506170023751415
+    },
+    {
+      "variant": "yes_no",
+      "id": "12-zh-idle",
+      "language": "zh",
+      "group": "request",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9474938299762485,
+          "B": 0.052506170023751415
+        }
+      },
+      "inputTokens": 84,
+      "milliseconds": 2024.6469160192646,
+      "prediction": "false",
+      "score": 0.9474938299762485,
+      "pTrue": 0.052506170023751415
+    },
+    {
+      "variant": "defined_bool",
+      "id": "12-zh-idle",
+      "language": "zh",
+      "group": "request",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.8838175199281608,
+          "B": 0.11618248007183914
+        }
+      },
+      "inputTokens": 117,
+      "milliseconds": 1718.2902499916963,
+      "prediction": "false",
+      "score": 0.8838175199281608,
+      "pTrue": 0.11618248007183914
+    },
+    {
+      "variant": "defined_bool",
+      "id": "13-en-busy",
+      "language": "en",
+      "group": "request",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9929252733846916,
+          "B": 0.007074726615308415
+        }
+      },
+      "inputTokens": 113,
+      "milliseconds": 1936.057166021783,
+      "prediction": "false",
+      "score": 0.9929252733846916,
+      "pTrue": 0.007074726615308415
+    },
+    {
+      "variant": "yes_no",
+      "id": "13-en-busy",
+      "language": "en",
+      "group": "request",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9921074434093667,
+          "B": 0.00789255659063338
+        }
+      },
+      "inputTokens": 80,
+      "milliseconds": 1475.5903329933062,
+      "prediction": "false",
+      "score": 0.9921074434093667,
+      "pTrue": 0.00789255659063338
+    },
+    {
+      "variant": "yes_no",
+      "id": "13-en-idle",
+      "language": "en",
+      "group": "request",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9921074434093667,
+          "B": 0.00789255659063338
+        }
+      },
+      "inputTokens": 80,
+      "milliseconds": 2529.469542001607,
+      "prediction": "false",
+      "score": 0.9921074434093667,
+      "pTrue": 0.00789255659063338
+    },
+    {
+      "variant": "defined_bool",
+      "id": "13-en-idle",
+      "language": "en",
+      "group": "request",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9929252733846916,
+          "B": 0.007074726615308415
+        }
+      },
+      "inputTokens": 113,
+      "milliseconds": 1742.0131659891922,
+      "prediction": "false",
+      "score": 0.9929252733846916,
+      "pTrue": 0.007074726615308415
+    },
+    {
+      "variant": "defined_bool",
+      "id": "13-zh-busy",
+      "language": "zh",
+      "group": "request",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9930402411601182,
+          "B": 0.006959758839881764
+        }
+      },
+      "inputTokens": 130,
+      "milliseconds": 1497.1140830020886,
+      "prediction": "false",
+      "score": 0.9930402411601182,
+      "pTrue": 0.006959758839881764
+    },
+    {
+      "variant": "yes_no",
+      "id": "13-zh-busy",
+      "language": "zh",
+      "group": "request",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9912793344390913,
+          "B": 0.008720665560908662
+        }
+      },
+      "inputTokens": 97,
+      "milliseconds": 998.4522919985466,
+      "prediction": "false",
+      "score": 0.9912793344390913,
+      "pTrue": 0.008720665560908662
+    },
+    {
+      "variant": "yes_no",
+      "id": "13-zh-idle",
+      "language": "zh",
+      "group": "request",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9912793344390913,
+          "B": 0.008720665560908662
+        }
+      },
+      "inputTokens": 97,
+      "milliseconds": 754.5073330111336,
+      "prediction": "false",
+      "score": 0.9912793344390913,
+      "pTrue": 0.008720665560908662
+    },
+    {
+      "variant": "defined_bool",
+      "id": "13-zh-idle",
+      "language": "zh",
+      "group": "request",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9930402411601182,
+          "B": 0.006959758839881764
+        }
+      },
+      "inputTokens": 130,
+      "milliseconds": 932.1392500132788,
+      "prediction": "false",
+      "score": 0.9930402411601182,
+      "pTrue": 0.006959758839881764
+    },
+    {
+      "variant": "defined_bool",
+      "id": "14-en-busy",
+      "language": "en",
+      "group": "question",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9994941040870832,
+          "B": 0.0005058959129167764
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 798.6661250179168,
+      "prediction": "false",
+      "score": 0.9994941040870832,
+      "pTrue": 0.0005058959129167764
+    },
+    {
+      "variant": "yes_no",
+      "id": "14-en-busy",
+      "language": "en",
+      "group": "question",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9976954170198895,
+          "B": 0.0023045829801105044
+        }
+      },
+      "inputTokens": 82,
+      "milliseconds": 734.9699169863015,
+      "prediction": "false",
+      "score": 0.9976954170198895,
+      "pTrue": 0.0023045829801105044
+    },
+    {
+      "variant": "yes_no",
+      "id": "14-en-idle",
+      "language": "en",
+      "group": "question",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9976954170198895,
+          "B": 0.0023045829801105044
+        }
+      },
+      "inputTokens": 82,
+      "milliseconds": 622.7935419883579,
+      "prediction": "false",
+      "score": 0.9976954170198895,
+      "pTrue": 0.0023045829801105044
+    },
+    {
+      "variant": "defined_bool",
+      "id": "14-en-idle",
+      "language": "en",
+      "group": "question",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9994941040870832,
+          "B": 0.0005058959129167764
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 1512.187707994599,
+      "prediction": "false",
+      "score": 0.9994941040870832,
+      "pTrue": 0.0005058959129167764
+    },
+    {
+      "variant": "defined_bool",
+      "id": "14-zh-busy",
+      "language": "zh",
+      "group": "question",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9987617530004023,
+          "B": 0.0012382469995977834
+        }
+      },
+      "inputTokens": 126,
+      "milliseconds": 1811.5848330198787,
+      "prediction": "false",
+      "score": 0.9987617530004023,
+      "pTrue": 0.0012382469995977834
+    },
+    {
+      "variant": "yes_no",
+      "id": "14-zh-busy",
+      "language": "zh",
+      "group": "question",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9967570199385455,
+          "B": 0.0032429800614544643
+        }
+      },
+      "inputTokens": 93,
+      "milliseconds": 2360.812625003746,
+      "prediction": "false",
+      "score": 0.9967570199385455,
+      "pTrue": 0.0032429800614544643
+    },
+    {
+      "variant": "yes_no",
+      "id": "14-zh-idle",
+      "language": "zh",
+      "group": "question",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9967570199385455,
+          "B": 0.0032429800614544643
+        }
+      },
+      "inputTokens": 93,
+      "milliseconds": 1272.6170000096317,
+      "prediction": "false",
+      "score": 0.9967570199385455,
+      "pTrue": 0.0032429800614544643
+    },
+    {
+      "variant": "defined_bool",
+      "id": "14-zh-idle",
+      "language": "zh",
+      "group": "question",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9987617530004023,
+          "B": 0.0012382469995977834
+        }
+      },
+      "inputTokens": 126,
+      "milliseconds": 1433.9135830232408,
+      "prediction": "false",
+      "score": 0.9987617530004023,
+      "pTrue": 0.0012382469995977834
+    },
+    {
+      "variant": "defined_bool",
+      "id": "15-en-busy",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9854972909682572,
+          "B": 0.01450270903174271
+        }
+      },
+      "inputTokens": 110,
+      "milliseconds": 1185.9857919916976,
+      "prediction": "false",
+      "score": 0.9854972909682572,
+      "pTrue": 0.01450270903174271
+    },
+    {
+      "variant": "yes_no",
+      "id": "15-en-busy",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9876963570596734,
+          "B": 0.012303642940326534
+        }
+      },
+      "inputTokens": 77,
+      "milliseconds": 1677.6025420113,
+      "prediction": "false",
+      "score": 0.9876963570596734,
+      "pTrue": 0.012303642940326534
+    },
+    {
+      "variant": "yes_no",
+      "id": "15-en-idle",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9876963570596734,
+          "B": 0.012303642940326534
+        }
+      },
+      "inputTokens": 77,
+      "milliseconds": 2462.8039590024855,
+      "prediction": "false",
+      "score": 0.9876963570596734,
+      "pTrue": 0.012303642940326534
+    },
+    {
+      "variant": "defined_bool",
+      "id": "15-en-idle",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9854972909682572,
+          "B": 0.01450270903174271
+        }
+      },
+      "inputTokens": 110,
+      "milliseconds": 1128.3577909925953,
+      "prediction": "false",
+      "score": 0.9854972909682572,
+      "pTrue": 0.01450270903174271
+    },
+    {
+      "variant": "defined_bool",
+      "id": "15-zh-busy",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9562459185304341,
+          "B": 0.043754081469565935
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 973.2836250041146,
+      "prediction": "false",
+      "score": 0.9562459185304341,
+      "pTrue": 0.043754081469565935
+    },
+    {
+      "variant": "yes_no",
+      "id": "15-zh-busy",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9643824164141066,
+          "B": 0.03561758358589347
+        }
+      },
+      "inputTokens": 82,
+      "milliseconds": 620.7435000105761,
+      "prediction": "false",
+      "score": 0.9643824164141066,
+      "pTrue": 0.03561758358589347
+    },
+    {
+      "variant": "yes_no",
+      "id": "15-zh-idle",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9643824164141066,
+          "B": 0.03561758358589347
+        }
+      },
+      "inputTokens": 82,
+      "milliseconds": 529.8825830104761,
+      "prediction": "false",
+      "score": 0.9643824164141066,
+      "pTrue": 0.03561758358589347
+    },
+    {
+      "variant": "defined_bool",
+      "id": "15-zh-idle",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9562459185304341,
+          "B": 0.043754081469565935
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 531.560040981276,
+      "prediction": "false",
+      "score": 0.9562459185304341,
+      "pTrue": 0.043754081469565935
+    },
+    {
+      "variant": "defined_bool",
+      "id": "16-en-busy",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9965132041131879,
+          "B": 0.0034867958868119954
+        }
+      },
+      "inputTokens": 110,
+      "milliseconds": 538.1489589926787,
+      "prediction": "false",
+      "score": 0.9965132041131879,
+      "pTrue": 0.0034867958868119954
+    },
+    {
+      "variant": "yes_no",
+      "id": "16-en-busy",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.5798074433518736,
+          "B": 0.42019255664812644
+        }
+      },
+      "inputTokens": 77,
+      "milliseconds": 386.77549999556504,
+      "prediction": "false",
+      "score": 0.5798074433518736,
+      "pTrue": 0.42019255664812644
+    },
+    {
+      "variant": "yes_no",
+      "id": "16-en-idle",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.5798074433518736,
+          "B": 0.42019255664812644
+        }
+      },
+      "inputTokens": 77,
+      "milliseconds": 408.8582079857588,
+      "prediction": "false",
+      "score": 0.5798074433518736,
+      "pTrue": 0.42019255664812644
+    },
+    {
+      "variant": "defined_bool",
+      "id": "16-en-idle",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9965132041131879,
+          "B": 0.0034867958868119954
+        }
+      },
+      "inputTokens": 110,
+      "milliseconds": 833.4002080082428,
+      "prediction": "false",
+      "score": 0.9965132041131879,
+      "pTrue": 0.0034867958868119954
+    },
+    {
+      "variant": "defined_bool",
+      "id": "16-zh-busy",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9929525965191999,
+          "B": 0.007047403480800144
+        }
+      },
+      "inputTokens": 111,
+      "milliseconds": 643.2881249929778,
+      "prediction": "false",
+      "score": 0.9929525965191999,
+      "pTrue": 0.007047403480800144
+    },
+    {
+      "variant": "yes_no",
+      "id": "16-zh-busy",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.877270519639497,
+          "B": 0.12272948036050307
+        }
+      },
+      "inputTokens": 78,
+      "milliseconds": 394.23158299177885,
+      "prediction": "false",
+      "score": 0.877270519639497,
+      "pTrue": 0.12272948036050307
+    },
+    {
+      "variant": "yes_no",
+      "id": "16-zh-idle",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.877270519639497,
+          "B": 0.12272948036050307
+        }
+      },
+      "inputTokens": 78,
+      "milliseconds": 355.2402079803869,
+      "prediction": "false",
+      "score": 0.877270519639497,
+      "pTrue": 0.12272948036050307
+    },
+    {
+      "variant": "defined_bool",
+      "id": "16-zh-idle",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9929525965191999,
+          "B": 0.007047403480800144
+        }
+      },
+      "inputTokens": 111,
+      "milliseconds": 395.6992079911288,
+      "prediction": "false",
+      "score": 0.9929525965191999,
+      "pTrue": 0.007047403480800144
+    },
+    {
+      "variant": "defined_bool",
+      "id": "17-en-busy",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9963711941838305,
+          "B": 0.0036288058161695206
+        }
+      },
+      "inputTokens": 112,
+      "milliseconds": 426.2760829878971,
+      "prediction": "false",
+      "score": 0.9963711941838305,
+      "pTrue": 0.0036288058161695206
+    },
+    {
+      "variant": "yes_no",
+      "id": "17-en-busy",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9963307787726289,
+          "B": 0.00366922122737112
+        }
+      },
+      "inputTokens": 79,
+      "milliseconds": 315.62370900064707,
+      "prediction": "false",
+      "score": 0.9963307787726289,
+      "pTrue": 0.00366922122737112
+    },
+    {
+      "variant": "yes_no",
+      "id": "17-en-idle",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9963307787726289,
+          "B": 0.00366922122737112
+        }
+      },
+      "inputTokens": 79,
+      "milliseconds": 300.75824999948964,
+      "prediction": "false",
+      "score": 0.9963307787726289,
+      "pTrue": 0.00366922122737112
+    },
+    {
+      "variant": "defined_bool",
+      "id": "17-en-idle",
+      "language": "en",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9963711941838305,
+          "B": 0.0036288058161695206
+        }
+      },
+      "inputTokens": 112,
+      "milliseconds": 384.45329101523384,
+      "prediction": "false",
+      "score": 0.9963711941838305,
+      "pTrue": 0.0036288058161695206
+    },
+    {
+      "variant": "defined_bool",
+      "id": "17-zh-busy",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.991912466262001,
+          "B": 0.008087533737998908
+        }
+      },
+      "inputTokens": 117,
+      "milliseconds": 828.6102919955738,
+      "prediction": "false",
+      "score": 0.991912466262001,
+      "pTrue": 0.008087533737998908
+    },
+    {
+      "variant": "yes_no",
+      "id": "17-zh-busy",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9772538615108454,
+          "B": 0.022746138489154563
+        }
+      },
+      "inputTokens": 84,
+      "milliseconds": 1332.3198750149459,
+      "prediction": "false",
+      "score": 0.9772538615108454,
+      "pTrue": 0.022746138489154563
+    },
+    {
+      "variant": "yes_no",
+      "id": "17-zh-idle",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9772538615108454,
+          "B": 0.022746138489154563
+        }
+      },
+      "inputTokens": 84,
+      "milliseconds": 940.2720410143957,
+      "prediction": "false",
+      "score": 0.9772538615108454,
+      "pTrue": 0.022746138489154563
+    },
+    {
+      "variant": "defined_bool",
+      "id": "17-zh-idle",
+      "language": "zh",
+      "group": "answer",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.991912466262001,
+          "B": 0.008087533737998908
+        }
+      },
+      "inputTokens": 117,
+      "milliseconds": 896.6296250000596,
+      "prediction": "false",
+      "score": 0.991912466262001,
+      "pTrue": 0.008087533737998908
+    },
+    {
+      "variant": "defined_bool",
+      "id": "18-en-busy",
+      "language": "en",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9926770932277094,
+          "B": 0.007322906772290672
+        }
+      },
+      "inputTokens": 111,
+      "milliseconds": 522.2505409910809,
+      "prediction": "false",
+      "score": 0.9926770932277094,
+      "pTrue": 0.007322906772290672
+    },
+    {
+      "variant": "yes_no",
+      "id": "18-en-busy",
+      "language": "en",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9887264055515366,
+          "B": 0.011273594448463523
+        }
+      },
+      "inputTokens": 78,
+      "milliseconds": 419.7037080011796,
+      "prediction": "false",
+      "score": 0.9887264055515366,
+      "pTrue": 0.011273594448463523
+    },
+    {
+      "variant": "yes_no",
+      "id": "18-en-idle",
+      "language": "en",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9887264055515366,
+          "B": 0.011273594448463523
+        }
+      },
+      "inputTokens": 78,
+      "milliseconds": 322.0787909813225,
+      "prediction": "false",
+      "score": 0.9887264055515366,
+      "pTrue": 0.011273594448463523
+    },
+    {
+      "variant": "defined_bool",
+      "id": "18-en-idle",
+      "language": "en",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9926770932277094,
+          "B": 0.007322906772290672
+        }
+      },
+      "inputTokens": 111,
+      "milliseconds": 394.5689999964088,
+      "prediction": "false",
+      "score": 0.9926770932277094,
+      "pTrue": 0.007322906772290672
+    },
+    {
+      "variant": "defined_bool",
+      "id": "18-zh-busy",
+      "language": "zh",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9705305525206109,
+          "B": 0.0294694474793891
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 472.2933750017546,
+      "prediction": "false",
+      "score": 0.9705305525206109,
+      "pTrue": 0.0294694474793891
+    },
+    {
+      "variant": "yes_no",
+      "id": "18-zh-busy",
+      "language": "zh",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9679784281453109,
+          "B": 0.032021571854689165
+        }
+      },
+      "inputTokens": 82,
+      "milliseconds": 314.5919170056004,
+      "prediction": "false",
+      "score": 0.9679784281453109,
+      "pTrue": 0.032021571854689165
+    },
+    {
+      "variant": "yes_no",
+      "id": "18-zh-idle",
+      "language": "zh",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9679784281453109,
+          "B": 0.032021571854689165
+        }
+      },
+      "inputTokens": 82,
+      "milliseconds": 337.8078330133576,
+      "prediction": "false",
+      "score": 0.9679784281453109,
+      "pTrue": 0.032021571854689165
+    },
+    {
+      "variant": "defined_bool",
+      "id": "18-zh-idle",
+      "language": "zh",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9705305525206109,
+          "B": 0.0294694474793891
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 425.57583400048316,
+      "prediction": "false",
+      "score": 0.9705305525206109,
+      "pTrue": 0.0294694474793891
+    },
+    {
+      "variant": "defined_bool",
+      "id": "19-en-busy",
+      "language": "en",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9984726098918549,
+          "B": 0.0015273901081449635
+        }
+      },
+      "inputTokens": 112,
+      "milliseconds": 965.8572080079466,
+      "prediction": "false",
+      "score": 0.9984726098918549,
+      "pTrue": 0.0015273901081449635
+    },
+    {
+      "variant": "yes_no",
+      "id": "19-en-busy",
+      "language": "en",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.997128735101275,
+          "B": 0.0028712648987250645
+        }
+      },
+      "inputTokens": 79,
+      "milliseconds": 1215.0166250066832,
+      "prediction": "false",
+      "score": 0.997128735101275,
+      "pTrue": 0.0028712648987250645
+    },
+    {
+      "variant": "yes_no",
+      "id": "19-en-idle",
+      "language": "en",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.997128735101275,
+          "B": 0.0028712648987250645
+        }
+      },
+      "inputTokens": 79,
+      "milliseconds": 711.7707500001416,
+      "prediction": "false",
+      "score": 0.997128735101275,
+      "pTrue": 0.0028712648987250645
+    },
+    {
+      "variant": "defined_bool",
+      "id": "19-en-idle",
+      "language": "en",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9984726098918549,
+          "B": 0.0015273901081449635
+        }
+      },
+      "inputTokens": 112,
+      "milliseconds": 570.663999998942,
+      "prediction": "false",
+      "score": 0.9984726098918549,
+      "pTrue": 0.0015273901081449635
+    },
+    {
+      "variant": "defined_bool",
+      "id": "19-zh-busy",
+      "language": "zh",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9714421930062871,
+          "B": 0.02855780699371298
+        }
+      },
+      "inputTokens": 121,
+      "milliseconds": 505.6985419942066,
+      "prediction": "false",
+      "score": 0.9714421930062871,
+      "pTrue": 0.02855780699371298
+    },
+    {
+      "variant": "yes_no",
+      "id": "19-zh-busy",
+      "language": "zh",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.979654656325164,
+          "B": 0.020345343674835932
+        }
+      },
+      "inputTokens": 88,
+      "milliseconds": 336.3620419986546,
+      "prediction": "false",
+      "score": 0.979654656325164,
+      "pTrue": 0.020345343674835932
+    },
+    {
+      "variant": "yes_no",
+      "id": "19-zh-idle",
+      "language": "zh",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.979654656325164,
+          "B": 0.020345343674835932
+        }
+      },
+      "inputTokens": 88,
+      "milliseconds": 398.1746670033317,
+      "prediction": "false",
+      "score": 0.979654656325164,
+      "pTrue": 0.020345343674835932
+    },
+    {
+      "variant": "defined_bool",
+      "id": "19-zh-idle",
+      "language": "zh",
+      "group": "unfinished",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9714421930062871,
+          "B": 0.02855780699371298
+        }
+      },
+      "inputTokens": 121,
+      "milliseconds": 431.5563749987632,
+      "prediction": "false",
+      "score": 0.9714421930062871,
+      "pTrue": 0.02855780699371298
+    },
+    {
+      "variant": "defined_bool",
+      "id": "20-en-busy",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9858517172225251,
+          "B": 0.014148282777474833
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 379.6798329858575,
+      "prediction": "false",
+      "score": 0.9858517172225251,
+      "pTrue": 0.014148282777474833
+    },
+    {
+      "variant": "yes_no",
+      "id": "20-en-busy",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.984781377484193,
+          "B": 0.015218622515806876
+        }
+      },
+      "inputTokens": 82,
+      "milliseconds": 439.8075829958543,
+      "prediction": "false",
+      "score": 0.984781377484193,
+      "pTrue": 0.015218622515806876
+    },
+    {
+      "variant": "yes_no",
+      "id": "20-en-idle",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.984781377484193,
+          "B": 0.015218622515806876
+        }
+      },
+      "inputTokens": 82,
+      "milliseconds": 563.3434999908786,
+      "prediction": "false",
+      "score": 0.984781377484193,
+      "pTrue": 0.015218622515806876
+    },
+    {
+      "variant": "defined_bool",
+      "id": "20-en-idle",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9858517172225251,
+          "B": 0.014148282777474833
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 1103.5971670062281,
+      "prediction": "false",
+      "score": 0.9858517172225251,
+      "pTrue": 0.014148282777474833
+    },
+    {
+      "variant": "defined_bool",
+      "id": "20-zh-busy",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9768901248147471,
+          "B": 0.023109875185252902
+        }
+      },
+      "inputTokens": 121,
+      "milliseconds": 782.6469999854453,
+      "prediction": "false",
+      "score": 0.9768901248147471,
+      "pTrue": 0.023109875185252902
+    },
+    {
+      "variant": "yes_no",
+      "id": "20-zh-busy",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9385009032414079,
+          "B": 0.06149909675859195
+        }
+      },
+      "inputTokens": 88,
+      "milliseconds": 353.50100000505336,
+      "prediction": "false",
+      "score": 0.9385009032414079,
+      "pTrue": 0.06149909675859195
+    },
+    {
+      "variant": "yes_no",
+      "id": "20-zh-idle",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9385009032414079,
+          "B": 0.06149909675859195
+        }
+      },
+      "inputTokens": 88,
+      "milliseconds": 353.6020409956109,
+      "prediction": "false",
+      "score": 0.9385009032414079,
+      "pTrue": 0.06149909675859195
+    },
+    {
+      "variant": "defined_bool",
+      "id": "20-zh-idle",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9768901248147471,
+          "B": 0.023109875185252902
+        }
+      },
+      "inputTokens": 121,
+      "milliseconds": 429.5885419996921,
+      "prediction": "false",
+      "score": 0.9768901248147471,
+      "pTrue": 0.023109875185252902
+    },
+    {
+      "variant": "defined_bool",
+      "id": "21-en-busy",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.949712340684111,
+          "B": 0.05028765931588891
+        }
+      },
+      "inputTokens": 116,
+      "milliseconds": 417.91154199745506,
+      "prediction": "false",
+      "score": 0.949712340684111,
+      "pTrue": 0.05028765931588891
+    },
+    {
+      "variant": "yes_no",
+      "id": "21-en-busy",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9657903010293387,
+          "B": 0.034209698970661215
+        }
+      },
+      "inputTokens": 83,
+      "milliseconds": 294.86762499436736,
+      "prediction": "false",
+      "score": 0.9657903010293387,
+      "pTrue": 0.034209698970661215
+    },
+    {
+      "variant": "yes_no",
+      "id": "21-en-idle",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9657903010293387,
+          "B": 0.034209698970661215
+        }
+      },
+      "inputTokens": 83,
+      "milliseconds": 292.5823339901399,
+      "prediction": "false",
+      "score": 0.9657903010293387,
+      "pTrue": 0.034209698970661215
+    },
+    {
+      "variant": "defined_bool",
+      "id": "21-en-idle",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.949712340684111,
+          "B": 0.05028765931588891
+        }
+      },
+      "inputTokens": 116,
+      "milliseconds": 469.6200840116944,
+      "prediction": "false",
+      "score": 0.949712340684111,
+      "pTrue": 0.05028765931588891
+    },
+    {
+      "variant": "defined_bool",
+      "id": "21-zh-busy",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9139185677810704,
+          "B": 0.08608143221892965
+        }
+      },
+      "inputTokens": 122,
+      "milliseconds": 469.024417019682,
+      "prediction": "false",
+      "score": 0.9139185677810704,
+      "pTrue": 0.08608143221892965
+    },
+    {
+      "variant": "yes_no",
+      "id": "21-zh-busy",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9476126464183957,
+          "B": 0.05238735358160425
+        }
+      },
+      "inputTokens": 89,
+      "milliseconds": 448.1946669984609,
+      "prediction": "false",
+      "score": 0.9476126464183957,
+      "pTrue": 0.05238735358160425
+    },
+    {
+      "variant": "yes_no",
+      "id": "21-zh-idle",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9476126464183957,
+          "B": 0.05238735358160425
+        }
+      },
+      "inputTokens": 89,
+      "milliseconds": 679.8478339915164,
+      "prediction": "false",
+      "score": 0.9476126464183957,
+      "pTrue": 0.05238735358160425
+    },
+    {
+      "variant": "defined_bool",
+      "id": "21-zh-idle",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9139185677810704,
+          "B": 0.08608143221892965
+        }
+      },
+      "inputTokens": 122,
+      "milliseconds": 965.9994590037968,
+      "prediction": "false",
+      "score": 0.9139185677810704,
+      "pTrue": 0.08608143221892965
+    },
+    {
+      "variant": "defined_bool",
+      "id": "22-en-busy",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9549587405071255,
+          "B": 0.045041259492874484
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 650.6012080062646,
+      "prediction": "false",
+      "score": 0.9549587405071255,
+      "pTrue": 0.045041259492874484
+    },
+    {
+      "variant": "yes_no",
+      "id": "22-en-busy",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9533143446312113,
+          "B": 0.04668565536878859
+        }
+      },
+      "inputTokens": 81,
+      "milliseconds": 340.71424999274313,
+      "prediction": "false",
+      "score": 0.9533143446312113,
+      "pTrue": 0.04668565536878859
+    },
+    {
+      "variant": "yes_no",
+      "id": "22-en-idle",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9533143446312113,
+          "B": 0.04668565536878859
+        }
+      },
+      "inputTokens": 81,
+      "milliseconds": 318.5565830208361,
+      "prediction": "false",
+      "score": 0.9533143446312113,
+      "pTrue": 0.04668565536878859
+    },
+    {
+      "variant": "defined_bool",
+      "id": "22-en-idle",
+      "language": "en",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9549587405071255,
+          "B": 0.045041259492874484
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 382.6554999977816,
+      "prediction": "false",
+      "score": 0.9549587405071255,
+      "pTrue": 0.045041259492874484
+    },
+    {
+      "variant": "defined_bool",
+      "id": "22-zh-busy",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.96626820238223,
+          "B": 0.03373179761777008
+        }
+      },
+      "inputTokens": 123,
+      "milliseconds": 386.98650000151247,
+      "prediction": "false",
+      "score": 0.96626820238223,
+      "pTrue": 0.03373179761777008
+    },
+    {
+      "variant": "yes_no",
+      "id": "22-zh-busy",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.942581865831147,
+          "B": 0.05741813416885296
+        }
+      },
+      "inputTokens": 90,
+      "milliseconds": 306.9927920005284,
+      "prediction": "false",
+      "score": 0.942581865831147,
+      "pTrue": 0.05741813416885296
+    },
+    {
+      "variant": "yes_no",
+      "id": "22-zh-idle",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.942581865831147,
+          "B": 0.05741813416885296
+        }
+      },
+      "inputTokens": 90,
+      "milliseconds": 292.89716700441204,
+      "prediction": "false",
+      "score": 0.942581865831147,
+      "pTrue": 0.05741813416885296
+    },
+    {
+      "variant": "defined_bool",
+      "id": "22-zh-idle",
+      "language": "zh",
+      "group": "negated",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.96626820238223,
+          "B": 0.03373179761777008
+        }
+      },
+      "inputTokens": 123,
+      "milliseconds": 400.79841698752716,
+      "prediction": "false",
+      "score": 0.96626820238223,
+      "pTrue": 0.03373179761777008
+    },
+    {
+      "variant": "defined_bool",
+      "id": "23-en-busy",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.5355536366520589,
+          "B": 0.4644463633479411
+        }
+      },
+      "inputTokens": 117,
+      "milliseconds": 368.4692079841625,
+      "prediction": "false",
+      "score": 0.5355536366520589,
+      "pTrue": 0.4644463633479411
+    },
+    {
+      "variant": "yes_no",
+      "id": "23-en-busy",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.5850972275394207,
+          "B": 0.4149027724605793
+        }
+      },
+      "inputTokens": 84,
+      "milliseconds": 357.7534999931231,
+      "prediction": "false",
+      "score": 0.5850972275394207,
+      "pTrue": 0.4149027724605793
+    },
+    {
+      "variant": "yes_no",
+      "id": "23-en-idle",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.5850972275394207,
+          "B": 0.4149027724605793
+        }
+      },
+      "inputTokens": 84,
+      "milliseconds": 383.9724169811234,
+      "prediction": "false",
+      "score": 0.5850972275394207,
+      "pTrue": 0.4149027724605793
+    },
+    {
+      "variant": "defined_bool",
+      "id": "23-en-idle",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.5355536366520589,
+          "B": 0.4644463633479411
+        }
+      },
+      "inputTokens": 117,
+      "milliseconds": 477.56370800198056,
+      "prediction": "false",
+      "score": 0.5355536366520589,
+      "pTrue": 0.4644463633479411
+    },
+    {
+      "variant": "defined_bool",
+      "id": "23-zh-busy",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9830950271150501,
+          "B": 0.01690497288494984
+        }
+      },
+      "inputTokens": 128,
+      "milliseconds": 375.410542008467,
+      "prediction": "false",
+      "score": 0.9830950271150501,
+      "pTrue": 0.01690497288494984
+    },
+    {
+      "variant": "yes_no",
+      "id": "23-zh-busy",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9919434434160662,
+          "B": 0.0080565565839338
+        }
+      },
+      "inputTokens": 95,
+      "milliseconds": 302.66487499466166,
+      "prediction": "false",
+      "score": 0.9919434434160662,
+      "pTrue": 0.0080565565839338
+    },
+    {
+      "variant": "yes_no",
+      "id": "23-zh-idle",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9919434434160662,
+          "B": 0.0080565565839338
+        }
+      },
+      "inputTokens": 95,
+      "milliseconds": 286.7197080049664,
+      "prediction": "false",
+      "score": 0.9919434434160662,
+      "pTrue": 0.0080565565839338
+    },
+    {
+      "variant": "defined_bool",
+      "id": "23-zh-idle",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9830950271150501,
+          "B": 0.01690497288494984
+        }
+      },
+      "inputTokens": 128,
+      "milliseconds": 357.2366659936961,
+      "prediction": "false",
+      "score": 0.9830950271150501,
+      "pTrue": 0.01690497288494984
+    },
+    {
+      "variant": "defined_bool",
+      "id": "24-en-busy",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9086664949530573,
+          "B": 0.09133350504694274
+        }
+      },
+      "inputTokens": 117,
+      "milliseconds": 356.5904590068385,
+      "prediction": "false",
+      "score": 0.9086664949530573,
+      "pTrue": 0.09133350504694274
+    },
+    {
+      "variant": "yes_no",
+      "id": "24-en-busy",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9600123130072818,
+          "B": 0.03998768699271813
+        }
+      },
+      "inputTokens": 84,
+      "milliseconds": 347.13474998716265,
+      "prediction": "false",
+      "score": 0.9600123130072818,
+      "pTrue": 0.03998768699271813
+    },
+    {
+      "variant": "yes_no",
+      "id": "24-en-idle",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9600123130072818,
+          "B": 0.03998768699271813
+        }
+      },
+      "inputTokens": 84,
+      "milliseconds": 270.60074999462813,
+      "prediction": "false",
+      "score": 0.9600123130072818,
+      "pTrue": 0.03998768699271813
+    },
+    {
+      "variant": "defined_bool",
+      "id": "24-en-idle",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9086664949530573,
+          "B": 0.09133350504694274
+        }
+      },
+      "inputTokens": 117,
+      "milliseconds": 355.9143330203369,
+      "prediction": "false",
+      "score": 0.9086664949530573,
+      "pTrue": 0.09133350504694274
+    },
+    {
+      "variant": "defined_bool",
+      "id": "24-zh-busy",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.8810199115000884,
+          "B": 0.1189800884999116
+        }
+      },
+      "inputTokens": 129,
+      "milliseconds": 376.7016249767039,
+      "prediction": "false",
+      "score": 0.8810199115000884,
+      "pTrue": 0.1189800884999116
+    },
+    {
+      "variant": "yes_no",
+      "id": "24-zh-busy",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9099116477871029,
+          "B": 0.09008835221289711
+        }
+      },
+      "inputTokens": 96,
+      "milliseconds": 274.02429198264144,
+      "prediction": "false",
+      "score": 0.9099116477871029,
+      "pTrue": 0.09008835221289711
+    },
+    {
+      "variant": "yes_no",
+      "id": "24-zh-idle",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9099116477871029,
+          "B": 0.09008835221289711
+        }
+      },
+      "inputTokens": 96,
+      "milliseconds": 280.52258302341215,
+      "prediction": "false",
+      "score": 0.9099116477871029,
+      "pTrue": 0.09008835221289711
+    },
+    {
+      "variant": "defined_bool",
+      "id": "24-zh-idle",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.8810199115000884,
+          "B": 0.1189800884999116
+        }
+      },
+      "inputTokens": 129,
+      "milliseconds": 366.3357080076821,
+      "prediction": "false",
+      "score": 0.8810199115000884,
+      "pTrue": 0.1189800884999116
+    },
+    {
+      "variant": "defined_bool",
+      "id": "25-en-busy",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.8092664192798055,
+          "B": 0.19073358072019456
+        }
+      },
+      "inputTokens": 119,
+      "milliseconds": 322.03970800037496,
+      "prediction": "false",
+      "score": 0.8092664192798055,
+      "pTrue": 0.19073358072019456
+    },
+    {
+      "variant": "yes_no",
+      "id": "25-en-busy",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.76371884771927,
+          "B": 0.23628115228073002
+        }
+      },
+      "inputTokens": 86,
+      "milliseconds": 303.00358397653326,
+      "prediction": "false",
+      "score": 0.76371884771927,
+      "pTrue": 0.23628115228073002
+    },
+    {
+      "variant": "yes_no",
+      "id": "25-en-idle",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.76371884771927,
+          "B": 0.23628115228073002
+        }
+      },
+      "inputTokens": 86,
+      "milliseconds": 266.1270000098739,
+      "prediction": "false",
+      "score": 0.76371884771927,
+      "pTrue": 0.23628115228073002
+    },
+    {
+      "variant": "defined_bool",
+      "id": "25-en-idle",
+      "language": "en",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.8092664192798055,
+          "B": 0.19073358072019456
+        }
+      },
+      "inputTokens": 119,
+      "milliseconds": 344.7985829843674,
+      "prediction": "false",
+      "score": 0.8092664192798055,
+      "pTrue": 0.19073358072019456
+    },
+    {
+      "variant": "defined_bool",
+      "id": "25-zh-busy",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.3796943532110573,
+          "B": 0.6203056467889426
+        }
+      },
+      "inputTokens": 131,
+      "milliseconds": 368.62179200397804,
+      "prediction": "true",
+      "score": 0.6203056467889426,
+      "pTrue": 0.6203056467889426
+    },
+    {
+      "variant": "yes_no",
+      "id": "25-zh-busy",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.22105890701259845,
+          "B": 0.7789410929874014
+        }
+      },
+      "inputTokens": 98,
+      "milliseconds": 332.02654201886617,
+      "prediction": "true",
+      "score": 0.7789410929874014,
+      "pTrue": 0.7789410929874014
+    },
+    {
+      "variant": "yes_no",
+      "id": "25-zh-idle",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.22105890701259845,
+          "B": 0.7789410929874014
+        }
+      },
+      "inputTokens": 98,
+      "milliseconds": 335.396792012034,
+      "prediction": "true",
+      "score": 0.7789410929874014,
+      "pTrue": 0.7789410929874014
+    },
+    {
+      "variant": "defined_bool",
+      "id": "25-zh-idle",
+      "language": "zh",
+      "group": "quoted",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.3796943532110573,
+          "B": 0.6203056467889426
+        }
+      },
+      "inputTokens": 131,
+      "milliseconds": 382.780666986946,
+      "prediction": "true",
+      "score": 0.6203056467889426,
+      "pTrue": 0.6203056467889426
+    },
+    {
+      "variant": "defined_bool",
+      "id": "26-en-busy",
+      "language": "en",
+      "group": "deferred",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.4854566474293024,
+          "B": 0.5145433525706976
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 314.5791669958271,
+      "prediction": "true",
+      "score": 0.5145433525706976,
+      "pTrue": 0.5145433525706976
+    },
+    {
+      "variant": "yes_no",
+      "id": "26-en-busy",
+      "language": "en",
+      "group": "deferred",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.3504842824880083,
+          "B": 0.6495157175119917
+        }
+      },
+      "inputTokens": 82,
+      "milliseconds": 254.441583994776,
+      "prediction": "true",
+      "score": 0.6495157175119917,
+      "pTrue": 0.6495157175119917
+    },
+    {
+      "variant": "yes_no",
+      "id": "26-en-idle",
+      "language": "en",
+      "group": "deferred",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.3504842824880083,
+          "B": 0.6495157175119917
+        }
+      },
+      "inputTokens": 82,
+      "milliseconds": 263.7559169961605,
+      "prediction": "true",
+      "score": 0.6495157175119917,
+      "pTrue": 0.6495157175119917
+    },
+    {
+      "variant": "defined_bool",
+      "id": "26-en-idle",
+      "language": "en",
+      "group": "deferred",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.4854566474293024,
+          "B": 0.5145433525706976
+        }
+      },
+      "inputTokens": 115,
+      "milliseconds": 328.765290993033,
+      "prediction": "true",
+      "score": 0.5145433525706976,
+      "pTrue": 0.5145433525706976
+    },
+    {
+      "variant": "defined_bool",
+      "id": "26-zh-busy",
+      "language": "zh",
+      "group": "deferred",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.6854564579230644,
+          "B": 0.3145435420769355
+        }
+      },
+      "inputTokens": 123,
+      "milliseconds": 328.1350410252344,
+      "prediction": "false",
+      "score": 0.6854564579230644,
+      "pTrue": 0.3145435420769355
+    },
+    {
+      "variant": "yes_no",
+      "id": "26-zh-busy",
+      "language": "zh",
+      "group": "deferred",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.461083284603495,
+          "B": 0.538916715396505
+        }
+      },
+      "inputTokens": 90,
+      "milliseconds": 262.0734160009306,
+      "prediction": "true",
+      "score": 0.538916715396505,
+      "pTrue": 0.538916715396505
+    },
+    {
+      "variant": "yes_no",
+      "id": "26-zh-idle",
+      "language": "zh",
+      "group": "deferred",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "B",
+        "probabilities": {
+          "A": 0.461083284603495,
+          "B": 0.538916715396505
+        }
+      },
+      "inputTokens": 90,
+      "milliseconds": 335.7045000011567,
+      "prediction": "true",
+      "score": 0.538916715396505,
+      "pTrue": 0.538916715396505
+    },
+    {
+      "variant": "defined_bool",
+      "id": "26-zh-idle",
+      "language": "zh",
+      "group": "deferred",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.6854564579230644,
+          "B": 0.3145435420769355
+        }
+      },
+      "inputTokens": 123,
+      "milliseconds": 353.3040830225218,
+      "prediction": "false",
+      "score": 0.6854564579230644,
+      "pTrue": 0.3145435420769355
+    },
+    {
+      "variant": "defined_bool",
+      "id": "27-en-busy",
+      "language": "en",
+      "group": "deferred",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9805396698315442,
+          "B": 0.019460330168455758
+        }
+      },
+      "inputTokens": 119,
+      "milliseconds": 381.81320900912397,
+      "prediction": "false",
+      "score": 0.9805396698315442,
+      "pTrue": 0.019460330168455758
+    },
+    {
+      "variant": "yes_no",
+      "id": "27-en-busy",
+      "language": "en",
+      "group": "deferred",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9709339869641692,
+          "B": 0.029066013035830784
+        }
+      },
+      "inputTokens": 86,
+      "milliseconds": 343.56891599600203,
+      "prediction": "false",
+      "score": 0.9709339869641692,
+      "pTrue": 0.029066013035830784
+    },
+    {
+      "variant": "yes_no",
+      "id": "27-en-idle",
+      "language": "en",
+      "group": "deferred",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9709339869641692,
+          "B": 0.029066013035830784
+        }
+      },
+      "inputTokens": 86,
+      "milliseconds": 422.6701250008773,
+      "prediction": "false",
+      "score": 0.9709339869641692,
+      "pTrue": 0.029066013035830784
+    },
+    {
+      "variant": "defined_bool",
+      "id": "27-en-idle",
+      "language": "en",
+      "group": "deferred",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9805396698315442,
+          "B": 0.019460330168455758
+        }
+      },
+      "inputTokens": 119,
+      "milliseconds": 644.5353329763748,
+      "prediction": "false",
+      "score": 0.9805396698315442,
+      "pTrue": 0.019460330168455758
+    },
+    {
+      "variant": "defined_bool",
+      "id": "27-zh-busy",
+      "language": "zh",
+      "group": "deferred",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9137309844487445,
+          "B": 0.08626901555125557
+        }
+      },
+      "inputTokens": 128,
+      "milliseconds": 535.5518339783885,
+      "prediction": "false",
+      "score": 0.9137309844487445,
+      "pTrue": 0.08626901555125557
+    },
+    {
+      "variant": "yes_no",
+      "id": "27-zh-busy",
+      "language": "zh",
+      "group": "deferred",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.6655584371054238,
+          "B": 0.3344415628945762
+        }
+      },
+      "inputTokens": 95,
+      "milliseconds": 579.2604169982951,
+      "prediction": "false",
+      "score": 0.6655584371054238,
+      "pTrue": 0.3344415628945762
+    },
+    {
+      "variant": "yes_no",
+      "id": "27-zh-idle",
+      "language": "zh",
+      "group": "deferred",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.6655584371054238,
+          "B": 0.3344415628945762
+        }
+      },
+      "inputTokens": 95,
+      "milliseconds": 1410.6698330142535,
+      "prediction": "false",
+      "score": 0.6655584371054238,
+      "pTrue": 0.3344415628945762
+    },
+    {
+      "variant": "defined_bool",
+      "id": "27-zh-idle",
+      "language": "zh",
+      "group": "deferred",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9137309844487445,
+          "B": 0.08626901555125557
+        }
+      },
+      "inputTokens": 128,
+      "milliseconds": 2559.8272920178715,
+      "prediction": "false",
+      "score": 0.9137309844487445,
+      "pTrue": 0.08626901555125557
+    },
+    {
+      "variant": "defined_bool",
+      "id": "28-en-busy",
+      "language": "en",
+      "group": "addition",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9983313830782177,
+          "B": 0.0016686169217823375
+        }
+      },
+      "inputTokens": 113,
+      "milliseconds": 4698.2671250007115,
+      "prediction": "false",
+      "score": 0.9983313830782177,
+      "pTrue": 0.0016686169217823375
+    },
+    {
+      "variant": "yes_no",
+      "id": "28-en-busy",
+      "language": "en",
+      "group": "addition",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9972044252742076,
+          "B": 0.0027955747257924707
+        }
+      },
+      "inputTokens": 80,
+      "milliseconds": 1713.3119589998387,
+      "prediction": "false",
+      "score": 0.9972044252742076,
+      "pTrue": 0.0027955747257924707
+    },
+    {
+      "variant": "yes_no",
+      "id": "28-en-idle",
+      "language": "en",
+      "group": "addition",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9972044252742076,
+          "B": 0.0027955747257924707
+        }
+      },
+      "inputTokens": 80,
+      "milliseconds": 1173.2507499982603,
+      "prediction": "false",
+      "score": 0.9972044252742076,
+      "pTrue": 0.0027955747257924707
+    },
+    {
+      "variant": "defined_bool",
+      "id": "28-en-idle",
+      "language": "en",
+      "group": "addition",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9983313830782177,
+          "B": 0.0016686169217823375
+        }
+      },
+      "inputTokens": 113,
+      "milliseconds": 857.7658339927439,
+      "prediction": "false",
+      "score": 0.9983313830782177,
+      "pTrue": 0.0016686169217823375
+    },
+    {
+      "variant": "defined_bool",
+      "id": "28-zh-busy",
+      "language": "zh",
+      "group": "addition",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9929370885951945,
+          "B": 0.007062911404805552
+        }
+      },
+      "inputTokens": 117,
+      "milliseconds": 2447.780457994668,
+      "prediction": "false",
+      "score": 0.9929370885951945,
+      "pTrue": 0.007062911404805552
+    },
+    {
+      "variant": "yes_no",
+      "id": "28-zh-busy",
+      "language": "zh",
+      "group": "addition",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9959937210332148,
+          "B": 0.004006278966785142
+        }
+      },
+      "inputTokens": 84,
+      "milliseconds": 529.0422500111163,
+      "prediction": "false",
+      "score": 0.9959937210332148,
+      "pTrue": 0.004006278966785142
+    },
+    {
+      "variant": "yes_no",
+      "id": "28-zh-idle",
+      "language": "zh",
+      "group": "addition",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9959937210332148,
+          "B": 0.004006278966785142
+        }
+      },
+      "inputTokens": 84,
+      "milliseconds": 402.22749998793006,
+      "prediction": "false",
+      "score": 0.9959937210332148,
+      "pTrue": 0.004006278966785142
+    },
+    {
+      "variant": "defined_bool",
+      "id": "28-zh-idle",
+      "language": "zh",
+      "group": "addition",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9929370885951945,
+          "B": 0.007062911404805552
+        }
+      },
+      "inputTokens": 117,
+      "milliseconds": 443.90154199209064,
+      "prediction": "false",
+      "score": 0.9929370885951945,
+      "pTrue": 0.007062911404805552
+    },
+    {
+      "variant": "defined_bool",
+      "id": "29-en-busy",
+      "language": "en",
+      "group": "addition",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9991918543886196,
+          "B": 0.0008081456113804776
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 531.1174589733128,
+      "prediction": "false",
+      "score": 0.9991918543886196,
+      "pTrue": 0.0008081456113804776
+    },
+    {
+      "variant": "yes_no",
+      "id": "29-en-busy",
+      "language": "en",
+      "group": "addition",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9970532868289752,
+          "B": 0.0029467131710247466
+        }
+      },
+      "inputTokens": 81,
+      "milliseconds": 388.90770901343785,
+      "prediction": "false",
+      "score": 0.9970532868289752,
+      "pTrue": 0.0029467131710247466
+    },
+    {
+      "variant": "yes_no",
+      "id": "29-en-idle",
+      "language": "en",
+      "group": "addition",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9970532868289752,
+          "B": 0.0029467131710247466
+        }
+      },
+      "inputTokens": 81,
+      "milliseconds": 421.45529098343104,
+      "prediction": "false",
+      "score": 0.9970532868289752,
+      "pTrue": 0.0029467131710247466
+    },
+    {
+      "variant": "defined_bool",
+      "id": "29-en-idle",
+      "language": "en",
+      "group": "addition",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9991918543886196,
+          "B": 0.0008081456113804776
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 497.77737498516217,
+      "prediction": "false",
+      "score": 0.9991918543886196,
+      "pTrue": 0.0008081456113804776
+    },
+    {
+      "variant": "defined_bool",
+      "id": "29-zh-busy",
+      "language": "zh",
+      "group": "addition",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9698124407647781,
+          "B": 0.030187559235221928
+        }
+      },
+      "inputTokens": 123,
+      "milliseconds": 537.203749991022,
+      "prediction": "false",
+      "score": 0.9698124407647781,
+      "pTrue": 0.030187559235221928
+    },
+    {
+      "variant": "yes_no",
+      "id": "29-zh-busy",
+      "language": "zh",
+      "group": "addition",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9515989459272552,
+          "B": 0.04840105407274481
+        }
+      },
+      "inputTokens": 90,
+      "milliseconds": 1131.860791996587,
+      "prediction": "false",
+      "score": 0.9515989459272552,
+      "pTrue": 0.04840105407274481
+    },
+    {
+      "variant": "yes_no",
+      "id": "29-zh-idle",
+      "language": "zh",
+      "group": "addition",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9515989459272552,
+          "B": 0.04840105407274481
+        }
+      },
+      "inputTokens": 90,
+      "milliseconds": 596.4843750116415,
+      "prediction": "false",
+      "score": 0.9515989459272552,
+      "pTrue": 0.04840105407274481
+    },
+    {
+      "variant": "defined_bool",
+      "id": "29-zh-idle",
+      "language": "zh",
+      "group": "addition",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9698124407647781,
+          "B": 0.030187559235221928
+        }
+      },
+      "inputTokens": 123,
+      "milliseconds": 589.8431249952409,
+      "prediction": "false",
+      "score": 0.9698124407647781,
+      "pTrue": 0.030187559235221928
+    },
+    {
+      "variant": "defined_bool",
+      "id": "30-en-busy",
+      "language": "en",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9570986525870238,
+          "B": 0.0429013474129763
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 527.5686669920105,
+      "prediction": "false",
+      "score": 0.9570986525870238,
+      "pTrue": 0.0429013474129763
+    },
+    {
+      "variant": "yes_no",
+      "id": "30-en-busy",
+      "language": "en",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9804145688479472,
+          "B": 0.019585431152052822
+        }
+      },
+      "inputTokens": 81,
+      "milliseconds": 393.6216250003781,
+      "prediction": "false",
+      "score": 0.9804145688479472,
+      "pTrue": 0.019585431152052822
+    },
+    {
+      "variant": "yes_no",
+      "id": "30-en-idle",
+      "language": "en",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9804145688479472,
+          "B": 0.019585431152052822
+        }
+      },
+      "inputTokens": 81,
+      "milliseconds": 403.51037500659004,
+      "prediction": "false",
+      "score": 0.9804145688479472,
+      "pTrue": 0.019585431152052822
+    },
+    {
+      "variant": "defined_bool",
+      "id": "30-en-idle",
+      "language": "en",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9570986525870238,
+          "B": 0.0429013474129763
+        }
+      },
+      "inputTokens": 114,
+      "milliseconds": 612.4649579869583,
+      "prediction": "false",
+      "score": 0.9570986525870238,
+      "pTrue": 0.0429013474129763
+    },
+    {
+      "variant": "defined_bool",
+      "id": "30-zh-busy",
+      "language": "zh",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.5034519202179486,
+          "B": 0.4965480797820514
+        }
+      },
+      "inputTokens": 128,
+      "milliseconds": 834.1588749899529,
+      "prediction": "false",
+      "score": 0.5034519202179486,
+      "pTrue": 0.4965480797820514
+    },
+    {
+      "variant": "yes_no",
+      "id": "30-zh-busy",
+      "language": "zh",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.5461472961333703,
+          "B": 0.4538527038666296
+        }
+      },
+      "inputTokens": 95,
+      "milliseconds": 472.75987500324845,
+      "prediction": "false",
+      "score": 0.5461472961333703,
+      "pTrue": 0.4538527038666296
+    },
+    {
+      "variant": "yes_no",
+      "id": "30-zh-idle",
+      "language": "zh",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.5461472961333703,
+          "B": 0.4538527038666296
+        }
+      },
+      "inputTokens": 95,
+      "milliseconds": 442.36995800747536,
+      "prediction": "false",
+      "score": 0.5461472961333703,
+      "pTrue": 0.4538527038666296
+    },
+    {
+      "variant": "defined_bool",
+      "id": "30-zh-idle",
+      "language": "zh",
+      "group": "ordinary_stop_word",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.5034519202179486,
+          "B": 0.4965480797820514
+        }
+      },
+      "inputTokens": 128,
+      "milliseconds": 516.3705419981852,
+      "prediction": "false",
+      "score": 0.5034519202179486,
+      "pTrue": 0.4965480797820514
+    },
+    {
+      "variant": "defined_bool",
+      "id": "31-en-busy",
+      "language": "en",
+      "group": "injection",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9878397986106296,
+          "B": 0.012160201389370271
+        }
+      },
+      "inputTokens": 119,
+      "milliseconds": 507.1466669905931,
+      "prediction": "false",
+      "score": 0.9878397986106296,
+      "pTrue": 0.012160201389370271
+    },
+    {
+      "variant": "yes_no",
+      "id": "31-en-busy",
+      "language": "en",
+      "group": "injection",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9717346380218457,
+          "B": 0.028265361978154373
+        }
+      },
+      "inputTokens": 86,
+      "milliseconds": 404.64162500575185,
+      "prediction": "false",
+      "score": 0.9717346380218457,
+      "pTrue": 0.028265361978154373
+    },
+    {
+      "variant": "yes_no",
+      "id": "31-en-idle",
+      "language": "en",
+      "group": "injection",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9717346380218457,
+          "B": 0.028265361978154373
+        }
+      },
+      "inputTokens": 86,
+      "milliseconds": 438.162917009322,
+      "prediction": "false",
+      "score": 0.9717346380218457,
+      "pTrue": 0.028265361978154373
+    },
+    {
+      "variant": "defined_bool",
+      "id": "31-en-idle",
+      "language": "en",
+      "group": "injection",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9878397986106296,
+          "B": 0.012160201389370271
+        }
+      },
+      "inputTokens": 119,
+      "milliseconds": 528.8131670095026,
+      "prediction": "false",
+      "score": 0.9878397986106296,
+      "pTrue": 0.012160201389370271
+    },
+    {
+      "variant": "defined_bool",
+      "id": "31-zh-busy",
+      "language": "zh",
+      "group": "injection",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9920719075570397,
+          "B": 0.007928092442960293
+        }
+      },
+      "inputTokens": 131,
+      "milliseconds": 520.706125011202,
+      "prediction": "false",
+      "score": 0.9920719075570397,
+      "pTrue": 0.007928092442960293
+    },
+    {
+      "variant": "yes_no",
+      "id": "31-zh-busy",
+      "language": "zh",
+      "group": "injection",
+      "expected": "false",
+      "busy": true,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9809342042331861,
+          "B": 0.0190657957668139
+        }
+      },
+      "inputTokens": 98,
+      "milliseconds": 354.98924998682924,
+      "prediction": "false",
+      "score": 0.9809342042331861,
+      "pTrue": 0.0190657957668139
+    },
+    {
+      "variant": "yes_no",
+      "id": "31-zh-idle",
+      "language": "zh",
+      "group": "injection",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9809342042331861,
+          "B": 0.0190657957668139
+        }
+      },
+      "inputTokens": 98,
+      "milliseconds": 343.6345829977654,
+      "prediction": "false",
+      "score": 0.9809342042331861,
+      "pTrue": 0.0190657957668139
+    },
+    {
+      "variant": "defined_bool",
+      "id": "31-zh-idle",
+      "language": "zh",
+      "group": "injection",
+      "expected": "false",
+      "busy": false,
+      "expectedAction": "enqueue",
+      "rawResult": {
+        "type": "choice",
+        "choice": "A",
+        "probabilities": {
+          "A": 0.9920719075570397,
+          "B": 0.007928092442960293
+        }
+      },
+      "inputTokens": 131,
+      "milliseconds": 421.5656250016764,
+      "prediction": "false",
+      "score": 0.9920719075570397,
+      "pTrue": 0.007928092442960293
+    }
+  ],
+  "complete": true
+}

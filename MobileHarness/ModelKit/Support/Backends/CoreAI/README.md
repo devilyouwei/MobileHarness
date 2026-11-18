@@ -15,3 +15,6 @@ ComputeUnits expresses public specialization preferences; cpuOnly restricts the 
 ComputeUnits.automatic uses SpecializationOptions.default without a heterogeneous placement preference. [D3](../../../Language/JEV/README.md) selects this option for its pinned artifact.
 
 GraphModel exposes the native deviceArchitectureName for artifact selection and accepts both source .aimodel and compiled .aimodelc URLs through the same AIModel loader. Compiled assets can still require device specialization.
+
+
+GraphModel accepts immutable constantInputs during construction. They are shape/dtype checked and converted to native arrays once; inputNames exposes only per-call inputs, and run combines both sets without allowing callers to overwrite constants. function(named:) creates another stateless function handle on the same AIModel, retaining model lifetime without another specialization. SafeTensorArchive maps external F32 safetensors, validates the header/tensor bounds and declared shapes, and returns typed weight values; it does not interpret model or business policy.

@@ -34,7 +34,7 @@ def load_config(profile, platform=None):
         return json.loads((GEMMA_TESTS / "gemma4-e2b-macos.download.json").read_text())
     if profile not in PRODUCTION:
         return json.loads((MODELS / (profile + ".download.json")).read_text())
-    catalog = json.loads((REPOSITORY / "MobileHarness/ModelKit/Support/Management/model-catalog.json").read_text())
+    catalog = json.loads((REPOSITORY / "MobileHarness/ModelKit/Support/Config/model-catalog.json").read_text())
     if catalog["schemaVersion"] != 2:
         raise ValueError("Unsupported model catalog")
     model = next(p for p in catalog["packages"] if p["id"] == PRODUCTION[profile])

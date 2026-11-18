@@ -108,7 +108,7 @@ private actor DecisionQueues {
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
-func multiSourceBatchClassifiesOnlyUsersAndPersistsOneAttributedRequest() async throws {
+func multiSourceBatchQueuesIdleUsersWithoutDecisionAndPersistsAttribution() async throws {
     let database = try SQLiteRepositories.temporary()
     let store = AssistantHistoryStore(
         records: try AssistantRecordStore(
@@ -158,17 +158,14 @@ func multiSourceBatchClassifiesOnlyUsersAndPersistsOneAttributedRequest() async 
     }
     try await agent.receive(.init(id: "typed", sessionID: "batch", payload: .text("总结一下")))
     for _ in 0..<500 {
-        if await queueProbe.ready == 4, await queueProbe.classifying == 0, await classifier.requests.count == 3 {
+        if await queueProbe.ready == 4, await queueProbe.classifying == 0 {
             break
         }
         try await Task.sleep(for: .milliseconds(2))
     }
-    let decisions = await classifier.requests
-    #expect(decisions.count == 3)
-    let lastDecision = try #require(decisions.last?.messages.last?.content)
-    #expect(!lastDecision.contains("Buffered user input"))
-    #expect(!lastDecision.contains("拍一张照片"))
-    #expect(!lastDecision.contains("照片已经拍好"))
+    #expect(await classifier.requests.isEmpty)
+    #expect(await queueProbe.ready == 4)
+    #expect(await queueProbe.classifying == 0)
     #expect(await main.requests.isEmpty)
     let dialog = try await store.readCurrent().current.id
     #expect(try await database.assistantMessages.messages(dialog: dialog).isEmpty)
@@ -198,8 +195,10 @@ func multiSourceBatchClassifiesOnlyUsersAndPersistsOneAttributedRequest() async 
         })
     let evidence = try JSONDecoder().decode(AssistantInputCoordination.self, from: Data(metadata.utf8))
     let members = try #require(evidence.members)
-    let routedIDs = members.filter { $0.route == "cloud:decision" && $0.decision == "false" }.map(\.id)
-    #expect(Set(routedIDs) == ["asr-old", "asr-new", "typed"])
+    let userIDs: Set<String> = ["asr-old", "asr-new", "typed"]
+    let userMembers = members.filter { userIDs.contains($0.id) }
+    #expect(Set(userMembers.map(\.id)) == userIDs)
+    #expect(userMembers.allSatisfy { $0.route == nil && $0.decision == nil })
     let invocation = try #require(try await store.readCurrent().current.turns.flatMap { $0.modelRequests ?? [] }.first)
     #expect(invocation.input == body)
     await agent.stop()
@@ -366,7 +365,7 @@ func binaryContextContainsOnlyCurrentExchangeAndLatest(language: String) throws 
     }
 }
 
-@Test(arguments: ["d3-edge", "vela3-fast"])
+@Test(arguments: ["d3-edge", "vela3-fast", "vela3.1-fast", "laya-multilingual"])
 func selectedNativeDecisionUsesNoulAndNeverCloud(id: String) async throws {
     let cloud = DecisionCloudFixture(events: [.text("false"), .finished(.stop)])
     let service = AssistantInputDecision(
@@ -376,12 +375,13 @@ func selectedNativeDecisionUsesNoulAndNeverCloud(id: String) async throws {
     let result = await service.classify(
         .init(input: .init(id: id, sessionID: "s", payload: .text("Stop")), text: "Stop"))
     #expect(result.modelResult == true)
+    #expect(result.route.rawValue == "local:" + id)
     #expect(result.requests.first?.contains("noul") == true)
     #expect(await cloud.requests.isEmpty)
     await service.stop()
 }
 
-@Test(arguments: ["d3-edge", "vela3-fast"])
+@Test(arguments: ["d3-edge", "vela3-fast", "vela3.1-fast", "laya-multilingual"])
 func unavailableNativeDecisionDoesNotFabricateFalseOrUseCloud(id: String) async throws {
     let cloud = DecisionCloudFixture(events: [])
     let service = AssistantInputDecision(
@@ -395,7 +395,7 @@ func unavailableNativeDecisionDoesNotFabricateFalseOrUseCloud(id: String) async 
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
-func idleMessageDispatchesBeforeDecisionAndCannotInterruptItself() async throws {
+func idleMessageDispatchesWithoutDecisionAndCannotInterruptItself() async throws {
     let classifier = DecisionCloudFixture(events: [.text("true"), .finished(.stop)], delay: .milliseconds(300))
     let decision = decisionFixture(cloud: classifier)
     let main = DecisionCloudFixture(events: [.text("Hello"), .finished(.stop)], delay: .seconds(1))
@@ -413,6 +413,7 @@ func idleMessageDispatchesBeforeDecisionAndCannotInterruptItself() async throws 
     #expect(await main.requests.count == 1)
     try await Task.sleep(for: .milliseconds(400))
     #expect(await probe.count == 0)
+    #expect(await classifier.requests.isEmpty)
     await agent.stop()
 }
 
@@ -432,7 +433,7 @@ actor DecisionFeedbackProbe {
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func lateDecisionForFinishedReplyDoesNotCancelSuccessor() async throws {
-    let deferred = DeferredBooleanChat()
+    let deferred = DeferredBooleanChat(blocksFirst: true, replyValue: true)
     let service = AssistantInputDecision(
         local: UnavailableDecision(), configuration: { (false, { deferred }) },
         timeout: .seconds(30), localTimeout: .seconds(5))
@@ -451,10 +452,16 @@ func lateDecisionForFinishedReplyDoesNotCancelSuccessor() async throws {
     try await agent.start()
     try await agent.receive(.init(id: "a", sessionID: "s", payload: .text("Explain A")))
     for _ in 0..<1000 {
-        if await main.requests.count == 1, await deferred.requests.count == 1 { break }
+        if await main.requests.count == 1 { break }
         try await Task.sleep(for: .milliseconds(2))
     }
+    #expect(await deferred.requests.isEmpty)
     try await agent.receive(.init(id: "b", sessionID: "s", payload: .text("Stop A and explain B")))
+    for _ in 0..<1000 {
+        if await deferred.requests.count == 1 { break }
+        try await Task.sleep(for: .milliseconds(2))
+    }
+    #expect(await deferred.requests.count == 1)
     await main.release()
     for _ in 0..<1000 {
         if await main.requests.count == 2 { break }
@@ -480,7 +487,11 @@ func lateDecisionForFinishedReplyDoesNotCancelSuccessor() async throws {
 }
 private actor DeferredBooleanChat: ChatCapability {
     let blocksFirst: Bool
-    init(blocksFirst: Bool = false) { self.blocksFirst = blocksFirst }
+    let replyValue: Bool?
+    init(blocksFirst: Bool = false, replyValue: Bool? = nil) {
+        self.blocksFirst = blocksFirst
+        self.replyValue = replyValue
+    }
     var availability: CapabilityAvailability { .available }
     var requests: [ChatRequest] = []
     private var released = false
@@ -492,8 +503,9 @@ private actor DeferredBooleanChat: ChatCapability {
     }
     func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
         requests.append(request)
-        let value = requests.count > 1
-        if (blocksFirst ? requests.count == 1 : value) && !released {
+        let subsequent = requests.count > 1
+        let value = replyValue ?? subsequent
+        if (blocksFirst ? requests.count == 1 : subsequent) && !released {
             await withTaskCancellationHandler {
                 await withCheckedContinuation { waiter = $0 }
             } onCancel: {
@@ -511,7 +523,7 @@ private actor DeferredBooleanChat: ChatCapability {
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func twoInterruptSignalsForOneReplyCancelOnlyOnceAndKeepBothInputs() async throws {
-    let deferred = DeferredBooleanChat()
+    let deferred = DeferredBooleanChat(blocksFirst: true, replyValue: true)
     let service = AssistantInputDecision(
         local: UnavailableDecision(), configuration: { (false, { deferred }) },
         timeout: .seconds(30), localTimeout: .seconds(5))
@@ -533,9 +545,10 @@ func twoInterruptSignalsForOneReplyCancelOnlyOnceAndKeepBothInputs() async throw
     try await agent.start()
     try await agent.receive(.init(id: "original", sessionID: "s", payload: .text("Explain A")))
     for _ in 0..<1000 {
-        if await main.requests.count == 1, await deferred.requests.count == 1 { break }
+        if await main.requests.count == 1 { break }
         try await Task.sleep(for: .milliseconds(2))
     }
+    #expect(await deferred.requests.isEmpty)
     try await agent.receive(.init(id: "interrupt-one", sessionID: "s", payload: .text("Stop and explain B")))
     try await agent.receive(.init(id: "interrupt-two", sessionID: "s", payload: .text("Stop and explain C")))
     await deferred.release()

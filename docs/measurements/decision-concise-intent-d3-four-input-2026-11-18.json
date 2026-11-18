@@ -1,0 +1,2517 @@
+{
+  "sourceFile": "decision-vela-d3-input-2026-11-17.json",
+  "sourceSHA256": "c41c18f208d479587209bcba1f6222b45ae4da36f2fe4fb341df92bafcb51de6",
+  "sourceHashes": {
+    "Tests/IntegrationTests/DecisionPromptOptimizationTests.swift": "118e3357dc3230a634d4737cddebe50e859843ba7c3952f7eb71a1f3ee01d163",
+    "MobileHarness/ModelKit/Language/JEV/D3Decision.swift": "b871e1ac8d9ca518969ca0ebc6b96035a1948f128aa1dcbc4e81b6f61755e1ad",
+    "Tests/DecisionBenchmarks/concise_intent_experiment.py": "7ac342b13ab49ee24b4e2f7d2d701f3bce59108e3f4414974dfc9da37180bdbe"
+  },
+  "formatterSHA256": "3badfbc70561bb3f5b8ec16a11d2c455b96ddb32caace0a8a54ca102eae1f3fa",
+  "rows": [
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-alarm-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "Wake me on Monday at",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nWake me on Monday at",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-alarm-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "周一叫醒我，时间定在",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n周一叫醒我，时间定在",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-alarm-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "six thirty.",
+        "held": [
+          "Wake me on Monday at"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nWake me on Monday at\nsix thirty.",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-alarm-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "六点半。",
+        "held": [
+          "周一叫醒我，时间定在"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n周一叫醒我，时间定在\n六点半。",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-brightness-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "Change the brightness to",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nChange the brightness to",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-brightness-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "把亮度调成",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n把亮度调成",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-brightness-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "twenty percent.",
+        "held": [
+          "Change the brightness to"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nChange the brightness to\ntwenty percent.",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-brightness-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "百分之二十。",
+        "held": [
+          "把亮度调成"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n把亮度调成\n百分之二十。",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-attachment-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "Attach the",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nAttach the",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-attachment-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "附上那份",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n附上那份",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-attachment-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "budget spreadsheet.",
+        "held": [
+          "Attach the"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nAttach the\nbudget spreadsheet.",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-attachment-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "预算表。",
+        "held": [
+          "附上那份"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n附上那份\n预算表。",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-unless-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "Unless the shop is closed,",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nUnless the shop is closed,",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-unless-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "除非商店关门了，否则",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n除非商店关门了，否则",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-unless-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "remind me to buy bread.",
+        "held": [
+          "Unless the shop is closed,"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nUnless the shop is closed,\nremind me to buy bread.",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-unless-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "提醒我买面包。",
+        "held": [
+          "除非商店关门了，否则"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n除非商店关门了，否则\n提醒我买面包。",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-route-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "Show the route from the museum to",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nShow the route from the museum to",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-route-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "显示从博物馆到",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n显示从博物馆到",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-route-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "the library.",
+        "held": [
+          "Show the route from the museum to"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nShow the route from the museum to\nthe library.",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-route-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "图书馆的路线。",
+        "held": [
+          "显示从博物馆到"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n显示从博物馆到\n图书馆的路线。",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-rewrite-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "Rewrite the last sentence as",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nRewrite the last sentence as",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-rewrite-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "把最后一句改为",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n把最后一句改为",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-rewrite-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "See you next week.",
+        "held": [
+          "Rewrite the last sentence as"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nRewrite the last sentence as\nSee you next week.",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-rewrite-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "下周见。",
+        "held": [
+          "把最后一句改为"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n把最后一句改为\n下周见。",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-list-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "Pack socks, shoes, and",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nPack socks, shoes, and",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-list-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "打包袜子、鞋子，还有",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n打包袜子、鞋子，还有",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-list-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "a jacket.",
+        "held": [
+          "Pack socks, shoes, and"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nPack socks, shoes, and\na jacket.",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-list-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "一件夹克。",
+        "held": [
+          "打包袜子、鞋子，还有"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n打包袜子、鞋子，还有\n一件夹克。",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-purpose-unfinished-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "I need a note that says",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nI need a note that says",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-purpose-unfinished-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "continue_listening",
+        "expectedAdopted": "continue_listening",
+        "running": false,
+        "playing": false,
+        "latest": "我需要一张便条，上面写",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n我需要一张便条，上面写",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-purpose-complete-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "Please close the door.",
+        "held": [
+          "I need a note that says"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nI need a note that says\nPlease close the door.",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-purpose-complete-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "请关门。",
+        "held": [
+          "我需要一张便条，上面写"
+        ],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n我需要一张便条，上面写\n请关门。",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-short-answer-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "The smaller one.",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": "Which size?",
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\nAssistant: Which size?\n\nThe following is the user's latest message:\nThe smaller one.",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-short-answer-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "小的那个。",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": "哪种尺寸？",
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n助手：哪种尺寸？\n\n以下是用户发送的最新消息：\n小的那个。",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-short-command-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "Take a selfie.",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nTake a selfie.",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-short-command-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": false,
+        "playing": false,
+        "latest": "拍张自拍。",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n拍张自拍。",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-stop-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "interrupt",
+        "expectedAdopted": "interrupt",
+        "running": true,
+        "playing": true,
+        "latest": "Be quiet now.",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nBe quiet now.",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-stop-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "interrupt",
+        "expectedAdopted": "interrupt",
+        "running": true,
+        "playing": true,
+        "latest": "现在别出声了。",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n现在别出声了。",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-switch-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "interrupt",
+        "expectedAdopted": "interrupt",
+        "running": true,
+        "playing": true,
+        "latest": "Stop this and read my calendar instead.",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nStop this and read my calendar instead.",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-switch-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "interrupt",
+        "expectedAdopted": "interrupt",
+        "running": true,
+        "playing": true,
+        "latest": "先停下，改读我的日历。",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n先停下，改读我的日历。",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-negated-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": true,
+        "playing": true,
+        "latest": "Keep going, do not stop.",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nKeep going, do not stop.",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-negated-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": true,
+        "playing": true,
+        "latest": "接着说，不要停。",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n接着说，不要停。",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-quoted-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": true,
+        "playing": true,
+        "latest": "Write the words stop now.",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nWrite the words stop now.",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-quoted-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "enqueue",
+        "expectedAdopted": "enqueue",
+        "running": true,
+        "playing": true,
+        "latest": "写下“现在停止”四个字。",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n写下“现在停止”四个字。",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-noise-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "discard",
+        "expectedAdopted": "discard",
+        "running": false,
+        "playing": false,
+        "latest": "[inaudible]",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\n[inaudible]",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-noise-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "discard",
+        "expectedAdopted": "discard",
+        "running": false,
+        "playing": false,
+        "latest": "[听不清]",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n[听不清]",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-filler-en",
+        "group": "holdout",
+        "language": "en",
+        "expected": "discard",
+        "expectedAdopted": "discard",
+        "running": false,
+        "playing": false,
+        "latest": "er",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\ner",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "holdout-filler-zh-Hans",
+        "group": "holdout",
+        "language": "zh-Hans",
+        "expected": "discard",
+        "expectedAdopted": "discard",
+        "running": false,
+        "playing": false,
+        "latest": "呃",
+        "held": [],
+        "buffer": [],
+        "speech": true,
+        "canHold": true,
+        "user": "",
+        "assistant": "",
+        "question": null,
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n呃",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "probe-00-empty",
+        "language": "en",
+        "group": "diagnostic",
+        "expected": "enqueue",
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nDo not ignore this message.",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "probe-01-empty",
+        "language": "en",
+        "group": "diagnostic",
+        "expected": "enqueue",
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nDo not discard this message.",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "probe-02-empty",
+        "language": "en",
+        "group": "diagnostic",
+        "expected": "enqueue",
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nOpen the camera.",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "probe-03-empty",
+        "language": "zh",
+        "group": "diagnostic",
+        "expected": "enqueue",
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n不要忽略这条消息。",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "probe-04-empty",
+        "language": "zh",
+        "group": "diagnostic",
+        "expected": "enqueue",
+        "locale": "zh"
+      },
+      "request": {
+        "text": "以下是当前正在进行的对话：\n（无）\n\n以下是用户发送的最新消息：\n打开相机。",
+        "instructions": "请问用户的意图是什么？",
+        "candidates": [
+          "打断",
+          "未说完",
+          "无意义消息",
+          "等待"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "请问用户的意图是什么？",
+        "criteria": {
+          "打断": null,
+          "未说完": null,
+          "无意义消息": null,
+          "等待": null
+        }
+      }
+    },
+    {
+      "variant": "concise_choice",
+      "scenario": {
+        "id": "probe-05-empty",
+        "language": "en",
+        "group": "diagnostic",
+        "expected": "continue_listening",
+        "locale": "en"
+      },
+      "request": {
+        "text": "The following conversation is currently in progress:\n(None)\n\nThe following is the user's latest message:\nI want to",
+        "instructions": "What is the user's intent?",
+        "candidates": [
+          "Interrupt",
+          "Unfinished",
+          "Meaningless message",
+          "Wait"
+        ],
+        "actions": [
+          "interrupt",
+          "continue_listening",
+          "discard",
+          "enqueue"
+        ]
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "What is the user's intent?",
+        "criteria": {
+          "Interrupt": null,
+          "Unfinished": null,
+          "Meaningless message": null,
+          "Wait": null
+        }
+      }
+    }
+  ],
+  "note": "Waiting maps to enqueue for evaluation; no business-state fields or earlier history."
+}

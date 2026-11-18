@@ -1,0 +1,542 @@
+[
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-alarm-unfinished-zh-Hans\/concise_choice",
+    "milliseconds" : 353.620166,
+    "model" : "vela31",
+    "prediction" : "无意义消息",
+    "reference" : 0.5472835529994435,
+    "score" : 0.5472835529994435
+  },
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-alarm-complete-zh-Hans\/concise_choice",
+    "milliseconds" : 133.466958,
+    "model" : "vela31",
+    "prediction" : "无意义消息",
+    "reference" : 0.6113638018381572,
+    "score" : 0.6113638018381572
+  },
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-brightness-unfinished-zh-Hans\/concise_choice",
+    "milliseconds" : 128.201959,
+    "model" : "vela31",
+    "prediction" : "无意义消息",
+    "reference" : 0.5518639053907461,
+    "score" : 0.5518639053907461
+  },
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-alarm-unfinished-en\/concise_choice",
+    "milliseconds" : 85.011542,
+    "model" : "vela31",
+    "prediction" : "Meaningless message",
+    "reference" : 0.5033240303892978,
+    "score" : 0.5033240303892978
+  },
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-alarm-complete-en\/concise_choice",
+    "milliseconds" : 82.790667,
+    "model" : "vela31",
+    "prediction" : "Meaningless message",
+    "reference" : 0.6198562499044813,
+    "score" : 0.6198562499044813
+  },
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-brightness-unfinished-en\/concise_choice",
+    "milliseconds" : 80.3675,
+    "model" : "vela31",
+    "prediction" : "Meaningless message",
+    "reference" : 0.4124924350908597,
+    "score" : 0.4124924350908597
+  },
+  {
+    "delta" : 2.7755575615628914e-17,
+    "id" : "single\/zh-main-00\/concise_noul",
+    "milliseconds" : 106.7905,
+    "model" : "vela31",
+    "prediction" : "false",
+    "reference" : 0.16787365004281649,
+    "score" : 0.1678736500428165
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/zh-main-00\/concise_choice",
+    "milliseconds" : 105.163375,
+    "model" : "vela31",
+    "prediction" : "否",
+    "reference" : 0.6406643417851272,
+    "score" : 0.6406643417851272
+  },
+  {
+    "delta" : 2.7755575615628914e-17,
+    "id" : "single\/zh-main-01\/concise_noul",
+    "milliseconds" : 104.905916,
+    "model" : "vela31",
+    "prediction" : "false",
+    "reference" : 0.17351225363419834,
+    "score" : 0.1735122536341983
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/zh-main-01\/concise_choice",
+    "milliseconds" : 105.588917,
+    "model" : "vela31",
+    "prediction" : "否",
+    "reference" : 0.6042315263410347,
+    "score" : 0.6042315263410347
+  },
+  {
+    "delta" : 8.326672684688674e-17,
+    "id" : "single\/zh-main-02\/concise_noul",
+    "milliseconds" : 113.833542,
+    "model" : "vela31",
+    "prediction" : "false",
+    "reference" : 0.20824610250204764,
+    "score" : 0.20824610250204756
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/zh-main-02\/concise_choice",
+    "milliseconds" : 127.247958,
+    "model" : "vela31",
+    "prediction" : "否",
+    "reference" : 0.6167331609296828,
+    "score" : 0.6167331609296828
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-00\/concise_noul",
+    "milliseconds" : 93.702167,
+    "model" : "vela31",
+    "prediction" : "true",
+    "reference" : 0.9939590923936603,
+    "score" : 0.9939590923936603
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-00\/concise_choice",
+    "milliseconds" : 105.062042,
+    "model" : "vela31",
+    "prediction" : "Yes",
+    "reference" : 0.9938170855221596,
+    "score" : 0.9938170855221596
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-01\/concise_noul",
+    "milliseconds" : 106.730375,
+    "model" : "vela31",
+    "prediction" : "true",
+    "reference" : 0.9950649331908644,
+    "score" : 0.9950649331908644
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-01\/concise_choice",
+    "milliseconds" : 109.42575,
+    "model" : "vela31",
+    "prediction" : "Yes",
+    "reference" : 0.9951593670290128,
+    "score" : 0.9951593670290128
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-02\/concise_noul",
+    "milliseconds" : 115.893542,
+    "model" : "vela31",
+    "prediction" : "true",
+    "reference" : 0.9919637966236557,
+    "score" : 0.9919637966236557
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-02\/concise_choice",
+    "milliseconds" : 88.382542,
+    "model" : "vela31",
+    "prediction" : "Yes",
+    "reference" : 0.9921992344510315,
+    "score" : 0.9921992344510315
+  },
+  {
+    "delta" : 4.163336342344337e-17,
+    "id" : "current\/zh-main-00-h0\/concise_noul",
+    "milliseconds" : 157.128084,
+    "model" : "vela31",
+    "prediction" : "false",
+    "reference" : 0.11252347170195746,
+    "score" : 0.11252347170195742
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/zh-main-00-h0\/concise_choice",
+    "milliseconds" : 151.420541,
+    "model" : "vela31",
+    "prediction" : "否",
+    "reference" : 0.7302574400446382,
+    "score" : 0.7302574400446382
+  },
+  {
+    "delta" : 1.1102230246251565e-16,
+    "id" : "current\/zh-main-01-h0\/concise_noul",
+    "milliseconds" : 152.732125,
+    "model" : "vela31",
+    "prediction" : "false",
+    "reference" : 0.254268132399297,
+    "score" : 0.25426813239929713
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/zh-main-01-h0\/concise_choice",
+    "milliseconds" : 179.789292,
+    "model" : "vela31",
+    "prediction" : "否",
+    "reference" : 0.6283717922418182,
+    "score" : 0.6283717922418182
+  },
+  {
+    "delta" : 5.551115123125783e-17,
+    "id" : "current\/zh-main-02-h0\/concise_noul",
+    "milliseconds" : 169.43975,
+    "model" : "vela31",
+    "prediction" : "false",
+    "reference" : 0.26941857504420025,
+    "score" : 0.2694185750442002
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/zh-main-02-h0\/concise_choice",
+    "milliseconds" : 138.483583,
+    "model" : "vela31",
+    "prediction" : "否",
+    "reference" : 0.645243842850313,
+    "score" : 0.645243842850313
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-00-h0\/concise_noul",
+    "milliseconds" : 79.991709,
+    "model" : "vela31",
+    "prediction" : "true",
+    "reference" : 0.9910275570905988,
+    "score" : 0.9910275570905988
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-00-h0\/concise_choice",
+    "milliseconds" : 79.889709,
+    "model" : "vela31",
+    "prediction" : "Yes",
+    "reference" : 0.9911068394880248,
+    "score" : 0.9911068394880248
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-01-h0\/concise_noul",
+    "milliseconds" : 81.707458,
+    "model" : "vela31",
+    "prediction" : "true",
+    "reference" : 0.9656373948572174,
+    "score" : 0.9656373948572174
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-01-h0\/concise_choice",
+    "milliseconds" : 83.283292,
+    "model" : "vela31",
+    "prediction" : "Yes",
+    "reference" : 0.9677417696371996,
+    "score" : 0.9677417696371996
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-02-h0\/concise_noul",
+    "milliseconds" : 81.938,
+    "model" : "vela31",
+    "prediction" : "true",
+    "reference" : 0.9860157238486323,
+    "score" : 0.9860157238486323
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-02-h0\/concise_choice",
+    "milliseconds" : 82.215292,
+    "model" : "vela31",
+    "prediction" : "Yes",
+    "reference" : 0.9854324250995776,
+    "score" : 0.9854324250995776
+  },
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-alarm-unfinished-zh-Hans\/concise_choice",
+    "milliseconds" : 211.538375,
+    "model" : "laya",
+    "prediction" : "未说完",
+    "reference" : 0.4103,
+    "score" : 0.4103
+  },
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-alarm-complete-zh-Hans\/concise_choice",
+    "milliseconds" : 142.271583,
+    "model" : "laya",
+    "prediction" : "等待",
+    "reference" : 0.3218,
+    "score" : 0.3218
+  },
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-brightness-unfinished-zh-Hans\/concise_choice",
+    "milliseconds" : 143.315334,
+    "model" : "laya",
+    "prediction" : "无意义消息",
+    "reference" : 0.4336,
+    "score" : 0.4336
+  },
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-alarm-unfinished-en\/concise_choice",
+    "milliseconds" : 144.677375,
+    "model" : "laya",
+    "prediction" : "Wait",
+    "reference" : 0.5053,
+    "score" : 0.5053
+  },
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-alarm-complete-en\/concise_choice",
+    "milliseconds" : 148.233208,
+    "model" : "laya",
+    "prediction" : "Wait",
+    "reference" : 0.5036,
+    "score" : 0.5036
+  },
+  {
+    "delta" : 0,
+    "id" : "four\/holdout-brightness-unfinished-en\/concise_choice",
+    "milliseconds" : 145.307042,
+    "model" : "laya",
+    "prediction" : "Unfinished",
+    "reference" : 0.4145,
+    "score" : 0.4145
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/zh-main-00\/concise_noul",
+    "milliseconds" : 144.464583,
+    "model" : "laya",
+    "prediction" : "true",
+    "reference" : 0.706,
+    "score" : 0.706
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/zh-main-00\/concise_choice",
+    "milliseconds" : 142.026458,
+    "model" : "laya",
+    "prediction" : "是",
+    "reference" : 0.8861,
+    "score" : 0.8861
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/zh-main-01\/concise_noul",
+    "milliseconds" : 144.646625,
+    "model" : "laya",
+    "prediction" : "false",
+    "reference" : 0.3824,
+    "score" : 0.3824
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/zh-main-01\/concise_choice",
+    "milliseconds" : 142.119375,
+    "model" : "laya",
+    "prediction" : "否",
+    "reference" : 0.9259,
+    "score" : 0.9259
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/zh-main-02\/concise_noul",
+    "milliseconds" : 142.924042,
+    "model" : "laya",
+    "prediction" : "true",
+    "reference" : 0.6943,
+    "score" : 0.6943
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/zh-main-02\/concise_choice",
+    "milliseconds" : 144.987208,
+    "model" : "laya",
+    "prediction" : "是",
+    "reference" : 0.886,
+    "score" : 0.886
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-00\/concise_noul",
+    "milliseconds" : 156.090792,
+    "model" : "laya",
+    "prediction" : "true",
+    "reference" : 0.7299,
+    "score" : 0.7299
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-00\/concise_choice",
+    "milliseconds" : 154.752083,
+    "model" : "laya",
+    "prediction" : "Yes",
+    "reference" : 0.9706,
+    "score" : 0.9706
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-01\/concise_noul",
+    "milliseconds" : 153.812167,
+    "model" : "laya",
+    "prediction" : "true",
+    "reference" : 0.7616,
+    "score" : 0.7616
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-01\/concise_choice",
+    "milliseconds" : 152.142709,
+    "model" : "laya",
+    "prediction" : "Yes",
+    "reference" : 0.9749,
+    "score" : 0.9749
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-02\/concise_noul",
+    "milliseconds" : 150.0145,
+    "model" : "laya",
+    "prediction" : "true",
+    "reference" : 0.721,
+    "score" : 0.721
+  },
+  {
+    "delta" : 0,
+    "id" : "single\/en-main-02\/concise_choice",
+    "milliseconds" : 143.45025,
+    "model" : "laya",
+    "prediction" : "Yes",
+    "reference" : 0.9816,
+    "score" : 0.9816
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/zh-main-00-h0\/concise_noul",
+    "milliseconds" : 149.804875,
+    "model" : "laya",
+    "prediction" : "false",
+    "reference" : 0.4276,
+    "score" : 0.4276
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/zh-main-00-h0\/concise_choice",
+    "milliseconds" : 148.949583,
+    "model" : "laya",
+    "prediction" : "是",
+    "reference" : 0.7528,
+    "score" : 0.7528
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/zh-main-01-h0\/concise_noul",
+    "milliseconds" : 151.646875,
+    "model" : "laya",
+    "prediction" : "false",
+    "reference" : 0.4017,
+    "score" : 0.4017
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/zh-main-01-h0\/concise_choice",
+    "milliseconds" : 149.397125,
+    "model" : "laya",
+    "prediction" : "是",
+    "reference" : 0.7684,
+    "score" : 0.7684
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/zh-main-02-h0\/concise_noul",
+    "milliseconds" : 148.407375,
+    "model" : "laya",
+    "prediction" : "false",
+    "reference" : 0.4557,
+    "score" : 0.4557
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/zh-main-02-h0\/concise_choice",
+    "milliseconds" : 146.393417,
+    "model" : "laya",
+    "prediction" : "否",
+    "reference" : 0.5256,
+    "score" : 0.5256
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-00-h0\/concise_noul",
+    "milliseconds" : 149.357,
+    "model" : "laya",
+    "prediction" : "false",
+    "reference" : 0.315,
+    "score" : 0.315
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-00-h0\/concise_choice",
+    "milliseconds" : 149.6865,
+    "model" : "laya",
+    "prediction" : "Yes",
+    "reference" : 0.8019,
+    "score" : 0.8019
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-01-h0\/concise_noul",
+    "milliseconds" : 154.123167,
+    "model" : "laya",
+    "prediction" : "true",
+    "reference" : 0.6457,
+    "score" : 0.6457
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-01-h0\/concise_choice",
+    "milliseconds" : 148.818791,
+    "model" : "laya",
+    "prediction" : "Yes",
+    "reference" : 0.9288,
+    "score" : 0.9288
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-02-h0\/concise_noul",
+    "milliseconds" : 150.278875,
+    "model" : "laya",
+    "prediction" : "false",
+    "reference" : 0.4361,
+    "score" : 0.4361
+  },
+  {
+    "delta" : 0,
+    "id" : "current\/en-main-02-h0\/concise_choice",
+    "milliseconds" : 151.219167,
+    "model" : "laya",
+    "prediction" : "Yes",
+    "reference" : 0.8293,
+    "score" : 0.8293
+  }
+]

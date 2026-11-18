@@ -1,0 +1,7 @@
+{
+  "capturedAt": "2026-11-17T18:32:41.106555+00:00",
+  "stage": "during-vela31-four",
+  "hardwareAndSwap": "hw.memsize: 8589934592\nvm.swapusage: total = 8192.00M  used = 7627.56M  free = 564.44M  (encrypted)\n",
+  "disk": "Filesystem      Size    Used   Avail Capacity iused ifree %iused  Mounted on\n/dev/disk3s5   228Gi   194Gi   1.7Gi   100%    1.6M   18M    8%   /System/Volumes/Data\n",
+  "note": "8 GiB Mac under swap pressure; latency is this measured end-to-end run, not isolated silicon capability. Weight file staged by APFS clone after partial ordinary copy exhausted disk; cloned bytes match pinned remote LFS hash."
+}
