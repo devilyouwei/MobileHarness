@@ -11,7 +11,7 @@ Purpose: record how to verify the current voice experience and what remains unpr
 ## Repeatable repository checks
 
 - Run `./scripts/check.sh` for module boundaries, Swift tests and project metadata. Its speech tests use controlled model/device substitutes, including synthesis admission, audio-ID ownership, reply cleanup, cache overflow and delayed producer progress.
-- Run `./scripts/test-silero.sh` for the opt-in real VAD check; use its documented Nemotron option when the local model artifact is available.
+- Run `./scripts/models/test-silero.sh` for the opt-in real VAD check; use its documented Nemotron option when the local model artifact is available.
 - Run `./scripts/build-ios.sh` for four unsigned simulator builds. Build success is not evidence of device listening quality or latency.
 - When validating MOSS, use its in-app diagnostic and [historical report](Moss-Validation.md), recording the actually tested revision and artifacts. Those measurements do not replace the full conversation loop.
 

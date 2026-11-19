@@ -1,0 +1,13 @@
+{
+  "platform": "macOS-27.2.1-arm64-arm-64bit",
+  "git": "db4ec4048f9d03c7e18365ca2836e61cdfa935e3",
+  "runtime": "Native Swift ModelKit CoreAI; D3 automatic, Vela3/3.1 CPU, Laya GPU; sequential multi-question implementation; not iPhone latency",
+  "sources": {
+    "Tests/DecisionBenchmarks/multi_noul_experiment.py": "ef27ced3a7a288499935dae541ac551476ff8e1b4ec42ffbb769a6b13a1bc529",
+    "Tests/IntegrationTests/DecisionMultiNoulExperimentTests.swift": "25da057255be4f41d251b6e30ea0d18d7365f8cb5663eaf29ca8a32854d487a5",
+    "docs/measurements/decision-multi-noul-2026-11-18-input.json": "47821cb5f8e0a5179f2b6dcfedad8ba246d62e55ad9d521b9575ee447e7ecc01",
+    "Tests/DecisionBenchmarks/vela31-model.json": "b424d9ee431b8ac59001226f924043e7a8c33ce7e94b2e2faa1ebe5b0225e0e6",
+    "Tests/DecisionBenchmarks/vela-model.json": "ab4a38ebb21685b73f7716e1457867f2d7faa1bf9d91ea6daa44d76123c8fe30",
+    "Tests/DecisionBenchmarks/laya-model.json": "ae008ecd497acea673568ce946dc6d236e2d42337f7405e58c98882d1d99dfe8"
+  }
+}

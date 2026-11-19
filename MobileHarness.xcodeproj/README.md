@@ -16,6 +16,8 @@ HarnessKit 提供共享模块；MOBILEHARNESS_BUILD_VARIANT=simulator 变体排�
 
 共享构建设置、权限、entitlements 和 AppInfo.plist 归 [Config](../Config/README.md)，本地签名保存在忽略的 Local.xcconfig。CADisableMinimumFrameDurationOnPhone 由 AppInfo.plist 提供；最终包验证其值，高刷请求不证明设备实际帧率。
 
+工程不保存 DEVELOPMENT_TEAM，设备宿主和扩展通过 Shared.xcconfig 引入本地签名配置。扩展的 GENERATE_INFOPLIST_FILE 继承共享值，扩展专属 plist、显示名称、隔离及权限覆盖仍由目标配置声明。Config/InfoPlist.xcstrings 与根导航中的其他 Config 文件并列，IslandStatus.xcstrings 位于 UI/Components 导航组；导航归属与 Resources 构建成员独立维护。Frameworks 构建项必须引用有效文件或 SwiftPM 产品，删除文件时同步移除失效导航引用和空组。
+
 设备／模拟器资源列表只暂存模型 catalog 和许可，不嵌入权重、模型图或 tokenizer。Agent／Skill 与 Core 协议资源由 SwiftPM 声明，scheme 清理与最终包检查防止增量构建留下旧资源。资源策略见 [Resources](../MobileHarness/Resources/README.md)。
 
 ## 构建接口与验收边界
@@ -23,3 +25,7 @@ HarnessKit 提供共享模块；MOBILEHARNESS_BUILD_VARIANT=simulator 变体排�
 scripts/check.sh 检查源码／目标边界、测试和项目元数据；scripts/build-ios.sh 依次构建 MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero 并验证 Agent 资源。MobileHarness scheme 用于签名设备构建；具体命令和工具链约束见 [scripts](../scripts/README.md)。
 
 ❌ 构建不证明真实模型、麦克风／播放、相机、蓝牙／机械臂、原生交互、延迟或持续温度验收。运行、安装和失败记录只归 [validation](../docs/validation/README.md)，导航／所有权演进只归 [history](../docs/history/README.md)。
+
+## Tests 导航
+
+Tests 分组展示常规回归，experiments 分组展示纯 Python 模型实验、数据和配置，不编译进 App 或 SwiftPM target。两个分组均按职责目录组织；Tests 编译成员由根 Package.swift 的 testSources 明确指定。文件迁移同时维护源路径和导航分组，保留已有文件 ID 与 target 配置。

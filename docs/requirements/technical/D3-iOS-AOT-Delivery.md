@@ -44,7 +44,7 @@ Edge源图选择已实施；远端固定版本与Mac本地12文件内容匹配�
 
 ## 2026-11-17 恢复自有源图并开展提示对照
 
-用户反馈第三方制品也频繁discard，要求恢复自己的repo及文件清单。将Edge完整source/requiredFiles恢复为DecisionBenchmarks/models.json中已固定的hugging-mac原始decision.aimodel声明，大小恢复1013189709，不启用iOS AOT，不改变Lite。同步目录回归和现行说明。本轮提示优化只在实验请求中进行，先对现有minimal、仅补充入队定义中的问候/命令、仅明确discard不可理解边界、两项合并进行单因素/组合对照；使用原48条样例和6条诊断并补Hello，历史留出已多次观察，称回归集，不称新独立留出。保留输入/输出和错误，不新增模型结果覆盖代码，不自动把最优实验方案写入App。
+用户反馈第三方制品也频繁discard，要求恢复自己的repo及文件清单。将Edge完整source/requiredFiles恢复为experiments/decision/benchmark/models.json中已固定的hugging-mac原始decision.aimodel声明，大小恢复1013189709，不启用iOS AOT，不改变Lite。同步目录回归和现行说明。本轮提示优化只在实验请求中进行，先对现有minimal、仅补充入队定义中的问候/命令、仅明确discard不可理解边界、两项合并进行单因素/组合对照；使用原48条样例和6条诊断并补Hello，历史留出已多次观察，称回归集，不称新独立留出。保留输入/输出和错误，不新增模型结果覆盖代码，不自动把最优实验方案写入App。
 
 首轮220条完成，minimal基线18/48，收窄discard为24/48但继续聆听仍0/16，补问候定义仅8/48。追加预先固定对照：历史utterance_status原样参考、仅将ASR marker短语替换为unintelligible text、仅保留无待答问题的hesitation定义、替换为无可识别话语定义；其余上下文和选项不变。历史ASR描述只作已存档控制，绝不恢复生产噪声词表或声称ASR提供该标签。
 

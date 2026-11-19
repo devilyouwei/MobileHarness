@@ -75,7 +75,7 @@ SpeechPerception 自有的播放感知接纳状态放在现有目录内。播放
 | Agents/Assistant：AssistantSpeechOutput.swift、现有 runtime binding | 保持播放占用查询；区分准备、原生已开始与结束事实，不用 replyActive 代替播放状态 |
 | Agents/SpeechPerception：SpeechPerceptionAgent.swift、SpeechBoundaryPolicy.swift、VoiceActivitySegmenter.swift、SpeechPCMPreparation.swift；必要时同目录新增策略文件 | 拥有接纳状态机、起声/维持分离、候选缓冲、捕获时间映射与取消隔离 |
 | Agents/AgentRuntime.swift、App/Composition 现有装配 | 注入上述窄端口；不引入 Agents 对 Actions 实现细节或基础模块之间的新依赖 |
-| Tests/IntegrationTests、Tests/AppWorkflowTests、必要时 Tests/SileroTests | 状态机、实际链路、增强时间对齐、取消及延迟回归 |
+| Tests/Agents、Tests/App、必要时 Tests/ModelKit/Speech/VAD | 状态机、实际链路、增强时间对齐、取消及延迟回归 |
 
 不新增目录或模块。若后续需要产品设置，另列 UI/Settings → ApplicationControl → Actions 偏好持久化及恢复计划后实施；逐音频包不读取磁盘。
 

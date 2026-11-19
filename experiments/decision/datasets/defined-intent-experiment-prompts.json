@@ -1,0 +1,10 @@
+{
+  "zh": {
+    "binary": "请问用户是否要求立即停止或改变当前正在进行的回复？\n仅追加问题、补充信息或要求稍后处理，不算打断。",
+    "four": "请问用户的意图是什么？\n打断：要求立即停止或改变当前正在进行的回复；仅追加问题、补充信息或要求稍后处理不算打断。\n未说完：话语尚未完整，需要更多内容才能理解意图。\n无意义消息：没有可理解的交流含义。\n等待：有完整意义、可正常入队处理且不要求立即打断的消息，并非指用户说了“等一下”。"
+  },
+  "en": {
+    "binary": "Does the user ask to immediately stop or change the response currently in progress?\nMerely adding a question, providing more information, or requesting something for later does not count as an interruption.",
+    "four": "What is the user's intent?\nInterrupt: Ask to immediately stop or change the response currently in progress; merely adding a question, providing more information, or requesting something for later does not count.\nUnfinished: The utterance is incomplete and needs more words before its intent can be understood.\nMeaningless message: The message has no understandable communicative meaning.\nWait: A complete, meaningful message that can enter the normal queue without an immediate interruption; this does not mean the user said \"wait a moment\"."
+  }
+}

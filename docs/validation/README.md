@@ -1,5 +1,7 @@
 # 验证与验收资料
 
+[Xcode 工程配置清理](Xcode-Project-Cleanup.md)：工程结构、五个模拟器构建目标、资源验证及 SwiftPM 锁等待限制。
+
 本目录保存验证方法和可追溯证据。报告必须区分替身测试、真实模型、构建、原生 UI 和物理设备，并保留日期、环境、版本、失败与未执行范围。历史报告中的“当前”“默认”“尚未接入”只对应当时版本，不是今天的配置或待办。
 
 ## 当前验收入口
@@ -63,7 +65,6 @@
 | [连续动作提示词验证](Action-Sequence-Prompts.md) | 串行动作、组内语音/表情并行的生产示例与预算回归；包含 Flash/Max 三轮专项及完整原始数据，保留完整检查、构建与原生效果验收限制。 |
 | [语音验收指南](Voice.md) | 当前可重复的语音体验检查步骤及记录要求，不固定某次模型默认或宣称已经通过。 |
 | [NexArm 物理试验](NexArm_Physical_Acceptance.md) | 带日期的真实硬件调查和测量，限定 USB/BLE、设备、负载和观察范围。 |
-| [原始测量数据](../measurements/README.md) | 保留原始 CSV 与字段解释；测量值和失败样本不因文档整理改变。 |
 
 ## 专项历史报告
 
@@ -223,3 +224,25 @@ refactor, Agent-only model recording, current-file recovery and automated/build/
 [D3 Edge 提示词结构优化](Decision-Model-Mac-Comparison.md#d3-edge-提示词结构优化实验2026-11-16仅实验环境)：官方/公开集成调研、11组对照与48条预冻结留出；仅实验，保留误继续聆听风险及生产未变的哈希证据。
 
 - [ModelKit 制品所有权与 D3 Lite 移除](ModelKit-Artifact-Ownership.md)：独立存储、下载、目录与回归验证。
+
+- [Tests 目录整理验证](Tests-Organization.md)
+
+- [实验与评估目录迁移验证](Experiments-Organization.md)
+
+- [任务评估集与共享制品验证](Evaluation-Datasets.md)
+
+- [Research / Engineering 职责修正验证](Research-Engineering-Responsibilities.md)
+
+- [仓库脚本整理验证](Scripts-Organization.md)：离线工具回归、五个 iOS 构建与全量测试限制。
+
+- [模块与链路测试覆盖审查](Module-Test-Coverage.md)：八模块基本功能、跨模块集成证据、生产装配缺口与失效用例。
+
+- [模块测试修复验证](Module-Test-Repairs.md)：归属、夹具、时序契约和真实 App 装配验收。
+
+- [实验数据职责整理](Experiment-Data-Ownership.md)：任务输入、原始结果与文档分离及验证。
+
+- [experiments 命名验证](Experiment-Naming.md)：统一文件名与引用校验。
+
+- [纯 Python 实验验证](Python-Experiments.md)：Research 与 Swift 工程测试解耦及运行证据。
+
+- [Tests / experiments 独立验证](Independent-Research-Tests.md)：仅共享模型制品，源码、数据和验证入口独立。

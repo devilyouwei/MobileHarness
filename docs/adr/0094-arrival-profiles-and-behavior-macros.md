@@ -16,6 +16,6 @@ ActionExecutor and bounded composition leaves use cooperative deadline cancellat
 
 ## Evidence and limits
 
-The [NexArm README](../../MobileHarness/Actions/NexArm/README.md) is the current algorithm and budget specification. [Retained serial trials](../measurements/nexarm-2026-10-01.csv) distinguish measured values from extrapolation. Deterministic tests cover fresh arrival, stationary off-target windows, feedback gaps, motion deadlines, timing arithmetic, generated metadata and timeout report preservation. Physical acceptance and build/install verification are recorded in the roadmap.
+The [NexArm README](../../MobileHarness/Actions/NexArm/README.md) is the current algorithm and budget specification. [Retained serial trials](../../experiments/assistant/results/nexarm-2026-10-01.csv) distinguish measured values from extrapolation. Deterministic tests cover fresh arrival, stationary off-target windows, feedback gaps, motion deadlines, timing arithmetic, generated metadata and timeout report preservation. Physical acceptance and build/install verification are recorded in the roadmap.
 
 ❌ Full workspace/load calibration, a physical emergency-stop mechanism and forced cancellation of uncooperative handlers are outside this implementation.

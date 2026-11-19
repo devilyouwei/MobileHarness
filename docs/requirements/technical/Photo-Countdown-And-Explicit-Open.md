@@ -14,8 +14,8 @@
 - Actions/Camera/CaptureActions.swift：参数声明、纯校验和直接调用，预算移除自动打开所占 60 秒，保留 50 秒倒计时/拍照预算。
 - Actions/Support/Contracts/CameraCapabilities.swift、CameraExecutionEndpoint.swift、CameraCoordinator.swift：传递可选倒计时，入口和原有会话验证保持一致；CameraPhotoSession 继续拥有单个可取消、可加入的倒计时/拍照事务。
 - Resources/Skills/Photography/Instructions.md：删除分轮准备和拍照自动打开描述，补充已打开、需要打开、倒计时、多 Action 示例。共享输出协议已支持一轮多 Action，无需更改调度器。
-- Tests/IntegrationTests/CameraEnhancementTests.swift、GenerationRoundTests.swift、PromptTemplateTests.swift：覆盖参数边界、失败/取消、无隐式打开、真实 Action 声明与 Gateway 的同轮有序执行、预览就绪后才拍照。
-- 同步 Actions/Camera、Actions/Support/Contracts、Actions、Resources/Skills、Tests/IntegrationTests 的 README 及 MobileHarness/README.md 中跨模块链路，保留其他工作区修改。
+- Tests/Actions/Camera/CameraEnhancementTests.swift、GenerationRoundTests.swift、PromptTemplateTests.swift：覆盖参数边界、失败/取消、无隐式打开、真实 Action 声明与 Gateway 的同轮有序执行、预览就绪后才拍照。
+- 同步 Actions/Camera、Actions/Support/Contracts、Actions、Resources/Skills、Tests/Agents 的 README 及 MobileHarness/README.md 中跨模块链路，保留其他工作区修改。
 
 ## 验证与状态
 

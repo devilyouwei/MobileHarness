@@ -1,12 +1,12 @@
 # Writer 双模型提示词优化
 
-2026-11-08。用户确认复用 .env.local 的 Provider URL/密钥；仅 Qwen3.8 Max、GPT6.1 sol。Swift 改动已在会话中事先告知：只扩展 IntegrationTests/WriterModelEvaluationTests.swift 的评估代码，生产 Swift 不修改。
+2026-11-08。用户确认复用 .env.local 的 Provider URL/密钥；仅 Qwen3.8 Max、GPT6.1 sol。Swift 改动已在会话中事先告知：只扩展 experiments/writer/WriterModelEvaluationTests.swift 的评估代码，生产 Swift 不修改。
 
 ## 范围与所有权
 
-- 场景 JSON：Tests/AgentModelEvaluationTests/Scenarios/writer-workflows.json；模型/实验配置：同目录 writer-evaluation.json。均在既有目录。
+- 场景 JSON：experiments/writer/datasets/writer-workflows.json；模型/实验配置：同目录 writer-evaluation.json。均在既有目录。
 - 测试适配器读取 JSON，实际执行 Writer/Gateway/Artifacts/SQLite 与 ArtifactPresentation/WebPageContainer/WindowState；macOS 界面动画完成回执由测试宿主提供，不等于 iOS 真机界面验收。
-- scripts/evaluate-writer.py 读取两个 Provider 各自配置，隔离环境和输出，校验准确模型名称；不打印凭据，不修改凭据。
+- experiments/writer/evaluate_writer.py 读取两个 Provider 各自配置，隔离环境和输出，校验准确模型名称；不打印凭据，不修改凭据。
 - Writer/Instructions.md 与 Prompts.json 使用生产装配器加载；只在公开职责确有错误时修改 Writer/Agent.json。Assistant/BasicSkill/Core 保持不变。
 - 保留现有六场景的历史执行入口，新的 JSON 矩阵使用独立 opt-in 路径，不将旧历史结果改写成新矩阵结果。
 - 原始 JSON、文件/窗口事件、请求与源码哈希归 docs/measurements；分析归 docs/validation/Writer-Prompt-Optimization.md。完整临时数据库、文件及截图存独立 /tmp 输出，持久报告保存脱敏请求、关键文件和必要视觉证据，不能只留临时路径。
@@ -29,7 +29,7 @@ JSON 定义目标、合成初始作品、宿主事件及断言。必要效果与
 
 ## 视觉评审补充（编写工具前告知）
 
-生产截图接口要求 WKWebView 已挂载原生窗口。矩阵宿主虽有真实 WindowState/WebKit，但没有原生视图挂载，因此返回 screenshot unavailable，不伪造模型已看图。增加 scripts/render-writer-review.swift，仅离线加载已生成的 HTML 与本地资源并输出图像；不改变矩阵发送给模型的内容，不把离线截图当作模型曾经接收的证据。该 Swift 评估工具已事先在会话告知，生产 Swift 仍不修改。
+生产截图接口要求 WKWebView 已挂载原生窗口。矩阵宿主虽有真实 WindowState/WebKit，但没有原生视图挂载，因此返回 screenshot unavailable，不伪造模型已看图。增加 experiments/writer/RenderWriterReview.swift，仅离线加载已生成的 HTML 与本地资源并输出图像；不改变矩阵发送给模型的内容，不把离线截图当作模型曾经接收的证据。该 Swift 评估工具已事先在会话告知，生产 Swift 仍不修改。
 
 ## 基线发现与首轮调整
 

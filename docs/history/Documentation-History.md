@@ -181,7 +181,7 @@ Local user settings now use Storage-backed cached persistence in the application
 
 ✅ [ADR0093](../adr/0093-nexarm-platform-action-boundary.md) defines the NexArm foundational protocol SDK versus Action behavior boundary.
 
-✅ [ADR0094](../adr/0094-arrival-profiles-and-behavior-macros.md) records fresh-arrival completion, measured profiles, dynamic budgets and Action/Tool macros. Bounded hardware evidence lives in [measurements](../measurements/README.md).
+✅ [ADR0094](../adr/0094-arrival-profiles-and-behavior-macros.md) records fresh-arrival completion, measured profiles, dynamic budgets and Action/Tool macros. Bounded hardware evidence lives in [measurements](../validation/NexArm_Physical_Acceptance.md).
 
 ✅ [ADR0095](../adr/0095-remove-retired-device-and-behavior-code.md) records removal of unused device placeholders and isolation of retired Action diagnostics.
 
@@ -399,7 +399,7 @@ Historical evidence routing:
 
 | Earlier material | Retained location |
 | --- | --- |
-| NexArm serial arrival trials, celebration/dance outcomes and calibration limits | [Milestone history](Milestone-History.md), [physical acceptance](../validation/NexArm_Physical_Acceptance.md), [measurements](../measurements/README.md) |
+| NexArm serial arrival trials, celebration/dance outcomes and calibration limits | [Milestone history](Milestone-History.md), [physical acceptance](../validation/NexArm_Physical_Acceptance.md), [measurements](../validation/NexArm_Physical_Acceptance.md) |
 | First MOSS prediction/warmup and audio deadline investigation | [MOSS validation](../validation/Moss-Validation.md) |
 | Nemotron/Silero real-weight and packet-size observations | [Nemotron validation](../validation/Nemotron-Validation.md), [Silero validation](../validation/Silero-Validation.md) |
 | FOA capture/extraction investigation and device installation | [Validation history](../validation/Validation-History.md) |

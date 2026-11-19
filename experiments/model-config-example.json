@@ -1,0 +1,7 @@
+{
+  "backend": "cloud",
+  "model": "replace-with-provider-model-id",
+  "endpoint": "https://replace-with-provider-endpoint/v1",
+  "api_key_env": "EXPERIMENT_API_KEY",
+  "options": {"temperature": 0}
+}

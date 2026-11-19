@@ -6,7 +6,7 @@
 
 - UI/Components/Island/IslandHost.swift：标题宿主改用与状态条一致的全视口固定画布，按IslandPlacement.compact定位内容；通过逆向父容器偏移保持全局位置，展开顶部6pt下移仍由UIKit frame动画承担。标题内容宽度变化不再改变宿主画布宽度。背景、命中和占位仍使用同一IslandPlacement。
 - render设置同步重入保护，嵌套布局只请求下一次布局，不重复构造／覆盖animator。两段开场、展开／收起在有效动画完成后无动画统一写回目标frame／corner／alpha／内容及状态条坐标，再发localCompleted；被新token取代的动画不能校正新目标。
-- Tests/UITests/IslandStateTests.swift补充固定画布坐标回归：单侧／双侧状态、22pt普通槽／44pt计时槽、展开／收起、硬件保护区／非硬件布局及父容器中途位置，验证背景与内容共享同一全局基准，不从截图宣称已证明唯一根因。
+- Tests/UI/Presentation/IslandStateTests.swift补充固定画布坐标回归：单侧／双侧状态、22pt普通槽／44pt计时槽、展开／收起、硬件保护区／非硬件布局及父容器中途位置，验证背景与内容共享同一全局基准，不从截图宣称已证明唯一根因。
 - 更新Island与测试README，保留其他在途紫色主题等改动。运行完整check和四项iOS构建；记录实际结果与尚未覆盖的真机间歇复现／转场验收。本次不改变跨模块接口或系统Widget外壳。
 
 ## 2026-11-03 现有窗口使用emoji
@@ -20,7 +20,7 @@
 - UI/Components/Window 新增同目录 WindowAppearance.swift，拥有通用 WindowIcon（系统symbol、单个emoji、自定义图片Data）及原生字体测量／卡片宽度规则。无图标时保持左槽。图片最多1MiB、尺寸最多4096×4096，接纳时ImageIO缩放为最长边96像素PNG；错误明确invalidIcon，不读文件／网络，不增加异步任务。
 - WindowState.present增加可选icon参数，随窗口身份保留规范化图标；layout/present依据标题和字体更新卡片宽度，旋转／字体变化保留卡片中心并约束到安全范围，普通窗口几何独立。WindowHost使用同字号渲染和测量，观察Dynamic Type变化；最小化图标22pt，图片等比完整显示，不侵占标题／关闭命中。
 - Actions/Camera/CameraCoordinator、Actions/Web/WebExecutionService在创建窗口时分别提供camera.fill／globe系统图标；通用UI不根据业务content猜图标。UI/Window、UI模块、Actions/Camera、Actions/Web及总体设计同步接口说明。
-- Xcode工程为WindowAppearance增加源码导航引用，编译所有权仍由UI包目标持有。scripts/check-modelkit-boundaries.py仅为新WindowAppearance文件声明原生AppKit测量与ImageIO图标处理权限，保持UI零项目依赖。Tests/UITests/WindowStateTests覆盖中英文／emoji标题、短长宽度／封顶／窄屏／字体尺寸变化、位置与模式保留、各类图标、非法图片／符号及清理；更新测试和脚本README。
+- Xcode工程为WindowAppearance增加源码导航引用，编译所有权仍由UI包目标持有。scripts/checks/check-modelkit-boundaries.py仅为新WindowAppearance文件声明原生AppKit测量与ImageIO图标处理权限，保持UI零项目依赖。Tests/UI/WindowStateTests覆盖中英文／emoji标题、短长宽度／封顶／窄屏／字体尺寸变化、位置与模式保留、各类图标、非法图片／符号及清理；更新测试和脚本README。
 - 执行完整check与四项iOS构建，记录实际结果；真实iOS图标、截断、关闭按钮及拖动触控验收单列，不把状态测试或编译当成真机效果。
 
 
@@ -254,7 +254,7 @@ Completed: cross-module descriptions are integrated into the existing sections; 
 - Agents根增加场景可见性通知，只停止VisionPerception，保留SpeechPerception/Assistant等已运行输入/决策；App不读取内部worker。Actions根增加独立场景回调执行既有camera/bluetooth foreground关闭与加入，不取消其他已接纳Action；原invalidate/stop保持完整取消。Platform基础会话/Model/Gateway不因页面隐藏销毁，根停止仍原顺序。后台相机/机器人等有前台门的Action继续明确拒绝，不能保证所有Action后台可用。
 - 半双工仍暂停VAD/ASR准入，但在回复等待/播放期间保留同一原生录音流并消费丢弃被抑制PCM，避免每次回复都中断后台音频会话；禁止将回复音重新识别。录像交接、用户关聆听、系统中断及根停止仍关闭原生采集。UIBackgroundModes仅新增audio，不采用静音播放/循环背景任务保活。
 - UI根增加Scene呈现控制，保留home的会话/回复事实和token；关闭Window接纳及本地岛渲染，Island内容/详情偏好/图片/owner/generation与系统更新持续，返回前台重挂最新内容。前台Metal和频谱已有scenePhase停止机制继续使用。系统外壳/动画仍归iOS；中断或进程终止不能承诺无限后台执行，系统快照staleDate保留。
-- 更新各owner README及总体跨模块流程、配置文档；scripts/check-modelkit-boundaries.py同步校验UI独立Scene入口及Model仅前台重新接纳绑定，保留根start/invalidate/stop绑定检查。自动化验证Actions场景切换保留在途执行及已准备票据、持续服务场景切换不失效且根停止仍清理、默认服务保留旧行为、岛后台接纳更新/回前台身份偏好保持、最终结束系统活动，以及半双工准入/失败回归。完整检查、四iOS构建、资源/签名/audio后台模式校验并安装真机；锁屏/桌面下长句ASR、慢请求、TTS连续多轮、用户关闭及音频中断由真机验收。CoreML语音当前CPU路径可持续；本地GPU模型受iOS限制，不承诺后台GPU推理可用，错误如实报告。
+- 更新各owner README及总体跨模块流程、配置文档；scripts/checks/check-modelkit-boundaries.py同步校验UI独立Scene入口及Model仅前台重新接纳绑定，保留根start/invalidate/stop绑定检查。自动化验证Actions场景切换保留在途执行及已准备票据、持续服务场景切换不失效且根停止仍清理、默认服务保留旧行为、岛后台接纳更新/回前台身份偏好保持、最终结束系统活动，以及半双工准入/失败回归。完整检查、四iOS构建、资源/签名/audio后台模式校验并安装真机；锁屏/桌面下长句ASR、慢请求、TTS连续多轮、用户关闭及音频中断由真机验收。CoreML语音当前CPU路径可持续；本地GPU模型受iOS限制，不承诺后台GPU推理可用，错误如实报告。
 
 来源：Apple AVAudioSession record文档明确UIBackgroundModes audio用于锁屏/后台继续录音；Activity.update支持后台运行期间更新，Live Activity不授予执行时长。https://developer.apple.com/documentation/avfaudio/avaudiosession/category-swift.struct/record 、https://developer.apple.com/documentation/activitykit/activity/update(_:)
 
@@ -272,7 +272,7 @@ Completed: cross-module descriptions are integrated into the existing sections; 
 
 - SpeechPerception负责取消并加入失败ASR/VAD、重建下一轮、清除失败临时字幕并封口，通过既有transition发布empty终态（持久状态为listening）及UI.VoiceState.listening；Assistant已有empty处理释放该turn识别绑定。原始错误继续报告，不伪造final、不启动聊天。
 - 生命周期/采集代变化后不复活旧轮次；恢复接纳仍检查captureOpen、enabled与paused，关闭或暂停时不发聆听显示，不获取设备/重启麦克风。UI和灵动岛继续消费统一语音呈现事实，不加超时重置或第二套修补状态。
-- Tests/IntegrationTests/VoiceTests覆盖ASR创建失败和输入结束时报错，验证processing后恢复呈现/Context/listening、empty/字幕封口、下一句成功，保留原错误。更新SpeechPerception/Agents/测试README，完整检查及四项构建后签名安装真机，用户验证Apple ASR真实拒识；不操作模拟器界面。
+- Tests/Agents/VoiceTests覆盖ASR创建失败和输入结束时报错，验证processing后恢复呈现/Context/listening、empty/字幕封口、下一句成功，保留原错误。更新SpeechPerception/Agents/测试README，完整检查及四项构建后签名安装真机，用户验证Apple ASR真实拒识；不操作模拟器界面。
 
 ## 2026-11-02 收起重开、详情对齐与相机初始位置（130）
 
@@ -531,7 +531,7 @@ Completed: cross-module descriptions are integrated into the existing sections; 
 
 build 2026110105 已验证预览，用户进一步报告前置拍照通过手动和语音均失败。两入口复用 Foundation Camera 的 capturePhoto；本轮先在 PlatformKit/Vision/AppleCamera 保留原生处理／终结回执错误，诊断模式输出阶段、错误域／码、返回JPEG字节数与照片尺寸，不输出图像或用户媒体。区分原生采集失败、无编码数据、原生结束失败及4MiB结果预算拒绝，避免把它们全部抹为photoFailed。
 
-诊断版2026110106真机确认：前置原生处理及结束均无错误，4032×3024 JPEG为5542949字节，随后被4194304字节上限拒绝；确认现场根因为成功照片超过字节预算，而非原生拍摄失败。NativeImageCompression 增加显式输入预算，默认仍为4MiB；Camera 唯一拍摄任务在原生回调终结后，对超4MiB且不超过32MiB／4096边长／16777216像素的JPEG使用既有有界Image I/O编码，输出继续严格限制4MiB。未超预算的原片保持字节不变；超预算编码保持构图与镜像、应用EXIF方向，有限质量／尺寸调整不重复快门。编码任务保留在photoTask内，取消和stopAndWait必须加入，原生10秒回调期限不延伸到已经完成的快门；编码阶段取消只取消并加入编码，不停止已经完成快门的共享采集，根stopAndWait仍显式停机。增加合成大JPEG、方向、小图不变、非法输入／预算和取消回归。随后根据真机回执定位是否还需修复原生格式或有界照片准备路径，继续保持共享采集、一次快门、回调加入、取消和真实完成；不以自动重拍、放宽下游媒体边界或假成功解决。若需编码适配，在既有 PlatformKit/Vision/NativeImageCompression 内完成并先补充具体预算计划；不新增目录或Action入口。同步该目录README及 Tests/IntegrationTests 的相关失败回归，执行完整check、四iOS构建和包资源校验。安装真机后验证前置及后置照片，而非只验证预览；语音和手动使用同一能力。
+诊断版2026110106真机确认：前置原生处理及结束均无错误，4032×3024 JPEG为5542949字节，随后被4194304字节上限拒绝；确认现场根因为成功照片超过字节预算，而非原生拍摄失败。NativeImageCompression 增加显式输入预算，默认仍为4MiB；Camera 唯一拍摄任务在原生回调终结后，对超4MiB且不超过32MiB／4096边长／16777216像素的JPEG使用既有有界Image I/O编码，输出继续严格限制4MiB。未超预算的原片保持字节不变；超预算编码保持构图与镜像、应用EXIF方向，有限质量／尺寸调整不重复快门。编码任务保留在photoTask内，取消和stopAndWait必须加入，原生10秒回调期限不延伸到已经完成的快门；编码阶段取消只取消并加入编码，不停止已经完成快门的共享采集，根stopAndWait仍显式停机。增加合成大JPEG、方向、小图不变、非法输入／预算和取消回归。随后根据真机回执定位是否还需修复原生格式或有界照片准备路径，继续保持共享采集、一次快门、回调加入、取消和真实完成；不以自动重拍、放宽下游媒体边界或假成功解决。若需编码适配，在既有 PlatformKit/Vision/NativeImageCompression 内完成并先补充具体预算计划；不新增目录或Action入口。同步该目录README及 Tests/Agents 的相关失败回归，执行完整check、四iOS构建和包资源校验。安装真机后验证前置及后置照片，而非只验证预览；语音和手动使用同一能力。
 
 本项结果：已实现有界原生照片准备和原始错误保留；943项集成测试、225项实时测试及check.sh其余检查通过，四iOS构建／资源／签名校验通过。修复版2026110107已安装，用户明确确认前置正常拍摄；后置和本轮语音句式没有单独验收记录。证据见[验证记录](../validation/Window-Camera.md)。
 
@@ -574,7 +574,7 @@ UI/Camera/CameraConversationSurface 恢复原右上角胶囊：视觉开关（ey
 | `Agents/Photographer/` | 原相机链增加本地拍摄请求 |
 | `App/Composition/`、`Agents/AgentContainer.swift`、`AgentRuntime.swift` | 同一根注入和前后台；删除导航路径控制相机的旧入口 |
 | `Agents/Assistant/AssistantStateBindings.swift`、`Resources/Skills/` | ui.windows 选择，Photography/ApplicationControl 一致 Window 别名；BasicSkill 不扩大 |
-| `Tests/UITests/WindowStateTests.swift`、`Tests/AppWorkflowTests/WindowExecutionTests.swift` | 布局/层级/容量/真实回执契约、生命周期失败与取消的替身验证；不增加产品演示窗口 |
+| `Tests/UI/Window/WindowStateTests.swift`、`Tests/App/Presentation/WindowExecutionTests.swift` | 布局/层级/容量/真实回执契约、生命周期失败与取消的替身验证；不增加产品演示窗口 |
 
 链路：窗口按钮 → UIRequests → ApplicationControl → Gateway → 固定 UI.Window Action → WindowExecutionService → 领域暂停/恢复/关闭 → UI 呈现完成。拍照按钮继续走 Photographer → Camera.Capture。拖动和聚焦直接修改同一 UI 状态，不逐帧发 Action。
 
@@ -626,7 +626,7 @@ App 内灵动岛已实现独立根组件与蓝牙／Task／回复频谱／Camera
 
 模拟器交互修订：ApplicationRootView 的 Face 相机入口不再复用对话模型准备门；只在应用会话尚未建立或根启动失败时禁用，并继续保留 Camera 自身 busy 与类型化请求/Action 准入。未安装对话模型不应阻止用户打开相机窗口；姿态模型失败仍由原领域单独呈现。同步 UI/Camera README 的入口契约。
 
-签名包验证修订：模拟器可执行验收使用 Xcode ad-hoc 签名包；scripts/verify-app-agent-resources.py 区分资源根的 Apple `_CodeSignature` 标准元数据与业务资源，仍逐字节校验所有声明/提示词并拒绝未知文件。同步 scripts/README.md。无源码签名设置或凭据变更。
+签名包验证修订：模拟器可执行验收使用 Xcode ad-hoc 签名包；scripts/resources/verify-app-agent-resources.py 区分资源根的 Apple `_CodeSignature` 标准元数据与业务资源，仍逐字节校验所有声明/提示词并拒绝未知文件。同步 scripts/README.md。无源码签名设置或凭据变更。
 
 权限弹窗实测修订：系统授权弹窗导致场景暂时失活时，现有请求按代际撤销，保留窗口并允许重新开启。CameraInteractionWorkflow 将 UIRequestError 和取消映射为明确的业务提示，不向用户显示 Swift 类型/数字错误码；保持已保存照片的成功事实及原始请求失败语义，新增工作流回归测试并同步 Camera README。
 

@@ -10,8 +10,8 @@ WriterContainer 现在读取最多 21 条，只发布前 20 条；存在第 21 �
 
 ## 自动回归
 
-- Tests/IntegrationTests/WriterAgentTests.swift：真实 SQLite 与 WriterRecordsControlling 检查任务和请求在 0/19/20/21/40 条时的首末页、游标、两页无漏项/重复项；重复读取末页仍无游标。
-- Tests/UITests/ConversationHistoryPresentationTests.swift：页面已加载标志、40 条保留、重复末页刷新、更新去重、新增第 41 条、显式刷新为空、取消提交保留原页及之后重试。
+- Tests/Agents/Writer/WriterAgentTests.swift：真实 SQLite 与 WriterRecordsControlling 检查任务和请求在 0/19/20/21/40 条时的首末页、游标、两页无漏项/重复项；重复读取末页仍无游标。
+- Tests/UI/Conversation/ConversationHistoryPresentationTests.swift：页面已加载标志、40 条保留、重复末页刷新、更新去重、新增第 41 条、显式刷新为空、取消提交保留原页及之后重试。
 - 专项筛选 writerRecordPages、writerRecordControllers、writerRequestSummariesAreScopedPaged：4 项通过；随后补充空任务页断言，由完整检查验证。
 
 状态测试验证缓存与首次加载门；不等于真实 iPhone List 的导航、滚动位置验收。失败读取不提交快照的分支经代码核对；取消提交与重试有自动测试。
@@ -24,4 +24,4 @@ WriterContainer 现在读取最多 21 条，只发布前 20 条；存在第 21 �
 
 ./scripts/check.sh 退出码 0：格式、边界、Python 与 plist 检查通过；包含 1,096 项集成测试和 227 项独立原生运行时测试的全部测试通过。分页相关源码与测试指纹在运行后保持一致。./scripts/build-ios.sh 退出码 0：MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero 四目标全部成功；30 项 Agent/Skill 资源与 Live Activity 打包校验通过。
 
-[检查证据](../measurements/writer-pagination-2026-11-08-checks.json)保存运行时间、退出码、本机日志哈希与源码指纹。相关链接与 diff 格式检查通过。[需求归档](../completed/Writer-Record-Pagination.md)记录范围；本轮未进行真实模型调用或真机原生点击验收。
+[检查证据](../../experiments/writer/results/writer-pagination-2026-11-08-checks.json)保存运行时间、退出码、本机日志哈希与源码指纹。相关链接与 diff 格式检查通过。[需求归档](../completed/Writer-Record-Pagination.md)记录范围；本轮未进行真实模型调用或真机原生点击验收。

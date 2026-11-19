@@ -24,7 +24,7 @@ task_10为新的Transformer架构图目标，base保留首控制请求generating
 - “看看Writer画的那个窗口里写了什么文字”：5.503秒，3次模型请求，先loadSkills(web-browsing)，再Web.inspect(actual windowID)。
 - “把Writer的流程图窗口放大”：2.959秒，2次模型请求，先loadSkills(application-control)，再Window.maximize(actual windowID)。
 
-使用.env.local中阿里兼容端点，未使用OpenAI凭据。实际执行生产Assistant、Gateway/XML/Skill工作流；窗口/页面反馈为明确替身，不代表iOS原生截图或真人语音。模型结果及源码哈希见Writer-Round-Window-Model.json，原始证据/tmp/writer-window-model-final-qwen3.8-max.json。前次失败保留/tmp/writer-shared-window-model.summary.json。
+使用.env.local中阿里兼容端点，未使用OpenAI凭据。实际执行生产Assistant、Gateway/XML/Skill工作流；窗口/页面反馈为明确替身，不代表iOS原生截图或真人语音。模型结果及源码哈希见writer-round-window-model.json，原始证据/tmp/writer-window-model-final-qwen3.8-max.json。前次失败保留/tmp/writer-shared-window-model.summary.json。
 
 ## 推理模式对照
 同一原始简单图目标，使用生产Writer/Gateway/Storage和真实macOS WebKit，新增仅评估的minimum模式（Qwen的Provider参数关闭thinking），未改生产设置：
@@ -33,7 +33,7 @@ task_10为新的Transformer架构图目标，base保留首控制请求generating
 | 前次enabled | 4 | 197.29秒 | 229.59秒 | 148.56 / 183.02秒 |
 | 本次minimum | 4 | 12.94秒 | 47.04秒 | 0.552 / 40.925秒 |
 两次源码约6.0KB/5.7KB，均发布并通过结构/标签/实际WebKit检查；没有跳过必要render或增加输出限制。这个单例对照支持推理模式是明显延迟因素，不保证所有请求相同比例提速，也不是手机端实测延迟。用户依据对照确认优先速度；新版本Writer默认minimum，并新增可显式开启的深度思考开关，当前执行的租约保持原配置。
-minimum实验sourceUnchanged/binaryUnchanged=true、exit0、diagram1/1，结果/轨迹见Writer-Round-Minimum.json与Writer-Round-Minimum-Requests.json。完整临时记录/tmp/writer-round-minimum-qwen3.8-max。
+minimum实验sourceUnchanged/binaryUnchanged=true、exit0、diagram1/1，结果/轨迹见writer-round-minimum.json与writer-round-minimum-requests.json。完整临时记录/tmp/writer-round-minimum-qwen3.8-max。
 
 ## 完整验证与交付
 回合/窗口修正后的完整check exit0（/tmp/writer-round-window-check-final.log），iOS四目标构建exit0（/tmp/writer-round-window-ios-latest.log）。随后按用户确认新增Writer低思考默认与可选开关，最新iOS四目标构建exit0（/tmp/writer-thinking-ios.log），配置持久/重开/回滚、草稿保存、模型选择隔离定向测试通过（/tmp/writer-thinking-tests-final.log）。用户确认后的最新完整check exit0（/tmp/writer-thinking-check.log），包括1013项主体与225项原生运行时测试，架构边界、格式和plist校验通过。真机调查使用此前版本，本轮代码尚未安装，未声称新版本原生语音/窗口体验通过。

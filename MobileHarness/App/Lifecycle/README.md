@@ -28,7 +28,7 @@ Scene失活在running时只同步invalidate未声明continuesInBackground的服�
 
 服务工作者由模块根句柄持有，不随页面 task 取消；AppLifecycle 的等待不会伪造不合作依赖已经结束。OS 下载回调与业务图分离，模型制品服务拥有真实传输及完成处理；设备安全不能使用后台额度作为保证。
 
-[App](../README.md) · [装配](../Composition/README.md) · [测试](../../../Tests/AppWorkflowTests/README.md)
+[App](../README.md) · [装配](../Composition/README.md) · [测试](../../../Tests/App/README.md)
 
 ## ForegroundPreparation
 

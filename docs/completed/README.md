@@ -1,5 +1,7 @@
 # 已完成需求归档
 
+- [Xcode 工程配置清理](Xcode-Project-Cleanup.md)（2026-11-18）：无效引用、本地签名与资源导航整理；完整检查限制见验证记录。
+
 - [ReACT 回复字幕](ReACT-Reply-Captions.md)（2026-11-16）：Action/native Tool 观察续轮继承呈现身份，正文进入字幕；独立真机验收及完整检查限制见验证记录。
 
 - [MobileHarness 技术文档核对](Readme-Ownership-Audit.md)（2026-11-14）。总设计、九个一级模块和子目录的职责、数据流与实现说明同步。
@@ -158,3 +160,41 @@
 - [D3 Edge Core AI conversion](D3-Edge-CoreAI-Conversion.md)：文本模型转换、对照验证与 Hugging Face 发布完成；业务误判、数值漂移和平台边界见专项验证。
 
 - [DeepFilterNet3 capability](DeepFilterNet3-Capability-Plan.md): standalone ModelKit denoising interface and provider; validation limitations recorded separately.
+
+- [Tests 职责聚类整理](Tests-Organization.md)：目录与编译成员迁移完成，检查失败及未完成阶段独立留证。
+
+- [实验与评估独立目录](Experiments-Organization.md)：按评估目的划分，App 模型链路测试保留 Tests；执行验证独立记录。
+
+- [任务评估集与共享制品](Evaluation-Datasets.md)：任务内 Datasets、Python 输入输出路径与根 Models 共享制品。
+
+- [Research 与工程贡献边界](Research-Engineering-Boundaries.md)：根目录职责与贡献规则。
+
+- [Research / Engineering 职责修正](Research-Engineering-Responsibilities.md)：工程运行器回归与少量真实模型链路、研究数据和模板归属；全量失败独立留证。
+
+- [Tests Swift源码归属](Swift-Test-Sources.md)：Python工具检查归scripts，保留离线回归覆盖。
+
+- [仓库脚本整理](Scripts-Organization.md)：按职责归档、合并下载入口与共用音频夹具，保留逐文件工具清单。
+
+- [模块归属与工程回归修复](Module-Test-Repairs.md)：跨模块测试归位、失效测试修复及生产 App 装配验收。
+
+- [实验数据职责整理](Experiment-Data-Ownership.md)：任务原始数据与文档报告分离。
+
+- [experiments 命名统一](Experiment-Naming.md)：文件命名规则与引用整理。
+
+- [纯 Python 实验](Python-Experiments.md)：按任务组织模型case、提示词、评分与原始数据，移除Swift实验入口；工程检查与真实模型验证范围见专项记录。
+
+- [Tests 与 experiments 独立边界](Independent-Research-Tests.md)：仅共享下载制品，移除代码、数据和验证入口之间的依赖。
+
+- [Agent 验证目录关系](Agent-Validation-Workflow.md)：批处理编排、独立验证与共享制品规则。
+
+- [Root README refresh](Root-Readme-Refresh.md): reorganized validation directories, current build entry points and repaired navigation.
+
+- [Validation ownership clarification](Validation-Ownership-Clarification.md): language, model-backend and App/research/document boundaries.
+
+- [Measurements directory cleanup](Measurements-Directory-Cleanup.md): consolidated historical notes and report attachments into existing documentation categories.
+
+- [Lowercase experiments root](Lowercase-Experiments.md): research root naming and active references synchronized.
+
+- [Python experiment layout](Python-Experiment-Layout.md): lowercase directories and recursive Python test discovery.
+
+- [Experiment utilities](Experiment-Utilities.md): research-only shared runtime and decoder package.

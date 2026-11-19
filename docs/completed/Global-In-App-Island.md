@@ -11,7 +11,7 @@
 - `UI/UIContainer.swift`：首页导航可见性只控制首页窗口；不改变灵动岛状态、代际、完成回执或展开偏好。
 - `UI/Components/Island/IslandState.swift`：删除导航专用可见性开关、暂存偏好及相关分支。原生本地显示仍受根 available、sceneActive 和实际内容控制。活动替换/结束、后台恢复、根失活的原有围栏保留。
 - `UI/Components/Island/IslandHost.swift`：删除导航可见性判断，继续使用已存在的非 key、alert 层透明覆盖窗口。命中限于实际岛身，外侧触摸透传；不改变顶部位置、手势、排序或业务执行。
-- `Tests/UITests/NavigationContextTests.swift`：替换原“导航隐藏”断言，覆盖多层导航保持挂载/状态栏、任意页面切换展开偏好、录音/播放状态及频带更新、前后台恢复、活动结束与根失活不复活旧内容。
+- `Tests/UI/Navigation/NavigationContextTests.swift`：替换原“导航隐藏”断言，覆盖多层导航保持挂载/状态栏、任意页面切换展开偏好、录音/播放状态及频带更新、前后台恢复、活动结束与根失活不复活旧内容。
 - 更新 `UI/README.md`、`UI/Root/README.md`、Island README、`MobileHarness/README.md` 中旧层级和导航暂停描述；更新测试 README。跨模块生产者、Gateway、声音采集/播放接口不变。
 
 ## 验证

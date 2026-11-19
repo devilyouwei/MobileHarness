@@ -42,6 +42,6 @@ Qwen3.8 Max 使用真实 Assistant/Gateway 与合成设备/网页执行反馈。
 
 revision 49 复验四场景通过 3/4：相机冷启动修正为单独加载后执行；网页冷启动、普通知识问答通过；“点一次头”仍返回 express(smile)，没有加载 robot-interaction。这是尚未解决的模型泛化失败，不能据此宣称所有能力发现已可靠。两轮选取不同场景，不将总通过率直接作为提升幅度。
 
-第二轮在共享构建锁持续占用时，先逐字节核对已编译 Agents bundle 的 BasicSkill 与 WebBrowsing 资源等于最新源码，再通过已有评估脚本的 skip-build 路径直接使用已知测试二进制位置，省去会等锁的路径查询；未改生产代码或共享 bundle。两轮 sourceUnchanged 均为 true。模型响应、调用、原始报告路径与 hash 摘录见[测量记录](../measurements/skill-discovery-2026-11-08.json)。
+第二轮在共享构建锁持续占用时，先逐字节核对已编译 Agents bundle 的 BasicSkill 与 WebBrowsing 资源等于最新源码，再通过已有评估脚本的 skip-build 路径直接使用已知测试二进制位置，省去会等锁的路径查询；未改生产代码或共享 bundle。两轮 sourceUnchanged 均为 true。模型响应、调用、原始报告路径与 hash 摘录见[测量记录](../../experiments/assistant/results/skill-discovery-2026-11-08.json)。
 
 revision 49 的四目标资源重打包、原生阶段、真实设备/网站验收及剩余模型泛化失败均未作为通过项。本需求保留未归档，不把通用教学改动等同于对模型行为的确定性保证。

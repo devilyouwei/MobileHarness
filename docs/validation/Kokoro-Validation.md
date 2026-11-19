@@ -31,7 +31,7 @@ Kokoro 曾有 CoreAI 英语与 FluidAudio Core ML 中英两个验收阶段，随
 ## 历史复现（入口已移除）
 
 1. 历史下载入口 `scripts/download-kokoro.py` 已移除；下列步骤记录当时流程，不能按当前仓库直接复现。现有可选测试需显式提供外部资源路径。
-2. Mac 使用匹配 Xcode 27：`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./scripts/test-kokoro.sh`。
+2. Mac 使用匹配 Xcode 27：`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./scripts/models/test-kokoro.sh`。
 3. Xcode 选择 **KokoroValidation** scheme、iOS 27 真机，默认 Release。沿用项目本地签名设置。
 4. 点击“合成并试听”；显示加载、首段 PCM、总合成时间、音频时长、实时率与系统热状态。再次点击可测已加载状态。
 5. 点击“停止并卸载”会取消推理/播放并等待模型释放。暂存音频仅在临时目录，停止时清理。
@@ -48,7 +48,7 @@ Kokoro 曾有 CoreAI 英语与 FluidAudio Core ML 中英两个验收阶段，随
 - ✅ Xcode 27.0 (27A266a) / Swift 6.4；通过 DEVELOPER_DIR 选择完整 Xcode，未修改系统工具选择。
 - ✅ `scripts/check.sh` 通过：模块边界、资源脚本测试、格式检查、Swift tests 和工程元数据。默认合成与命名 Kokoro 身份一致；缺失资源明确失败；Speech Action 请求 en-US。
 - ✅ `scripts/build-ios.sh` 四个模拟器 scheme 全部通过。模拟器构建不代表 CoreAI 真机推理验收。
-- ✅ `scripts/test-kokoro.sh` Release 五项测试通过，包含真实三图推理、非静音有限 PCM、序列/时间戳、finished、并发拒绝、取消与卸载。
+- ✅ `scripts/models/test-kokoro.sh` Release 五项测试通过，包含真实三图推理、非静音有限 PCM、序列/时间戳、finished、并发拒绝、取消与卸载。
 - ✅ 当前 Mac 缓存加载 0.160 秒；固定英语句子生成 3.375 秒音频，两次首段 1.339 / 1.072 秒，总耗时 1.339 / 1.072 秒。音频 24 kHz mono，路径仍为 `/tmp/mobileharness-kokoro-0.wav` 和 `/tmp/mobileharness-kokoro-1.wav`。
 - ❌ 本轮未执行 iPhone 安装/试听、持续热状态测量或完整真实 ASR→LLM→TTS 对话测试；英语提示不保证每次模型输出都符合输入范围。
 
@@ -60,7 +60,7 @@ Kokoro 曾有 CoreAI 英语与 FluidAudio Core ML 中英两个验收阶段，随
 
 ✅ `scripts/check.sh`、`scripts/build-ios.sh` 四个模拟器 scheme、MobileHarness 真机目标 Debug 无签名构建均通过。已确认 App 内存在 KokoroCoreML/ANE-zh 的实际图文件。真机编译/打包成功不代表已安装或试听。
 
-✅ `scripts/test-kokoro.sh` Release 五项测试通过：中英脚本路由/混读顺序、长度限制与拒绝、英文词典和标点、真实合成的有限非静音 PCM/序列/时间戳/唯一 finished、并发拒绝、取消与卸载状态。
+✅ `scripts/models/test-kokoro.sh` Release 五项测试通过：中英脚本路由/混读顺序、长度限制与拒绝、英文词典和标点、真实合成的有限非静音 PCM/序列/时间戳/唯一 finished、并发拒绝、取消与卸载状态。
 
 当前 Mac 缓存加载 0.811 秒；各样例均为 24 kHz 单声道 PCM：
 

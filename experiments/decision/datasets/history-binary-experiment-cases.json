@@ -1,0 +1,362 @@
+[
+  [
+    "explicit_stop",
+    true,
+    0,
+    [
+      "介绍北京",
+      "北京有很多景点。",
+      "停一下。"
+    ],
+    [
+      "Describe Beijing",
+      "Beijing has many sights.",
+      "Stop."
+    ]
+  ],
+  [
+    "pause",
+    true,
+    0,
+    [
+      "解释步骤",
+      "第一步，打开页面。",
+      "暂停，我先记下来。"
+    ],
+    [
+      "Explain the steps",
+      "First, open the page.",
+      "Pause while I take notes."
+    ]
+  ],
+  [
+    "task_switch",
+    true,
+    0,
+    [
+      "介绍北京",
+      "先介绍历史。",
+      "别讲北京了，改讲上海。"
+    ],
+    [
+      "Describe Beijing",
+      "First, its history.",
+      "Stop describing Beijing. Switch to Shanghai."
+    ]
+  ],
+  [
+    "correction",
+    true,
+    0,
+    [
+      "说说上海",
+      "北京的交通主要有",
+      "不对，我问的是上海，先停。"
+    ],
+    [
+      "Tell me about Shanghai",
+      "Beijing's transport includes",
+      "No, I asked about Shanghai. Stop."
+    ]
+  ],
+  [
+    "short_counterfactual",
+    true,
+    0,
+    [
+      "多举些例子",
+      "再举一个例子，还有",
+      "够了。"
+    ],
+    [
+      "Give more examples",
+      "Another example is, and also",
+      "Enough."
+    ]
+  ],
+  [
+    "short_counterfactual",
+    true,
+    0,
+    [
+      "继续介绍方案",
+      "接着介绍第三个方案",
+      "不用继续了。"
+    ],
+    [
+      "Continue describing the plan",
+      "Next, the third part of the plan",
+      "No need to continue."
+    ]
+  ],
+  [
+    "polite_stop",
+    true,
+    0,
+    [
+      "读这段说明",
+      "本产品适用于",
+      "可以先停一下吗？"
+    ],
+    [
+      "Read these instructions",
+      "This product is suitable for",
+      "Could you stop for a moment?"
+    ]
+  ],
+  [
+    "self_correction",
+    true,
+    0,
+    [
+      "继续讲",
+      "下一点是",
+      "继续，不，还是现在停。"
+    ],
+    [
+      "Keep explaining",
+      "The next point is",
+      "Continue, no, stop now instead."
+    ]
+  ],
+  [
+    "history_code_1",
+    true,
+    1,
+    [
+      "介绍景点",
+      "第一个景点是",
+      "青松。"
+    ],
+    [
+      "Describe the sights",
+      "The first sight is",
+      "Pine."
+    ]
+  ],
+  [
+    "history_code_2",
+    true,
+    2,
+    [
+      "介绍景点",
+      "第一个景点是",
+      "蓝鲸。"
+    ],
+    [
+      "Describe the sights",
+      "The first sight is",
+      "Whale."
+    ]
+  ],
+  [
+    "history_code_4",
+    true,
+    4,
+    [
+      "介绍景点",
+      "第一个景点是",
+      "银杏。"
+    ],
+    [
+      "Describe the sights",
+      "The first sight is",
+      "Ginkgo."
+    ]
+  ],
+  [
+    "history_override",
+    true,
+    1,
+    [
+      "介绍景点",
+      "第一个景点是",
+      "白鹭。"
+    ],
+    [
+      "Describe the sights",
+      "The first sight is",
+      "Egret."
+    ]
+  ],
+  [
+    "answer",
+    false,
+    0,
+    [
+      "问我喜欢的颜色",
+      "你喜欢什么颜色？",
+      "蓝色。"
+    ],
+    [
+      "Ask my favorite color",
+      "What color do you like?",
+      "Blue."
+    ]
+  ],
+  [
+    "addition",
+    false,
+    0,
+    [
+      "介绍景点",
+      "北京有很多景点。",
+      "最后加上交通方式。"
+    ],
+    [
+      "Describe the sights",
+      "Beijing has many sights.",
+      "Add transport options at the end."
+    ]
+  ],
+  [
+    "quotation",
+    false,
+    0,
+    [
+      "练习翻译",
+      "请给出要翻译的句子。",
+      "翻译：立即停止。"
+    ],
+    [
+      "Practice translation",
+      "Give me a sentence to translate.",
+      "Translate: Stop immediately."
+    ]
+  ],
+  [
+    "negation",
+    false,
+    0,
+    [
+      "解释步骤",
+      "第一步是",
+      "别停，继续。"
+    ],
+    [
+      "Explain the steps",
+      "The first step is",
+      "Don't stop. Continue."
+    ]
+  ],
+  [
+    "short_counterfactual",
+    false,
+    0,
+    [
+      "问我杯子里的水量",
+      "这些水够了吗？",
+      "够了。"
+    ],
+    [
+      "Ask about the water in my cup",
+      "Is that enough water?",
+      "Enough."
+    ]
+  ],
+  [
+    "short_counterfactual",
+    false,
+    0,
+    [
+      "帮我回复朋友",
+      "朋友问要不要继续练琴。你想怎么回复？",
+      "不用继续了。"
+    ],
+    [
+      "Help me reply to a friend",
+      "Your friend asks whether to keep practicing piano. What is your reply?",
+      "No need to continue."
+    ]
+  ],
+  [
+    "deferred",
+    false,
+    0,
+    [
+      "介绍三个景点",
+      "第一个景点是",
+      "讲完这三个再停。"
+    ],
+    [
+      "Describe three sights",
+      "The first sight is",
+      "Stop after you describe all three."
+    ]
+  ],
+  [
+    "self_correction",
+    false,
+    0,
+    [
+      "介绍景点",
+      "第一个景点是",
+      "停，算了，你继续。"
+    ],
+    [
+      "Describe the sights",
+      "The first sight is",
+      "Stop, never mind, keep going."
+    ]
+  ],
+  [
+    "history_code_1",
+    false,
+    1,
+    [
+      "介绍景点",
+      "第一个景点是",
+      "青松。"
+    ],
+    [
+      "Describe the sights",
+      "The first sight is",
+      "Pine."
+    ]
+  ],
+  [
+    "history_code_2",
+    false,
+    2,
+    [
+      "介绍景点",
+      "第一个景点是",
+      "蓝鲸。"
+    ],
+    [
+      "Describe the sights",
+      "The first sight is",
+      "Whale."
+    ]
+  ],
+  [
+    "history_code_4",
+    false,
+    4,
+    [
+      "介绍景点",
+      "第一个景点是",
+      "银杏。"
+    ],
+    [
+      "Describe the sights",
+      "The first sight is",
+      "Ginkgo."
+    ]
+  ],
+  [
+    "history_override",
+    false,
+    1,
+    [
+      "介绍景点",
+      "第一个景点是",
+      "白鹭。"
+    ],
+    [
+      "Describe the sights",
+      "The first sight is",
+      "Egret."
+    ]
+  ]
+]

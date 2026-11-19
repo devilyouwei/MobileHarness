@@ -8,8 +8,8 @@ WebBrowsing/WebDrawing声明ui.web，UIContainer也已提供reader，但Assistan
 
 - Agents/Assistant/AssistantStateBindings.swift：显式注册ui.web，仅选择content/url业务事实；保持Runtime不向Assistant披露，不忽略未知路径错误。
 - UI/Components/Web/WebPageContainer.swift：被动投影empty/local/remote内容类型和远程URL，本地文件路径不披露；读取不创建WebKit或触发导航，原生就绪/加载指标继续属于Runtime。
-- Tests/IntegrationTests/ContainerContextTests.swift：从打包Catalog动态枚举全部Skill；逐项loadSkills后通过真实UIContainer/PlatformContainer和AssistantStateBindings读取有效useStates，验证加载与释放，修复前应复现missing。
-- Tests/UITests/WebPageTests.swift：真实本地页面加载后验证content=local、url未知，关闭后为空；不把本地路径带入状态。
+- Tests/Agents/Core/ContainerContextTests.swift：从打包Catalog动态枚举全部Skill；逐项loadSkills后通过真实UIContainer/PlatformContainer和AssistantStateBindings读取有效useStates，验证加载与释放，修复前应复现missing。
+- Tests/UI/Window/WebPageTests.swift：真实本地页面加载后验证content=local、url未知，关闭后为空；不把本地路径带入状态。
 - 同步Assistant、UI/Web、Context与测试README。无模块依赖或跨层职责变化。
 
 ## 验证与交付

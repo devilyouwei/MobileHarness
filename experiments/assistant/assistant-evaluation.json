@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "system": "You are an assistant in a synthetic model-case experiment. Respond with XML action tags and plain spoken text. Use <wait>...</wait> for sequential groups. Use loadSkills before invoking a skill, and wait for actual tool feedback before dependent actions. Do not invent tool results. Follow user intent; do not start a task for an immediate simple action. No real device is connected.",
+  "actions": [
+    "Bluetooth.control",
+    "Bluetooth.readStatus",
+    "History.list",
+    "History.read",
+    "ModelResources.cancel",
+    "ModelResources.download",
+    "ModelResources.snapshot",
+    "Provider.readSettings",
+    "Web.browse",
+    "Web.inspect",
+    "Web.navigate",
+    "Web.snapshot",
+    "Window.maximize",
+    "closeCamera",
+    "dance",
+    "express",
+    "flipCamera",
+    "loadSkills",
+    "moveMotor",
+    "nodHead",
+    "openCamera",
+    "openPage",
+    "releaseSkills",
+    "resetArm",
+    "resetMotor",
+    "retryCamera",
+    "savePhoto",
+    "setExpression",
+    "shakeHead",
+    "speak",
+    "takePhoto",
+    "task.cancel",
+    "task.end",
+    "task.finish",
+    "task.send",
+    "task.start",
+    "tiltWrist",
+    "waveWrist"
+  ],
+  "requestLimit": 16,
+  "parameters": {
+    "openPage": [
+      "destination"
+    ],
+    "savePhoto": [
+      "mediaID"
+    ],
+    "flipCamera": [
+      "facing"
+    ],
+    "task.end": [
+      "continueDecision"
+    ],
+    "Bluetooth.control": [
+      "id",
+      "operation"
+    ],
+    "ModelResources.download": [
+      "allowsCellular",
+      "endpoint",
+      "id"
+    ],
+    "ModelResources.cancel": [
+      "id"
+    ],
+    "nodHead": [
+      "cycles"
+    ],
+    "moveMotor": [
+      "acceleration",
+      "deltaDegrees",
+      "motor",
+      "speed",
+      "target"
+    ],
+    "resetMotor": [
+      "motor"
+    ],
+    "resetArm": [],
+    "waveWrist": [
+      "count"
+    ],
+    "tiltWrist": [
+      "direction"
+    ],
+    "shakeHead": [
+      "cycles"
+    ],
+    "Web.inspect": [
+      "windowID"
+    ],
+    "Window.maximize": [
+      "windowID"
+    ],
+    "Web.browse": [
+      "url"
+    ],
+    "loadSkills": [
+      "ids"
+    ],
+    "releaseSkills": [
+      "ids"
+    ],
+    "task.start": [
+      "goal",
+      "skills"
+    ],
+    "task.finish": [
+      "summary"
+    ],
+    "express": [
+      "emotion"
+    ]
+  }
+}

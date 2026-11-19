@@ -1,0 +1,58 @@
+[
+  {
+    "id": "stop",
+    "occupied": true,
+    "context": "下面介绍三个步骤。",
+    "input": "停一下。",
+    "expected": "interrupt"
+  },
+  {
+    "id": "correction",
+    "occupied": true,
+    "context": "会议定在今天下午。",
+    "input": "不对，是明天下午。",
+    "expected": "interrupt"
+  },
+  {
+    "id": "ack",
+    "occupied": true,
+    "context": "第一步打开设置。",
+    "input": "嗯。",
+    "expected": "discard"
+  },
+  {
+    "id": "queued",
+    "occupied": true,
+    "context": "正在介绍北京的景点。",
+    "input": "讲完以后再说说上海。",
+    "expected": "enqueue"
+  },
+  {
+    "id": "answer",
+    "occupied": false,
+    "context": "是否保存文件？",
+    "input": "嗯。",
+    "expected": "enqueue"
+  },
+  {
+    "id": "idle",
+    "occupied": false,
+    "context": "你好，有什么需要？",
+    "input": "帮我拍张照片。",
+    "expected": "enqueue"
+  },
+  {
+    "id": "negatedStop",
+    "occupied": true,
+    "context": "正在介绍路线。",
+    "input": "不用停，你继续。",
+    "expected": "discard"
+  },
+  {
+    "id": "quotedStop",
+    "occupied": true,
+    "context": "正在讲解英语。",
+    "input": "讲完后解释一下 stop 这个词。",
+    "expected": "enqueue"
+  }
+]

@@ -16,7 +16,7 @@
 
 英文分别以 137、4,000、16,000 个采样点分片输入，三次均得到 `The quick brown fox jumps over the lazy dog`；中文得到 `你好, 这是一个语音识别测试`。测试同时检查 partial/final、segment 与 revision、预热、连续会话、取消、空输入、卸载和再次加载。纯单元测试覆盖 mel 分片一致性、tokenizer、独占 lease、制品损坏及路径穿越拒绝。
 
-复现真实推理：先运行 `python3 scripts/download-nemotron.py`，再使用完整 Xcode 工具链运行 `./scripts/test-nemotron.sh`。常规 CI 不自动启用真实权重测试。
+复现真实推理：先运行 `python3 scripts/models/model_download.py nemotron`，再使用完整 Xcode 工具链运行 `./scripts/models/test-nemotron.sh`。常规 CI 不自动启用真实权重测试。
 
 ## 未覆盖
 

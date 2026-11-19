@@ -4,7 +4,7 @@
 
 Mac17,5 / Apple A18 Pro, Xcode 27.2 (27B52), Metal Toolchain 27B47. The AOT target is iOS 27.0, architecture h18p, default compute placement. The Mac's own runtime architecture reports h17p; compiled h18p assets must be accepted on the target phone, not treated as Mac inference evidence.
 
-Source graphs and per-file build inventories are recorded in [the measurement](../measurements/decision-d3-ios-aot-2026-11-15.json). Edge source revision is 0690c04ee1640c1c3fa11a882323751dda6d086a; Lite is 863963d371d5af6784bf726fb85a508c08751d65. Tokenizers, prompts, graph inputs and scoring policy are unchanged. iOS manifests add compiled_models for native architecture selection.
+Source graphs and per-file build inventories are recorded in [the measurement](../../experiments/decision/results/decision-d3-ios-aot-2026-11-15.json). Edge source revision is 0690c04ee1640c1c3fa11a882323751dda6d086a; Lite is 863963d371d5af6784bf726fb85a508c08751d65. Tokenizers, prompts, graph inputs and scoring policy are unchanged. iOS manifests add compiled_models for native architecture selection.
 
 ## Compilation
 
@@ -12,9 +12,9 @@ Both commands completed with exit code 0 and produced complete decision.h18p.aim
 
 ```sh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun coreai-build compile \
-  Tests/DecisionBenchmarks/.local/models/D3Lite/decision.aimodel \
+  Models/D3Lite/decision.aimodel \
   --platform iOS --min-deployment-version 27.0 --architecture h18p \
-  --output Tests/DecisionBenchmarks/.local/models/D3Lite/decision-ios
+  --output Models/D3Lite/decision-ios
 ```
 
 Edge uses the corresponding D3Edge paths. Both processes emitted `Failed to import MPS module` before successful compilation; this message was not an exit failure. The resulting package contains MPSGraph executable resources. Compilation completion is not proof that the phone performs no additional specialization or that model numerics match the source graph.
@@ -51,13 +51,13 @@ Mac SDK inspection of SpecializationOptions.default reports expectFrequentReshap
 
 The current Lite AOT package fails physical-device acceptance. Edge success is user-reported rather than independently measured here. No App code, installed model, cache, selected model, HF package or device OS was changed during this investigation. Use Edge while isolating the failing Lite graph; source-model rollback would restore the previously observed long specialization and is not presented as a fix. Any replacement export/compute preference must pass actual device load and inference parity before publication.
 
-Sanitized evidence: [Lite AOT crash measurement](../measurements/decision-d3-lite-ios-aot-crash-2026-11-15.json). Raw reports and copied device files remain under /tmp and are not committed. This investigation did not implement a crash fix; the AirPods startup investigation is also still unresolved.
+Sanitized evidence: [Lite AOT crash measurement](../../experiments/decision/results/decision-d3-lite-ios-aot-crash-2026-11-15.json). Raw reports and copied device files remain under /tmp and are not committed. This investigation did not implement a crash fix; the AirPods startup investigation is also still unresolved.
 
 ## Edge source-package selection restored — 2026-11-17
 
 At the user's request, Edge no longer selects the h18p AOT override. All architectures use hugging-mac/d3-edge-CoreAI revision 0690c04ee1640c1c3fa11a882323751dda6d086a and decision.aimodel plus its matching manifest/tokenizer/configuration. Lite's AOT selection and generic architecture support are unchanged. This isolates the package selection change; the minimal production prompt and adoption rules are unchanged.
 
-The fixed HF API revision was fetched successfully after two incomplete HTTP responses. All 12 corresponding local Mac artifact files match remote content: LFS SHA-256 for large files and Git blob SHA-1 for ordinary files, with local SHA-256 also recorded. See [file parity evidence](../measurements/decision-edge-source-rollback-parity-2026-11-17.json). This verifies the selected source package against Mac artifacts, not iPhone inference parity. Existing AOT receipts do not match the source revision; the phone must remove and download Edge through Agent Models. Installing an App catalog alone does not replace installed weights or receipts.
+The fixed HF API revision was fetched successfully after two incomplete HTTP responses. All 12 corresponding local Mac artifact files match remote content: LFS SHA-256 for large files and Git blob SHA-1 for ordinary files, with local SHA-256 also recorded. See [file parity evidence](../../experiments/decision/results/decision-edge-source-rollback-parity-2026-11-17.json). This verifies the selected source package against Mac artifacts, not iPhone inference parity. Existing AOT receipts do not match the source revision; the phone must remove and download Edge through Agent Models. Installing an App catalog alone does not replace installed weights or receipts.
 
 Historical prompt evidence: the official-format utterance-status variant scored 113/182 (62.1%) on development and 29/48 (60.4%) on held-out synthetic cases; the latter was reproduced with all 48 predictions unchanged. The later changed discard definition scored 13/48, and the subsequent minimal template scored 1/6 on a small diagnostic set. These are Mac source-graph results; they already establish prompt-dependent errors without iOS AOT. No numerical AOT defect is established by this configuration rollback.
 
@@ -77,7 +77,7 @@ Installed dev.mobileharness.app in place on Youwei’s iPhone 17 Pro, receipt se
 
 User requested an independent publisher for physical-device comparison. Edge now pins maxffarrell/d3-edge-CoreAI revision ffa8431fe8dd5209f3ec2c8bf59afc829ec96c31. Only the decision graph and text companions are selected; estimated size is 1,013,190,012 bytes. No vision graph or external Python code is installed into the App. Model ID/directory, prompts, adoption rules, Lite and historical Mac artifacts remain unchanged.
 
-Remote manifest, decision configuration, tokenizer, tokenizer configuration and chat template hashes were verified. The existing D3 adapter supports the five inputs and supplies zero visual embeddings plus a false visual mask for text. The graph retains 512 tokens and 255 answer codes. Metadata evidence: [alternative artifact](../measurements/decision-alternative-edge-artifact-2026-11-17.json). This is contract compatibility, not a successful native load or classification test of this artifact.
+Remote manifest, decision configuration, tokenizer, tokenizer configuration and chat template hashes were verified. The existing D3 adapter supports the five inputs and supplies zero visual embeddings plus a false visual mask for text. The graph retains 512 tokens and 255 answer codes. Metadata evidence: [alternative artifact](../../experiments/decision/results/decision-alternative-edge-artifact-2026-11-17.json). This is contract compatibility, not a successful native load or classification test of this artifact.
 
 The publisher documents numerical drift and no iPhone acceptance. Its upstream revision 18d61df78684675463af9ae732872478845c5a79 differs from the hugging-mac package's bee5e872f75b9c5d1405767bf244a6948b95c0af. This comparison changes publisher/export and upstream revision; it is not a strictly identical-weight compiler isolation experiment. The original Hello request also reproduced discard on Mac three times before this source change.
 
@@ -89,6 +89,6 @@ Full check passed boundaries, eight Python tests and Swift formatting, but repor
 
 ## Own source restored after third-party test — 2026-11-17
 
-At the user's request, Edge source and requiredFiles were restored exactly from DecisionBenchmarks/models.json: hugging-mac/d3-edge-CoreAI revision0690c04ee1640c1c3fa11a882323751dda6d086a, original decision.aimodel, no AOT override. The production catalog regression passed. The signed device build, strict deep signature and Agent/Skill/Live Activity/localization validation passed; packaged catalog matches source byte-for-byte. Installed in place with receipt sequence7244. Launch was denied because the iPhone was locked. Logs `/tmp/d3-restore-own-{device,install,launch}.log`. Existing third-party model files were not altered; Agent Models removal/download is required to acquire the restored source. Prompt candidates were evaluated offline only, with no production prompt or adoption changes.
+At the user's request, Edge source and requiredFiles were restored exactly from experiments/decision/benchmark/models.json: hugging-mac/d3-edge-CoreAI revision0690c04ee1640c1c3fa11a882323751dda6d086a, original decision.aimodel, no AOT override. The production catalog regression passed. The signed device build, strict deep signature and Agent/Skill/Live Activity/localization validation passed; packaged catalog matches source byte-for-byte. Installed in place with receipt sequence7244. Launch was denied because the iPhone was locked. Logs `/tmp/d3-restore-own-{device,install,launch}.log`. Existing third-party model files were not altered; Agent Models removal/download is required to acquire the restored source. Prompt candidates were evaluated offline only, with no production prompt or adoption changes.
 
 All five build-ios schemes passed. check.sh passed boundaries, eight Python tests and formatting, then reported Integration/AppWorkflow failures including missing injected Action declarations. The check and task-owned children were stopped after confirming failures; subsequent native/plist phases were not run. Full check is not a pass. Diff formatting passed. No unrelated behavior was modified for test success.

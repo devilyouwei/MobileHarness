@@ -10,7 +10,7 @@
 - 区分 Skill 事务失败与替换 Task 的多阶段失败。替换前预校验失败不改旧目标；清理失败拒绝启动；旧目标已收尾后新目标创建失败，不自动恢复旧目标。
 - `Skill.json` 仅更新 description 和 revision；保持 schema、九项 useActions 的绑定/Channel、依赖及现有 useStates 不变。不增加重复参数 Schema、执行效果字段或业务路由。
 - 保留少量通用目标的生命周期 XML 示例。参数与协议以 canonical Action / Core 为准；仅保留必要的角色文本映射和控制轮独占约束。
-- 更新 `Resources/Skills/README.md` 与 `Tests/IntegrationTests/README.md`。测试核对打包教学、覆盖九个动作及状态来源，沿用真实状态转移/失败/Task 收尾回归；必要时补足缺口。没有生产 Swift、模块边界或跨模块流程变更，不新增目录。
+- 更新 `Resources/Skills/README.md` 与 `Tests/Agents/README.md`。测试核对打包教学、覆盖九个动作及状态来源，沿用真实状态转移/失败/Task 收尾回归；必要时补足缺口。没有生产 Swift、模块边界或跨模块流程变更，不新增目录。
 
 ## 验证
 

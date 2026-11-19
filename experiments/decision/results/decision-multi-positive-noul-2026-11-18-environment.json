@@ -1,0 +1,9 @@
+{
+  "platform": "macOS-27.2.1-arm64-arm-64bit",
+  "sources": {
+    "Tests/DecisionBenchmarks/multi_noul_experiment.py": "e3f142feec6f7894d3dfcd80038757410b40c3a75d48e40b0a6265d9636f6347",
+    "Tests/IntegrationTests/DecisionMultiNoulExperimentTests.swift": "58e050b5eda591d0f5aac96ea41a09f663313828c40b47c049c5b74e26568ef1",
+    "docs/measurements/decision-multi-positive-noul-2026-11-18-input.json": "222d4d1b4833645913b13ef39d4eed17886d9d4513c9f08052e71e67ea42f9ee"
+  },
+  "note": "Same native artifacts/placement as negative run. Raw meaningful retained; discard/score explicitly negated for comparable scoring."
+}

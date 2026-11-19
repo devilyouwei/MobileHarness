@@ -1,0 +1,282 @@
+[
+  [
+    "stop",
+    1,
+    0,
+    "停，别说了。",
+    "Stop. Stop talking."
+  ],
+  [
+    "pause",
+    1,
+    0,
+    "先暂停一下。",
+    "Pause for a moment."
+  ],
+  [
+    "replace",
+    1,
+    0,
+    "别讲旅游了，现在改讲天气。",
+    "Stop talking about travel. Talk about the weather now."
+  ],
+  [
+    "correct",
+    1,
+    0,
+    "等等，你说错了，是上海，不是北京。",
+    "Wait, that is wrong. Shanghai, not Beijing."
+  ],
+  [
+    "short_stop",
+    1,
+    0,
+    "停！",
+    "Stop!"
+  ],
+  [
+    "change_language",
+    1,
+    0,
+    "先别往下说，现在改成中文。",
+    "Do not continue. Switch to Chinese now."
+  ],
+  [
+    "cancel",
+    1,
+    0,
+    "取消你现在这个回答。",
+    "Cancel your current answer."
+  ],
+  [
+    "asr_stop",
+    1,
+    0,
+    "停停 先 不 要 说 了",
+    "stop stop dont keep talk ing"
+  ],
+  [
+    "asr_replace",
+    1,
+    0,
+    "别讲北经了 现在讲上诲",
+    "stop talking about Beijng switch to Shanghi now"
+  ],
+  [
+    "partial_stop",
+    1,
+    0,
+    "别说了，我想……",
+    "Stop talking, I want to…"
+  ],
+  [
+    "greeting",
+    0,
+    0,
+    "你好。",
+    "Hello."
+  ],
+  [
+    "request",
+    0,
+    0,
+    "帮我打开相机。",
+    "Open the camera."
+  ],
+  [
+    "question",
+    0,
+    0,
+    "上海今天冷吗？",
+    "Is Shanghai cold today?"
+  ],
+  [
+    "answer",
+    0,
+    0,
+    "上海。",
+    "Shanghai."
+  ],
+  [
+    "yes",
+    0,
+    0,
+    "对。",
+    "Yes."
+  ],
+  [
+    "thanks",
+    0,
+    0,
+    "谢谢。",
+    "Thank you."
+  ],
+  [
+    "add",
+    0,
+    0,
+    "另外再介绍一下上海。",
+    "Also tell me about Shanghai."
+  ],
+  [
+    "deferred",
+    0,
+    0,
+    "说完以后再讲上海。",
+    "Tell me about Shanghai after you finish."
+  ],
+  [
+    "negated",
+    0,
+    0,
+    "不要停，继续说。",
+    "Do not stop. Keep going."
+  ],
+  [
+    "quote",
+    0,
+    0,
+    "书里写着“停止说话”。",
+    "The book says “stop talking”."
+  ],
+  [
+    "reported",
+    0,
+    0,
+    "他刚才叫我别说话。",
+    "He just told me to stop talking."
+  ],
+  [
+    "asr_request",
+    0,
+    0,
+    "帮窝打凯 相机",
+    "op en the camra please"
+  ],
+  [
+    "asr_repetition",
+    0,
+    0,
+    "我我我想知道上海天气天气",
+    "I I I want the Shanghai weather weather"
+  ],
+  [
+    "asr_punctuation",
+    0,
+    0,
+    "上海 明天 天气 怎么样",
+    "Shanghai tomorrow weather how is it"
+  ],
+  [
+    "partial_request",
+    0,
+    0,
+    "我想问一下……",
+    "I wanted to ask…"
+  ],
+  [
+    "missing_object",
+    0,
+    0,
+    "请帮我打开……",
+    "Please open…"
+  ],
+  [
+    "partial_condition",
+    0,
+    0,
+    "如果明天下雨的话……",
+    "If it rains tomorrow…"
+  ],
+  [
+    "self_repair",
+    0,
+    0,
+    "我想去北京，不对，上海。",
+    "I want to visit Beijing, no, Shanghai."
+  ],
+  [
+    "emotion",
+    0,
+    0,
+    "这让我很难过。",
+    "That makes me sad."
+  ],
+  [
+    "laugh",
+    0,
+    0,
+    "哈哈，这很好笑。",
+    "Haha, that is funny."
+  ],
+  [
+    "nonsense",
+    0,
+    1,
+    "咕咔嘟咧噗嗞。",
+    "blorpt zizzle flumpt"
+  ],
+  [
+    "random",
+    0,
+    1,
+    "xqz 9v# ktt@ 7jk",
+    "xqz 9v# ktt@ 7jk"
+  ],
+  [
+    "repeated_noise",
+    0,
+    1,
+    "嘶嘶嘶 嗡嗡嗡 咔咔咔",
+    "shhhh bzzzz krrr krrr"
+  ],
+  [
+    "word_salad",
+    0,
+    1,
+    "桌子蓝色乘以星期帽子跳。",
+    "table blue multiply Tuesday hat jump"
+  ],
+  [
+    "fragment_garble",
+    0,
+    1,
+    "呃咕咧 嗞 再 呃噗",
+    "uh blerp zz uh plft"
+  ],
+  [
+    "empty",
+    0,
+    1,
+    "",
+    ""
+  ],
+  [
+    "punctuation",
+    0,
+    1,
+    "……？？！！",
+    "...??!!"
+  ],
+  [
+    "probe_filler",
+    null,
+    null,
+    "嗯……",
+    "Um…"
+  ],
+  [
+    "probe_wait",
+    null,
+    null,
+    "等等那个……",
+    "Wait, the…"
+  ],
+  [
+    "probe_asr",
+    null,
+    null,
+    "天气停相机那个",
+    "weather stop camera that"
+  ]
+]

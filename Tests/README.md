@@ -1,62 +1,50 @@
 # Tests
 
-✅ UI 的相机实际期限、媒体生命周期回归与原生呈现归入现有串行阶段；普通状态／请求测试继续并发。覆盖范围、断言及生产期限保持，总用例数不变，不设置全局并发宽度。锁屏下的无窗口验证只提供部分证据，完整结果见验证记录。
+## 职责与运行
 
-## 职责与边界
+case 评估、提示词/业务用例对照与推理性能实验归 [experiments](../experiments/README.md)。App 模型管理、部署、适配器和推理链路测试（含真实模型验收）仍归 Tests/ModelKit。常规测试按被验证能力的职责组织；物理目录不等同于 SwiftPM 编译 target。根目录只保留全局测试契约和导航，具体回归和辅助代码归所属目录。
 
-测试源统一位于本目录。App 与 SDK 测试由根 Package.swift 的独立 target 编译，Mac Decision 基准使用单独的包和 runner。单元/合成集成测试验证协议、状态及失败契约；真实模型、网络、原生 UI 和物理设备使用各自显式 gate，不能用替身通过代替验收。每次执行的环境、数字、失败和日志只记录到 [validation](../docs/validation/README.md)。
-
-## 当前测试分工
-
-| 目录 | 测试职责 |
+| 分类 | 内容 |
 | --- | --- |
-| [IntegrationTests](IntegrationTests/README.md) | Agents/Gateway/Actions/Storage 真实边界与注入执行/模型替身 |
-| [AppWorkflowTests](AppWorkflowTests/README.md) | 根生命周期、Feature workflows、独立输出与 UI 数据映射 |
-| [UITests](UITests/README.md) | UI-owned 状态、分页、布局值和交互；不是原生触摸自动化 |
-| [FunctionContractTests](FunctionContractTests/README.md) | 中立函数定义、参数、预算及结果 |
-| [ModelKitTests](ModelKitTests/README.md) | 基础推理 SDK 的类型、流及并发契约 |
-| [ModelKitDefaultsTests](ModelKitDefaultsTests/README.md) | 模型选择、缺失资源与默认组装 |
-| [ModelKitRuntimeTests](ModelKitRuntimeTests/README.md) | 管理器注册、准备、卸载与替换 |
-| [ModelKitHubTests](ModelKitHubTests/README.md) | 下载/制品、安全边界、可选真实网络传输 |
-| [ModelKitAppleSpeechTests](ModelKitAppleSpeechTests/README.md) | Apple 音频请求与 PCM 转换 |
-| [OpenAIChatTests](OpenAIChatTests/README.md) | 请求编码、Responses SSE、原生调用配对与取消 |
-| [DecisionBenchmarks](DecisionBenchmarks/README.md) | 可独立运行的 Mac Decision 固定制品、样例和延迟对照 |
-| [Gemma4Tests](Gemma4Tests/README.md) | 本地语言适配契约和显式启用的真实推理 |
-| [NemotronTests](NemotronTests/README.md) / [SileroTests](SileroTests/README.md) | ASR/VAD 模型适配 |
-| [EnergyVADTests](EnergyVADTests/README.md) | 纯 RMS/hysteresis、分包边界与复位 |
-| [MossNanoTests](MossNanoTests/README.md) / [KokoroTests](KokoroTests/README.md) | TTS 适配、PCM 和显式真实模型检查 |
-| [YOLOPoseTests](YOLOPoseTests/README.md) | RGB、预处理、解码、NMS、pose 和可选模型 smoke |
-| [AgentModelEvaluationTests](AgentModelEvaluationTests/README.md) | 与 SDK 测试分离的应用提示词实验 |
-| test_model_download.py | 离线下载清单、安全路径、ZIP 校验和原子替换 |
+| [ModelKit](ModelKit/README.md) | SDK 核心、管理、下载、语言、语音与视觉适配 |
+| [Agents](Agents/README.md) | 运行时、角色、上下文及提示词契约回归 |
+| [Actions](Actions/README.md) | 函数契约、执行、设备和业务能力 |
+| [Gateway](Gateway/README.md) | 输入、输出、调度及媒体传输 |
+| [PlatformKit](PlatformKit/README.md) | 平台状态、音频、图像及连接能力 |
+| [Storage](Storage/README.md) | 文件、数据库、仓库及存储生命周期 |
+| [App](App/README.md) | 应用生命周期、工作流、设置与呈现组合 |
+| [UI](UI/README.md) | UI 状态、请求、布局和显式原生验收入口 |
 
-## 运行与用例设计
+## 编译与资源边界
 
-常规入口为 ../scripts/check.sh；配置完整 Xcode 后按单个 target/函数过滤 swift test 可复现专项。真实网络、模型及设备 gate 见所属 README，不在普通检查中自动启用，不提交凭据、权重或用户媒体。
+根 [Package.swift](../Package.swift) 的 `testSources` 使用仓库相对路径，显式记录每个既有 target 的源文件；`organizedTestTarget` 排除其他 target 的源文件及非源码。新增或移动 Swift 测试时同步更新这份成员表，非源码排除项登记在 `testNonSources`，不因目录相邻而增加依赖。测试名称、target 名称和 `swift test --filter` 标识保持稳定。跨能力测试替身仍在原 target 内共享，无新增公共测试库。
 
-异步测试用明确 gate/确认信号控制顺序，检查可观察行为、失败、隔离、取消与清理；注入的执行者和数据必须明确标为合成。构建成功、协议测试通过与原生/物理验收分别报告。
+experiments 是纯 Python 数据/运行器目录，整个目录从 SwiftPM 测试 target 排除。本地模型和构建缓存不提交。
 
-## 待实现
+## 检查入口
 
-- 各模型及设备 README 列出的真实准确率、持续运行、声学/图像质量和资源压力验收。
-- 原生 UI 导航、手势、辅助功能及长历史交互验收。
+从仓库根执行 `./scripts/check.sh`：模型边界、工程工具的 Python 离线回归、Swift 格式检查、Swift 测试和项目配置检查。Python 使用所属目录显式 discovery，无须把职责目录变成 Python package。
 
-## Storage 依赖
+普通 Swift 用例与 `LiveRuntimeTests|NativePresentationTests` 分阶段执行，后者保留原有串行隔离。单个测试名称及 live gate 见各能力 README。真实网络、模型、原生 UI 和物理设备验收必须显式启用；合成端点、构建和自动化检查不能替代这些验收。
 
-✅ 存储访问使用独立的 Cache、Database 和 Files 接口；App 注册根实例，消费者通过构造器获得所需能力。存储容器不接管本目录的业务验证、执行和完成语义。
+迁移和检查证据见 [Tests 整理验证](../docs/validation/Tests-Organization.md)。历史报告中的源路径与哈希属于当时版本，不能将旧记录的哈希改写为新源码哈希。
 
-## Container 上下文边界
+本地模型制品可与实验共享仓库根 [Models](../Models/README.md)，通过既有资源参数/环境变量显式选择。
 
-✅ Container上下文回归覆盖显式编码、会话隔离、代际／容量／失败和每轮重新采集；Task从Agent私有决策快照生成，不建立Storage镜像。Assistant fixture显式注入只读容器来源；测试替身和自动化结果不等于真实模型或物理设备验收。
+## 少量真实模型链路验证
 
-[容器上下文契约](../MobileHarness/Agents/Support/Context/README.md)
+Tests 可用单个模型验证模块、通信和业务闭环；case/模型效果矩阵归 experiments。Assistant/Writer smoke 分别由 `MH_ASSISTANT_SMOKE=1`、`MH_WRITER_SMOKE=1` 启用，并显式提供 `MH_SMOKE_API_URL`、`MH_SMOKE_API_KEY`、`MH_SMOKE_MODEL`。从根目录使用 `swift test --filter assistantSingleModelRequestCompletesThroughGateway` 或 `writerSingleDelegatePublishesAndCompletes` 运行。各验证一个输入/delegate，最多8次请求；默认关闭，不自动读取凭据文件。
 
-✅ test_evaluate_qwen.py 离线验证 ENV 仅选择阿里字段、不执行 shell 内容，以及数组/对象请求证据的压缩兼容性；通过单独 unittest 命令运行，不访问网络。
+App通信、解析和原生渲染的辅助机制在既有 IntegrationTests target 内复用，不增加生产 API。Python评估器的schema、评分、统计及凭据隔离回归归 experiments，独立执行。
 
-场景选择为空或包含未知 ID 必须在网络前失败；子进程清除继承的 live gate/filter，只接纳 CLI 的显式测试范围。
+工程Python工具的离线回归与原生参考检查归仓库根 scripts；Tests 的可执行测试源码使用 Swift。scripts/check.sh 发现 scripts/checks/test_*.py。
 
+## 跨模块链路归属
 
-✅ test_compare_qwen_protocols.py 离线验证受控协议组的声明与评分、合法混合响应、错误通道/名称/参数及依赖先后；测试不访问云。生产框架混合调用能力继续由 GenerationRoundTests 的既有混合轮次/屏障用例验证。
+按发起工作流的业务所有者放置，不建通用 Integration 杂物目录：Assistant/Writer/感知闭环归 Agents；执行能力集成归 Actions；通信、Channel/wait 与资源调度归 Gateway；生产装配、根注册和宿主生命周期归 App。基础模块自身的机制测试留在基础模块。编译 target 不代表目录责任。
 
-## Qwen / GPT-4.1 提示词回归扩展
+默认确定性链路随 check.sh 运行；有真实截止时间的少量回归进入已有 LiveRuntimeTests 串行阶段。生产 iOS 装配用 `./scripts/simulator/test-composition.sh`；真实 Assistant/Writer 模型 smoke 使用上文显式 gate；WebKit/Writer 原生 UI 使用 scripts/simulator 对应入口。各层单独报告，不用跳过的测试或构建成功充当链路验收。
 
-✅ 使用生产提示词与 qwen-workflows.json 中的有界场景集，evaluate-qwen.py接受三款Qwen与gpt-4.1；每个子进程仅注入对应Provider凭据，GPT使用OpenAI端点。运行前后记录生产上下文／Skill／解析与执行源hash，不修改提示词或放宽断言。报告保留失败与实际响应；本轮使用合成设备／仓库，不能替代真机验收。
+Tests 与 experiments 完全独立：不互相导入代码，不读取对方的数据、配置、提示词或结果，也不共用项目辅助库。允许重复实现；唯一共享内容是 Models 中按来源、版本和校验和约定下载的模型制品。
+
+Swift test sources validate App unit behavior, business logic and cross-module flows. Small model requests verify integration, never model quality or case-matrix performance.

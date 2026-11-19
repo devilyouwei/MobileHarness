@@ -49,7 +49,7 @@ BasicSkill 含 Action 且常驻，按 Skill 分开 Action/Tool 仍会在多 Skil
 
 ## 验证、复现与限制
 
-- [完整请求、公开响应、判定和临时脚本源码](../measurements/skill-protocol-focused-2026-10-17.json)保留四场景、十个函数定义、完整原生名称、动态目录、逐轮模拟结果、失败及计数。附带本轮临时脚本和导入的原对照脚本源码/hash；临时主脚本运行期间未改变。没有完整 SSE wire 捕获，Provider reasoning 项未存档。未取得 GPT‑4.1 的可比较结果。
+- [完整请求、公开响应、判定和临时脚本源码](../../experiments/assistant/results/skill-protocol-focused-2026-10-17.json)保留四场景、十个函数定义、完整原生名称、动态目录、逐轮模拟结果、失败及计数。附带本轮临时脚本和导入的原对照脚本源码/hash；临时主脚本运行期间未改变。没有完整 SSE wire 捕获，Provider reasoning 项未存档。未取得 GPT‑4.1 的可比较结果。
 - 临时脚本离线验证通过12个正向 fixture trial，验证声明分组、全 Action 无 native 声明、动态 Task/Skill 目录和原始 native call_id 配对；既有协议判定离线5测试通过，覆盖错名、错协议、参数及依赖分轮。
 - 已构建测试二进制的定向复查通过3个测试声明/13个参数情况：`generationRoundActualOutputControlsContinuationForAllThreeRoutes`、`generationRoundVoidSuccessStopsAndFailuresContinueWithoutReplay`、`generationRoundToolBypassesWaitButContinuationJoinsEveryAction`。其中 Action 返回值可触发下一轮，纯完成不触发，失败保留反馈，不重放效果。这是生产框架加确定性替身，与云协议实验分开。
 - 本轮仓库只添加测量/报告并更新文档；实验脚本在 `/tmp`，源码随数据归档。不改生产协议/注册，不增加目录。未为本轮冻结全部生产源码；上述 Swift 复查使用 `--skip-build`，不作新编译结论。未重复全量 check.sh 或 build-ios.sh；此前全量失败和 Simulator 外部 CoreAI 限制不因本轮通过而消失。

@@ -22,7 +22,7 @@ WorkspaceRepositoryTests 验证不存在目标、目标持有写租约及请求�
 
 使用已授权 .env.local 中各 Provider 的 URL/key，仅 qwen3.8-max、gpt-6.1-sol，thinking=minimum，输出上限沿用 Provider 默认。仍使用原有 28 组/30 子例的 JSON 场景及断言，没有为通过而放宽 P04/B02。矩阵按请求关联读取选择后的实际 taskID，源哈希增加 WriterTasks/WriterMessages 实现。
 
-[定向七例](../measurements/writer-cohesion-2026-11-08-pilot1.json)两模型均 7/7，sourceUnchanged、binaryUnchanged 均为 true。两模型 P04 均执行 projects→select→search→read→replace→render→finish，修改原作品且样式和其余字节不变；B02 显式 finish(outcome=explanation) 完成，没有文件或窗口副作用。其余含歧义追问、已知作品续作、不可信文档及补充输入。
+[定向七例](../../experiments/writer/results/writer-cohesion-2026-11-08-pilot1.json)两模型均 7/7，sourceUnchanged、binaryUnchanged 均为 true。两模型 P04 均执行 projects→select→search→read→replace→render→finish，修改原作品且样式和其余字节不变；B02 显式 finish(outcome=explanation) 完成，没有文件或窗口副作用。其余含歧义追问、已知作品续作、不可信文档及补充输入。
 
 该定向实验后补齐入站 workspaceID 解码拒绝及对应测试，再构建进行完整矩阵；提示词和选择业务流程未改变。完整结果见下方；仓库检查单独记录。
 
@@ -32,7 +32,7 @@ WorkspaceRepositoryTests 验证不存在目标、目标持有写租约及请求�
 
 ## 完整矩阵结果
 
-[完整原始结果](../measurements/writer-cohesion-2026-11-08-full1.json)两个模型均 30/30、进程 exit 0；sourceUnchanged、binaryUnchanged 均 true。模型/场景/断言与原提示词最终实验一致，本轮每例期限为 180 秒（评估配置默认 300 秒），请求上限 24，未放宽成功断言。
+[完整原始结果](../../experiments/writer/results/writer-cohesion-2026-11-08-full1.json)两个模型均 30/30、进程 exit 0；sourceUnchanged、binaryUnchanged 均 true。模型/场景/断言与原提示词最终实验一致，本轮每例期限为 180 秒（评估配置默认 300 秒），请求上限 24，未放宽成功断言。
 
 | 模型 | 上轮提示词优化 | 本轮执行内聚 |
 | --- | ---: | ---: |
@@ -45,7 +45,7 @@ P04 两模型都在原作品内完成局部替换，没有副本；B02 两模型
 
 ## 仓库验证与归档
 
-[检查证据](../measurements/writer-cohesion-2026-11-08-checks.json)保存命令、起止时间、退出码、日志哈希与改动前后文件指纹：
+[检查证据](../../experiments/writer/results/writer-cohesion-2026-11-08-checks.json)保存命令、起止时间、退出码、日志哈希与改动前后文件指纹：
 
 - `./scripts/check.sh` exit 0；模块边界、目录文档、Python 检查、Swift 格式、各模块测试与 plist 校验通过。常规集成阶段 1,094 项，原生运行时阶段 227 项。
 - `./scripts/build-ios.sh` exit 0；MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero 四目标成功，App Skill 资源及 Live Activity 包装校验通过。

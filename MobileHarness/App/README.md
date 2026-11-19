@@ -88,3 +88,5 @@ ApplicationStateInspection supports exact reads, descriptors and explicit bounde
 Speech-detection preferences cross the Actions/Agents boundary through an injected read-only port adapted in [Composition](Composition/README.md); policy and persistence remain with their owning modules.
 
 Foreground preparation includes installed DeepFilterNet3 alongside existing models. Missing artifacts skip the optional step; installed-model load errors remain visible. App only composes preparation and preference/capability bindings; it does not process PCM.
+
+生产装配的自动验收入口为 `scripts/simulator/test-composition.sh`，使用原 App 编译源、独立 Simulator 和临时存储验证根启动、设置请求、前后台及关闭。默认产品入口保持不变；工厂注入和停止语义见 [Composition](Composition/README.md)。

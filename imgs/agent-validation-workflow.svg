@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="430" viewBox="0 0 800 430" role="img" aria-label="scripts executes independent Tests and experiments; both use Models artifacts">
+<defs>
+  <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#63758b" stroke-width="1.5"/></marker>
+</defs>
+<g fill="none" stroke="#63758b" stroke-width="2" marker-end="url(#arrow)">
+  <path d="M340 94V121H200V155"/>
+  <path d="M460 94V121H600V155"/>
+  <path d="M340 336V306H200V270"/>
+  <path d="M460 336V306H600V270"/>
+</g>
+<g font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" text-anchor="middle" fill="#20334b">
+  <rect x="280" y="24" width="240" height="70" rx="12" fill="#eee8fa" stroke="#a797c5"/>
+  <text x="400" y="68" font-size="25" font-weight="600">scripts</text>
+  <rect x="60" y="155" width="280" height="115" rx="12" fill="#e6f3ed" stroke="#8ab4a0"/>
+  <text x="200" y="190" font-size="25" font-weight="600">Tests</text>
+  <text x="200" y="220" font-size="17">for engineer</text>
+  <text x="200" y="247" font-size="18">Engineering validation</text>
+  <rect x="460" y="155" width="280" height="115" rx="12" fill="#e6effa" stroke="#90accb"/>
+  <text x="600" y="190" font-size="25" font-weight="600">experiments</text>
+  <text x="600" y="220" font-size="17">for researcher</text>
+  <text x="600" y="247" font-size="18">Model evaluation</text>
+  <rect x="280" y="336" width="240" height="70" rx="12" fill="#fff1dc" stroke="#cbb185"/>
+  <text x="400" y="367" font-size="25" font-weight="600">Models</text>
+  <text x="400" y="392" font-size="16">Shared model artifacts</text>
+</g>
+</svg>

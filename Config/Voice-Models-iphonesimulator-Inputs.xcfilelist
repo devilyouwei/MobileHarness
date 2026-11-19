@@ -1,4 +1,4 @@
-$(SRCROOT)/scripts/stage-voice-models.sh
+$(SRCROOT)/scripts/resources/stage-voice-models.sh
 $(SRCROOT)/MobileHarness/ModelKit/Support/Config/model-catalog.json
 $(SRCROOT)/docs/licenses/Nemotron-OpenMDW-1.1.txt
 $(SRCROOT)/docs/licenses/CoreAIKit-BSD-3-Clause.txt

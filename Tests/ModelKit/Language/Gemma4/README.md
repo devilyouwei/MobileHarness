@@ -1,0 +1,36 @@
+# Gemma 4 tests
+
+已实现：权重无关的窗口回归使用注入计数器验证真实生产裁剪算法，覆盖20轮→最新5条消息、system完全移除／Unicode当前输入原样保留、中文／emoji、模板开销、输出预留／显式预算、当前输入过长、取消及原请求不变；真实tokenizer／本地生成另行验收。
+
+Purpose: verify local ChatCapability contracts. Design goals: weight-free regressions plus explicit real-model opt-in.
+
+Prompt rendering preserves system/user/model turns; reasoning filtering withholds partial markers and thought text; invalid requests fail before loading.
+
+## Consecutive user message boundaries
+
+The exact prompt regression preserves every consecutive-user turn. Existing alternating-role assertions remain; no real Gemma weights or inference are required.
+
+## Native tools
+
+GemmaToolProtocolTests covers neutral declarations to native syntax, nested argument values and Unicode, generated call IDs and paired result continuation, multiple calls, split-marker buffering, malformed/undeclared/duplicate/truncated calls, required-tool violations, reserved tokens, nesting/output bounds, and complete tool-history budget preservation. These are deterministic weight-free tests, not proof of real model quality or device support.
+
+## Mac 制品
+
+`gemma4-e2b-macos.download.json` 固定 Mac 非 AOT decoder 和 QAT 表。运行 `python3 scripts/models/model_download.py gemma4-e2b --platform macos` 后，制品位于项目根目录的 `Models/Gemma4`。从仓库根执行 `HARNESS_TEST_GEMMA4=1 ./scripts/models/test-gemma4.sh` 使用该路径，也可传 `HARNESS_GEMMA4_ROOT` 指向其他制品根。iOS 资源继续使用生产 catalog。
+
+## Decision 对照
+
+
+## 文件归属
+
+- [Gemma4Tests.swift](Gemma4Tests.swift)
+- [GemmaToolProtocolTests.swift](GemmaToolProtocolTests.swift)
+- [gemma4-e2b-macos.download.json](gemma4-e2b-macos.download.json)
+
+## 契约覆盖
+
+回归验证首部、中间、末尾及超长system均不进入tokenize，保留用户消息边界、原请求及本地输入限制。
+
+回归覆盖失败历史中的空assistant／空白消息、末尾system移除、空当前输入不可回退旧user、无当前user及具体错误原因。
+
+回归覆盖iOS 1024／macOS 4096及模型更小窗口解析、1024内长system与历史裁剪、输出预算和当前输入超限拒绝。

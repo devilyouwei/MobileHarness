@@ -8,10 +8,10 @@
 
 ## 文件归属与复现
 
-- 用例：[writer-workflows.json](../../Tests/AgentModelEvaluationTests/Scenarios/writer-workflows.json)，28 组、30 个独立子例；与 Assistant 的场景 JSON 同目录。
-- 模型及预算：[writer-evaluation.json](../../Tests/AgentModelEvaluationTests/Scenarios/writer-evaluation.json)。
-- 执行：[WriterModelEvaluationTests.swift](../../Tests/IntegrationTests/WriterModelEvaluationTests.swift)，沿用 Writer 原有真实模型执行入口，独立于 Assistant XML/Skill 替身评估器。
-- 脚本：[evaluate-writer.py](../../scripts/evaluate-writer.py)；`python3 scripts/evaluate-writer.py --matrix --seconds 300 --output-prefix /tmp/writer-prompt-unique`。完整 Xcode 环境下构建后执行；子进程只接收对应 Provider 凭据，不输出凭据。
+- 用例：[writer-workflows.json](../../experiments/writer/datasets/writer-workflows.json)，28 组、30 个独立子例；与 Assistant 的场景 JSON 同目录。
+- 模型及预算：[writer-evaluation.json](../../experiments/writer/writer-evaluation.json)。
+- 执行：[WriterModelEvaluationTests.swift](../../experiments/writer/README.md)，沿用 Writer 原有真实模型执行入口，独立于 Assistant XML/Skill 替身评估器。
+- 脚本：[evaluate_writer.py](../../experiments/writer/evaluate_writer.py)；`python3 experiments/writer/evaluate_writer.py --matrix --seconds 300 --output-prefix /tmp/writer-prompt-unique`。完整 Xcode 环境下构建后执行；子进程只接收对应 Provider 凭据，不输出凭据。
 - 唯一生产行为调整：[Writer/Instructions.md](../../MobileHarness/Resources/Agents/Writer/Instructions.md)、[Writer/Prompts.json](../../MobileHarness/Resources/Agents/Writer/Prompts.json)。装配器仍按原入口加载，Assistant/BasicSkill/公共工具声明未因本轮实验修改。生产 Swift 未修改。
 - Swift 变更事前在会话告知，限测试宿主、原职责断言和离线视觉工具。未创建源码目录。
 
@@ -19,17 +19,17 @@
 
 使用真实 Provider、Writer、Gateway、ArtifactService、SQLite、ArtifactPresentation、WindowState 与 macOS WebKit。每例独立数据库和文件。窗口动画完成回执由桌面测试宿主合成，不等于手机上窗口动画/触摸的实际验收。
 
-矩阵未将 WKWebView 挂到原生 NSWindow，生产截图接口如实返回 unavailable；模型可用文本、DOM 和诊断，没有收到离线截图。`render-writer-review.swift` 单独挂载原生 WebKit，离线加载实际发布文件和关联资源供人工看图，不改变模型输入。Markdown 预览是当前产品支持的有限语法；存在 SVG 文件/引用不证明 Markdown 中的图片已展示。
+矩阵未将 WKWebView 挂到原生 NSWindow，生产截图接口如实返回 unavailable；模型可用文本、DOM 和诊断，没有收到离线截图。`RenderWriterReview.swift` 单独挂载原生 WebKit，离线加载实际发布文件和关联资源供人工看图，不改变模型输入。Markdown 预览是当前产品支持的有限语法；存在 SVG 文件/引用不证明 Markdown 中的图片已展示。
 
 证据 JSON 保存真实请求文本、工具参数/结果、生成文件、窗口事件和资源/二进制哈希，属于 Provider-neutral 轨迹，不声称完整 HTTP wire 捕获。完整 SQLite 与历史存储仍在各报告注明的本机临时输出；足以解释结论的请求和文件已持久化，不依赖临时目录继续存在。
 
 ## 校准与基线
 
-[完整原始基线](../measurements/writer-prompt-2026-11-08-baseline.json)中 Qwen 22/30、GPT 26/30，阶段内 sourceUnchanged、binaryUnchanged 均为 true。
+[完整原始基线](../../experiments/writer/results/writer-prompt-2026-11-08-baseline.json)中 Qwen 22/30、GPT 26/30，阶段内 sourceUnchanged、binaryUnchanged 均为 true。
 
 正式基线前：旧测试提交调用者 taskID 被当前 Writer 拒绝，校准最初没有真实模型请求；修正为 goal-only 请求。还修正 closing 过渡态误判及“下周启动试运行”被过严短语断言拒绝。校准失败没有被当作提示词收益。
 
-正式基线后发现测试宿主未 bindCommunications，导致问题虽到达、续答却未入库接纳，取消也受影响。保持原提示词补接后，[两模型 B05/B06 复测](../measurements/writer-prompt-2026-11-08-baseline-binding.json)均正常完成追问/取消。B05 原字符串断言仍误判千位逗号金额；`12,000.00` 与 `12000` 等值，后续数值包含检查接受千位逗号，精确替换仍逐字节检查。原始报告不改写。比较时将这两个夹具修复单列，不把其改善归因于提示词。
+正式基线后发现测试宿主未 bindCommunications，导致问题虽到达、续答却未入库接纳，取消也受影响。保持原提示词补接后，[两模型 B05/B06 复测](../../experiments/writer/results/writer-prompt-2026-11-08-baseline-binding.json)均正常完成追问/取消。B05 原字符串断言仍误判千位逗号金额；`12,000.00` 与 `12000` 等值，后续数值包含检查接受千位逗号，精确替换仍逐字节检查。原始报告不改写。比较时将这两个夹具修复单列，不把其改善归因于提示词。
 
 ## 基线问题与提示词对应调整
 
@@ -47,22 +47,22 @@
 
 两个模型的 C04 流程图均显示开始、需求、开发、评审、发布、结束；通过分支指向发布，不通过回到开发。两份 C05 柱状图均为 10/25/15 万元，合计 50 万元，柱高比例正确、标签可读。Qwen 使用较多纵向留白，但未作为未请求的美化修改理由。
 
-图像保存在 measurements 下 `writer-prompt-2026-11-08-baseline-{模型}-C04-flowchart.png` 与 `...-C05-data-chart.png`。这里只是四张离线桌面视口复核，不代表所有办公文档均经过视觉验收，也不等于模型已看图。
+当时进行了四张离线桌面视口复核；临时测试截图已清理，不代表所有办公文档均经过视觉验收，也不等于模型已看图。
 
 ## 定向优化记录
 
-首轮 [pilot1](../measurements/writer-prompt-2026-11-08-pilot1.json)针对八例，两模型各 6/8。Qwen 的纯文本、歧义选择、不可信文档编辑恢复正常；P04 仍错误新建，B02 在恢复时写了限制说明文件。第二轮将“恢复观察不能授权新建”和目标绑定核对前置，并明确省略空白商业条款。完整轨迹统计替代有界历史统计，修正长任务早期调用漏算；原报告保持原样。
+首轮 [pilot1](../../experiments/writer/results/writer-prompt-2026-11-08-pilot1.json)针对八例，两模型各 6/8。Qwen 的纯文本、歧义选择、不可信文档编辑恢复正常；P04 仍错误新建，B02 在恢复时写了限制说明文件。第二轮将“恢复观察不能授权新建”和目标绑定核对前置，并明确省略空白商业条款。完整轨迹统计替代有界历史统计，修正长任务早期调用漏算；原报告保持原样。
 
 ## 完整对照结果
 
-[最终完整结果](../measurements/writer-prompt-2026-11-08-full1.json)两模型均 28/30。sourceUnchanged、binaryUnchanged 均为 true；与基线相比，追踪范围中的生产文件只有 Writer/Instructions.md 与 Prompts.json 的哈希变化。所有原始失败报告保留。
+[最终完整结果](../../experiments/writer/results/writer-prompt-2026-11-08-full1.json)两模型均 28/30。sourceUnchanged、binaryUnchanged 均为 true；与基线相比，追踪范围中的生产文件只有 Writer/Instructions.md 与 Prompts.json 的哈希变化。所有原始失败报告保留。
 
 | 模型 | 原始基线 | 原提示词 + 夹具修正复核后的可比基线 | 优化后完整矩阵 |
 | --- | ---: | ---: | ---: |
 | qwen3.8-max | 22/30 | 24/30 | 28/30 |
 | gpt-6.1-sol | 26/30 | 28/30 | 28/30 |
 
-可比基线是“原始其余 28 例 + 原提示词 B05/B06 独立重跑”的合成复核数，不是另跑的一次 30 例矩阵；B05 金额千位格式经复核接受。不得把 22→28、26→28 的全部变化归因于提示词。Qwen 四项真实自动改善为 C03、C07、P05、B01；GPT 保持自动通过数，所有权和格式规则更清晰。第二轮定向记录见 [pilot2](../measurements/writer-prompt-2026-11-08-pilot2.json)，校准轨迹见 [calibrations](../measurements/writer-prompt-2026-11-08-calibrations.json)。
+可比基线是“原始其余 28 例 + 原提示词 B05/B06 独立重跑”的合成复核数，不是另跑的一次 30 例矩阵；B05 金额千位格式经复核接受。不得把 22→28、26→28 的全部变化归因于提示词。Qwen 四项真实自动改善为 C03、C07、P05、B01；GPT 保持自动通过数，所有权和格式规则更清晰。第二轮定向记录见 [pilot2](../../experiments/writer/results/writer-prompt-2026-11-08-pilot2.json)，校准轨迹见 [calibrations](../../experiments/writer/results/writer-prompt-2026-11-08-calibrations.json)。
 
 仍失败的 P04：GPT 查询后如实报告需要正确绑定，未编辑目标；Qwen 仍尝试读取当前新绑定并激活空工作区，最后询问重新在目标 workspace 发起，未创建替代成品，但也未完成修改。原作品保持未改状态。B02 两模型都正确说明限制且无文件/窗口副作用，宿主仍标为 writer.incomplete。两个例子均没有以放宽断言转为通过。
 
@@ -89,10 +89,6 @@
 
 完整回归的四张图也已逐张查看：两个 C04 的通过/退回分支与箭头方向正确，标签清楚；两个 C05 的 10/25/15 万元、50 万元合计、零基线柱高比例正确。未观察到标签遮挡或横向裁切。它们均为桌面 WebKit 390×844 视口离线截图。
 
-| 内容 | Qwen | GPT |
-| --- | --- | --- |
-| 流程图 | [截图](../measurements/writer-prompt-2026-11-08-full1-qwen3.8-max-C04-flowchart.png) | [截图](../measurements/writer-prompt-2026-11-08-full1-gpt-6.1-sol-C04-flowchart.png) |
-| 柱状图 | [截图](../measurements/writer-prompt-2026-11-08-full1-qwen3.8-max-C05-data-chart.png) | [截图](../measurements/writer-prompt-2026-11-08-full1-gpt-6.1-sol-C05-data-chart.png) |
 
 最终完整 B05 两模型均只包含客户和金额等相关信息，Qwen 本次未保留定向轮的空白报价方字段；这是本次观察，不代表跨采样保证。
 
@@ -135,12 +131,12 @@
 
 ## 仓库验证
 
-[验证记录](../measurements/writer-prompt-2026-11-08-checks.json)：`./scripts/check.sh` exit 0，包括 1,092 项常规集成测试、227 项原生运行时测试及其他模块检查；`./scripts/build-ios.sh` exit 0，四个 iOS Simulator scheme 构建成功，App Agent/Skill 资源与 Live Activity 包装校验通过。新增 JSON、脚本语法、离线 Swift 格式、报告链接、diff 格式检查通过。测试日志有既有非致命编译警告，未记为构建错误。
+[验证记录](../../experiments/writer/results/writer-prompt-2026-11-08-checks.json)：`./scripts/check.sh` exit 0，包括 1,092 项常规集成测试、227 项原生运行时测试及其他模块检查；`./scripts/build-ios.sh` exit 0，四个 iOS Simulator scheme 构建成功，App Agent/Skill 资源与 Live Activity 包装校验通过。新增 JSON、脚本语法、离线 Swift 格式、报告链接、diff 格式检查通过。测试日志有既有非致命编译警告，未记为构建错误。
 
 完整模型实验结束时源码/二进制未变化；收尾时再次核对，Writer 三份资源仍与实测哈希一致，但生产 Swift 出现下述并行变化。持久模型证据经过配置密钥字节检查，无命中。未提交任何凭据、用户媒体或数据库。工作树原有改动保留，本轮没有执行 Git 提交。
 
 ## 收尾时的并行代码变化
 
-最终模型报告生成于本机 16:03:26，check.sh 于 16:09:34 完成；之后 WriterHistory.swift、WriterWorkflow.swift（16:10:24）和 WriterContainer.swift（16:11:39）发生本轮之外的修改。生产 Swift 没有由本轮编辑或回退。评估时与收尾时哈希已写入 [人工复核记录](../measurements/writer-prompt-2026-11-08-review.json)。
+最终模型报告生成于本机 16:03:26，check.sh 于 16:09:34 完成；之后 WriterHistory.swift、WriterWorkflow.swift（16:10:24）和 WriterContainer.swift（16:11:39）发生本轮之外的修改。生产 Swift 没有由本轮编辑或回退。评估时与收尾时哈希已写入 [人工复核记录](../../experiments/writer/results/writer-prompt-2026-11-08-review.json)。
 
 因此 28/30 及 check.sh 通过结论只对应各自执行时版本，不能视作上述并行修改的验收。iOS 构建在这些修改期间完成，虽然四目标成功，也不能据此宣称对并行修改做过完整运行时回归。Writer/Instructions.md、Prompts.json、Agent.json 三份资源仍与最终模型实测哈希完全一致。

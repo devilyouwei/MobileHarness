@@ -10,7 +10,7 @@ Current architecture and API contracts belong to the [overall design](../../Mobi
 
 ## Automated coverage
 
-[GatewayContainerTests](../../Tests/IntegrationTests/GatewayContainerTests.swift) exercises:
+[GatewayContainerTests](../../Tests/Gateway/Output/GatewayContainerTests.swift) exercises:
 
 - Scoped identity, inert construction, once-only configuration, invalid configuration and terminal closure.
 - Cached-port admission fencing, terminal controls while suspended and isolation between role registrations.
@@ -19,7 +19,7 @@ Current architecture and API contracts belong to the [overall design](../../Mobi
 - App lifecycle readiness, inverse shutdown with retained execution bindings and rollback after Agent startup failure.
 - Bounded observation-session acquisition, diagnostic identity isolation, independent release and root-owned final cleanup.
 
-The sound-source diagnostic regression in [SoundSourceTests](../../Tests/IntegrationTests/SoundSourceTests.swift) now uses the root-owned observation path. It supplies synthetic PCM and providers that must not run ASR/VAD; this is not real model or microphone acceptance.
+The sound-source diagnostic regression in [SoundSourceTests](../../Tests/Agents/SpeechPerception/SoundSourceTests.swift) now uses the root-owned observation path. It supplies synthetic PCM and providers that must not run ASR/VAD; this is not real model or microphone acceptance.
 
 Boundary checks reject Gateway facility construction inside Agents and require the App lifecycle graph and AppStorage target dependency to include Gateway. Existing authorization, resource, Channel/wait, execution-report and role-input regressions remain part of the full check.
 

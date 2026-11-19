@@ -1,6 +1,6 @@
 # Writer 本机真实模型多流程回归
 
-日期：2026-11-04。目的：区分模型/Provider、内容协议、文件事务、渲染和 Writer 循环造成的停滞。测试工具和用例见 [IntegrationTests](../../Tests/IntegrationTests/WriterModelEvaluationTests.swift)、[runner](../../scripts/evaluate-writer.py)；计划见 [Writer plan](../requirements/Writer-Agent-Plan.md)。
+日期：2026-11-04。目的：区分模型/Provider、内容协议、文件事务、渲染和 Writer 循环造成的停滞。测试工具和用例见 [IntegrationTests](../../experiments/writer/README.md)、[runner](../../experiments/writer/evaluate_writer.py)；计划见 [Writer plan](../requirements/Writer-Agent-Plan.md)。
 
 ## 方法与证据范围
 
@@ -44,7 +44,7 @@ Writer 域增加跨 delta 原始代码前缀检查：代码格式的外层围栏
 
 ## 最终完整矩阵（源码与二进制未变）
 
-`/tmp/writer-real-20261104-e.summary.json`：sourceUnchanged=true、binaryUnchanged=true；两进程exitCode=0、complete=true，各6/6通过。已保存到文档目录的[机器结果](Writer-Model-Regression.json)包含源码/二进制哈希、逐例结果、SQLite绑定和证据文件哈希；[逐请求轨迹](Writer-Model-Regression-Requests.json)包含阶段、首事件/完成时间、字节、native参数与实际用量。凭据不进入这些文件。
+`/tmp/writer-real-20261104-e.summary.json`：sourceUnchanged=true、binaryUnchanged=true；两进程exitCode=0、complete=true，各6/6通过。已保存到文档目录的[机器结果](../../experiments/writer/results/writer-model-regression.json)包含源码/二进制哈希、逐例结果、SQLite绑定和证据文件哈希；[逐请求轨迹](../../experiments/writer/results/writer-model-regression-requests.json)包含阶段、首事件/完成时间、字节、native参数与实际用量。凭据不进入这些文件。
 
 | 流程 | Qwen3.8-max：秒／请求数 | DeepSeek-v4.1-flash：秒／请求数 | 结果 |
 | --- | ---: | ---: | --- |
@@ -63,7 +63,7 @@ Qwen首事件等待中位约3.97s、最长47.23s；DeepSeek约1.61s、最长20.5
 复现：
 
 ```sh
-python3 scripts/evaluate-writer.py --output-prefix /tmp/writer-regression-new
+python3 experiments/writer/evaluate_writer.py --output-prefix /tmp/writer-regression-new
 ```
 
 本次使用已构建的IntegrationTests，通过`--skip-build --test-binary /Users/devil/Pro/MobileHarness/.build/out/Products/Debug/IntegrationTests.xctest/Contents/MacOS/IntegrationTests`运行同一入口；完整命令无密钥参数。

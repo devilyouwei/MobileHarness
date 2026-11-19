@@ -12,4 +12,4 @@ App/ModelKitRuntime/ModelKitNemotron/ModelKitSilero 模拟器构建通过；Mobi
 
 尚未在 iPhone 上运行。没有自然语音 WER、VAD F1、噪声误报/漏报、20 轮连续麦克风对话、峰值内存、延迟、耗电或热状态的验收结论。完整 App 仍需要 Nemotron 支持的 iOS 27/h18p，Silero 自身的基线更低。
 
-复现：先运行 scripts/download-silero.py（组合测试还需 download-nemotron.py），再使用完整 Xcode 工具链执行 `HARNESS_TEST_NEMOTRON=1 ./scripts/test-silero.sh`。不设置 Nemotron 环境开关时只测试 Silero。
+复现：先运行 scripts/models/model_download.py silero（组合测试还需 `python3 scripts/models/model_download.py nemotron`），再使用完整 Xcode 工具链执行 `HARNESS_TEST_NEMOTRON=1 ./scripts/models/test-silero.sh`。不设置 Nemotron 环境开关时只测试 Silero。

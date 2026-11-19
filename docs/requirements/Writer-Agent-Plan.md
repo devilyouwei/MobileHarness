@@ -289,7 +289,7 @@ ModelKit/OpenAI 移除累计响应及 SSE 行/帧的生成大小截断，保留�
 
 ### 本机 Writer 双模型多流程回归（2026-11-04）
 
-新增显式启用的真实模型评估，复用 Assistant 多 case 回归的凭据隔离与逐 case 落盘方式。scripts/evaluate-writer.py 仅读取 .env.local 的阿里 Provider 配置，向独立测试进程传递凭据，分别运行 qwen3.8-max、deepseek4.1-flash；不输出密钥、不设置模型输出上限、不修改生产模型选择。Tests/IntegrationTests/WriterModelEvaluationTests.swift 运行生产 WriterAgent、Gateway direct、ArtifactService、StorageFiles 和 SQLite，使用本机 WebKit 执行 HTML/JS、校验本地资源和脚本错误；不将无截图的验证描述为视觉验收。
+新增显式启用的真实模型评估，复用 Assistant 多 case 回归的凭据隔离与逐 case 落盘方式。experiments/writer/evaluate_writer.py 仅读取 .env.local 的阿里 Provider 配置，向独立测试进程传递凭据，分别运行 qwen3.8-max、deepseek4.1-flash；不输出密钥、不设置模型输出上限、不修改生产模型选择。experiments/writer/WriterModelEvaluationTests.swift 运行生产 WriterAgent、Gateway direct、ArtifactService、StorageFiles 和 SQLite，使用本机 WebKit 执行 HTML/JS、校验本地资源和脚本错误；不将无截图的验证描述为视觉验收。
 
 场景覆盖简单流程图、多文件 HTML/CSS/JS、续作局部编辑、目录查询/移动/删除、Markdown，以及连续新建与旧任务续作。评估记录每次请求的阶段、开始/首输出/结束耗时、文本字节、工具调用、usage、错误分类，保存完整 SQLite 证据和作品；每 case 完成立即保存结果。付费实验单独设置请求次数和等待期限，超限明确标记评估中断并取消/加入 Writer，不作为生产预算，也不冒充模型或正常任务失败。报告区分 Provider 错误、原生工具协议、文件事务、渲染、创作循环及测试期限。按轨迹发现实现缺陷时先补充本计划再修复和复测。
 

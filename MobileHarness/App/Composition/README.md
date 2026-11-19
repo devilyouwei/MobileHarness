@@ -128,3 +128,5 @@ Foreground model preparation adds an optional enhancement step: prepare/read art
 语音宿主桥透传 playbackChanged(audioID, active, time) 的单调原生播放时刻，不在组合根推断播放开始或执行 ASR 冷却。
 
 ModelContainer 自行构造模型文件与下载能力；ApplicationContainer 不计算模型路径、不注入 Storage 文件接口。模型生命周期只依赖 diagnostics。App 启动 Storage 前将旧 Models/download-source.json 一次移动到 Settings/download-source.json，已有新位置优先，迁移失败阻止启动并报告；该兼容逻辑仅处理业务偏好，不读取或搬迁模型制品。
+
+ServiceFactories.make 接收可选存储根，默认仍为 App Application Support。AppComposition 接收构造服务的闭包与语言偏好对象，首次启动及替换复用同一工厂，ModuleRegistration 图保持唯一；stop 加入正在进行的替换后关闭当前根。隔离 Simulator 验收使用这些接口覆盖实际生产装配，测试不提供另一份生命周期图。

@@ -42,4 +42,4 @@ Resources: 64 definitions, 128 permitted owners per definition, 8 resources/requ
 
 ❌ No durable outbox, crash recovery or global exactly-once delivery. No generic activity registry/event outbox, automatic model recovery, priority/fairness queue, per-Action execution deadlines or hardware watchdog. Audio and robot resources remain unmigrated. Lease expiry relies on the process running and is not physical robot safety. Domain Action namespace/file/signature cleanup and true animation/physical completion acceptance remain pending.
 
-Validation: [ActionLifecycleTests](../../Tests/IntegrationTests/ActionLifecycleTests.swift) exercises controlled acknowledgment, retry, takeover, expiry, owner closure and fault recovery. Full repository and simulator build outcomes are recorded in Roadmap; physical-device acceptance is separate.
+Validation: [ActionLifecycleTests](../../Tests/Actions/Execution/ActionLifecycleTests.swift) exercises controlled acknowledgment, retry, takeover, expiry, owner closure and fault recovery. Full repository and simulator build outcomes are recorded in Roadmap; physical-device acceptance is separate.

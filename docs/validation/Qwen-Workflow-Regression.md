@@ -6,7 +6,7 @@
 
 Run date: 2026-10-17. Branch: `codex/storage-lifecycle-boundary`, following checkpoint `4edff0f3`, with the uncommitted prompt optimization. This is an opt-in paid cloud-model experiment, not physical-device acceptance.
 
-The same versioned [scenario set](../../Tests/AgentModelEvaluationTests/Scenarios/qwen-workflows.json) exercises each model through the production Assistant, Skill loader, private Task/Skill context, fresh public State snapshots, Responses streaming decoder, Action parser and Gateway. Camera, robot, Bluetooth, navigation and repository responses are synthetic and cause no native effects. Fake execution validates scenario identities/prerequisites; it does not replace exhaustive native/domain argument validation. The camera fixture omits absent optional media fields; iOS encodes these as null. Thus the simulated requests are not a claim of exact iPhone request-byte parity. No app SQLite or user conversation is sent.
+The same versioned [scenario set](../../experiments/assistant/datasets/qwen-workflows.json) exercises each model through the production Assistant, Skill loader, private Task/Skill context, fresh public State snapshots, Responses streaming decoder, Action parser and Gateway. Camera, robot, Bluetooth, navigation and repository responses are synthetic and cause no native effects. Fake execution validates scenario identities/prerequisites; it does not replace exhaustive native/domain argument validation. The camera fixture omits absent optional media fields; iOS encodes these as null. Thus the simulated requests are not a claim of exact iPhone request-byte parity. No app SQLite or user conversation is sent.
 
 Only the ignored local ENV's Aliyun endpoint/key are used. Model inventory confirms `qwen3.8-flash`, `qwen3.8-max` and `qwen3.7-plus`; it does not list `qwen3.8-plus`. The plus comparison uses `qwen3.7-plus`, explicitly distinguished from the 3.8 models. The configured Aliyun workspace Responses endpoint is used for all three. This selection also agrees with [Aliyun's Responses model list](https://www.alibabacloud.com/help/zh/model-studio/qwen-api-via-openai-responses). No OpenAI API request is made.
 
@@ -21,7 +21,7 @@ Coverage includes ordinary chat; cold/recent Skill loading and release; five-dec
 Use a fresh output prefix to preserve earlier runs:
 
 ```sh
-python3 scripts/evaluate-qwen.py \
+python3 experiments/assistant/evaluate_qwen.py \
   --models qwen3.8-flash qwen3.7-plus qwen3.8-max \
   --output-prefix /tmp/qwen-workflow-fresh
 ```
@@ -42,7 +42,7 @@ These are strict, single-sample scenario results, not a statistically establishe
 
 ### Shared findings and attribution
 
-1. **Native Tool naming/protocol has a concrete failure path.** A separate replay of the synthetic Provider query declared `Provider_readSettings_1`, but flash returned `Provider_readSettings` and undeclared `loadSkills` as native calls. Production ChatEventDecoder rejects the first name at response.output_item.added and surfaces invalidResponse. Three minimal control requests, with no business prose aliases, returned the exact declared `Provider_readSettings_1` on flash/plus/max. This supports investigating the mismatch between readable dotted aliases in Skill instructions and indexed wire names, plus Action-versus-Tool teaching. It does not establish that every invalidResponse in the full run has the same cause. The replay is an additional equivalent request, not the original failed stream. [Raw diagnostic metadata](../measurements/qwen-native-names-2026-10-17.json) preserves declared/returned names and controls. The new offline decoder fixture verifies rejection, not a compatibility fix.
+1. **Native Tool naming/protocol has a concrete failure path.** A separate replay of the synthetic Provider query declared `Provider_readSettings_1`, but flash returned `Provider_readSettings` and undeclared `loadSkills` as native calls. Production ChatEventDecoder rejects the first name at response.output_item.added and surfaces invalidResponse. Three minimal control requests, with no business prose aliases, returned the exact declared `Provider_readSettings_1` on flash/plus/max. This supports investigating the mismatch between readable dotted aliases in Skill instructions and indexed wire names, plus Action-versus-Tool teaching. It does not establish that every invalidResponse in the full run has the same cause. The replay is an additional equivalent request, not the original failed stream. [Raw diagnostic metadata](../../experiments/assistant/results/qwen-native-names-2026-10-17.json) preserves declared/returned names and controls. The new offline decoder fixture verifies rejection, not a compatibility fix.
 2. **Task terminal rules need clearer teaching.** All three ignored the preview after the user requested ignore, then asked whether to reshoot/end instead of finishTask. All three also violated control-only/separate-transition rules in explicit goal replacement, e.g. finishTask plus loadSkills together, or text plus startTask/loadSkills. Photography's current concise rule delegates termination to BasicSkill without an explicit ignore-success terminal example. This is a shared prompt-contract gap candidate; merely replacing flash with max does not resolve the observed failures.
 3. **Current facts do not reliably prevent avoidable calls.** All three attempted capture while camera.busy=true. The revised executor rejects with CameraControlError.busy; max additionally emitted retryCamera without an explicit user retry. Plus attempted dance while robot.controlAvailable=false. Production owners still enforce their own safety/admission checks; no physical effect was tested or caused.
 4. **Some results are claimed without the required effect.** Flash gave saved confirmation without savePhoto in two preview/save contexts, and sometimes finished the Task. Plus did likewise in the existing-Task continuation context and replayed savePhoto after a simulated failure. These are failures under the supplied synthetic State/results, not proof of the same behavior on the phone. Current test State's optional-null encoding difference and synthetic error/receipt shapes remain limitations.
@@ -52,13 +52,13 @@ Bluetooth scan/connect are deliberately XML Actions; Bluetooth.readStatus is a n
 
 ### Calibration and earlier evidence
 
-[First complete run](../measurements/qwen-workflow-2026-10-17-run1.json): flash34/52, plus40/52, max42/52,462 recorded requests. This run is preserved, not overwritten. It had two overstrict conditions: a history query while retaining an existing Task was treated as goal replacement; a connection query was forced to use a Tool even though current State could answer it. The revision allows the query aside, adds an explicit unresolved-replacement confirmation scenario, asks Bluetooth power/discovery facts absent from State, and makes the continuing scan/connect Task intent explicit. It also uses typed camera errors and rejects busy capture rather than fabricating fixture success. Differences between runs are not prompt improvements or statistically meaningful model improvements.
+[First complete run](../../experiments/assistant/results/qwen-workflow-2026-10-17-run1.json): flash34/52, plus40/52, max42/52,462 recorded requests. This run is preserved, not overwritten. It had two overstrict conditions: a history query while retaining an existing Task was treated as goal replacement; a connection query was forced to use a Tool even though current State could answer it. The revision allows the query aside, adds an explicit unresolved-replacement confirmation scenario, asks Bluetooth power/discovery facts absent from State, and makes the continuing scan/connect Task intent explicit. It also uses typed camera errors and rejects busy capture rather than fabricating fixture success. Differences between runs are not prompt improvements or statistically meaningful model improvements.
 
 An earlier six-case/two-model smoke run exposed two harness bugs (normal teardown cancellation counted as failure, and request evidence assumed an object instead of the actual array). Both were corrected before the complete runs. Smoke outcomes are not full-suite pass claims. Four additional native-name diagnostics are separate from the468 requests in the revised run. No transparent provider retry or model substitution occurred.
 
 ### Per-scenario revised results
 
-Order follows the versioned scenario specification. ✅ means every selected call/Task/Skill assertion passed in this sample. ❌ details and exact actual responses are in the [revised raw results](../measurements/qwen-workflow-2026-10-17-run2.json).
+Order follows the versioned scenario specification. ✅ means every selected call/Task/Skill assertion passed in this sample. ❌ details and exact actual responses are in the [revised raw results](../../experiments/assistant/results/qwen-workflow-2026-10-17-run2.json).
 
 | Scenario | flash | plus | max |
 | --- | --- | --- | --- |
@@ -137,7 +137,7 @@ Host-local logs: /tmp/qwen-eval-compile.log, /tmp/qwen-eval-offline-final.log, /
 
 ### 范围与方法
 
-用户要求复测几款Qwen并加入GPT-4.1，专门验证当前提示词。沿用现有evaluate-qwen.py及59个固定场景／85个用户输入，包含6个连续表情专项；本轮没有修改生产提示词、场景内容、评分断言或执行权限。生产实现是Container内存快照、独立AGENT CONTEXT及Skill v3，已加载函数使用现行Action-only教学；不能把与早期53场景／混合native协议的差异直接归因于某条提示词。
+用户要求复测几款Qwen并加入GPT-4.1，专门验证当前提示词。沿用现有evaluate_qwen.py及59个固定场景／85个用户输入，包含6个连续表情专项；本轮没有修改生产提示词、场景内容、评分断言或执行权限。生产实现是Container内存快照、独立AGENT CONTEXT及Skill v3，已加载函数使用现行Action-only教学；不能把与早期53场景／混合native协议的差异直接归因于某条提示词。
 
 仅扩展测试Provider选择：Qwen子进程使用Aliyun配置，gpt-4.1使用OpenAI配置，二者凭据隔离。用户明确授权复用本地OpenAI密钥；未修改或导出密钥。模型列表预检确认Aliyun提供qwen3.8-flash、qwen3.7-plus、qwen3.8-max；不把plus写成3.8。
 
@@ -188,7 +188,7 @@ Host-local logs: /tmp/qwen-eval-compile.log, /tmp/qwen-eval-offline-final.log, /
 
 用量取实际请求回执，不据此推算费用或性能。GPT-4.1无用量回执。
 
-[完整持久化证据](../measurements/prompt-regression-2026-10-25.json)包含59场景规格、三款模型全部实际回复、调用、上下文、执行日志、Token用量、源hash和GPT鉴权诊断。超过160字符的重复字符串用`{"$text":"SHA256"}`引用textPool；requestJSON解析为requestMessages语义消息，并保留原序列化字节数及SHA256。该格式避免重复保存静态教学，不声称是HTTP/SSE wire捕获。已核对不含本地API Key，不含用户设备记录或媒体。
+[完整持久化证据](../../experiments/assistant/results/prompt-regression-2026-10-25.json)包含59场景规格、三款模型全部实际回复、调用、上下文、执行日志、Token用量、源hash和GPT鉴权诊断。超过160字符的重复字符串用`{"$text":"SHA256"}`引用textPool；requestJSON解析为requestMessages语义消息，并保留原序列化字节数及SHA256。该格式避免重复保存静态教学，不声称是HTTP/SSE wire捕获。已核对不含本地API Key，不含用户设备记录或媒体。
 
 基于提交3767d6c的工作区，增加了本轮测试Provider扩展；源hash记录实际未提交测试版本。完整主机报告及日志保留于`/tmp/prompt-regression-20261025-qwen-{model}.json/.log`和`/tmp/prompt-regression-20261025-gpt-auth-gpt-4.1.json/.log`，持久化证据不依赖临时文件才能审查。
 
@@ -197,11 +197,11 @@ Host-local logs: /tmp/qwen-eval-compile.log, /tmp/qwen-eval-offline-final.log, /
 先执行离线用例／评分合法性检查与Python runner回归，再执行：
 
 ```sh
-python3 scripts/evaluate-qwen.py \
+python3 experiments/assistant/evaluate_qwen.py \
   --models qwen3.8-flash qwen3.7-plus qwen3.8-max \
   --parallel 3 --skip-build \
   --output-prefix /tmp/prompt-regression-20261025-qwen
-python3 scripts/evaluate-qwen.py \
+python3 experiments/assistant/evaluate_qwen.py \
   --models gpt-4.1 --cases plain-chat --parallel 1 --skip-build \
   --output-prefix /tmp/prompt-regression-20261025-gpt-auth
 ```

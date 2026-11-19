@@ -1,0 +1,216 @@
+{
+  "version": 1,
+  "scope": "Independent Python native adapter smoke runs; no aggregate accuracy or speed claim",
+  "runs": [
+    {
+      "id": "d3",
+      "sourceFile": "decision-python-smoke-d3-2026-11-19.json",
+      "sourceSHA256": "fcd541f24ea7d526b0df08a4ff11acbef9ecb0f594b03c14f0b2c868059999a5",
+      "report": {
+        "version": 1,
+        "scope": "Python model-case evaluation; no App execution",
+        "provenance": {
+          "inputSHA256": "544ef9b0905cd800b897760780db6f848df69141828b28cf954dc51eb30af324",
+          "runnerSHA256": "1194a56a604daa15fd8ada5edebf26140722b23da361b0dd1e5d2c8342c45b71",
+          "model": "d3-edge",
+          "configSHA256": null,
+          "excludedWarmups": 0
+        },
+        "rows": [
+          {
+            "id": "0",
+            "expected": true,
+            "variant": null,
+            "language": "en",
+            "scored": true,
+            "answers": {
+              "decision": {
+                "value": true,
+                "score": 0.9037566781044006
+              }
+            },
+            "prediction": true,
+            "passed": true,
+            "milliseconds": 324.8319170088507
+          }
+        ],
+        "complete": true,
+        "summary": {
+          "count": 1,
+          "scored": 1,
+          "excluded": 0,
+          "passed": 1,
+          "errors": 0,
+          "p50MS": 324.8319170088507,
+          "p95MS": 324.8319170088507
+        }
+      }
+    },
+    {
+      "id": "d3-initial",
+      "sourceFile": "decision-python-smoke-d3-initial-2026-11-19.json",
+      "sourceSHA256": "bd9c25ab55874b815b19d2eb707415890fd446e58d77ff89777017c7b564ac68",
+      "report": {
+        "version": 1,
+        "scope": "Python model-case evaluation; no App execution",
+        "provenance": {
+          "inputSHA256": "544ef9b0905cd800b897760780db6f848df69141828b28cf954dc51eb30af324",
+          "runnerSHA256": "1194a56a604daa15fd8ada5edebf26140722b23da361b0dd1e5d2c8342c45b71",
+          "model": "d3-edge",
+          "configSHA256": null,
+          "excludedWarmups": 0
+        },
+        "rows": [
+          {
+            "id": "0",
+            "passed": false,
+            "error": "TypeError",
+            "milliseconds": 50.522334000561386
+          }
+        ],
+        "complete": true,
+        "summary": {
+          "count": 1,
+          "scored": 1,
+          "excluded": 0,
+          "passed": 0,
+          "errors": 1,
+          "p50MS": null,
+          "p95MS": null
+        }
+      }
+    },
+    {
+      "id": "laya",
+      "sourceFile": "decision-python-smoke-laya-2026-11-19.json",
+      "sourceSHA256": "2919600a5051d5797a0d8416098768980518f52632a32ee95905cd66ce9375e0",
+      "report": {
+        "version": 1,
+        "scope": "Python model-case evaluation; no App execution",
+        "provenance": {
+          "inputSHA256": "544ef9b0905cd800b897760780db6f848df69141828b28cf954dc51eb30af324",
+          "runnerSHA256": "1194a56a604daa15fd8ada5edebf26140722b23da361b0dd1e5d2c8342c45b71",
+          "model": "laya",
+          "configSHA256": null,
+          "excludedWarmups": 0
+        },
+        "rows": [
+          {
+            "id": "0",
+            "expected": true,
+            "variant": null,
+            "language": "en",
+            "scored": true,
+            "answers": {
+              "decision": {
+                "value": true,
+                "score": 0.7498
+              }
+            },
+            "prediction": true,
+            "passed": true,
+            "milliseconds": 312.2419170103967
+          }
+        ],
+        "complete": true,
+        "summary": {
+          "count": 1,
+          "scored": 1,
+          "excluded": 0,
+          "passed": 1,
+          "errors": 0,
+          "p50MS": 312.2419170103967,
+          "p95MS": 312.2419170103967
+        }
+      }
+    },
+    {
+      "id": "vela3",
+      "sourceFile": "decision-python-smoke-vela3-2026-11-19.json",
+      "sourceSHA256": "ec3a8993d1f47f3055d5245433c59d098d3d99751d458857d9d4166606eaffaf",
+      "report": {
+        "version": 1,
+        "scope": "Python model-case evaluation; no App execution",
+        "provenance": {
+          "inputSHA256": "544ef9b0905cd800b897760780db6f848df69141828b28cf954dc51eb30af324",
+          "runnerSHA256": "1194a56a604daa15fd8ada5edebf26140722b23da361b0dd1e5d2c8342c45b71",
+          "model": "vela3-fast",
+          "configSHA256": null,
+          "excludedWarmups": 0
+        },
+        "rows": [
+          {
+            "id": "0",
+            "expected": true,
+            "variant": null,
+            "language": "en",
+            "scored": true,
+            "answers": {
+              "decision": {
+                "value": true,
+                "score": 0.8890020672026014
+              }
+            },
+            "prediction": true,
+            "passed": true,
+            "milliseconds": 1853.5065830219537
+          }
+        ],
+        "complete": true,
+        "summary": {
+          "count": 1,
+          "scored": 1,
+          "excluded": 0,
+          "passed": 1,
+          "errors": 0,
+          "p50MS": 1853.5065830219537,
+          "p95MS": 1853.5065830219537
+        }
+      }
+    },
+    {
+      "id": "vela31",
+      "sourceFile": "decision-python-smoke-vela31-2026-11-19.json",
+      "sourceSHA256": "e1cb08dcffd0973f4e90627ebbb593b1161db4f37a8852f6a82f7a3ce35a8c2d",
+      "report": {
+        "version": 1,
+        "scope": "Python model-case evaluation; no App execution",
+        "provenance": {
+          "inputSHA256": "544ef9b0905cd800b897760780db6f848df69141828b28cf954dc51eb30af324",
+          "runnerSHA256": "1194a56a604daa15fd8ada5edebf26140722b23da361b0dd1e5d2c8342c45b71",
+          "model": "vela31-fast",
+          "configSHA256": null,
+          "excludedWarmups": 0
+        },
+        "rows": [
+          {
+            "id": "0",
+            "expected": true,
+            "variant": null,
+            "language": "en",
+            "scored": true,
+            "answers": {
+              "decision": {
+                "value": true,
+                "score": 0.9599220214352309
+              }
+            },
+            "prediction": true,
+            "passed": true,
+            "milliseconds": 348.50449999794364
+          }
+        ],
+        "complete": true,
+        "summary": {
+          "count": 1,
+          "scored": 1,
+          "excluded": 0,
+          "passed": 1,
+          "errors": 0,
+          "p50MS": 348.50449999794364,
+          "p95MS": 348.50449999794364
+        }
+      }
+    }
+  ]
+}

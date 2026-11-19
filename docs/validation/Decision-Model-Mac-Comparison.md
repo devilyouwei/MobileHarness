@@ -49,7 +49,7 @@ Laya 的较低延迟伴随更差的分类结果。长中文组将 44/48 条判�
 
 ## 证据与边界
 
-[456 次逐条判定与延迟](../measurements/decision-model-mac-2026-11-11.csv)保留模型、提示词、样例 ID、三类分数、真实 token 数和计算窗口。脚本与模型制品位于本机临时目录 `/tmp/mobileharness-decision-compare.QYtdFu`。
+[456 次逐条判定与延迟](../../experiments/decision/results/decision-model-mac-2026-11-11.csv)保留模型、提示词、样例 ID、三类分数、真实 token 数和计算窗口。脚本与模型制品位于本机临时目录 `/tmp/mobileharness-decision-compare.QYtdFu`。
 
 历史短提示词曾用这批样例调试 D3，各组复用相同语料。结果适用于这里的冻结请求，其他模型专用提示词、独立真实转写、并发负载和 iPhone 表现仍待验证。沙盒内首次加载 D3 的 Metal delegate 失败，在获准使用本机加速器后完成复跑。UniMC 初次运行遇到 Transformers 5 移除 `encode_plus`，适配到 tokenizer 的现行调用后完整通过执行。仓库改动限于验证记录和测量数据，应用构建未运行。
 
@@ -89,7 +89,7 @@ Laya 的较低延迟伴随更差的分类结果。长中文组将 44/48 条判�
 
 BGE 单条分词和编码中位耗时约 7–10 ms，候选向量预先计算。原话匹配保留了三种上下文里的“拍一张啊”，但在“嗯哼”两条同文异义样例中都判丢弃，也把“不用暂停”和“说完再停”判成打断。状态和原话一起匹配区分了两条“嗯哼”，同时把“要。”误判为打断，并误丢更多有效输入。多条类定义改善总分，但相较单定义新增误丢弃。
 
-[追加实验原始数据](../measurements/decision-request-embedding-2026-11-11.json)包含 957 次判定、输入、提示词和原型。辅助脚本在 `/tmp/mobileharness-decision-compare.QYtdFu`。本轮结果覆盖合成文本和 Mac 离线推理。真实 ASR、iPhone 时延、负载及有拒判策略的业务指标仍待验收。
+[追加实验原始数据](../../experiments/decision/results/decision-request-embedding-2026-11-11.json)包含 957 次判定、输入、提示词和原型。辅助脚本在 `/tmp/mobileharness-decision-compare.QYtdFu`。本轮结果覆盖合成文本和 Mac 离线推理。真实 ASR、iPhone 时延、负载及有拒判策略的业务指标仍待验收。
 
 ## 小参数生成模型的 Core AI 对照
 
@@ -125,7 +125,7 @@ Qwen3 0.6B 全部打断。MiniCPM 和 LFM 全部入队。Qwen3.5 只打断两条
 
 - D3 使用项目发布的 BF16 文本图。千问分别使用 0.6B Mac 动态 INT4、0.8B Mac INT8、1.5B Instruct INT8。对应 1.5B 上游卡报告 **1.54B** 总参数。 [D3](https://huggingface.co/hugging-mac/d3-edge-CoreAI) · [0.6B](https://huggingface.co/mlboydaisuke/qwen3-0.6b-CoreAI-official) · [0.8B](https://huggingface.co/mlboydaisuke/qwen3.5-0.8B-CoreAI) · [1.5B 制品](https://huggingface.co/kevinqz/Qwen2.5-1.5B-Instruct-CoreAI) · [1.5B 上游](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct)
 - MiniCPM5 使用 INT8 block-32。LFM 旧 b1 制品在当前系统触发版本化 IR 错误，改用 b2 版后完整通过推理。 [MiniCPM5](https://huggingface.co/mlboydaisuke/MiniCPM5-1B-CoreAI) · [LFM2.5 b2](https://huggingface.co/mlboydaisuke/LFM2.5-1.2B-CoreAI/tree/3e3241cbcf368a663768dcc4e5785c4f0a02bae4/gpu-pipelined-b2)
-- [逐条分数、时间、制品 revision、SHA-256 和复现脚本](../measurements/duplex-llm-coreai-2026-11-13.json)。本轮是离线模型实验，验证记录之外没有应用源码变更。
+- [逐条分数、时间、制品 revision、SHA-256 和复现脚本](../../experiments/decision/results/duplex-llm-coreai-2026-11-13.json)。本轮是离线模型实验，验证记录之外没有应用源码变更。
 
 ### 对话历史窗口对照
 
@@ -146,7 +146,7 @@ D3 使用最近一来一回时完整判对 4/13 组，包括等待确认和一�
 
 此轮实验时，应用分流读取最近回复片段和关联追问，生成请求从同一会话选择最多 10 个历史项。此轮是独立 Mac 合成实验。后续接入和英文对照见下文。候选窗口以真实 iPhone 并发下的 100 ms 端到端验收为准。
 
-[逐条记录及复现脚本](../measurements/duplex-history-coreai-2026-11-13.json)
+[逐条记录及复现脚本](../../experiments/decision/results/duplex-history-coreai-2026-11-13.json)
 
 后续候选按 **100 ms 硬上限**筛选，任意测量样本超限即淘汰该模型与输入配置的组合。Qwen3.5 0.8B 和 LFM2.5 1.17B 已退出分流候选，其本机 Core AI 制品、编译缓存和补测临时文件已清除。
 
@@ -174,7 +174,7 @@ D3 使用最近一来一回时完整判对 4/13 组，包括等待确认和一�
 - D3 Lite 使用 BF16、固定 512 token 的公开 Core AI 制品。每档首个计时请求超限，未产生整组准确率。按淘汰规则清除本机模型及编译缓存。 [D3 Lite 制品](https://huggingface.co/ahmedandaloes/d3-lite-CoreAI)
 - D3 Nano 使用约 3.77 GB 的公开 BF16 文本 Core AI 图，固定 512 token。仅加载文本图。首次加载含编译约 65.4 秒，每档独立预热 3 次后首个计时请求均超限，终止剩余样例。已清除本机模型及编译缓存。 [D3 Nano 上游](https://huggingface.co/vllm-sr/d3-nano) · [Core AI 制品](https://huggingface.co/ahmedandaloes/d3-nano-CoreAI/tree/8b39d9169e25a6077fb1814b9b1d73b8aea78ea0)
 
-本轮 D3 Edge 的 2 条窗口得分最高。Julia-1 的 4 条配置是新增候选中得分最高的一组。结果仍来自原 28 条合成探测，未覆盖真实 ASR、并发播放或 iPhone 端到端延迟。 [逐条结果、制品 revision 和复现脚本](../measurements/duplex-history-windows-coreai-2026-11-13.json)
+本轮 D3 Edge 的 2 条窗口得分最高。Julia-1 的 4 条配置是新增候选中得分最高的一组。结果仍来自原 28 条合成探测，未覆盖真实 ASR、并发播放或 iPhone 端到端延迟。 [逐条结果、制品 revision 和复现脚本](../../experiments/decision/results/duplex-history-windows-coreai-2026-11-13.json)
 
 #### 同一窗口的英文提示词对照
 
@@ -198,7 +198,7 @@ D3 使用最近一来一回时完整判对 4/13 组，包括等待确认和一�
 | 新增 18 条 | 原英文版 | 9 / 18 | 1 | 3 | 3 | 214–227 | 67.84 / 67.87 ms |
 | 新增 18 条 | 定义与示例 | 10 / 18 | 0 | 0 | 4 | 285–298 | 59.32 / 59.60 ms |
 
-新版在这次对照中减少了误打断和误丢弃。新增探测中的四条应打断输入均被入队，包括「别念了，我自己来」和计时参数的即时纠正。加入定义与示例增加了 71 token。表内时间为这一次运行，另有措辞变体遇到超过 100 ms 的单条离群值，已终止对应配置。真实语音和 iPhone 并发端到端延迟仍待验证。 [逐条对照](../measurements/duplex-decision-prompt-examples-2026-11-13.json) · [运行提示词](../../MobileHarness/Resources/Agents/Assistant/InputDecision.json)
+新版在这次对照中减少了误打断和误丢弃。新增探测中的四条应打断输入均被入队，包括「别念了，我自己来」和计时参数的即时纠正。加入定义与示例增加了 71 token。表内时间为这一次运行，另有措辞变体遇到超过 100 ms 的单条离群值，已终止对应配置。真实语音和 iPhone 并发端到端延迟仍待验证。 [逐条对照](../../experiments/decision/results/duplex-decision-prompt-examples-2026-11-13.json) · [运行提示词](../../MobileHarness/Resources/Agents/Assistant/InputDecision.json)
 
 #### D3 输入边界与双语示例
 
@@ -218,7 +218,7 @@ App 内的 D3 Edge 文本 Core AI 图固定为 **512 token**。计数涵盖 chat
 
 另以两条历史和一条关联追问各 80 个中文字符测试预算。最新输入分别为「下午吧。」、100 字中文或 100 字符英文。当前提示词分别占 419、468、435 token。8 个双语例的发送对照版占 446、495、462 token。沿用现有规则的 12 例版占 548、597、564 token，三种输入均超限。字符数与 token 的比例取决于文本。
 
-本次保留当前运行提示词。双语候选的最高正确数为 49/70，新增了 5 次误丢弃且未减少漏打断。保住零误丢弃的发送对照版多答对 1 条，同时多误打断 1 次。12 个详细例缩小了实际输入余量。该对照使用合成文本，真机 ASR 与并发播报延迟仍待测。 [提示词、逐条输出及边界测试](../measurements/duplex-d3-bilingual-examples-2026-11-13.json)
+本次保留当前运行提示词。双语候选的最高正确数为 49/70，新增了 5 次误丢弃且未减少漏打断。保住零误丢弃的发送对照版多答对 1 条，同时多误打断 1 次。12 个详细例缩小了实际输入余量。该对照使用合成文本，真机 ASR 与并发播报延迟仍待测。 [提示词、逐条输出及边界测试](../../experiments/decision/results/duplex-d3-bilingual-examples-2026-11-13.json)
 
 #### 保留明确指令和可能有效的转写
 
@@ -229,7 +229,7 @@ App 内的 D3 Edge 文本 Core AI 图固定为 **512 token**。计数涵盖 chat
 | 原提示词及规则 | 3 | 2 | 3 | 11 | 51.83 ms | 273–305 |
 | 保留指令的提示词及规则 | 1 | 0 | 5 | 10 | 51.84 ms | 313–345 |
 
-原提示词曾将「开相机」「地址乱了呃先别发」和一个英文待答短句判为丢弃。新版模型仍把「开相机」判成丢弃，采纳规则将其保留。三条明确噪声输入最终丢弃，两条纯语气词被模型判为入队。整组采用正确数由 59/90 变为 57/90，主要变化是更少的丢弃及额外两次误打断。历史和追问各到 80 字、最新中文输入 100 字的合成样例占 508 token。没有运行真机端到端语音分类验收。 [逐条结果](../measurements/duplex-d3-discard-protection-2026-11-14.json)
+原提示词曾将「开相机」「地址乱了呃先别发」和一个英文待答短句判为丢弃。新版模型仍把「开相机」判成丢弃，采纳规则将其保留。三条明确噪声输入最终丢弃，两条纯语气词被模型判为入队。整组采用正确数由 59/90 变为 57/90，主要变化是更少的丢弃及额外两次误打断。历史和追问各到 80 字、最新中文输入 100 字的合成样例占 508 token。没有运行真机端到端语音分类验收。 [逐条结果](../../experiments/decision/results/duplex-d3-discard-protection-2026-11-14.json)
 
 #### 中英文打断近义词
 
@@ -243,13 +243,13 @@ App 内的 D3 Edge 文本 Core AI 图固定为 **512 token**。计数涵盖 chat
 | 替换打断示例，保留重复的定义 | 82 | 0 | 11 | 14 | 320–352 | 70.63 ms |
 | 接入版，替换示例并压缩规则 | 80 | 0 | 7 | 20 | 306–338 | 65.58 ms |
 
-接入版将「停下、别说了、等下 / stop, stop talking, hold on」放到打断示例。立即停止或改变的条件继续由打断候选说明。长中文样例用满两条历史和追问时，接入版占 501 token，原版为 508 token，打断与入队同时扩写的版本为 563 token。接入版能处理测试里的英文 “Enough talking”，仍漏判单独的「别说了」「等下」和 “Hold on a second”。对应延后及空闲用例都入队。未做真机语音验收。 [配置和测量](../measurements/duplex-d3-interrupt-synonyms-2026-11-14.json)
+接入版将「停下、别说了、等下 / stop, stop talking, hold on」放到打断示例。立即停止或改变的条件继续由打断候选说明。长中文样例用满两条历史和追问时，接入版占 501 token，原版为 508 token，打断与入队同时扩写的版本为 563 token。接入版能处理测试里的英文 “Enough talking”，仍漏判单独的「别说了」「等下」和 “Hold on a second”。对应延后及空闲用例都入队。未做真机语音验收。 [配置和测量](../../experiments/decision/results/duplex-d3-interrupt-synonyms-2026-11-14.json)
 
 ## Decision prompt language split
 
 2026-11-14, Apple M5 Mac, macOS 27.2.1 (26B131), Swift 6.4. The experiment used the installed D3 Edge BF16 Core AI graph with upstream revision `bee5e872f75b9c5d1405767bf244a6948b95c0af`. The graph SHA-256 was `ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78`.
 
-Each of 27 scenarios has English and Simplified Chinese versions with the same expected intent and playback, execution, and question state. Each language has 8 interrupt, 13 enqueue, and 6 discard cases. The two current prompt configurations load the bundled [English](../../MobileHarness/Resources/Agents/Assistant/InputDecision.json) and [Simplified Chinese](../../MobileHarness/Resources/Agents/Assistant/InputDecision.zh-Hans.json) resources at runtime. The pre-split baseline uses the archived `terse-example-cut` instruction with the current English request formatting and identical baseline candidate descriptions. All six combinations run through the Swift request renderer, real D3 and the application's adoption policy. The runner warms each prompt three times and measures native request submission through model cleanup. The times exclude ASR, playback, and any subsequent interruption cleanup. [Paired fixture](../measurements/decision-language-scenarios-2026-11-14.json)
+Each of 27 scenarios has English and Simplified Chinese versions with the same expected intent and playback, execution, and question state. Each language has 8 interrupt, 13 enqueue, and 6 discard cases. The two current prompt configurations load the bundled [English](../../MobileHarness/Resources/Agents/Assistant/InputDecision.json) and [Simplified Chinese](../../MobileHarness/Resources/Agents/Assistant/InputDecision.zh-Hans.json) resources at runtime. The pre-split baseline uses the archived `terse-example-cut` instruction with the current English request formatting and identical baseline candidate descriptions. All six combinations run through the Swift request renderer, real D3 and the application's adoption policy. The runner warms each prompt three times and measures native request submission through model cleanup. The times exclude ASR, playback, and any subsequent interruption cleanup. [Paired fixture](../../experiments/decision/datasets/decision-language-scenarios-2026-11-14.json)
 
 | Prompt | Input | Raw correct | Adopted correct | False discard raw → adopted | False interrupt raw → adopted | Missed interrupts raw → adopted | Native p50 / p95 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -260,14 +260,14 @@ Each of 27 scenarios has English and Simplified Chinese versions with the same e
 | Pre-split mixed | English | 16/27 | 20/27 | 1 → 0 | 2 → 1 | 4 → 4 | 50.87 / 51.11 ms |
 | Pre-split mixed | Chinese | 17/27 | 20/27 | 1 → 0 | 1 → 1 | 4 → 4 | 50.99 / 51.41 ms |
 
-With input and prompt languages matched, adoption accuracy was 44/54 against 40/54 for the pre-split mixed prompt. Raw accuracy was 36/54 against 33/54. The Chinese prompt recovered the short Chinese pause request “等一下。” and still missed “别说了。” in this history. The earlier four-input smoke test used a different history and selected interrupt for the same utterance with the Chinese prompt. English “Stop talking.” during playback was correctly interrupted by the English and mixed prompts. The Chinese prompt selected discard, which the app converted to enqueue. The Chinese prompt also interrupted both English deferred-action probes. [Per-request decisions, scores, and timings](../measurements/decision-language-d3-2026-11-14.json)
+With input and prompt languages matched, adoption accuracy was 44/54 against 40/54 for the pre-split mixed prompt. Raw accuracy was 36/54 against 33/54. The Chinese prompt recovered the short Chinese pause request “等一下。” and still missed “别说了。” in this history. The earlier four-input smoke test used a different history and selected interrupt for the same utterance with the Chinese prompt. English “Stop talking.” during playback was correctly interrupted by the English and mixed prompts. The Chinese prompt selected discard, which the app converted to enqueue. The Chinese prompt also interrupted both English deferred-action probes. [Per-request decisions, scores, and timings](../../experiments/decision/results/decision-language-d3-2026-11-14.json)
 
 There were no fallbacks across the 162 scored cases. Separate capacity probes filled both history messages and the pending question to 80 characters each. At five repeats of the test utterance, both split prompts accepted both input languages. The mixed baseline rejected the Chinese probe. At 25 repeats every configuration returned the native 512-token error, and the classifier retained the input as enqueue with no cloud fallback configured. The 18 probes are excluded from the accuracy table. The sample is synthetic and includes known difficult phrases. It provides no estimate of live transcription accuracy, iPhone latency, or cloud-provider performance.
 
 Run the repository script with a resource root containing `D3Edge/` and a fresh output path. The script reads the saved fixture and baseline from this repository and records the exact rendered instructions, candidate descriptions, and state for every call.
 
 ```bash
-./scripts/evaluate-decision-language.sh "$D3_RESOURCE_ROOT" /tmp/decision-language-result.json
+./experiments/decision/evaluate-decision-language.sh "$D3_RESOURCE_ROOT" /tmp/decision-language-result.json
 ```
 
 The native experiment, `./scripts/check.sh`, four iOS Simulator schemes in `./scripts/build-ios.sh`, and `git diff --check` passed. The measured requests were checked against the current source resources, baseline and fixture. The iOS build verifies packaging. The Decision experiment ran on the Mac.
@@ -289,7 +289,7 @@ The native experiment, `./scripts/check.sh`, four iOS Simulator schemes in `./sc
 
 当前英文提示下，Lite 命中 13/15 次应入队、5/9 次应打断和 1/12 次应舍弃。Edge 命中全部 9 次应打断，额外误打断 25 次，两种语言均未选过入队。旧短提示下 Edge 的总分更高，因此排名取决于提示结构。六组共 200 条热态推理全部低于 500 ms，Lite 最慢 190.74 ms。首次运行的 Lite 默认自动编译遇到磁盘空间不足，CPU-only 探测未通过有限分数检查。清理可再生成的旧 Core AI 编译缓存后，两款均以默认配置完成，分进程运行。无 App 源码变化和真机测量。
 
-[两款制品的 SHA-256、实际提示、逐条分数和复现脚本](../measurements/duplex-d3-lite-edge-coreai-2026-11-15.json)。
+[两款制品的 SHA-256、实际提示、逐条分数和复现脚本](../../experiments/decision/results/duplex-d3-lite-edge-coreai-2026-11-15.json)。
 
 ## Decision runtime-state prompt revision (2026-11-15)
 
@@ -307,7 +307,7 @@ Logs: `/tmp/mobileharness-decision-check.log`, `/tmp/mobileharness-decision-focu
 
 ## Apple system model Decision comparison (2026-11-15)
 
-使用新增 [Swift 实验测试](../../Tests/IntegrationTests/AppleDecisionEvaluationTests.swift)，通过 `ModelKitAppleLLM.AppleChat` 调用 `SystemLanguageModel.default`。实验目标依赖 Apple provider，ModelKit 不依赖 Agents 或其他业务模块。未修改生产 Decision 路由、提示词或模型选择。
+使用新增 [Swift 实验测试](../../experiments/decision/README.md)，通过 `ModelKitAppleLLM.AppleChat` 调用 `SystemLanguageModel.default`。实验目标依赖 Apple provider，ModelKit 不依赖 Agents 或其他业务模块。未修改生产 Decision 路由、提示词或模型选择。
 
 ### 固定方法与基线
 
@@ -329,7 +329,7 @@ Logs: `/tmp/mobileharness-decision-check.log`, `/tmp/mobileharness-decision-focu
 
 本次主机报告 `Mac17,5`、Apple A18 Pro、macOS 27.2.1（26B131）；历史 D3 对照来自 M5 Mac。因此即使以后本机可用，也不能将旧 M5 的耗时当作相同硬件下的延迟对照。此处只记录系统 API 返回值，不据此推断所有同型号设备永久不支持。仍需在返回 `.available` 的主机上完整运行。
 
-[本次报告](../measurements/decision-apple-system-2026-11-15.json)保存全部 154 条待测请求、100 条配对基线、设备信息、可用性和来源 SHA-256。代码、当前提示和原始基线均保留指纹。运行命令见 [测试说明](../../Tests/IntegrationTests/README.md#apple-system-decision-comparison)，必须使用新的输出文件路径。
+[本次报告](../../experiments/decision/results/decision-apple-system-2026-11-15.json)保存全部 154 条待测请求、100 条配对基线、设备信息、可用性和来源 SHA-256。代码、当前提示和原始基线均保留指纹。运行命令见 [测试说明](../../experiments/decision/README.md#apple-system-decision-comparison)，必须使用新的输出文件路径。
 
 ### 工程验证
 
@@ -359,13 +359,13 @@ Logs: `/tmp/mobileharness-decision-check.log`, `/tmp/mobileharness-decision-focu
 
 两款 D3 在冻结 100 条上的预测逐条与历史一致。当前 54 条合计，Apple、Edge、Lite 的正确数分别是 27、21、38。Apple 漏打断 9/16、误丢弃 22 条、误打断 4 条。Lite 漏打断 1/16、误丢弃 7 条、误打断 8 条。英文 Apple 的分类准确率接近 Lite，中文下尤其容易把应入队的内容判成舍弃（10/13）。当前两组分别使用对应语言的同场景改写，结论反映提示与输入语言共同变化。
 
-三款共 462 条计时请求均在 500 ms 内。Apple 154 条全部无原生错误且格式有效，最长 393.59 ms，149 条超过 250 ms。四项 Apple Decision Swift 测试通过。仅测 Mac 文本和原始模型输出。 [逐条输出、同机 D3 读出和复现代码](../measurements/decision-apple-system-m5-2026-11-15.json)
+三款共 462 条计时请求均在 500 ms 内。Apple 154 条全部无原生错误且格式有效，最长 393.59 ms，149 条超过 250 ms。四项 Apple Decision Swift 测试通过。仅测 Mac 文本和原始模型输出。 [逐条输出、同机 D3 读出和复现代码](../../experiments/decision/results/decision-apple-system-m5-2026-11-15.json)
 
 ### Mac Decision 实验迁入 Tests
 
-将满足 500 ms 和 2B 条件且有代表性的 D3 Edge、D3 Lite、Qwen2.5 1.54B 的可执行基线迁到 `Tests/DecisionBenchmarks`。目录拥有冻结样例、版本化下载配置、独立 runner、计分和使用说明。Apple 的现行 Assistant renderer 对照仍由已有 Swift 集成测试负责。Mac Gemma profile 和制品归 `Tests/Gemma4Tests`，App 继续从生产 catalog 取得手机图。下载复用仓库的开发下载器。旧实验报告用于解释历史结果，继续归档。
+将满足 500 ms 和 2B 条件且有代表性的 D3 Edge、D3 Lite、Qwen2.5 1.54B 的可执行基线迁到 `experiments/decision/benchmark`。目录拥有冻结样例、版本化下载配置、独立 runner、计分和使用说明。Apple 的现行 Assistant renderer 对照仍由已有 Swift 集成测试负责。Mac Gemma profile 和制品归 `Tests/ModelKit/Language/Gemma4`，App 继续从生产 catalog 取得手机图。下载复用仓库的开发下载器。旧实验报告用于解释历史结果，继续归档。
 
-新增 [独立实验入口](../../Tests/DecisionBenchmarks/README.md) 在 M5 Mac 复跑 D3 Edge/Lite 各 154 条、Qwen2.5 四种输出协议各 100 条。708 条预测与对应归档逐条一致，逐条耗时均在 500 ms 内。Qwen 单词打分及生成各 62/100，数字打分及生成各 57/100。Lite 下载入口验证并复用已存在的模型图后补齐许可文件。Gemma 开发下载入口验证并补齐迁移后的 Mac 制品，默认根为 `Tests/Gemma4Tests/.local/Gemma4`。未运行 Gemma 真实推理。
+新增 [独立实验入口](../../experiments/decision/benchmark/README.md) 在 M5 Mac 复跑 D3 Edge/Lite 各 154 条、Qwen2.5 四种输出协议各 100 条。708 条预测与对应归档逐条一致，逐条耗时均在 500 ms 内。Qwen 单词打分及生成各 62/100，数字打分及生成各 57/100。Lite 下载入口验证并复用已存在的模型图后补齐许可文件。Gemma 开发下载入口验证并补齐迁移后的 Mac 制品，默认根为 `experiments/Models/Language/.local/Gemma4`。未运行 Gemma 真实推理。
 
 独立 Swift release 构建、开发下载器的 8 项测试和 `git diff --check` 通过。iOS 的五个 Simulator scheme 与 App 资源校验通过。全量 `scripts/check.sh` 在既有 Lite 路由夹具、NexArm 以及 Writer/Web 声明注入用例上失败。AppWorkflow helper 约 90 秒未继续输出后终止。
 
@@ -407,7 +407,7 @@ Production recorded no native errors. All 54 measured requests took more than 50
 
 The diagnostic arm eliminated the 17 format failures and added 10 correct classifications in English. Chinese accuracy was unchanged. The diagnostic arm had 4 false discards, 12 false interrupts and one missed interrupt. All 54 calls still exceeded the deadline. Only the production arm contributes to the Settings recommendation.
 
-[Reproduction command](../../Tests/Gemma4Tests/README.md#decision-对照) and [108 measured rows with warmups, source hashes and segment metadata](../measurements/decision-gemma4-m5-2026-11-15.json).
+[Reproduction command](../../Tests/ModelKit/Language/Gemma4/README.md#decision-对照) and [108 measured rows with warmups, source hashes and segment metadata](../../experiments/decision/results/decision-gemma4-m5-2026-11-15.json).
 
 Validation passed the three segmented native runs, the role-rating tests and all five iOS Simulator schemes. The repository check exited 1 after reproducing the known D3 Lite, NexArm tracking and Writer/Web failures. The stalled AppWorkflow helper was stopped. The isolated runtime phase passed 228 tests.
 
@@ -424,7 +424,7 @@ The protocol comparison calls the production Assistant projection and parser, wi
 
 Text led on timely accuracy and raw accuracy for both cloud IDs, and the application selects it for those exact IDs. Qwen3.7 Flash Tool had eight invalid tool argument objects. Qwen3.8 Flash Tool had one invalid tool argument object and one transport failure. The Text arm had zero false discards for either model. The 500 ms comparison emphasizes fast useful results independently of the cloud Decision ceiling of two seconds.
 
-[Cloud per-case report](../measurements/decision-protocols-cloud-2026-11-15.json) and [benchmark commands](../../Tests/IntegrationTests/README.md#assistant-decision-protocol-comparison).
+[Cloud per-case report](../../experiments/decision/results/decision-protocols-cloud-2026-11-15.json) and [benchmark commands](../../experiments/decision/README.md#assistant-decision-protocol-comparison).
 
 | Local model | Mode | Raw correct | Within 500 ms | Within App budget | Valid p95 | Invalid or failed |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
@@ -436,7 +436,7 @@ Text led on timely accuracy and raw accuracy for both cloud IDs, and the applica
 
 Gemma Text had zero false discards, 15 false interrupts and zero missed interrupts. Tool had six false discards, four false interrupts and five missed interrupts. Its 25 failures failed strict tool argument validation. The App selects Text for Gemma based on raw accuracy and valid-response coverage. Both protocols exceeded the Mac real-time budget. Rankings reflect raw classifier outputs before Assistant's speech guards. The iPhone artifact and end-to-end voice latency require separate measurements.
 
-The local comparison ran on Mac17,3 with Apple M5 and macOS 27.2.1. Local segments used three warmups and cloud cells used one warmup per language. Transport failures were recorded as observed. The launcher uses opt-in synthetic tests and keeps cloud credentials and endpoint out of the archived evidence. The older independent D3/Qwen experiments and the earlier Gemma prompt comparison remain historical baselines. [Local per-case report](../measurements/decision-protocols-local-2026-11-15.json)
+The local comparison ran on Mac17,3 with Apple M5 and macOS 27.2.1. Local segments used three warmups and cloud cells used one warmup per language. Transport failures were recorded as observed. The launcher uses opt-in synthetic tests and keeps cloud credentials and endpoint out of the archived evidence. The older independent D3/Qwen experiments and the earlier Gemma prompt comparison remain historical baselines. [Local per-case report](../../experiments/decision/results/decision-protocols-local-2026-11-15.json)
 
 Final validation passed the Decision protocol, route, request-log and recommendation tests, all five iOS Simulator schemes, and the 228-test isolated runtime phase. `check.sh` exited 1 after the existing NexArm tracking and Writer/Web fixture failures. The stalled AppWorkflow helper was stopped. The two archives were verified against the same fixture IDs and recomputed summaries.
 
@@ -446,9 +446,9 @@ Final validation passed the Decision protocol, route, request-log and recommenda
 
 ### 制品与方法
 
-复用 `Tests/DecisionBenchmarks/models.json` 固定版本：Edge `0690c04ee1640c1c3fa11a882323751dda6d086a`，Lite `863963d371d5af6784bf726fb85a508c08751d65`。用户批准创建被忽略的 `.local` 测试缓存并下载制品；两张图均通过固定 SHA-256 校验，manifest 均为三输入文本图，所有必需文件齐全。
+复用 `experiments/decision/benchmark/models.json` 固定版本：Edge `0690c04ee1640c1c3fa11a882323751dda6d086a`，Lite `863963d371d5af6784bf726fb85a508c08751d65`。用户批准创建被忽略的 `.local` 测试缓存并下载制品；两张图均通过固定 SHA-256 校验，manifest 均为三输入文本图，所有必需文件齐全。
 
-使用现有 `D3NativeTests` 经生产 ModelContainer/ModelKit 端口验证预热到 ready、四候选推理、有限分数及超长输入拒绝；Edge 另验证公开参考分类/分数。再使用 `scripts/evaluate-decision-protocols.py MODEL --skip-build --output NEW_PATH`，每个模型串行执行27条英文和27条中文场景，语言组各预热3次。评分直接调用生产 JEV 投影与解码，不经过 Assistant 的采用规则。采样允许请求完成，250 ms预算只用于事后统计，不实际取消请求。
+使用现有 `D3NativeTests` 经生产 ModelContainer/ModelKit 端口验证预热到 ready、四候选推理、有限分数及超长输入拒绝；Edge 另验证公开参考分类/分数。再使用 `experiments/decision/evaluate_decision_protocols.py MODEL --skip-build --output NEW_PATH`，每个模型串行执行27条英文和27条中文场景，语言组各预热3次。评分直接调用生产 JEV 投影与解码，不经过 Assistant 的采用规则。采样允许请求完成，250 ms预算只用于事后统计，不实际取消请求。
 
 ### 加载与调用
 
@@ -473,7 +473,7 @@ Edge热态范围198.44–234.35 ms；Lite为540.74–807.68 ms，54条均超过5
 
 构建最初因生成计划引用已失效的Metal工具链挂载路径失败；备份XCBuildData并重新生成后测试构建成功，协议选择回归1项通过。Edge原生2项、Lite原生1项、缓存后原生2项均通过；两个模型的英文/中文评分进程均exit 0且每组27条完整。下载的远端断开/停滞通过固定版本续传恢复，完整哈希验证在推理前完成。
 
-[原始结果与元数据](../measurements/decision-d3-a18-mac-2026-11-15.json)保存108条评分、预热记录、原生测试日志、加载采样片段、制品身份、混淆矩阵、硬件及源码哈希。这里没有四分类continue_listening语义评分（四候选原生接口单独验证），没有真实ASR/原生UI/iPhone验收，也未重跑全仓检查或iOS构建。
+[原始结果与元数据](../../experiments/decision/results/decision-d3-a18-mac-2026-11-15.json)保存108条评分、预热记录、原生测试日志、加载采样片段、制品身份、混淆矩阵、硬件及源码哈希。这里没有四分类continue_listening语义评分（四候选原生接口单独验证），没有真实ASR/原生UI/iPhone验收，也未重跑全仓检查或iOS构建。
 
 ### App 与此次实验流程核对
 
@@ -490,7 +490,7 @@ Edge热态范围198.44–234.35 ms；Lite为540.74–807.68 ms，54条均超过5
 | 截止/清理 | 就绪后D3推理250ms，队列接纳起总预算2秒；超时取消，清理未完时拒绝下一次调用 | 直接调用协议等待完成，按250/500ms事后统计；分段进程另有420秒上限 |
 | 采用 | outcome可覆盖模型判定 | 无采用规则，直接统计模型输出 |
 
-源码位置：AssistantChatWorker.swift的classifyPendingInputs；AssistantInputDecision.swift的prompt/classifyInput/race；DecisionLanguageEvaluationTests.swift的Transcript.snapshot；DecisionProtocolBenchmark.swift的warmup与measure。两边共用AssistantDecisionProtocol.JEV、ModelKit D3Decision、Tokenizer、图输入适配和候选解码；第4选项加入并不改变前3个数字的映射。App catalog和实验模型revision一致，最后一次设备构建包内中英文InputDecision JSON与当前源码逐字节一致。尚未读取手机实际已安装模型文件，不能据此证明手机制品与Mac缓存相同。
+源码位置：AssistantChatWorker.swift的classifyPendingInputs；AssistantInputDecision.swift的prompt/classifyInput/race；DecisionLanguageEvaluationTests.swift的Transcript.snapshot；DecisionProtocolEvaluationTests.swift的warmup与measure。两边共用AssistantDecisionProtocol.JEV、ModelKit D3Decision、Tokenizer、图输入适配和候选解码；第4选项加入并不改变前3个数字的映射。App catalog和实验模型revision一致，最后一次设备构建包内中英文InputDecision JSON与当前源码逐字节一致。尚未读取手机实际已安装模型文件，不能据此证明手机制品与Mac缓存相同。
 
 用户补充Lite显示loading：若执行日志为not ready (loading)，它尚未进入分类；提示词、输出映射和250ms推理截止不能解释这条加载中状态。App的preparation没有独立加载截止，可持续等待Core AI加载；缓存后的失败阻塞与持续loading是不同分支，不应混为一谈。Mac上已观测到约302秒首次Lite图编译，但iPhone上的持续加载根因仍需设备证据，不能仅凭Mac测试判为已解决。
 
@@ -508,7 +508,7 @@ Edge热态范围198.44–234.35 ms；Lite为540.74–807.68 ms，54条均超过5
 
 仍未确认编译最终是否完成、耗时根因、其他系统版本或限制计算单元后的差异。手机iOS27.0.1与Mac macOS27.2.1并非相同系统实现；同一automatic配置也不能保证不同硬件采用相同编译路径。后续受控对照应保留制品与模型请求不变，分别观察默认编译及明确限制计算设备的加载/数值结果，不能直接把GPU偏好当作排除ANE，也不能跳过分类一致性验证。此轮不修改模型路由。
 
-[脱敏采集摘要](../measurements/decision-d3-lite-iphone-loading-2026-11-15.json)保留身份、指标、符号化链和限制。原始应用系统报告与设备元数据仅保留在本机/tmp，未将设备标识或原始诊断包加入仓库。实时Instruments采样仍待USB连接恢复；已有系统microstackshots提供了独立的加载卡点证据。
+[脱敏采集摘要](../../experiments/decision/results/decision-d3-lite-iphone-loading-2026-11-15.json)保留身份、指标、符号化链和限制。原始应用系统报告与设备元数据仅保留在本机/tmp，未将设备标识或原始诊断包加入仓库。实时Instruments采样仍待USB连接恢复；已有系统microstackshots提供了独立的加载卡点证据。
 
 #### 直连后的实时采样
 
@@ -524,7 +524,7 @@ Edge热态范围198.44–234.35 ms；Lite为540.74–807.68 ms，54条均超过5
 
 只测现有本机 D3 Edge，逐字使用最新 App 的 `InputDecisionSnapshot.prompt()` 和 `AssistantDecisionProtocol.JEV`，生产提示词、期限及采纳规则未改。旧 `DecisionLanguageEvaluationTests` 的快照未显式开启 `allowsContinueListening`，因此旧实验只有三候选，不能解释第四类的效果。本次语音请求均显式携带 `1/2/3/4`，D3 模板映射 `A/B/C/D`；键盘对照仍为三候选。
 
-主机为 Apple A18 Pro、8 GiB、macOS 27.2.1（26B131）。模型保持在 `Tests/DecisionBenchmarks/.local/models/D3Edge`，源 revision 为 `bee5e872f75b9c5d1405767bf244a6948b95c0af`，BF16 源图 SHA-256 为 `ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78`。制品文件及生产输入相关源码在运行前后核对一致。请求 token 数由同一 Swift Tokenizers 和制品模板计算，并验证记录请求与真实 D3 入参一致。
+主机为 Apple A18 Pro、8 GiB、macOS 27.2.1（26B131）。模型保持在 `Models/D3Edge`，源 revision 为 `bee5e872f75b9c5d1405767bf244a6948b95c0af`，BF16 源图 SHA-256 为 `ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78`。制品文件及生产输入相关源码在运行前后核对一致。请求 token 数由同一 Swift Tokenizers 和制品模板计算，并验证记录请求与真实 D3 入参一致。
 
 ### 样例与方法
 
@@ -595,12 +595,12 @@ Edge热态范围198.44–234.35 ms；Lite为540.74–807.68 ms，54条均超过5
 
 ### 复现和证据
 
-- [冻结194条样例](../measurements/decision-continue-listening-scenarios-2026-11-16.json)
-- [App路径完整请求、原始输出、采纳及计时](../measurements/decision-continue-listening-d3-edge-2026-11-16.json)
-- [无Assistant期限的原生读出诊断](../measurements/decision-continue-listening-readout-2026-11-16.json)
-- [混淆矩阵、分类别统计与误判清单](../measurements/decision-continue-listening-summary-2026-11-16.json)
-- [主机、制品manifest及前后哈希](../measurements/decision-continue-listening-artifact-2026-11-16.json)
-- [实验入口和运行命令](../../Tests/IntegrationTests/README.md#d3-edge-continuation-classification-experiment)
+- [冻结194条样例](../../experiments/decision/datasets/decision-continue-listening-scenarios-2026-11-16.json)
+- [App路径完整请求、原始输出、采纳及计时](../../experiments/decision/results/decision-continue-listening-d3-edge-2026-11-16.json)
+- [无Assistant期限的原生读出诊断](../../experiments/decision/results/decision-continue-listening-readout-2026-11-16.json)
+- [混淆矩阵、分类别统计与误判清单](../../experiments/decision/results/decision-continue-listening-summary-2026-11-16.json)
+- [主机、制品manifest及前后哈希](../../experiments/decision/results/decision-continue-listening-artifact-2026-11-16.json)
+- [实验入口和运行命令](../../experiments/decision/README.md#d3-edge-continuation-classification-experiment)
 
 两项真实D3实验均完成，源码前后校验通过。新增读出入口首次编译出现Swift并发捕获错误，修正后再执行；没有把失败编译计为模型请求。仓库验证结果另列在本节末尾。原有测试文件、模型位置和历史报告保持原样，仅新增本次入口/样例/结果并追加导航。
 
@@ -656,7 +656,7 @@ Edge热态范围198.44–234.35 ms；Lite为540.74–807.68 ms，54条均超过5
 
 ### 实验模板与使用边界
 
-[完整实验模板及动作映射](../measurements/decision-prompt-optimization-template-2026-11-16.json)保留实际测试的英文Question与Options。State只放事实，输入原文保留中文/英文，接续片段仍用换行组合。布局为：
+[完整实验模板及动作映射](../../experiments/decision/decision-prompt-optimization-template-2026-11-16.json)保留实际测试的英文Question与Options。State只放事实，输入原文保留中文/英文，接续片段仍用换行组合。布局为：
 
 ```text
 State: {utterance, assistant_busy, question_to_user,
@@ -675,10 +675,10 @@ D: unfinished_utterance: ...
 
 ### 文件与复现
 
-- [首轮完整请求](../measurements/decision-prompt-optimization-input-2026-11-16.json)、[首轮逐条结果](../measurements/decision-prompt-optimization-results-2026-11-16.json)、[首轮汇总](../measurements/decision-prompt-optimization-summary-2026-11-16.json)
-- [第二轮完整请求](../measurements/decision-prompt-optimization-refined-input-2026-11-16.json)、[逐条结果](../measurements/decision-prompt-optimization-refined-results-2026-11-16.json)、[汇总](../measurements/decision-prompt-optimization-refined-summary-2026-11-16.json)
-- [预冻结留出样例](../measurements/decision-prompt-optimization-holdout-2026-11-16.json)、[选型记录（留出前）](../measurements/decision-prompt-optimization-selection-2026-11-16.json)、[留出实际请求](../measurements/decision-prompt-optimization-holdout-input-2026-11-16.json)、[逐条结果](../measurements/decision-prompt-optimization-holdout-results-2026-11-16.json)、[汇总](../measurements/decision-prompt-optimization-holdout-summary-2026-11-16.json)
-- [请求生成/评分说明](../../Tests/DecisionBenchmarks/README.md#实验环境提示词优化)、[Swift原生入口](../../Tests/IntegrationTests/README.md#experimental-d3-prompt-optimization)
+- [首轮完整请求](../../experiments/decision/datasets/decision-prompt-optimization-input-2026-11-16.json)、[首轮逐条结果](../../experiments/decision/results/decision-prompt-optimization-results-2026-11-16.json)、[首轮汇总](../../experiments/decision/results/decision-prompt-optimization-summary-2026-11-16.json)
+- [第二轮完整请求](../../experiments/decision/datasets/decision-prompt-optimization-refined-input-2026-11-16.json)、[逐条结果](../../experiments/decision/results/decision-prompt-optimization-refined-results-2026-11-16.json)、[汇总](../../experiments/decision/results/decision-prompt-optimization-refined-summary-2026-11-16.json)
+- [预冻结留出样例](../../experiments/decision/datasets/decision-prompt-optimization-holdout-2026-11-16.json)、[选型记录（留出前）](../../experiments/decision/results/decision-prompt-optimization-selection-2026-11-16.json)、[留出实际请求](../../experiments/decision/datasets/decision-prompt-optimization-holdout-input-2026-11-16.json)、[逐条结果](../../experiments/decision/results/decision-prompt-optimization-holdout-results-2026-11-16.json)、[汇总](../../experiments/decision/results/decision-prompt-optimization-holdout-summary-2026-11-16.json)
+- [请求生成/评分说明](../../experiments/decision/benchmark/README.md#实验环境提示词优化)、[Swift原生入口](../../experiments/decision/README.md#experimental-d3-prompt-optimization)
 
 三次真实D3实验均通过，共2230条计分/探测请求，另39条预热。超512的探测拒绝不计为成功图调用。新留出基线的生成器已与194条存档生产请求逐字校验一致。所有输入/结果保留哈希和选项映射；第一次生成输入时处理了可选question字段缺省的JSON解析问题，该准备错误没有计作模型推理。
 
@@ -750,7 +750,7 @@ D3替身断言在专项回归中通过，全量并发中失败（该测试使用
 
 Mac 使用源图，手机 catalog 指向 h18p AOT；本轮未重新读取手机模型制品，也未测两者逐 logits 一致性。但 Mac 已复现当前模板的大量 discard，不能仅归因于手机 AOT。请求均小于512token，模型输出有效；不是容量拒绝或 fallback。两个真实实验完成 120 个评分请求与 12 次预热，源码哈希验证通过。本轮只追加实验输入、结果和文档，未修改 App 提示词、结果采纳或安装版本；未重复 App 构建/全量检查。
 
-证据：[汇总](../measurements/decision-discard-recheck-summary-2026-11-16.json)、[现场回放输入](../measurements/decision-discard-device-replay-input-2026-11-16.json)、[现场回放结果](../measurements/decision-discard-device-replay-results-2026-11-16.json)、[留出对照输入](../measurements/decision-discard-holdout-recheck-input-2026-11-16.json)、[留出对照结果](../measurements/decision-discard-holdout-recheck-results-2026-11-16.json)。
+证据：[汇总](../../experiments/decision/results/decision-discard-recheck-summary-2026-11-16.json)、[现场回放输入](../../experiments/decision/datasets/decision-discard-device-replay-input-2026-11-16.json)、[现场回放结果](../../experiments/decision/results/decision-discard-device-replay-results-2026-11-16.json)、[留出对照输入](../../experiments/decision/datasets/decision-discard-holdout-recheck-input-2026-11-16.json)、[留出对照结果](../../experiments/decision/results/decision-discard-holdout-recheck-results-2026-11-16.json)。
 
 ## 精简 JEV 接入与安装（2026-11-16）
 
@@ -758,7 +758,7 @@ Mac 使用源图，手机 catalog 指向 h18p AOT；本轮未重新读取手机�
 
 双语 JEV 契约回归通过，验证 State 仅两项、原文转义、播放态 busy、四类映射及键盘三候选。真实 D3 Edge 使用原位置模型重放六条最小上下文请求，原始分类仅1/6正确：Do not ignore this message.、Do not discard this message.、不要忽略这条消息。均选择interrupt；Open the camera. 与 I want to 均选择discard；打开相机。选择enqueue。输入186–188token，全部有效返回，源码/模型哈希前后相同。原有idle interrupt采纳入队不计为模型分类正确。该小样本不代表总体准确率，但明确显示精简后仍不能稳定判断基本输入。
 
-[最小请求](../measurements/decision-minimal-app-input-2026-11-16.json)与[原始结果](../measurements/decision-minimal-app-results-2026-11-16.json)保存原实验位置。直接调用SwiftPM测试helper的前两次尝试因XCTest动态依赖缺失失败，未执行模型；补齐Xcode的DYLD_FRAMEWORK_PATH/DYLD_LIBRARY_PATH后，使用刚编译的同一测试bundle成功完成6条及3次预热。标准swift test排队入口在共享构建锁等待期间终止，没有重复写结果。并行构建与全量检查影响延迟，本轮不作性能结论。
+[最小请求](../../experiments/decision/datasets/decision-minimal-app-input-2026-11-16.json)与[原始结果](../../experiments/decision/results/decision-minimal-app-results-2026-11-16.json)保存原实验位置。直接调用SwiftPM测试helper的前两次尝试因XCTest动态依赖缺失失败，未执行模型；补齐Xcode的DYLD_FRAMEWORK_PATH/DYLD_LIBRARY_PATH后，使用刚编译的同一测试bundle成功完成6条及3次预热。标准swift test排队入口在共享构建锁等待期间终止，没有重复写结果。并行构建与全量检查影响延迟，本轮不作性能结论。
 
 真机 Debug 构建成功，严格深层签名、73项Agent/Skill、Live Activity及中英文资源检查通过。安装包两份InputDecision资源与源码逐字节一致。已原位安装至Youwei’s iPhone 17 Pro，回执序号7220，并收到Launched application成功启动回执。构建、安装及启动日志 `/tmp/decision-minimal-device-{build,install,launch}.log`。未清除用户数据；安装启动不等于真机分类效果验收。
 
@@ -768,7 +768,7 @@ Mac 使用源图，手机 catalog 指向 h18p AOT；本轮未重新读取手机�
 
 ### 制品与接口
 
-核对[发布模型](https://huggingface.co/hugging-mac/vela3-fast-CoreAI/tree/6aaa9ccd747c4bad65037979e7f9373a76fb7683)，固定 revision 6aaa9ccd747c4bad65037979e7f9373a76fb7683，上游 revision fa60e3aa41132c60bf05a84cabfdced39cb6d4f7。网页工具连接失败后读取 HF API，核对另一项目发布目录的26个文件，均与远端 LFS SHA-256 或 Git blob 哈希匹配。逐文件 SHA-256 在 Tests/DecisionBenchmarks/vela-model.json。经用户批准，制品存放于 .local/models/Vela3Fast，与 D3Edge 并列。
+核对[发布模型](https://huggingface.co/hugging-mac/vela3-fast-CoreAI/tree/6aaa9ccd747c4bad65037979e7f9373a76fb7683)，固定 revision 6aaa9ccd747c4bad65037979e7f9373a76fb7683，上游 revision fa60e3aa41132c60bf05a84cabfdced39cb6d4f7。网页工具连接失败后读取 HF API，核对另一项目发布目录的26个文件，均与远端 LFS SHA-256 或 Git blob 哈希匹配。逐文件 SHA-256 在 experiments/decision/benchmark/vela-model.json。经用户批准，制品存放于 .local/models/Vela3Fast，与 D3Edge 并列。
 
 这是 FP32 decision backbone 的实验转换，支持 choice/noul，不是完整上游任务适配器或生成模型。Vela 使用 [Q]/[O]/[SEP_SCHEMA]/[SEG_user] 编码，输入 input_ids、attention_mask、option_positions、pool_mask，输出动态候选 logits。声明输入上限32768，发布方实际CPU校验到2048token；本轮未验证长输入、GPU/ANE或iPhone。D3使用聊天模板、固定512token和255码读出，两者不能混用编码。发布说明中的12/12上游一致性不是本App四分类准确率。
 
@@ -795,7 +795,7 @@ Vela完成后磁盘耗尽。本轮复制的大图已改为APFS克隆并重新验
 
 结论：Vela四候选推理可运行，但当前两套固定模板没有显示可替换D3的分类能力，继续聆听召回为0。精简条件相对较好，完整表达误discard仍明显。后续可独立验证Vela语义候选键和任务描述，但不能凭12个基础发布例子或低时延直接接入。App目录、生产提示、采纳及手机安装本轮均未修改。
 
-证据：[配对输入](../measurements/decision-vela-d3-input-2026-11-17.json)、[Vela结果](../measurements/decision-vela-results-2026-11-17.json)、[汇总](../measurements/decision-vela-d3-summary-2026-11-17.json)、[D3最终CPU失败](../measurements/decision-d3-cpu-vela-final-results-2026-11-17.json)、[运行说明](../../Tests/DecisionBenchmarks/README.md#vela3-fast-paired-comparison)。自动模式空报告及中间失败报告保留为失败记录，不作为完成结果。
+证据：[配对输入](../../experiments/decision/datasets/decision-vela-d3-input-2026-11-17.json)、[Vela结果](../../experiments/decision/results/decision-vela-results-2026-11-17.json)、[汇总](../../experiments/decision/results/decision-vela-d3-summary-2026-11-17.json)、[D3最终CPU失败](../../experiments/decision/results/decision-d3-cpu-vela-final-results-2026-11-17.json)、[运行说明](../../experiments/decision/benchmark/README.md#vela3-fast-paired-comparison)。自动模式空报告及中间失败报告保留为失败记录，不作为完成结果。
 
 验证收尾：Vela全部108条完成，结果JSON、脚本语法、概率归一化、制品/源码/输入哈希及git diff --check通过。`build-ios.sh`五个scheme全部构建通过。`check.sh`边界、8项Python和严格Swift格式通过；1204项IntegrationTests有7个问题，AppWorkflow随后报缺失Action声明等错误并停止推进，终止本次检查及子进程，未执行后续独立原生/plist阶段。全量检查未通过。日志 `/tmp/vela-comparison-{check,ios}.log`。新实验没有生产代码修改，构建结果不代表Vela iOS验收。
 
@@ -805,11 +805,11 @@ Vela完成后磁盘耗尽。本轮复制的大图已改为APFS克隆并重新验
 
 只读检查手机D3Edge目录和安装收据，确认已装decision.aimodel源图，revision为0690c04ee1640c1c3fa11a882323751dda6d086a；不是此前h18p AOT目录。元数据不能单独证明内存中正在执行的图或全权重内容一致。
 
-手机完整main.mlirb已只读导出并计算SHA-256，ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78与Mac完全一致；manifest、decision_config和main.hash也一致。见[手机制品核对](../measurements/decision-hello-device-artifact-check-2026-11-17.json)。这排除已检查文件内容不一致，不证明跨平台运行数值一致，也不排除共同转换问题。
+手机完整main.mlirb已只读导出并计算SHA-256，ca54b56a901d10db4e85a046aeaaaa65cde273afd2e18c47f3bb57487c3d6a78与Mac完全一致；manifest、decision_config和main.hash也一致。见[手机制品核对](../../experiments/decision/results/decision-hello-device-artifact-check-2026-11-17.json)。这排除已检查文件内容不一致，不证明跨平台运行数值一致，也不排除共同转换问题。
 
 ## 恢复自有制品及discard边界对照（2026-11-17）
 
-用户反馈第三方制品也频繁discard，要求恢复自有repo并优化提示。App Edge source及requiredFiles完整恢复到DecisionBenchmarks/models.json中的hugging-mac/d3-edge-CoreAI、revision0690c04ee1640c1c3fa11a882323751dda6d086a，原始三输入decision.aimodel，大小1013189709，无AOT覆盖。Lite未变；生产提示及模型结果采纳均未改。
+用户反馈第三方制品也频繁discard，要求恢复自有repo并优化提示。App Edge source及requiredFiles完整恢复到experiments/decision/benchmark/models.json中的hugging-mac/d3-edge-CoreAI、revision0690c04ee1640c1c3fa11a882323751dda6d086a，原始三输入decision.aimodel，大小1013189709，无AOT覆盖。Lite未变；生产提示及模型结果采纳均未改。
 
 在自有Mac制品及原生Swift入口运行两轮，各4条件×55请求=220条，合计440条评分及24次预热。48条旧留出已经多次观察，本轮称回归集，不再称独立留出；另有7条诊断，包括Hello及既有6条。使用同一冻结预期动作，不根据输出重标。第一轮仅修改minimal的C定义、B定义、或两项组合；第二轮回到历史utterance_status，只改B，保留历史原样作为控制。第二轮方案在执行前写入计划；未将ASR噪声词表或相关假设恢复到生产。
 
@@ -826,7 +826,7 @@ Vela完成后磁盘耗尽。本轮复制的大图已改为APFS克隆并重新验
 
 补问候定义让Hello进入enqueue，但使总体准确率下降；不能把单条修正当成整体改善。仅收窄discard虽减少误丢弃，仍未恢复继续聆听能力。历史结构hesitation条件回归正确29/48，但7条诊断仅I want to正确继续聆听，Hello及中英文相机命令等仍discard。因此本轮没有可上线的新候选，也未自动应用分数最高项。现有证据支持模型对候选文字高度敏感，不能单凭这两轮推断内部原因或宣布纯提示工程能达到目标。
 
-两轮无推理错误，源文件和输入哈希前后相同。证据：[第一轮输入](../measurements/decision-discard-boundary-input-2026-11-17.json)、[第一轮结果](../measurements/decision-discard-boundary-results-2026-11-17.json)、[第二轮输入](../measurements/decision-discard-status-refinement-input-2026-11-17.json)、[第二轮结果](../measurements/decision-discard-status-refinement-results-2026-11-17.json)、[汇总](../measurements/decision-discard-refinement-summary-2026-11-17.json)。
+两轮无推理错误，源文件和输入哈希前后相同。证据：[第一轮输入](../../experiments/decision/datasets/decision-discard-boundary-input-2026-11-17.json)、[第一轮结果](../../experiments/decision/results/decision-discard-boundary-results-2026-11-17.json)、[第二轮输入](../../experiments/decision/datasets/decision-discard-status-refinement-input-2026-11-17.json)、[第二轮结果](../../experiments/decision/results/decision-discard-status-refinement-results-2026-11-17.json)、[汇总](../../experiments/decision/results/decision-discard-refinement-summary-2026-11-17.json)。
 
 
 ## Vela 3.1 Fast 固定矩阵对照（2026-11-18）
@@ -835,7 +835,7 @@ Vela完成后磁盘耗尽。本轮复制的大图已改为APFS克隆并重新验
 
 ### 制品、方法和范围
 
-使用 [hugging-mac/vela3.1-fast](https://huggingface.co/hugging-mac/vela3.1-fast)，revision `108e385769cbd0da463706b24cac5a535604d2c6`，SDK decision-only CoreAI CPU 路径。仅准备决策图、权重与配置/tokenizer九个必要文件，保留原目录中的旧 Vela/D3。原始权重来源为 vllm-sr/vela3.1-fast。[上游模型说明](https://huggingface.co/vllm-sr/vela3.1-fast#why-31)声称增加多语言训练、问题/选项格式扰动及带定义的 noul；这些不等于本任务实测结论。具体制品见 [模型说明](../../Tests/DecisionBenchmarks/vela31-model.json)。
+使用 [hugging-mac/vela3.1-fast](https://huggingface.co/hugging-mac/vela3.1-fast)，revision `108e385769cbd0da463706b24cac5a535604d2c6`，SDK decision-only CoreAI CPU 路径。仅准备决策图、权重与配置/tokenizer九个必要文件，保留原目录中的旧 Vela/D3。原始权重来源为 vllm-sr/vela3.1-fast。[上游模型说明](https://huggingface.co/vllm-sr/vela3.1-fast#why-31)声称增加多语言训练、问题/选项格式扰动及带定义的 noul；这些不等于本任务实测结论。具体制品见 [模型说明](../../experiments/decision/benchmark/vela31-model.json)。
 
 原样复用108条请求：两种模板各48条既有回归样本和6条诊断；这批样本已多次使用，不再视为新的独立留出集。候选顺序、定义、预期标签不调整。Vela 3与3.1在同一Mac、同一 Python 3.12/coreai-core 1.0.0b2 环境串行运行；每条件3次预热。D3只引用逐项请求一致的历史结果，未重跑。
 
@@ -851,7 +851,7 @@ Vela完成后磁盘耗尽。本轮复制的大图已改为APFS克隆并重新验
 
 8 GiB主机存在约7.6 GiB交换空间使用，记录于环境文件。时延包含编码、推理与解码，不含加载/预热；固定串行执行也不能消除不同时段的内存压力，不能把所有延迟差归因于模型架构。新制品使用外部FP32主干权重，旧制品布局不同。初次普通复制因磁盘空间不足失败，删除本任务的残缺目标后改用APFS克隆并核对内容；未删其他项目文件。
 
-证据：[Vela 3.1逐条结果](../measurements/decision-vela31-comparison-vela31-four-2026-11-18.json)、[Vela 3复测](../measurements/decision-vela31-comparison-vela3-four-2026-11-18.json)、[配对汇总](../measurements/decision-vela31-comparison-paired-2026-11-18.json)、[参考输出对齐](../measurements/decision-vela31-native-parity-2026-11-18.json)、[主机记录](../measurements/decision-vela31-environment-2026-11-18.json)。二分类另见[独立报告](Decision-Binary-Interrupt-Mac-Comparison.md#vela-31-fast-固定矩阵对照2026-11-18)。本轮不修改App，不安装真机，不将Mac结果当作手机效果。
+证据：[Vela 3.1逐条结果](../../experiments/decision/results/decision-vela31-comparison-vela31-four-2026-11-18.json)、[Vela 3复测](../../experiments/decision/results/decision-vela31-comparison-vela3-four-2026-11-18.json)、[配对汇总](../../experiments/decision/results/decision-vela31-comparison-paired-2026-11-18.json)、[参考输出对齐](../../experiments/decision/results/decision-vela31-native-parity-2026-11-18.json)、[主机记录](../../experiments/decision/results/decision-vela31-environment-2026-11-18.json)。二分类另见[独立报告](Decision-Binary-Interrupt-Mac-Comparison.md#vela-31-fast-固定矩阵对照2026-11-18)。本轮不修改App，不安装真机，不将Mac结果当作手机效果。
 
 本轮脚本/汇总/工程检查记录统一见[二分类报告本次工程验证](Decision-Binary-Interrupt-Mac-Comparison.md#本次工程验证)，不以工程构建代替模型或手机验收。
 
@@ -876,7 +876,7 @@ Vela完成后磁盘耗尽。本轮复制的大图已改为APFS克隆并重新验
 
 Laya两模板对24条完整表达的enqueue命中均为0。utterance_status虽然继续聆听召回15/16，但把20/24完整表达误判为继续聆听，不能视为可替换方案。两条件共108条（含各6条另计诊断）无执行错误；token、instruction、option预检无截断。病例此前已多次使用，属于冻结回归集而非新留出集。
 
-不同GPU/CPU、不同时间段及磁盘/内存压力下的时延不可作同计算单元性能排名。数据：[逐条四分类](../measurements/decision-laya-four-2026-11-18.json)、[201条参考对齐](../measurements/decision-laya-parity-2026-11-18.json)、[加载失败](../measurements/decision-laya-load-failures-2026-11-18.json)。二分类、最终工程检查另见[二分类报告](Decision-Binary-Interrupt-Mac-Comparison.md#laya-multilingual-coreai-固定矩阵2026-11-18)。
+不同GPU/CPU、不同时间段及磁盘/内存压力下的时延不可作同计算单元性能排名。数据：[逐条四分类](../../experiments/decision/results/decision-laya-four-2026-11-18.json)、[201条参考对齐](../../experiments/decision/results/decision-laya-parity-2026-11-18.json)、[加载失败](../../experiments/decision/results/decision-laya-load-failures-2026-11-18.json)。二分类、最终工程检查另见[二分类报告](Decision-Binary-Interrupt-Mac-Comparison.md#laya-multilingual-coreai-固定矩阵2026-11-18)。
 
 本次工程收尾见[二分类报告Laya工程验证](Decision-Binary-Interrupt-Mac-Comparison.md#laya-工程验证)：5个iOS构建通过，完整检查有既有失败及中断阶段，未做Laya手机验收。
 
@@ -907,7 +907,7 @@ Laya沿用GPU debug-enabled路径，Vela3.1沿用CPU，D3为Swift自动计算路
 | Vela 3.1 | 2 | 6 | 0 |
 | D3 Edge | 5 | 5 | 0 |
 
-证据：[新四分类完整输入](../measurements/decision-concise-intent-shared-four-input-2026-11-18.json)、[三模型汇总](../measurements/decision-concise-intent-summary-2026-11-18.json)。二分类和工程验证见[同轮二分类报告](Decision-Binary-Interrupt-Mac-Comparison.md#用户精简意图模板2026-11-18)。没有改App。
+证据：[新四分类完整输入](../../experiments/decision/datasets/decision-concise-intent-shared-four-input-2026-11-18.json)、[三模型汇总](../../experiments/decision/results/decision-concise-intent-summary-2026-11-18.json)。二分类和工程验证见[同轮二分类报告](Decision-Binary-Interrupt-Mac-Comparison.md#用户精简意图模板2026-11-18)。没有改App。
 
 
 ## Laya精简提示词补充定义（2026-11-18）
@@ -947,4 +947,4 @@ Wait: A complete, meaningful message that can enter the normal queue without an 
 误丢弃由14降至6，但未说完识别从9/16降到5/16，正确总数18降到17；没有整体提升。6条诊断case另列于汇总，不能并入48条主评分。
 
 
-原始输入、输出及逐例配对见[汇总](../measurements/decision-defined-intent-summary-2026-11-18.json)，输入及模型结果使用同目录decision-defined-intent前缀，未覆盖旧数据。脚本见[defined_intent_experiment.py](../../Tests/DecisionBenchmarks/defined_intent_experiment.py)。本轮仍为反复使用的回归案例，不是新holdout，未做真机验证，也未据结果调整阈值或覆盖模型输出。
+原始输入、输出及逐例配对见[汇总](../../experiments/decision/results/decision-defined-intent-summary-2026-11-18.json)，输入及模型结果使用同目录decision-defined-intent前缀，未覆盖旧数据。脚本见[defined_intent_experiment.py](../../experiments/decision/benchmark/defined_intent_experiment.py)。本轮仍为反复使用的回归案例，不是新holdout，未做真机验证，也未据结果调整阈值或覆盖模型输出。

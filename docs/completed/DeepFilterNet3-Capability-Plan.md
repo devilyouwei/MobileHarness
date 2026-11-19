@@ -13,7 +13,7 @@ The published graph takes variable-length ERB/spectral features, not PCM, and do
 - Support/Backends/CoreML: validate flexible tensor shapes against Core ML constraints while retaining bounded allocations.
 - Support/Management: enhancement typed registration, acquisition, standalone default provider and artifact catalog entry. Existing ASR/TTS/VAD selections and startup requirements remain unchanged.
 - Package.swift and boundary checks: isolated ModelKitDeepFilterNet3 target depending only on ModelKit/CoreML backend.
-- Existing Tests/SileroTests: DSP roundtrip, auxiliary corruption and layout, input contract and resource failure coverage.
+- Existing Tests/ModelKit/Speech/VAD: DSP roundtrip, auxiliary corruption and layout, input contract and resource failure coverage.
 - Update ModelKit, Speech, Management and backend READMEs and catalog documentation after implementation; validation evidence under docs/validation.
 
 PCM -> 960-point Vorbis STFT / 480 hop -> ERB power and normalized complex features -> Core ML masks and five-tap complex coefficients -> ERB masking / deep filtering -> inverse STFT and delay trimming -> equal-length PCM.

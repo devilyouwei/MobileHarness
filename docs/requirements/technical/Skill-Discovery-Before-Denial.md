@@ -17,9 +17,9 @@
 - `Resources/Skills/BasicSkill/Instructions.md`：先按用户目标和公开 description 判断能力归属；区分已加载、可加载及未提供能力。缺少当前 Action 不等于不支持；有匹配 Skill 时先加载再读取其私有教学。单次工作使用 loadSkills，新持续目标保持 task.start(skills)，同行拥有的目标仍直接委托。事实已足够时直接回答，失败后不重载循环，不虚构能力。
 - `Resources/Skills/BasicSkill/Skill.json`：递增 revision。加载前教学只描述通用流程，不硬编码业务 Skill ID。
 - `Resources/Skills/WebBrowsing/Skill.json`：公开 description 写清网站名/URL 的访问意图及实际操作边界，递增 revision；保持所有函数绑定和依赖。
-- `Tests/IntegrationTests/PromptTemplateTests.swift`：从默认请求验证发现信息，解析测试侧加载调用并提交真实 Skill 状态，检查下一请求的函数/私有教学，以及旧目录不被扩大；覆盖全部非基础 Skill。
-- `Tests/AgentModelEvaluationTests/Scenarios/qwen-workflows.json`：新增未预载浏览、已预载不重载、普通知识问答及不支持操作边界的合成模型场景。断言不进入模型输入。
-- `Tests/IntegrationTests/QwenWorkflowEvaluationTests.swift`：为 Web.browse 提供明确标注的合成网页文本回执及失败，成功时同步合成 ui.web content/url，覆盖加载→访问→反馈，不请求真实网站、不伪造截图或媒体编号。
+- `Tests/Agents/Assistant/PromptTemplateTests.swift`：从默认请求验证发现信息，解析测试侧加载调用并提交真实 Skill 状态，检查下一请求的函数/私有教学，以及旧目录不被扩大；覆盖全部非基础 Skill。
+- `experiments/assistant/datasets/qwen-workflows.json`：新增未预载浏览、已预载不重载、普通知识问答及不支持操作边界的合成模型场景。断言不进入模型输入。
+- `experiments/assistant/QwenWorkflowEvaluationTests.swift`：为 Web.browse 提供明确标注的合成网页文本回执及失败，成功时同步合成 ui.web content/url，覆盖加载→访问→反馈，不请求真实网站、不伪造截图或媒体编号。
 - 更新 `Resources/Skills/README.md`、相关测试 README；模块边界、跨模块流程和运行时实现不变，无需新目录。
 
 ## 验证计划

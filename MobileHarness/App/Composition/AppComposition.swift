@@ -45,6 +45,7 @@ import UI
 }
 
 @MainActor @Observable final class AppComposition {
+    private let makeServices: @MainActor (@escaping @Sendable () -> AppLanguage) -> ServiceFactories.Services
     private var services: ServiceFactories.Services
     let languageSettings: ApplicationLanguageSettings
     private let writerBackground: WriterContinuedProcessing
@@ -59,11 +60,16 @@ import UI
     }
     var features: ApplicationPresentation { services.ui }
 
-    init() {
-        let languageSettings = ApplicationLanguageSettings()
+    init(
+        languageSettings: ApplicationLanguageSettings = ApplicationLanguageSettings(),
+        makeServices: @escaping @MainActor (@escaping @Sendable () -> AppLanguage) -> ServiceFactories.Services = {
+            ServiceFactories.make(language: $0)
+        }
+    ) {
+        self.makeServices = makeServices
         self.languageSettings = languageSettings
         writerBackground = WriterContinuedProcessing(language: languageSettings.read)
-        let created = ServiceFactories.make(language: languageSettings.read)
+        let created = makeServices(languageSettings.read)
         services = created
         owner = Result { try ModuleRegistration.lifecycle(created) }
         connect()
@@ -127,6 +133,12 @@ import UI
             if foreground, lifecycle.state == .suspended { retry() }
         } catch { features.reportStartupFailure(error) }
     }
+    /// Joins an in-flight replacement before closing the retained production scope.
+    func stop() async throws {
+        foreground = false
+        if let replacement { await replacement.value }
+        try await owner.get().stop()
+    }
     private func retry() {
         guard replacement == nil else { return }
         replacement = Task {
@@ -141,7 +153,7 @@ import UI
                     try await services.model.stop()
                 }
                 backgroundArtifactsPrepared = false
-                services = ServiceFactories.make(language: languageSettings.read)
+                services = makeServices(languageSettings.read)
                 owner = Result { try ModuleRegistration.lifecycle(services) }
                 scopeID = UUID()
                 connect()

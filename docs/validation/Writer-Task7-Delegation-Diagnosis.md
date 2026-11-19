@@ -22,4 +22,4 @@
 
 ## 证据与范围
 
-[脱敏诊断摘要](../measurements/writer-task7-2026-11-08-diagnosis.json)包含逐行时间/顺序、A/B 归属、显示分组、文件与源码哈希。原始用户数据库只保留在 /tmp/task7-device.sqlite、对应 WAL 和 /tmp/task7-snapshot.sqlite，不进入仓库。只读检查未重启、安装或修改手机数据库；此轮没有改 Swift、提示词或工具配置，也未运行构建。离线分组复现不是原生点击验收。
+[脱敏诊断摘要](../../experiments/writer/results/writer-task7-2026-11-08-diagnosis.json)包含逐行时间/顺序、A/B 归属、显示分组、文件与源码哈希。原始用户数据库只保留在 /tmp/task7-device.sqlite、对应 WAL 和 /tmp/task7-snapshot.sqlite，不进入仓库。只读检查未重启、安装或修改手机数据库；此轮没有改 Swift、提示词或工具配置，也未运行构建。离线分组复现不是原生点击验收。

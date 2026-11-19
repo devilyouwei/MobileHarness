@@ -27,8 +27,10 @@ import UI
         let ui: ApplicationPresentation
         let homePreparation: ForegroundPreparation
     }
-    static func make(language: @escaping @Sendable () -> AppLanguage = { .english }) -> Services {
-        let root = URL.applicationSupportDirectory.appendingPathComponent("MobileHarness", isDirectory: true)
+    static func make(
+        root: URL = URL.applicationSupportDirectory.appendingPathComponent("MobileHarness", isDirectory: true),
+        language: @escaping @Sendable () -> AppLanguage = { .english }
+    ) -> Services {
         let registry = ApplicationContainer(
             root: root, uiConfiguration: .init(settings: SettingsProviderAdapter.initial),
             recognitionLocale: { language().speechRecognitionLocale })

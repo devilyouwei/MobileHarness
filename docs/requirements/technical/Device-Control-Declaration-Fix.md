@@ -6,7 +6,7 @@
 
 ActionFunction 统一按声明校验参数后，DeviceActions.control 声明仅包含 operation/id，却在实现与 ApplicationControl InternalTool 中支持 value/action/fence 和更多 UI 操作。手机连接、忽略等携带 fence 的调用在到达设备能力前报 invalidKeys；preset/openPage 等还可能因枚举不完整失败。
 
-修改 Actions/System/Device/DeviceActions.swift 的声明，使其覆盖现有端口全部操作与字段，不放宽统一校验，不改变模块边界、设备操作或物理完成语义。Skill 的参数投影同步采用完整声明；fence 仍须通过业务 UUID 与设备当前会话校验。FunctionTokenParserTests 的 XML 用例应保留已声明 fence，继续丢弃真正未知字段。更新 Device 与 System README，IntegrationTests/ActionContractTests.swift 覆盖真实生成声明的 connect/forget fence、全部可信操作，以及未知键和非法操作拒绝。InteractionPipelineTests 经真实 Agent/Gateway/Actions 路径覆盖携带 fence 的 connect/forget。执行 scripts/check.sh 与 scripts/build-ios.sh，结果记录在本文件。
+修改 Actions/System/Device/DeviceActions.swift 的声明，使其覆盖现有端口全部操作与字段，不放宽统一校验，不改变模块边界、设备操作或物理完成语义。Skill 的参数投影同步采用完整声明；fence 仍须通过业务 UUID 与设备当前会话校验。FunctionTokenParserTests 的 XML 用例应保留已声明 fence，继续丢弃真正未知字段。更新 Device 与 System README，Tests/Actions/Contracts/ActionContractTests.swift 覆盖真实生成声明的 connect/forget fence、全部可信操作，以及未知键和非法操作拒绝。InteractionPipelineTests 经真实 Agent/Gateway/Actions 路径覆盖携带 fence 的 connect/forget。执行 scripts/check.sh 与 scripts/build-ios.sh，结果记录在本文件。
 
 ## 验收
 

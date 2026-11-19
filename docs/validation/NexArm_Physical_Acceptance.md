@@ -1,6 +1,6 @@
 # NexArm supervised USB acceptance
 
-Each dated section is an independent hardware experiment with its own transport, configuration, observations and limits. This report includes September controller trials and October serial/decoder investigations; no single section defines the current implementation or proves iPhone BLE acceptance. Current contracts belong to module READMEs; raw samples are indexed in [measurements](../measurements/README.md).
+Each dated section is an independent hardware experiment with its own transport, configuration, observations and limits. This report includes September controller trials and October serial/decoder investigations; no single section defines the current implementation or proves iPhone BLE acceptance. Current contracts belong to module READMEs; raw samples are indexed in [measurements](../validation/NexArm_Physical_Acceptance.md).
 
 ## 2026-10-24 — Restore motors 1 and 4 to position mode
 
@@ -291,7 +291,7 @@ Invalid target5000 produced a failed Action with its captured validation reason;
 
 ### Reproduction and remaining acceptance
 
-Run only under supervision, one physical test per process, with `NEXARM_PORT` set and exactly one gate set to `1`: `NEXARM_SERIAL_PREFLIGHT`, `NEXARM_SERIAL_ACCEPTANCE`, `NEXARM_SERIAL_TRACKING_ACCEPTANCE`, or `NEXARM_SERIAL_PRESETS_ACCEPTANCE`. The matching function names and bounds are in Tests/IntegrationTests/README.md. Default checks disable these gates. Final logs were `/tmp/mobileharness-serial-final-preflight-planner.log`, `/tmp/mobileharness-serial-final-settings-agent.log`, `/tmp/mobileharness-serial-final-tracking.log`, and `/tmp/mobileharness-serial-final-presets.log`.
+Run only under supervision, one physical test per process, with `NEXARM_PORT` set and exactly one gate set to `1`: `NEXARM_SERIAL_PREFLIGHT`, `NEXARM_SERIAL_ACCEPTANCE`, `NEXARM_SERIAL_TRACKING_ACCEPTANCE`, or `NEXARM_SERIAL_PRESETS_ACCEPTANCE`. The matching function names and bounds are in Tests/Agents/README.md. Default checks disable these gates. Final logs were `/tmp/mobileharness-serial-final-preflight-planner.log`, `/tmp/mobileharness-serial-final-settings-agent.log`, `/tmp/mobileharness-serial-final-tracking.log`, and `/tmp/mobileharness-serial-final-presets.log`.
 
 No torque, calibration, firmware, gripper motion or automatic failure return-home was used. These results do not establish emergency stopping, every individual slider under load, wrist/reach tracking accuracy, native phone touch behavior, weak-signal BLE, actual radio detach/recovery, device starvation endurance or the previously reported phone reconnect loop. Phone/load configuration was not separately recorded; do not generalize these samples to another load. The initial missing serial feedback required the user's device restart; no application-only recovery conclusion is drawn from that event.
 

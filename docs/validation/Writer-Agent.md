@@ -14,7 +14,7 @@
 
 - 第一轮修订后的 `scripts/check.sh` 通过，包括普通 IntegrationTests 984 项、AppWorkflowTests 146 项和单独的 LiveRuntimeTests 225 项，以及其他测试目标、边界、格式、Python 与 plist 检查。这一轮不包含最后补充的全部回归，不代替最终检查。
 - `scripts/build-ios.sh` 第一轮四个目标均通过：MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero。最后完整构建 `/tmp/writer-ios-final-2.log` 四目标通过；浏览域清理后又单独构建 MobileHarnessSimulator，通过（`/tmp/writer-ios-app-final.log`），Agent/Skill 资源和 Live Activity 验证亦通过。
-- `scripts/test-webkit-simulator.sh` 通过。生产 WebPageContainer 完成本地 HTML/CSS/JS、定时动画、两次版本渲染、JPEG 截图及 example.com 远程浏览；新增双页面脚本启停隔离和独立关闭检查通过。已查看 local-2.jpg，中文标题、流程节点和更新状态清晰，无明显裁切。
+- `scripts/simulator/test-webkit-simulator.sh` 通过。生产 WebPageContainer 完成本地 HTML/CSS/JS、定时动画、两次版本渲染、JPEG 截图及 example.com 远程浏览；新增双页面脚本启停隔离和独立关闭检查通过。已查看 local-2.jpg，中文标题、流程节点和更新状态清晰，无明显裁切。
 - 原生证据目录：`/Users/devil/Library/Developer/CoreSimulator/Devices/9CC7DAF2-4A23-471B-8277-A673D8ECBE7D/data/Containers/Data/Application/EE36FC28-4C02-410E-834B-88596390CC48/Documents`。该绝对路径为本机运行证据，不是项目运行依赖。
 - 开发期间曾出现测试夹具缺少新角色/工具注册、iOS 前后台调用位置错误、测试初始化 API 和嵌套 Testing 宏错误；均据实际检查修正。Provider 回归初次未先 load 即 save，被既有持久化契约拒绝，已修正测试顺序。保留这些失败，不将首次执行描述为通过。
 
@@ -35,7 +35,7 @@
 
 - 完整 `scripts/check.sh` 通过（`/tmp/writer-opt-check.log`）：IntegrationTests 988 项、AppWorkflowTests 153 项、独立 LiveRuntimeTests 225 项，以及其他测试目标、格式/模块边界、Python/plist。硬件专用条件测试按原配置跳过，不代表真机硬件验收。
 - `scripts/build-ios.sh` 四目标通过（`/tmp/writer-opt-ios.log`）。此后补充入口移动扩展名检查、相同流式快照去重和嵌套入口读取根支持；最终定向测试通过（`/tmp/writer-opt-focused-final.log`），包含真实 Artifacts 服务与脚本模型测试，呈现探针仍是替身。
-- 原生 `scripts/test-webkit-simulator.sh` 通过（`/tmp/writer-opt-native.log`）：嵌套入口从显式受控作品根加载兄弟 CSS/JS，验证样式计算值与脚本输出；两个独立页面脚本启停/关闭隔离、动画、两次完整渲染和截图、远程浏览均通过。已查看 local-2.jpg，中文和流程节点清晰。
+- 原生 `scripts/simulator/test-webkit-simulator.sh` 通过（`/tmp/writer-opt-native.log`）：嵌套入口从显式受控作品根加载兄弟 CSS/JS，验证样式计算值与脚本输出；两个独立页面脚本启停/关闭隔离、动画、两次完整渲染和截图、远程浏览均通过。已查看 local-2.jpg，中文和流程节点清晰。
 - 本轮原生证据目录：`/Users/devil/Library/Developer/CoreSimulator/Devices/9CC7DAF2-4A23-471B-8277-A673D8ECBE7D/data/Containers/Data/Application/A477839F-ABE4-42A4-86F1-38D90A1D3F1D/Documents`。这是固定页面的 WebKit 测试，不是模型创作质量或整个 Writer/UI 链路验收。
 - 新增回归覆盖：普通编辑在节流时间之后仍不渲染；单次 opt-in 预览及最后刷新；跨文件上下文与追加用户要求进入内容模型；Unicode 行定位与独立文件引用；搜索分页；目录整体校验/移动、入口格式约束、差异与撤销；历史源文件恢复；运行错误阻止发布。
 - 开发中首次直接 Swift 测试误用 Command Line Tools，缺少 Metal 编译器；改用完整 Xcode 后编译通过。旧“跨文件引用全部失效”断言按新契约调整；新增测试曾错误地比较包含读取状态的整个草稿、或直接匹配被 JSON 转义的路径，改为比较文件内容及解码后的路径后通过。
@@ -49,7 +49,7 @@
 - `scripts/check.sh` 通过（`/tmp/writer-records-check2.log`）：普通 IntegrationTests 989 项、AppWorkflowTests 154 项、独立 LiveRuntimeTests 225 项及其他测试目标、格式、模块边界、Python/plist。后续补充的截图所有权和完整委托历史断言另作定向复核。
 - 最终定向回归通过（`/tmp/writer-records-verified.log`）：真实 SQLite 关闭重开、Assistant/Writer 角色隔离、实际请求参数/源码/工具结果/取消状态；截图媒体引用可由 Writer 对应输入读取，Assistant 读取被拒绝；两种完整委托流程（直接完成/追问后完成）均保留历史并通过 Gateway 新建会话；ZIP 由独立解压器验证目录、UTF-8 内容和 CRC。
 - `scripts/build-ios.sh` 四目标通过（`/tmp/writer-records-ios-final.log`）；媒体历史绑定加入后的应用构建通过（`/tmp/writer-records-ios-app.log`）。
-- `scripts/test-webkit-simulator.sh` 通过（`/tmp/writer-pdf-native.log`）：嵌套 HTML/CSS/JS 原生 PDF、中文可选文本、140 段文档生成 6 页 A4 且末段完整。已查看首页和末页，未见文本裁切。证据位于本机模拟器 Documents：`/Users/devil/Library/Developer/CoreSimulator/Devices/9CC7DAF2-4A23-471B-8277-A673D8ECBE7D/data/Containers/Data/Application/36D3E210-8C42-458D-B631-2B7716824642/Documents`。
+- `scripts/simulator/test-webkit-simulator.sh` 通过（`/tmp/writer-pdf-native.log`）：嵌套 HTML/CSS/JS 原生 PDF、中文可选文本、140 段文档生成 6 页 A4 且末段完整。已查看首页和末页，未见文本裁切。证据位于本机模拟器 Documents：`/Users/devil/Library/Developer/CoreSimulator/Devices/9CC7DAF2-4A23-471B-8277-A673D8ECBE7D/data/Containers/Data/Application/36D3E210-8C42-458D-B631-2B7716824642/Documents`。
 - 开发中曾因 FinishReason 非 RawRepresentable、测试缺少 await/try、Xcode 文件引用遗漏及历史 UI 直接修改仓库被检查拒绝；均已修正。补充完整委托测试首次将 Writer 注册限制在单个委托会话，导致独立历史 UI 会话返回 scopeClosed；按生产长期角色的无单会话限制注册修正后通过，未放宽 Gateway 校验。
 - 原生 PDF 使用固定内容；模型测试采用替身。未验收真实云端模型、真机安装或设置页系统分享的手动交互。当前仅支持 HTML/Markdown/TXT 转 PDF；不声称支持 DOC/DOCX。历史保存使用共享 SQLite，图片由既有媒体存储保存，作品文件与临时导出位于 StorageFiles 工作区。
 
@@ -272,7 +272,7 @@ No runtime code, local signing settings, SQLite or artifact history was changed/
 
 ## 本机真实模型多流程回归（2026-11-04）
 
-新增独立专项[报告](Writer-Model-Regression.md)、[机器结果](Writer-Model-Regression.json)与[请求轨迹](Writer-Model-Regression-Requests.json)。实际Qwen3.8-max和DeepSeek-v4.1-flash各6/6通过，生产Writer/Gateway/Artifacts/SQLite与本机WebKit实际执行；源码和二进制未变，99次请求使用Provider默认输出预算。该专项还保留前轮失败及工具/内容协议修复依据，不将失败改写为首次成功。安装/真机语音与原生UI不由本机回归替代。
+新增独立专项[报告](Writer-Model-Regression.md)、[机器结果](../../experiments/writer/results/writer-model-regression.json)与[请求轨迹](../../experiments/writer/results/writer-model-regression-requests.json)。实际Qwen3.8-max和DeepSeek-v4.1-flash各6/6通过，生产Writer/Gateway/Artifacts/SQLite与本机WebKit实际执行；源码和二进制未变，99次请求使用Provider默认输出预算。该专项还保留前轮失败及工具/内容协议修复依据，不将失败改写为首次成功。安装/真机语音与原生UI不由本机回归替代。
 
 ## 2026-11-04 Agent 自有任务岛结束
 

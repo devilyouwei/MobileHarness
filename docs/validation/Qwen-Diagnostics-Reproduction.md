@@ -11,7 +11,7 @@
 在 codex/storage-lifecycle-boundary 的当前未提交代码上，执行：
 
 ```sh
-python3 scripts/evaluate-qwen.py --models qwen3.8-flash qwen3.7-plus qwen3.8-max --output-prefix /tmp/qwen-diagnostics-20261017-run1
+python3 experiments/assistant/evaluate_qwen.py --models qwen3.8-flash qwen3.7-plus qwen3.8-max --output-prefix /tmp/qwen-diagnostics-20261017-run1
 ```
 
 每模型共用同一53场景、78条用户输入；共159个场景执行、234条输入、457次实际阿里 Responses 请求。qwen3.7-plus 沿用上轮供应方确实提供的 exact ID，不称为 qwen3.8-plus。
@@ -125,7 +125,7 @@ declaredTools(3)=Bluetooth_readStatus_2,ModelResources_snapshot_0,Provider_readS
 
 ## 证据、验证与限制
 
-- [完整压缩测量](../measurements/qwen-diagnostics-2026-10-17-run1.json)：保留模型响应、实际调用/结果、State、逐轮断言、诊断、冻结场景、原始请求 hash、catalog 引用及498份源输入 hash。catalog 仅规范化去重，保留原编码 hash。
+- [完整压缩测量](../../experiments/assistant/results/qwen-diagnostics-2026-10-17-run1.json)：保留模型响应、实际调用/结果、State、逐轮断言、诊断、冻结场景、原始请求 hash、catalog 引用及498份源输入 hash。catalog 仅规范化去重，保留原编码 hash。
 - Host-local完整 provider-neutral 请求与日志：`/tmp/qwen-diagnostics-20261017-run1-{model}.json/.log`；启动日志 `.launch.log`、原 summary `.summary.json`、源清单 `-source-manifest.json`、分析 `.analysis.log`。临时文件不是永久附件，也不是完整 HTTP wire。
 - runner 在运行前重新构建当前测试二进制；qwenWorkflowCasesAreBoundedAndUseRegisteredAliases 通过，三模型均完整53场景/78输入，sourceUnchanged=true，额外完整源清单也无变化。JSON、计数/分类、场景相等、catalog 引用、源 hash、链接、凭据排查及 diff 格式检查通过。
 - 本轮没有生产代码或提示词修改，因此未重复全仓 check.sh 或 Xcode 构建。上轮全量集成17项失败、Simulator 外部 CoreAI 限制继续保留；本轮真实云回归不替代全仓或真机验收。没有安装、commit、merge，亦无 OpenAI API 调用。

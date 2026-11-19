@@ -75,3 +75,23 @@ Before completing a code change:
 - Keep changes focused on the requested task. Preserve unrelated working-tree changes and include only intended files in a commit.
 - Do not commit secrets, local signing settings, model weights, or user media.
 - Add third-party dependencies only for a concrete integration need; document their purpose and owning module.
+
+## 9. Agent Validation Workflow and Directory Ownership
+
+Before changing or running experiments, read [experiments/AGENTS.md](experiments/AGENTS.md) and the owning task README. That file defines experiment execution, data ownership and report placement. Raw outputs belong in `experiments/<Task>/results/`; authored experiment reports belong in `docs/validation/` and link to those outputs.
+
+- `scripts/` 是供开发 agent 使用的批处理与自动化入口：选择模块/任务，调用 Tests 或 experiments 的执行入口，传递配置、限制并发/超时、收集退出状态。批处理代码放这里；断言、评分、提示词和业务夹具放所属目录。不得把 scripts 做成双方共用的业务库。
+- `Tests/` 使用 Swift 验证 App 模块功能、接口及跨模块链路。允许单模型、个位数请求验证通信与业务通顺；不运行模型效果矩阵。
+- `experiments/<任务>/` 使用 Python 直接运行模型 case、提示词对照、准确率与性能实验；自有脚本、配置、Datasets 和 Results。运行器自身的离线回归也由这里维护。
+- Tests 与 experiments 不互相导入，不读取对方代码、配置、数据或结果，不通过 scripts 间接共享这些内容。允许各自重复实现；双方可独立运行。
+- `Models/<模型名>/` 是双方唯一共享的制品位置：从 Hugging Face 或其他明确 URL 下载，固定版本、校验大小/哈希，复用已有有效制品，避免重复下载。这里不放项目共享业务库、评估集或运行结果。
+- `docs/` 保存人工撰写或汇总的方法、结论、计划、验证报告及文档附件；原始实验数据归 experiments。`MobileHarness/` 拥有 App 生产实现。
+- 执行前先读 `scripts/README.md` 和目标目录 README，优先使用现有脚本入口；缺少批处理入口时，可直接调用所属目录入口，新增批处理仅做编排，不复制验证逻辑。不要假设存在统一实验命令。
+- 工程检查使用 `./scripts/check.sh`，构建使用 `./scripts/build-ios.sh`；模型实验显式选择任务、模型/版本、case、请求预算和输出路径。默认工程检查不触发真实模型矩阵；凭据不写入脚本或结果。
+- 工程测试、构建、研究工具回归、真实模型实验分别记录成功/失败/未执行。批处理保留子任务失败状态，不以其他任务通过掩盖失败；计时敏感工程测试与重模型实验串行运行。
+
+### Validation scope
+
+- `Tests/`: Swift only. Own App unit tests, business logic, module contracts and cross-module flows, including App model management, deployment and inference integration. A few model requests may verify communication and flow correctness; prompt quality, case matrices and model comparisons belong in experiments.
+- `experiments/`: Python only. Evaluate model cases, prompts, accuracy and inference performance. Local experiments use Apple Core AI / Core ML artifacts through Python interfaces, without launching Swift, App code or Tests. Explicit cloud and Apple system-model backends also run directly from Python. Keep task inputs in Datasets and raw outputs in Results.
+- `docs/`: Authored or summarized documentation and reports, including agent-written documents. No executable tests, experiment runners, datasets, runtime configurations, raw responses or machine-generated metrics. Engineering fixtures belong in Tests; experimental data belongs in experiments.

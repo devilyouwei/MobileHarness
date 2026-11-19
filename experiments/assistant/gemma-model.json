@@ -1,0 +1,13 @@
+{
+  "backend": "coreai",
+  "template": "gemma4",
+  "graph": "Models/Gemma4/gpu-pipelined-b2/gemma4_e2b_qat_decode_int4lin_tbl/gemma4_e2b_qat_decode_int4lin_tbl.aimodel",
+  "tokenizer": "Models/Gemma4/gpu-pipelined-b2/gemma4_e2b_qat_decode_int4lin_tbl/tokenizer",
+  "context_length": 4096,
+  "max_tokens": 512,
+  "stop_strings": ["<eos>", "<turn|>", "<|tool_response>"],
+  "static_inputs": {
+    "ple_table": {"path": "Models/Gemma4/ios-frontend/gemma4_qat_gather_raw/embed_per_layer.i8", "dtype": "int8", "shape": [262144, 8960]},
+    "ple_scale": {"path": "Models/Gemma4/ios-frontend/gemma4_qat_gather_raw/embed_per_layer.scale.f32", "dtype": "float32", "shape": [262144]}
+  }
+}

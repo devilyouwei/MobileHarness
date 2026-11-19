@@ -1,6 +1,6 @@
 ![MobileHarness concept banner showing a winking phone, four robots, and illustrated panels for drawing, document writing, web browsing, and taking photos.](output/mobileharness-office-banner-v2.png)
 
-<h1 align="center"><img src="docs/imgs/mobileharness-eyes.png" width="48" alt="" style="vertical-align: 0.1em;"> MobileHarness</h1>
+<h1 align="center"><img src="imgs/mobileharness-eyes.png" width="48" alt="" style="vertical-align: 0.1em;"> MobileHarness</h1>
 
 <p align="center"><em>The phone is the best gateway to robotics.</em></p>
 
@@ -9,13 +9,13 @@
 MobileHarness is a bio-inspired agentic app that makes your smartphone an embodied agent capable of serving as a robot’s brain and controlling its movements. Built around a **Perception → Cognition → Action** agent loop, it coordinates the phone's hardware and sensors, such as its camera, microphone and speaker, so Agents can perceive the world, understand users, reason, converse and act. You can now use **MobileHarness** to connect your iPhone to a **NexArm** robotic arm and control it to carry out grounded tasks.
 
 <p align="center">
-  <img src="docs/imgs/perception-cognition-action.svg" alt="Perception, Cognition and Action form a counterclockwise loop connected by Internal Signals. A dashed External Signal arrow enters Perception from outside the loop.">
+  <img src="imgs/perception-cognition-action.svg" alt="Perception, Cognition and Action form a counterclockwise loop connected by Internal Signals. A dashed External Signal arrow enters Perception from outside the loop.">
 </p>
 
-In MobileHarness, _every input is a Signal; every output is an Action_. Signals carry information through the **Perception → Cognition → Action** loop. External Signals bring observations from the world and user interactions into perceptions. Internal Signals connect the three stages, carrying interpreted information, intent and feedback. **Gateway** is the Signal highway, carrying processed information between Agents. Agents interpret Signals, decide what to do and take Actions; the outcomes return as Signals to close the loop. Human interaction is full-duplex—_receiving multi-channel Signal input while producing multi-channel Action output_—and this is the pattern that informs our design.
+In MobileHarness, _every input is a Signal; every output is an Action_. Signals carry information through the **Perception → Cognition → Action** loop. External Signals bring observations from the world and user interactions into perceptions. Internal Signals connect the three stages, carrying interpreted information, intent and feedback. **Gateway** is the Signal highway, carrying processed information between Agents. Agents interpret Signals, decide what to do and take Actions; the outcomes return as Signals to close the loop. For humans, interaction is full-duplex: receiving multi-channel Signal input while producing multi-channel Action output. This is the interaction pattern we aim to emulate.
 
 <p align="center">
-  <img src="docs/imgs/task-skill-capabilities.svg" alt="An Agent manages a Task and loads Skills. Each Skill declares Actions, read-only States, Instructions and dependencies on other Skills.">
+  <img src="imgs/task-skill-capabilities.svg" alt="An Agent manages a Task and loads Skills. Each Skill declares Actions, read-only States, Instructions and dependencies on other Skills.">
 </p>
 
 **Tasks** preserve goals and context across conversation turns, while **Skills** provide the capabilities needed to pursue them. Each Skill declares **Actions** (operations), **States** (current facts), **Instructions** (workflow guidance) and **dependencies** (other Skills). Agents load Skills as needed and use actual results to guide their next decisions.
@@ -23,7 +23,7 @@ In MobileHarness, _every input is a Signal; every output is an Action_. Signals 
 **States** give Agents a form of **proprioception**: awareness of current capabilities and conditions, such as camera activity or a robotic arm's target and measured position. Selected facts refresh on each model request; the underlying modules retain ownership of live state.
 
 <p align="center">
-  <img src="docs/imgs/multi-agent-communication.svg" alt="Assistant delegates a goal and sends follow-up input to Writer through Gateway. Writer returns progress, questions and completion or failure while each Agent retains its own context and responsibilities.">
+  <img src="imgs/multi-agent-communication.svg" alt="Assistant delegates a goal and sends follow-up input to Writer through Gateway. Writer returns progress, questions and completion or failure while each Agent retains its own context and responsibilities.">
 </p>
 
 **Multi-Agent collaboration** lets specialized Agents exchange messages and delegate work through **Gateway**, within their declared communication permissions. For example, **Assistant** can relay a request to write an illustrated article to **Writer**, which decides whether to take it on and owns the creation workflow, context and workspace. Assistant remains available for conversation and can relay follow-ups or a request to stop. Writer reports acceptance, selected milestones, questions and the final outcome. Message delivery, task acceptance and task completion each have their own confirmation.
@@ -37,7 +37,7 @@ Biological inspiration runs throughout MobileHarness. **Agents** resemble specia
 ### Requirements
 
 - A Mac with **Xcode 27+**, matching SDKs and **Swift 6.4+** tooling.
-- **Python 3** for optional model provisioning and repository checks.
+- **Python 3** for repository checks, model provisioning and Python experiments; install experiment dependencies for the selected backend separately.
 - An **iOS 27+ physical device** and development signing for the complete application.
 
 The app deployment target is iOS 27; the shared package declares iOS/macOS 26, with CoreAI execution requiring OS 27 and supported hardware. That package floor does not make the full app compatible with older iOS. XcodeGen and CocoaPods are not required.
@@ -87,9 +87,9 @@ On an audio route with active echo cancellation, the Assistant keeps listening w
 
 The current frontend has no text-entry field. Native and model failures are reported explicitly. An active inference request stays with its selected provider.
 
-Model downloads use an explicit Hugging Face, HF-Mirror or custom HTTPS source; YOLO retains its declared ZIP source. Production revisions remain pinned. Background transfer and resume depend on the OS and server; force-quit does not guarantee continued transfer. See [model resources](MobileHarness/Resources/Models/README.md) and the [Hub adapter](MobileHarness/ModelKit/Support/Management/HuggingFace/README.md) for acquisition, compatibility and recovery details.
+Model downloads use an explicit Hugging Face, HF-Mirror or custom HTTPS source; YOLO retains its declared ZIP source. Production revisions remain pinned. Background transfer and resume depend on the OS and server; force-quit does not guarantee continued transfer. See [model resources](MobileHarness/ModelKit/Support/Config/README.md) and the [Hub adapter](MobileHarness/ModelKit/Support/Management/HuggingFace/README.md) for acquisition, compatibility and recovery details.
 
-For offline development and opt-in Mac/model tests, existing `scripts/download-*.py` wrappers provision ignored local artifacts; Hugging Face wrappers accept `--endpoint`. Gemma Mac tests use a separate decoder profile. For voice experiments and acceptance procedures, see [Voice](docs/validation/Voice.md) and [MOSS validation](docs/validation/Moss-Validation.md).
+For local Gemma development, `python3 scripts/models/model_download.py gemma4-e2b --platform macos` provisions `Models/Gemma4`; `--endpoint` selects the download source. Other downloader profiles still use the legacy `MobileHarness/Resources/Models` destination, so check the [script inventory](scripts/README.md) before provisioning. Research and engineering should reuse verified artifacts in root [Models](Models/README.md) through their explicit resource settings. App-managed downloads are separate from this development workspace. See [Voice](docs/validation/Voice.md) and [MOSS validation](docs/validation/Moss-Validation.md) for native acceptance procedures.
 
 ## Development
 
@@ -98,21 +98,38 @@ For offline development and opt-in Mac/model tests, existing `scripts/download-*
 ./scripts/build-ios.sh
 ```
 
-`check.sh` runs static dependency/ownership checks, Python provisioning tests, strict Swift formatting, shared-package tests and project/privacy/entitlement metadata checks. `build-ios.sh` builds four unsigned simulator schemes with full Xcode using the explicit simulator variant and validates packaged Agent/Skill resources after the app build. Build results and real-model/native/device acceptance are recorded separately; see the [State validation record](docs/validation/Container-Reflexivity.md).
+Run these commands from the repository root. `check.sh` runs engineering boundary checks, Python tooling regressions, Swift formatting, package tests and project metadata checks. Timing-sensitive runtime tests run in a separate serial phase. `build-ios.sh` builds five unsigned simulator schemes and verifies packaged Agent/Skill, Island and localization resources.
+
+Research runner checks and model evaluations run separately from `check.sh`; use the commands in [experiments](experiments/README.md) and its task directories. For focused module tests, model communication checks and simulator acceptance, use the [Tests guide](Tests/README.md) and [script inventory](scripts/README.md). Report engineering tests, builds and real-model/native/device acceptance separately in [validation reports](docs/validation/README.md).
 
 [Package.swift](Package.swift) maps the existing source tree into independent targets; tests live in [Tests](Tests/README.md). ModelKit, PlatformKit, Storage and UI are foundational modules; base capability targets have no upper-layer project dependencies, while domain/adaptor targets retain their explicit internal dependencies. AgentCore and FunctionContracts are independent contracts. The complete target map, queue limits, cancellation and completion rules belong to [MobileHarness/README.md](MobileHarness/README.md).
 
+## Tests and experiments
+
+![Scripts runs independent Tests and experiments; both use shared Models artifacts.](imgs/agent-validation-workflow.svg)
+
+- [scripts/](scripts/README.md): Batch execution for development agents; orchestrates tests and experiments without owning their validation logic.
+- [Tests/](Tests/README.md): Swift module and integration tests for engineers, including small model communication checks.
+- [experiments/](experiments/README.md): Python model evaluations for researchers, using Apple Core AI / Core ML for local inference; task-owned prompts, scoring, `datasets/` inputs and `results/` raw outputs. Write methods and conclusions in `docs/`.
+- [Models/](Models/README.md): Verified artifacts downloaded from Hugging Face or other URLs, stored once per model and reused by both sides. Keep weights out of Git.
+
+Tests and experiments share only model artifacts, never code, configuration, datasets or results. See [AGENTS.md](AGENTS.md#9-agent-validation-workflow-and-directory-ownership) for development rules.
+
 ## Features
 
-| Feature                               | What you can do today                                                                                                                                                                                                                       |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Everyday interaction**              | Have multi-turn voice conversations with the Assistant, with live captions, spoken replies and expressive eyes and gaze.                                                                                                                    |
-| **Full-duplex voice interaction**     | On supported audio routes, speak while the Assistant is thinking or replying. The configured Decision model can queue a follow-up or confirm an interruption. [Technical design](MobileHarness/README.md#assistant-full-duplex-interaction) |
-| **Interactive UI**                    | Interact with generated pages, charts and small tools, manage content windows, and follow task progress in the in-app Island.                                                                                                               |
-| **NexArm robotic-arm control**        | Control a **NexArm** by voice, move individual joints, perform gestures such as nodding and waving, and aim using visual pose tracking.                                                                                                     |
-| **Intelligent photography and album** | Take photos and videos by voice or on-screen controls, adjust countdown, flash and zoom, and use NexArm for pose-driven aiming. Browse, replay, export and delete saved photos and videos in the app album.                                 |
-| **Writer text and visual authoring**  | Create articles, illustrated layouts, diagrams and interactive content. Preview results as they develop, refine them through conversation, and reopen or export saved work.                                                                 |
-| **Web browsing**                      | Ask the Assistant to open and read web pages, inspect page content and navigate in an in-app browser.                                                                                                                                       |
+**Everyday interaction** — Have multi-turn voice conversations with the Assistant, with live captions, spoken replies and expressive eyes and gaze.
+
+**Full-duplex voice interaction** — On supported audio routes, speak while the Assistant is thinking or replying. The configured Decision model can queue a follow-up or confirm an interruption. [Technical design](MobileHarness/README.md#assistant-full-duplex-interaction)
+
+**Interactive UI** — Interact with generated pages, charts and small tools, manage content windows, and follow task progress in the in-app Island.
+
+**NexArm robotic-arm control** — Control a **NexArm** by voice, move individual joints, perform gestures such as nodding and waving, and aim using visual pose tracking.
+
+**Intelligent photography and album** — Take photos and videos by voice or on-screen controls, adjust countdown, flash and zoom, and use NexArm for pose-driven aiming. Browse, replay, export and delete saved photos and videos in the app album.
+
+**Writer text and visual authoring** — Create articles, illustrated layouts, diagrams and interactive content. Preview results as they develop, refine them through conversation, and reopen or export saved work.
+
+**Web browsing** — Ask the Assistant to open and read web pages, inspect page content and navigate in an in-app browser.
 
 ## Examples
 
@@ -120,55 +137,55 @@ For offline development and opt-in Mac/model tests, existing `scripts/download-*
   <tr>
     <td align="center" valign="top" width="25%">
       <strong>Start listening</strong><br><br>
-      <a href="docs/imgs/start-listening-demo.gif"><img src="docs/imgs/start-listening-demo.gif" width="150" alt="Press and hold the companion's eyes to start listening"></a>
+      <a href="imgs/start-listening-demo.gif"><img src="imgs/start-listening-demo.gif" width="180" alt="Press and hold the companion's eyes to start listening"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>Everyday interaction</strong><br><br>
-      <a href="docs/imgs/everyday-voice-interaction.png"><img src="docs/imgs/everyday-voice-interaction.png" width="150" alt="Voice conversation with captions, expressive eyes and pose overlays"></a>
+      <a href="imgs/everyday-voice-interaction.png"><img src="imgs/everyday-voice-interaction.png" width="180" alt="Voice conversation with captions, expressive eyes and pose overlays"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>Multiple windows</strong><br><br>
-      <a href="docs/imgs/interactive-multiwindow.png"><img src="docs/imgs/interactive-multiwindow.png" width="150" alt="Multiple browser and Writer windows on the home screen"></a>
+      <a href="imgs/interactive-multiwindow.png"><img src="imgs/interactive-multiwindow.png" width="180" alt="Multiple browser and Writer windows on the home screen"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>Window control</strong><br><br>
-      <a href="docs/imgs/interactive-minimized-windows.png"><img src="docs/imgs/interactive-minimized-windows.png" width="150" alt="Browser and Writer windows minimized after a voice request"></a>
+      <a href="imgs/interactive-minimized-windows.png"><img src="imgs/interactive-minimized-windows.png" width="180" alt="Browser and Writer windows minimized after a voice request"></a>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top" width="25%">
       <strong>Web browsing</strong><br><br>
-      <a href="docs/imgs/web-browsing.png"><img src="docs/imgs/web-browsing.png" width="150" alt="Web search results shown in the in-app browser"></a>
+      <a href="imgs/web-browsing.png"><img src="imgs/web-browsing.png" width="180" alt="Web search results shown in the in-app browser"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>Photography</strong><br><br>
-      <a href="docs/imgs/photography-camera.png"><img src="docs/imgs/photography-camera.png" width="150" alt="Ongoing photography task with camera controls and recent-photo thumbnails"></a>
+      <a href="imgs/photography-camera.png"><img src="imgs/photography-camera.png" width="180" alt="Ongoing photography task with camera controls and recent-photo thumbnails"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>Photo album</strong><br><br>
-      <a href="docs/imgs/photography-album.png"><img src="docs/imgs/photography-album.png" width="150" alt="App album displaying a grid of saved photos"></a>
+      <a href="imgs/photography-album.png"><img src="imgs/photography-album.png" width="180" alt="App album displaying a grid of saved photos"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>Illustrated writing</strong><br><br>
-      <a href="docs/imgs/writer-illustrated-article.png"><img src="docs/imgs/writer-illustrated-article.png" width="150" alt="Writer article explaining the banker algorithm with tables and diagrams"></a>
+      <a href="imgs/writer-illustrated-article.png"><img src="imgs/writer-illustrated-article.png" width="180" alt="Writer article explaining the banker algorithm with tables and diagrams"></a>
     </td>
   </tr>
   <tr>
     <td align="center" valign="top" width="25%">
       <strong>Visual diagrams</strong><br><br>
-      <a href="docs/imgs/writer-visual-flowchart.png"><img src="docs/imgs/writer-visual-flowchart.png" width="150" alt="Writer-created visual processing flowchart reopened from saved work"></a>
+      <a href="imgs/writer-visual-flowchart.png"><img src="imgs/writer-visual-flowchart.png" width="180" alt="Writer-created visual processing flowchart reopened from saved work"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>Drawing in progress</strong><br><br>
-      <a href="docs/imgs/writer-drawing-demo.gif"><img src="docs/imgs/writer-drawing-demo.gif" width="150" alt="A drawing taking shape in the Writer preview"></a>
+      <a href="imgs/writer-drawing-demo.gif"><img src="imgs/writer-drawing-demo.gif" width="180" alt="A drawing taking shape in the Writer preview"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>NexArm control</strong><br><br>
-      <a href="docs/imgs/nexarm-control-demo.gif"><img src="docs/imgs/nexarm-control-demo.gif" width="150" alt="Animated demonstration of a phone mounted on a NexArm robotic arm"></a>
+      <a href="imgs/nexarm-control-demo.gif"><img src="imgs/nexarm-control-demo.gif" width="180" alt="Animated demonstration of a phone mounted on a NexArm robotic arm"></a>
     </td>
     <td align="center" valign="top" width="25%">
       <strong>NexArm motion</strong><br><br>
-      <a href="docs/imgs/nexarm-motion-demo.gif"><img src="docs/imgs/nexarm-motion-demo.gif" width="150" alt="NexArm moving the mounted phone during an Assistant interaction"></a>
+      <a href="imgs/nexarm-motion-demo.gif"><img src="imgs/nexarm-motion-demo.gif" width="180" alt="NexArm moving the mounted phone during an Assistant interaction"></a>
     </td>
   </tr>
 </table>
@@ -189,7 +206,7 @@ For offline development and opt-in Mac/model tests, existing `scripts/download-*
 | [Product scope](docs/Product-Scope.md) / [Concepts](docs/Concepts.md)      | Delivered product scope, biological analogy and architectural vocabulary.      |
 | [Public architecture](docs/Architecture.md)                                | Public system explanation and retained architecture context.                   |
 | [Technical design](MobileHarness/README.md)                                | Current framework, module boundaries, target map and complete technical flows. |
-| [Module READMEs](MobileHarness/README.md#part-ii--module-responsibilities) | Current local interfaces, algorithms, lifecycle, bounds and failure contracts. |
+| [Module READMEs](MobileHarness/README.md#part-ii--module-design) | Current local interfaces, algorithms, lifecycle, bounds and failure contracts. |
 | [Roadmap](docs/Roadmap.md)                                                 | Pending work and proposed directions.                                          |
 | [Change log](docs/history/Change-Log.md) / [ADRs](docs/adr/README.md)      | Changes, decisions and supersession.                                           |
 | [Validation](docs/README.md#experiments-tests-and-acceptance)              | Recorded experiments, tests, native/device observations and measurements.      |
@@ -198,22 +215,14 @@ This root README introduces the project and its concepts. Source READMEs define 
 
 ## Contributing
 
-Issues and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), use the issue/PR templates and discuss substantial architecture or dependency changes before implementing them.
-
-Useful contributions include reproducible device reports, focused fixes, tests, documentation and concrete capability integrations. Include the device/toolchain, expected and actual behavior, and sanitized reproduction steps. Keep foundational modules independent, declare effective Agent grants and update owning-module design documents with implementation changes.
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines and [AGENTS.md](AGENTS.md) for development rules.
 
 ## Security and Privacy
 
-The default inference configuration uses on-device speech and local chat; no cloud inference key is required for that mode. Model acquisition and Apple language-asset installation are separate network operations. Explicit cloud chat sends the selected request context, messages and any authorized attached photo content to the configured provider. Microphone processing, synthesis and YOLO pose inference remain local. The cloud adapter requests `store=false`; provider retention remains governed by that provider's policy.
-
-Credentials are retained in device Keychain; preferences, role contexts and captured-photo evidence use device-local storage. Provider drafts/keys are staged privately rather than inserted into model arguments or histories. Microphone, camera, Photos and Bluetooth operations check their actual platform capability/permissions. User consent controls listening; immediate native lifecycle fences do not wait for model decisions.
-
-Do not commit or post credentials, signing settings, model weights, recordings or private media. Follow [SECURITY.md](SECURITY.md) for sensitive reports; the repository has no configured private reporting channel yet. Physical control requires independent hardware protections and cannot rely on iOS background execution.
+See [SECURITY.md](SECURITY.md) for data handling, platform permissions and sensitive-report guidance. Never include credentials or private user data in public reports.
 
 ## License and Acknowledgments
 
-MobileHarness is source-available under the standard [PolyForm Noncommercial License 1.0.0](LICENSE). Noncommercial use, modification and redistribution are permitted under its terms. The license also expressly permits use by specified charitable, educational, public research, public safety or health, environmental protection and government organizations, regardless of funding source or resulting funding obligations. Uses outside the license's permitted purposes require separate authorization from the relevant rights holders; contact the [project owner](https://github.com/devilyouwei) for commercial licensing. This is a source-available license, not an OSI-approved open-source license.
+MobileHarness is source-available under [PolyForm Noncommercial 1.0.0](LICENSE). See [licensing details and third-party notices](docs/licenses/README.md) for usage terms and acknowledgments.
 
 Required Notice: Copyright (c) 2026 devilyouwei (https://github.com/devilyouwei)
-
-MobileHarness builds on Apple frameworks, CoreAI, Gemma 4 E2B, Nemotron, Silero, MOSS-TTS-Nano and Ultralytics YOLO. Kokoro remains an optional adapter/test integration rather than the production default. Dependencies and model artifacts retain their own redistribution conditions; the configured YOLO26 pose artifact declares AGPL-3.0. See [license notices](docs/licenses/README.md) and [resource profiles](MobileHarness/Resources/Models/README.md).

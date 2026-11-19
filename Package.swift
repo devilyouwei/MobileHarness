@@ -112,6 +112,312 @@ func databaseTarget(_ name: String, dependencies: [Target.Dependency]) -> Target
         sources: sources)
 }
 
+// Physical test ownership is independent of compilation targets. See Tests/README.md.
+let testSources: [String: [String]] = [
+    "AppWorkflowTests": [
+        "Tests/Agents/Support/WorkflowCatalogFixture.swift",
+        "Tests/App/Camera/CameraVisionRestartTests.swift",
+        "Tests/App/Camera/PhotoDispositionWorkflowTests.swift",
+        "Tests/App/Lifecycle/ApplicationEnvironmentInputsTests.swift",
+        "Tests/App/Lifecycle/ApplicationLifecycleTests.swift",
+        "Tests/App/Lifecycle/IndependentOutputTests.swift",
+        "Tests/App/Presentation/ActionActivityTests.swift",
+        "Tests/App/Presentation/ConversationHistoryWorkflowTests.swift",
+        "Tests/App/Presentation/ConversationPresentationTests.swift",
+        "Tests/App/Presentation/HomeEffectsTests.swift",
+        "Tests/App/Presentation/NativeInteractionWorkflowTests.swift",
+        "Tests/App/Presentation/WindowExecutionTests.swift",
+        "Tests/App/Resources/ModelResourceInteractionWorkflowTests.swift",
+        "Tests/App/Resources/ModelResourcesWorkflowTests.swift",
+        "Tests/App/Resources/ResourceObservationWorkflowTests.swift",
+        "Tests/App/Settings/SettingsInteractionTests.swift",
+        "Tests/App/Settings/SettingsTransactionTests.swift",
+        "Tests/App/Speech/AudioDetectionWorkflowTests.swift",
+        "Tests/App/Speech/ListeningActivationTests.swift",
+        "Tests/App/Speech/ListeningCaptureWorkflowTests.swift",
+        "Tests/App/Web/WebWorkspaceTests.swift",
+        "Tests/Agents/Writer/WriterWorkflowTests.swift",
+    ],
+    "EnergyVADTests": [
+        "Tests/ModelKit/Speech/VAD/Energy/EnergyVADTests.swift"
+    ],
+    "FunctionContractTests": [
+        "Tests/Actions/Contracts/Functions/FunctionContractTests.swift"
+    ],
+    "Gemma4Tests": [
+        "Tests/ModelKit/Language/Gemma4/Gemma4Tests.swift",
+        "Tests/ModelKit/Language/Gemma4/GemmaToolProtocolTests.swift",
+    ],
+    "IntegrationTests": [
+        "Tests/Agents/Assistant/AssistantCommunicationFixture.swift",
+        "Tests/Agents/Writer/WriterCommunicationFixture.swift",
+        "Tests/ModelKit/Management/Defaults/DecisionAdapterNativeTests.swift",
+        "Tests/ModelKit/Core/DecisionWeightArchiveTests.swift",
+        "Tests/Agents/Assistant/AssistantEvaluationRunnerTests.swift",
+
+        "Tests/Agents/Writer/WriterEvaluationRunnerTests.swift",
+
+        "Tests/Actions/Camera/CameraEnhancementTests.swift",
+        "Tests/Actions/Contracts/ActionAuthoringTests.swift",
+        "Tests/Actions/Contracts/ActionContractTests.swift",
+        "Tests/Actions/Contracts/ActionDeclarationTests.swift",
+        "Tests/Actions/Contracts/UnifiedCapabilityTests.swift",
+        "Tests/Actions/Execution/ActionCompositionTests.swift",
+        "Tests/Gateway/Output/ChannelSchedulerTests.swift",
+        "Tests/Actions/Execution/ActionLifecycleTests.swift",
+        "Tests/Actions/Execution/ActionObservationTests.swift",
+        "Tests/Actions/Execution/ActionsContainerTests.swift",
+        "Tests/Actions/Execution/BehaviorAssemblyTests.swift",
+        "Tests/Actions/History/HistoryToolTests.swift",
+        "Tests/Actions/NexArm/NexArmAimTests.swift",
+        "Tests/Actions/NexArm/NexArmArrivalPolicyTests.swift",
+        "Tests/Actions/NexArm/NexArmCausalTests.swift",
+        "Tests/Actions/NexArm/NexArmLegacyArrivalTracker.swift",
+        "Tests/Actions/NexArm/NexArmLegacyDiagnosticController.swift",
+        "Tests/Actions/NexArm/NexArmSerialAcceptanceTests.swift",
+        "Tests/Actions/NexArm/NexArmTelemetryTests.swift",
+        "Tests/Actions/NexArm/NexArmTests.swift",
+        "Tests/Actions/Speech/SpeechPlaybackTests.swift",
+        "Tests/Actions/Support/ActionCatalogFixture.swift",
+        "Tests/Actions/Support/ActionTestRegistry.swift",
+        "Tests/Actions/Support/BehaviorContractFixtures.swift",
+        "Tests/Actions/Support/ResolvedCallSupport.swift",
+        "Tests/Actions/System/ProviderDiscoveryTests.swift",
+        "Tests/Actions/System/ProviderSettingsTests.swift",
+        "Tests/Actions/System/ResourceInventoryTests.swift",
+        "Tests/Actions/System/ResourcePreferencesTests.swift",
+        "Tests/Actions/UI/AlbumNavigationTests.swift",
+        "Tests/Actions/UI/FeedbackActionTests.swift",
+        "Tests/Actions/UI/HomeEffectActionTests.swift",
+        "Tests/Actions/UI/UIToolTests.swift",
+        "Tests/Agents/Assistant/AssistantChatTests.swift",
+        "Tests/Agents/Assistant/ConversationHistoryTests.swift",
+        "Tests/Agents/Assistant/FunctionTokenParserTests.swift",
+        "Tests/Agents/Assistant/HistoryIntentTests.swift",
+        "Tests/Agents/Assistant/InputDecisionTests.swift",
+        "Tests/Agents/Assistant/InteractionPipelineTests.swift",
+        "Tests/Agents/Assistant/PromptTemplateTests.swift",
+        "Tests/Agents/Assistant/ResourceHostFailureTests.swift",
+        "Tests/Agents/Assistant/ResourceIntentTests.swift",
+        "Tests/Agents/Assistant/ResourceObservationTests.swift",
+        "Tests/Agents/Assistant/ResourcePresentationTests.swift",
+        "Tests/Agents/Assistant/SentenceFunctionTests.swift",
+        "Tests/Agents/Core/AgentArchitectureTests.swift",
+        "Tests/Agents/Core/AgentConfigurationTests.swift",
+        "Tests/Agents/Core/AgentContainerTests.swift",
+        "Tests/Agents/Core/AgentSpecialistTests.swift",
+        "Tests/Agents/Core/AgentTaskSkillTests.swift",
+        "Tests/Agents/Core/BehaviorTranslationTests.swift",
+        "Tests/Agents/Core/CommunicationTests.swift",
+        "Tests/Agents/Core/ContainerContextTests.swift",
+        "Tests/Agents/Core/ContainerFailureTests.swift",
+        "Tests/Agents/Core/GenerationRoundTests.swift",
+        "Tests/Agents/Core/RuntimeTests.swift",
+        "Tests/Agents/Photographer/CameraSamplingTests.swift",
+        "Tests/Agents/Photographer/EyeTrackingTests.swift",
+        "Tests/Agents/Photographer/PhotoFeedbackTests.swift",
+        "Tests/Agents/Photographer/PhotographerCameraTests.swift",
+        "Tests/Agents/Photographer/PhotographyPipelineTests.swift",
+        "Tests/Agents/SpeechPerception/SoundSourceTests.swift",
+        "Tests/Agents/SpeechPerception/SpeechEnhancementWorkflowTests.swift",
+        "Tests/Agents/SpeechPerception/VoiceTests.swift",
+        "Tests/Agents/Support/ContainerExecutionFixtures.swift",
+        "Tests/Agents/Support/DirectInputSupport.swift",
+        "Tests/Agents/Support/FixedTextChat.swift",
+        "Tests/Agents/Support/FixtureCommunications.swift",
+        "Tests/Agents/Support/SpeechRequestProbe.swift",
+        "Tests/Agents/Writer/WriterAgentTests.swift",
+        "Tests/App/Composition/FoundationFailureTests.swift",
+        "Tests/App/Composition/RootCompositionTests.swift",
+        "Tests/App/Composition/ProductionCompositionAcceptance.swift",
+        "Tests/Gateway/Input/DeviceInputTests.swift",
+        "Tests/Gateway/Output/GatewayContainerTests.swift",
+        "Tests/Gateway/Output/MediaTransportTests.swift",
+        "Tests/Gateway/Output/NativeAttachmentTests.swift",
+        "Tests/Gateway/Output/WindowGatewayTests.swift",
+        "Tests/PlatformKit/Audio/AudioCaptureReadinessTests.swift",
+        "Tests/PlatformKit/Audio/AudioSampleBufferReaderTests.swift",
+        "Tests/PlatformKit/Audio/PCMResamplerTests.swift",
+        "Tests/PlatformKit/Connectivity/NexArmBluetoothTests.swift",
+        "Tests/PlatformKit/Core/PlatformContainerTests.swift",
+        "Tests/PlatformKit/Core/PlatformStateTests.swift",
+        "Tests/PlatformKit/Vision/NativeImageCompressionTests.swift",
+        "Tests/Storage/Core/StorageContainerTests.swift",
+        "Tests/Storage/Core/StorageRuntimeTests.swift",
+        "Tests/Storage/Core/StorageTests.swift",
+        "Tests/Storage/Database/AlbumTests.swift",
+        "Tests/Storage/Database/DatabaseTableRecordTests.swift",
+        "Tests/Storage/Database/SQLiteDialogLifecycleTests.swift",
+        "Tests/Storage/Database/SQLiteRecordSupport.swift",
+        "Tests/Storage/Database/SQLiteRecordTests.swift",
+        "Tests/Storage/Database/StorageRepositoryContractTests.swift",
+        "Tests/Storage/Database/StorageSchemaTests.swift",
+        "Tests/Storage/Database/WorkspaceRepositoryTests.swift",
+        "Tests/Storage/Files/LocalFileStoreTests.swift",
+        "Tests/UI/Container/IslandIntegrationTests.swift",
+        "Tests/UI/Container/UIContainerTests.swift",
+    ],
+    "KokoroTests": [
+        "Tests/ModelKit/Speech/TTS/Kokoro/KokoroTests.swift"
+    ],
+    "ModelKitAppleSpeechTests": [
+        "Tests/ModelKit/Speech/Apple/AppleSpeechTests.swift"
+    ],
+    "ModelKitDefaultsTests": [
+        "Tests/ModelKit/Management/Defaults/D3NativeTests.swift",
+        "Tests/ModelKit/Management/Defaults/ChatExecutionTests.swift",
+        "Tests/ModelKit/Management/Defaults/DefaultsTests.swift",
+        "Tests/ModelKit/Management/Defaults/SpeechSelectionTests.swift",
+    ],
+    "ModelKitHubTests": [
+        "Tests/ModelKit/Management/Download/HuggingFaceDownloadTests.swift"
+    ],
+    "ModelKitRuntimeTests": [
+        "Tests/ModelKit/Management/Runtime/CompositionTests.swift",
+        "Tests/ModelKit/Management/Runtime/ModelArtifactTests.swift",
+        "Tests/ModelKit/Management/Runtime/ModelLifecycleTests.swift",
+        "Tests/ModelKit/Management/Runtime/RuntimeBoundaryTests.swift",
+    ],
+    "ModelKitTests": [
+        "Tests/ModelKit/Core/CapabilityTests.swift",
+        "Tests/ModelKit/Core/CoreBoundaryTests.swift",
+        "Tests/ModelKit/Core/InferenceTaskControlTests.swift",
+        "Tests/ModelKit/Core/MultiDecisionTests.swift",
+        "Tests/ModelKit/Core/SessionTests.swift",
+        "Tests/ModelKit/Language/Apple/AppleChatTests.swift",
+    ],
+    "MossNanoTests": [
+        "Tests/ModelKit/Speech/TTS/MossNano/MossNanoTests.swift"
+    ],
+    "NemotronTests": [
+        "Tests/ModelKit/Speech/ASR/NemotronTests.swift"
+    ],
+    "OpenAIChatTests": [
+        "Tests/ModelKit/Language/OpenAI/OpenAIChatTests.swift"
+    ],
+    "SileroTests": [
+        "Tests/ModelKit/Speech/Enhancement/DeepFilterTests.swift",
+        "Tests/ModelKit/Speech/Enhancement/WindowedEnhancementTests.swift",
+        "Tests/ModelKit/Speech/VAD/SileroTests.swift",
+    ],
+    "UITests": [
+        "Tests/UI/Camera/CameraControlAvailabilityTests.swift",
+        "Tests/UI/Camera/CameraFramePresentationTests.swift",
+        "Tests/UI/Camera/CameraGalleryTests.swift",
+        "Tests/UI/Conversation/CaptionPresentationTests.swift",
+        "Tests/UI/Conversation/ConversationHistoryPresentationTests.swift",
+        "Tests/UI/Navigation/NavigationContextTests.swift",
+        "Tests/UI/Navigation/PersistentHomeNavigationTests.swift",
+        "Tests/UI/Navigation/UIRequestsTests.swift",
+        "Tests/UI/Presentation/ExecutionLogTests.swift",
+        "Tests/UI/Presentation/EyeGeometryTests.swift",
+        "Tests/UI/Presentation/IslandStateTests.swift",
+        "Tests/UI/Presentation/IslandSystemPresentationTests.swift",
+        "Tests/UI/Presentation/ListeningMotionTests.swift",
+        "Tests/UI/Settings/AudioDetectionStateTests.swift",
+        "Tests/UI/Settings/BluetoothConnectionStateTests.swift",
+        "Tests/UI/Settings/SettingsStateTests.swift",
+        "Tests/UI/Window/WebPageTests.swift",
+        "Tests/UI/Window/WebSimulatorAcceptance.swift",
+        "Tests/UI/Window/WindowStateTests.swift",
+        "Tests/UI/Window/WriterRecordsNativeAcceptance.swift",
+    ],
+    "YOLOPoseTests": [
+        "Tests/ModelKit/Vision/CoreMLTensorTransferTests.swift",
+        "Tests/ModelKit/Vision/PoseTests.swift",
+    ],
+]
+
+let testNonSources = [
+    "experiments",
+    "Tests/UI/Camera/ManualAcceptance.md",
+    "Tests/ModelKit/Management/Defaults/decision-swift-adapters-input-2026-11-18.json",
+    "Tests/ModelKit/Management/Defaults/decision-laya-swift-token-input-2026-11-18.json",
+
+    "Tests/Actions/Camera/README.md",
+    "Tests/Actions/Contracts/Functions/README.md",
+    "Tests/Actions/Contracts/README.md",
+    "Tests/Actions/Execution/README.md",
+    "Tests/Actions/History/README.md",
+    "Tests/Actions/NexArm/README.md",
+    "Tests/Actions/README.md",
+    "Tests/Actions/Speech/README.md",
+    "Tests/Actions/Support/README.md",
+    "Tests/Actions/System/README.md",
+    "Tests/Actions/UI/README.md",
+    "Tests/Agents/Assistant/README.md",
+    "Tests/Agents/Core/README.md",
+    "Tests/Agents/Photographer/README.md",
+    "Tests/Agents/README.md",
+    "Tests/Agents/SpeechPerception/README.md",
+    "Tests/Agents/Support/README.md",
+    "Tests/Agents/Writer/README.md",
+    "Tests/App/Camera/README.md",
+    "Tests/App/Composition/README.md",
+    "Tests/App/Lifecycle/README.md",
+    "Tests/App/Presentation/README.md",
+    "Tests/App/README.md",
+    "Tests/App/Resources/README.md",
+    "Tests/App/Settings/README.md",
+    "Tests/App/Speech/README.md",
+    "Tests/App/Web/README.md",
+    "Tests/Gateway/Input/README.md",
+    "Tests/Gateway/Output/README.md",
+    "Tests/Gateway/README.md",
+    "Tests/ModelKit/Core/README.md",
+    "Tests/ModelKit/Language/Apple/README.md",
+    "Tests/ModelKit/Language/Gemma4/README.md",
+    "Tests/ModelKit/Language/Gemma4/gemma4-e2b-macos.download.json",
+    "Tests/ModelKit/Language/OpenAI/README.md",
+    "Tests/ModelKit/Language/README.md",
+    "Tests/ModelKit/Management/Defaults/README.md",
+    "Tests/ModelKit/Management/Download/README.md",
+    "Tests/ModelKit/Management/README.md",
+    "Tests/ModelKit/Management/Runtime/README.md",
+    "Tests/ModelKit/README.md",
+    "Tests/ModelKit/Speech/ASR/README.md",
+    "Tests/ModelKit/Speech/Apple/README.md",
+    "Tests/ModelKit/Speech/Enhancement/README.md",
+    "Tests/ModelKit/Speech/README.md",
+    "Tests/ModelKit/Speech/TTS/Kokoro/README.md",
+    "Tests/ModelKit/Speech/TTS/MossNano/README.md",
+    "Tests/ModelKit/Speech/TTS/README.md",
+    "Tests/ModelKit/Speech/VAD/Energy/README.md",
+    "Tests/ModelKit/Speech/VAD/README.md",
+    "Tests/ModelKit/Vision/README.md",
+    "Tests/PlatformKit/Audio/README.md",
+    "Tests/PlatformKit/Connectivity/README.md",
+    "Tests/PlatformKit/Core/README.md",
+    "Tests/PlatformKit/README.md",
+    "Tests/PlatformKit/Vision/README.md",
+    "Tests/README.md",
+    "Tests/Storage/Core/README.md",
+    "Tests/Storage/Database/README.md",
+    "Tests/Storage/Files/README.md",
+    "Tests/Storage/README.md",
+    "Tests/UI/Camera/README.md",
+    "Tests/UI/Container/README.md",
+    "Tests/UI/Conversation/README.md",
+    "Tests/UI/Navigation/README.md",
+    "Tests/UI/Presentation/README.md",
+    "Tests/UI/README.md",
+    "Tests/UI/Settings/README.md",
+    "Tests/UI/Window/README.md",
+]
+
+func organizedTestTarget(name: String, dependencies: [Target.Dependency]) -> Target {
+    let unrelated = [
+        "MobileHarness", "Macros", "Models", "Config", "docs", "scripts", "output", "build",
+        "MobileHarness.xcodeproj", "AGENTS.md", "CONTRIBUTING.md", "LICENSE", "README.md", "SECURITY.md",
+    ]
+    let repository = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    return .testTarget(
+        name: name, dependencies: dependencies, path: ".",
+        exclude: unrelated.filter { FileManager.default.fileExists(atPath: repository.appendingPathComponent($0).path) }
+            + testNonSources + testSources.filter { $0.key != name }.flatMap(\.value),
+        sources: testSources[name])
+}
+
 let package = Package(
     name: "HarnessKit",
     defaultLocalization: "en",
@@ -201,21 +507,20 @@ let package = Package(
         .target(
             name: "AppLifecycle", dependencies: [], path: "MobileHarness/App/Lifecycle",
             exclude: ["README.md", "ApplicationSystemDelegate.swift"], sources: ["ApplicationLifecycle.swift"]),
-        .testTarget(
+        organizedTestTarget(
             name: "ModelKitHubTests",
             dependencies: [
                 "ModelKitHub", "ModelKitRuntime", .product(name: "HuggingFace", package: "swift-huggingface"),
-            ], exclude: ["README.md"]),
-        .testTarget(name: "UITests", dependencies: ["UI"], exclude: ["README.md"]),
-        .testTarget(
+            ]),
+        organizedTestTarget(name: "UITests", dependencies: ["UI"]),
+        organizedTestTarget(
             name: "AppWorkflowTests",
             dependencies: [
                 "StorageFiles",
                 "StorageCore",
                 "AppLifecycle", "Gateway", "Actions", "FunctionContracts",
                 "ExecutionRuntime", "PlatformKit", "UI", "StorageChat", "ModelKit", "Agents",
-            ],
-            exclude: ["README.md"]),
+            ]),
         .target(
             name: "AgentCore", dependencies: ["FunctionContracts"], path: "MobileHarness/Agents/Support/Core",
             exclude: [
@@ -404,9 +709,7 @@ let package = Package(
         .target(
             name: "ModelKitOpenAI", dependencies: ["ModelKit"],
             path: "MobileHarness/ModelKit/Language/LLM/OpenAI", exclude: ["README.md"]),
-        .testTarget(
-            name: "OpenAIChatTests", dependencies: ["ModelKit", "ModelKitOpenAI", "ModelKitRuntime"],
-            exclude: ["README.md"]),
+        organizedTestTarget(name: "OpenAIChatTests", dependencies: ["ModelKit", "ModelKitOpenAI", "ModelKitRuntime"]),
         .target(
             name: "ModelKitAppleLLM", dependencies: ["ModelKit"],
             path: "MobileHarness/ModelKit/Language/LLM/Apple", exclude: ["README.md"]),
@@ -469,10 +772,8 @@ let package = Package(
         .target(
             name: "ModelKitYOLOPose", dependencies: ["ModelKit", "ModelKitCoreML"],
             path: "MobileHarness/ModelKit/Vision/YOLO", exclude: ["README.md"]),
-        .testTarget(
-            name: "YOLOPoseTests",
-            dependencies: ["ModelKit", "ModelKitYOLOPose", "ModelKitCoreML", "ModelKitRuntime"],
-            exclude: ["README.md"]),
+        organizedTestTarget(
+            name: "YOLOPoseTests", dependencies: ["ModelKit", "ModelKitYOLOPose", "ModelKitCoreML", "ModelKitRuntime"]),
         .target(name: "ModelKitCoreML", path: "MobileHarness/ModelKit/Support/Backends/CoreML"),
         .target(
             name: "ModelKitDeepFilterNet3", dependencies: ["ModelKit", "ModelKitCoreML"],
@@ -480,45 +781,37 @@ let package = Package(
         .target(
             name: "ModelKitSilero", dependencies: ["ModelKit", "ModelKitCoreML"],
             path: "MobileHarness/ModelKit/Speech/VAD/Silero", exclude: ["README.md"]),
-        .testTarget(
+        organizedTestTarget(
             name: "SileroTests",
             dependencies: [
                 "ModelKit", "ModelKitDeepFilterNet3", "ModelKitSilero", "ModelKitNemotron", "ModelKitKokoro", "Agents",
                 "PlatformKit",
-            ], exclude: ["README.md"]),
+            ]),
         .target(
             name: "ModelKitCoreAI", path: "MobileHarness/ModelKit/Support/Backends/CoreAI", exclude: ["README.md"]),
         .target(
             name: "ModelKitNemotron",
             dependencies: ["ModelKit", .product(name: "FluidAudio", package: "FluidAudio")],
             path: "MobileHarness/ModelKit/Speech/ASR/Nemotron", exclude: ["README.md"]),
-        .testTarget(
-            name: "EnergyVADTests", dependencies: ["ModelKit", "ModelKitEnergy"], exclude: ["README.md"]),
-        .testTarget(
-            name: "NemotronTests", dependencies: ["ModelKit", "ModelKitNemotron"],
-            exclude: ["README.md"]),
+        organizedTestTarget(name: "EnergyVADTests", dependencies: ["ModelKit", "ModelKitEnergy"]),
+        organizedTestTarget(name: "NemotronTests", dependencies: ["ModelKit", "ModelKitNemotron"]),
         .target(
             name: "ModelKitMossNano", dependencies: ["ModelKit"],
             path: "MobileHarness/ModelKit/Speech/TTS/MossNano", exclude: ["README.md"]),
-        .testTarget(
-            name: "MossNanoTests", dependencies: ["ModelKit", "ModelKitMossNano"],
-            exclude: ["README.md"]),
+        organizedTestTarget(name: "MossNanoTests", dependencies: ["ModelKit", "ModelKitMossNano"]),
         .target(
             name: "ModelKitKokoro",
             dependencies: ["ModelKit", .product(name: "FluidAudio", package: "FluidAudio")],
             path: "MobileHarness/ModelKit/Speech/TTS/Kokoro", exclude: ["README.md"]),
-        .testTarget(
-            name: "KokoroTests", dependencies: ["ModelKit", "ModelKitKokoro"], exclude: ["README.md"]),
+        organizedTestTarget(name: "KokoroTests", dependencies: ["ModelKit", "ModelKitKokoro"]),
         .target(
             name: "PlatformKit", dependencies: [], path: "MobileHarness/PlatformKit",
             exclude: [
                 "README.md", "Audio/README.md", "Vision/README.md", "Core/README.md", "Connectivity/README.md",
                 "Connectivity/NexArm/README.md",
             ]),
-        .testTarget(
-            name: "FunctionContractTests", dependencies: ["FunctionContracts"],
-            path: "Tests/FunctionContractTests", exclude: ["README.md"]),
-        .testTarget(
+        organizedTestTarget(name: "FunctionContractTests", dependencies: ["FunctionContracts"]),
+        organizedTestTarget(
             name: "IntegrationTests",
             dependencies: [
                 .product(name: "GRDB", package: "GRDB.swift"),
@@ -529,8 +822,7 @@ let package = Package(
                 "ModelKit", "ModelKitOpenAI", "ModelKitRuntime", "ModelKitAppleLLM", "ModelKitD3", "ModelKitCoreAI",
                 "StorageChat", "StorageCache", "StorageTasks", "StorageMedia", "StorageDevices", "StorageSQLite",
                 "PlatformKit",
-            ],
-            exclude: ["README.md"]),
+            ]),
         .target(
             name: "ModelKitGemma4",
             dependencies: [
@@ -538,24 +830,13 @@ let package = Package(
                 .product(name: "Tokenizers", package: "swift-transformers"),
             ],
             path: "MobileHarness/ModelKit/Language/LLM/Gemma4", exclude: ["README.md"]),
-        .testTarget(
-            name: "Gemma4Tests", dependencies: ["StorageCore", "ModelKit", "ModelKitGemma4"],
-            exclude: ["README.md", "gemma4-e2b-macos.download.json"]),
-        .testTarget(
-            name: "AgentModelEvaluationTests",
-            dependencies: ["StorageCore", "AgentCore", "Agents", "ModelKit", "ModelKitGemma4"],
-            exclude: ["README.md"], resources: [.copy("Scenarios")]),
-        .testTarget(
+        organizedTestTarget(name: "Gemma4Tests", dependencies: ["StorageCore", "ModelKit", "ModelKitGemma4"]),
+        organizedTestTarget(
             name: "ModelKitDefaultsTests",
-            dependencies: ["ModelKit", "ModelKitRuntime", "ModelKitDefaults", "ModelKitOpenAI"],
-            exclude: ["README.md"]),
-        .testTarget(name: "ModelKitTests", dependencies: ["ModelKit", "ModelKitAppleLLM"], exclude: ["README.md"]),
-        .testTarget(
-            name: "ModelKitRuntimeTests", dependencies: ["ModelKit", "ModelKitRuntime"],
-            exclude: ["README.md"]),
-        .testTarget(
-            name: "ModelKitAppleSpeechTests", dependencies: ["ModelKit", "ModelKitAppleSpeech"],
-            exclude: ["README.md"]),
+            dependencies: ["ModelKit", "ModelKitRuntime", "ModelKitDefaults", "ModelKitOpenAI"]),
+        organizedTestTarget(name: "ModelKitTests", dependencies: ["ModelKit", "ModelKitAppleLLM"]),
+        organizedTestTarget(name: "ModelKitRuntimeTests", dependencies: ["ModelKit", "ModelKitRuntime"]),
+        organizedTestTarget(name: "ModelKitAppleSpeechTests", dependencies: ["ModelKit", "ModelKitAppleSpeech"]),
     ],
     swiftLanguageModes: [.v6]
 )

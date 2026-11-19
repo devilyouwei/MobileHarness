@@ -36,7 +36,7 @@ Writer拥有750ms预览worker，一个在途+一个最新待呈现请求，通�
 
 完整检查首轮发现两项问题：SQLite合法的空预留身份没有metadata，轻量查询误将其作为JSON解析；预览用例在千项并发运行中未能在测试5秒内获得调度。前者增加空data分支、非空损坏JSON仍报错；后者只放宽测试启动等待至20秒，不改变生产750ms或取消/不重试断言。最终检查结果在下节列出，首轮exit1不改写为通过。
 
-[机器结果](Writer-Continuous-Progress.json)和[逐请求/预览轨迹](Writer-Continuous-Progress-Requests.json)来自一次未变Writer/Artifacts/OpenAI源码与测试二进制的真实矩阵，sourceUnchanged=true、binaryUnchanged=true，两个进程exit0，各6/6通过。使用被忽略的.env.local阿里兼容端点、Qwen3.8-max和实际Provider ID deepseek-v4.1-flash；均thinking enabled、maximumOutputTokens=provider default。没有生产总轮数/任务时限。评估自身保留36请求/600秒显式取消边界，方法及macOS WebKit适配器限制沿用[前次实验](Writer-Model-Regression.md)。
+[机器结果](../../experiments/writer/results/writer-continuous-progress.json)和[逐请求/预览轨迹](../../experiments/writer/results/writer-continuous-progress-requests.json)来自一次未变Writer/Artifacts/OpenAI源码与测试二进制的真实矩阵，sourceUnchanged=true、binaryUnchanged=true，两个进程exit0，各6/6通过。使用被忽略的.env.local阿里兼容端点、Qwen3.8-max和实际Provider ID deepseek-v4.1-flash；均thinking enabled、maximumOutputTokens=provider default。没有生产总轮数/任务时限。评估自身保留36请求/600秒显式取消边界，方法及macOS WebKit适配器限制沿用[前次实验](Writer-Model-Regression.md)。
 
 | 流程 | Qwen：秒 / 请求 / 预览帧 | DeepSeek：秒 / 请求 / 预览帧 |
 | --- | ---: | ---: |
@@ -58,7 +58,7 @@ Qwen内容首事件等待148.56秒、内容请求183.02秒；DeepSeek47.43/55.41
 
 ### 原生模拟器
 
-宿主缺少Simulator.app，但独立XCTest runner成功在iOS27模拟器实际启动并点击生产App。`scripts/test-writer-records-simulator.sh`使用独立设备82F45964-B809-469A-8358-9AEA6A2636F3，只读backup模型实验SQLite（包含WAL提交）至该模拟器，并复制对应作品文件；没有替换真机或原有用户模拟器数据。模拟器截图中的task_6是该独立评估数据库的JS修复用例，不是真机基线中的流程图task_6。
+宿主缺少Simulator.app，但独立XCTest runner成功在iOS27模拟器实际启动并点击生产App。`scripts/simulator/test-writer-records-simulator.sh`使用独立设备82F45964-B809-469A-8358-9AEA6A2636F3，只读backup模型实验SQLite（包含WAL提交）至该模拟器，并复制对应作品文件；没有替换真机或原有用户模拟器数据。模拟器截图中的task_6是该独立评估数据库的JS修复用例，不是真机基线中的流程图task_6。
 
 首轮页面点击均正常，分享断言因iOS27将Copy呈现为Cell而非Button失败；改为验证原生活动集合。种子改为一致backup后复测通过。最终扩展验收包含独立入口、图标/目标/状态/轮次、头部操作、文件列表与HTML WebView、PDF/ZIP原生分享、原生请求详情、任务对话分享；结果见最终检查表。该验证导入人工设定的测试目标及对应真实模型请求历史，不是在模拟器现场发起创作，不代表语音→真实模型→iOS窗口全流程。最终XCTest为1项通过、0失败，37.13秒；xcresult位于`/tmp/mobileharness-writer-ui.5us2Yf/WriterUI.xcresult`。
 

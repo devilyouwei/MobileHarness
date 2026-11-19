@@ -1,0 +1,10 @@
+{
+  "zh": {
+    "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+    "discard": "用户最新消息是否没有可理解的交流含义，应当丢弃？有意义的请求、问题、陈述、回答、问候和可澄清的半句话都不应丢弃。"
+  },
+  "en": {
+    "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+    "discard": "Does the latest user message lack understandable communicative meaning and warrant discarding? Meaningful requests, questions, statements, answers, greetings and fragments that can be clarified should not be discarded."
+  }
+}

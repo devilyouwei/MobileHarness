@@ -87,7 +87,7 @@ output[1].arguments = "{}"
 
 ## 验证与证据
 
-- [完整测量与请求/公开响应](../measurements/qwen-protocol-comparison-2026-10-17.json)：包括主实验138个trial、170请求，18个标记探针、原始判定、函数/schema、输入、原生名、反馈配对、源hash和补充探针源码。主脚本运行期间 hash 不变；旧生产53场景报告没有重写。
+- [完整测量与请求/公开响应](../../experiments/assistant/results/qwen-protocol-comparison-2026-10-17.json)：包括主实验138个trial、170请求，18个标记探针、原始判定、函数/schema、输入、原生名、反馈配对、源hash和补充探针源码。主脚本运行期间 hash 不变；旧生产53场景报告没有重写。
 - 新 Python 离线5项测试通过，覆盖声明分区、合法同响应混合、错误通道/名称/参数、依赖分轮及原始 call_id 配对。没有网络测试被加入常规 check。
 - 现有生产框架 generationRoundActualOutputControlsContinuationForAllThreeRoutes 的6种 action/tool/mixed×value 情况，以及 generationRoundToolBypassesWaitButContinuationJoinsEveryAction 均通过；原生参数计时相关用例也通过。这些是生产 Agent/Gateway 加确定性模型/执行替身，支持框架混合能力，不是云业务混合成功。
 - ./scripts/check.sh：边界/资源、6项既有Python、严格格式和编译通过；OpenAI42/UI67/AppWorkflow118通过。Integration909仍有8项失败/15个issues，全量不通过。这轮只增加Python实验/测试与文档，未修改生产Swift，未修复这些时序路径。

@@ -36,7 +36,7 @@ Qwen3 0.6B 使用 Mac INT4，MiniCPM5 1.08B 使用 INT8，Qwen2.5 1.54B Instruct
 - Qwen3 1.7B 两组均未通过整段输出校验，常见行为是复述选项或解释，不能与已合规的错误分类混为一类。上一轮较短的数字提示曾有 96 条合规，说明该结果依赖本轮提示和输出协议。
 - Qwen3.5 0.8B 两组都输出合规数字，两组各漏掉 24 条应打断。中文 99 条入队，英文 100 条入队。当前 Mac 图与上下文顺序的 200 条均超预算，延迟证据限于本制品与逐 token 预填充路径。
 
-[逐条输出、混淆矩阵、提示词、SHA-256 与复现代码](../measurements/duplex-llm-bilingual-digits-coreai-2026-11-14.json)。原始 JSON 也保存按样例语言和来源分组的结果、两版逐条差异以及旧实验文件哈希。App 代码没有修改。本轮是 Mac 本地文本实验，未测量 iPhone 上的 ASR 到决策延迟。
+[逐条输出、混淆矩阵、提示词、SHA-256 与复现代码](../../experiments/decision/results/duplex-llm-bilingual-digits-coreai-2026-11-14.json)。原始 JSON 也保存按样例语言和来源分组的结果、两版逐条差异以及旧实验文件哈希。App 代码没有修改。本轮是 Mac 本地文本实验，未测量 iPhone 上的 ASR 到决策延迟。
 
 ## D3 Edge 同批对照
 
@@ -57,7 +57,7 @@ D3 英文 Choice 比旧提示多答对 18 条，比本轮通用 LLM 最好的配
 
 D3 共 500 条热态推理全部有效且在 500 ms 内，最长 51.82 ms。上述延迟是 Mac 本地文本推理，排除模型装载和 ASR。选项呈现和原生读出都保留各自模型的协议，因此横向对照比较的是完整配置的表现。App 运行时及默认提示未修改。
 
-[实际渲染提示、图 SHA-256、500 条候选分数与复现代码](../measurements/duplex-d3-bilingual-digits-coreai-2026-11-14.json)。
+[实际渲染提示、图 SHA-256、500 条候选分数与复现代码](../../experiments/decision/results/duplex-d3-bilingual-digits-coreai-2026-11-14.json)。
 
 ## 去掉动作定义的对照
 
@@ -100,7 +100,7 @@ D3 四组的正确数下降 9–28 条，热态 p95 差值均小于 0.5 ms。中
 
 此次完成 14 组共 1400 条简化提示推理，另完成 100 条 D3 旧提示对照。App 未修改。延迟限于 Mac 热态文本推理。
 
-[简化提示、逐条输出、混淆矩阵、前轮差值与复现代码](../measurements/duplex-local-no-action-definitions-coreai-2026-11-14.json)。
+[简化提示、逐条输出、混淆矩阵、前轮差值与复现代码](../../experiments/decision/results/duplex-local-no-action-definitions-coreai-2026-11-14.json)。
 
 ## 历史对话与缓冲区格式复测
 
@@ -135,4 +135,4 @@ D3 的原生模板把前两段放入 `State`，后两段放入 `Question`，模�
 
 D3 两组都没有选过入队。Qwen2.5 中英文共 72 次都未生成单个数字，多数复述完整选项，如 `3. 进入队列等待下一轮`，所以表中 0 表示严格格式下的计分。共 144 次热态推理全部在 500 ms 内。素材与上面的 100 条数字实验不同，分数不能直接相减。App 运行时未改。
 
-[实际渲染提示、36 条用例、逐条读出和复现脚本](../measurements/duplex-history-buffer-prompt-coreai-2026-11-14.json)。
+[实际渲染提示、36 条用例、逐条读出和复现脚本](../../experiments/decision/results/duplex-history-buffer-prompt-coreai-2026-11-14.json)。

@@ -95,7 +95,7 @@ Decision 仅执行所选模型，本地和云端互斥；移除 UI 的 Cloud fal
 
 Gemma4Chat 负责能力声明、请求校验、工具输出有界缓冲、完成校验和中立事件；GemmaLanguageEngine 负责原始模板编码、在工具响应起始标记停止并维持取消/释放语义；同目录工具适配器负责嵌套对象/数组/字符串/数值解析、拒绝重复键、未知函数、无效/截断输出及 required 工具违约。完整生成成功并校验全部调用后才发布工具事件；错误不执行工具。工具结果仍由调用方执行后回传，ModelKit 不拥有业务执行。更新 Writer/UI 双语能力说明以及 ModelKit/LLM/Gemma4/Writer 和总体设计。新增无权重协议、往返、失败和上下文回归；真实权重与设备验收单独记录。运行 check.sh、build-ios.sh。
 
-集成核对补充：ModelContainer.ConfiguredChat 的固定配置包装器不能再以 configuration != nil 推断工具能力。由 ModelScope 按该包装器冻结的配置解析轻量 capability（本地 get(load:false)，云端沿既有缓存），异步转发 supportsToolCalls/supportsImages；不得借用会变化的 Assistant 默认选择。Tests/ModelKitDefaultsTests 验证本地、云端及独立根的实际能力、固定本地选择不随默认配置变化，并保留无权重加载断言。同步 ModelKit 和默认装配测试文档。
+集成核对补充：ModelContainer.ConfiguredChat 的固定配置包装器不能再以 configuration != nil 推断工具能力。由 ModelScope 按该包装器冻结的配置解析轻量 capability（本地 get(load:false)，云端沿既有缓存），异步转发 supportsToolCalls/supportsImages；不得借用会变化的 Assistant 默认选择。Tests/ModelKit/Management/Defaults 验证本地、云端及独立根的实际能力、固定本地选择不随默认配置变化，并保留无权重加载断言。同步 ModelKit 和默认装配测试文档。
 
 本地工具模板、解析/结果回传、固定配置能力透传和双语说明已实现；专项回归与 iOS 构建通过。真实权重工具选择质量及设备验收待执行；全量测试的失败与未完成套件保留于 [验证记录](../../validation/Provider-Management.md#local-gemma-native-tools-2026-11-15)。
 

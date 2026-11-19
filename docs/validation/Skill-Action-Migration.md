@@ -46,8 +46,8 @@ Validation uses production registration, query execution/value continuation, Tas
 
 ## 证据与复现
 
-[永久测量](../measurements/qwen-all-action-2026-10-17-full1.json)包含原始判定、实际响应/调用/State/生成轮次、规范化解码请求、原编码 hash/字节数和499项源清单。长字符串按 `$text`/textPool 去重；requestPool 按原 requestJSON hash 寻址。完整 provider-neutral 请求保留，不是 HTTP wire 捕获；不含 ENV 凭据或手机数据。
+[永久测量](../../experiments/assistant/results/qwen-all-action-2026-10-17-full1.json)包含原始判定、实际响应/调用/State/生成轮次、规范化解码请求、原编码 hash/字节数和499项源清单。长字符串按 `$text`/textPool 去重；requestPool 按原 requestJSON hash 寻址。完整 provider-neutral 请求保留，不是 HTTP wire 捕获；不含 ENV 凭据或手机数据。
 
-运行：`python3 scripts/evaluate-qwen.py --skip-build --models qwen3.8-max qwen3.8-flash --parallel 2 --output-prefix /tmp/qwen-all-action-20261017-full1`。skip-build 使用前述已重新编译的测试二进制。每场景32请求、每输入10请求/180秒，沿用现有准入/取消并加入契约。
+运行：`python3 experiments/assistant/evaluate_qwen.py --skip-build --models qwen3.8-max qwen3.8-flash --parallel 2 --output-prefix /tmp/qwen-all-action-20261017-full1`。skip-build 使用前述已重新编译的测试二进制。每场景32请求、每输入10请求/180秒，沿用现有准入/取消并加入契约。
 
 主机证据：`/tmp/qwen-all-action-20261017-full1*.json/.log`、`/tmp/skill-action-source-manifest.json`、`/tmp/skill-action-focused1.log`、`/tmp/skill-action-focused2.log`、`/tmp/skill-action-check.log`、`/tmp/skill-action-rechecks.json` 与逐项日志、`/tmp/skill-action-ios.log`、`/tmp/skill-action-device.log`。不以临时路径代替上述永久测量。没有 commit、merge、安装、OpenAI 或其他模型调用。

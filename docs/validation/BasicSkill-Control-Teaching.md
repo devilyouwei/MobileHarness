@@ -22,7 +22,7 @@ JSON 与改动前逐字段比较，只有 revision 和 description 改变；vers
 
 ## 真实模型与合成执行
 
-Qwen3.8 Max，生产 Assistant/Gateway、已编译 IntegrationTests 与合成设备/网页反馈。每轮先逐字节核对编译资源包的 BasicSkill 与源码一致，再使用既有 evaluate-qwen.py 的 skip-build 路径；测试二进制位置已知，省略会占共享构建锁的路径查询，不修改共享 bundle。两轮 sourceUnchanged 均为 true；原始回复、调用、请求/相关源码 hash 摘录见[测量记录](../measurements/basic-skill-control-2026-11-08.json)。
+Qwen3.8 Max，生产 Assistant/Gateway、已编译 IntegrationTests 与合成设备/网页反馈。每轮先逐字节核对编译资源包的 BasicSkill 与源码一致，再使用既有 evaluate_qwen.py 的 skip-build 路径；测试二进制位置已知，省略会占共享构建锁的路径查询，不修改共享 bundle。两轮 sourceUnchanged 均为 true；原始回复、调用、请求/相关源码 hash 摘录见[测量记录](../../experiments/assistant/results/basic-skill-control-2026-11-08.json)。
 
 首轮自动评分 5/9。除技能数组 XML 引号错误、误读相机已启用状态、点头误选表情外，旧 task-continue 场景还遭遇评估夹具不适配：模型调用当前 canonical 的 previewID，QwenEffects 仍使用 mediaID 比对，导致 photoUnavailable。该失败保留，不能据此判断 Task 完成教学失效；没有修改摄影实现或伪装成功。
 
@@ -52,4 +52,4 @@ Qwen3.8 Max，生产 Assistant/Gateway、已编译 IntegrationTests 与合成设
 
 安装结果：签名 Debug 真机构建成功，严格深层签名、30 项 Agent/Skill 资源及 Live Activity 打包校验通过。覆盖安装成功（安装序列 6360），独立应用清单确认 0.1.0 / 2026110807；包内 BasicSkill revision 50 与源文件一致。未执行卸载、主动清空应用数据或更改 Provider 配置。
 
-系统启动请求失败：手机处于锁屏状态，返回 FBSOpenApplicationErrorDomain code 7（Locked）。安装已完成，但未验证启动、原生交互或真实模型行为；解锁后可手动打开应用。[测量记录](../measurements/basic-skill-control-2026-11-08.json)的 deviceInstallation 保存安装结果和本机原始日志哈希。
+系统启动请求失败：手机处于锁屏状态，返回 FBSOpenApplicationErrorDomain code 7（Locked）。安装已完成，但未验证启动、原生交互或真实模型行为；解锁后可手动打开应用。[测量记录](../../experiments/assistant/results/basic-skill-control-2026-11-08.json)的 deviceInstallation 保存安装结果和本机原始日志哈希。

@@ -8,7 +8,7 @@
 
 - `MobileHarness/Agents/Assistant/AssistantChatWorker.swift`：两种结果输入继承来源 input 的 turn 与 taskScope；结果消息 ID、来源、父子关系保持原有独立归属。新模型请求继续生成独立 Decision 身份，并通过现有 beginReplyTurn 替换字幕。
 - 不更改 Actions 的会话、取消轮次、来源、Decision、Task 和序号校验；没有呈现轮次的后台输入不凭空创建轮次。队列、取消与生命周期仍由 Assistant 拥有。
-- `Tests/IntegrationTests/GenerationRoundTests.swift`：使用替身模型和真实字幕接纳策略覆盖 Action/native Tool 结果后的正文显示、旧 Decision 拒绝及取消轮次拒绝。
+- `Tests/Agents/Core/GenerationRoundTests.swift`：使用替身模型和真实字幕接纳策略覆盖 Action/native Tool 结果后的正文显示、旧 Decision 拒绝及取消轮次拒绝。
 - 实施后同步 Assistant README 和测试 README；跨模块接口不变。
 
 ## 验证

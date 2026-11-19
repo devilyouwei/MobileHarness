@@ -1,0 +1,34 @@
+[
+  {
+    "id": "diagram",
+    "goal": "绘制一份简单的测试流程图",
+    "entry": "index.html"
+  },
+  {
+    "id": "multifile",
+    "goal": "制作一个极简计数器demo，恰好三个文件index.html、style.css、app.js。标题是计数器，按钮id=increment，数字id=count，初始0，点击加1。HTML用相对路径引用CSS和JS。HTML里保留注释KEEP_ME。不要额外功能。",
+    "entry": "index.html"
+  },
+  {
+    "id": "partial-resume",
+    "goal": "继续已有计数器，只将页面标题和主标题改为“中文测试计数器”；先读取并使用reference局部修改。保留KEEP_ME注释，app.js与style.css必须逐字节不变，其余内容不变。",
+    "entry": "index.html",
+    "resumes": "multifile"
+  },
+  {
+    "id": "file-operations",
+    "goal": "在现有计数器项目先list并search定位app.js引用，用move将app.js移到assets/main.js，然后读取index.html并仅修改脚本路径。新增notes.txt内容临时备注，读取它，再用remove删除notes.txt。保留计数器功能和KEEP_ME。最后render检查再finish。",
+    "entry": "index.html",
+    "resumes": "multifile"
+  },
+  {
+    "id": "markdown",
+    "goal": "写一个简短Markdown测试报告document.md，标题Writer测试报告，包含三个步骤的有序列表、一个两列表格和一段JS代码示例，总共不超过20行。不需要HTML。",
+    "entry": "document.md"
+  },
+  {
+    "id": "javascript-repair",
+    "goal": "创建最小两个文件index.html和app.js。为了测试修复循环，先让app.js执行throw new Error(\"WRITER_TEST\")，调用render观察错误；随后读取app.js，用reference修复为给按钮id=increment添加点击计数逻辑，count初始0。重新render确认无错误，最后finish。无其他功能。",
+    "entry": "index.html"
+  }
+]

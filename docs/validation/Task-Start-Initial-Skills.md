@@ -22,7 +22,7 @@
 
 ## 仓库检查
 
-[检查证据](../measurements/task-start-skills-2026-11-08-checks.json)保存命令、退出码、日志哈希及资源/测试指纹。
+[检查证据](../../experiments/assistant/results/task-start-skills-2026-11-08-checks.json)保存命令、退出码、日志哈希及资源/测试指纹。
 
 - `./scripts/check.sh` exit 0：1,095 项常规集成测试、227 项原生运行时测试通过；格式、模块边界、Python、资源和 plist 检查通过。
 - `./scripts/build-ios.sh` exit 0：MobileHarnessSimulator、ModelKitRuntime、ModelKitNemotron、ModelKitSilero 四目标成功；App Skill 资源及 Live Activity 包装校验通过。
@@ -36,4 +36,4 @@
 
 安装结果：签名 Debug 真机构建 0.1.0 / 2026110806 成功；严格签名、30 项 Agent/Skill 资源及 Live Activity 打包校验通过。覆盖安装成功（安装序列 6352），独立应用清单确认构建号 2026110806。正常启动成功，进程清单确认新安装路径下 MobileHarness PID 24957 运行。未卸载、清空数据或修改 Provider 配置。
 
-[真机安装证据](../measurements/task-start-skills-2026-11-08-device.json)记录版本、签名/资源校验和本机原始日志哈希。本次确认真机安装与系统启动，未调用真实模型验证 task.start 携带 Skill 的选择行为，也不替代交互验收。
+[真机安装证据](../../experiments/assistant/results/task-start-skills-2026-11-08-device.json)记录版本、签名/资源校验和本机原始日志哈希。本次确认真机安装与系统启动，未调用真实模型验证 task.start 携带 Skill 的选择行为，也不替代交互验收。

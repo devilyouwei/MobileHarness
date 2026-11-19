@@ -1,0 +1,142 @@
+[
+  {
+    "language": "en",
+    "text": "Stop talking now.",
+    "expected": true
+  },
+  {
+    "language": "en",
+    "text": "Pause for a moment.",
+    "expected": true
+  },
+  {
+    "language": "en",
+    "text": "No, stop that and explain Shanghai instead.",
+    "expected": true
+  },
+  {
+    "language": "en",
+    "text": "Cancel what you're doing.",
+    "expected": true
+  },
+  {
+    "language": "en",
+    "text": "Hello.",
+    "expected": false
+  },
+  {
+    "language": "en",
+    "text": "Open the camera.",
+    "expected": false
+  },
+  {
+    "language": "en",
+    "text": "Don't stop, keep going.",
+    "expected": false
+  },
+  {
+    "language": "en",
+    "text": "After that, explain Shanghai.",
+    "expected": false
+  },
+  {
+    "language": "en",
+    "text": "What does 'stop talking' mean?",
+    "expected": false
+  },
+  {
+    "language": "en",
+    "text": "Yes.",
+    "expected": false
+  },
+  {
+    "language": "en",
+    "text": "Also include the population.",
+    "expected": false
+  },
+  {
+    "language": "en",
+    "text": "He told me to stop.",
+    "expected": false
+  },
+  {
+    "language": "en",
+    "text": "停一下，先别说了。",
+    "expected": true
+  },
+  {
+    "language": "en",
+    "text": "讲完以后再说上海。",
+    "expected": false
+  },
+  {
+    "language": "zh-Hans",
+    "text": "停一下，先别说了。",
+    "expected": true
+  },
+  {
+    "language": "zh-Hans",
+    "text": "暂停。",
+    "expected": true
+  },
+  {
+    "language": "zh-Hans",
+    "text": "别讲北京了，现在改讲上海。",
+    "expected": true
+  },
+  {
+    "language": "zh-Hans",
+    "text": "取消当前任务。",
+    "expected": true
+  },
+  {
+    "language": "zh-Hans",
+    "text": "你好。",
+    "expected": false
+  },
+  {
+    "language": "zh-Hans",
+    "text": "打开相机。",
+    "expected": false
+  },
+  {
+    "language": "zh-Hans",
+    "text": "不用停，继续说。",
+    "expected": false
+  },
+  {
+    "language": "zh-Hans",
+    "text": "讲完以后再说上海。",
+    "expected": false
+  },
+  {
+    "language": "zh-Hans",
+    "text": "解释一下“别说了”的意思。",
+    "expected": false
+  },
+  {
+    "language": "zh-Hans",
+    "text": "是的。",
+    "expected": false
+  },
+  {
+    "language": "zh-Hans",
+    "text": "再加上人口信息。",
+    "expected": false
+  },
+  {
+    "language": "zh-Hans",
+    "text": "他昨天让我停下来。",
+    "expected": false
+  },
+  {
+    "language": "zh-Hans",
+    "text": "Stop talking now.",
+    "expected": true
+  },
+  {
+    "language": "zh-Hans",
+    "text": "Don't stop, keep going.",
+    "expected": false
+  }
+]

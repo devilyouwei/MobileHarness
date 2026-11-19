@@ -9,7 +9,7 @@
 - 浏览教学明确browse自动打开窗口且已经返回截图、inspect与snapshot按证据缺口选择、长网页逐屏观察、无自动点击/输入能力、只读未知状态不等于必须先查询或不能打开。
 - 绘图教学明确文字任务包含结果目标和保留项；创建省略projectID，修改复用真实ID；不把windowID/mediaID/revision当项目ID，不在主上下文生成代码；成功后的具体修正与失败重试分开。保留作品窗口作为成果，关闭不等于删除。
 - 示例使用实际XML别名与参数，依赖反馈分到下一请求，假设ID明确标注；递增revision至2并优化发现描述。
-- 同步Resources/Skills/README.md；Tests/IntegrationTests/PromptTemplateTests.swift通过生产解析器验证新示例及已加载Web提示预算，不以关键词匹配当模型行为验证。
+- 同步Resources/Skills/README.md；Tests/Agents/Assistant/PromptTemplateTests.swift通过生产解析器验证新示例及已加载Web提示预算，不以关键词匹配当模型行为验证。
 
 ## 验证
 

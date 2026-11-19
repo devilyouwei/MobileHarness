@@ -1,0 +1,1253 @@
+{
+  "rows": [
+    {
+      "id": "zh-00",
+      "locale": "zh",
+      "category": "stop",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"停，别说了。\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-01",
+      "locale": "zh",
+      "category": "pause",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"先暂停一下。\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-02",
+      "locale": "zh",
+      "category": "replace",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"别讲旅游了，现在改讲天气。\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-03",
+      "locale": "zh",
+      "category": "correct",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"等等，你说错了，是上海，不是北京。\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-04",
+      "locale": "zh",
+      "category": "short_stop",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"停！\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-05",
+      "locale": "zh",
+      "category": "change_language",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"先别往下说，现在改成中文。\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-06",
+      "locale": "zh",
+      "category": "cancel",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"取消你现在这个回答。\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-07",
+      "locale": "zh",
+      "category": "asr_stop",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"停停 先 不 要 说 了\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-08",
+      "locale": "zh",
+      "category": "asr_replace",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"别讲北经了 现在讲上诲\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-09",
+      "locale": "zh",
+      "category": "partial_stop",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"别说了，我想……\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-10",
+      "locale": "zh",
+      "category": "greeting",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"你好。\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-11",
+      "locale": "zh",
+      "category": "request",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"帮我打开相机。\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-12",
+      "locale": "zh",
+      "category": "question",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"上海今天冷吗？\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-13",
+      "locale": "zh",
+      "category": "answer",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"你刚才问我去哪个城市。\", \"assistant\": \"你想去哪个城市？\"}, \"incoming_user_input\": \"上海。\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-14",
+      "locale": "zh",
+      "category": "yes",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"对。\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-15",
+      "locale": "zh",
+      "category": "thanks",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"谢谢。\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-16",
+      "locale": "zh",
+      "category": "add",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"另外再介绍一下上海。\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-17",
+      "locale": "zh",
+      "category": "deferred",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"说完以后再讲上海。\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-18",
+      "locale": "zh",
+      "category": "negated",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"不要停，继续说。\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-19",
+      "locale": "zh",
+      "category": "quote",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"书里写着“停止说话”。\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-20",
+      "locale": "zh",
+      "category": "reported",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"他刚才叫我别说话。\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-21",
+      "locale": "zh",
+      "category": "asr_request",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"帮窝打凯 相机\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-22",
+      "locale": "zh",
+      "category": "asr_repetition",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"我我我想知道上海天气天气\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-23",
+      "locale": "zh",
+      "category": "asr_punctuation",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"上海 明天 天气 怎么样\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-24",
+      "locale": "zh",
+      "category": "partial_request",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"我想问一下……\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-25",
+      "locale": "zh",
+      "category": "missing_object",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"请帮我打开……\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-26",
+      "locale": "zh",
+      "category": "partial_condition",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"如果明天下雨的话……\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-27",
+      "locale": "zh",
+      "category": "self_repair",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"我想去北京，不对，上海。\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-28",
+      "locale": "zh",
+      "category": "emotion",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"这让我很难过。\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-29",
+      "locale": "zh",
+      "category": "laugh",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"哈哈，这很好笑。\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-30",
+      "locale": "zh",
+      "category": "nonsense",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"咕咔嘟咧噗嗞。\"}",
+      "interrupt": false,
+      "discard": true,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-31",
+      "locale": "zh",
+      "category": "random",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"xqz 9v# ktt@ 7jk\"}",
+      "interrupt": false,
+      "discard": true,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-32",
+      "locale": "zh",
+      "category": "repeated_noise",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"嘶嘶嘶 嗡嗡嗡 咔咔咔\"}",
+      "interrupt": false,
+      "discard": true,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-33",
+      "locale": "zh",
+      "category": "word_salad",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"桌子蓝色乘以星期帽子跳。\"}",
+      "interrupt": false,
+      "discard": true,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-34",
+      "locale": "zh",
+      "category": "fragment_garble",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"呃咕咧 嗞 再 呃噗\"}",
+      "interrupt": false,
+      "discard": true,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-35",
+      "locale": "zh",
+      "category": "empty",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"\"}",
+      "interrupt": false,
+      "discard": true,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-36",
+      "locale": "zh",
+      "category": "punctuation",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"……？？！！\"}",
+      "interrupt": false,
+      "discard": true,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-37",
+      "locale": "zh",
+      "category": "probe_filler",
+      "partition": "probe",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"嗯……\"}",
+      "interrupt": null,
+      "discard": null,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-38",
+      "locale": "zh",
+      "category": "probe_wait",
+      "partition": "probe",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"等等那个……\"}",
+      "interrupt": null,
+      "discard": null,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-39",
+      "locale": "zh",
+      "category": "probe_asr",
+      "partition": "probe",
+      "text": "{\"current_turn\": {\"user\": \"介绍北京的景点。\", \"assistant\": \"北京有许多景点，比如故宫和\"}, \"incoming_user_input\": \"天气停相机那个\"}",
+      "interrupt": null,
+      "discard": null,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-cross-0",
+      "locale": "zh",
+      "category": "stop",
+      "partition": "cross",
+      "text": "{\"incoming_user_input\": \"Stop. Stop talking.\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-cross-1",
+      "locale": "zh",
+      "category": "pause",
+      "partition": "cross",
+      "text": "{\"incoming_user_input\": \"Pause for a moment.\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-cross-2",
+      "locale": "zh",
+      "category": "replace",
+      "partition": "cross",
+      "text": "{\"incoming_user_input\": \"Stop talking about travel. Talk about the weather now.\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-cross-3",
+      "locale": "zh",
+      "category": "correct",
+      "partition": "cross",
+      "text": "{\"incoming_user_input\": \"Wait, that is wrong. Shanghai, not Beijing.\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-cross-4",
+      "locale": "zh",
+      "category": "greeting",
+      "partition": "cross",
+      "text": "{\"incoming_user_input\": \"Hello.\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-cross-5",
+      "locale": "zh",
+      "category": "asr_request",
+      "partition": "cross",
+      "text": "{\"incoming_user_input\": \"op en the camra please\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-cross-6",
+      "locale": "zh",
+      "category": "nonsense",
+      "partition": "cross",
+      "text": "{\"incoming_user_input\": \"blorpt zizzle flumpt\"}",
+      "interrupt": false,
+      "discard": true,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "zh-cross-7",
+      "locale": "zh",
+      "category": "repeated_noise",
+      "partition": "cross",
+      "text": "{\"incoming_user_input\": \"shhhh bzzzz krrr krrr\"}",
+      "interrupt": false,
+      "discard": true,
+      "questions": {
+        "interrupt": "用户最新消息是否表达要求立即停止、暂停或改变当前回复的意愿？仅追加问题、补充信息、引用或要求稍后处理不算打断。",
+        "meaningful": "用户最新消息是否有可理解的实际交流意义，值得回复或追问？请求、问题、陈述、回答、问候和可澄清的半句话都算有意义；无法理解的乱码、噪声或混乱词语不算。"
+      }
+    },
+    {
+      "id": "en-00",
+      "locale": "en",
+      "category": "stop",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"Stop. Stop talking.\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-01",
+      "locale": "en",
+      "category": "pause",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"Pause for a moment.\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-02",
+      "locale": "en",
+      "category": "replace",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"Stop talking about travel. Talk about the weather now.\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-03",
+      "locale": "en",
+      "category": "correct",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"Wait, that is wrong. Shanghai, not Beijing.\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-04",
+      "locale": "en",
+      "category": "short_stop",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"Stop!\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-05",
+      "locale": "en",
+      "category": "change_language",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"Do not continue. Switch to Chinese now.\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-06",
+      "locale": "en",
+      "category": "cancel",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"Cancel your current answer.\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-07",
+      "locale": "en",
+      "category": "asr_stop",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"stop stop dont keep talk ing\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-08",
+      "locale": "en",
+      "category": "asr_replace",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"stop talking about Beijng switch to Shanghi now\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-09",
+      "locale": "en",
+      "category": "partial_stop",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"Stop talking, I want to…\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-10",
+      "locale": "en",
+      "category": "greeting",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"Hello.\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-11",
+      "locale": "en",
+      "category": "request",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"Open the camera.\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-12",
+      "locale": "en",
+      "category": "question",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"Is Shanghai cold today?\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-13",
+      "locale": "en",
+      "category": "answer",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"You asked me which city to visit.\", \"assistant\": \"Which city would you like to visit?\"}, \"incoming_user_input\": \"Shanghai.\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-14",
+      "locale": "en",
+      "category": "yes",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"Yes.\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-15",
+      "locale": "en",
+      "category": "thanks",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"Thank you.\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-16",
+      "locale": "en",
+      "category": "add",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"Also tell me about Shanghai.\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-17",
+      "locale": "en",
+      "category": "deferred",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"Tell me about Shanghai after you finish.\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-18",
+      "locale": "en",
+      "category": "negated",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"Do not stop. Keep going.\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-19",
+      "locale": "en",
+      "category": "quote",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"The book says “stop talking”.\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-20",
+      "locale": "en",
+      "category": "reported",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"He just told me to stop talking.\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-21",
+      "locale": "en",
+      "category": "asr_request",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"op en the camra please\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-22",
+      "locale": "en",
+      "category": "asr_repetition",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"I I I want the Shanghai weather weather\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-23",
+      "locale": "en",
+      "category": "asr_punctuation",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"Shanghai tomorrow weather how is it\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-24",
+      "locale": "en",
+      "category": "partial_request",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"I wanted to ask…\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-25",
+      "locale": "en",
+      "category": "missing_object",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"Please open…\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-26",
+      "locale": "en",
+      "category": "partial_condition",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"If it rains tomorrow…\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-27",
+      "locale": "en",
+      "category": "self_repair",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"I want to visit Beijing, no, Shanghai.\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-28",
+      "locale": "en",
+      "category": "emotion",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"That makes me sad.\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-29",
+      "locale": "en",
+      "category": "laugh",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"Haha, that is funny.\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-30",
+      "locale": "en",
+      "category": "nonsense",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"blorpt zizzle flumpt\"}",
+      "interrupt": false,
+      "discard": true,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-31",
+      "locale": "en",
+      "category": "random",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"xqz 9v# ktt@ 7jk\"}",
+      "interrupt": false,
+      "discard": true,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-32",
+      "locale": "en",
+      "category": "repeated_noise",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"shhhh bzzzz krrr krrr\"}",
+      "interrupt": false,
+      "discard": true,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-33",
+      "locale": "en",
+      "category": "word_salad",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"table blue multiply Tuesday hat jump\"}",
+      "interrupt": false,
+      "discard": true,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-34",
+      "locale": "en",
+      "category": "fragment_garble",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"uh blerp zz uh plft\"}",
+      "interrupt": false,
+      "discard": true,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-35",
+      "locale": "en",
+      "category": "empty",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"\"}",
+      "interrupt": false,
+      "discard": true,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-36",
+      "locale": "en",
+      "category": "punctuation",
+      "partition": "main",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"...??!!\"}",
+      "interrupt": false,
+      "discard": true,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-37",
+      "locale": "en",
+      "category": "probe_filler",
+      "partition": "probe",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"Um…\"}",
+      "interrupt": null,
+      "discard": null,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-38",
+      "locale": "en",
+      "category": "probe_wait",
+      "partition": "probe",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"Wait, the…\"}",
+      "interrupt": null,
+      "discard": null,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-39",
+      "locale": "en",
+      "category": "probe_asr",
+      "partition": "probe",
+      "text": "{\"current_turn\": {\"user\": \"Tell me about Beijing attractions.\", \"assistant\": \"Beijing has many attractions, including the Forbidden City and\"}, \"incoming_user_input\": \"weather stop camera that\"}",
+      "interrupt": null,
+      "discard": null,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-cross-0",
+      "locale": "en",
+      "category": "stop",
+      "partition": "cross",
+      "text": "{\"incoming_user_input\": \"停，别说了。\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-cross-1",
+      "locale": "en",
+      "category": "pause",
+      "partition": "cross",
+      "text": "{\"incoming_user_input\": \"先暂停一下。\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-cross-2",
+      "locale": "en",
+      "category": "replace",
+      "partition": "cross",
+      "text": "{\"incoming_user_input\": \"别讲旅游了，现在改讲天气。\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-cross-3",
+      "locale": "en",
+      "category": "correct",
+      "partition": "cross",
+      "text": "{\"incoming_user_input\": \"等等，你说错了，是上海，不是北京。\"}",
+      "interrupt": true,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-cross-4",
+      "locale": "en",
+      "category": "greeting",
+      "partition": "cross",
+      "text": "{\"incoming_user_input\": \"你好。\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-cross-5",
+      "locale": "en",
+      "category": "asr_request",
+      "partition": "cross",
+      "text": "{\"incoming_user_input\": \"帮窝打凯 相机\"}",
+      "interrupt": false,
+      "discard": false,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-cross-6",
+      "locale": "en",
+      "category": "nonsense",
+      "partition": "cross",
+      "text": "{\"incoming_user_input\": \"咕咔嘟咧噗嗞。\"}",
+      "interrupt": false,
+      "discard": true,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    },
+    {
+      "id": "en-cross-7",
+      "locale": "en",
+      "category": "repeated_noise",
+      "partition": "cross",
+      "text": "{\"incoming_user_input\": \"嘶嘶嘶 嗡嗡嗡 咔咔咔\"}",
+      "interrupt": false,
+      "discard": true,
+      "questions": {
+        "interrupt": "Does the latest user message express a wish to immediately stop, pause or change the current response? Added questions, information, quotations or requests for later do not count.",
+        "meaningful": "Does the latest user message have understandable communicative meaning and deserve a response or clarification? Requests, questions, statements, answers, greetings and clarifiable fragments are meaningful; unintelligible gibberish, noise or word salad are not."
+      }
+    }
+  ],
+  "note": "Positive meaningful wording control; raw meaningful is preserved and discard derived as its negation for scoring. Identical cases/labels to negative-question fixture."
+}

@@ -8,7 +8,7 @@
 
 本节保留 2026-09-28 集成时的步骤；执行前核对现有脚本、scheme 和制品。文中的历史容量与超时不作为当前运行契约。
 
-1. Run `python3 scripts/download-moss-tts-nano.py` to provision the pinned artifacts (about 533 MB of compiled graphs plus tokenizer/config/voice codes).
+1. Run `python3 scripts/models/model_download.py moss-tts-nano` to provision the pinned artifacts (about 533 MB of compiled graphs plus tokenizer/config/voice codes).
 2. Run `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer HARNESS_TEST_MOSS=1 swift test -c release --filter MossNanoTests` for Mac tokenizer, PCM, real Chinese/English/mixed synthesis and lifecycle tests. No user recordings, downloads at runtime, microphone or speaker access are used by these tests.
 3. In the App, first download MOSS through Settings → 本地模型资源. In Xcode select **MossValidation**, Release, and a physical iPhone. The scheme selects `-moss-benchmark`; tap 合成并试听. It uses the same default managed provider as normal conversation. Optional `-moss-autorun` writes timings to the App's Documents/moss-validation.txt without playing audio.
 4. Test normal conversation with microphone/camera, repeated cancellation, a long reply and English/Chinese switching. Measure initial and warmed first audio, sustained real-time rate, memory and thermal state. The subsequent ADR 0087 revision removed the independent three-second empty-read deadline and recorded a 60-second synthesis execution deadline excluding queue time. These describe that revision; current timing belongs to the owning Agent/runtime README. Record per-frame arrival gaps and playback failures separately when diagnosing truncation.

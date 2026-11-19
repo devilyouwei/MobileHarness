@@ -30,7 +30,7 @@
 
 ## Flash / Max 真实模型专项
 
-同日按用户授权复用 `.env.local` 与 `scripts/evaluate-qwen.py`，通过生产 Assistant、提示词、函数目录、增量解析器和 Gateway 调度运行；设备、仓库和语音执行仍为明确的合成替身。原有 53 个场景保持原文和判定，新增 6 个 expression-sequence 场景，本次只选择这 6 个专项，不代表全部 59 场景回归。
+同日按用户授权复用 `.env.local` 与 `experiments/assistant/evaluate_qwen.py`，通过生产 Assistant、提示词、函数目录、增量解析器和 Gateway 调度运行；设备、仓库和语音执行仍为明确的合成替身。原有 53 个场景保持原文和判定，新增 6 个 expression-sequence 场景，本次只选择这 6 个专项，不代表全部 59 场景回归。
 
 每个模型执行三轮独立采样，每轮每场景使用独立会话；改序场景包含两个用户输入，其余各一个。共 36 次场景运行、42 个用户输入、42 次真实模型请求，无自动重试或换模型。三轮执行前后源 hash 一致，三轮之间也一致；采样期间未修改提示词或判定。
 
@@ -50,7 +50,7 @@
 
 ### 数据与复现
 
-[完整数据 JSON](Action-Sequence-Flash-Max-2026-10-18.json) 保存三轮六份原始模型报告、每次实际请求消息、模型原文、已解析调用与 waitPath、State、用量、测试日志、源 hash、场景规格和教学快照。已检查不含本地 API Key。实际使用阿里云配置，不读取或发送 OpenAI Key。
+[完整数据 JSON](../../experiments/assistant/results/action-sequence-flash-max-2026-10-18.json) 保存三轮六份原始模型报告、每次实际请求消息、模型原文、已解析调用与 waitPath、State、用量、测试日志、源 hash、场景规格和教学快照。已检查不含本地 API Key。实际使用阿里云配置，不读取或发送 OpenAI Key。
 
 | 用量 | Flash | Max |
 | --- | --- | --- |
@@ -64,7 +64,7 @@
 ```sh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test \
   --filter 'qwenWorkflowCasesAreBoundedAndUseRegisteredAliases|qwenExpressionSequenceScoringRejectsBrokenGroups'
-python3 scripts/evaluate-qwen.py \
+python3 experiments/assistant/evaluate_qwen.py \
   --models qwen3.8-flash qwen3.8-max \
   --cases expression-serial-four,expression-serial-all,expression-paired-three,expression-paired-all,expression-paired-reordered,expression-paired-keeps-task \
   --parallel 2 --skip-build --output-prefix /tmp/qwen-expression-20261018-r1

@@ -14,7 +14,7 @@
 1. Resources/Catalog、Assistant Instructions、BasicSkill、WebBrowsing：统一入口选择与职责，删除 Writing，递增变更 Skill revision；Actions/System/Task 的 canonical doc 同步。
 2. Agents/Writer/WriterAgent、WriterWorkflow：暴露 projects/open/delete，已有可信委托身份保持不变；编辑工作区延迟到首个文件操作才初始化，单纯作品查询/打开不创建草稿。只读库操作通过真实结果完成，不走文件发布检查；实际编辑仍必须 render/finish。取消、暂停和清理沿用根拥有的 worker 和 ArtifactStreaming 屏障。
 3. Actions/Artifacts/ArtifactService、WorkspaceActions：作品库改为 Writer 原生操作，返回身份只选择作品不改变执行 owner；仍持有项目锁，失败原样返回，拒绝 Assistant。
-4. Tests/IntegrationTests：资源不可加载/不可调用、路由教学、无前台委派、库操作成功与失败、只查看不发布、编辑完成约束回归。
+4. Tests/Agents：资源不可加载/不可调用、路由教学、无前台委派、库操作成功与失败、只查看不发布、编辑完成约束回归。
 5. 实施后同步总体、Agents/Writer/Assistant、Actions/Artifacts/System/Task、资源与测试 README；历史记录保留当时 Writing 描述。
 
 ## 验证

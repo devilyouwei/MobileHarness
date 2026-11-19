@@ -146,7 +146,7 @@ Writer ｜ 13:06:37
 
 - 用户输入触发 `interrupt` 时，保留前台任务和其 Skill。`Agents/Support/Chat/AgentChatWorker.swift` 在标记已生成、等待执行结果的轮次时保存取消类型。轮次在会话打断屏障释放后仍按该类型结算，旧轮的取消和执行证据留在原 Message。显式关闭会话仍可结束任务。
 - 新输入继续绑定原前台任务。拍照场景中，用户在旧回复期间要求丢弃照片并结束，后续轮次确认关相机成功，再用原 `task.end` 接口提交终态和摘要。存储协议、表结构与显式 `task.cancel` 契约沿用现有设计。
-- 在 `Tests/IntegrationTests/AgentTaskSkillTests.swift` 用脚本模型、阻塞的旧轮 Action 和真实 SQLite 验证打断、同任务继续执行、摘要落盘。完成后同步 Chat Worker 技术说明和全双工验证记录。
+- 在 `Tests/Agents/Core/AgentTaskSkillTests.swift` 用脚本模型、阻塞的旧轮 Action 和真实 SQLite 验证打断、同任务继续执行、摘要落盘。完成后同步 Chat Worker 技术说明和全双工验证记录。
 
 当前行为以紧接的前台结束与 Writer 取消消息为准。
 
@@ -819,19 +819,19 @@ ModelKit 的 D3 适配器根据 manifest 和图输入校验三输入及五输入
 
 ### D3 Edge 四分类继续聆听实验（2026-11-16）
 
-按最新 App 的 `InputDecisionSnapshot.prompt()`、`AssistantDecisionProtocol.JEV` 和 `AssistantInputDecision` 进行只读生产行为实验，只加载现有 `Tests/DecisionBenchmarks/.local/models/D3Edge`，不移动制品、不运行其他模型、不调整生产提示词或采纳逻辑。旧测试文件及冻结样例保持原样。新增 opt-in 实验入口放在 `Tests/IntegrationTests`，扩展样例和逐条结果放在 `docs/measurements`，方法、结论和限制追加到原 `docs/validation/Decision-Model-Mac-Comparison.md`。
+按最新 App 的 `InputDecisionSnapshot.prompt()`、`AssistantDecisionProtocol.JEV` 和 `AssistantInputDecision` 进行只读生产行为实验，只加载现有 `Models/D3Edge`，不移动制品、不运行其他模型、不调整生产提示词或采纳逻辑。旧测试文件及冻结样例保持原样。新增 opt-in 实验入口放在 `Tests/Agents`，扩展样例和逐条结果放在 `docs/measurements`，方法、结论和限制追加到原 `docs/validation/Decision-Model-Mac-Comparison.md`。
 
 新样例显式区分语音四候选与键盘三候选。保留原27组双语样例作历史锚点；新增未完成意图、缺宾语/参数、悬空连接词、连续片段补全、完整短回答/命令、否定/引用停止、噪声、缓冲满及上下文容量探测。先固定人工预期，不根据输出改标签。成对样例将持有片段按生产 newline 规则拼到最新输入，原始 payload 仅含当前片段。分别报告模型原始动作和运行时采纳动作，容量/保护探测不混入语义准确率。
 
 实验记录实际生产请求、四候选是否出现、原生 tokenizer token 数、选中候选和分数、路由/错误/采纳原因、热调用和端到端耗时、制品与源码哈希。中英文分别用同语言提示，串行推理、每语言预热三次，保留超过512 token或250ms的失败，不用云端备用掩盖。本实验不代表真实 ASR 截断、iPhone 延迟或真实对话到达顺序验收。扩展入口及复现说明同步现有 README 导航。
 
-首轮发现真实 App 的250ms预算会产生超时，增加独立的原生读出诊断：在 `Tests/IntegrationTests` 新增 opt-in 入口，逐字复用首轮记录的生产 DecisionRequest（含四候选），仅绕过 Assistant 的250ms竞速，仍由 D3 原生适配器执行512 token检查和图推理。保留完整App结果，不将第二轮输出称为实际采纳；两轮分别统计，验证是否因超时而掩盖模型原始分类。该诊断不改生产期限、提示词或制品。
+首轮发现真实 App 的250ms预算会产生超时，增加独立的原生读出诊断：在 `Tests/Agents` 新增 opt-in 入口，逐字复用首轮记录的生产 DecisionRequest（含四候选），仅绕过 Assistant 的250ms竞速，仍由 D3 原生适配器执行512 token检查和图推理。保留完整App结果，不将第二轮输出称为实际采纳；两轮分别统计，验证是否因超时而掩盖模型原始分类。该诊断不改生产期限、提示词或制品。
 
 本次194条扩展快照的App路径与独立原生读出均已完成，只使用D3 Edge。结果、复现命令、原始请求、超时/容量限制及检查失败说明见[原Mac实验报告的新节](../validation/Decision-Model-Mac-Comparison.md#d3-edge-继续聆听四分类实验2026-11-16)。生产优化与真实语音验收不属于本轮已完成实验结论。
 
 ### D3 Edge 提示词实验优化（仅实验环境，2026-11-16）
 
-生产源码和资源保持不变。新增实验文件仍放 `Tests/DecisionBenchmarks` / `Tests/IntegrationTests`，测量和分析沿用 `docs/measurements` 与原Mac报告。以194条冻结快照作开发对照，比较原样基线、仅把规则从State移到Question、紧凑事实State加语义候选、加入完整/不完整边界短例、继续聆听候选前置、统一英文规则六个条件；候选顺序显式映射回稳定业务标签。所有变体只修改实验输入。
+生产源码和资源保持不变。新增实验文件仍放 `experiments/decision/benchmark` / `Tests/Agents`，测量和分析沿用 `docs/measurements` 与原Mac报告。以194条冻结快照作开发对照，比较原样基线、仅把规则从State移到Question、紧凑事实State加语义候选、加入完整/不完整边界短例、继续聆听候选前置、统一英文规则六个条件；候选顺序显式映射回稳定业务标签。所有变体只修改实验输入。
 
 同时在选择方案前冻结独立留出样例；开发集按原始四分类macro-F1、继续聆听召回/精确率、完整话语误继续、误打断/误舍弃、512token和250ms观测共同选择方案。只将基线和入选方案用于留出复核，不依据留出结果再调模板。全程仅现有D3 Edge，串行真实读出、每条件3次预热，不执行App采纳，不修改生产期限；保存逐条完整请求、token数、选择/分数/错误、耗时和输入/生产文件哈希。结论不声称真实ASR或iPhone验收。
 
@@ -960,7 +960,7 @@ AssistantChatWorker 删除继续聆听 buffer、discard/continue 分支、拼接
 
 ## Vela3.1 Fast 对照实验（2026-11-18）
 
-用户要求将 hugging-mac/vela3.1-fast 加入既有四分类和二分类对照，并批准 `.local/models/Vela31Fast` 及制品子目录。仅实验，不修改 App 配置。固定远端 revision 108e385769cbd0da463706b24cac5a535604d2c6，复用原四分类配对矩阵、单轮中英文 noul/choice 矩阵及历史上下文矩阵；不覆盖旧脚本、输入、结果。新增实验 runner/模型说明放 Tests/DecisionBenchmarks，逐条结果放 docs/measurements，报告分别追加多分类和二分类原验证文档。
+用户要求将 hugging-mac/vela3.1-fast 加入既有四分类和二分类对照，并批准 `.local/models/Vela31Fast` 及制品子目录。仅实验，不修改 App 配置。固定远端 revision 108e385769cbd0da463706b24cac5a535604d2c6，复用原四分类配对矩阵、单轮中英文 noul/choice 矩阵及历史上下文矩阵；不覆盖旧脚本、输入、结果。新增实验 runner/模型说明放 experiments/decision/benchmark，逐条结果放 docs/measurements，报告分别追加多分类和二分类原验证文档。
 
 采用 Hugging Mac SDK 的3.1决策专用 CoreAI 路径，CPU，与旧Vela路径区分；仅准备决策图、主干权重和 tokenizer/配置等运行必要文件，不下载无关任务 adapter 或将 LICENSE/README 列为模型必要文件。固定提示词、标签语义和0.5阈值；四分类报告宏F1、误丢弃及继续聆听召回，二分类报告误打断、召回、F1、分语言/上下文/type表现及P50/P95。错误保留为错误，歧义样本不计入主指标。优先复用既有同机冻结D3/Vela结果，明确历史延迟不是本轮同时测量；在条件允许时对旧Vela做同轮复测。
 
@@ -973,13 +973,13 @@ AssistantChatWorker 删除继续聆听 buffer、discard/continue 分支、拼接
 
 用户要求加入Laya多语言CoreAI实验，并批准 `.local/models/LayaMultilingual` 及制品子目录。选用 ahmedandaloes/laya-multilingual-CoreAI 固定revision b347e24ceca82f2bf8ee185de282fea28c2c64cf，1024-token FP32图及发布适配器；仅下载运行必要文件，模型说明和验证资料用于研究溯源，不加入App requiredFiles。使用已有环境做兼容性预检，明确记录与发布环境的版本差异；不隐式替换其他项目环境依赖。
 
-新增实验脚本与模型说明放Tests/DecisionBenchmarks，复用四分类108、初始二分类256、本地化980、历史1120条冻结矩阵。先核对上游问题标准化、sequence构造和布尔概率；超长或隐式截断需显式检查，不能算成完整上下文测试。原生noul和choice独立运行，记录温度、输入长度、概率、错误及端到端P50/P95；不根据结果调整标签/阈值。新报告与旧模型按case配对，历史延迟明确标记，四分类/二分类报告分开追加。仅实验，不改变App或模型管理，不安装真机。
+新增实验脚本与模型说明放experiments/decision/benchmark，复用四分类108、初始二分类256、本地化980、历史1120条冻结矩阵。先核对上游问题标准化、sequence构造和布尔概率；超长或隐式截断需显式检查，不能算成完整上下文测试。原生noul和choice独立运行，记录温度、输入长度、概率、错误及端到端P50/P95；不根据结果调整标签/阈值。新报告与旧模型按case配对，历史延迟明确标记，四分类/二分类报告分开追加。仅实验，不改变App或模型管理，不安装真机。
 
 同时原样重放既有252条带定义noul探索fixture，独立于主矩阵记录。发布适配器返回四位小数概率，保留其原生输出，不另加阈值优化；Laya类型输入不同，不强求noul/choice概率相同。
 
 首选1024图在b2 CPU、默认模式及隔离b3 CPU均未能加载，尚无语义评分。保留制品说明/失败记录，删除本任务下载的失败main.mlirb以释放空间。改试 mlboydaisuke/Laya-Multilingual-CoreAI 的macOS wfp16-s512（revision 3fe58a5ed7857b41f5c7ba8c0f46ce420b42cf02），CPU；沿用发布者host读出及参考fixture核对，再执行原矩阵。512容量不够的输入必须明确报告，不声称完整重放；不可隐藏截断。该图来自不同的上游固定checkpoint，报告明确区别，不能混为同一制品结果。
 
-替代制品增加Tests/DecisionBenchmarks/laya_artifact_adapter.py实验适配器：严格按发布host的main→marker gather→act→temperature decode执行，复用发布_laya_host.py，不修改分类。仍使用隔离Laya0.4.2的host sequence builder，并以制品201条参考的原始tokens/marker及输出核对兼容性；全部通过才进入业务实验。
+替代制品增加experiments/decision/benchmark/laya_artifact_adapter.py实验适配器：严格按发布host的main→marker gather→act→temperature decode执行，复用发布_laya_host.py，不修改分类。仍使用隔离Laya0.4.2的host sequence builder，并以制品201条参考的原始tokens/marker及输出核对兼容性；全部通过才进入业务实验。
 
 替代图CPU加载亦失败，显式GPU加载成功。正式实验固定GPU（不作自动运行时回退），使用201条参考门槛验证该路径；与旧Vela CPU数据的时延不能视为同计算单元比较。
 
@@ -992,7 +992,7 @@ GPU对齐启动时明确报No space left on device。复用本次已成功生成
 
 用户要求按“以下是当前正在进行的对话；以下是用户发送的最新消息；用户意图是什么/是否表达打断”测试Laya、Vela3.1、D3 Edge，仅实验。四分类候选按用户顺序：打断、未说完、无意义消息、等待；等待在评分中映射原enqueue（不打断、排队处理），不修改旧case预期标签。二分类原生noul与简短否/是choice分开。中英文提示词各用对应语言，不额外加入长定义或调阈值。
 
-新增Tests/DecisionBenchmarks/concise_intent_experiment.py，复用既有模型位置/适配器，不建目录、不改App。冻结四分类54例（48回归+6诊断）、二分类单句196例、当前轮h0的56例；不额外带更早历史。四分类旧case已有同一句分片维持原拼接内容，question_to_user按现有文本呈现为assistant问题；不虚构缺失的当前轮，缺省显示无。新状态只用自然语言角色与段落分隔，不传busy/queue等元数据。三模型同一语义state/question/candidates；协议格式保留原生适配，D3使用固定上游formatter生成noul的等价候选，并复用既有原生Swift评测入口。
+新增experiments/decision/benchmark/concise_intent_experiment.py，复用既有模型位置/适配器，不建目录、不改App。冻结四分类54例（48回归+6诊断）、二分类单句196例、当前轮h0的56例；不额外带更早历史。四分类旧case已有同一句分片维持原拼接内容，question_to_user按现有文本呈现为assistant问题；不虚构缺失的当前轮，缺省显示无。新状态只用自然语言角色与段落分隔，不传busy/queue等元数据。三模型同一语义state/question/candidates；协议格式保留原生适配，D3使用固定上游formatter生成noul的等价候选，并复用既有原生Swift评测入口。
 
 每模型54+196×2+56×2=558次，三模型共1674次，三次预热/条件另计；顺序执行，不与编译/检查竞争。全部case/提示词在运行前冻结，不按结果改标签；旧实验作为带日期的回归参照，新的整体模板、语言和标签同时变化，不声称分离各因素的因果贡献。错误、输入超限明确记录，不能伪装为false。报告仍分别追加四分类/二分类原验证文档，保存逐例结果、误打断、召回、macro-F1与P50/P95，并明确运行时差异。运行仓库检查/iOS构建，保留其他正在进行的模型管理修改。
 
@@ -1006,7 +1006,7 @@ GPU对齐启动时明确报No space left on device。复用本次已成功生成
 
 按用户确认，保留上一轮自然语言分段，分别使用中文、英文提示词，仅补充语义定义；不修改App。二分类问题改为是否要求立即停止或改变当前回复，并明确仅追加问题、补充信息、要求稍后处理不算打断。四分类每类补一句短定义，等待表示完整且可正常入队的消息，不能因出现“等一下”归为等待。
 
-在现有Tests/DecisionBenchmarks新增defined_intent_experiment.py，复用concise_intent_experiment的Laya推理入口/既有GPU路径，复制冻结输入只变更instructions，保持候选文字和顺序、上下文、case标签、阈值不变。四分类54条、单句196×2条、当前轮56×2条，共558条，二分类分别测noul与choice。中英单独评分，跨语言边界单列；与上一轮作配对对照，记录误打断、召回、四分类准确率及P50/P95。使用decision-defined-intent新前缀保存，不覆盖旧结果、不新建目录。报告追加原四分类及二分类验证文档，更新实验与测量索引；执行实验校验、check.sh及iOS构建，区分真实模型结果与工程失败。此轮是已见回归case，不能当独立泛化验证。
+在现有experiments/decision/benchmark新增defined_intent_experiment.py，复用concise_intent_experiment的Laya推理入口/既有GPU路径，复制冻结输入只变更instructions，保持候选文字和顺序、上下文、case标签、阈值不变。四分类54条、单句196×2条、当前轮56×2条，共558条，二分类分别测noul与choice。中英单独评分，跨语言边界单列；与上一轮作配对对照，记录误打断、召回、四分类准确率及P50/P95。使用decision-defined-intent新前缀保存，不覆盖旧结果、不新建目录。报告追加原四分类及二分类验证文档，更新实验与测量索引；执行实验校验、check.sh及iOS构建，区分真实模型结果与工程失败。此轮是已见回归case，不能当独立泛化验证。
 
 本轮558条已完成，零推理错误、输入完整。与冻结旧输入逐项核对，除instructions外完全相同；配对汇总复算、AST及链接检查通过。四分类正确数18→17/48，误丢弃14→6但未说完识别9→5/16。二分类8个同语言主分组误打断均增加，不建议进入App；完整结果追加原四/二分类报告。工程检查另记。
 
@@ -1043,6 +1043,14 @@ Laya原生对照首轮发现概率不一致。源码检查显示发布tokenizer�
 GenerationRoundTests的动作结算回归也需同步：首条空闲输入不再分类，等待动作结算期间的follow-up仍算忙并分类一次，两个动作结果及用户输入仍合批为一个后续请求。
 
 实施完成：空闲输入不构造Decision快照/任务；忙时沿用原回复身份和并行推理。5项定向回归通过（工具结算包含成功/失败case），五个iOS scheme构建通过。全仓检查仍有此前NexArm/声源时序失败及AppWorkflow缺声明停滞，详细证据见[二分类验证记录](../validation/Decision-Binary-Interrupt-Mac-Comparison.md)。未安装或测量真机。
+
+## 双问题独立布尔实验（2026-11-18）
+
+仅实验：新增共享当前轮上下文与最新输入的interrupt/discard双noul矩阵，直接调用ModelKit.decide，比较D3、Vela3、Vela3.1及Laya。当前协议内部串行两题，不能称为一次前向；测量配对总延迟和逐题对照。中文/英文问题分别用于对应locale，少量跨语言输入；覆盖清晰打断、正常请求/回答、ASR错词/重复/乱码、可理解片段、缺宾语半句话和不可理解片段。discard=true仅无可理解交流含义；值得澄清的半句话保持false。主集人工冻结标签，歧义探针不计分。输出两题混淆矩阵、联合正确率、误丢弃/误打断、召回和P50/P95；保留原始输出、失败和制品路径。沿用experiments/decision/benchmark、Tests/Agents、docs/measurements与现有验证报告，不改App。
+
+补充正向措辞对照：原始用户建议的“有实际意义、值得回复/追问”作为meaningful noul，与已执行的负向discard问题分别运行。原始meaningful值及概率保留；仅评分字段显式取反得到discard，不称模型直接输出discard。相同冻结case和两种题序，不根据输出调整标签。两个独立文件前缀分开保存，比较否定措辞效应；App仍不改动。
+
+实验完成：负向discard及正向meaningful两组分别768次双问题请求，四模型、96案例、两种题序，原始输出/分组/题序/延迟均保留。正向组保留原始meaningful及派生discard。结论与工程失败见[验证报告](../validation/Decision-Binary-Interrupt-Mac-Comparison.md)，不采纳自动丢弃、不改App。
 
 ## Assistant对无明确交流含义输入的回应（2026-11-18）
 

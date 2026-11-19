@@ -12,12 +12,12 @@
 
 ## 模拟器证据
 
-`scripts/test-webkit-simulator.sh` 成功；最终结构化结果为 `passed`。本地第二版JPEG为96,573字节，1024像素宽。入口HTML、外部CSS、外部JS和计时器均实际执行；远程页面观察和JPEG实际取得。图片为手写验收fixture，不能据此宣称真实LLM能生成同样图形。
+`scripts/simulator/test-webkit-simulator.sh` 成功；最终结构化结果为 `passed`。本地第二版JPEG为96,573字节，1024像素宽。入口HTML、外部CSS、外部JS和计时器均实际执行；远程页面观察和JPEG实际取得。图片为手写验收fixture，不能据此宣称真实LLM能生成同样图形。
 
 - [结构化证据](../../output/webkit-acceptance-2026-11-03.json)
 - [本地第二版截图](../../output/webkit-acceptance-2026-11-03.jpg)
 
-复现：先启动一个iOS 27模拟器，再运行 `./scripts/test-webkit-simulator.sh`。脚本不更改主App模型/密钥设置，最多等待55秒；失败返回非零，证据保存在隔离测试App的Documents目录。
+复现：先启动一个iOS 27模拟器，再运行 `./scripts/simulator/test-webkit-simulator.sh`。脚本不更改主App模型/密钥设置，最多等待55秒；失败返回非零，证据保存在隔离测试App的Documents目录。
 
 ## 修复过程中保留的失败
 

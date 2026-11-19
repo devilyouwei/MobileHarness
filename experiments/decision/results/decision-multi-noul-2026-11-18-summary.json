@@ -1,0 +1,1271 @@
+{
+  "groups": {
+    "d3/interrupt_first/main/all": {
+      "n": 74,
+      "errors": 0,
+      "p50": 546.1913955,
+      "p95": 589.594208,
+      "interrupt": {
+        "tp": 15,
+        "tn": 48,
+        "fp": 6,
+        "fn": 5,
+        "precision": 0.7142857142857143,
+        "recall": 0.75,
+        "falsePositiveRate": 0.1111111111111111
+      },
+      "discard": {
+        "tp": 11,
+        "tn": 14,
+        "fp": 46,
+        "fn": 3,
+        "precision": 0.19298245614035087,
+        "recall": 0.7857142857142857,
+        "falsePositiveRate": 0.7666666666666667
+      },
+      "bothTrue": 16,
+      "jointCorrect": 23
+    },
+    "d3/interrupt_first/main/zh": {
+      "n": 37,
+      "errors": 0,
+      "p50": 531.637875,
+      "p95": 554.118209,
+      "interrupt": {
+        "tp": 8,
+        "tn": 24,
+        "fp": 3,
+        "fn": 2,
+        "precision": 0.7272727272727273,
+        "recall": 0.8,
+        "falsePositiveRate": 0.1111111111111111
+      },
+      "discard": {
+        "tp": 7,
+        "tn": 1,
+        "fp": 29,
+        "fn": 0,
+        "precision": 0.19444444444444445,
+        "recall": 1.0,
+        "falsePositiveRate": 0.9666666666666667
+      },
+      "bothTrue": 11,
+      "jointCorrect": 8
+    },
+    "d3/interrupt_first/main/en": {
+      "n": 37,
+      "errors": 0,
+      "p50": 551.916084,
+      "p95": 592.241666,
+      "interrupt": {
+        "tp": 7,
+        "tn": 24,
+        "fp": 3,
+        "fn": 3,
+        "precision": 0.7,
+        "recall": 0.7,
+        "falsePositiveRate": 0.1111111111111111
+      },
+      "discard": {
+        "tp": 4,
+        "tn": 13,
+        "fp": 17,
+        "fn": 3,
+        "precision": 0.19047619047619047,
+        "recall": 0.5714285714285714,
+        "falsePositiveRate": 0.5666666666666667
+      },
+      "bothTrue": 5,
+      "jointCorrect": 15
+    },
+    "d3/interrupt_first/cross/all": {
+      "n": 16,
+      "errors": 0,
+      "p50": 551.0545414999999,
+      "p95": 575.952542,
+      "interrupt": {
+        "tp": 5,
+        "tn": 8,
+        "fp": 0,
+        "fn": 3,
+        "precision": 1.0,
+        "recall": 0.625,
+        "falsePositiveRate": 0.0
+      },
+      "discard": {
+        "tp": 2,
+        "tn": 10,
+        "fp": 2,
+        "fn": 2,
+        "precision": 0.5,
+        "recall": 0.5,
+        "falsePositiveRate": 0.16666666666666666
+      },
+      "bothTrue": 0,
+      "jointCorrect": 10
+    },
+    "d3/interrupt_first/cross/zh": {
+      "n": 8,
+      "errors": 0,
+      "p50": 546.305666,
+      "p95": 555.052542,
+      "interrupt": {
+        "tp": 3,
+        "tn": 4,
+        "fp": 0,
+        "fn": 1,
+        "precision": 1.0,
+        "recall": 0.75,
+        "falsePositiveRate": 0.0
+      },
+      "discard": {
+        "tp": 2,
+        "tn": 4,
+        "fp": 2,
+        "fn": 0,
+        "precision": 0.5,
+        "recall": 1.0,
+        "falsePositiveRate": 0.3333333333333333
+      },
+      "bothTrue": 0,
+      "jointCorrect": 6
+    },
+    "d3/interrupt_first/cross/en": {
+      "n": 8,
+      "errors": 0,
+      "p50": 555.0739165,
+      "p95": 575.952542,
+      "interrupt": {
+        "tp": 2,
+        "tn": 4,
+        "fp": 0,
+        "fn": 2,
+        "precision": 1.0,
+        "recall": 0.5,
+        "falsePositiveRate": 0.0
+      },
+      "discard": {
+        "tp": 0,
+        "tn": 6,
+        "fp": 0,
+        "fn": 2,
+        "precision": null,
+        "recall": 0.0,
+        "falsePositiveRate": 0.0
+      },
+      "bothTrue": 0,
+      "jointCorrect": 4
+    },
+    "d3/discard_first/main/all": {
+      "n": 74,
+      "errors": 0,
+      "p50": 543.320375,
+      "p95": 569.337625,
+      "interrupt": {
+        "tp": 15,
+        "tn": 48,
+        "fp": 6,
+        "fn": 5,
+        "precision": 0.7142857142857143,
+        "recall": 0.75,
+        "falsePositiveRate": 0.1111111111111111
+      },
+      "discard": {
+        "tp": 11,
+        "tn": 14,
+        "fp": 46,
+        "fn": 3,
+        "precision": 0.19298245614035087,
+        "recall": 0.7857142857142857,
+        "falsePositiveRate": 0.7666666666666667
+      },
+      "bothTrue": 16,
+      "jointCorrect": 23
+    },
+    "d3/discard_first/main/zh": {
+      "n": 37,
+      "errors": 0,
+      "p50": 530.672292,
+      "p95": 557.300208,
+      "interrupt": {
+        "tp": 8,
+        "tn": 24,
+        "fp": 3,
+        "fn": 2,
+        "precision": 0.7272727272727273,
+        "recall": 0.8,
+        "falsePositiveRate": 0.1111111111111111
+      },
+      "discard": {
+        "tp": 7,
+        "tn": 1,
+        "fp": 29,
+        "fn": 0,
+        "precision": 0.19444444444444445,
+        "recall": 1.0,
+        "falsePositiveRate": 0.9666666666666667
+      },
+      "bothTrue": 11,
+      "jointCorrect": 8
+    },
+    "d3/discard_first/main/en": {
+      "n": 37,
+      "errors": 0,
+      "p50": 550.966375,
+      "p95": 617.022625,
+      "interrupt": {
+        "tp": 7,
+        "tn": 24,
+        "fp": 3,
+        "fn": 3,
+        "precision": 0.7,
+        "recall": 0.7,
+        "falsePositiveRate": 0.1111111111111111
+      },
+      "discard": {
+        "tp": 4,
+        "tn": 13,
+        "fp": 17,
+        "fn": 3,
+        "precision": 0.19047619047619047,
+        "recall": 0.5714285714285714,
+        "falsePositiveRate": 0.5666666666666667
+      },
+      "bothTrue": 5,
+      "jointCorrect": 15
+    },
+    "d3/discard_first/cross/all": {
+      "n": 16,
+      "errors": 0,
+      "p50": 551.604104,
+      "p95": 574.1265,
+      "interrupt": {
+        "tp": 5,
+        "tn": 8,
+        "fp": 0,
+        "fn": 3,
+        "precision": 1.0,
+        "recall": 0.625,
+        "falsePositiveRate": 0.0
+      },
+      "discard": {
+        "tp": 2,
+        "tn": 10,
+        "fp": 2,
+        "fn": 2,
+        "precision": 0.5,
+        "recall": 0.5,
+        "falsePositiveRate": 0.16666666666666666
+      },
+      "bothTrue": 0,
+      "jointCorrect": 10
+    },
+    "d3/discard_first/cross/zh": {
+      "n": 8,
+      "errors": 0,
+      "p50": 544.5498540000001,
+      "p95": 565.024292,
+      "interrupt": {
+        "tp": 3,
+        "tn": 4,
+        "fp": 0,
+        "fn": 1,
+        "precision": 1.0,
+        "recall": 0.75,
+        "falsePositiveRate": 0.0
+      },
+      "discard": {
+        "tp": 2,
+        "tn": 4,
+        "fp": 2,
+        "fn": 0,
+        "precision": 0.5,
+        "recall": 1.0,
+        "falsePositiveRate": 0.3333333333333333
+      },
+      "bothTrue": 0,
+      "jointCorrect": 6
+    },
+    "d3/discard_first/cross/en": {
+      "n": 8,
+      "errors": 0,
+      "p50": 554.3276665,
+      "p95": 574.1265,
+      "interrupt": {
+        "tp": 2,
+        "tn": 4,
+        "fp": 0,
+        "fn": 2,
+        "precision": 1.0,
+        "recall": 0.5,
+        "falsePositiveRate": 0.0
+      },
+      "discard": {
+        "tp": 0,
+        "tn": 6,
+        "fp": 0,
+        "fn": 2,
+        "precision": null,
+        "recall": 0.0,
+        "falsePositiveRate": 0.0
+      },
+      "bothTrue": 0,
+      "jointCorrect": 4
+    },
+    "vela/interrupt_first/main/all": {
+      "n": 74,
+      "errors": 0,
+      "p50": 467.4240625,
+      "p95": 914.092125,
+      "interrupt": {
+        "tp": 14,
+        "tn": 48,
+        "fp": 6,
+        "fn": 6,
+        "precision": 0.7,
+        "recall": 0.7,
+        "falsePositiveRate": 0.1111111111111111
+      },
+      "discard": {
+        "tp": 3,
+        "tn": 51,
+        "fp": 9,
+        "fn": 11,
+        "precision": 0.25,
+        "recall": 0.21428571428571427,
+        "falsePositiveRate": 0.15
+      },
+      "bothTrue": 8,
+      "jointCorrect": 42
+    },
+    "vela/interrupt_first/main/zh": {
+      "n": 37,
+      "errors": 0,
+      "p50": 520.415083,
+      "p95": 3038.905709,
+      "interrupt": {
+        "tp": 4,
+        "tn": 26,
+        "fp": 1,
+        "fn": 6,
+        "precision": 0.8,
+        "recall": 0.4,
+        "falsePositiveRate": 0.037037037037037035
+      },
+      "discard": {
+        "tp": 0,
+        "tn": 30,
+        "fp": 0,
+        "fn": 7,
+        "precision": null,
+        "recall": 0.0,
+        "falsePositiveRate": 0.0
+      },
+      "bothTrue": 0,
+      "jointCorrect": 23
+    },
+    "vela/interrupt_first/main/en": {
+      "n": 37,
+      "errors": 0,
+      "p50": 369.326958,
+      "p95": 728.427083,
+      "interrupt": {
+        "tp": 10,
+        "tn": 22,
+        "fp": 5,
+        "fn": 0,
+        "precision": 0.6666666666666666,
+        "recall": 1.0,
+        "falsePositiveRate": 0.18518518518518517
+      },
+      "discard": {
+        "tp": 3,
+        "tn": 21,
+        "fp": 9,
+        "fn": 4,
+        "precision": 0.25,
+        "recall": 0.42857142857142855,
+        "falsePositiveRate": 0.3
+      },
+      "bothTrue": 8,
+      "jointCorrect": 19
+    },
+    "vela/interrupt_first/cross/all": {
+      "n": 16,
+      "errors": 0,
+      "p50": 391.285833,
+      "p95": 463.606833,
+      "interrupt": {
+        "tp": 3,
+        "tn": 7,
+        "fp": 1,
+        "fn": 5,
+        "precision": 0.75,
+        "recall": 0.375,
+        "falsePositiveRate": 0.125
+      },
+      "discard": {
+        "tp": 1,
+        "tn": 12,
+        "fp": 0,
+        "fn": 3,
+        "precision": 1.0,
+        "recall": 0.25,
+        "falsePositiveRate": 0.0
+      },
+      "bothTrue": 1,
+      "jointCorrect": 7
+    },
+    "vela/interrupt_first/cross/zh": {
+      "n": 8,
+      "errors": 0,
+      "p50": 438.46195850000004,
+      "p95": 463.606833,
+      "interrupt": {
+        "tp": 1,
+        "tn": 3,
+        "fp": 1,
+        "fn": 3,
+        "precision": 0.5,
+        "recall": 0.25,
+        "falsePositiveRate": 0.25
+      },
+      "discard": {
+        "tp": 1,
+        "tn": 6,
+        "fp": 0,
+        "fn": 1,
+        "precision": 1.0,
+        "recall": 0.5,
+        "falsePositiveRate": 0.0
+      },
+      "bothTrue": 1,
+      "jointCorrect": 3
+    },
+    "vela/interrupt_first/cross/en": {
+      "n": 8,
+      "errors": 0,
+      "p50": 342.1543335,
+      "p95": 462.398042,
+      "interrupt": {
+        "tp": 2,
+        "tn": 4,
+        "fp": 0,
+        "fn": 2,
+        "precision": 1.0,
+        "recall": 0.5,
+        "falsePositiveRate": 0.0
+      },
+      "discard": {
+        "tp": 0,
+        "tn": 6,
+        "fp": 0,
+        "fn": 2,
+        "precision": null,
+        "recall": 0.0,
+        "falsePositiveRate": 0.0
+      },
+      "bothTrue": 0,
+      "jointCorrect": 4
+    },
+    "vela/discard_first/main/all": {
+      "n": 74,
+      "errors": 0,
+      "p50": 472.58947950000004,
+      "p95": 673.119709,
+      "interrupt": {
+        "tp": 14,
+        "tn": 48,
+        "fp": 6,
+        "fn": 6,
+        "precision": 0.7,
+        "recall": 0.7,
+        "falsePositiveRate": 0.1111111111111111
+      },
+      "discard": {
+        "tp": 3,
+        "tn": 51,
+        "fp": 9,
+        "fn": 11,
+        "precision": 0.25,
+        "recall": 0.21428571428571427,
+        "falsePositiveRate": 0.15
+      },
+      "bothTrue": 8,
+      "jointCorrect": 42
+    },
+    "vela/discard_first/main/zh": {
+      "n": 37,
+      "errors": 0,
+      "p50": 520.021875,
+      "p95": 791.71625,
+      "interrupt": {
+        "tp": 4,
+        "tn": 26,
+        "fp": 1,
+        "fn": 6,
+        "precision": 0.8,
+        "recall": 0.4,
+        "falsePositiveRate": 0.037037037037037035
+      },
+      "discard": {
+        "tp": 0,
+        "tn": 30,
+        "fp": 0,
+        "fn": 7,
+        "precision": null,
+        "recall": 0.0,
+        "falsePositiveRate": 0.0
+      },
+      "bothTrue": 0,
+      "jointCorrect": 23
+    },
+    "vela/discard_first/main/en": {
+      "n": 37,
+      "errors": 0,
+      "p50": 370.602958,
+      "p95": 673.119709,
+      "interrupt": {
+        "tp": 10,
+        "tn": 22,
+        "fp": 5,
+        "fn": 0,
+        "precision": 0.6666666666666666,
+        "recall": 1.0,
+        "falsePositiveRate": 0.18518518518518517
+      },
+      "discard": {
+        "tp": 3,
+        "tn": 21,
+        "fp": 9,
+        "fn": 4,
+        "precision": 0.25,
+        "recall": 0.42857142857142855,
+        "falsePositiveRate": 0.3
+      },
+      "bothTrue": 8,
+      "jointCorrect": 19
+    },
+    "vela/discard_first/cross/all": {
+      "n": 16,
+      "errors": 0,
+      "p50": 395.11949949999996,
+      "p95": 450.705208,
+      "interrupt": {
+        "tp": 3,
+        "tn": 7,
+        "fp": 1,
+        "fn": 5,
+        "precision": 0.75,
+        "recall": 0.375,
+        "falsePositiveRate": 0.125
+      },
+      "discard": {
+        "tp": 1,
+        "tn": 12,
+        "fp": 0,
+        "fn": 3,
+        "precision": 1.0,
+        "recall": 0.25,
+        "falsePositiveRate": 0.0
+      },
+      "bothTrue": 1,
+      "jointCorrect": 7
+    },
+    "vela/discard_first/cross/zh": {
+      "n": 8,
+      "errors": 0,
+      "p50": 412.3138335,
+      "p95": 450.705208,
+      "interrupt": {
+        "tp": 1,
+        "tn": 3,
+        "fp": 1,
+        "fn": 3,
+        "precision": 0.5,
+        "recall": 0.25,
+        "falsePositiveRate": 0.25
+      },
+      "discard": {
+        "tp": 1,
+        "tn": 6,
+        "fp": 0,
+        "fn": 1,
+        "precision": 1.0,
+        "recall": 0.5,
+        "falsePositiveRate": 0.0
+      },
+      "bothTrue": 1,
+      "jointCorrect": 3
+    },
+    "vela/discard_first/cross/en": {
+      "n": 8,
+      "errors": 0,
+      "p50": 348.1513545,
+      "p95": 408.604334,
+      "interrupt": {
+        "tp": 2,
+        "tn": 4,
+        "fp": 0,
+        "fn": 2,
+        "precision": 1.0,
+        "recall": 0.5,
+        "falsePositiveRate": 0.0
+      },
+      "discard": {
+        "tp": 0,
+        "tn": 6,
+        "fp": 0,
+        "fn": 2,
+        "precision": null,
+        "recall": 0.0,
+        "falsePositiveRate": 0.0
+      },
+      "bothTrue": 0,
+      "jointCorrect": 4
+    },
+    "vela31/interrupt_first/main/all": {
+      "n": 74,
+      "errors": 0,
+      "p50": 479.98670849999996,
+      "p95": 663.449292,
+      "interrupt": {
+        "tp": 13,
+        "tn": 45,
+        "fp": 9,
+        "fn": 7,
+        "precision": 0.5909090909090909,
+        "recall": 0.65,
+        "falsePositiveRate": 0.16666666666666666
+      },
+      "discard": {
+        "tp": 7,
+        "tn": 38,
+        "fp": 22,
+        "fn": 7,
+        "precision": 0.2413793103448276,
+        "recall": 0.5,
+        "falsePositiveRate": 0.36666666666666664
+      },
+      "bothTrue": 19,
+      "jointCorrect": 34
+    },
+    "vela31/interrupt_first/main/zh": {
+      "n": 37,
+      "errors": 0,
+      "p50": 550.894042,
+      "p95": 844.880125,
+      "interrupt": {
+        "tp": 4,
+        "tn": 24,
+        "fp": 3,
+        "fn": 6,
+        "precision": 0.5714285714285714,
+        "recall": 0.4,
+        "falsePositiveRate": 0.1111111111111111
+      },
+      "discard": {
+        "tp": 1,
+        "tn": 26,
+        "fp": 4,
+        "fn": 6,
+        "precision": 0.2,
+        "recall": 0.14285714285714285,
+        "falsePositiveRate": 0.13333333333333333
+      },
+      "bothTrue": 4,
+      "jointCorrect": 21
+    },
+    "vela31/interrupt_first/main/en": {
+      "n": 37,
+      "errors": 0,
+      "p50": 356.718208,
+      "p95": 473.547625,
+      "interrupt": {
+        "tp": 9,
+        "tn": 21,
+        "fp": 6,
+        "fn": 1,
+        "precision": 0.6,
+        "recall": 0.9,
+        "falsePositiveRate": 0.2222222222222222
+      },
+      "discard": {
+        "tp": 6,
+        "tn": 12,
+        "fp": 18,
+        "fn": 1,
+        "precision": 0.25,
+        "recall": 0.8571428571428571,
+        "falsePositiveRate": 0.6
+      },
+      "bothTrue": 15,
+      "jointCorrect": 13
+    },
+    "vela31/interrupt_first/cross/all": {
+      "n": 16,
+      "errors": 0,
+      "p50": 366.815854,
+      "p95": 487.358542,
+      "interrupt": {
+        "tp": 4,
+        "tn": 7,
+        "fp": 1,
+        "fn": 4,
+        "precision": 0.8,
+        "recall": 0.5,
+        "falsePositiveRate": 0.125
+      },
+      "discard": {
+        "tp": 1,
+        "tn": 11,
+        "fp": 1,
+        "fn": 3,
+        "precision": 0.5,
+        "recall": 0.25,
+        "falsePositiveRate": 0.08333333333333333
+      },
+      "bothTrue": 2,
+      "jointCorrect": 7
+    },
+    "vela31/interrupt_first/cross/zh": {
+      "n": 8,
+      "errors": 0,
+      "p50": 436.4999795,
+      "p95": 487.358542,
+      "interrupt": {
+        "tp": 2,
+        "tn": 3,
+        "fp": 1,
+        "fn": 2,
+        "precision": 0.6666666666666666,
+        "recall": 0.5,
+        "falsePositiveRate": 0.25
+      },
+      "discard": {
+        "tp": 1,
+        "tn": 5,
+        "fp": 1,
+        "fn": 1,
+        "precision": 0.5,
+        "recall": 0.5,
+        "falsePositiveRate": 0.16666666666666666
+      },
+      "bothTrue": 2,
+      "jointCorrect": 3
+    },
+    "vela31/interrupt_first/cross/en": {
+      "n": 8,
+      "errors": 0,
+      "p50": 323.1696455,
+      "p95": 333.328625,
+      "interrupt": {
+        "tp": 2,
+        "tn": 4,
+        "fp": 0,
+        "fn": 2,
+        "precision": 1.0,
+        "recall": 0.5,
+        "falsePositiveRate": 0.0
+      },
+      "discard": {
+        "tp": 0,
+        "tn": 6,
+        "fp": 0,
+        "fn": 2,
+        "precision": null,
+        "recall": 0.0,
+        "falsePositiveRate": 0.0
+      },
+      "bothTrue": 0,
+      "jointCorrect": 4
+    },
+    "vela31/discard_first/main/all": {
+      "n": 74,
+      "errors": 0,
+      "p50": 474.4858545,
+      "p95": 621.062,
+      "interrupt": {
+        "tp": 13,
+        "tn": 45,
+        "fp": 9,
+        "fn": 7,
+        "precision": 0.5909090909090909,
+        "recall": 0.65,
+        "falsePositiveRate": 0.16666666666666666
+      },
+      "discard": {
+        "tp": 7,
+        "tn": 38,
+        "fp": 22,
+        "fn": 7,
+        "precision": 0.2413793103448276,
+        "recall": 0.5,
+        "falsePositiveRate": 0.36666666666666664
+      },
+      "bothTrue": 19,
+      "jointCorrect": 34
+    },
+    "vela31/discard_first/main/zh": {
+      "n": 37,
+      "errors": 0,
+      "p50": 554.127458,
+      "p95": 652.874417,
+      "interrupt": {
+        "tp": 4,
+        "tn": 24,
+        "fp": 3,
+        "fn": 6,
+        "precision": 0.5714285714285714,
+        "recall": 0.4,
+        "falsePositiveRate": 0.1111111111111111
+      },
+      "discard": {
+        "tp": 1,
+        "tn": 26,
+        "fp": 4,
+        "fn": 6,
+        "precision": 0.2,
+        "recall": 0.14285714285714285,
+        "falsePositiveRate": 0.13333333333333333
+      },
+      "bothTrue": 4,
+      "jointCorrect": 21
+    },
+    "vela31/discard_first/main/en": {
+      "n": 37,
+      "errors": 0,
+      "p50": 365.8265,
+      "p95": 451.303667,
+      "interrupt": {
+        "tp": 9,
+        "tn": 21,
+        "fp": 6,
+        "fn": 1,
+        "precision": 0.6,
+        "recall": 0.9,
+        "falsePositiveRate": 0.2222222222222222
+      },
+      "discard": {
+        "tp": 6,
+        "tn": 12,
+        "fp": 18,
+        "fn": 1,
+        "precision": 0.25,
+        "recall": 0.8571428571428571,
+        "falsePositiveRate": 0.6
+      },
+      "bothTrue": 15,
+      "jointCorrect": 13
+    },
+    "vela31/discard_first/cross/all": {
+      "n": 16,
+      "errors": 0,
+      "p50": 396.071958,
+      "p95": 597.755583,
+      "interrupt": {
+        "tp": 4,
+        "tn": 7,
+        "fp": 1,
+        "fn": 4,
+        "precision": 0.8,
+        "recall": 0.5,
+        "falsePositiveRate": 0.125
+      },
+      "discard": {
+        "tp": 1,
+        "tn": 11,
+        "fp": 1,
+        "fn": 3,
+        "precision": 0.5,
+        "recall": 0.25,
+        "falsePositiveRate": 0.08333333333333333
+      },
+      "bothTrue": 2,
+      "jointCorrect": 7
+    },
+    "vela31/discard_first/cross/zh": {
+      "n": 8,
+      "errors": 0,
+      "p50": 428.4337915,
+      "p95": 597.755583,
+      "interrupt": {
+        "tp": 2,
+        "tn": 3,
+        "fp": 1,
+        "fn": 2,
+        "precision": 0.6666666666666666,
+        "recall": 0.5,
+        "falsePositiveRate": 0.25
+      },
+      "discard": {
+        "tp": 1,
+        "tn": 5,
+        "fp": 1,
+        "fn": 1,
+        "precision": 0.5,
+        "recall": 0.5,
+        "falsePositiveRate": 0.16666666666666666
+      },
+      "bothTrue": 2,
+      "jointCorrect": 3
+    },
+    "vela31/discard_first/cross/en": {
+      "n": 8,
+      "errors": 0,
+      "p50": 328.6670835,
+      "p95": 390.173333,
+      "interrupt": {
+        "tp": 2,
+        "tn": 4,
+        "fp": 0,
+        "fn": 2,
+        "precision": 1.0,
+        "recall": 0.5,
+        "falsePositiveRate": 0.0
+      },
+      "discard": {
+        "tp": 0,
+        "tn": 6,
+        "fp": 0,
+        "fn": 2,
+        "precision": null,
+        "recall": 0.0,
+        "falsePositiveRate": 0.0
+      },
+      "bothTrue": 0,
+      "jointCorrect": 4
+    },
+    "laya/interrupt_first/main/all": {
+      "n": 74,
+      "errors": 0,
+      "p50": 427.2842495,
+      "p95": 469.081333,
+      "interrupt": {
+        "tp": 15,
+        "tn": 42,
+        "fp": 12,
+        "fn": 5,
+        "precision": 0.5555555555555556,
+        "recall": 0.75,
+        "falsePositiveRate": 0.2222222222222222
+      },
+      "discard": {
+        "tp": 13,
+        "tn": 24,
+        "fp": 36,
+        "fn": 1,
+        "precision": 0.2653061224489796,
+        "recall": 0.9285714285714286,
+        "falsePositiveRate": 0.6
+      },
+      "bothTrue": 24,
+      "jointCorrect": 27
+    },
+    "laya/interrupt_first/main/zh": {
+      "n": 37,
+      "errors": 0,
+      "p50": 420.862791,
+      "p95": 446.868791,
+      "interrupt": {
+        "tp": 9,
+        "tn": 18,
+        "fp": 9,
+        "fn": 1,
+        "precision": 0.5,
+        "recall": 0.9,
+        "falsePositiveRate": 0.3333333333333333
+      },
+      "discard": {
+        "tp": 7,
+        "tn": 5,
+        "fp": 25,
+        "fn": 0,
+        "precision": 0.21875,
+        "recall": 1.0,
+        "falsePositiveRate": 0.8333333333333334
+      },
+      "bothTrue": 18,
+      "jointCorrect": 8
+    },
+    "laya/interrupt_first/main/en": {
+      "n": 37,
+      "errors": 0,
+      "p50": 436.466791,
+      "p95": 509.767541,
+      "interrupt": {
+        "tp": 6,
+        "tn": 24,
+        "fp": 3,
+        "fn": 4,
+        "precision": 0.6666666666666666,
+        "recall": 0.6,
+        "falsePositiveRate": 0.1111111111111111
+      },
+      "discard": {
+        "tp": 6,
+        "tn": 19,
+        "fp": 11,
+        "fn": 1,
+        "precision": 0.35294117647058826,
+        "recall": 0.8571428571428571,
+        "falsePositiveRate": 0.36666666666666664
+      },
+      "bothTrue": 6,
+      "jointCorrect": 19
+    },
+    "laya/interrupt_first/cross/all": {
+      "n": 16,
+      "errors": 0,
+      "p50": 417.5195205,
+      "p95": 455.366208,
+      "interrupt": {
+        "tp": 5,
+        "tn": 6,
+        "fp": 2,
+        "fn": 3,
+        "precision": 0.7142857142857143,
+        "recall": 0.625,
+        "falsePositiveRate": 0.25
+      },
+      "discard": {
+        "tp": 4,
+        "tn": 2,
+        "fp": 10,
+        "fn": 0,
+        "precision": 0.2857142857142857,
+        "recall": 1.0,
+        "falsePositiveRate": 0.8333333333333334
+      },
+      "bothTrue": 7,
+      "jointCorrect": 3
+    },
+    "laya/interrupt_first/cross/zh": {
+      "n": 8,
+      "errors": 0,
+      "p50": 417.051854,
+      "p95": 438.594042,
+      "interrupt": {
+        "tp": 3,
+        "tn": 2,
+        "fp": 2,
+        "fn": 1,
+        "precision": 0.6,
+        "recall": 0.75,
+        "falsePositiveRate": 0.5
+      },
+      "discard": {
+        "tp": 2,
+        "tn": 1,
+        "fp": 5,
+        "fn": 0,
+        "precision": 0.2857142857142857,
+        "recall": 1.0,
+        "falsePositiveRate": 0.8333333333333334
+      },
+      "bothTrue": 5,
+      "jointCorrect": 1
+    },
+    "laya/interrupt_first/cross/en": {
+      "n": 8,
+      "errors": 0,
+      "p50": 428.0990415,
+      "p95": 455.366208,
+      "interrupt": {
+        "tp": 2,
+        "tn": 4,
+        "fp": 0,
+        "fn": 2,
+        "precision": 1.0,
+        "recall": 0.5,
+        "falsePositiveRate": 0.0
+      },
+      "discard": {
+        "tp": 2,
+        "tn": 1,
+        "fp": 5,
+        "fn": 0,
+        "precision": 0.2857142857142857,
+        "recall": 1.0,
+        "falsePositiveRate": 0.8333333333333334
+      },
+      "bothTrue": 2,
+      "jointCorrect": 2
+    },
+    "laya/discard_first/main/all": {
+      "n": 74,
+      "errors": 0,
+      "p50": 423.4530205,
+      "p95": 453.601875,
+      "interrupt": {
+        "tp": 15,
+        "tn": 42,
+        "fp": 12,
+        "fn": 5,
+        "precision": 0.5555555555555556,
+        "recall": 0.75,
+        "falsePositiveRate": 0.2222222222222222
+      },
+      "discard": {
+        "tp": 13,
+        "tn": 24,
+        "fp": 36,
+        "fn": 1,
+        "precision": 0.2653061224489796,
+        "recall": 0.9285714285714286,
+        "falsePositiveRate": 0.6
+      },
+      "bothTrue": 24,
+      "jointCorrect": 27
+    },
+    "laya/discard_first/main/zh": {
+      "n": 37,
+      "errors": 0,
+      "p50": 417.128458,
+      "p95": 446.878041,
+      "interrupt": {
+        "tp": 9,
+        "tn": 18,
+        "fp": 9,
+        "fn": 1,
+        "precision": 0.5,
+        "recall": 0.9,
+        "falsePositiveRate": 0.3333333333333333
+      },
+      "discard": {
+        "tp": 7,
+        "tn": 5,
+        "fp": 25,
+        "fn": 0,
+        "precision": 0.21875,
+        "recall": 1.0,
+        "falsePositiveRate": 0.8333333333333334
+      },
+      "bothTrue": 18,
+      "jointCorrect": 8
+    },
+    "laya/discard_first/main/en": {
+      "n": 37,
+      "errors": 0,
+      "p50": 431.213459,
+      "p95": 469.304291,
+      "interrupt": {
+        "tp": 6,
+        "tn": 24,
+        "fp": 3,
+        "fn": 4,
+        "precision": 0.6666666666666666,
+        "recall": 0.6,
+        "falsePositiveRate": 0.1111111111111111
+      },
+      "discard": {
+        "tp": 6,
+        "tn": 19,
+        "fp": 11,
+        "fn": 1,
+        "precision": 0.35294117647058826,
+        "recall": 0.8571428571428571,
+        "falsePositiveRate": 0.36666666666666664
+      },
+      "bothTrue": 6,
+      "jointCorrect": 19
+    },
+    "laya/discard_first/cross/all": {
+      "n": 16,
+      "errors": 0,
+      "p50": 421.6283955,
+      "p95": 615.926292,
+      "interrupt": {
+        "tp": 5,
+        "tn": 6,
+        "fp": 2,
+        "fn": 3,
+        "precision": 0.7142857142857143,
+        "recall": 0.625,
+        "falsePositiveRate": 0.25
+      },
+      "discard": {
+        "tp": 4,
+        "tn": 2,
+        "fp": 10,
+        "fn": 0,
+        "precision": 0.2857142857142857,
+        "recall": 1.0,
+        "falsePositiveRate": 0.8333333333333334
+      },
+      "bothTrue": 7,
+      "jointCorrect": 3
+    },
+    "laya/discard_first/cross/zh": {
+      "n": 8,
+      "errors": 0,
+      "p50": 416.3601875,
+      "p95": 427.293958,
+      "interrupt": {
+        "tp": 3,
+        "tn": 2,
+        "fp": 2,
+        "fn": 1,
+        "precision": 0.6,
+        "recall": 0.75,
+        "falsePositiveRate": 0.5
+      },
+      "discard": {
+        "tp": 2,
+        "tn": 1,
+        "fp": 5,
+        "fn": 0,
+        "precision": 0.2857142857142857,
+        "recall": 1.0,
+        "falsePositiveRate": 0.8333333333333334
+      },
+      "bothTrue": 5,
+      "jointCorrect": 1
+    },
+    "laya/discard_first/cross/en": {
+      "n": 8,
+      "errors": 0,
+      "p50": 429.264188,
+      "p95": 615.926292,
+      "interrupt": {
+        "tp": 2,
+        "tn": 4,
+        "fp": 0,
+        "fn": 2,
+        "precision": 1.0,
+        "recall": 0.5,
+        "falsePositiveRate": 0.0
+      },
+      "discard": {
+        "tp": 2,
+        "tn": 1,
+        "fp": 5,
+        "fn": 0,
+        "precision": 0.2857142857142857,
+        "recall": 1.0,
+        "falsePositiveRate": 0.8333333333333334
+      },
+      "bothTrue": 2,
+      "jointCorrect": 2
+    }
+  },
+  "orderDisagreements": {
+    "d3": {
+      "interrupt": 0,
+      "discard": 0
+    },
+    "vela": {
+      "interrupt": 0,
+      "discard": 0
+    },
+    "vela31": {
+      "interrupt": 0,
+      "discard": 0
+    },
+    "laya": {
+      "interrupt": 0,
+      "discard": 0
+    }
+  },
+  "inputSHA256": "47821cb5f8e0a5179f2b6dcfedad8ba246d62e55ad9d521b9575ee447e7ecc01"
+}

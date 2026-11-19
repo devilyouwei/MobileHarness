@@ -10,9 +10,9 @@
 
 ## 变更范围与实施顺序
 
-1. `Tests/IntegrationTests/VoiceTests.swift`：在真实 Agent/OutputGateway/InputGateway/SpeechPerception 链路中，用受控播放清理 gate 固定“取消尚未完成时到达空闲通知”的时序；先复现失败，再验证取消期间普通执行仍被拒绝，用户关闭保持关闭，重新开启不再 paused，旧占用通知不能覆盖新 revision，重复启停可恢复。
+1. `Tests/Agents/SpeechPerception/VoiceTests.swift`：在真实 Agent/OutputGateway/InputGateway/SpeechPerception 链路中，用受控播放清理 gate 固定“取消尚未完成时到达空闲通知”的时序；先复现失败，再验证取消期间普通执行仍被拒绝，用户关闭保持关闭，重新开启不再 paused，旧占用通知不能覆盖新 revision，重复启停可恢复。
 2. `MobileHarness/Agents/Support/OutputGateway.swift`：把类型化 ReplyActivity 作为独立于回复执行取消的生命周期事实；允许其穿过 producer/scope 取消围栏，并在 cancelCalls 加入执行时保留其在途投递。注册身份、会话、通信权限、接收者 revision/incarnation 校验与关闭生命周期不放宽；不扩大普通 Action/Tool 或任意通信权限。
-3. 文档同步：更新 `MobileHarness/Agents/Support/README.md` 的取消与事实投递契约，`MobileHarness/Agents/README.md` 的模块生命周期边界，以及 `MobileHarness/README.md` 的回复取消流程；更新 `Tests/IntegrationTests/README.md` 覆盖说明。
+3. 文档同步：更新 `MobileHarness/Agents/Support/README.md` 的取消与事实投递契约，`MobileHarness/Agents/README.md` 的模块生命周期边界，以及 `MobileHarness/README.md` 的回复取消流程；更新 `Tests/Agents/README.md` 覆盖说明。
 4. 执行定向回归、`./scripts/check.sh`、完整 Xcode 可用时的 `./scripts/build-ios.sh`，结果写入 `docs/validation/Listening-Interruption-Recovery.md`。不新增目录、不改动签名、不覆盖无关工作区改动。
 
 ## 验收
@@ -44,9 +44,9 @@ Actions的ConversationPresentation不再因识别轮次变化清空双方字幕�
 
 按本次用户要求，替代上文“停止聆听保留字幕”的开关策略：结束聆听立即清空 user 和 assistant 字幕，重新长按开启时保持空白，直到新的识别或回复内容到达。聆听仍启用时的识别、处理和播放阶段切换继续保留原有字幕行为。
 
-实施范围：`UI/Conversation/ConversationState.swift` 在 `isVoiceActive=false` 的统一状态入口调用既有 `resetCaptions`，同时清除定稿、等待和透明度状态；不增加模块、目录或跨模块接口。更新 `Tests/UITests/CaptionPresentationTests.swift` 覆盖关闭、重新开启、重复开关和根失效，更新 `UI/Conversation/README.md` 和 `UI/README.md` 的现行契约。执行 check.sh 和完整 Xcode 下的 build-ios.sh，将实际结果记录到对应验证文档；自动化不替代真机视觉验收。
+实施范围：`UI/Conversation/ConversationState.swift` 在 `isVoiceActive=false` 的统一状态入口调用既有 `resetCaptions`，同时清除定稿、等待和透明度状态；不增加模块、目录或跨模块接口。更新 `Tests/UI/Conversation/CaptionPresentationTests.swift` 覆盖关闭、重新开启、重复开关和根失效，更新 `UI/Conversation/README.md` 和 `UI/README.md` 的现行契约。执行 check.sh 和完整 Xcode 下的 build-ios.sh，将实际结果记录到对应验证文档；自动化不替代真机视觉验收。
 
-回归同步范围补充：`Tests/AppWorkflowTests/HomeEffectsTests.swift` 中停止聆听保留字幕的旧断言也改为双方为空；回复结束但聆听仍启用时的保留断言继续保留。
+回归同步范围补充：`Tests/App/Presentation/HomeEffectsTests.swift` 中停止聆听保留字幕的旧断言也改为双方为空；回复结束但聆听仍启用时的保留断言继续保留。
 
 本节代码、文档与三项字幕生命周期回归已完成；定向测试及四目标 iOS 构建通过，全量检查存在其他失败和中断，真机未验。详情见[验证记录](../validation/Listening-Interruption-Recovery.md#2026-11-14-结束聆听清空双方字幕)。
 

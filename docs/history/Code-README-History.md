@@ -15,7 +15,7 @@ Purpose: own shared Xcode settings, local-signing templates and explicit metadat
 
 - ✅ Shared Swift 6 / iOS 27 settings; local signing stays in ignored Local.xcconfig.
 - ✅ Both device and simulator Voice-Models file lists stage only model-catalog.json and license notices. No model graphs, weights, tokenizers or voice assets are build inputs or packaged outputs.
-- ✅ Regenerate lists with scripts/update-model-filelists.py after changing staging metadata/licenses. The pre-build cleanup removes obsolete Models output from incremental App builds; staging never removes developer source artifacts.
+- ✅ Regenerate lists with scripts/resources/update-model-filelists.py after changing staging metadata/licenses. The pre-build cleanup removes obsolete Models output from incremental App builds; staging never removes developer source artifacts.
 - ✅ Physical App requests com.apple.developer.kernel.increased-memory-limit. It is not a memory-availability guarantee; simulator does not request it.
 - ✅ NSCameraUsageDescription covers local preview and pose inference. Camera denial does not block Settings/history or voice preparation.
 - ❌ Signed-device performance, export compatibility and background transfer acceptance require separate validation; configuration/build success is not that evidence.
@@ -3578,7 +3578,7 @@ SQLiteDialogLifecycleTests.swift owns current-dialog rotation/publication fault 
 ````markdown
 # MOSS-TTS-Nano tests
 
-❌ Mac synthesis does not validate iPhone latency, memory pressure, Chinese pronunciation or sustained stability. No runtime download occurs in tests; provision with scripts/download-moss-tts-nano.py first.
+❌ Mac synthesis does not validate iPhone latency, memory pressure, Chinese pronunciation or sustained stability. No runtime download occurs in tests; provision with scripts/models/model_download.py moss-tts-nano first.
 ````
 
 ## Tests/NemotronTests/README.md
@@ -3589,7 +3589,7 @@ SQLiteDialogLifecycleTests.swift owns current-dialog rotation/publication fault 
 # NemotronTests
 
 - ✅ Strict 2240 ms metadata and prompt mapping, missing-resource availability, invalid PCM format and exclusive lease/unload checks.
-- ✅ Optional scripts/test-nemotron.sh uses ignored Resources/Models/Nemotron, shared with iOS catalog provisioning, for packet parity, cancel/reload and synthetic English/Chinese checks.
+- ✅ Optional scripts/models/test-nemotron.sh uses ignored Resources/Models/Nemotron, shared with iOS catalog provisioning, for packet parity, cancel/reload and synthetic English/Chinese checks.
 - ❌ Default tests skip real weights; they do not prove phone accuracy, streaming latency or sustained stability.
 ````
 
@@ -3944,7 +3944,7 @@ flowchart LR
     Sources --> Checks[Formatting / tests / builds]
 ```
 
-✅ Run python3 scripts/update-model-filelists.py after editing production download profiles. It generates explicit Xcode sandbox file inputs and outputs; staging copies only those required files and licenses.
+✅ Run python3 scripts/resources/update-model-filelists.py after editing production download profiles. It generates explicit Xcode sandbox file inputs and outputs; staging copies only those required files and licenses.
 
 ✅ Language-model download and test entry points target Gemma 4 E2B CoreAI through the pinned CoreAILM runtime.
 

@@ -1,0 +1,21 @@
+# Function Contract Tests
+
+Purpose: verify standard callable contracts independently of Gateway, execution SDKs and business modules. Design goals: concrete standard inputs, injected reporting and intrinsic metadata preservation.
+
+This target depends only on FunctionContracts. The fixture invokes one function with an ordinary FunctionInvocation and a test-owned bounded report sink.
+
+## Action timeout contract
+
+验证基础默认 timeout、动态优先与异常不回退、无效静态值和预算上限，独立于 Gateway。
+
+## Committed business references
+
+Runtime fixtures use opaque UUID strings; committed business entities use dialog/message/task/media/device database IDs. Independent repository interfaces preserve ownership/cancellation and foundation boundaries. Completed messages (including each ReACT message) persist individually, without delta fragments or old allocator/file-index compatibility. See the project SQLite business-record plan.
+
+## Platform 根、设备接入与同帧呈现
+
+FunctionInput 的可选 Sendable 附件缺省为空，原生 Tool 附件与字符串参数的隔离由 IntegrationTests/NativeAttachmentTests 覆盖。此目标仍只依赖独立函数契约。
+
+## 文件归属
+
+- [FunctionContractTests.swift](FunctionContractTests.swift)

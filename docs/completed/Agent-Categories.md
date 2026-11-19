@@ -5,7 +5,7 @@
 ## 设计与范围
 
 - 在现有 `MobileHarness/Agents/Support/Core/AgentDescriptor.swift` 内定义 `AgentCategory: String, Codable, Sendable`，只有 perception/cognition；Descriptor 持有必填不可变 category，不提供默认类别。
-- 每个 `Resources/Agents/<角色>/Agent.json` 显式声明 category，作为生产角色唯一来源。资源 schema 从 v9 升为 v10；`Support/AgentConfigurations.swift` 严格校验必填字段、值与类型，投影到携带 category 的 AgentCore v8 配置（原 v7）。旧版本、缺失/null/未知类别明确拒绝。同步 scripts/check-modelkit-boundaries.py 的资源版本及类别合法性校验，保持静态检查与加载器一致。
+- 每个 `Resources/Agents/<角色>/Agent.json` 显式声明 category，作为生产角色唯一来源。资源 schema 从 v9 升为 v10；`Support/AgentConfigurations.swift` 严格校验必填字段、值与类型，投影到携带 category 的 AgentCore v8 配置（原 v7）。旧版本、缺失/null/未知类别明确拒绝。同步 scripts/checks/check-modelkit-boundaries.py 的资源版本及类别合法性校验，保持静态检查与加载器一致。
 - `AgentConfiguration` 保存类别，restrictingCommunication 保留原值。七个生产角色从配置构造 Descriptor；OutputGateway 在收窄有效能力时保留该身份属性。纯函数目录的内部临时配置显式填写类别，仅用于 schema 编译，不产生 Agent 身份或分类策略。
 - cognition：Assistant、Writer、Memory。perception：SpeechPerception、VisionPerception、Photographer、ApplicationControl。后两者按当前快速响应和确定性执行职责分类；类别不等于是否调用模型。
 - 本轮只增加静态声明与读取，不改变权限、队列、模型请求、持久化消息或 UI，也不增加目录、依赖或运行任务。无需新增取消和清理机制。

@@ -12,7 +12,7 @@
 - 同文件的通知桥独立于 FOA 硬件后端，在 macOS/iOS 均编译，以实际 NotificationCenter 通知测试错误传播；测试不得请求权限或打开设备。首个失败同时传给 readiness、PCM source 和 Platform 报告，重复事件不覆写主因。
 - `PlatformKit/Audio/MicrophoneFrame.swift`：补充 runtimeFailed/startFailed 原生错误分类，不改变已有 PCM 验证。
 - `Actions/Speech/Detection/AudioDetectionExecution.swift` 及本目录 README：穷举映射兼容新增错误，直接传播原生启动/运行失败，不将其映射成格式错误；不改变检测生命周期。
-- `Tests/IntegrationTests/AudioCaptureReadinessTests.swift`：覆盖原生错误、无 payload、中断、启动前/后失败、重复/迟到事件及无关 session 隔离。
+- `Tests/PlatformKit/Audio/AudioCaptureReadinessTests.swift`：覆盖原生错误、无 payload、中断、启动前/后失败、重复/迟到事件及无关 session 隔离。
 - 更新 Audio README 和测试 README，验证记录放 `docs/validation/`。不改变模块边界、Gateway、Writer、媒体采集策略，不推测性关闭 FOA 或自动重拍。
 
 ## 验证与后续

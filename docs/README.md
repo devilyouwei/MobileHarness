@@ -11,9 +11,8 @@
 | [validation/](validation/README.md) | 自动化检查、模型实验、设备实测和验收步骤。 |
 | [history/](history/README.md) | 变更、历史里程碑、迁出的旧说明和原始 Markdown 设计。 |
 | [adr/](adr/README.md) | 架构决策、理由和替代关系。 |
-| [measurements/](measurements/README.md) | 保留的原始测量数据及解释约束。 |
 | [licenses/](licenses/README.md) | 第三方许可和分发说明。 |
-| [imgs/](imgs/README.md) | 项目 README 使用的概念图、功能截图与演示动画。 |
+| [imgs/](../imgs/README.md) | 项目 README 使用的概念图、功能截图与演示动画。 |
 
 ## 当前产品与架构说明
 
@@ -27,7 +26,7 @@
 | [Overall technical design](../MobileHarness/README.md) | 完整框架、模块边界、编译依赖和跨模块技术流程。 |
 | [Module READMEs](../MobileHarness/README.md#part-ii--module-responsibilities) | 各目录的接口、状态、算法、生命周期、容量和失败契约。 |
 
-## Experiments, tests and acceptance
+## experiments, tests and acceptance
 
 [验证索引](validation/README.md) 区分可执行验收指南、项目验证日志和专项历史报告。测试是否执行、成功与失败、模型/设备/版本及证据限制，均在相应报告记录；编译或替身测试不等于真实模型、原生 UI 或物理设备验收。
 
@@ -49,3 +48,7 @@
 - 历史记录中的“当前”“默认”“待实现”只对应当时版本；不能从旧记录自动生成当前待办或覆盖新设计。
 - 目录或文件迁移同步更新全仓引用与文档导航。保留历史证据的日期、失败、指标和设备范围，不将旧失败改写为通过。
 - 原始 Word 设计源 [Technical_Design.docx](Technical_Design.docx) 保持原路径与内容；[原始 Markdown 设计](history/Tech_Design.md) 归入历史资料。
+
+`docs` 只保存撰写或汇总的文档及其插图、截图等附件。评估输入、脚本、配置、原始输出和机器生成的指标数据归 `experiments/<任务>/`，报告通过链接引用，不在 docs 复制数据。
+
+Engineering fixtures belong in Tests; experimental datasets, configurations and raw outputs belong in experiments. This directory contains authored documentation and summarized reports only.

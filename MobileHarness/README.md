@@ -124,7 +124,7 @@ MobileHarness/
 | Foundation                            | [Storage](Storage/README.md)         | Own bounded temporary data, controlled files and durable domain repositories.                                                    | Exposes storage contracts and commit results without interpreting application policy.                                                                                      |
 | Packaged definitions                  | [Resources](Resources/README.md)     | Organize declarative Agent/Skill configuration, model metadata, privacy declarations and assets.                                 | Build tooling packages declarations; owning runtime modules validate and interpret them.                                                                                   |
 
-Resources is a packaging owner rather than an executable service. At repository level, [Package.swift](../Package.swift) and the Xcode project define build units; `Config/`, `Tests/` and `scripts/` own build configuration, automated coverage and developer checks respectively. [docs](../docs/README.md) owns requirements and evidence. Internal directory maps remain in the linked READMEs.
+Resources is a packaging owner rather than an executable service. Shared opt-in development model artifacts are owned by repository [Models](../Models/README.md), grouped by model and consumed explicitly by tests and experiments; production resource deployment stays with Resources and ModelKit. At repository level, [Package.swift](../Package.swift) and the Xcode project define build units; `Config/`, `Tests/`, `experiments/` and `scripts/` own build configuration, application and SDK regression/acceptance coverage, case/prompt evaluations and performance experiments, and developer checks respectively. [docs](../docs/README.md) owns requirements and evidence. Internal directory maps remain in the linked READMEs.
 
 ### 2. Dependency model
 
@@ -227,6 +227,8 @@ Inversion of Control (IoC) separates dependency assembly from capability use. Ap
 | PlatformContainer     | AudioContainer, VisionContainer and ConnectivityContainer                                                                                               |
 | ModelContainer        | ModelLanguageContainer, ModelSpeechContainer, ModelVisionContainer and ModelArtifactsContainer                                                          |
 | StorageContainer      | CacheContainer, FilesContainer and the injected DatabaseStorage backend interface                                                                       |
+
+Agents separates root host/execution contracts from Support adapters and role-owned orchestration. App binds those public contracts; the [Agents design](Agents/README.md#root-source-ownership) owns internal source placement and catalog assembly.
 
 The table describes ownership; module READMEs define child interfaces and internal lifecycle. ContainerFailureChannel, executionBindings and ForegroundPreparation are supporting lifecycle services, not additional module roots.
 
@@ -354,6 +356,8 @@ flowchart TB
 [ApplicationLifecycle](App/Lifecycle/ApplicationLifecycle.swift) selects the first registered service whose prerequisites are ready and starts services serially. With the current registration order, startup is: **diagnostics → storage → model → platform → ui → executionBindings → actions → gateway → agents → homePreparation**. This sequence reflects the current registration order; the readiness prerequisites are the edges above. Storage opens repositories; ModelKit prepares its own artifact management and registers inference capabilities, with weights loaded on demand. executionBindings waits for all four foundation roots before assembling the business execution interfaces.
 
 During `executionBindings`, Agents prepares its requirements, Actions assembles the business services and catalog, and Agents validates catalog coverage. App then configures Gateway and injects the resulting execution facilities into Agents. Actions then starts execution services, Gateway opens admission, and Agents starts its roles. Home preparation follows the foreground barrier and visible-home condition.
+
+Home foreground preparation includes the selected local Decision route alongside the existing conversation/speech and optional vision capabilities. Agents supplies saved selection, App connects the generic preparation worker, and ModelKit checks/warms the resource. An absent local selection performs no load; preparation failures remain visible before home reports ready. Optional installed speech enhancement is also prepared through ModelKit, independently of the listening denoising switch. See [foreground preparation](App/Composition/README.md).
 
 #### Lifecycle
 
@@ -1002,7 +1006,7 @@ sequenceDiagram
         participant P as Microphone
     end
     box rgb(238,239,255) ModelKit
-        participant M as VAD / ASR
+        participant M as Enhancement / VAD / ASR
     end
     UI->>S: typed listening request
     S->>S: check listening policy
@@ -1010,24 +1014,38 @@ sequenceDiagram
     G->>X: execute with permit
     X->>P: authorize and start capture
     P-->>S: direct ordered PCM observation
-    S->>A: read reply activity and interruption marker
-    A-->>S: reply activity and pending marker
-    S->>M: validated typed samples
+    S->>S: validate PCM and select mono/W
+    opt Denoising enabled for this capture
+        S->>M: 48 kHz enhancement input
+        M-->>S: enhanced PCM or explicit failure
+    end
+    S->>S: stateful 16 kHz conversion / capture-time slices
+    S->>A: read injected playback / reply activity / interruption snapshots
+    A-->>S: same-session facts bound by AgentRuntime
+    S->>M: VAD / ASR with playback-aware onset
     M-->>S: VAD / recognition output
     S->>S: select silence endpoint and assemble transcript / direction
-    S->>G: authorized final transcript Signal
+    S->>G: final caption and seal submissions
+    S->>G: authorized nonempty final transcript Signal
     G-->>A: transcript with source ID
+    S->>S: reset full-utterance state / resume eligible audio
     S-->>X: low-rate measurement
     X->>UI: present spectrum / diagnostic facts
 ```
 
 SpeechPerception owns consent, route-aware listening policy and the recognition turn, using ModelKit for VAD and ASR. Actions coordinates microphone permission, capture readiness and shutdown through PlatformKit. PlatformKit owns the native capture generation, which SpeechPerception uses to fence its audio subscription. Read subscriptions alone do not open the microphone. Immutable native PCM reaches the role directly without Signal JSON re-encoding.
 
+SpeechPerception selects mono/W from validated native PCM and owns capture-scoped preprocessing: optional 48 kHz ModelKit enhancement, then stateful conversion to 16 kHz for the shared VAD/ASR path. The durable denoising preference is snapshotted when capture observation starts. PlatformKit retains native Voice Processing and echo cancellation; spatial measurements use the original capture. Processing stays in the single ordered PCM consumer, without a second native queue. Enabled enhancement failure is reported through perception recovery rather than silently bypassed. See [preprocessing](Agents/SpeechPerception/README.md#optional-speech-enhancement) and the [enhancement contract](ModelKit/Speech/Enhancement/README.md).
+
 BasicSkill also exposes explicit startListening/stopListening Actions through Agent → Gateway → Actions. The voice execution owner calls the neutral perception policy port and directly applies its revision, without recursively scheduling another Action. Stop revokes consent and joins native capture cleanup without cancelling and joining its own reply execution. Reply completion cannot renew consent; a fresh screen hold or explicit user start is required. The owning [Listening design](Actions/Speech/Listening/README.md) defines the local lifecycle and failure details.
 
 Readiness depends on effective samples and native conditions. The role validates channel layout, rate, sequence and continuity before model adaptation; ordered PCM overflow fails explicitly. Partials do not independently start ordinary conversation. SpeechPerception submits the final caption and its seal before publishing a nonempty final through Gateway. Assistant subscribes to `user.input.asr.final` on the `user.input` topic. Sound-source estimation and low-rate measurements belong to perception, while Actions presents facts. A declared observation contract does not imply a current subscriber. See [SpeechPerception](Agents/SpeechPerception/README.md), [Listening](Actions/Speech/Listening/README.md) and [Platform Audio](PlatformKit/Audio/README.md).
 
-SpeechPerception starts recognition captions at confirmed VAD onset and publishes the speaking-phase control fact. For silence endpointing, AgentRuntime binds same-session Assistant reply activity and the pending interruption marker. SpeechPerception acknowledges that marker after forwarding the next nonempty final transcript. In the full-duplex Assistant, onset leaves the current reply caption in place. Final ASR enters Decision, and the next actual reply replaces the Assistant caption. Actions fences stale request, turn and sequence updates. UI renders user and Assistant captions in fixed, separate regions. See [Assistant captions](Agents/Assistant/README.md#presentation-speech-and-cleanup), [caption execution](Actions/UI/Conversation/README.md) and [Conversation](UI/Conversation/README.md).
+SpeechPerception starts recognition captions at confirmed VAD onset and publishes the speaking-phase control fact. For silence endpointing, AgentRuntime binds same-session Assistant reply activity and the pending interruption marker. SpeechPerception acknowledges that marker after forwarding the next nonempty final transcript. In the full-duplex Assistant, onset leaves the current reply caption in place. Final ASR enters the ordinary Assistant queue; interruption Decision runs only when same-session reply work or playback existed at arrival. The next actual reply replaces the Assistant caption. Actions fences stale request, turn and sequence updates. UI renders user and Assistant captions in fixed, separate regions. See [Assistant captions](Agents/Assistant/README.md#presentation-speech-and-cleanup), [caption execution](Actions/UI/Conversation/README.md) and [Conversation](UI/Conversation/README.md).
+
+#### Playback-aware speech admission
+
+Actions forwards native first-scheduled-buffer and completion timestamps with audio identity through App-bound host ports to AssistantSpeechOutput. Assistant owns bounded same-session playback facts; AgentRuntime injects their snapshot into SpeechPerception. SpeechPerception applies playback-dependent onset thresholds while PlatformKit keeps the shared capture/playback/voice-processing graph running. Playback onset and completed ASR introduce no timed audio rejection window. Confirmed user speech survives new playback; full utterance completion resets VAD and preprocessing history. See [speech admission](Agents/SpeechPerception/README.md#播放状态与连续接纳) and [native playback facts](Actions/Speech/Listening/README.md#播放时刻事实). Capture timestamps, preserved through preprocessing, select playback facts for each bounded model slice; processing time does not substitute for capture time. Maximum-duration model segments retain the same utterance. ASR finalization and restricted-route playback admission retain their own lifecycle fences.
 
 Actions retires failed capture and owns one bounded recovery attempt per explicit listening session. PlatformKit rebuilds the stopped audio graph while Agents retains the current decision and listening intent. User stop and root shutdown retain cancellation and join authority. See [Listening recovery](Actions/Speech/Listening/README.md#采集故障隔离与受限恢复).
 
@@ -1120,6 +1138,8 @@ flowchart TB
 PlatformKit reports capture capability; SpeechPerception publishes partial and final ASR. Assistant admits authenticated final ASR and typed user text to its bounded ordinary queue and independently asks ModelKit for a boolean interruption decision only if the same session had reply work or playback when the input arrived. Idle arrivals dispatch without invoking Decision, even if admission starts their own reply. The frozen context contains only the current user/assistant exchange and latest input. A target-bound true signal can cancel the original reply after identity validation; an idle or stale signal cannot cancel a new reply. Errors leave admitted messages queued. ModelKit owns choice/noul protocol encoding for D3, Vela and Laya and strict boolean adaptation for Chat providers. Peer reports and execution observations bypass user Decision. Full-duplex audio policy and round settlement remain unchanged. See [Assistant input handling](Agents/Assistant/README.md#full-duplex-input-and-decision).
 
 Model generation closes the set of calls. Gateway preserves ordering within each Channel and coordinates resource use across Channels. Assistant keeps accepting input while the round's Channels, native calls and result delivery settle. Once the admissions tracked at settlement finish, it freezes the ready items in that session into a time-ordered input batch. An interruption retains the new input and pending queue. When its generation still matches, Assistant cancels the old round and joins cleanup before dispatch. Independent Writer work continues, and an unfinished foreground task remains available until `task.end` commits. Storage records dispatched requests, replies, Action results and Task commits at their respective boundaries. See [Assistant multi-Channel output](Agents/Assistant/README.md#input-timeline-and-channels), [Gateway scheduling](Gateway/Output/Scheduling/README.md) and [history and restart](#18-history-business-records-and-restart-behavior).
+
+Assistant interruption has one role-owned entry for internal Decision, trusted host requests and authorized `assistant.interrupt` messages delivered by Gateway. Target matching and dispatch fencing precede joined cancellation; ordinary text admission remains independent. External world signals are adapted by their owning role or host, never constructed by foundation modules. Details: [Assistant unified interruption](Agents/Assistant/README.md#unified-interruption-control).
 
 ### 13. Camera preview, vision and tracking
 
@@ -1439,6 +1459,8 @@ Download, installation, preference selection and model residency are separate st
 
 Agent Models manages shared cloud Providers and local model downloads. Assistant, Writer and Decision save their own model selections. UI merges each page’s draft into the committed settings and shares per-provider discovery; ApplicationControl and Gateway carry requests to the Actions transaction owner. Assistant can select local Gemma, the Apple system model or a cloud model with minimum reasoning. Decision adds D3 Edge, Vela 3 Fast, Vela 3.1 Fast and Laya Multilingual to the existing Chat choices. Assistant uses the same noul interface and context with each selection; ModelKit owns native formats. See the [Assistant Decision design](Agents/Assistant/README.md#full-duplex-input-and-decision). Writer offers tool-capable local Gemma and requires tool support from its cloud Chat capability. Gemma adapts native tools within its context window and reports overflow. Cloud Writer offers optional deeper reasoning. The Apple model remains visible in the Assistant and Decision menus and is selectable when the system reports availability. Each classification reads one snapshot, invokes only the selected model, and reports failure with a localized Toast and enqueue. UI selects Provider then Model, with artifact-specific installation checks before local selection is saved. In-flight Writer execution retains its configuration. See [Provider](Actions/System/Provider/README.md), [Settings](UI/Settings/README.md) and [Writer](Agents/Writer/README.md).
 
+Speech detection settings follow UI Settings → ApplicationControl → Actions resource preferences → Storage. App composition injects a read-only settings closure into Agents; SpeechPerception snapshots it when opening its VAD session. UI and PlatformKit do not own recognition thresholds.
+
 ### 18. History, business records and restart behavior
 
 ```mermaid
@@ -1580,6 +1602,10 @@ The cloud adapter encodes declared Responses contracts and validates terminal ev
 
 ModelKit owns Chat execution and resource concurrency. Agents retain fixed model selections and request sessions; configured cloud clients are shared with independent sessions, while local LLM requests use a root-owned bounded FIFO with explicit overflow and joined cancellation. The Responses adapter backpressures streamed deltas without a cumulative generation-size ceiling. These mechanisms do not choose business retries: Writer's private recovery owns retry decisions and actual failure observations, while uncertain commits and cleanup failures stop without replay. See [ModelKit](ModelKit/README.md), [Responses adapter](ModelKit/Language/LLM/OpenAI/README.md) and [Writer recovery](Agents/Writer/README.md#bounded-recovery).
 
+#### Model artifact architecture selection
+
+Default ModelKit assembly resolves optional artifact catalog architecture variants before acquisition; native architecture discovery stays inside ModelKit providers/backends. ModelKitRuntime bundles the single declarative catalog and its parser from [Support/Config](ModelKit/Support/Config/README.md); ModelKitDefaults composes its own disk storage and Hub downloader. The selected source revision and required-file set flow together into download, installation receipts and resource loading. Source packages remain available for architectures without a compiled variant. See [ModelKit management](ModelKit/Support/Management/README.md).
+
 ### 20. Diagnostics, UI presentation and native rendering
 
 ```mermaid
@@ -1635,6 +1661,8 @@ flowchart TB
 ```
 
 Foundations report their own native Failure types without business wording, Signals or automatic recovery. App preserves original errors and source identity in its bounded ContainerFailureChannel. ApplicationControl classifies the passive failure evidence and sends runtime issues and eligible Toasts through injected UI ports. Authorized device and model presentation calls use the business execution path. Bootstrap failure has an App-owned fallback before roles are available. Reporting failure does not recursively generate more failures.
+
+Runtime log language is supplied by App composition to execution snapshot projection and by AgentRuntime to cognitive log observations. Agents resolves app-owned copy through UI.AppLanguage while retaining raw execution evidence. No language state or UI dependency enters AgentCore; see [Support presentation](Agents/Support/README.md#state-configuration-and-localization).
 
 Pure cancellation is distinct from real or mixed execution/cleanup failure; classification uses structured reports rather than error strings. Display filters do not cancel work or establish released resources. Agents supplies Task, Agent and Decision display values. App binds scheduler snapshots to the same UI-owned [RuntimeLog component](UI/Components/RuntimeLog/README.md).
 
@@ -1720,7 +1748,7 @@ App requests iOS continued processing for eligible Writer segments while the sce
 | Scenario | Workflow | Completion boundary |
 | --- | --- | --- |
 | Album and settings | [UI execution](#3-ui-requests-and-shared-business-execution) · [Photo and album](#14-photovideo-capture-app-album-and-system-export) · [Provider settings](#17-settings-provider-and-model-resource-workflows) | Page path, business reply and media commit have separate receipts. |
-| Voice conversation | [ASR](#11-listening-asr-and-sound-source-observations) · [TTS](#12-reply-synthesis-playback-and-listening-restoration) · [Full duplex](#assistant-full-duplex-interaction) | Final ASR enters the ordinary queue and independent Decision inference. Round settlement gates the next batch. |
+| Voice conversation | [ASR](#11-listening-asr-and-sound-source-observations) · [TTS](#12-reply-synthesis-playback-and-listening-restoration) · [Full duplex](#assistant-full-duplex-interaction) | Final ASR enters the ordinary queue; concurrent reply work or playback at arrival additionally triggers Decision. Round settlement gates the next batch. |
 | Expression and speech sequence | [Function Tokens](#8-function-token-and-action-call-protocol) · [Channel and wait](#9-channel-ordering-wait-and-resource-ownership) | Gateway joins the wait group before the parent phase continues. |
 | Vision and tracking | [Camera and vision](#13-camera-preview-vision-and-tracking) · [Robot motion](#15-robot-motion-hardware-facts-and-control-handoff) | Pose freshness and motor authority gate effects. Observed feedback determines motion completion. |
 | Device or module change | [Bluetooth](#16-bluetooth-discovery-connection-and-recovery) · [Diagnostics](#20-diagnostics-ui-presentation-and-native-rendering) | Native facts and failures reach their owners and UI projections. |
@@ -1728,24 +1756,3 @@ App requests iOS continued processing for eligible Writer segments while the sce
 | Navigation and inactivity | [Navigation](#4-page-navigation-and-visible-page-context) · [Scene lifetime](#scene-visibility-versus-execution-lifetime) | Page acknowledgment and device cleanup follow their own owners. |
 
 Automated checks, iOS builds, real-model samples, native UI and physical-device acceptance are separate evidence categories maintained in [validation](../docs/validation/README.md). Requirements and decisions live in [requirements](../docs/requirements/README.md) and [ADR](../docs/adr/README.md); historical design rationale lives in [documentation history](../docs/history/Documentation-History.md).
-
-Runtime log language is supplied by App composition to execution snapshot projection and by AgentRuntime to cognitive log observations. Agents resolves app-owned copy through UI.AppLanguage while retaining raw execution evidence. No language state or UI dependency enters AgentCore; see [Support presentation](Agents/Support/README.md#state-configuration-and-localization).
-
-Agents root contracts distinguish App-bound host bindings and Gateway configuration/capabilities from Support adapter implementations. Root composition supplies role-owned local native declarations and owner identities to an immutable function catalog; shared configuration/coverage validate those explicit inputs. Assistant owns conversational Task/Decision/history orchestration, while Support/Chat supplies model consumption, recording and neutral projection. These are internal Agents ownership boundaries; AgentCore and foundation target dependencies remain unchanged. See [Agents ownership](Agents/README.md#root-source-ownership).
-
-
-### Model artifact architecture selection
-
-Default ModelKit assembly resolves optional artifact catalog architecture variants before acquisition; native architecture discovery stays inside ModelKit providers/backends. ModelKitRuntime bundles the single declarative catalog and its parser from [Support/Config](ModelKit/Support/Config/README.md); ModelKitDefaults composes its own disk storage and Hub downloader. The selected source revision and required-file set flow together into download, installation receipts and resource loading. Source packages remain available for architectures without a compiled variant. See [ModelKit management](ModelKit/Support/Management/README.md).
-
-Speech detection settings follow UI Settings → ApplicationControl → Actions resource preferences → Storage. App composition injects a read-only settings closure into Agents; SpeechPerception snapshots it when opening its VAD session. UI and PlatformKit do not own recognition thresholds.
-
-Home foreground preparation includes the selected local Decision route alongside the existing conversation/speech and optional vision capabilities. Agents supplies saved selection, App connects the generic preparation worker, and ModelKit checks/warms the resource. An absent local selection performs no load; preparation failures remain visible before home reports ready.
-
-ModelKit also exposes standalone `speech.enhancement` for bounded PCM denoising. App preloads this optional model when installed. SpeechPerception composes its window adapter after native VPIO capture and before VAD/ASR only when the durable denoising preference is enabled; PlatformKit retains device/AEC ownership. See [enhancement contract](ModelKit/Speech/Enhancement/README.md).
-
-### Playback-aware speech admission
-
-Actions forwards native first-scheduled-buffer and completion timestamps with audio identity through App-bound host ports to AssistantSpeechOutput. Assistant owns bounded same-session playback facts; AgentRuntime injects their snapshot into SpeechPerception. SpeechPerception applies playback-dependent onset thresholds while PlatformKit keeps the shared capture/playback/voice-processing graph running. Playback onset and completed ASR introduce no timed audio rejection window. Confirmed user speech survives new playback; full utterance completion resets VAD and preprocessing history. See [speech admission](Agents/SpeechPerception/README.md#播放状态与连续接纳) and [native playback facts](Actions/Speech/Listening/README.md#播放时刻事实).
-
-Assistant interruption has one role-owned entry for internal Decision, trusted host requests and authorized `assistant.interrupt` messages delivered by Gateway. Target matching and dispatch fencing precede joined cancellation; ordinary text admission remains independent. External world signals are adapted by their owning role or host, never constructed by foundation modules. Details: [Assistant unified interruption](Agents/Assistant/README.md#unified-interruption-control).

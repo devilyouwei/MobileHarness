@@ -8,7 +8,7 @@ The motor contract adds `deltaDegrees` as an alternative to absolute `target`. T
 
 ## Experiment design
 
-Use `python3 scripts/evaluate-qwen.py --robot-only --output-prefix /tmp/<unique-prefix>`. Defaults are the three models above; `--models` overrides them. There are 21 robot scenarios (5 existing and 16 added), within a 75-case full fixture bounded to 96. Exact robot sequences check count, order, motor, parameters and Channel; an empty sequence forbids every NexArm call. Assertions are not injected into prompts. Each scenario has a 180-second turn deadline, 10 requests/turn and 32 requests/scenario. No automatic service retry or model substitution.
+Use `python3 experiments/assistant/evaluate_qwen.py --robot-only --output-prefix /tmp/<unique-prefix>`. Defaults are the three models above; `--models` overrides them. There are 21 robot scenarios (5 existing and 16 added), within a 75-case full fixture bounded to 96. Exact robot sequences check count, order, motor, parameters and Channel; an empty sequence forbids every NexArm call. Assertions are not injected into prompts. Each scenario has a 180-second turn deadline, 10 requests/turn and 32 requests/scenario. No automatic service retry or model substitution.
 
 Baseline uses the new Action declaration/relative runtime with the old revision-10 teaching: it isolates incremental teaching benefit and is **not** a measurement of the original pre-change app. Later variants retain the same semantic assertions. Successful single samples do not establish a statistical reliability rate.
 
@@ -35,7 +35,7 @@ The original repository check rejected expanded prompts at base=29079/photograph
 
 ## Final evidence and checks
 
-[Persisted experiment evidence](../measurements/nexarm-robot-teaching-2026-10-27.json) contains all six variants, source hashes, actual state/outputs/calls and 366 distinct normalized model requests. Long strings are deduplicated through `textPool`; resolve `{$text: SHA256}` references recursively. Request hashes are computed from original requestJSON bytes; normalized requests preserve parsed message content. Credential absence was checked before writing. Raw temporary reports remain under `/tmp/robot-teaching-*`; the persisted file is self-contained for prompt/output inspection.
+[Persisted experiment evidence](../../experiments/assistant/results/nexarm-robot-teaching-2026-10-27.json) contains all six variants, source hashes, actual state/outputs/calls and 366 distinct normalized model requests. Long strings are deduplicated through `textPool`; resolve `{$text: SHA256}` references recursively. Request hashes are computed from original requestJSON bytes; normalized requests preserve parsed message content. Credential absence was checked before writing. Raw temporary reports remain under `/tmp/robot-teaching-*`; the persisted file is self-contained for prompt/output inspection.
 
 The final prompt retains the original budget limits: base **24563/25000** bytes, with photography **31939/32000** bytes. No test thresholds or semantic assertions were relaxed. The shared relative input range is owned by `NexArmDeviceLimits.relativeDegrees`; Actions references it rather than duplicating enforcement constants.
 

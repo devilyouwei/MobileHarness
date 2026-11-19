@@ -6,8 +6,8 @@ if [[ -z "${DEVELOPER_DIR:-}" && "$(xcode-select -p)" == */CommandLineTools && -
 fi
 cd "$(dirname "$0")/.."
 swift --version
-python3 scripts/check-modelkit-boundaries.py
-python3 -m unittest discover -s Tests -p test_model_download.py
+python3 scripts/checks/check-modelkit-boundaries.py
+python3 -m unittest discover -s scripts/checks -p 'test_*.py'
 swift format lint --strict --recursive MobileHarness Macros Tests Package.swift
 test_args=(--package-path .)
 developer_dir="${DEVELOPER_DIR:-$(xcode-select -p)}"
