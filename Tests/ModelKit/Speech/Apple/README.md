@@ -27,3 +27,7 @@ Regressions cover for immediate first PCM including short output, byte/sequence/
 ## 文件归属
 
 - [AppleSpeechTests.swift](AppleSpeechTests.swift)
+
+## 测试分层与可用性
+
+PCM、locale 和回调累计规则属于 Unit Tests；真实系统识别/合成属于显式开启的 Integration Tests。普通受限回归使用 @available；显式开启识别验收在不支持系统抛出 unavailable，不返回空执行成功。

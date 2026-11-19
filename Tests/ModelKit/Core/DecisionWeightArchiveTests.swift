@@ -2,8 +2,8 @@ import Foundation
 import ModelKitCoreAI
 import Testing
 
+@available(macOS 27, iOS 27, *)
 @Test func decisionWeightArchiveReadsScalarsAndRejectsInvalidTensorBounds() throws {
-    guard #available(macOS 27, iOS 27, *) else { return }
     #if canImport(CoreAI)
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".safetensors")
         defer { try? FileManager.default.removeItem(at: url) }
@@ -25,5 +25,7 @@ import Testing
         #expect(throws: CoreAIGraphError.self) { try archive.tensor(named: "w", shape: [1]) }
         try Data([0]).write(to: url)
         #expect(throws: CoreAIGraphError.self) { try SafeTensorArchive(contentsOf: url) }
+    #else
+        Issue.record("CoreAI is required for the weight archive integration test")
     #endif
 }

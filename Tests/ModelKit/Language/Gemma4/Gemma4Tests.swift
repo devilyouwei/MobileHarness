@@ -6,8 +6,8 @@ import Testing
 
 @Suite(.serialized)
 struct Gemma4ProviderTests {
+    @available(iOS 27, macOS 27, *)
     @Test func promptRetainsRolesAndOpensModelTurn() {
-        guard #available(iOS 27, macOS 27, *) else { return }
         #expect(
             GemmaLanguageEngine.render([
                 .init(role: "system", content: "instructions"), .init(role: "user", content: "hello"),
@@ -17,8 +17,8 @@ struct Gemma4ProviderTests {
         )
     }
 
+    @available(iOS 27, macOS 27, *)
     @Test func promptPreservesConsecutiveUserTurns() {
-        guard #available(iOS 27, macOS 27, *) else { return }
         #expect(
             GemmaLanguageEngine.render([
                 .init(role: "system", content: "instructions"),
@@ -46,8 +46,8 @@ struct Gemma4ProviderTests {
         #expect(GemmaResponseText.visible("answer<|chan") == "answer")
     }
 
+    @available(iOS 27, macOS 27, *)
     @Test func invalidRequestsFailBeforeLoading() throws {
-        guard #available(iOS 27, macOS 27, *) else { return }
         #expect(throws: CapabilityError.self) {
             try Gemma4Chat.validate(ChatRequest(messages: [.init(role: .assistant, content: "not a user")]))
         }
@@ -59,7 +59,9 @@ struct Gemma4ProviderTests {
 
     @Test(.enabled(if: ProcessInfo.processInfo.environment["HARNESS_TEST_GEMMA4"] == "1"))
     func realInferenceCancellationAndReload() async throws {
-        guard #available(iOS 27, macOS 27, *) else { return }
+        guard #available(iOS 27, macOS 27, *) else {
+            throw CapabilityError.unavailable("This native integration test requires iOS 27, macOS 27")
+        }
         let path = try #require(ProcessInfo.processInfo.environment["HARNESS_GEMMA4_ROOT"])
         let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
         let model = try Gemma4Chat(context: context, artifacts: URL(fileURLWithPath: path))
@@ -84,8 +86,8 @@ struct Gemma4ProviderTests {
     }
 }
 
+@available(iOS 27, macOS 27, *)
 @Test func localSystemFactsAreOmittedWithoutBecomingUserText() throws {
-    guard #available(iOS 27, macOS 27, *) else { return }
     let request = try ChatRequest(messages: [
         .init(role: .system, content: "stable rules"),
         .init(role: .user, content: "earlier"), .init(role: .assistant, content: "reply"),
@@ -105,17 +107,17 @@ private func budgetTokens(_ messages: [ChatMessage]) -> [Int] {
         count: GemmaLanguageEngine.render(messages.map { .init(role: $0.role.rawValue, content: $0.content) }).count)
 }
 
+@available(iOS 27, macOS 27, *)
 @Test func localWindowResolvesPinnedBackendCapacity() {
-    guard #available(iOS 27, macOS 27, *) else { return }
     #expect(GemmaContextBudget.effectiveContextLimit(modelLimit: 32768, isIOS: true) == 1024)
     #expect(GemmaContextBudget.effectiveContextLimit(modelLimit: 32768, isIOS: false) == 4096)
     #expect(GemmaContextBudget.effectiveContextLimit(modelLimit: 512, isIOS: true) == 512)
     #expect(GemmaContextBudget.effectiveContextLimit(modelLimit: 512, isIOS: false) == 512)
 }
 
+@available(iOS 27, macOS 27, *)
 @Test(arguments: [0, 64, 1024, 4096])
 func localWindowFitsIOSCapacityWithLongSystemAndHistory(_ requested: Int) async throws {
-    guard #available(iOS 27, macOS 27, *) else { return }
     var messages: [ChatMessage] = [.init(role: .system, content: String(repeating: "rules ", count: 600))]
     for index in 0..<20 {
         messages += [
@@ -140,8 +142,8 @@ func localWindowFitsIOSCapacityWithLongSystemAndHistory(_ requested: Int) async 
     #expect(request.messages == messages)
 }
 
+@available(iOS 27, macOS 27, *)
 @Test func localWindowRejectsCurrentInputBeyondActualBackendCapacity() async throws {
-    guard #available(iOS 27, macOS 27, *) else { return }
     let request = try ChatRequest(messages: [.init(role: .user, content: String(repeating: "q", count: 1024))])
     await #expect(
         throws: CapabilityError.invalidRequest(
@@ -151,9 +153,9 @@ func localWindowFitsIOSCapacityWithLongSystemAndHistory(_ requested: Int) async 
     }
 }
 
+@available(iOS 27, macOS 27, *)
 @Test(arguments: [0, 1, 4097])
 func localWindowRejectsInvalidBackendCapacity(_ limit: Int) async throws {
-    guard #available(iOS 27, macOS 27, *) else { return }
     let request = try ChatRequest(messages: [.init(role: .user, content: "current input")])
     await #expect(throws: CapabilityError.self) {
         _ = try await GemmaContextBudget.prepare(request, contextLimit: limit) { _ in
@@ -163,8 +165,8 @@ func localWindowRejectsInvalidBackendCapacity(_ limit: Int) async throws {
     }
 }
 
+@available(iOS 27, macOS 27, *)
 @Test func localWindowNormalizesEmptyHistoryAndTrailingSystemBeforeBudgeting() async throws {
-    guard #available(iOS 27, macOS 27, *) else { return }
     let messages: [ChatMessage] = [
         .init(role: .system, content: "rules"), .init(role: .user, content: "failed question"),
         .init(role: .assistant, content: ""), .init(role: .user, content: " \n"),
@@ -182,9 +184,9 @@ func localWindowRejectsInvalidBackendCapacity(_ limit: Int) async throws {
     #expect(request.messages == messages)
 }
 
+@available(iOS 27, macOS 27, *)
 @Test(arguments: ["", " \n\t"])
 func localWindowRejectsEmptyCurrentWithoutReusingHistoricalUser(_ current: String) async throws {
-    guard #available(iOS 27, macOS 27, *) else { return }
     let request = try ChatRequest(messages: [
         .init(role: .user, content: "old question"), .init(role: .assistant, content: "old answer"),
         .init(role: .user, content: current), .init(role: .system, content: "facts"),
@@ -197,8 +199,8 @@ func localWindowRejectsEmptyCurrentWithoutReusingHistoricalUser(_ current: Strin
     }
 }
 
+@available(iOS 27, macOS 27, *)
 @Test func localWindowRejectsTerminalAssistantEvenWhenItIsEmpty() throws {
-    guard #available(iOS 27, macOS 27, *) else { return }
     let request = try ChatRequest(messages: [
         .init(role: .user, content: "old question"), .init(role: .assistant, content: ""),
         .init(role: .system, content: "facts"),
@@ -208,8 +210,8 @@ func localWindowRejectsEmptyCurrentWithoutReusingHistoricalUser(_ current: Strin
     }
 }
 
+@available(iOS 27, macOS 27, *)
 @Test func localWindowKeepsLatestFiveMessagesAndOriginalRequest() async throws {
-    guard #available(iOS 27, macOS 27, *) else { return }
     var messages: [ChatMessage] = [.init(role: .system, content: "rules")]
     for index in 0..<20 {
         messages += [
@@ -229,8 +231,8 @@ func localWindowRejectsEmptyCurrentWithoutReusingHistoricalUser(_ current: Strin
     #expect(request.messages == messages)
 }
 
+@available(iOS 27, macOS 27, *)
 @Test func localWindowOmitsEverySystemBeforeTokenizationAndPreservesUnicodeInput() async throws {
-    guard #available(iOS 27, macOS 27, *) else { return }
     let source = "START " + String(repeating: "汉👨‍👩‍👧‍👦e\u{301}", count: 1300) + " TAIL"
     let current = " 当前问题👨‍👩‍👧‍👦e\u{301} "
     let request = try ChatRequest(messages: [
@@ -250,9 +252,9 @@ func localWindowRejectsEmptyCurrentWithoutReusingHistoricalUser(_ current: Strin
     #expect(request.messages.last?.role == .system)
 }
 
+@available(iOS 27, macOS 27, *)
 @Test(arguments: [1, 64, 1024, 2048, 4096, Int.max])
 func localWindowBudgetsExplicitGenerationIncludingTemplate(_ requested: Int) async throws {
-    guard #available(iOS 27, macOS 27, *) else { return }
     let request = try ChatRequest(
         messages: [
             .init(role: .system, content: String(repeating: "s", count: 2500)),
@@ -266,8 +268,8 @@ func localWindowBudgetsExplicitGenerationIncludingTemplate(_ requested: Int) asy
     if requested == 64 { #expect(prepared.messages == request.messages.filter { $0.role != .system }) }
 }
 
+@available(iOS 27, macOS 27, *)
 @Test func localWindowPrunesOldestMessagesBeforeTouchingCurrentInput() async throws {
-    guard #available(iOS 27, macOS 27, *) else { return }
     let request = try ChatRequest(messages: [
         .init(role: .system, content: "rules"),
         .init(role: .user, content: String(repeating: "u", count: 1800)),
@@ -284,8 +286,8 @@ func localWindowBudgetsExplicitGenerationIncludingTemplate(_ requested: Int) asy
     #expect(prepared.tokens.count + prepared.maximumOutputTokens <= 4096)
 }
 
+@available(iOS 27, macOS 27, *)
 @Test func localWindowPreservesLongCurrentInputByReducingOutput() async throws {
-    guard #available(iOS 27, macOS 27, *) else { return }
     let current = String(repeating: "q", count: 3500)
     let request = try ChatRequest(messages: [
         .init(role: .system, content: String(repeating: "s", count: 2000)), .init(role: .user, content: current),
@@ -300,8 +302,8 @@ func localWindowBudgetsExplicitGenerationIncludingTemplate(_ requested: Int) asy
     }
 }
 
+@available(iOS 27, macOS 27, *)
 @Test(.timeLimit(.minutes(1))) func localWindowCancellationJoinsTokenizationAndSuppressesPreparation() async throws {
-    guard #available(iOS 27, macOS 27, *) else { return }
     let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let release = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let request = try ChatRequest(messages: [.init(role: .user, content: "current")])
@@ -320,8 +322,8 @@ func localWindowBudgetsExplicitGenerationIncludingTemplate(_ requested: Int) asy
     release.continuation.finish()
 }
 
+@available(iOS 27, macOS 27, *)
 @Test func localWindowRejectsImagesAndPreservesToolHistory() async throws {
-    guard #available(iOS 27, macOS 27, *) else { return }
     let image = try ChatImage(id: "fixture", data: Data([1]))
     var messages: [ChatMessage] = [.init(role: .user, content: "old image", images: [image])]
     messages += (0..<6).map { .init(role: .user, content: "later \($0)") }

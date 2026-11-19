@@ -32,3 +32,7 @@ CoreBoundaryTests cover opaque scope propagation, invalid injected limits, globa
 Session coverage includes a one-event queue without a single-event byte ceiling, large payload preservation and suspended-producer progress after consumption.
 
 [DecisionWeightArchiveTests.swift](DecisionWeightArchiveTests.swift) 验证 CoreAI 权重标量读取、tensor shape 与越界拒绝。
+
+## 测试层级
+
+能力、会话、取消控制与多问题策略使用确定性 Unit Tests；DecisionWeightArchiveTests 通过临时 safetensors 验证真实 CoreAI 张量读取，属于 Integration Tests。受限系统使用 @available 报告跳过，缺少 CoreAI 的编译环境明确记录失败，不能无断言通过。

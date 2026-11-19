@@ -24,7 +24,7 @@ with sqlite3.connect(f"file:{seed/'records.sqlite'}?mode=ro",uri=True) as source
         source.backup(target)
 shutil.copytree(seed/'workspaces',root/'ArtifactWorkspaces',dirs_exist_ok=True)
 PY
-python3 - "$writer_ui_work" "$PWD/Tests/UI/Window/WriterRecordsNativeAcceptance.swift" <<'PY'
+python3 - "$writer_ui_work" "$PWD/Tests/UI/Window/WriterRecordsUITests.swift" <<'PY'
 import sys
 from pathlib import Path
 work,source=map(Path,sys.argv[1:]);project=work/'WriterUI.xcodeproj';project.mkdir()
@@ -51,6 +51,6 @@ ref='<BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="A100
 (schemes/'WriterUI.xcscheme').write_text(f'''<?xml version="1.0" encoding="UTF-8"?><Scheme LastUpgradeVersion="2700" version="1.3"><BuildAction parallelizeBuildables="NO" buildImplicitDependencies="YES"><BuildActionEntries><BuildActionEntry buildForTesting="YES" buildForRunning="NO" buildForProfiling="NO" buildForArchiving="NO" buildForAnalyzing="YES">{ref}</BuildActionEntry></BuildActionEntries></BuildAction><TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES"><Testables><TestableReference skipped="NO">{ref}</TestableReference></Testables></TestAction></Scheme>''')
 PY
 writer_ui_filters=()
-if [[ -n "${WRITER_UI_ONLY_TEST:-}" ]]; then writer_ui_filters+=("-only-testing:WriterUI/WriterRecordsNativeAcceptance/$WRITER_UI_ONLY_TEST"); fi
+if [[ -n "${WRITER_UI_ONLY_TEST:-}" ]]; then writer_ui_filters+=("-only-testing:WriterUI/WriterRecordsUITests/$WRITER_UI_ONLY_TEST"); fi
 xcodebuild "${writer_ui_filters[@]}" -project "$writer_ui_work/WriterUI.xcodeproj" -scheme WriterUI -destination "platform=iOS Simulator,id=$WRITER_SIMULATOR_ID" -derivedDataPath "$writer_ui_work/DerivedData" -resultBundlePath "$writer_ui_work/WriterUI.xcresult" CODE_SIGNING_ALLOWED=NO test
 printf 'Native Writer UI evidence: %s\n' "$writer_ui_work/WriterUI.xcresult"

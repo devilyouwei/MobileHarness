@@ -1,5 +1,7 @@
 # 技术需求
 
+已完成：[Tests 分层与维护优化](../../completed/Tests-Optimization-Plan.md)，保留模块目录，明确单元/集成/UI 测试、整理混合文件与命名，并通过工程检查及五个 Simulator 构建。
+
 - [全双工播放期间的语音接纳优化](Full-Duplex-Playback-Admission.md)：动态起声门槛、起播 ASR 保护窗口、采样时间对齐与真机误触发/打断延迟验收。
 
 - [拍照倒计时与显式打开相机](Photo-Countdown-And-Explicit-Open.md)：单次倒计时、独立打开、同轮多 Action 与验证。

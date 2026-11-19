@@ -46,7 +46,7 @@
 
 例如：`python3 scripts/models/model_download.py gemma4-e2b --platform macos`。下载器复用生产 catalog / Mac profile，四个下载工作者、有界路径、hash/大小校验与原子替换；默认复用制品，--force 显式刷新。App 在线模型管理仍由 ModelKit 拥有。原生对照工具使用本目录独立参考适配器，需要相应模型与 Python SDK；不加入默认离线检查。研究运行器回归由 experiments 独立维护和运行。
 
-## simulator：原生 UI 验收
+## simulator：原生集成与 UI 自动化
 
 | 文件 | 职责 |
 | --- | --- |
@@ -65,3 +65,5 @@ Writer 验收要求 WRITER_SIMULATOR_ID 和 WRITER_SIMULATOR_SEED；拒绝覆盖
 模型工程参考检查使用 scripts/models 自有适配器与清单，不导入实验代码或数据。laya_artifact_adapter.py 和 laya-model.json 分别拥有 Laya 工程参考读出与固定制品描述。
 
 本目录是 agent 执行工程测试或模型实验的编排层。批量入口只选择任务、传参、控制执行和汇总状态；测试断言归 Tests，实验提示词/评分/数据归 experiments。两者不导入 scripts 作为共享业务库。当前具体入口以上表为准；尚无统一实验批处理命令时直接调用任务入口，不虚构命令。
+
+Simulator 入口按测试层级区分：test-composition.sh 是生产装配 Integration Tests；test-webkit-simulator.sh 是原生组件 Integration Tests；test-writer-records-simulator.sh 执行 WriterRecordsUITests 的 XCTest UI Tests。环境和验收目的不替代层级，默认 Swift 工程回归不自动运行这些独立宿主。

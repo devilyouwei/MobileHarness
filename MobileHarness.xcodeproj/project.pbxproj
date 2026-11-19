@@ -1074,7 +1074,7 @@
 		A6D61E5BCCF8CD5732556A23 /* Tests/UI/Window/WebPageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/UI/Window/WebPageTests.swift; sourceTree = SOURCE_ROOT; };
 		FED3CDFF50D53B217480FE6A /* Tests/UI/Window/WebSimulatorAcceptance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/UI/Window/WebSimulatorAcceptance.swift; sourceTree = SOURCE_ROOT; };
 		557F22EDC9ED6FE37CDC686D /* Tests/UI/Window/WindowStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/UI/Window/WindowStateTests.swift; sourceTree = SOURCE_ROOT; };
-		48DDE03CDCE57917C5486353 /* Tests/UI/Window/WriterRecordsNativeAcceptance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/UI/Window/WriterRecordsNativeAcceptance.swift; sourceTree = SOURCE_ROOT; };
+		48DDE03CDCE57917C5486353 /* Tests/UI/Window/WriterRecordsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/UI/Window/WriterRecordsUITests.swift; sourceTree = SOURCE_ROOT; };
 		09232F3836D9599D5DEB2D15 /* experiments/assistant/compare_qwen_protocols.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = experiments/assistant/compare_qwen_protocols.py; sourceTree = SOURCE_ROOT; };
 		9C8B4B7F031C618E3BA15676 /* experiments/assistant/evaluate_qwen.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = experiments/assistant/evaluate_qwen.py; sourceTree = SOURCE_ROOT; };
 		916A4802F486BD1104E6EC78 /* experiments/writer/evaluate_writer.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = experiments/writer/evaluate_writer.py; sourceTree = SOURCE_ROOT; };
@@ -1334,6 +1334,9 @@
 		07789257F1C3D860EB427362 /* experiments/utils/__init__.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = experiments/utils/__init__.py; sourceTree = SOURCE_ROOT; };
 		643534BEDA8C5B943C9BB233 /* experiments/utils/coreai_decoder.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = experiments/utils/coreai_decoder.py; sourceTree = SOURCE_ROOT; };
 		E99645317BC135632250E2A8 /* experiments/utils/runtime.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = experiments/utils/runtime.py; sourceTree = SOURCE_ROOT; };
+		65E22B73EE23086BCEEC464D /* Tests/Actions/NexArm/NexArmBluetoothIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Actions/NexArm/NexArmBluetoothIntegrationTests.swift; sourceTree = SOURCE_ROOT; };
+		C019F1D7B5B63D4CB5F086FC /* Tests/Actions/NexArm/NexArmConnectionPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Actions/NexArm/NexArmConnectionPolicyTests.swift; sourceTree = SOURCE_ROOT; };
+		0465C7AA2B4197A4527B0943 /* Tests/Agents/Core/GenerationObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Agents/Core/GenerationObservationTests.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -3173,6 +3176,8 @@
 			isa = PBXGroup;
 			children = (
 				70F3D556BD4EF72BF68D7FB6 /* Tests/Actions/NexArm/NexArmAimTests.swift */,
+				C019F1D7B5B63D4CB5F086FC /* Tests/Actions/NexArm/NexArmConnectionPolicyTests.swift */,
+				65E22B73EE23086BCEEC464D /* Tests/Actions/NexArm/NexArmBluetoothIntegrationTests.swift */,
 				A7CD11B37148D5191188A281 /* Tests/Actions/NexArm/NexArmArrivalPolicyTests.swift */,
 				4FC8C45071C8759634DF67D7 /* Tests/Actions/NexArm/NexArmCausalTests.swift */,
 				AD67787654E88AD3629C861E /* Tests/Actions/NexArm/NexArmLegacyArrivalTracker.swift */,
@@ -3279,6 +3284,7 @@
 				39A1B84611D0F6AE644A98FE /* Tests/Agents/Core/ContainerContextTests.swift */,
 				1921D65B4F5EB67DB873E940 /* Tests/Agents/Core/ContainerFailureTests.swift */,
 				0969B7EA7480B9821267BEA8 /* Tests/Agents/Core/GenerationRoundTests.swift */,
+				0465C7AA2B4197A4527B0943 /* Tests/Agents/Core/GenerationObservationTests.swift */,
 				B5D72AE9609680B70F51F878 /* Tests/Agents/Core/README.md */,
 				654DE9B1AC6837ACEB545FD7 /* Tests/Agents/Core/RuntimeTests.swift */,
 			);
@@ -3869,7 +3875,7 @@
 				A6D61E5BCCF8CD5732556A23 /* Tests/UI/Window/WebPageTests.swift */,
 				FED3CDFF50D53B217480FE6A /* Tests/UI/Window/WebSimulatorAcceptance.swift */,
 				557F22EDC9ED6FE37CDC686D /* Tests/UI/Window/WindowStateTests.swift */,
-				48DDE03CDCE57917C5486353 /* Tests/UI/Window/WriterRecordsNativeAcceptance.swift */,
+				48DDE03CDCE57917C5486353 /* Tests/UI/Window/WriterRecordsUITests.swift */,
 			);
 			name = Window;
 			sourceTree = "<group>";

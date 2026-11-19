@@ -30,7 +30,7 @@ ApplicationControl tests cover unknown/admitted/paused/stopped summary reads, pe
 
 ActionContractTests 直接验证生产 Device.control 生成声明，覆盖携带会话 fence 的连接／忽略与完整可信 UI 操作集合，并检查未知参数、非法操作仍在执行前被拒绝。此测试不访问真实蓝牙或机械臂。
 
-NexArmAimTests 覆盖位置跟踪的方向、死区、有限前瞻/六轴边界和速度/模式/扭矩寄存器拒绝；NexArmBluetoothTests 使用替身验证单目标有限位置包及取消后无追加运动。无真实机械臂验收。
+NexArmAimTests 覆盖位置跟踪的方向、死区、有限前瞻/六轴边界和速度/模式/扭矩寄存器拒绝；NexArmBluetoothIntegrationTests 使用替身验证单目标有限位置包及取消后无追加运动。无真实机械臂验收。
 
 位置跟随回归覆盖 20 Hz 发布、采样率无关的位移/滤波、过时输入和卡顿、慢 Gateway 消费者仅执行最新待发目标、未接纳提案隔离、3 count 更新及 SDK 设备参数边界。混合生产者 BLE 预算和背压测试验证约 33 Hz 连接级上限；替身测试不证明物理平滑或舵机保护。
 
@@ -40,7 +40,7 @@ NexArm relative-motor regression covers encoder conversion, all-axis bounds, fre
 
 ## Reflexive State regression
 
-ContainerContextTests validates passive cold reads, expression override/cancellation/restoration, internal tree paths/depth/capacity/cancellation/partial failures, per-owner health preservation and Skill load/release selection. NexArmBluetoothTests uses an explicit simulated passive link to verify encoder positions, freshness, disconnected-session invalidation and zero control writes/queries. These tests do not establish physical-device acceptance.
+ContainerContextTests validates passive cold reads, expression override/cancellation/restoration, internal tree paths/depth/capacity/cancellation/partial failures, per-owner health preservation and Skill load/release selection. NexArmBluetoothIntegrationTests uses an explicit simulated passive link to verify encoder positions, freshness, disconnected-session invalidation and zero control writes/queries. These tests do not establish physical-device acceptance.
 
 ContainerContextTests covers Assistant-owned Business selection, nested-field exclusion, fresh reads, unknown observations, propagation of read failures and independent full Runtime inspection. Native robot tests read the unified State contract.
 
@@ -82,3 +82,11 @@ Camera preparation also uses a padded synthetic mirrored JPEG to verify that nor
 - [ContainerFailureTests.swift](ContainerFailureTests.swift)
 - [GenerationRoundTests.swift](GenerationRoundTests.swift)
 - [RuntimeTests.swift](RuntimeTests.swift)
+
+## 观察值与执行集成的边界
+
+[GenerationObservationTests.swift](GenerationObservationTests.swift) 是 Unit Tests：直接验证 AgentChatContextBuilder 对业务值、拒绝、部分失败和取消的编码，不启动模型、Gateway 或仓库。
+
+GenerationRoundTests 的 compactRoundObservationsKeepSameAliasCallsDistinctAndPreserveNativeAndJournalIDs 是 Integration Tests：启动真实轮次/执行链，并读取后续请求与 journal，验证调用身份和协议配对。其他轮次用例继续保留其独立的取消、容量、全双工与媒体边界。
+
+TaskSkill、Writer、视觉和蓝牙的大文件审查按不变量区分：Skill 授权/释放、轮次屏障、文件提交、原生连接恢复和 UI 分页各自保护不同边界，不因出现相似取消或失败断言而删除。文件层级索引见 [Agents](../README.md)。

@@ -188,3 +188,24 @@ func bluetoothCurrentStateDoesNotBorrowAnotherDevicesRecoveryOrRetainIdleError()
     #expect(!root.home.conversation.presentBluetoothConnection(.connected, revision: 4))
     #expect(!root.devices.state.presentBluetoothConnection(.connected, revision: 4))
 }
+
+@Test @MainActor
+func bluetoothManualControlsStayEnabledDuringActiveMotionAndRefresh() {
+    let state = BluetoothSettingsState()
+    state.phase = .connected
+    state.jogging = true
+    #expect(state.canControl)
+    state.recoveryStage = .cleaning
+    #expect(!state.canControl)
+    state.recoveryStage = .idle
+    #expect(state.canControl)
+}
+
+@Test @MainActor
+func bluetoothManualButtonsOnlyRequireConnectedLink() {
+    let state = BluetoothSettingsState()
+    state.phase = .connected
+    #expect(state.canControl)
+    state.phase = .disconnecting
+    #expect(!state.canControl)
+}

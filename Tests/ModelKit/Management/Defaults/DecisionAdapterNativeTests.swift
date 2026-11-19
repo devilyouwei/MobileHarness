@@ -19,6 +19,85 @@ private struct AdapterParityInput: Decodable {
         let score: Double
     }
     let rows: [Row]
+
+    func selectedGroups(model: String?) throws -> [(String, [Row])] {
+        let supported = ["vela31", "laya"]
+        if let model, !supported.contains(model) { throw ParityInputError.unknownModel }
+        guard !rows.isEmpty else { throw ParityInputError.emptyRows }
+        let selected = model.map { [$0] } ?? supported
+        return try selected.map { name in
+            let cases = Array(rows.filter { $0.model == name }.prefix(3))
+            guard !cases.isEmpty else { throw ParityInputError.missingModel }
+            guard cases.allSatisfy({ ["choice", "noul"].contains($0.kind) }) else {
+                throw ParityInputError.invalidKind
+            }
+            return (name, cases)
+        }
+    }
+}
+
+private enum ParityInputError: Error { case unknownModel, emptyRows, missingModel, invalidKind }
+
+private struct TokenizerParityInput: Decodable {
+    struct Row: Decodable {
+        let text: String
+        let ids: [Int]
+    }
+    let root: String
+    let rows: [Row]
+
+    func validate() throws {
+        guard !rows.isEmpty else { throw ParityInputError.emptyRows }
+    }
+}
+
+@Test(arguments: ["unknown", "empty", "missing", "kind", "valid", "default", "bounded"])
+func decisionParityRequiresSelectedReferenceCases(scenario: String) throws {
+    func row(_ model: String, kind: String = "choice") -> AdapterParityInput.Row {
+        .init(
+            model: model, artifacts: "Models/fixture", id: "fixture", text: "input", instructions: "rules",
+            kind: kind, candidates: ["yes", "no"], prediction: "yes", score: 0.8)
+    }
+    let fixture: AdapterParityInput
+    let selection: String?
+    switch scenario {
+    case "empty":
+        fixture = .init(rows: [])
+        selection = "vela31"
+    case "missing":
+        fixture = .init(rows: [row("vela31")])
+        selection = nil
+    case "kind":
+        fixture = .init(rows: [row("vela31", kind: "typo")])
+        selection = "vela31"
+    case "default":
+        fixture = .init(rows: [row("vela31"), row("laya", kind: "noul")])
+        selection = nil
+    case "bounded":
+        fixture = .init(rows: Array(repeating: row("vela31"), count: 5))
+        selection = "vela31"
+    default:
+        fixture = .init(rows: [row("vela31")])
+        selection = scenario == "unknown" ? "typo" : "vela31"
+    }
+    if ["unknown", "empty", "missing", "kind"].contains(scenario) {
+        #expect(throws: ParityInputError.self) { try fixture.selectedGroups(model: selection) }
+    } else {
+        let groups = try fixture.selectedGroups(model: selection)
+        #expect(groups.map { $0.0 } == (selection.map { [$0] } ?? ["vela31", "laya"]))
+        #expect(groups.allSatisfy { !$0.1.isEmpty && $0.1.count <= 3 })
+        #expect(groups.first?.1.count == (scenario == "bounded" ? 3 : 1))
+    }
+}
+
+@Test(arguments: [false, true])
+func tokenizerParityRequiresReferenceRows(hasRows: Bool) throws {
+    let input = TokenizerParityInput(root: "Models/fixture", rows: hasRows ? [.init(text: "input", ids: [1])] : [])
+    if hasRows {
+        try input.validate()
+    } else {
+        #expect(throws: ParityInputError.self) { try input.validate() }
+    }
 }
 
 @Test(.enabled(if: ProcessInfo.processInfo.environment["DECISION_ADAPTER_INPUT"] != nil))
@@ -38,8 +117,8 @@ func decisionNewAdaptersNativeParity() async throws {
         let milliseconds: Double
     }
     var rows: [Row] = []
-    for name in ["vela31", "laya"] where env["DECISION_ADAPTER_MODEL"].map({ $0 == name }) ?? true {
-        let cases = Array(fixture.rows.filter { $0.model == name }.prefix(3))
+    let groups = try fixture.selectedGroups(model: env["DECISION_ADAPTER_MODEL"])
+    for (name, cases) in groups {
         let artifacts = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent(
                 try #require(cases.first?.artifacts))
@@ -116,16 +195,9 @@ func decisionNewAdaptersNativeParity() async throws {
 
 @Test(.enabled(if: ProcessInfo.processInfo.environment["LAYA_TOKEN_INPUT"] != nil))
 func layaPublishedTokenizerParity() async throws {
-    struct Input: Decodable {
-        struct Row: Decodable {
-            let text: String
-            let ids: [Int]
-        }
-        let root: String
-        let rows: [Row]
-    }
     let path = try #require(ProcessInfo.processInfo.environment["LAYA_TOKEN_INPUT"])
-    let input = try JSONDecoder().decode(Input.self, from: Data(contentsOf: URL(fileURLWithPath: path)))
+    let input = try JSONDecoder().decode(TokenizerParityInput.self, from: Data(contentsOf: URL(fileURLWithPath: path)))
+    try input.validate()
     let tokenizer = try LayaTokenizer.load(
         at: URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent(

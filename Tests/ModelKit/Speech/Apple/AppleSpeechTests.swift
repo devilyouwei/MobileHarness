@@ -5,8 +5,8 @@ import Testing
 
 @testable import ModelKitAppleSpeech
 
+@available(macOS 26, iOS 26, *)
 @Test func modernAppleRecognitionRejectsInvalidPCMWithoutLoading() async throws {
-    guard #available(macOS 26, iOS 26, *) else { return }
     let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
     let provider = try AppleSpeechRecognition(context: context)
     let format = try AudioFormat(sampleRate: 24000, channels: 1, encoding: .float32)
@@ -122,7 +122,9 @@ import Testing
 /// Real modern on-device ASR; opt-in because Apple may install system language assets.
 @Test(.enabled(if: ProcessInfo.processInfo.environment["HARNESS_TEST_SYSTEM_ASR_WAV"] != nil))
 func systemAnalyzerTranscribesFixtureAndReleasesLease() async throws {
-    guard #available(macOS 26, iOS 26, *) else { return }
+    guard #available(macOS 26, iOS 26, *) else {
+        throw CapabilityError.unavailable("This native integration test requires macOS 26, iOS 26")
+    }
     let path = try #require(ProcessInfo.processInfo.environment["HARNESS_TEST_SYSTEM_ASR_WAV"])
     let file = try AVAudioFile(forReading: URL(fileURLWithPath: path))
     #expect(file.processingFormat.sampleRate == 16000)

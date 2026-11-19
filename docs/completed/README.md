@@ -1,5 +1,7 @@
 # 已完成需求归档
 
+- [Tests 分层与维护优化](Tests-Optimization-Plan.md)（2026-11-19）：保留模块目录，明确单元/集成/UI 分层、拆分混合文件并修复无效通过；工程验证见专项记录。
+
 - [Xcode 工程配置清理](Xcode-Project-Cleanup.md)（2026-11-18）：无效引用、本地签名与资源导航整理；完整检查限制见验证记录。
 
 - [ReACT 回复字幕](ReACT-Reply-Captions.md)（2026-11-16）：Action/native Tool 观察续轮继承呈现身份，正文进入字幕；独立真机验收及完整检查限制见验证记录。

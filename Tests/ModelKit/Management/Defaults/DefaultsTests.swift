@@ -4,8 +4,8 @@ import ModelKitDefaults
 import ModelKitRuntime
 import Testing
 
+@available(macOS 27, iOS 27, *)
 @Test @MainActor func modelRootsAreIsolatedLazyAndTerminal() async throws {
-    guard #available(macOS 27, iOS 27, *) else { return }
     let resources = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     let first = ModelContainer(resources: resources)
     let second = ModelContainer(resources: resources)
@@ -38,8 +38,8 @@ import Testing
     try await second.stop()
 }
 
+@available(macOS 27, iOS 27, *)
 @Test @MainActor func stoppedModelRootCannotPrepareArtifactsOrReopenPorts() async throws {
-    guard #available(macOS 27, iOS 27, *) else { return }
     let root = ModelContainer(resources: URL(fileURLWithPath: "/missing/models"))
     let port = root.artifacts
     try await root.stop()
@@ -47,8 +47,8 @@ import Testing
     await #expect(throws: ModelFailure.self) { try await root.setForeground(true) }
 }
 
+@available(macOS 27, iOS 27, *)
 @Test @MainActor func modelChatConfigurationIsRootLocalAndUpdatesRetainedPort() async throws {
-    guard #available(macOS 27, iOS 27, *) else { return }
     let path = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     let first = ModelContainer(resources: path)
     let second = ModelContainer(resources: path)
@@ -94,7 +94,9 @@ import Testing
 
 @Test(.enabled(if: ProcessInfo.processInfo.environment["APPLE_APP_CHAT_SMOKE"] == "1"))
 @MainActor func appleAppChatSelectionUsesSystemModelWithTextOnlyHistory() async throws {
-    guard #available(macOS 27, iOS 27, *) else { return }
+    guard #available(macOS 27, iOS 27, *) else {
+        throw CapabilityError.unavailable("This native integration test requires macOS 27, iOS 27")
+    }
     let root = ModelContainer(resources: FileManager.default.temporaryDirectory)
     try await root.start()
     do {
@@ -163,8 +165,8 @@ func localPreparationUsesSelectedResourceAndRejectsStoppedScope() async throws {
     await #expect(throws: InferenceAdmissionError.self) { try await selected.prepare { _ in } }
 }
 
+@available(macOS 27, iOS 27, *)
 @Test @MainActor func deepFilterDefaultIsLazyAndExplicit() async throws {
-    guard #available(macOS 27, iOS 27, *) else { return }
     let root = ModelContainer(resources: URL(fileURLWithPath: "/missing/deepfilter-default"))
     try await root.start()
     try await root.setForeground(true)
@@ -175,8 +177,8 @@ func localPreparationUsesSelectedResourceAndRejectsStoppedScope() async throws {
     try await root.stop()
 }
 
+@available(macOS 27, iOS 27, *)
 @Test @MainActor func speechEnhancementOptionalPreparationSkipsMissingSelection() async throws {
-    guard #available(macOS 27, iOS 27, *) else { return }
     let root = ModelContainer(resources: URL(fileURLWithPath: "/missing/enhancement-preload"))
     try await root.start()
     try await root.setForeground(true)

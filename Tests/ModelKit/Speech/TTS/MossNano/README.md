@@ -10,3 +10,7 @@ Startup/diagnostics 在对话接纳和计时测试前执行真实内存合成 wa
 ## 文件归属
 
 - [MossNanoTests.swift](MossNanoTests.swift)
+
+## 测试分层与可用性
+
+输入/tokenizer/PCM 规则属于 Unit Tests；缺失资源和真实合成的 provider 生命周期属于 Integration Tests。普通平台限制使用 @available，HARNESS_TEST_MOSS 已开启但系统不支持时明确失败。

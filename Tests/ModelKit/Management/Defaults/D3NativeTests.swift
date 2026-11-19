@@ -6,7 +6,9 @@ import Testing
 /// Opt-in real artifact acceptance. No downloads or substitute model are performed by this test.
 @Test(.enabled(if: ProcessInfo.processInfo.environment["D3_TEST_RESOURCES"] != nil))
 @MainActor func d3NativeDecisionMatchesPublishedFixtureAndRejectsOversizedInput() async throws {
-    guard #available(macOS 27, iOS 27, *) else { return }
+    guard #available(macOS 27, iOS 27, *) else {
+        throw CapabilityError.unavailable("This native integration test requires macOS 27, iOS 27")
+    }
     let path = try #require(ProcessInfo.processInfo.environment["D3_TEST_RESOURCES"])
     let root = ModelContainer(resources: URL(fileURLWithPath: path))
     try await root.start()
@@ -50,7 +52,9 @@ import Testing
 
 @Test(.enabled(if: ProcessInfo.processInfo.environment["D3_EDGE_TEST_RESOURCES"] != nil))
 @MainActor func d3NativeDecisionRunsTextGraphAndRejectsOversizedInput() async throws {
-    guard #available(macOS 27, iOS 27, *) else { return }
+    guard #available(macOS 27, iOS 27, *) else {
+        throw CapabilityError.unavailable("This native integration test requires macOS 27, iOS 27")
+    }
     let path = try #require(ProcessInfo.processInfo.environment["D3_EDGE_TEST_RESOURCES"])
     let modelID = ProcessInfo.processInfo.environment["D3_NATIVE_MODEL_ID"] ?? "d3-edge"
     let root = ModelContainer(resources: URL(fileURLWithPath: path))

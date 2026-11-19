@@ -6,6 +6,8 @@
 
 ## 当前验收入口
 
+[Tests 分层整理](Tests-Layering.md)：模块目录下的单元、集成与 UI 测试分类，混合文件拆分、无效通过修复和工程验证证据。
+
 [全双工播放保护与 ASR 冷却](Full-Duplex-Playback-Admission.md)：短时 PCM 丢弃、播放态起声、增强时间对齐及自动化/真机验收边界。
 
 [ReACT 回复字幕](ReACT-Reply-Captions.md)：工具结果续轮字幕、旧 Decision/取消轮次拒绝及构建与检查限制。

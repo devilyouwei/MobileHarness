@@ -89,8 +89,8 @@ private func toolRequest(choice: ChatToolChoice = .automatic) throws -> ChatRequ
     #expect(buffer.text == text)
 }
 
+@available(iOS 27, macOS 27, *)
 @Test func gemmaToolBudgetPreservesInstructionsAndCompleteHistory() async throws {
-    guard #available(iOS 27, macOS 27, *) else { return }
     let request = try toolRequest()
     let prepared = try await GemmaContextBudget.prepare(request, contextLimit: 1024) { messages in
         #expect(messages == request.messages)
@@ -115,7 +115,9 @@ private func toolRequest(choice: ChatToolChoice = .automatic) throws -> ChatRequ
 
 @Test(.enabled(if: ProcessInfo.processInfo.environment["HARNESS_TEST_GEMMA4"] == "1"))
 func gemmaRealToolCallAndResultContinuation() async throws {
-    guard #available(iOS 27, macOS 27, *) else { return }
+    guard #available(iOS 27, macOS 27, *) else {
+        throw CapabilityError.unavailable("This native integration test requires iOS 27, macOS 27")
+    }
     let path = try #require(ProcessInfo.processInfo.environment["HARNESS_GEMMA4_ROOT"])
     let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
     let model = try Gemma4Chat(context: context, artifacts: URL(fileURLWithPath: path))

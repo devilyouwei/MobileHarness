@@ -27,28 +27,21 @@ private final class SettingsFacadeFixture {
                 }, errorMessage: { _ in nil }))
     }
 }
-@Test @MainActor
-func settingsFacadeFailureKeepsConfirmedLabelAndReconcilesOnExplicitRestore() async throws {
-    guard #available(macOS 27, iOS 27, *) else { return }
+@available(macOS 27, iOS 27, *)
+@Test(arguments: [false, true]) @MainActor
+func settingsFacadeCommitsOnlyAcknowledgedSaveAndReconcilesFailure(fails: Bool) async throws {
     let fixture = SettingsFacadeFixture()
     let workflow = fixture.workflow()
     _ = try await workflow.restore()
-    fixture.failSave = true
-    await #expect(throws: (any Error).self) {
-        try await workflow.save(.init(enabled: true, url: "https://example.invalid", key: "fixture", model: "new"))
+    fixture.failSave = fails
+    let updated = CloudSettingsDraft(enabled: true, url: "https://example.invalid", key: "fixture", model: "new")
+    if fails {
+        await #expect(throws: (any Error).self) { try await workflow.save(updated) }
+    } else {
+        try await workflow.save(updated)
     }
-    #expect(workflow.modelName == "old")
-    #expect(try await workflow.restore().model == "old")
-    #expect(fixture.restores == 2)
-}
-@Test @MainActor
-func settingsFacadeCommitsOnlyAcknowledgedInjectedSave() async throws {
-    guard #available(macOS 27, iOS 27, *) else { return }
-    let fixture = SettingsFacadeFixture()
-    let workflow = fixture.workflow()
-    _ = try await workflow.restore()
-    try await workflow.save(.init(enabled: true, url: "https://example.invalid", key: "fixture", model: "new"))
-    #expect(workflow.modelName == "new")
-    #expect(try await workflow.restore().model == "new")
-    #expect(fixture.restores == 1)
+    let confirmed = fails ? "old" : "new"
+    #expect(workflow.modelName == confirmed)
+    #expect(try await workflow.restore().model == confirmed)
+    #expect(fixture.restores == (fails ? 2 : 1))
 }

@@ -1,9 +1,30 @@
 # Storage tests
 
-持久化及存储契约中本目录能力的测试。测试通过真实接口及显式替身验证可观察行为、失败、取消和清理；真实模型及设备用例保留显式 gate。
+存储契约、真实临时文件和 SQLite。重开与故障注入不等同真实进程被杀；媒体原生导入/导出端点仍按用例注入。
 
-## 文件归属
+Core：内存/文档与生命周期；Files：路径约束和发布；Database：仓库、schema、消息、工作区与相册。
 
-- [Core](Core/README.md)：所属子能力的测试与资源。
-- [Database](Database/README.md)：所属子能力的测试与资源。
-- [Files](Files/README.md)：所属子能力的测试与资源。
+## 测试分层
+
+采用 [Tests 的统一分层](../README.md#测试分层)。混合行表示文件中同时存在独立逻辑单元与真实组件协作；按实际用例边界判断，不按 target 命名判断。
+
+| 能力目录 | 层级 | 文件或用例组 |
+| --- | --- | --- |
+| Core | Unit Tests / Integration Tests | [StorageContainerTests](Core/StorageContainerTests.swift)、[StorageTests](Core/StorageTests.swift) |
+| Core | Integration Tests | [StorageRuntimeTests](Core/StorageRuntimeTests.swift) |
+| Database | Integration Tests | [AlbumTests](Database/AlbumTests.swift)、[DatabaseTableRecordTests](Database/DatabaseTableRecordTests.swift)、[SQLiteDialogLifecycleTests](Database/SQLiteDialogLifecycleTests.swift)、[SQLiteRecordTests](Database/SQLiteRecordTests.swift)、[StorageRepositoryContractTests](Database/StorageRepositoryContractTests.swift)、[StorageSchemaTests](Database/StorageSchemaTests.swift)、[WorkspaceRepositoryTests](Database/WorkspaceRepositoryTests.swift) |
+| Files | Integration Tests | [LocalFileStoreTests](Files/LocalFileStoreTests.swift) |
+
+## 执行与替身边界
+
+默认执行 `./scripts/check.sh`；实际期限与原生窗口回归由既有串行阶段隔离。模型/网络/设备开关与原生独立入口见 所属能力 README 和 [执行总索引](../README.md#执行入口)。每次运行单独记录通过、失败与跳过，不将替身结果标成原生验收。
+
+## 辅助代码
+
+[SQLiteRecordSupport](Database/SQLiteRecordSupport.swift) 提供所属编译目标的夹具、探针或注册，不是独立测试层。
+
+## 能力文档
+
+- [Core](Core/README.md)
+- [Database](Database/README.md)
+- [Files](Files/README.md)

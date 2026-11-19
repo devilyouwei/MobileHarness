@@ -40,3 +40,13 @@ Run one explicitly selected physical test per process with `NEXARM_PORT=/dev/cu.
 - [NexArmSerialAcceptanceTests.swift](NexArmSerialAcceptanceTests.swift)
 - [NexArmTelemetryTests.swift](NexArmTelemetryTests.swift)
 - [NexArmTests.swift](NexArmTests.swift)
+
+## 测试分层
+
+| 文件 | 层级与边界 |
+| --- | --- |
+| [NexArmConnectionPolicyTests.swift](NexArmConnectionPolicyTests.swift) | Unit Tests：独立运动规划、速度/限位、发现/恢复策略及错误投影；无注册、数据库和设备连接。 |
+| [NexArmBluetoothIntegrationTests.swift](NexArmBluetoothIntegrationTests.swift) | Integration Tests：真实 BluetoothWorkflow、控制器、Gateway/Agent 与 SQLite；BluetoothArmFixture 明确模拟原生 link；保留 LiveRuntimeTests 串行隔离。 |
+| [PlatformKit BLE 单元测试](../../PlatformKit/Connectivity/NexArmBluetoothTests.swift) | Unit Tests：协议/ACK、写入准入与连接预算由底层模块拥有。 |
+
+其他 NexArm 文件混合规划/反馈单元与执行集成；串口 gate 是运行条件和验收目的，不是独立测试层。默认回归不动硬件。

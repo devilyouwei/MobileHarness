@@ -2,7 +2,7 @@
     import XCTest
 
     /// Actual app clicks against a simulator seeded only with synthetic Writer evidence.
-    @MainActor final class WriterRecordsNativeAcceptance: XCTestCase {
+    @MainActor final class WriterRecordsUITests: XCTestCase {
         func capture(_ name: String, app: XCUIApplication) {
             let attachment = XCTAttachment(screenshot: app.screenshot())
             attachment.name = name

@@ -42,8 +42,8 @@ import Testing
     #expect(throws: (any Error).self) { try MossTtsNanoTokenizer(modelData: Data()) }
 }
 
+@available(macOS 27, iOS 27, *)
 @Test func mossMissingResourcesFailWithoutFallback() async throws {
-    guard #available(macOS 27, iOS 27, *) else { return }
     let context = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
     let provider = try MossSpeechSynthesis(context: context, artifacts: URL(fileURLWithPath: "/missing-moss-models"))
     if case .available = await provider.availability { Issue.record("Missing resources must be unavailable") }
@@ -56,7 +56,9 @@ import Testing
 
 @Test(.enabled(if: ProcessInfo.processInfo.environment["HARNESS_TEST_MOSS"] == "1"))
 func realMossChineseEnglishAndLifecycle() async throws {
-    guard #available(macOS 27, iOS 27, *) else { return }
+    guard #available(macOS 27, iOS 27, *) else {
+        throw CapabilityError.unavailable("This native integration test requires macOS 27, iOS 27")
+    }
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         .appendingPathComponent("MobileHarness/Resources/Models/MossTTSNano")

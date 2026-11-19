@@ -36,3 +36,9 @@ DecisionAdapterNativeTests 每模型最多3条参考请求；tokenizer 夹具验
 - [vela31_parity.py](../../../../scripts/models/vela31_parity.py)：3条发布参考的加载器检查，显式 --reference/--output。
 
 这些脚本拥有独立的工程参考适配器，不导入 experiments；一致性断言与夹具由工程侧维护。历史全量测量不作为当前默认工程测试规模。
+
+## 测试分层与输入有效性
+
+DefaultsTests、ChatExecutionTests、SpeechSelectionTests 验证真实默认根/子能力、FIFO 及 SpeechSelection/ModelManager 的注册与选择协作，属于 Integration Tests；不加载真实权重。平台受限的普通回归使用 @available 报告跳过；显式开启的 D3/Apple 模型 smoke 在平台不支持时抛 unavailable。
+
+[DecisionAdapterNativeTests.swift](DecisionAdapterNativeTests.swift) 包含两层：decisionParityRequiresSelectedReferenceCases / tokenizerParityRequiresReferenceRows 是 Unit Tests，仅使用内存夹具；两个 native parity 用例是显式启用的 Integration Tests。原生加载前拒绝未知模型、空参考集、所选模型缺失、非法输出种类及空 tokenizer rows；每模型最多三个请求不变。

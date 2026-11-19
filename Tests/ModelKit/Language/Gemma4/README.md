@@ -34,3 +34,7 @@ GemmaToolProtocolTests covers neutral declarations to native syntax, nested argu
 回归覆盖失败历史中的空assistant／空白消息、末尾system移除、空当前输入不可回退旧user、无当前user及具体错误原因。
 
 回归覆盖iOS 1024／macOS 4096及模型更小窗口解析、1024内长system与历史裁剪、输出预算和当前输入超限拒绝。
+
+## 测试分层与可用性
+
+渲染、窗口预算、参数和 Tool 编解码属于 Unit Tests；真实 Gemma 加载/生成/取消/重载属于显式启用的 Integration Tests。普通回归使用函数级 @available，受限系统报告跳过；HARNESS_TEST_GEMMA4 显式开启后，不支持系统抛出 unavailable，不提前返回成功。

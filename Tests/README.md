@@ -1,50 +1,67 @@
 # Tests
 
-## 职责与运行
+## 测试分层
 
-case 评估、提示词/业务用例对照与推理性能实验归 [experiments](../experiments/README.md)。App 模型管理、部署、适配器和推理链路测试（含真实模型验收）仍归 Tests/ModelKit。常规测试按被验证能力的职责组织；物理目录不等同于 SwiftPM 编译 target。根目录只保留全局测试契约和导航，具体回归和辅助代码归所属目录。
+按 [Apple 测试金字塔](https://developer.apple.com/documentation/xcode/testing) 使用 Unit Tests、Integration Tests、UI Tests。单元测试承担业务规则与边界，集成测试验证真实接口协作，UI 自动化覆盖少量重要用户流程。模块目录表示所有权，SwiftPM target 表示编译边界，两者均不直接决定测试层级。
 
-| 分类 | 内容 |
+| 层级 | 边界 | 示例 |
+| --- | --- | --- |
+| Unit Tests | 一个逻辑单元的可观察行为，外部协作者按需隔离；不要求一个方法对应一个测试。 | 参数、解析、状态机、布局、选择策略与错误转换。 |
+| Integration Tests | 多个真实组件通过生产接口协作，包含模块内、跨模块、持久化和原生框架集成。 | Gateway/Actions、Writer/SQLite、生产装配、WebKit/Metal。 |
+| UI Tests | XCTest 与 XCUIAutomation 操作实际应用 UI，断言用户可观察结果。 | WriterRecordsUITests 的导航、分页、详情与分享。 |
+
+ViewModel 和几何的直接调用属于 Unit Tests；实际原生视图挂载、WebKit/Metal 框架调用属于 Integration Tests，不因名称含 UI/native 就成为 UI 自动化。E2E 描述完整外部入口到最终结果的系统范围，局部 UI 测试及绕过 UI 的装配测试不宣称完整用户流程 E2E。
+
+Contract、Regression、Smoke、Performance、Acceptance 描述目的或类型；模拟器、真机、真实模型/网络描述运行条件，均与层级分开。混合文件在模块索引标为 Unit Tests / Integration Tests，按被测行为区分，不重复实现另一套同义测试。
+
+## 模块归属
+
+| 模块 | 主要职责 |
 | --- | --- |
-| [ModelKit](ModelKit/README.md) | SDK 核心、管理、下载、语言、语音与视觉适配 |
-| [Agents](Agents/README.md) | 运行时、角色、上下文及提示词契约回归 |
-| [Actions](Actions/README.md) | 函数契约、执行、设备和业务能力 |
-| [Gateway](Gateway/README.md) | 输入、输出、调度及媒体传输 |
-| [PlatformKit](PlatformKit/README.md) | 平台状态、音频、图像及连接能力 |
-| [Storage](Storage/README.md) | 文件、数据库、仓库及存储生命周期 |
-| [App](App/README.md) | 应用生命周期、工作流、设置与呈现组合 |
-| [UI](UI/README.md) | UI 状态、请求、布局和显式原生验收入口 |
+| [ModelKit](ModelKit/README.md) | 推理契约、管理、制品及语言/语音/视觉适配。 |
+| [Agents](Agents/README.md) | 认知规则、角色工作流、通信、上下文和结果续轮。 |
+| [Actions](Actions/README.md) | 函数声明、业务执行、设备策略和能力工作流。 |
+| [Gateway](Gateway/README.md) | 输入、调度、路由及媒体/结果传输。 |
+| [PlatformKit](PlatformKit/README.md) | 原生平台事实、PCM/图像与连接机制。 |
+| [Storage](Storage/README.md) | 内存、文件、SQLite 与仓库持久化。 |
+| [App](App/README.md) | 生产装配、宿主生命周期及应用级接线。 |
+| [UI](UI/README.md) | 呈现状态/布局、原生组件集成和 UI 自动化。 |
 
-## 编译与资源边界
+跨模块集成测试归发起工作流的所有者；生产装配归 App。单元测试归被测对象所属能力。沿用现有目录，不建立平行 Unit/Integration 目录或公共测试业务库。现有清晰名称保留；新拆分文件使用 SubjectTests、WorkflowIntegrationTests、FeatureUITests。
 
-根 [Package.swift](../Package.swift) 的 `testSources` 使用仓库相对路径，显式记录每个既有 target 的源文件；`organizedTestTarget` 排除其他 target 的源文件及非源码。新增或移动 Swift 测试时同步更新这份成员表，非源码排除项登记在 `testNonSources`，不因目录相邻而增加依赖。测试名称、target 名称和 `swift test --filter` 标识保持稳定。跨能力测试替身仍在原 target 内共享，无新增公共测试库。
+## 执行入口
 
-experiments 是纯 Python 数据/运行器目录，整个目录从 SwiftPM 测试 target 排除。本地模型和构建缓存不提交。
+从仓库根运行。默认检查不下载权重、不读取开发凭据、不控制物理硬件；部分确定性原生组件集成随默认测试执行。
 
-## 检查入口
+| 入口 | 范围与条件 |
+| --- | --- |
+| `./scripts/check.sh` | 边界、Python 工程工具、Swift 格式、Swift 两阶段回归和 plist；普通阶段与 LiveRuntimeTests/NativePresentationTests 串行阶段都执行并保留失败。 |
+| `swift test --filter compactActionObservationPreservesBusinessContainersScalarsAndEmptyValues` | 结果观察值转换的单元测试示例。 |
+| `swift test --filter compactRoundObservationsKeepSameAliasCallsDistinctAndPreserveNativeAndJournalIDs` | 使用实际轮次、执行与 journal 的集成测试示例。 |
+| `./scripts/simulator/test-composition.sh` | 独立 iOS 生产装配集成，专用模拟器和临时数据。 |
+| `./scripts/simulator/test-webkit-simulator.sh` | 独立 iOS WebKit 组件集成，使用生产页面组件，不代表完整 Writer 用户流程。 |
+| `./scripts/simulator/test-writer-records-simulator.sh` | XCTest UI 自动化；要求隔离模拟器及合成 seed，见 [脚本说明](../scripts/README.md)。 |
+| Assistant/Writer model smoke | `MH_ASSISTANT_SMOKE=1` / `MH_WRITER_SMOKE=1`，显式 `MH_SMOKE_API_URL`、`MH_SMOKE_API_KEY`、`MH_SMOKE_MODEL`；每个输入/delegate 最多 8 次请求，过滤 assistantSingleModelRequestCompletesThroughGateway / writerSingleDelegatePublishesAndCompletes。 |
 
-从仓库根执行 `./scripts/check.sh`：模型边界、工程工具的 Python 离线回归、Swift 格式检查、Swift 测试和项目配置检查。Python 使用所属目录显式 discovery，无须把职责目录变成 Python package。
+权重、系统语音、真实服务、串口/触觉和规模测试各自保留所属 README 的显式开关。平台受限的普通回归使用函数级 @available 并报告跳过；已显式启用的模型验收在不支持环境报错。跳过、构建或替身结果不等于真实模型、UI 或设备验收。
 
-普通 Swift 用例与 `LiveRuntimeTests|NativePresentationTests` 分阶段执行，后者保留原有串行隔离。单个测试名称及 live gate 见各能力 README。真实网络、模型、原生 UI 和物理设备验收必须显式启用；合成端点、构建和自动化检查不能替代这些验收。
+## 核心集成覆盖
 
-迁移和检查证据见 [Tests 整理验证](../docs/validation/Tests-Organization.md)。历史报告中的源路径与哈希属于当时版本，不能将旧记录的哈希改写为新源码哈希。
+| 流程 | 所有者与现有用例组 | 观察结果 |
+| --- | --- | --- |
+| 生产装配与生命周期 | App/Composition、App/Lifecycle；ProductionCompositionAcceptance | 根启动、设置请求、导航、前后台、停止及拒绝迟到请求；手工服务图另行验证顺序和回滚。 |
+| Assistant 执行与续轮 | Agents/Core/GenerationRoundTests、Agents/Assistant/AssistantChatTests | Action/Tool 关联、真实业务结果续轮、失败/取消和不重放；模型为脚本替身。 |
+| Writer 委派与发布 | Agents/Writer/WriterAgentTests、WriterWorkflowTests | 实际文件/SQLite、委派终态、通知重投及清理；模型/部分呈现为替身。 |
+| 语音交互 | Agents/SpeechPerception/VoiceTests、Actions/Speech/SpeechPlaybackTests | 最终识别到回复输出、音频所有权、捕获代际与停止；识别/合成/播放端点为受控替身。 |
+| 摄影与媒体保存 | Agents/Photographer、Storage/Database/AlbumTests | 图像身份、保存/回读、部分失败保留与不重复捕获；原生相机/Photos 端点独立验收。 |
+| 设置与模型资源 | Actions/System、Agents/Assistant、App/Settings、App/Resources | 校验、保存、应用、回执与错误恢复；凭据和原生服务按测试边界替换。 |
 
-本地模型制品可与实验共享仓库根 [Models](../Models/README.md)，通过既有资源参数/环境变量显式选择。
+已有历史、窗口/Web、跟踪及诊断集成继续归其所有者。单元层覆盖参数矩阵，集成层保留独立接线与完成/失败不变量；重分类不自动复制场景。
 
-## 少量真实模型链路验证
+## 编译与数据边界
 
-Tests 可用单个模型验证模块、通信和业务闭环；case/模型效果矩阵归 experiments。Assistant/Writer smoke 分别由 `MH_ASSISTANT_SMOKE=1`、`MH_WRITER_SMOKE=1` 启用，并显式提供 `MH_SMOKE_API_URL`、`MH_SMOKE_API_KEY`、`MH_SMOKE_MODEL`。从根目录使用 `swift test --filter assistantSingleModelRequestCompletesThroughGateway` 或 `writerSingleDelegatePublishesAndCompletes` 运行。各验证一个输入/delegate，最多8次请求；默认关闭，不自动读取凭据文件。
+[Package.swift](../Package.swift) 的 testSources 显式登记 Swift 文件，testNonSources 排除说明和夹具；新增/移动源码同步成员、Xcode 导航及过滤引用。现有 IntegrationTests/UITests target 名与串行 suite 名保留，不冒充测试层级。辅助声明在所属目录/Support 复用，不增加公共测试库。
 
-App通信、解析和原生渲染的辅助机制在既有 IntegrationTests target 内复用，不增加生产 API。Python评估器的schema、评分、统计及凭据隔离回归归 experiments，独立执行。
+Tests 只维护 Swift 工程测试及自身夹具。scripts 只编排。模型 case、提示词质量、效果矩阵和推理性能实验归 [experiments](../experiments/README.md)，两者不互相读取源码、数据、配置或结果。唯一共享制品位置为根 [Models](../Models/README.md)，按固定来源/版本/校验复用。
 
-工程Python工具的离线回归与原生参考检查归仓库根 scripts；Tests 的可执行测试源码使用 Swift。scripts/check.sh 发现 scripts/checks/test_*.py。
-
-## 跨模块链路归属
-
-按发起工作流的业务所有者放置，不建通用 Integration 杂物目录：Assistant/Writer/感知闭环归 Agents；执行能力集成归 Actions；通信、Channel/wait 与资源调度归 Gateway；生产装配、根注册和宿主生命周期归 App。基础模块自身的机制测试留在基础模块。编译 target 不代表目录责任。
-
-默认确定性链路随 check.sh 运行；有真实截止时间的少量回归进入已有 LiveRuntimeTests 串行阶段。生产 iOS 装配用 `./scripts/simulator/test-composition.sh`；真实 Assistant/Writer 模型 smoke 使用上文显式 gate；WebKit/Writer 原生 UI 使用 scripts/simulator 对应入口。各层单独报告，不用跳过的测试或构建成功充当链路验收。
-
-Tests 与 experiments 完全独立：不互相导入代码，不读取对方的数据、配置、提示词或结果，也不共用项目辅助库。允许重复实现；唯一共享内容是 Models 中按来源、版本和校验和约定下载的模型制品。
-
-Swift test sources validate App unit behavior, business logic and cross-module flows. Small model requests verify integration, never model quality or case-matrix performance.
+实施记录见 [Tests 分层与维护优化](../docs/completed/Tests-Optimization-Plan.md)。运行结果与限制归 [validation](../docs/validation/README.md)，历史证据不作为当前测试通过结论。
