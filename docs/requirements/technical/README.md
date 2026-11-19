@@ -1,5 +1,7 @@
 # 技术需求
 
+- [Signal 核心架构重设计](Signal-Architecture-Redesign.md)：外部 SignalListener 直接监听、App 内部 Gateway 订阅与定向通信、未来 IPC 进程间信道；生产消费边界、生命周期及分阶段验收。
+
 已完成：[Tests 分层与维护优化](../../completed/Tests-Optimization-Plan.md)，保留模块目录，明确单元/集成/UI 测试、整理混合文件与命名，并通过工程检查及五个 Simulator 构建。
 
 - [全双工播放期间的语音接纳优化](Full-Duplex-Playback-Admission.md)：动态起声门槛、起播 ASR 保护窗口、采样时间对齐与真机误触发/打断延迟验收。
