@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="840" height="410" viewBox="0 0 840 410" role="img" aria-labelledby="title description">
   <title id="title">Agents, Tasks and Skill declarations</title>
-  <desc id="description">An Agent manages a Task and loads Skills. A Task preserves its goal and context and combines Skills. Each Skill declares Actions, read-only States, Instructions and dependencies on other Skills. Actions execute through Gateway; selected State facts are read on each model request. Skills reference capabilities rather than owning their implementation or live state.</desc>
+  <desc id="description">An Agent manages a Task and loads Skills. A Task preserves its goal and context and combines Skills. Each Skill declares Actions, read-only States, Instructions and dependencies on other Skills. Action invocations pass through Gateway and are scheduled and executed inside Actions; selected State facts are read on each model request. Skills reference capabilities rather than owning their implementation or live state.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
@@ -40,7 +40,7 @@
       <text x="126" y="206" text-anchor="start">manages</text>
       <text x="250" y="282">combines</text>
       <text x="433" y="151">Callable operations</text>
-      <text x="433" y="176">Execute via Gateway</text>
+      <text x="433" y="176">Scheduled &amp; run in Actions</text>
       <text x="679" y="151">Read-only current facts</text>
       <text x="679" y="176">Read on each model request</text>
       <text x="433" y="285">Workflow guidance</text>

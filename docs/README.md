@@ -19,6 +19,7 @@
 | 文档 | 唯一职责 |
 | --- | --- |
 | [Product scope](Product-Scope.md) | 用户能做什么、产品范围及明确限制。 |
+| [User & model guide](User-Guide.md) | 设备签名、构建变体、AI 模型配置与下载以及交互操作指南。 |
 | [Architecture](Architecture.md) | 模块如何协作，主要输入、执行、数据与生命周期流向。 |
 | [Concepts](Concepts.md) | Signal、Agent、Action、Task、Skill、完成与接纳等术语。 |
 | [Platform boundaries](Platform-Boundaries.md) | 平台授权、原生能力与物理控制边界。 |

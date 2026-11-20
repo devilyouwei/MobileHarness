@@ -12,7 +12,7 @@ MobileHarness is a bio-inspired agentic app that makes your smartphone an embodi
   <img src="imgs/perception-cognition-action.svg" alt="Perception, Cognition and Action form a counterclockwise loop connected by Internal Signals. A dashed External Signal arrow enters Perception from outside the loop.">
 </p>
 
-In MobileHarness, _every input is a Signal; every output is an Action_. Signals carry information through the **Perception → Cognition → Action** loop. External Signals bring observations from the world and user interactions into perceptions. Internal Signals connect the three stages, carrying interpreted information, intent and feedback. **Gateway** is the Signal highway, carrying processed information between Agents. Agents interpret Signals, decide what to do and take Actions; the outcomes return as Signals to close the loop. For humans, interaction is full-duplex: receiving multi-channel Signal input while producing multi-channel Action output. This is the interaction pattern we aim to emulate.
+In MobileHarness, _every input is a Signal; every output is an Action_. Signals carry information through the **Perception → Cognition → Action** loop. External Signals bring observations from the world and user interactions into perceptions. Internal Signals connect the three stages, carrying interpreted information, intent and feedback. **Gateway** is the internal Signal channel, routing messages between Agents and carrying invocations and results between Agents and Actions. Agents interpret Signals, decide what to do and request Actions; **Actions** schedules and manages execution internally, returning outcomes as Signals to close the loop. For humans, interaction is full-duplex: receiving multi-channel Signal input while producing multi-channel Action output. This is the interaction pattern we aim to emulate.
 
 <p align="center">
   <img src="imgs/task-skill-capabilities.svg" alt="An Agent manages a Task and loads Skills. Each Skill declares Actions, read-only States, Instructions and dependencies on other Skills.">
@@ -28,7 +28,7 @@ In MobileHarness, _every input is a Signal; every output is an Action_. Signals 
 
 **Multi-Agent collaboration** lets specialized Agents exchange messages and delegate work through **Gateway**, within their declared communication permissions. For example, **Assistant** can relay a request to write an illustrated article to **Writer**, which decides whether to take it on and owns the creation workflow, context and workspace. Assistant remains available for conversation and can relay follow-ups or a request to stop. Writer reports acceptance, selected milestones, questions and the final outcome. Message delivery, task acceptance and task completion each have their own confirmation.
 
-Biological inspiration runs throughout MobileHarness. **Agents** resemble specialized parts of the human brain, processing observations and **Signals** through capabilities such as speech recognition, visual pose detection and reasoning. **Gateway** provides nervous-system coordination for Agent communication and execution. **UI**, **PlatformKit**, **ModelKit** and **Storage** provide independent presentation, native I/O, inference and storage capabilities; **App** assembles the modules and owns their lifetimes.
+Biological inspiration runs throughout MobileHarness. **Agents** resemble specialized parts of the human brain, processing observations and **Signals** through capabilities such as speech recognition, visual pose detection and reasoning. **Gateway** serves as the nervous-system Signal channel for internal communication, while **Actions** independently schedules and manages action execution and resources. **UI**, **PlatformKit**, **ModelKit** and **Storage** provide independent presentation, native I/O, inference and storage capabilities; **App** assembles the modules and owns their lifetimes.
 
 [Quick Start](#quick-start) · [Documentation](docs/README.md) · [Technical Design](MobileHarness/README.md) · [Contributing](CONTRIBUTING.md)
 
@@ -41,8 +41,6 @@ Biological inspiration runs throughout MobileHarness. **Agents** resemble specia
 - An **iOS 27+ physical device** and development signing for the complete application.
 
 The app deployment target is iOS 27; the shared package declares iOS/macOS 26, with CoreAI execution requiring OS 27 and supported hardware. That package floor does not make the full app compatible with older iOS. XcodeGen and CocoaPods are not required.
-
-The current local Gemma iOS graph supports only hardware identifiers `iPhone18,1` and `iPhone18,2`. Other devices require explicitly configured cloud chat for conversation. See [Gemma compatibility](MobileHarness/ModelKit/Language/LLM/Gemma4/README.md#local-gemma-engine).
 
 ### 1. Get the project
 
@@ -57,39 +55,20 @@ Launch Xcode once to complete setup and select the full developer tools:
 sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 ```
 
-### 2. Open in Xcode
+### 2. Open in Xcode and configure signing
 
 ```sh
 open MobileHarness.xcodeproj
-```
-
-Use the physical-device **MobileHarness** scheme for the complete local-inference configuration. For simulator builds, `./scripts/build-ios.sh` selects **MobileHarnessSimulator** and sets `MOBILEHARNESS_BUILD_VARIANT=simulator` during package resolution to exclude the device-only Gemma backend. Local Gemma chat is unavailable in that variant; conversation requires an explicitly configured cloud provider. See [Gemma4](MobileHarness/ModelKit/Language/LLM/Gemma4/README.md) for the platform boundary.
-
-### 3. Configure device signing
-
-```sh
 cp Config/Local.xcconfig.example Config/Local.xcconfig
 ```
 
-Set `DEVELOPMENT_TEAM` and `PRODUCT_BUNDLE_IDENTIFIER` in the ignored local file. Builds bundle the pinned model catalog and notices, not inference weights; no model download is required before building.
+Set `DEVELOPMENT_TEAM` and `PRODUCT_BUNDLE_IDENTIFIER` in `Config/Local.xcconfig`, then select the **MobileHarness** scheme for an iOS 27+ physical device (or **MobileHarnessSimulator** for simulator builds) and run. Builds bundle the pinned model catalog and notices, not inference weights.
 
-### 4. Choose capabilities and run
+### 3. Configure models and interact
 
-Select the **MobileHarness** scheme, choose your connected iPhone, then build and run.
+Open **Settings → AI Models** in the app to manage speech, vision, and local/cloud LLM capabilities, then **press and hold the companion's eyes for half a second** to start or stop continuous voice listening.
 
-- Open Settings → **AI Models** to manage **Speech Recognition**, **Speech Synthesis**, **Agent Brains** and **Vision Recognition** resources. Custom recognition/synthesis default off; Apple ASR/TTS can run without Nemotron/MOSS weights. Silero/Energy selection is independent of that switch.
-- Download compatible **Gemma 4 E2B** for local text conversation, or explicitly configure a provider implementing the **Responses API**. A provider offering only Chat Completions is insufficient. Photo understanding requires an image-capable cloud model; local Gemma does not support images or native Tools. Cloud chat replaces chat only.
-- Camera preview starts off. Use the camera controls to open preview and grant permission; install YOLO for pose inference. Voice preparation is independent of camera preview. Saving a captured photo requests add-only Photos permission.
-- **Press and hold the companion's eyes for half a second** to enable continuous listening, prepare the selected speech capabilities and request microphone permission. Release after activation; speak, then pause to end the utterance. Partial captions become a final input and spoken reply.
-- Press and hold the eyes again to withdraw listening consent and stop microphone capture. Camera controls independently switch lenses or close preview.
-
-On an audio route with active echo cancellation, the Assistant keeps listening while it thinks or speaks. Configure a local D3 or cloud Decision model under **Agent Brains → Decision** to classify interruptions. Other audio routes pause recognition during replies and resume it while listening consent remains active. See [full-duplex interaction](MobileHarness/README.md#assistant-full-duplex-interaction).
-
-The current frontend has no text-entry field. Native and model failures are reported explicitly. An active inference request stays with its selected provider.
-
-Model downloads use an explicit Hugging Face, HF-Mirror or custom HTTPS source; YOLO retains its declared ZIP source. Production revisions remain pinned. Background transfer and resume depend on the OS and server; force-quit does not guarantee continued transfer. See [model resources](MobileHarness/ModelKit/Support/Config/README.md) and the [Hub adapter](MobileHarness/ModelKit/Support/Management/HuggingFace/README.md) for acquisition, compatibility and recovery details.
-
-For local Gemma development, `python3 scripts/models/model_download.py gemma4-e2b --platform macos` provisions `Models/Gemma4`; `--endpoint` selects the download source. Other downloader profiles still use the legacy `MobileHarness/Resources/Models` destination, so check the [script inventory](scripts/README.md) before provisioning. Research and engineering should reuse verified artifacts in root [Models](Models/README.md) through their explicit resource settings. App-managed downloads are separate from this development workspace. See [Voice](docs/validation/Voice.md) and [MOSS validation](docs/validation/Moss-Validation.md) for native acceptance procedures.
+For full device compatibility, simulator variant limits, model download sources, development provisioning, and interaction controls, see the [User & Model Guide](docs/User-Guide.md).
 
 ## Development
 
@@ -204,6 +183,7 @@ Tests and experiments share only model artifacts, never code, configuration, dat
 | [Pending requirements](docs/requirements/README.md)                        | Unimplemented technical, product and combined requirements.                    |
 | [Completed requirements](docs/completed/README.md)                         | Whole requirements archived after their original delivery scope is complete.   |
 | [Product scope](docs/Product-Scope.md) / [Concepts](docs/Concepts.md)      | Delivered product scope, biological analogy and architectural vocabulary.      |
+| [User & model guide](docs/User-Guide.md)                                   | Device setup, model configuration, download sources and interaction controls.  |
 | [Public architecture](docs/Architecture.md)                                | Public system explanation and retained architecture context.                   |
 | [Technical design](MobileHarness/README.md)                                | Current framework, module boundaries, target map and complete technical flows. |
 | [Module READMEs](MobileHarness/README.md#part-ii--module-design) | Current local interfaces, algorithms, lifecycle, bounds and failure contracts. |

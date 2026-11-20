@@ -64,7 +64,7 @@ flowchart TB
 
 **UI requests and native observations enter the responsible Agents directly**. **Perception roles** process audio, images and device observations; **cognitive roles** interpret intent, maintain goals and context, manage **Skill/Task scope** and coordinate specialized roles. Agents use deterministic processing or model inference to decide which operations to request. Role categories and their configuration are described in [Agents](Agents/README.md#agent-categories).
 
-**Gateway delivers Agent messages**, validates endpoint identity and execution admission, and coordinates scheduling and shared resources. **Actions validates business inputs and preconditions**, performs the admitted operations and returns completion or failure through Gateway to the requesting Agent. **Request identity is preserved through execution and feedback** so the Agent can relate each outcome to its goal and decide what to do next.
+**Gateway delivers Agent messages** and validates endpoint identity and execution admission for internal Signals. **Actions owns its execution Shell**, coordinating Channel scheduling, direct calls and shared resources, validating business inputs and preconditions, performing the admitted operations and returning completion or failure through Gateway to the requesting Agent. **Request identity is preserved through execution and feedback** so the Agent can relate each outcome to its goal and decide what to do next.
 
 Agents and Actions use **four independent foundations** through injected capabilities: **ModelKit runs inference**, **Storage provides temporary and durable data facilities**, **PlatformKit supplies native device and operating-system access**, and **UI handles interaction and presentation**. Local rendering stays within UI; each foundation exposes reusable mechanisms that the business modules compose for a particular goal.
 
@@ -103,7 +103,7 @@ A first-level source directory identifies an architectural owner. A logical modu
 MobileHarness/
 ├── App/           # Lifecycle host and application composition
 ├── Agents/        # Cognition and role coordination
-├── Gateway/       # Communication and execution mediation
+├── Gateway/       # Internal Signal communication and admission
 ├── Actions/       # Business operations and actual execution
 ├── UI/            # Independent interaction and presentation capability
 ├── PlatformKit/   # Independent native and device capability
@@ -116,7 +116,7 @@ MobileHarness/
 | ------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Lifecycle host                        | [App](App/README.md)                 | Construct scoped roots, connect public interfaces and coordinate application lifetime.                                           | Receives OS lifecycle events; assembles module roots and invokes their public lifecycle interfaces.                                                                        |
 | Cognition                             | [Agents](Agents/README.md)           | Interpret inputs, own goals and private context, select behavior and coordinate roles.                                           | Consumes required foundation capabilities; submits messages and output to Gateway; receives read-only catalog metadata and App-bound host ports through neutral contracts. |
-| Communication and execution mediation | [Gateway](Gateway/README.md)         | Own an App-scoped GatewayContainer for the four internal Signals: Agent messages, events, invocation to Actions and feedback to Agents. | Receives canonical calls and opaque endpoint messages; forwards invocations to the injected Actions-owned execution Shell and routes its feedback back to the bound endpoint. |
+| Internal Signal communication         | [Gateway](Gateway/README.md)         | Own an App-scoped GatewayContainer for the four internal Signals: Agent messages, events, invocation to Actions and feedback to Agents. | Receives canonical calls and opaque endpoint messages; forwards invocations to the injected Actions-owned execution Shell and routes its feedback back to the bound endpoint. |
 | Business execution                    | [Actions](Actions/README.md)         | Implement callable domain operations, validate execution preconditions and report actual outcomes.                               | Receives authorized invocations; uses required foundation capabilities and explicit domain ports.                                                                          |
 | Foundation                            | [UI](UI/README.md)                   | Own typed interaction requests, presentation state, rendering and display receipts.                                              | Exposes public request sources and presentation capabilities to injected consumers.                                                                                        |
 | Foundation                            | [PlatformKit](PlatformKit/README.md) | Own native I/O, platform permissions, device transport and native observations.                                                  | Exposes native operations and factual observations through its own interfaces.                                                                                             |
@@ -134,7 +134,7 @@ flowchart TB
         App["App · Composition"]
     end
     subgraph Business["BUSINESS"]
-        A["Agents · Cognition"] -->|Gateway API| G["Gateway · Coordination"]
+        A["Agents · Cognition"] -->|Gateway API| G["Gateway · Signal channel"]
         X["Actions · Business execution"]
     end
     subgraph Cognitive["AGENTCORE"]
@@ -256,7 +256,7 @@ flowchart TB
     APP -.->|construct / start / stop| A
     APP -.->|construct / start / stop| G
     APP -.->|construct / start / stop| X
-    A -->|injected communication and scheduling ports| G
+    A -->|injected Signal and invocation ports| G
     G ==>|injected neutral execution port| X
     X -.->|completion / failure| G
     G -.->|signals / results| A
@@ -280,7 +280,7 @@ flowchart TB
     style EXEC fill:#ffecef,stroke:#b86178,color:#6b2b3d
 ```
 
-Dashed arrows from App show root construction and lifecycle control. The solid arrow carries communication and scheduling requests, the thick arrow invokes execution, and dashed return arrows deliver Signals and outcomes.
+Dashed arrows from App show root construction and lifecycle control. The solid arrow carries Signal and invocation requests, the thick arrow forwards invocations to Actions, and dashed return arrows deliver Signals and outcomes.
 
 Agents uses Gateway Signal ports; Gateway forwards invocations to the neutral `ActionExecutionEngine` owned by ActionsContainer, whose scheduler delivers results back through the Gateway-bound feedback port. Direct tool calls return values through the same Shell. These runtime relationships preserve the compile-time boundaries above. The role and execution rules below define authorization, admission and business validation; injecting a capability does not grant permission or prove an effect.
 
@@ -403,7 +403,7 @@ flowchart LR
     D --> A["Receiving Agent<br/>Perception / cognition / task control"]
     T --> A
     R --> A
-    A -.->|"authorized execution request"| E["Gateway · Execution coordination"]
+    A -.->|"authorized execution request"| E["Gateway · Execution admission &amp; forwarding"]
     E -.->|"execute"| X
     style External fill:#e7f6fc,stroke:#3985a4,color:#1f4c60
     style Internal fill:#f0eaff,stroke:#8261b5,color:#463065
@@ -430,7 +430,7 @@ Solid arrows carry the incoming Signal paths; dashed arrows carry outgoing execu
 
 <a id="assistant-agent-delegation"></a>
 
-Assistant uses `task.start` and `task.end` for its own foreground task. For a goal owned by another Agent, it uses the Control Channel Action `task.send(agent_id,text)` directly. Writer is the current public destination. The same Action carries new goals, follow-ups, answers and stop requests as text. An unrelated Assistant foreground task can continue concurrently.
+Assistant uses `task.start` and `task.end` for its own foreground task. For a goal owned by another Agent, it uses the Agent control `task.send(agent_id,text)` directly. Writer is the current public destination. The same control carries new goals, follow-ups, answers and stop requests as text. An unrelated Assistant foreground task can continue concurrently.
 
 Assistant persists each addressed `agent.task.v1` with a message ID and originating dialog. For an answer, the runtime can attach the captured delegation and question IDs. Gateway delivers the authenticated message to Writer, which verifies it against the persisted record before admitting it to the bounded inbox. Assistant receives the direct admission Reply and records delivery. Writer then decides whether to start work, apply input, stop or reject the message. For new work, Writer uses the original message ID as the delegation ID and obtains an execution grant before starting. Writer admits one delegation at a time and chooses its workspace independently.
 
@@ -478,13 +478,13 @@ sequenceDiagram
     end
 ```
 
-The send Action completes after Assistant records successful delivery. Writer separately reports task acceptance and selected progress through `agent.task.events.v1`. Message rejections and task outcomes use durable delivery, which can retry independently of grant retirement. Assistant validates and deduplicates reports against the original message or delegation. In full-duplex mode, eligible reports for the active originating dialog enter the semantic input queue directly, bypassing the human-input Decision model. Synchronous mode uses the notification playback path. Writer presents its own progress and results in its Island.
+The send control completes after Assistant records successful delivery. Writer separately reports task acceptance and selected progress through `agent.task.events.v1`. Message rejections and task outcomes use durable delivery, which can retry independently of grant retirement. Assistant validates and deduplicates reports against the original message or delegation. In full-duplex mode, eligible reports for the active originating dialog enter the semantic input queue directly, bypassing the human-input Decision model. Synchronous mode uses the notification playback path. Writer presents its own progress and results in its Island.
 
 Task event publication is independent of subscription and consumption. Assistant listens to Writer's task channel throughout its role lifetime, and tracks producer/task/session separately before dispatch. Finishing a task removes tracking, while role stop retires the subscription. Writer declares its task-event production capability and publishes on demand without receiver readiness checks or subscription side effects. Startup validates publication/subscription pairs and real code capabilities, without requiring producer or consumer instances to be running. Gateway provides best-effort live events with no late-subscriber replay; direct send returns a typed peer Reply. Source outbox admission and consumer business reconciliation of stored task results are separate from the pub/sub protocol.
 
 Fixed-task executors implement `agent.task.v1` with submit/update/answer/status/cancel and role-owned typed bodies. Their progress and terminal reports share the `agent.task.events.v1` contract and are distinguished by the signal kind. The Agents output adapter validates the execution grant and coordinates outstanding Gateway work before terminal delivery. Local publication admission retires the fixed-task grant; it does not await consumer acknowledgment.
 
-[Assistant delegation](Agents/Assistant/README.md#delegation-and-peer-facts) · [Task Actions](Actions/System/Task/README.md) · [Task message values](Agents/Support/Communication/README.md) · [Independent output consumers](Agents/Support/README.md#lifetime-bounds-and-failures)
+[Assistant delegation](Agents/Assistant/README.md#delegation-and-peer-facts) · [Agent controls](Agents/Support/Core/Capability/README.md#agent-controls) · [Task message values](Agents/Support/Communication/README.md) · [Independent output consumers](Agents/Support/README.md#lifetime-bounds-and-failures)
 
 ### 3. UI requests and shared business execution
 
@@ -496,25 +496,24 @@ sequenceDiagram
     box rgb(240,234,255) Agents · Cognition
         participant A as Responsible role / output adapter
     end
-    box rgb(255,242,217) Gateway · Coordination
-        participant G as Scheduling / direct dispatch
+    box rgb(255,242,217) Gateway · Signal channel
+        participant G as Signal / admission
     end
-    box rgb(255,236,239) Actions · Execution
-        participant X as ActionsContainer
+    box rgb(255,236,239) Actions · Shell and execution
+        participant X as Shell / ActionsContainer
     end
     UI->>A: request and original reply identity
     A->>A: authorize fixed or frozen Skill / Task scope
     A->>G: canonical ActionCall or ToolCall and bound owner
-    G->>G: validate owner / envelope / scope and reserve capacity
-    G->>X: prepare with the submitted call protocol
-    X-->>G: single-use ticket / resources / budget
+    G->>G: validate owner / envelope / scope
+    G->>X: forward invocation to Actions Shell
+    X->>X: prepare with the submitted call protocol (ticket / resources / budget)
     alt ActionCall
-        G->>G: Channel FIFO / wait eligibility
+        X->>X: Channel FIFO / wait eligibility
     else ToolCall
-        G->>G: bounded direct execution slot
+        X->>X: bounded direct execution slot
     end
-    G->>G: arbitrate resources and obtain live permit
-    G->>X: execute ticket under resource permit
+    X->>X: arbitrate resources, obtain live permit and execute
     X->>X: recheck conditions, perform work, validate output
     X-->>G: completion / value / partial report / failure
     G-->>A: correlated outcome
@@ -781,20 +780,20 @@ sequenceDiagram
         participant A as Role / policy adapters
     end
     box rgb(255,242,217) Gateway
-        participant G as Communication / scheduler
+        participant G as Signal channel / admission
     end
     box rgb(255,236,239) Actions
-        participant X as Registry / executor
+        participant X as Registry / Shell / executor
     end
     rect rgb(248,250,252)
         Note over App,X: Configuration and registration
         App->>A: prepare role and Skill requirements
         A-->>App: required declarations and bindings
-        App->>X: configure business assembly
+        App->>X: configure business assembly and execution Shell
         X->>X: register and validate functions and protocols
-        X-->>App: immutable catalog and execution port
+        X-->>App: immutable catalog and ActionExecutionEngine port
         App->>A: validate catalog coverage
-        App->>G: configure execution and feedback
+        App->>G: configure Signal transport and bind Shell
         G-->>App: bound Gateway facilities
         App->>A: bind execution facilities
         App->>X: start Actions
@@ -805,20 +804,19 @@ sequenceDiagram
         Note over A,X: One request through completion
         A->>A: resolve / authorize producer, Skill, Task and decision
         A->>G: canonical invocation / bound execution owner
-        G->>G: validate endpoint / scope and reserve capacity
-        G->>X: prepare invocation
-        X->>X: validate input / resolve resources and budget
-        X-->>G: one-use ticket / resources / budget
-        G->>G: ActionCall FIFO / wait or ToolCall direct, acquire resources
-        G->>X: execute ticket with live permit
+        G->>G: validate endpoint / scope and gate admission
+        G->>X: forward invocation (ActionCall / wait / ToolCall)
+        X->>X: prepare (validate input / resolve resources and budget)
+        X->>X: Shell: ActionCall FIFO / wait or ToolCall direct, acquire resources
         X->>X: consume ticket / recheck permit and business conditions
         X->>X: execute / validate output / join cleanup
-        X-->>G: completion / value / partial report / failure
-        G->>G: release resources / retain delivery evidence
+        X->>X: release resources / retain delivery evidence
+        X-->>G: feedback Signal (completion / value / partial report / failure)
         G-->>A: correlated outcome
         A->>A: interpret / update history, Task and continuation
     end
     opt scheduled feedback delivery retry
+        X-->>G: retry undelivered outcome
         G-->>A: same outcome / no re-execution
     end
 ```
@@ -829,16 +827,16 @@ The configuration phase is part of [executionBindings and root startup](#1-conta
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | App                                       | Scoped roots, constructor/configuration injection, readiness order, foreground transitions, reverse joined stop and failed-start rollback.                                          | Keeps required bindings and module lifetimes available through cleanup. Function registration stays inside Actions; Skill/Task permission stays inside Agents.                                                                                                                                                                                                                                           |
 | Agents                                    | Role instances, fixed and effective Skill catalogs, private Task/context, call resolution, communication policy, authorization revocation and cognitive interpretation of outcomes. | Checks actual producer/incarnation/session, allowed output/function, frozen decision capabilities and Task grants before submission. Parsing/alias checks use the exposed catalog; authoritative business decoding belongs to Actions. Coverage validation proves registered support, not permission for every future call.                                                                              |
-| Gateway                                   | Neutral endpoints and Signal envelopes, execution scopes, bounded admission, Channel/wait, resource arbitration, cancellation/join, execution evidence and result delivery.         | Checks bound endpoint/context/scope, envelope/scheduling structure and capacity. Enforces injected generic resource policies, lease validity and live permits. It does not resolve roles, query Skills/Tasks or authorize business-function use.                                                                                                                                                         |
-| ActionsContainer and its business library | Compiled canonical definitions, registry/catalog, pure preparation, resources/budgets, actual invocation, input/output contracts and business/native cleanup.                       | Rejects duplicate/invalid registration and unsupported functions/protocols; validates arguments, budget/resource resolution and one-use root/catalog-bound preparation. Checks live permits, current service/session/business preconditions and completion contracts. Functions and domain services implement their own business checks; the module root coordinates them without acquiring role policy. |
+| Gateway                                   | Neutral endpoints and Signal envelopes, execution scopes, bounded Signal admission and invocation/feedback forwarding.                                                             | Checks bound endpoint/context/scope, envelope structure and Signal capacity. It does not resolve roles, schedule Channels, arbitrate resources, query Skills/Tasks or authorize business-function use.                                                                                                                                                                     |
+| ActionsContainer and its business library | Compiled canonical definitions, registry/catalog, execution Shell (Channel/wait, direct dispatch, resources, result retention), pure preparation, actual invocation and cleanup. | Rejects duplicate/invalid registration and unsupported functions/protocols; validates arguments, budget/resource resolution and one-use root/catalog-bound preparation. Enforces injected resource policies, lease validity, live permits, current service/session/business preconditions and completion contracts. Functions and domain services implement their own business checks; the module root coordinates them without acquiring role policy. |
 
 Registration, exposure and authorization are different facts. Actions registers an implementation; Agents selects the functions visible/available to a role or decision; only an authorized request is sent through Gateway. A valid authorization does not bypass capacity, ordering, resource conflicts or live business conditions. Required platform permissions remain enforced by the owning foundation APIs invoked by Actions.
 
 **Gateway has no Agent implementation dependency.** Its project dependency is FunctionContracts; imports are system libraries and those neutral contracts. AgentManager, Skill/Task checks, InputGateway, OutputGateway and cognitive projections live in Agents. The adapters' names do not change their module owner. Gateway receives opaque endpoint/incarnation/session values, execution correlation and injected callbacks, without retaining an Agent instance or searching an Agent container. Callback/result flow does not create a reverse implementation dependency.
 
-Resource authority is a coordination concern. For example, explicit lease acquisition checks configured allowed endpoint values and takeover checks configured preemption pairs; live permits fence actual use. Agents authors role takeover policy and App binds its neutral values. Gateway enforces those values without interpreting a role name or repeating the Skill/Task/function authorization decision. After admission, revocation is explicit scope cancellation; rechecking current business conditions belongs to Actions.
+Resource authority belongs to the Actions Shell. For example, explicit lease acquisition checks configured allowed endpoint values and takeover checks configured preemption pairs; live permits fence actual use. Agents authors role takeover policy and App binds its neutral values. The Shell enforces those values without interpreting a role name or repeating the Skill/Task/function authorization decision, using Gateway's bound endpoint-identity check to fence stale incarnations. After admission, revocation is explicit scope cancellation; rechecking current business conditions belongs to Actions.
 
-Gateway delivers real outcomes rather than interpreting them as Task success. Agents decides whether to record history, advance a Task or run another decision. Scheduled feedback retries redeliver terminal evidence; direct calls return through their owned invocation path. Cancellation joins actual work and retains independent failures; it does not undo already committed effects. The [resource](Actions/Support/Shell/README.md#resources), [result](Actions/Support/Shell/README.md#results-and-feedback) and [Actions](Actions/README.md) documents own their detailed contracts.
+Gateway forwards real outcomes rather than interpreting them as Task success. Agents decides whether to record history, advance a Task or run another decision. Scheduled feedback retries are initiated by the Actions Shell ledger and routed through Gateway without re-executing a handler; direct calls return through their owned invocation path. Cancellation joins actual work and retains independent failures; it does not undo already committed effects. The [resource](Actions/Support/Shell/README.md#resources), [result](Actions/Support/Shell/README.md#results-and-feedback) and [Actions](Actions/README.md) documents own their detailed contracts.
 
 Macros and explicit CapabilityModules registration assemble functions compiled into the application. There is no runtime discovery or hot update. Missing required bindings, duplicate protocol definitions and invalid metadata prevent startup. Optional capability presence is reflected in the catalog. Domains, modules and functions do not receive containers, lifecycle nodes or App registrations.
 
@@ -860,15 +858,21 @@ flowchart TB
     end
     style Cognition fill:#f0eaff,stroke:#8261b5,color:#463065
     subgraph Coordination["GATEWAY"]
-        G["Execution and scheduling<br/>interfaces"]:::gateway
+        G["Signal channel / admission"]:::gateway
     end
     style Coordination fill:#fff2d9,stroke:#bf842c,color:#694511
+    subgraph Execution["ACTIONS"]
+        X["Execution Shell · Channel/wait,<br/>direct calls &amp; execution"]:::action
+    end
+    style Execution fill:#ffecef,stroke:#b86178,color:#6b2b3d
     M -->|"streamed text"| P
     P -->|"aliases / string<br/>parameters"| C
     C -->|"ActionCall and scope<br/>boundaries"| E
     M -->|"complete native call"| N
     N -->|"Authorized ToolCall for direct dispatch"| G
     E -->|"authorized<br/>identity-bound output"| G
+    G ==>|"forward invocation Signals"| X
+    classDef action fill:#ffecef,stroke:#b86178,color:#6b2b3d
     classDef agent fill:#f0eaff,stroke:#8261b5,color:#463065
     classDef gateway fill:#fff2d9,stroke:#bf842c,color:#694511
     classDef model fill:#eeefff,stroke:#747bb8,color:#3c426d
@@ -878,13 +882,15 @@ flowchart TB
     linkStyle 3 stroke:#3985a4,stroke-width:1.5px
     linkStyle 4 stroke:#5078b8,stroke-width:1.5px
     linkStyle 5 stroke:#5078b8,stroke-width:1.5px
+    linkStyle 6 stroke:#bf842c,stroke-width:2.5px
 ```
 
 The model-output path is **ModelKit stream → Agents parsing and catalog resolution → ordered call/scheduling events → Gateway invocation Signal → Actions Shell scheduling and execution → Gateway feedback Signal**. ModelKit supplies output fragments; Agents interprets their protocol using the frozen decision catalog. Gateway carries resolved requests and scheduling boundaries, not raw model XML.
 
 | Boundary              | Contract                                                                                                                                                                                                                                                       |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Function Token syntax | Natural text mixed with restricted XML, without a document root. Self-closing Action tags name catalog aliases; paired wait scopes emit scheduling boundaries.                                                           |
+| Function Token syntax | Natural text mixed with restricted XML, without a document root. Self-closing tags name catalog aliases, which resolve to an Action or to an Agent control; paired wait scopes emit scheduling boundaries.                |
+| Agent control         | A self-closing tag registered through a Skill's `useControls` (`task.start`, `task.end`, `task.send`, `loadSkills`, `releaseSkills`). It resolves to a ControlCall with no Channel, never reaches Gateway or Actions, runs inside the owning Agent in emission order after the response's other calls settle, and is rejected inside `<wait>`. Cognitive control is Agents-owned; only expressible behavior is an Action. |
 | FunctionToken         | An Agent-local parsed text, action, boundary or scheduling event. Its boundary is independent of provider tokenizer tokens and network fragments. Incremental parsing handles incomplete UTF-8 and markup across fragments.                                    |
 | ActionCall            | A resolved actionPath, channel and string parameter map. Agents resolves aliases and parameters against its effective catalog; text mapping, when configured, produces ordered calls through the same generation pipeline.                                     |
 | Scheduling events     | beginWait/endWait travel in order with calls. Each call uses its registered Channel. Dropping wait events changes execution semantics.                                           |
@@ -901,7 +907,7 @@ Hello! How can I help you today?
 
 The XML requests a happy expression, and the following sentence is ordinary natural text. The parser emits beginWait, an action token for `express` with `emotion="happy"`, endWait, and text events. Catalog resolution turns the action token into an ActionCall with its canonical path, string parameters and registered Channel. The role's text mapping converts sentence chunks into its configured calls, such as speech or caption presentation; text is not an Action alias and does not execute by itself.
 
-Gateway receives the resolved calls together with the ordered wait events. The wait group joins the scheduled expression before the following mapped calls proceed; parsing `</wait>` itself does not mean the expression has finished. Wait is a protocol scope, not a business function. Channel routing is fixed by registration. Exact aliases, parameters, permitted Channels and natural-text behavior come from the current decision catalog and role configuration.
+Gateway forwards the resolved calls together with the ordered wait events to the Actions Shell. The Shell's wait group joins the scheduled expression before the following mapped calls proceed; parsing `</wait>` itself does not mean the expression has finished. Wait is a protocol scope, not a business function. Channel routing is fixed by registration. Exact aliases, parameters, permitted Channels and natural-text behavior come from the current decision catalog and role configuration.
 
 A complete Action tag can emit a call before its enclosing scope closes. Parsing completion does not establish execution completion. Unknown aliases and invalid/missing required arguments produce ordered non-executable CallRejection events. Malformed syntax, capacity violations or cancellation terminate interpretation; failed generations do not flush incomplete syntax or replay already emitted effects. A later parse failure cannot undo an effect already executed.
 
@@ -911,19 +917,24 @@ Native Tool calls use their separate complete-call parser and do not acquire XML
 
 ```mermaid
 flowchart TB
-    subgraph Coordination["GATEWAY"]
-        Calls["Prepared invocations"]:::gateway
-        Queue["ActionCall · Channel FIFO /<br/>wait tree"]:::gateway
-        Direct["ToolCall · bounded direct<br/>work"]:::gateway
-        Resources["Resource arbitration / live<br/>permit"]:::gateway
-        Join["Join actual completion /<br/>cancellation"]:::gateway
-        Release["Release matching occupancy"]:::gateway
+    subgraph Channel["GATEWAY"]
+        G["Signal admission &amp; forwarding"]:::gateway
     end
-    style Coordination fill:#fff2d9,stroke:#bf842c,color:#694511
-    subgraph Execution["ACTIONS"]
+    style Channel fill:#fff2d9,stroke:#bf842c,color:#694511
+    subgraph Shell["ACTIONS SHELL"]
+        Calls["Prepared invocations"]:::action
+        Queue["ActionCall · Channel FIFO /<br/>wait tree"]:::action
+        Direct["ToolCall · bounded direct<br/>work"]:::action
+        Resources["Resource arbitration / live<br/>permit"]:::action
+        Join["Join actual completion /<br/>cancellation"]:::action
+        Release["Release matching occupancy"]:::action
+    end
+    style Shell fill:#fff5f6,stroke:#b86178,color:#6b2b3d
+    subgraph Execution["ACTIONS EXECUTION"]
         X["Recheck conditions / execute<br/>/ native cleanup"]:::action
     end
     style Execution fill:#ffecef,stroke:#b86178,color:#6b2b3d
+    G ==>|"admitted invocation Signal"| Calls
     Calls -->|"scheduled protocol"| Queue
     Calls -->|"direct protocol"| Direct
     Queue -->|"eligible work"| Resources
@@ -931,15 +942,18 @@ flowchart TB
     Resources ==>|"execute with authority"| X
     X -.->|"actual terminal<br/>evidence"| Join
     Join -->|"after joined work"| Release
+    Join -.->|"feedback Signal"| G
     classDef action fill:#ffecef,stroke:#b86178,color:#6b2b3d
     classDef gateway fill:#fff2d9,stroke:#bf842c,color:#694511
-    linkStyle 0 stroke:#5078b8,stroke-width:1.5px
+    linkStyle 0 stroke:#bf842c,stroke-width:2.5px
     linkStyle 1 stroke:#5078b8,stroke-width:1.5px
     linkStyle 2 stroke:#5078b8,stroke-width:1.5px
     linkStyle 3 stroke:#5078b8,stroke-width:1.5px
-    linkStyle 4 stroke:#bf842c,stroke-width:2.5px
-    linkStyle 5 stroke:#438463,stroke-width:1.5px,stroke-dasharray:2 3
-    linkStyle 6 stroke:#5078b8,stroke-width:1.5px
+    linkStyle 4 stroke:#5078b8,stroke-width:1.5px
+    linkStyle 5 stroke:#b86178,stroke-width:2.5px
+    linkStyle 6 stroke:#438463,stroke-width:1.5px,stroke-dasharray:2 3
+    linkStyle 7 stroke:#5078b8,stroke-width:1.5px
+    linkStyle 8 stroke:#438463,stroke-width:1.5px,stroke-dasharray:2 3
 ```
 
 The Actions Shell owns Channel FIFO, wait trees and resource arbitration, and Actions declares required resources and owns actual device operations. Agents selects role takeover policy and App injects opaque policy values and native stop callbacks. The Shell compares neutral endpoint identities without understanding role semantics.
@@ -959,28 +973,31 @@ sequenceDiagram
     box rgb(238,239,255) ModelKit · Inference
         participant M as Chat capability
     end
-    box rgb(255,242,217) Gateway · Coordination
-        participant G as Scheduling / direct dispatch
+    box rgb(255,242,217) Gateway · Signal channel
+        participant G as Signal / admission
     end
-    box rgb(255,236,239) Actions · Execution
-        participant X as ActionsContainer
+    box rgb(255,236,239) Actions · Shell and execution
+        participant X as Shell / ActionsContainer
     end
     A->>M: frozen catalog, context and current input
     M-->>A: text fragments / native call events
     A->>A: parse, resolve, authorize and register calls
     A->>B: canonical output with call / round identity
     B->>G: authorized invocation
-    G->>X: prepare and execute under resource permit
+    G->>X: forward invocation to Actions Shell
+    X->>X: prepare, schedule / dispatch and execute under resource permit
     par Generation closes
         A->>A: seal the generated call set
         A->>B: roundFinished
         B->>G: request round settlement
+        G->>X: forward settlement barrier
     and Calls settle
         X-->>G: actual completion / report / failure
         G-->>B: correlated terminal evidence
         B-->>A: cognitive call results
     end
-    G-->>B: scheduling / delivery barrier settled
+    X-->>G: scheduling / delivery barrier settled
+    G-->>B: round settlement complete
     B-->>A: identity-bound RoundResult
     A->>A: join round evidence and evaluate continuation
     opt business output or real failure requires another decision
@@ -1297,7 +1314,7 @@ System export waits for the actual Photos transaction. Denied permission or writ
 
 Camera UI settings/countdown/start-stop/disposition requests flow through Photographer → Gateway → declared Camera.Capture/Video Actions. Assistant's Photography Skill uses the same declarations, selected facts and separate operation receipts. CameraCoordinator keeps photo/video demand independent of background Vision; both consume the same PlatformKit camera session and immutable preview. UI's file player and window activity labels are presentation-only.
 
-openCamera and takePhoto are independent Actions: opening/restoring the unique window waits for ready preview without capturing; takePhoto requires the visible ready camera and accepts a per-shot countdown override. Agents may emit both in one response, and Gateway orders them on the Camera Channel without an intermediate model continuation after open. Capture rechecks business readiness and returns actual media evidence; failures never cause implicit opening or retry. startRecording retains its internal canonical open composition with stop-on-failure. Generic scheduled Action failures advance later eligible work; successful composition child reports never replace the final value in Actions or Gateway.
+openCamera and takePhoto are independent Actions: opening/restoring the unique window waits for ready preview without capturing; takePhoto requires the visible ready camera and accepts a per-shot countdown override. Agents may emit both in one response, and the Actions Shell orders them on the Camera Channel without an intermediate model continuation after open. Capture rechecks business readiness and returns actual media evidence; failures never cause implicit opening or retry. startRecording retains its internal canonical open composition with stop-on-failure. Generic scheduled Action failures advance later eligible work; successful composition child reports never replace the final value in Actions or Gateway.
 
 Before recording, Actions prepares video mode with flash off, preserving lens, zoom and photo delay and applying any per-call duration limit. A configuration failure joins rollback before reporting the failed start. Actions then blocks new voice audio playback, joins VoiceSessionCoordinator's microphone pause and full native audio-owner release, and retains the prior listening generation. AppleCamera then reserves PlatformKit.Audio's native owner, adds microphone/movie output to its existing graph and waits for didStart. didFinish removes/releases native audio; Actions validates/publishes a pending local file through StorageMedia before resuming valid foreground listening intent and offers save/ignore. Model startRecording defaults to awaiting that terminal receipt under the original execution identity; only then does its ready result trigger ReAct with mediaID, fileName and actual duration. Photographer's interactive start Tool explicitly requests startup-only acknowledgement and releases its UI request slot. The UI stop Tool bypasses ChannelScheduler and joins the same recording completion; it does not independently notify the Assistant, so manual stop produces one original-call terminal observation. Cancellation joins matching native stop/finalization rather than leaving an orphan recording. Collection into the App album is a separate commit. Album playback uses a bounded local URL; system export joins a Photos transaction through VisionContainer. No movie is passed into model/history image decoding.
 
@@ -1318,11 +1335,11 @@ flowchart TB
     end
     style Cognition fill:#f0eaff,stroke:#8261b5,color:#463065
     subgraph Coordination["GATEWAY"]
-        G["Bound scope / motor<br/>resources / joined handoff"]:::gateway
+        G["Signal admission / bound scope"]:::gateway
     end
     style Coordination fill:#fff2d9,stroke:#bf842c,color:#694511
     subgraph Execution["ACTIONS"]
-        Service["NexArm motion / tracking /<br/>feedback validation"]:::action
+        Service["Shell resources &amp; handoff ·<br/>NexArm motion / tracking / validation"]:::action
         Facts["actions.robot · connection /<br/>control availability"]:::action
     end
     style Execution fill:#ffecef,stroke:#b86178,color:#6b2b3d
@@ -1419,7 +1436,7 @@ flowchart TB
     end
     style Cognition fill:#f0eaff,stroke:#8261b5,color:#463065
     subgraph Coordination["GATEWAY"]
-        G["Execution coordination"]:::gateway
+        G["Signal admission / forwarding"]:::gateway
     end
     style Coordination fill:#fff2d9,stroke:#bf842c,color:#694511
     subgraph Execution["ACTIONS"]
@@ -1485,7 +1502,7 @@ flowchart TB
     end
     style Cognition fill:#f0eaff,stroke:#8261b5,color:#463065
     subgraph Coordination["GATEWAY"]
-        G["Execution coordination"]:::gateway
+        G["Signal admission / forwarding"]:::gateway
     end
     style Coordination fill:#fff2d9,stroke:#bf842c,color:#694511
     subgraph Execution["ACTIONS"]
@@ -1554,7 +1571,7 @@ See [Memory](Agents/Memory/README.md), [History](Actions/History/README.md) and 
 
 Storage separates Assistant conversation themes and foreground tasks from Writer workspaces and delegation executions. Writer stores delegation executions separately from dispatched model Messages. Each Message's optional workspace ownership is fixed at creation, and later workspace selection leaves earlier Messages in their original scope. AgentMessages retains original communication and delivery facts. The stable workspace key is `workspace_N`; completion ends one delegation, not the lifetime of a reusable workspace. Request/event records retain runtime trace identities, while models receive readable workspace/window/editing handles with owner-projected metadata. WindowState owns window mapping independently of the creator. See [Task storage](Storage/Database/README.md) and [artifact identities](Actions/Artifacts/README.md#workspace-and-editing-identities).
 
-Assistant and Writer create business Message rows at inference dispatch. Assistant stores the submitted timeline separately from the original input and batch coordination, and stores one reply for the batch. Actions presents that submitted text in request history. In full-duplex mode, `task.end` runs on Gateway's Control Channel. Writer receives stop requests through `agent.task.v1` and owns its execution cleanup and terminal result. Agents commits the foreground task's terminal state and Message summary through Storage before the Action returns success. The summary covers dispatched Messages, including the one that issued `task.end`. The existing Message receives the reply at generation completion and Action results at execution settlement. Historical requests remain readable, and older JSON batches are projected into the timeline when replayed as model context. See [Assistant task lifecycle](Agents/Assistant/README.md#task-and-skill-lifecycle) and [Assistant history storage](Storage/Database/AssistantMessages/README.md).
+Assistant and Writer create business Message rows at inference dispatch. Assistant stores the submitted timeline separately from the original input and batch coordination, and stores one reply for the batch. Actions presents that submitted text in request history. In full-duplex mode, `task.end` is an Agent control that runs inside Assistant after the round's Actions settle. Writer receives stop requests through `agent.task.v1` and owns its execution cleanup and terminal result. Agents commits the foreground task's terminal state and Message summary through Storage before the control returns success. The summary covers dispatched Messages, including the one that issued `task.end`. The existing Message receives the reply at generation completion and Action results at execution settlement. Historical requests remain readable, and older JSON batches are projected into the timeline when replayed as model context. See [Assistant task lifecycle](Agents/Assistant/README.md#task-and-skill-lifecycle) and [Assistant history storage](Storage/Database/AssistantMessages/README.md).
 
 Writer uses its own WriterExecutionRepository and WriterMessageRepository, with WriterRecordStore/WriterHistoryStore owning its private history. Runtime history is scoped to the delegation; Settings queries delegation entries and workspace messages separately. Database message keys define ordering, while revision is a state version. A later delegation may reuse the same workspace while retaining separate execution history. Deleting the requesting Assistant dialog clears provenance without deleting the Writer workspace. App composes Writer's records interface and Actions' preview/export interface for Settings. Model timing flows through ModelKit → role history → Storage evidence → UI detail; Writer projects workspace start/update timestamps, request counts and operation summaries, while UI renders neutral values. Writer projects request overview, the current input, verified prior tool references, model output and host finalization through its Settings detail interface. The business sections survive request-log deletion, which clears prompt and generation diagnostics. Full persisted request/tool evidence is distinct from the Agent's selected model context. See [Writer history](Agents/Writer/README.md#sqlite-历史与设置页).
 
@@ -1634,11 +1651,11 @@ flowchart TB
     end
     style Cognition fill:#f0eaff,stroke:#8261b5,color:#463065
     subgraph Coordination["GATEWAY"]
-        G["Admission / scheduling"]:::gateway
+        G["Signal admission / forwarding"]:::gateway
     end
     style Coordination fill:#fff2d9,stroke:#bf842c,color:#694511
     subgraph Execution["ACTIONS"]
-        X["Notice / conversation /<br/>state functions"]:::action
+        X["Shell · Notice / conversation /<br/>state functions"]:::action
     end
     style Execution fill:#ffecef,stroke:#b86178,color:#6b2b3d
     subgraph Display["UI"]
@@ -1703,10 +1720,10 @@ sequenceDiagram
     box rgb(240,234,255) Agents · Cognitive work
         participant A as AgentContainer
     end
-    box rgb(255,242,217) Gateway · Coordination
+    box rgb(255,242,217) Gateway · Signal channel
         participant G as GatewayContainer
     end
-    box rgb(255,236,239) Actions · Business work
+    box rgb(255,236,239) Actions · Shell and business work
         participant X as ActionsContainer
     end
     box rgb(234,247,237) Foundations · Native capabilities
@@ -1714,15 +1731,15 @@ sequenceDiagram
     end
     App->>A: close requests / stop and join roles
     A->>G: cancel owned execution scopes
-    G->>X: cancel actual executing work
+    G->>X: forward scope cancellation to Shell
     X->>F: request and join required native cleanup
     F-->>X: cleanup result or retained failure
     X-->>G: joined terminal evidence
-    G-->>A: scoped results / scheduling and delivery barriers
+    G-->>A: Signal delivery and admission barriers
     A-->>App: cognitive shutdown settled
-    App->>G: close admission / stop remaining facilities
-    G-->>App: scheduling, resources, delivery and transport joined
-    App->>X: stop remaining business / native work
+    App->>G: close admission / stop Signal transport
+    G-->>App: transport and Signal delivery joined
+    App->>X: stop Shell (scheduling, resources, delivery) and remaining work
     X-->>App: joined cleanup or structured failure
     App->>App: release execution bindings
     App->>F: stop foundation roots in reverse dependency order
