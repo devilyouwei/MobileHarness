@@ -134,7 +134,7 @@ extension SQLiteWriterExecutionRepository {
             let existing = try AgentMessageRow.fetchOne(db, key: notification.eventID)
             let value = AgentCommunicationRecord(
                 id: notification.eventID, sender: "writer", receiver: incoming.senderAgentID,
-                contract: existing?.contract == "writer.completion" ? "writer.completion" : "agent.task.response",
+                contract: "agent.task.response",
                 payload: notification.data, correlationID: incoming.correlationID,
                 replyTo: incoming.id, senderContext: incoming.senderContext, dedupeKey: incoming.id + ":completion")
             if existing != nil {
@@ -186,7 +186,7 @@ extension SQLiteWriterExecutionRepository {
             try Row.fetchOne(
                 db,
                 sql:
-                    "SELECT rowid AS position,* FROM agent_messages WHERE correlation_id=? AND sender_agent_id='writer' AND contract IN ('agent.task.response','writer.completion') AND dedupe_key=correlation_id||':completion'",
+                    "SELECT rowid AS position,* FROM agent_messages WHERE correlation_id=? AND sender_agent_id='writer' AND contract='agent.task.response' AND dedupe_key=correlation_id||':completion'",
                 arguments: [delegateID]
             ).map { try Self.notification($0, db: db) }
         }
@@ -211,7 +211,7 @@ extension SQLiteWriterExecutionRepository {
             let rows = try Row.fetchAll(
                 db,
                 sql:
-                    "SELECT m.rowid AS position,m.* FROM agent_messages m WHERE m.sender_agent_id='writer' AND m.contract IN ('agent.task.response','writer.completion') AND m.rowid>? AND \(filter) ORDER BY m.rowid LIMIT ?",
+                    "SELECT m.rowid AS position,m.* FROM agent_messages m WHERE m.sender_agent_id='writer' AND m.contract='agent.task.response' AND m.rowid>? AND \(filter) ORDER BY m.rowid LIMIT ?",
                 arguments: args)
             var results: [WriterDelegationNotification] = []
             for row in rows {
@@ -255,7 +255,7 @@ extension SQLiteWriterExecutionRepository {
                 let row = try AgentMessageRow.fetchOne(
                     db,
                     sql:
-                        "SELECT * FROM agent_messages WHERE reply_to_id=? AND sender_agent_id='writer' AND contract IN ('agent.task.response','writer.completion') AND claim_token=? AND delivery_state IN ('in_flight','received')",
+                        "SELECT * FROM agent_messages WHERE reply_to_id=? AND sender_agent_id='writer' AND contract='agent.task.response' AND claim_token=? AND delivery_state IN ('in_flight','received')",
                     arguments: [delegateID, claimToken])
             else { throw RecordStorageError.conflict }
             let now = Date().timeIntervalSince1970

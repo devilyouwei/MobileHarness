@@ -177,6 +177,13 @@ public actor WriterHistoryStore {
     public func requestPreviews(_ id: String, before: UInt64?, limit: Int) async throws -> [WriterMessagePreview] {
         try await records.requestPreviews(id, before: before, limit: limit)
     }
+    /// Model messages a request produced before it was bound to a workspace.
+    public func preflightPreviews(requestMessageID: UInt64, after: UInt64, limit: Int) async throws
+        -> [WriterMessagePreview]
+    {
+        try await records.requestPreviews(
+            WriterPreflightOwner.id(requestMessageID), after: after, limit: limit)
+    }
     public func requestCount(_ id: String) async throws -> Int { try await records.requestCount(id) }
 
     public func ownerMetadata(_ id: String) async throws -> WriterHistorySnapshot {

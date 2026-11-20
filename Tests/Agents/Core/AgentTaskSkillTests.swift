@@ -2594,7 +2594,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
     let session = UUID().uuidString
     let context = try AgentContextRepository(
         agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState())
-    let model = WriterNoticeModel(delegate: true, retryRejected: outcome == "rejectedRetry")
+    let model = PeerNoticeModel(delegate: true, retryRejected: outcome == "rejectedRetry")
     let assistant = try AssistantAgent(
         stateContext: try publicStateFixture(),
         presentsReply: true, chat: model, conversations: history, communications: database.agentMessages,
@@ -2726,7 +2726,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
                 source: "assistant", sessionID: session, inputID: UUID().uuidString, decisionID: nil)
         }
         let started = try AgentTaskContent(
-            text: "已接纳", writerEvent: .init(sequence: 1, kind: .started))
+            text: "已接纳", event: .init(sequence: 1, kind: .started))
         _ = try await port.sendResult(
             AgentTaskResponse(started.signal(.progress, scope: scope)).message, parent: received, to: .assistant)
         let afterForegroundEnd = try await context.snapshot().state
@@ -2748,7 +2748,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         let ended = try await fixtureWriterCompletion(
             AgentTaskContent(
                 text: "Cleanup complete", stage: .completed,
-                writerEvent: .init(sequence: 2, kind: .cancelled)),
+                event: .init(sequence: 2, kind: .cancelled)),
             scope: scope, status: .cancelled, executions: database.writerExecutions)
         try await writerRuntime.retireTask(#require(ended.signal))
         _ = try await port.sendResult(ended.message, parent: received, to: .assistant)
@@ -2765,7 +2765,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
     }
     if outcome == "deferredNew" {
         let content = try AgentTaskContent(
-            text: "first complete", stage: .completed, writerEvent: .init(sequence: 1, kind: .completed))
+            text: "first complete", stage: .completed, event: .init(sequence: 1, kind: .completed))
         let old = try await fixtureWriterCompletion(
             content, scope: scope, status: .succeeded, executions: database.writerExecutions)
         #expect(try await context.snapshot().state.taskViews?[scope.id]?.terminal != true)
@@ -2793,7 +2793,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         #expect(try await context.snapshot().state.taskViews?[nextScope.id] == nil)
         let final = try await fixtureWriterCompletion(
             AgentTaskContent(
-                text: "second complete", stage: .completed, writerEvent: .init(sequence: 1, kind: .completed)),
+                text: "second complete", stage: .completed, event: .init(sequence: 1, kind: .completed)),
             scope: nextScope, status: .succeeded, executions: database.writerExecutions)
         try await writerRuntime.retireTask(#require(final.signal))
         _ = try await port.sendResult(final.message, parent: nextInput, to: .assistant)
@@ -2840,20 +2840,20 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
     let verifyAnnouncements = !foreground && outcome == "completed"
     let previousWork = try await context.snapshot().work.keys.sorted()
     let started = try AgentTaskContent(
-        text: "已接纳", writerEvent: .init(sequence: 1, kind: .started))
+        text: "已接纳", event: .init(sequence: 1, kind: .started))
     for _ in 1...(outcome == "duplicate" ? 5 : 1) {
         let receipt = try await port.sendResult(
             AgentTaskResponse(started.signal(.progress, scope: scope)).message, parent: received, to: .assistant)
         #expect(receipt.rejected.isEmpty)
     }
-    #expect(try await context.snapshot().state.taskViews?[scope.id]?.writerEvent?.sequence == 1)
+    #expect(try await context.snapshot().state.taskViews?[scope.id]?.event?.sequence == 1)
     let questionSequence: UInt64 = verifyAnnouncements ? 4 : 2
     if verifyAnnouncements {
-        let milestones: [(WriterDelegationEvent.Kind, String)] = [
+        let milestones: [(AgentTaskEvent.Kind, String)] = [
             (.draftUpdated, "草稿已保存"), (.recovering, "遇到异常，正在重试"),
         ]
         for (index, (kind, text)) in milestones.enumerated() {
-            let fact = try AgentTaskContent(text: text, writerEvent: .init(sequence: UInt64(index) + 2, kind: kind))
+            let fact = try AgentTaskContent(text: text, event: .init(sequence: UInt64(index) + 2, kind: kind))
             for _ in 1...2 {
                 let receipt = try await port.sendResult(
                     AgentTaskResponse(fact.signal(.progress, scope: scope)).message, parent: received, to: .assistant)
@@ -2864,7 +2864,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
     let interactionID = UUID().uuidString
     let question = try AgentTaskContent(
         text: "需要颜色", stage: .waitingUser, interactionID: interactionID,
-        writerEvent: .init(sequence: questionSequence, kind: .userInput))
+        event: .init(sequence: questionSequence, kind: .userInput))
     let progress = try AgentTaskResponse(question.signal(.progress, scope: scope))
     for _ in 1...2 {
         #expect(try await port.sendResult(progress.message, parent: received, to: .assistant).rejected.isEmpty)
@@ -2890,15 +2890,16 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         let replyRequest = try #require(await model.requests.last)
         #expect(
             replyRequest.messages.contains {
-                $0.role == .system && $0.content.contains("# WRITER QUESTION") && $0.content.contains("需要颜色")
+                $0.role == .system && $0.content.contains("# PEER TASK QUESTION") && $0.content.contains("Agent writer")
+                    && $0.content.contains("需要颜色")
             })
     }
 
-    let kind: WriterDelegationEvent.Kind =
+    let kind: AgentTaskEvent.Kind =
         outcome == "declined" ? .declined : outcome == "failed" ? .failed : .completed
     let completion = try AgentTaskContent(
         text: "Writer 终态", stage: .completed, artifactID: "project",
-        writerEvent: .init(sequence: questionSequence + 1, kind: kind))
+        event: .init(sequence: questionSequence + 1, kind: kind))
     let ended = try await fixtureWriterCompletion(
         completion, scope: scope, status: kind == .completed ? .succeeded : .failed,
         executions: database.writerExecutions)
@@ -2908,7 +2909,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
     try await writerRuntime.retireTask(#require(ended.signal))
     let settled = try await context.snapshot()
     #expect(settled.state.taskViews?[scope.id]?.terminal == true)
-    #expect(settled.state.taskViews?[scope.id]?.writerEvent?.kind == kind)
+    #expect(settled.state.taskViews?[scope.id]?.event?.kind == kind)
     #expect(settled.state.skillState?.activeTaskID == priorTask)
     #expect(settled.work.count == previousWork.count + (outcome == "completed" ? 1 : 0))
     var decisions = outcome == "completed" ? 2 : 1
@@ -2921,7 +2922,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         try await skillEventually { await log.writerSpokenTexts.count == 5 }
         #expect(
             await log.writerSpokenTexts == [
-                "Writer。 已接纳", "Writer。 草稿已保存", "Writer。 遇到异常，正在重试", "Writer。 需要颜色", "Writer。 Writer 终态",
+                "writer. 已接纳", "writer. 草稿已保存", "writer. 遇到异常，正在重试", "writer. 需要颜色", "writer. Writer 终态",
             ])
         try await skillEventually { await log.writerPlaybackCount == 5 }
         #expect(await model.requests.count == decisions)
@@ -2930,7 +2931,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         let expected = decisions
         try await skillEventually { await log.finishedDecisions.count == expected }
         let request = try #require(await model.requests.last)
-        let factBlock = try #require(request.messages.first { $0.content.contains("# WRITER EVENTS") }?.content)
+        let factBlock = try #require(request.messages.first { $0.content.contains("# PEER TASK EVENTS") }?.content)
         for fact in ["已接纳", "草稿已保存", "正在重试", "需要颜色", "Writer 终态"] {
             #expect(factBlock.contains(fact))
         }
@@ -2950,7 +2951,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
     try await database.shutdown()
 }
 
-private actor WriterNoticeModel: ChatCapability {
+private actor PeerNoticeModel: ChatCapability {
     var delegate: Bool
     var retryRejected: Bool
     private var cancellationRequested = false
@@ -3000,7 +3001,7 @@ private actor WriterOutputLog {
     func append(_ envelope: OutputEnvelope) { values.append(envelope) }
     private var writerSpeech: [(audioID: String, text: String)] = []
     func synthesized(id: String, text: String) {
-        if text.hasPrefix("Writer。") { writerSpeech.append((id, text)) }
+        if text.hasPrefix("writer. ") { writerSpeech.append((id, text)) }
     }
     var writerSpokenTexts: [String] { writerSpeech.map(\.text) }
     var writerPlaybackCount: Int {

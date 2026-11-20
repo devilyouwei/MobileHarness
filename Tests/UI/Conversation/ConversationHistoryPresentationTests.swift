@@ -720,7 +720,7 @@ func writerFormattedPromptsKeepToolPairsAndSelectOnlyCurrentInput(_ json: String
         "modelRequests": [
             [
                 "id": "request_1", "date": 0, "historyOrder": 1, "input": "full input", "requestJSON": "[]",
-                "producerMetadata": ["path": "styles/main.css", "phase": "文件内容请求"],
+                "producerMetadata": ["path": "styles/main.css", "phase": "File content request"],
                 "inputMessages": [
                     ["role": "tool", "content": "read file", "toolCallID": "earlier", "toolName": "workspace"]
                 ],

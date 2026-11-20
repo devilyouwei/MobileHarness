@@ -17,7 +17,7 @@ public final class SQLiteWriterMessageRepository: WriterMessageRepository {
         var id: String { request ? "writer/request_\(key)" : "workspace_\(key)" }
     }
     static func owner(_ id: String, db: Database) throws -> Owner {
-        if id.hasPrefix("writer/preflight_"), let key = Int64(id.dropFirst("writer/preflight_".count)) {
+        if id.hasPrefix(WriterPreflightOwner.prefix), let key = Int64(id.dropFirst(WriterPreflightOwner.prefix.count)) {
             return Owner(key: key, request: true, preflight: true)
         }
         if id.hasPrefix("writer/request_"), let key = Int64(id.dropFirst("writer/request_".count)),

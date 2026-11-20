@@ -623,7 +623,7 @@ func writerRejectsSplitOuterCodeFencesBeforeCommit(format: String) throws {
     #expect(try prefix.consume(" \n`") == " \n")
     #expect(try prefix.consume("`") == "")
     #expect(throws: WriterContentFormatFailure.self) { try prefix.consume("`\(format)\nsource") }
-    let failure = WriterDiagnostics.make(WriterContentFormatFailure(), stage: "文件内容请求")
+    let failure = WriterDiagnostics.make(WriterContentFormatFailure(), stage: "File content request")
     #expect(failure.code == "writer.content.markdownWrapper")
     #expect(WriterRecovery.retryable(WriterContentFormatFailure()))
 }

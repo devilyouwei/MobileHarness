@@ -308,7 +308,6 @@ import StorageFiles
             guard let streaming = business.artifactStreaming, let writerModel = business.writerModel else {
                 throw WriterFailure.unavailable
             }
-            writerContainer.bindArtifacts(business.writerArtifacts)
             try writerContainer.install(
                 manager: manager, output: gateway, model: writerModel, streaming: streaming, language: language)
             runtimeLogWorkflow = activity

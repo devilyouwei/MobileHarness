@@ -293,8 +293,7 @@ func requestBoundaryMigrationRetainsInvocationsAndMovesWriterExecutions(version:
     try await repository.shutdown()
 }
 
-@Test(arguments: ["agent.task.response", "writer.completion"])
-func completionOutboxRejectsStaleClaimsAndStopsAfterEightFailures(contract: String) async throws {
+@Test func completionOutboxRejectsStaleClaimsAndStopsAfterEightFailures() async throws {
     let repository = try SQLiteRepositories.temporary()
     let request = try await repository.seedDelegation(
         workspaceID: nil, goal: "work", input: "work", sourceDialog: nil, agent: "writer")
@@ -302,12 +301,7 @@ func completionOutboxRejectsStaleClaimsAndStopsAfterEightFailures(contract: Stri
     try await repository.writerExecutions.completeRequest(
         .init(delegateID: request.delegateID, agent: "writer", eventID: event, data: Data("{}".utf8)),
         status: "completed", failure: nil)
-    if contract == "writer.completion" {
-        try repository.database.write {
-            try $0.execute(sql: "UPDATE agent_messages SET contract=? WHERE id=?", arguments: [contract, event])
-        }
-    }
-    #expect(try await repository.agentMessages.agentMessage(event)?.contract == contract)
+    #expect(try await repository.agentMessages.agentMessage(event)?.contract == "agent.task.response")
     var prior: String?
     for attempt in 1...8 {
         // Advance only the delivery clock; business work is never replayed.
@@ -564,7 +558,7 @@ func completionOutboxRejectsStaleClaimsAndStopsAfterEightFailures(contract: Stri
     #expect(try await records.writerExecutions.workspace(fixture.id, agent: "writer").status == "deleted")
     #expect(try records.writerMessages.timelineCount(ownerID: fixture.workspaceID) == 2)
     let entry = try await records.writerExecutions.request(fixture.delegateID, agent: "writer")
-    #expect(try records.writerMessages.timelineCount(ownerID: "writer/preflight_\(entry.messageID)") == 0)
+    #expect(try records.writerMessages.timelineCount(ownerID: WriterPreflightOwner.id(entry.messageID)) == 0)
     await #expect(throws: RecordStorageError.conflict) {
         try await records.workspaces.claim(id, expecting: nil, lease: UUID())
     }

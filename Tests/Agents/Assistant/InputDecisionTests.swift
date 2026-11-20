@@ -278,7 +278,7 @@ func multiSourcePreparationFailureRetainsBatchWithoutCreatingMessageOrRetryLoop(
             content: #"{"status":"succeeded"}"#),
         .init(
             seq: 2, time: time.addingTimeInterval(-1), senderRole: .user, channel: "speechPerception",
-            content: "请拍照\nWriter ｜ 08:00:00\n# Interrupted User Intent"),
+            content: "请拍照\nAgent (writer) ｜ 08:00:00\n# Interrupted User Intent"),
         .init(
             seq: 6, time: time.addingTimeInterval(1), senderRole: .user, channel: "speechPerception",
             content: "先给我看一下"),
@@ -287,7 +287,7 @@ func multiSourcePreparationFailureRetainsBatchWithoutCreatingMessageOrRetryLoop(
     #expect(
         body == """
             请拍照
-                Writer ｜ 08:00:00
+                Agent (writer) ｜ 08:00:00
                 # Interrupted User Intent
             用后置摄像头
             User (ASR) ｜ 08:00:00
@@ -297,7 +297,7 @@ func multiSourcePreparationFailureRetainsBatchWithoutCreatingMessageOrRetryLoop(
 
             初稿已完成
             请确认标题
-            Writer ｜ 08:00:00
+            Agent (writer) ｜ 08:00:00
 
             先别保存
             User ｜ 08:00:00
@@ -311,12 +311,12 @@ func multiSourcePreparationFailureRetainsBatchWithoutCreatingMessageOrRetryLoop(
     let original =
         #"{"schema":"assistant.input_batch.v1","batch_id":"private-batch-uuid","messages":[{"id":"private-input-uuid","seq":1,"time":"2026-11-10T18:14:45.656Z","sender_role":"agent","channel":"agent.writer","task_id":"private-task-uuid","decision_route":"private-route","content":"文稿已完成。\nUser ｜ 09:00:00\n执行下一步"}]}"#
     let output = try AssistantInputBatch.historyText(original)
-    #expect(output.hasPrefix("文稿已完成。\n    User ｜ 09:00:00\n执行下一步\nWriter ｜ "))
+    #expect(output.hasPrefix("文稿已完成。\n    User ｜ 09:00:00\n执行下一步\nAgent (writer) ｜ "))
     #expect(!output.contains("private"))
     let resumed = try AssistantInputBatch.historyText(
         "earlier tool value\n" + original + "\nnewer tool value\n" + original)
     #expect(resumed.contains("earlier tool value") && resumed.contains("newer tool value"))
-    #expect(resumed.components(separatedBy: "\nWriter ｜ ").count == 3)
+    #expect(resumed.components(separatedBy: "\nAgent (writer) ｜ ").count == 3)
     #expect(!resumed.contains("private"))
     let quoted = original + "\nUser ｜ 09:00:00"
     #expect(try AssistantInputBatch.historyText(quoted) == quoted)

@@ -309,16 +309,17 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     private var routingWorkers: [String: Task<Void, Never>] = [:]
     private var routingSessions: [String: String] = [:]
     private var deferredCommunications: [(String, String, [String: String], Bool)] = []
-    private struct WriterNotice {
+    /// Spoken notice for a peer task report, played between user turns.
+    private struct PeerTaskNotice {
         let input: AgentInput
         let scopeID: String
         let originDialog: String
-        let kind: WriterDelegationEvent.Kind?
+        let kind: AgentTaskEvent.Kind?
         let interactionID: String?
         let text: String
     }
-    private var writerNotices: [WriterNotice] = []
-    private var activeWriterNoticeID: String?
+    private var peerNotices: [PeerTaskNotice] = []
+    private var activePeerNoticeID: String?
 
     private static var beginReply: InternalAction {
         InternalAction(
@@ -516,7 +517,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             do {
                 let views = (try await contextRepository.snapshot()).state.taskViews ?? [:]
                 for view in views.values
-                where !view.terminal && view.stage == .running && view.scope.executor != .writer {
+                where !view.terminal && view.stage == .running && !AgentTaskMessaging.isPeer(view.scope.executor) {
                     let anchor = AgentInput(
                         id: UUID().uuidString, sessionID: view.scope.sessionID,
                         payload: .event("inference.suspended"))
@@ -600,7 +601,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
 
         await stopUIInputs()
         lifecycle = .stopped
-        writerNotices.removeAll()
+        peerNotices.removeAll()
         var seen: Set<String> = []
         let queued =
             (queue.inputs + pendingRounds.values.map(\.input) + batchMembers.values.flatMap { $0 }).filter {
@@ -670,7 +671,8 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             ordered = true
         } else if case .observation(let message) = input.payload,
             message.content(as: AgentTaskResponse.self) != nil
-                || message.content(as: AgentTaskSignal.self)?.scope.executor == .writer
+                || message.content(as: AgentTaskSignal.self).map({ AgentTaskMessaging.isPeer($0.scope.executor) })
+                    == true
         {
             ordered = true
         } else {
@@ -744,7 +746,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             let signal = message.content(as: AgentTaskSignal.self)
         {
             guard
-                input.metadata.origin == .runtime || signal.scope.executor != .writer
+                input.metadata.origin == .runtime || !AgentTaskMessaging.isPeer(signal.scope.executor)
                     || (signal.kind != .progress && signal.kind != .result)
             else { throw CommunicationError.unauthorized }
             try await receiveTask(signal, input: input)
@@ -842,7 +844,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
                 let closesSession = control == .close
                 if closesSession {
                     if decisionTurn?.sessionID == input.sessionID { decisionTurn = nil }
-                    writerNotices.removeAll { $0.input.sessionID == input.sessionID }
+                    peerNotices.removeAll { $0.input.sessionID == input.sessionID }
                     if input.sessionID == speechSessionID { speechInterruptionID = nil }
                 }
                 guard !hostCancellationInProgress else { throw HarnessError.invalidTransition }
@@ -1140,7 +1142,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         let views = try await contextRepository.snapshot().state.taskViews ?? [:]
         return views.values.filter {
             !$0.terminal && $0.scope.sessionID == sessionID && $0.stage == .waitingUser
-                && ($0.scope.id == foreground || $0.scope.executor == .writer)
+                && ($0.scope.id == foreground || AgentTaskMessaging.isPeer($0.scope.executor))
         }
     }
 
@@ -1346,11 +1348,11 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
                 return
             }
         }
-        if lifecycle == .running, !writerNotices.isEmpty {
-            let notice = writerNotices.removeFirst()
-            activeWriterNoticeID = notice.input.id
+        if lifecycle == .running, !peerNotices.isEmpty {
+            let notice = peerNotices.removeFirst()
+            activePeerNoticeID = notice.input.id
             activeInput = notice.input
-            worker = Task { await playWriterNotice(notice) }
+            worker = Task { await playPeerNotice(notice) }
         }
     }
     private func beginReplyTurn(_ input: AgentInput) throws {
@@ -1736,16 +1738,19 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
                 if let manifest = imageProjection.manifest {
                     block += try contextTemplates.render("images", variables: ["manifest": manifest])
                 }
-                if let waiting = inputInteractions[input.id]?.first(where: { $0.scope.executor == .writer }),
+                if let waiting = inputInteractions[input.id]?.first(where: {
+                    AgentTaskMessaging.isPeer($0.scope.executor)
+                }),
                     let current = decisionContext.state.taskViews?[waiting.scope.id], !current.terminal,
                     current.interactionID == waiting.interactionID
                 {
                     let question = String(decoding: try JSONEncoder().encode(current.text), as: UTF8.self)
                     block += try AgentPrompts.load(named: State.configurationName).render(
-                        "writerQuestion", variables: ["question": question])
+                        "taskQuestion",
+                        variables: ["agent": waiting.scope.executor.rawValue, "question": question])
                 }
                 guard block.utf8.count <= 16 * 1024 else { throw CommunicationError.capacityExceeded }
-                block += try Self.writerFacts(
+                block += try Self.peerTaskFacts(
                     from: decisionContext.state.taskViews ?? [:], dialog: decisionContext.state.history.current.id,
                     budget: min(3_072, 16 * 1024 - block.utf8.count),
                     templates: AgentPrompts.load(named: State.configurationName))
@@ -2965,10 +2970,10 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         } else {
             content = try AgentTaskContent.decode(signal)
         }
-        if signal.scope.executor == .writer, signal.scope.execution == .background, signal.kind == .result,
-            signal.businessContract == "runtime.taskTermination"
+        if AgentTaskMessaging.isPeer(signal.scope.executor), signal.scope.execution == .background,
+            signal.kind == .result, signal.businessContract == "runtime.taskTermination"
         {
-            // The Writer persists and reports its own terminal outcome independently of the grant.
+            // A peer persists and reports its own terminal outcome independently of the grant.
             return
         }
         let prior = (try await contextRepository.snapshot()).state.taskViews?[signal.scope.id]
@@ -3049,7 +3054,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
 
     private func receiveTaskReport(_ report: AgentTaskResponse, input: AgentInput) async throws {
         guard lifecycle == .running || lifecycle == .paused, State.agentID == .assistant,
-            input.metadata.origin == .agent, input.metadata.source == AgentID.writer.rawValue,
+            input.metadata.origin == .agent, AgentTaskMessaging.isPeer(AgentID(rawValue: input.metadata.source)),
             input.metadata.incarnation != nil
         else { throw CommunicationError.unauthorized }
         try report.validate()
@@ -3058,42 +3063,40 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             try await receiveTaskMessageRejection(rejection, report: report, input: input)
             return
         }
-        guard let signal = report.signal, signal.scope.requester == descriptor.id, signal.scope.executor == .writer,
-            signal.scope.sessionID == input.sessionID
+        guard let signal = report.signal, signal.scope.requester == descriptor.id,
+            signal.scope.executor.rawValue == input.metadata.source, signal.scope.sessionID == input.sessionID
         else { throw CommunicationError.unauthorized }
         let content = try AgentTaskContent.decode(signal)
-        guard let event = content.writerEvent else { throw CommunicationError.invalidPayload }
+        guard let event = content.event else { throw CommunicationError.invalidPayload }
         if signal.kind == .result {
-            try await receiveWriterCompletion(report, signal: signal, content: content, event: event, input: input)
+            try await receivePeerCompletion(report, signal: signal, content: content, event: event, input: input)
         } else {
-            try await receiveWriterEvent(signal, content: content, event: event, input: input)
+            try await receivePeerEvent(signal, content: content, event: event, input: input)
         }
     }
 
-    private func receiveWriterEvent(
-        _ signal: AgentTaskSignal, content: AgentTaskContent, event: WriterDelegationEvent, input: AgentInput
+    private func receivePeerEvent(
+        _ signal: AgentTaskSignal, content: AgentTaskContent, event: AgentTaskEvent, input: AgentInput
     ) async throws {
         let snapshot = try await contextRepository.snapshot()
         let prior = snapshot.state.taskViews?[signal.scope.id]
         if let prior, prior.scope != signal.scope { throw CommunicationError.scopeClosed }
         if prior?.terminal == true || (prior?.stage == .waitingUser && event.kind.isMilestone)
-            || prior?.writerEvent?.eventID == event.eventID
-            || event.sequence <= (prior?.writerEvent?.sequence ?? 0)
+            || prior?.event?.eventID == event.eventID
+            || event.sequence <= (prior?.event?.sequence ?? 0)
         {
             return
         }
-        let origin = try await writerMessageOrigin(signal.scope.id)
+        let origin = try await peerRequestOrigin(signal.scope)
         try await contextRepository.recordSignal(
             input, disposition: .control, admissionSequence: snapshot.revision + 1, consumed: true,
             retainingLast: 4096
         ) { context in
             let prior = context.state.taskViews?[signal.scope.id]
             if let prior, prior.scope != signal.scope { throw CommunicationError.scopeClosed }
-            guard event.delegateID == nil || event.delegateID == signal.scope.id
-            else { throw CommunicationError.invalidPayload }
             if prior?.terminal == true || (prior?.stage == .waitingUser && event.kind.isMilestone)
-                || prior?.writerEvent?.eventID == event.eventID
-                || event.sequence <= (prior?.writerEvent?.sequence ?? 0)
+                || prior?.event?.eventID == event.eventID
+                || event.sequence <= (prior?.event?.sequence ?? 0)
             {
                 return
             }
@@ -3107,42 +3110,42 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             view.originDialog = prior?.originDialog ?? origin
             view.createdAt = prior?.createdAt ?? Date()
             if event.kind == .inputAccepted {
-                view.writerFacts = prior?.writerFacts
+                view.facts = prior?.facts
             } else {
-                view.retainWriterFacts(from: prior)
+                view.retainFacts(from: prior)
             }
             if context.state.taskViews == nil { context.state.taskViews = [:] }
             context.state.taskViews?[signal.scope.id] = view
         }
         if event.kind != .inputAccepted,
             let view = (try await contextRepository.snapshot()).state.taskViews?[signal.scope.id],
-            view.writerEvent?.eventID == event.eventID
+            view.event?.eventID == event.eventID
         {
-            try await enqueueWriterNotice(view, input: input)
+            try await enqueuePeerNotice(view, input: input)
         }
     }
 
-    private func writerMessageOrigin(_ id: String) async throws -> String? {
-        guard let record = try await requireCommunications().agentMessage(id), record.sender == descriptor.id.rawValue,
-            record.receiver == AgentID.writer.rawValue, record.replyTo == nil, record.correlationID == id,
-            [AgentTaskRequest.contract, "agent.taskMessage", "task.request"].contains(record.contract)
+    private func peerRequestOrigin(_ scope: AgentTaskScope) async throws -> String? {
+        guard let record = try await requireCommunications().agentMessage(scope.id),
+            record.sender == descriptor.id.rawValue, record.receiver == scope.executor.rawValue,
+            record.replyTo == nil, record.correlationID == scope.id, record.contract == AgentTaskRequest.contract
         else { throw CommunicationError.unauthorized }
         return record.senderContext
     }
 
-    private func receiveWriterCompletion(
-        _ report: AgentTaskResponse, signal: AgentTaskSignal, content: AgentTaskContent, event: WriterDelegationEvent,
+    private func receivePeerCompletion(
+        _ report: AgentTaskResponse, signal: AgentTaskSignal, content: AgentTaskContent, event: AgentTaskEvent,
         input: AgentInput
     ) async throws {
         guard let stored = try await requireCommunications().agentMessage(event.eventID),
-            stored.sender == "writer", stored.receiver == descriptor.id.rawValue,
-            [AgentTaskResponse.contract, "writer.completion"].contains(stored.contract),
+            stored.sender == signal.scope.executor.rawValue, stored.receiver == descriptor.id.rawValue,
+            stored.contract == AgentTaskResponse.contract,
             stored.correlationID == signal.scope.id, stored.replyTo == signal.scope.id,
             try JSONDecoder().decode(AgentTaskResponse.self, from: stored.payload) == report
         else { throw CommunicationError.invalidPayload }
-        let origin = try await writerMessageOrigin(signal.scope.id)
+        let origin = try await peerRequestOrigin(signal.scope)
         let snapshot = try await contextRepository.snapshot()
-        if snapshot.state.taskViews?[signal.scope.id]?.writerEvent?.eventID == event.eventID {
+        if snapshot.state.taskViews?[signal.scope.id]?.event?.eventID == event.eventID {
             try await requireCommunications().receiveAgentMessage(
                 event.eventID, receiver: descriptor.id.rawValue, consumed: true)
             return
@@ -3167,43 +3170,44 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             view.goal = event.goal ?? prior?.goal
             view.originDialog = prior?.originDialog ?? origin
             view.createdAt = prior?.createdAt ?? Date()
-            view.retainWriterFacts(from: prior)
+            view.retainFacts(from: prior)
             context.state.taskViews = context.state.taskViews ?? [:]
             context.state.taskViews?[signal.scope.id] = view
             if let state = context.tasks.task(signal.scope.id)?.state,
                 ![.succeeded, .failed, .cancelled, .interrupted].contains(state)
             {
-                try context.tasks.report(signal, agent: .writer)
+                try context.tasks.report(signal, agent: signal.scope.executor)
             }
         }
         if let view = (try await contextRepository.snapshot()).state.taskViews?[signal.scope.id] {
-            try await enqueueWriterNotice(view, input: input)
+            try await enqueuePeerNotice(view, input: input)
         }
         try await requireCommunications().receiveAgentMessage(
             event.eventID, receiver: descriptor.id.rawValue, consumed: true)
     }
 
-    private static func writerFacts(
+    private static func peerTaskFacts(
         from views: [String: AgentTaskView], dialog: String, budget: Int, templates: PromptTemplates
     ) throws -> String {
-        let recent = views.values.filter { $0.originDialog == dialog && $0.writerFacts?.isEmpty == false }
+        let recent = views.values.filter { $0.originDialog == dialog && $0.facts?.isEmpty == false }
             .sorted {
-                ($0.writerFacts?.last?.receivedAt ?? .distantPast) > ($1.writerFacts?.last?.receivedAt ?? .distantPast)
+                ($0.facts?.last?.receivedAt ?? .distantPast) > ($1.facts?.last?.receivedAt ?? .distantPast)
             }
             .prefix(2)
         guard !recent.isEmpty else { return "" }
-        let heading = try templates.render("writerEventsHeading")
+        let heading = try templates.render("taskEventsHeading")
         var block = heading
         for view in recent {
-            var entries = view.writerFacts?.map { ["event": $0.kind.rawValue, "text": $0.text] } ?? []
+            var entries = view.facts?.map { ["event": $0.kind.rawValue, "text": $0.text] } ?? []
             let fact = [
-                "workspaceID": view.writerEvent?.workspaceID ?? "",
-                "goal": String((view.goal ?? view.writerEvent?.goal ?? "").prefix(120)),
+                "agent": view.scope.executor.rawValue,
+                "artifactID": view.artifactID ?? "",
+                "goal": String((view.goal ?? view.event?.goal ?? "").prefix(120)),
             ]
             let header = String(decoding: try JSONEncoder().encode(fact), as: UTF8.self)
             while !entries.isEmpty {
                 let events = String(decoding: try JSONEncoder().encode(entries), as: UTF8.self)
-                let line = try templates.render("writerEvent", variables: ["workspace": header, "events": events])
+                let line = try templates.render("taskEvent", variables: ["task": header, "events": events])
                 if block.utf8.count + line.utf8.count <= budget {
                     block += line
                     break
@@ -3224,46 +3228,47 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         try await receiveSignal(candidate, semantic: semantic)
     }
 
-    private func enqueueWriterNotice(_ view: AgentTaskView, input: AgentInput) async throws {
+    private func enqueuePeerNotice(_ view: AgentTaskView, input: AgentInput) async throws {
         if fullDuplex {
             guard view.originDialog == (try await contextRepository.snapshot()).state.history.current.id else { return }
             try await admitPeerText(
                 view.text, input: input)
             return
         }
-        guard presentsReply, let event = view.writerEvent, let originDialog = view.originDialog else { return }
+        guard presentsReply, let event = view.event, let originDialog = view.originDialog else { return }
         if view.terminal {
-            writerNotices.removeAll {
+            peerNotices.removeAll {
                 $0.scopeID == view.scope.id && ($0.kind?.isMilestone == true || $0.kind == .userInput)
             }
         }
-        let text = view.text.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
-        let hasWorkspacePrefix =
-            text.first.map { $0.hasPrefix("Workspace workspace_") || $0.hasPrefix("工作区 workspace_") } ?? false
-        let summary = text.count == 2 && hasWorkspacePrefix ? text[1] : view.text[...]
         let anchor = AgentInput(
             id: event.eventID, sessionID: input.sessionID, payload: input.payload, metadata: input.metadata)
-        enqueueWriterNotice(
-            WriterNotice(
+        enqueuePeerNotice(
+            PeerTaskNotice(
                 input: anchor, scopeID: view.scope.id, originDialog: originDialog, kind: event.kind,
-                interactionID: view.interactionID, text: "Writer。 " + String(summary.prefix(180))))
+                interactionID: view.interactionID, text: try Self.peerNoticeText(view.text, from: view.scope.executor)))
     }
 
-    private func enqueueWriterNotice(_ notice: WriterNotice) {
-        if writerNotices.count == 8 {
-            let index = writerNotices.firstIndex(where: { $0.kind?.isMilestone == true }) ?? writerNotices.startIndex
-            writerNotices.remove(at: index)
-            Logger(subsystem: "dev.mobileharness", category: "WriterNotice").warning(
-                "Assistant Writer notice queue full")
+    private static func peerNoticeText(_ text: String, from agent: AgentID) throws -> String {
+        try AgentPrompts.load(named: State.configurationName).render(
+            "taskNotice", variables: ["agent": agent.rawValue, "text": String(text.prefix(180))])
+    }
+
+    private func enqueuePeerNotice(_ notice: PeerTaskNotice) {
+        if peerNotices.count == 8 {
+            let index = peerNotices.firstIndex(where: { $0.kind?.isMilestone == true }) ?? peerNotices.startIndex
+            peerNotices.remove(at: index)
+            Logger(subsystem: "dev.mobileharness", category: "PeerTaskNotice").warning(
+                "Assistant peer task notice queue full")
         }
-        writerNotices.append(notice)
+        peerNotices.append(notice)
         drain()
     }
 
-    private func playWriterNotice(_ notice: WriterNotice) async {
+    private func playPeerNotice(_ notice: PeerTaskNotice) async {
         let input = notice.input
         defer {
-            activeWriterNoticeID = nil
+            activePeerNoticeID = nil
             activeInput = nil
             worker = nil
             finishHostCancellation(input)
@@ -3370,10 +3375,10 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
                 routingSessions[input.id] = nil
             }
             do {
-                if view.scope.executor == .writer {
+                if AgentTaskMessaging.isPeer(view.scope.executor) {
                     let content = AgentTaskRequest(
                         text: intent.text, replyTo: view.scope.id, interactionID: intent.interactionID)
-                    try await deliverTaskMessage(content, to: .writer, parent: input)
+                    try await deliverTaskMessage(content, to: view.scope.executor, parent: input)
                     return
                 }
                 let report = try await communicate(signal.message(), parent: input, to: view.scope.executor)
@@ -3491,7 +3496,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         let controlInput = parked?.input ?? activeInput
         guard parked?.cancelled != true else { throw CommunicationError.scopeClosed }
         if fixed {
-            let idleForControl = (activeInput == nil && worker == nil) || activeWriterNoticeID != nil
+            let idleForControl = (activeInput == nil && worker == nil) || activePeerNoticeID != nil
             guard idleForControl, queue.count == 0, admitting == 0 else {
                 throw AssistantHistoryError.busy
             }
@@ -3674,10 +3679,10 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             if fullDuplex {
                 try await admitPeerText(rejection.text, input: notice)
             } else if presentsReply {
-                enqueueWriterNotice(
+                enqueuePeerNotice(
                     .init(
                         input: notice, scopeID: sent.id, originDialog: origin, kind: nil, interactionID: nil,
-                        text: "Writer。 " + String(rejection.text.prefix(180))))
+                        text: try Self.peerNoticeText(rejection.text, from: AgentID(rawValue: sent.receiver))))
             }
         }
         try await records.receiveAgentMessage(stored.id, receiver: descriptor.id.rawValue, consumed: true)

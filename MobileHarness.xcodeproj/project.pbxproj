@@ -559,6 +559,9 @@
 		A7CD11B37148D5191188A281 /* Tests/Actions/NexArm/NexArmArrivalPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Actions/NexArm/NexArmArrivalPolicyTests.swift; sourceTree = SOURCE_ROOT; };
 		A86C486F5B8D85AED0817101 /* MobileHarness/Actions/Support/Contracts/ProviderHostPorts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ProviderHostPorts.swift; sourceTree = SOURCE_ROOT; };
 		A8F7E788D421907CF0C2B390 /* MobileHarness/Actions/Support/Contracts/ActionExecutionContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ActionExecutionContext.swift; sourceTree = SOURCE_ROOT; };
+		7B72A22065084645A2A0F005 /* MobileHarness/Agents/Writer/WriterRecords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Writer/WriterRecords.swift; sourceTree = SOURCE_ROOT; };
+		7B72A22065084645A2A0F006 /* MobileHarness/Agents/Writer/WriterRequestNaming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Writer/WriterRequestNaming.swift; sourceTree = SOURCE_ROOT; };
+		7B72A22065084645A2A0F007 /* MobileHarness/Agents/Writer/WriterTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Writer/WriterTools.swift; sourceTree = SOURCE_ROOT; };
 		A93CD18D8BA86A73FE650C27 /* MobileHarness/Agents/Writer/WriterContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Writer/WriterContainer.swift; sourceTree = SOURCE_ROOT; };
 		A9F734E5F0E94D4A8A45D521 /* MobileHarness/UI/Components/Window/WindowAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/UI/Components/Window/WindowAppearance.swift; sourceTree = SOURCE_ROOT; };
 		AA01959EE1FF14E81C7E3D00 /* MobileHarness/ModelKit/Language/LLM/Gemma4/GemmaLanguageEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/ModelKit/Language/LLM/Gemma4/GemmaLanguageEngine.swift; sourceTree = SOURCE_ROOT; };
@@ -2902,6 +2905,9 @@
 				7B72A22065084645A2A0F004 /* MobileHarness/Agents/Writer/WriterPreview.swift */,
 				A93CD18D8BA86A73FE650C27 /* MobileHarness/Agents/Writer/WriterContainer.swift */,
 				CCD17922FD9D53FA4B7349D9 /* MobileHarness/Agents/Writer/WriterWorkflow.swift */,
+				7B72A22065084645A2A0F005 /* MobileHarness/Agents/Writer/WriterRecords.swift */,
+				7B72A22065084645A2A0F006 /* MobileHarness/Agents/Writer/WriterRequestNaming.swift */,
+				7B72A22065084645A2A0F007 /* MobileHarness/Agents/Writer/WriterTools.swift */,
 			);
 			name = Writer;
 			sourceTree = "<group>";

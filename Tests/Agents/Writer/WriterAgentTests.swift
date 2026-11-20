@@ -58,7 +58,9 @@ private actor WriterNativeFixture: ChatCapability {
             inboxRequests += 1
             let pair = InferenceSession<ChatEvent>.make(limits: try .init(), estimatedBytes: { $0.estimatedBytes })
             let input = request.messages.last?.content ?? ""
-            let response = input.contains("另写") ? "newWork" : input.contains("改天再写") ? "stop" : "followUp"
+            let response =
+                input.contains("另写")
+                ? "newWork" : input.contains("改天再写") || input.contains("取消当前创作") ? "stop" : "followUp"
             try pair.emitter.yield(.text(response))
             try pair.emitter.yield(.finished(.stop))
             pair.emitter.finish()
@@ -225,11 +227,11 @@ private actor WriterResultSink: Agent {
                     ?? message.content(as: AgentTaskSignal.self)
             else { return }
             if blocksReports {
-                if let event = try AgentTaskContent.decode(signal).writerEvent { rejectedReports.append(event.eventID) }
+                if let event = try AgentTaskContent.decode(signal).event { rejectedReports.append(event.eventID) }
                 throw CommunicationError.unavailableTarget
             }
             if signal.kind == .result, message.content(as: AgentTaskResponse.self) != nil,
-                let event = try AgentTaskContent.decode(signal).writerEvent,
+                let event = try AgentTaskContent.decode(signal).event,
                 event.kind == .completed, rejectedCompletion == nil
             {
                 rejectedCompletion = event.eventID
@@ -298,10 +300,10 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     ) { request in
         if mode == 0, request == 3 { #expect(await startup.shown) }
         if (mode == 0 && request == 5) || (mode == 6 && request == 3) {
-            let expected: WriterDelegationEvent.Kind = mode == 0 ? .draftUpdated : .recovering
+            let expected: AgentTaskEvent.Kind = mode == 0 ? .draftUpdated : .recovering
             let deadline = ContinuousClock.now + .seconds(5)
             while await sink.signals.contains(where: {
-                (try? AgentTaskContent.decode($0).writerEvent?.kind) == expected
+                (try? AgentTaskContent.decode($0).event?.kind) == expected
             }) == false {
                 guard ContinuousClock.now < deadline else { throw WriterFailure.incomplete }
                 try await Task.sleep(for: .milliseconds(10))
@@ -535,7 +537,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     }
     if [3, 4, 6].contains(mode) {
         if mode == 6 {
-            let diagnostic = try #require(try AgentTaskContent.decode(result).writerEvent?.failure)
+            let diagnostic = try #require(try AgentTaskContent.decode(result).event?.failure)
             #expect(diagnostic.category == "modelTransport" && diagnostic.code == "writer.network.timeout")
             #expect(diagnostic.stage == "Control request" && diagnostic.details["networkCode"] == "-1001")
             #expect(diagnostic.details["model"] == "writer-fixture" && diagnostic.details["inputID"] != nil)
@@ -550,7 +552,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
         }
 
         #expect(result.status == .failed)
-        #expect(try AgentTaskContent.decode(result).writerEvent?.kind == .failed)
+        #expect(try AgentTaskContent.decode(result).event?.kind == .failed)
         #expect(
             try await records.writerExecutions.request(scope.id, agent: "writer").status
                 == (mode == 4 ? "interrupted" : "failed"))
@@ -562,7 +564,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     }
     if cancels {
         #expect(result.status == .cancelled)
-        #expect(try AgentTaskContent.decode(result).writerEvent?.kind == .cancelled)
+        #expect(try AgentTaskContent.decode(result).event?.kind == .cancelled)
         let saved = try await records.writerExecutions.request(scope.id, agent: "writer")
         let reason = mode == 16 ? "我们改天再写这份稿子" : "取消当前创作"
         #expect(saved.status == "cancelled" && saved.cancellationReason == reason)
@@ -586,14 +588,14 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     let saved = try await records.writerExecutions.workspace(execution.workspaceID, agent: "writer")
     #expect(saved.workspaceReady && saved.workspaceID == saved.id)
     if !asks { #expect(pausedDelivery) }
-    #expect(try AgentTaskContent.decode(result).writerEvent?.eventID == (await sink.rejectedCompletion))
+    #expect(try AgentTaskContent.decode(result).event?.eventID == (await sink.rejectedCompletion))
     let evidence = await sink.signals.filter {
-        $0.kind == .result && (try? AgentTaskContent.decode($0).writerEvent?.kind) == .completed
+        $0.kind == .result && (try? AgentTaskContent.decode($0).event?.kind) == .completed
     }
     #expect(evidence.count == 1)
     #expect(try await workspace.list().first?.files["document.md"] == expectedSource)
     #expect(await model.requests == (mode == 9 ? 8 : asks || [8, 11].contains(mode) ? 7 : 6))
-    #expect(try AgentTaskContent.decode(result).writerEvent?.workspaceID != nil)
+    #expect(try AgentTaskContent.decode(result).artifactID != nil)
     let current = try await journal.readCurrent().current
     let persistedCount = try await records.writerMessages.timelineCount(ownerID: current.id)
     #expect(
@@ -613,10 +615,10 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
         #expect(textRound.generationRounds?.contains { $0.resultsJSON.contains("writer.runtime") } != true)
     }
     let updates = await sink.signals.filter { $0.kind == .progress }.compactMap {
-        try? AgentTaskContent.decode($0).writerEvent?.kind
+        try? AgentTaskContent.decode($0).event?.kind
     }
     #expect(updates.allSatisfy { [.started, .userInput, .inputAccepted, .draftUpdated, .recovering].contains($0) })
-    for kind in [WriterDelegationEvent.Kind.started, .draftUpdated, .recovering] {
+    for kind in [AgentTaskEvent.Kind.started, .draftUpdated, .recovering] {
         #expect(updates.filter { $0 == kind }.count <= 1)
     }
 
@@ -1267,10 +1269,11 @@ private actor WriterRenderProbe {
     try await history.dispatched(cancelled)
     try await history.event(.text("partial"), id: cancelled)
     try await history.finish(cancelled, error: CancellationError())
-    let failed = try await history.begin(request, phase: "控制请求")
+    let failed = try await history.begin(request, phase: "Control request")
     try await history.dispatched(failed)
     let diagnostic = WriterDiagnostics.make(
-        WriterNetworkFixtureFailure(), stage: "控制请求", details: ["model": "fixture", "elapsedSeconds": "60.030"])
+        WriterNetworkFixtureFailure(), stage: "Control request",
+        details: ["model": "fixture", "elapsedSeconds": "60.030"])
     try await history.finish(failed, error: WriterNetworkFixtureFailure(), diagnostic: diagnostic)
     let dialog = try await store.readCurrent().current.id
     #expect(dialog != assistant.id)
@@ -1312,11 +1315,12 @@ private actor WriterRenderProbe {
             == restoredRun.finishedAt
     )
 
-    let controller = await WriterContainer()
-    try await controller.configureHistory(
+    let container = await WriterContainer()
+    try await container.configureHistory(
         messages: reopened.writerMessages, executions: reopened.writerExecutions,
         communications: reopened.agentMessages,
         logs: reopened.logs)
+    let controller = try #require(await container.records)
     let requestPage = try await controller.requests(workspaceID: task.id, after: 0)
     #expect(requestPage.items.first?.title == "Read index.html")
     #expect(requestPage.items.first?.statusTitle == "Completed")
@@ -1407,7 +1411,7 @@ private actor WriterRenderProbe {
     let request = try ChatRequest(messages: [
         .init(role: .user, content: "Render", images: [try .init(id: "screenshot", data: bytes)])
     ])
-    let id = try await history.begin(request, phase: "控制请求")
+    let id = try await history.begin(request, phase: "Control request")
     try await history.dispatched(id)
     try await history.recording(AgentModelRequestRecording(request).snapshot(initial: true), id: id)
     try await history.event(.text("Observed screenshot"), id: id)
@@ -1457,7 +1461,7 @@ private actor WriterStartupProbe {
     let request = try ChatRequest(
         messages: [.init(role: .system, content: "policy"), .init(role: .user, content: "画流程图")],
         maximumOutputTokens: 2048, temperature: 0.2)
-    let input = try await history.begin(request, phase: "控制请求")
+    let input = try await history.begin(request, phase: "Control request")
     try await history.dispatched(input)
     try await history.recording(AgentModelRequestRecording(request).snapshot(initial: true), id: input)
     try await history.event(.text("先读文件"), id: input)
@@ -1536,7 +1540,8 @@ private actor WriterStartupProbe {
 @Test func writerCleanupFailureKeepsPrimaryNetworkCauseAndCleanupCause() throws {
     let network = WriterNetworkFixtureFailure()
     let storage = StorageFailure(component: "writer-files", operation: "release", underlying: FileStorageError.busy)
-    let report = WriterDiagnostics.make(WriterCleanupFailure(primary: network, cleanup: storage), stage: "控制请求")
+    let report = WriterDiagnostics.make(
+        WriterCleanupFailure(primary: network, cleanup: storage), stage: "Control request")
     #expect(report.category == "cleanup" && report.causes.count == 2)
     #expect(report.causes[0].code == "writer.network.timeout" && report.causes[0].details["networkCode"] == "-1001")
     #expect(report.causes[1].category == "storage" && report.causes[1].stage == "Cleanup")
@@ -1549,7 +1554,7 @@ private actor WriterStartupProbe {
     struct Fixture: ChatFailureProviding { let chatFailure: ChatFailureDiagnostic }
     let diagnostic = WriterDiagnostics.make(
         Fixture(chatFailure: .init(.providerFailure, stage: .event, providerCode: "credit_balance_exhausted")),
-        stage: "控制请求")
+        stage: "Control request")
     #expect(diagnostic.category == "modelProvider" && diagnostic.code == "writer.provider.failed")
     #expect(diagnostic.details["providerCode"] == "credit_balance_exhausted")
     #expect(!diagnostic.message.contains("协议"))
@@ -1557,7 +1562,8 @@ private actor WriterStartupProbe {
 }
 
 @Test func writerWorkflowFailureKeepsCancelledRequestAsSecondaryEvidence() {
-    let cancelled = WriterDiagnostics.make(CancellationError(), stage: "文件内容请求", details: ["inputID": "fixture"])
+    let cancelled = WriterDiagnostics.make(
+        CancellationError(), stage: "File content request", details: ["inputID": "fixture"])
     let diagnostic = WriterDiagnostics.make(WriterFailure.invalidOutput, stage: "创作执行", request: cancelled)
     #expect(diagnostic.code == "writer.invalidOutput" && diagnostic.category == "workflow")
     #expect(diagnostic.causes.first?.code == "writer.cancelled")
@@ -1569,14 +1575,12 @@ func fixtureWriterCompletion(
     executions: any WriterExecutionRepository
 ) async throws -> AgentTaskResponse {
     let run = try await executions.request(scope.id, agent: "writer")
-    let event = try #require(content.writerEvent)
+    let event = try #require(content.event)
     let canonical = try AgentTaskContent(
         text: content.text, stage: .completed,
         interactionID: content.interactionID, artifactID: content.artifactID,
-        writerEvent: .init(
-            sequence: event.sequence, kind: event.kind, workspaceID: event.workspaceID,
-            windowID: event.windowID, delegateID: run.delegateID,
-            failure: event.failure,
+        event: .init(
+            sequence: event.sequence, kind: event.kind, windowID: event.windowID, failure: event.failure,
             eventID: event.eventID))
     let report = try AgentTaskResponse(canonical.signal(.result, scope: scope, status: status))
     try await executions.completeRequest(
@@ -1717,7 +1721,7 @@ func writerAcceptsTwentyTasksWithAllUserNotificationsRejectedThenRestoresOnlyDel
         try await Task.sleep(for: .milliseconds(20))
     }
     let delivered = await resumedSink.signals.filter { $0.kind == .result }
-    #expect(Set(try delivered.map { try #require(try AgentTaskContent.decode($0).writerEvent?.eventID) }) == eventIDs)
+    #expect(Set(try delivered.map { try #require(try AgentTaskContent.decode($0).event?.eventID) }) == eventIDs)
     #expect(await models.count == 20)
     #expect(await restored.observationSnapshot().business["phase"] == .text("idle"))
     #expect(try await reopened.writerExecutions.workspaces(agent: "writer", before: nil, limit: 50).count == 20)
@@ -1926,7 +1930,8 @@ private actor WriterPreviewProbe {
     let history = WriterHistory(store: store, delegateID: delegation.delegateID, goal: "report")
     let request = try ChatRequest(messages: [.init(role: .user, content: "generate")])
     for i in 1...25 {
-        let id = try await history.begin(request, phase: "文件内容请求", attempt: i == 25 ? 2 : 1, path: "index.html")
+        let id = try await history.begin(
+            request, phase: "File content request", attempt: i == 25 ? 2 : 1, path: "index.html")
         try await history.dispatched(id)
         if i == 1 {
             let starting = try await store.requestPreviews(delegation.workspaceID, after: 0)
@@ -2271,16 +2276,16 @@ private actor WriterPreviewProbe {
     }
     let read = try call("read", ["path": "index.html"])
     let edit = try call("edit", ["path": "index.html", "instruction": "修改流程图布局"])
-    let combined = WriterRequestNaming.summary(phase: "控制请求", path: nil, calls: [read, read, edit])
+    let combined = WriterRequestNaming.summary(phase: "Control request", path: nil, calls: [read, read, edit])
     #expect(combined == "Read index.html, 修改流程图布局")
     #expect(
         WriterRequestNaming.summary(
             phase: "Control request", path: nil, calls: [read, edit], language: .simplifiedChinese)
             == "读取 index.html、修改流程图布局")
-    let content = WriterRequestNaming.summary(phase: "文件内容请求", path: "styles/main.css", calls: [])
+    let content = WriterRequestNaming.summary(phase: "File content request", path: "styles/main.css", calls: [])
     #expect(content == "Write styles/main.css")
     let source = try call("edit", ["path": "index.html", "instruction": "<html>code</html>"])
-    #expect(WriterRequestNaming.summary(phase: "控制请求", path: nil, calls: [source]) == "Write index.html")
+    #expect(WriterRequestNaming.summary(phase: "Control request", path: nil, calls: [source]) == "Write index.html")
     #expect(
         WriterRequestNaming.state(request: "completed", calls: [try call("read", state: "failed")])
             == "failed")
@@ -2324,11 +2329,12 @@ private actor WriterPreviewProbe {
     let record = try #require(try await restored.ownerHistory(task.workspaceID).turns.first)
     #expect(record.response == source)
     #expect(record.modelRequests?.first?.toolCalls.first?.output == result)
-    let controller = await WriterContainer()
-    try await controller.configureHistory(
+    let container = await WriterContainer()
+    try await container.configureHistory(
         messages: reopened.writerMessages, executions: reopened.writerExecutions,
         communications: reopened.agentMessages,
         logs: reopened.logs)
+    let controller = try #require(await container.records)
     let detail = try await controller.requestDetail(try #require(record.modelRequests?.first?.messageID))
     #expect(detail.finalization?.state == .completed && detail.finalization?.result == result)
     try await reopened.shutdown()
@@ -2771,7 +2777,7 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
     let current = try await records.writerExecutions.request(requestID, agent: "writer")
     let selected = ["enter", "direct-enter", "read-before-enter", "clarify-enter", "clarify-workspace"].contains(mode)
     if selected {
-        #expect(current.workspaceID == old.id && content.writerEvent?.workspaceID == old.id)
+        #expect(current.workspaceID == old.id && content.artifactID == old.id)
         #expect(try await workspace.inventory().count == 1)
         #expect(
             try await workspace.project(workspaceID).files == [
@@ -2791,7 +2797,7 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
                 "document.md": "# Draft\nKEEP", "style.css": "KEEP_STYLE",
             ])
     } else if mode == "switch-after-edit" {
-        #expect(current.workspaceID == old.id && content.writerEvent?.workspaceID == workspaceID.rawValue)
+        #expect(current.workspaceID == old.id && content.artifactID == workspaceID.rawValue)
         #expect(try await workspace.project(workspaceID).files["document.md"] == "# Final\nKEEP")
         let earlier = try #require(WorkspaceID(rawValue: "workspace_2"))
         #expect(try await workspace.checkpoint(for: earlier)?.draft.files["document.md"] == "# Draft\nKEEP")
@@ -2807,7 +2813,7 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
         #expect(try await workspace.inventory().count == 5)
     } else if ["explanation", "declined", "unavailable-workspace"].contains(mode) {
         if mode == "declined" {
-            #expect(content.writerEvent?.kind == .declined)
+            #expect(content.event?.kind == .declined)
             #expect(content.text == "我无法执行外部下载。")
             #expect(current.workspaceID.isEmpty)
             #expect(try await workspace.project(workspaceID).files["document.md"] == "# Draft\nKEEP")
@@ -2825,7 +2831,7 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
         }
         #expect(try await workspace.inventory().count == 1)
         #expect(await startup.shown == false)
-        #expect(content.artifactID == nil && content.writerEvent?.workspaceID == nil)
+        #expect(content.artifactID == nil)
         #expect(!content.text.contains("作品已保存"))
     } else {
         #expect(current.workspaceID != old.id)
@@ -2893,23 +2899,25 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
 
 @Test @MainActor func writerRecordControllersOnlyAdvertiseActualFollowingPages() async throws {
     let records = try SQLiteRepositories.temporary()
-    let controller = WriterContainer()
-    try controller.configureHistory(
+    let container = WriterContainer()
+    try container.configureHistory(
         messages: records.writerMessages, executions: records.writerExecutions, communications: records.agentMessages,
         logs: records.logs)
+    let controller = try #require(container.records)
     let empty = try await controller.workspaces(before: nil)
     #expect(empty.items.isEmpty && empty.nextID == nil)
     let emptyDelegations = try await controller.delegations(before: nil)
     #expect(emptyDelegations.items.isEmpty && emptyDelegations.next == nil && emptyDelegations.total == 0)
     let task = try await records.seedDelegation(
         workspaceID: nil, goal: "Paging", input: "Paging", sourceDialog: nil, agent: "writer")
-    let store = try #require(controller.historyStore)
+    let store = WriterHistoryStore(
+        records: try WriterRecordStore(repository: records.writerMessages, logs: records.logs))
     let history = WriterHistory(store: store, delegateID: task.delegateID, goal: "Paging")
     let request = try ChatRequest(messages: [.init(role: .user, content: "Page fixture")])
     var total = 0
     for count in [0, 19, 20, 21, 40] {
         while total < count {
-            let id = try await history.begin(request, phase: "控制请求")
+            let id = try await history.begin(request, phase: "Control request")
             try await history.dispatched(id)
             try await history.event(.text("row"), id: id)
             try await history.event(.finished(.stop), id: id)
@@ -2985,7 +2993,7 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
         records: try WriterRecordStore(repository: records.writerMessages, logs: records.logs))
     let history = WriterHistory(store: store, delegateID: requestID, goal: "Create")
     let request = try ChatRequest(messages: [.init(role: .user, content: "original")])
-    let first = try await history.begin(request, phase: "控制请求")
+    let first = try await history.begin(request, phase: "Control request")
     try await history.dispatched(first)
     try await history.event(.text("selecting"), id: first)
     try await history.event(.finished(.stop), id: first)
@@ -2996,15 +3004,16 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
     _ = try await files.publish(
         id: #require(WorkspaceID(rawValue: workspace.workspaceID)), expecting: nil, title: "A workspace",
         draft: ArtifactDraft(files: ["index.html": "<h1>Created</h1>"]))
-    let second = try await history.begin(request, phase: "文件内容请求", path: "index.html")
+    let second = try await history.begin(request, phase: "File content request", path: "index.html")
     try await history.dispatched(second)
     try await history.event(.text("<h1>Created</h1>"), id: second)
     try await history.event(.finished(.stop), id: second)
     try await history.finish(second)
-    let controller = WriterContainer()
-    try controller.configureHistory(
+    let container = WriterContainer()
+    try container.configureHistory(
         messages: records.writerMessages, executions: records.writerExecutions, communications: records.agentMessages,
         logs: records.logs)
+    let controller = try #require(container.records)
     let preflight = try await controller.preflight(requestID, after: 0)
     let inside = try await controller.requests(workspaceID: workspace.id, after: 0)
     #expect(preflight.items.count == 1 && inside.items.count == 1)
@@ -3027,7 +3036,7 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
     #expect(try await controller.requests(workspaceID: workspace.id, after: 0).items.count == 1)
     let continued = WriterHistory(store: store, delegateID: secondRequest, goal: "Continue")
     for index in 1...39 {
-        let input = try await continued.begin(request, phase: "控制请求")
+        let input = try await continued.begin(request, phase: "Control request")
         try await continued.dispatched(input)
         try await continued.event(.text("Workspace message \(index)"), id: input)
         try await continued.finish(input)

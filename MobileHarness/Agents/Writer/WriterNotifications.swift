@@ -63,9 +63,7 @@ actor WriterNotifications {
                     if !retirement {
                         let next = try await communications.nextAgentDelivery(
                             sender: "writer", contract: AgentTaskResponse.contract)
-                        let historical = try await communications.nextAgentDelivery(
-                            sender: "writer", contract: "writer.completion")
-                        if let due = [next, historical].compactMap({ $0 }).min() {
+                        if let due = next {
                             try await Task.sleep(for: .seconds(max(0.05, min(1, due.timeIntervalSinceNow))))
                             continue
                         }
@@ -81,7 +79,7 @@ actor WriterNotifications {
                         try report.validate()
                         if let signal = report.signal {
                             guard signal.kind == .result, signal.scope.id == row.delegateID,
-                                try AgentTaskContent.decode(signal).writerEvent?.eventID == row.eventID
+                                try AgentTaskContent.decode(signal).event?.eventID == row.eventID
                             else { throw CommunicationError.invalidPayload }
                         } else {
                             guard let rejection = report.rejection, rejection.eventID == row.eventID,

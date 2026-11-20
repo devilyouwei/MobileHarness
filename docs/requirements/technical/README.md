@@ -1,5 +1,7 @@
 # 技术需求
 
+- [Writer 内聚与 Assistant 解耦重构](Writer-Cohesion-Refactor.md)：通用任务事件协议、删除旧契约与停止短语、Writer 内部文件拆分；WriterAgent 状态聚合待完成。
+
 - [Signal 核心架构重设计](Signal-Architecture-Redesign.md)：外部 SignalListener 直接监听、App 内部 Gateway 订阅与定向通信、未来 IPC 进程间信道；生产消费边界、生命周期及分阶段验收。
 
 已完成：[Tests 分层与维护优化](../../completed/Tests-Optimization-Plan.md)，保留模块目录，明确单元/集成/UI 测试、整理混合文件与命名，并通过工程检查及五个 Simulator 构建。

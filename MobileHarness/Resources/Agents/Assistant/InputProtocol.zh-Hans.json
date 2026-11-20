@@ -6,13 +6,12 @@
     "toolsHeading": "# Attached Tool Results",
     "user": "User",
     "asr": "User (ASR)",
-    "writer": "Writer",
     "agent": "Agent",
     "action": "Action Result",
     "unrestorable": "无法恢复先前输入。",
     "pairedResults": "见对应工具结果。",
     "namedAgent": "Agent ({{name}})",
     "sourceLine": "\n{{source}} ｜ {{time}}",
-    "legacySourcePattern": "^(?:User(?: \\(ASR\\))?|Writer|Action Result|Agent(?: \\([^()]+\\))?) ｜ [0-9]{2}:[0-9]{2}:[0-9]{2}$"
+    "legacySourcePattern": "^(?:User(?: \\(ASR\\))?|Action Result|Agent(?: \\([^()]+\\))?) ｜ [0-9]{2}:[0-9]{2}:[0-9]{2}$"
   }
 }

@@ -22,7 +22,7 @@ WriterHistoryStore.requestPreviews 透传有界 limit（默认 20，仓库上限
 
 Writer 从普通消息正文识别明确停止请求后，在同一事务确认来源及执行身份、标记原消息已消费、进入 closing 并保存原因。清理结果由 Writer 随独立终态通知提交。私有模型选择取消时，终态事务保存它的事实摘要。既有取消记录可按历史消息读取。
 
-新入口接纳 agent.task.request，消息身份成为执行入口的来源。Writer 判定为补充或停止后将消息关联到原入口，存储核对来源、关联身份和当前执行状态后消费。消息级拒绝留在 Agent 消息表，与任务终态共用 agent.task.response 的持久投递；退休查询只选择任务终态。旧 writer.completion 数据仍可读取，待投递记录以当前契约发出。
+新入口接纳 agent.task.request，消息身份成为执行入口的来源。Writer 判定为补充或停止后将消息关联到原入口，存储核对来源、关联身份和当前执行状态后消费。消息级拒绝留在 Agent 消息表，与任务终态共用 agent.task.response 的持久投递；退休查询只选择任务终态。持久投递只识别 agent.task.response。前序（未进入工作区）请求的所有者由 WriterPreflightOwner.id(requestMessageID) 生成，读取统一走 WriterHistoryStore.preflightPreviews。
 
 忙碌拒绝使用 rejected 入口并记录失败原因与完成时间，计入委托列表但不参与运行上下文选择。委托终态结果由入口 result_json 保存，通知删除或日志清理不改变业务结果。
 
