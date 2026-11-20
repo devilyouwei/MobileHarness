@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "photography",
-  "revision": 46,
+  "revision": 47,
   "description": "Photo/video capture, camera controls, photo saving and video save/ignore. Tracking: application-control.",
   "dependencies": [],
   "useActions": [
@@ -57,7 +57,7 @@
       "path": "Camera.Capture.cancelCapture",
       "callType": "action",
       "alias": "cancelCapture",
-      "channel": "Camera"
+      "channel": "CameraCancel"
     },
     {
       "path": "Camera.Video.startRecording",
@@ -87,43 +87,43 @@
       "path": "UI.Window.focus",
       "callType": "action",
       "alias": "Window.focus",
-      "channel": "Display"
+      "channel": "Window"
     },
     {
       "path": "UI.Window.minimize",
       "callType": "action",
       "alias": "Window.minimize",
-      "channel": "Display"
+      "channel": "Window"
     },
     {
       "path": "UI.Window.maximize",
       "callType": "action",
       "alias": "Window.maximize",
-      "channel": "Display"
+      "channel": "Window"
     },
     {
       "path": "UI.Window.restore",
       "callType": "action",
       "alias": "Window.restore",
-      "channel": "Display"
+      "channel": "Window"
     },
     {
       "path": "UI.Window.move",
       "callType": "action",
       "alias": "Window.move",
-      "channel": "Display"
+      "channel": "Window"
     },
     {
       "path": "UI.Window.close",
       "callType": "action",
       "alias": "Window.close",
-      "channel": "Display"
+      "channel": "Window"
     },
     {
       "path": "UI.Island.setPresentation",
       "callType": "action",
       "alias": "Island.setPresentation",
-      "channel": "Display"
+      "channel": "Island"
     },
     {
       "path": "Camera.Capture.loadPreviewImage",

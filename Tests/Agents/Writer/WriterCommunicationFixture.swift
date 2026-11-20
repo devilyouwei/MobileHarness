@@ -524,9 +524,9 @@ func writerPromptCase(_ scenario: WriterPromptCase, env: [String: String], root:
             try await Task.sleep(for: .milliseconds(50))
         }
         if let busyID = item["busyMessageID"] as? String {
-            let rejected =
-                try await records.agentMessages.agentReply(to: busyID, contract: "agent.task.events.v1")
-                != nil
+            let consumed = try await records.agentMessages.isAgentMessageConsumed(busyID)
+            let started = (try? await records.writerExecutions.request(busyID, agent: "writer")) != nil
+            let rejected = consumed && !started
             item["busyRejected"] = rejected
             if !rejected { issues.append("Busy assignment was accepted") }
         }

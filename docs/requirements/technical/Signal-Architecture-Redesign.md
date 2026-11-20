@@ -1001,3 +1001,118 @@ Writer、Memory、Photographer、ApplicationControl 及拥有固定任务报告�
 - ModelKit 行为不变：handleMemoryPressure 仍只尽力卸载声明 releaseWhenIdle 的空闲模型，不等待也不取消推理。
 
 受影响文件：PlatformKit/Core（新文件、README）、PlatformKit/PlatformContainer.swift、App/Composition（MemoryPressureRelay、ModuleRegistration、ServiceFactories、README）、Agents/AgentContainer.swift、Agents/SpeechPerception/VoiceInteractionSession.swift、Tests/Agents/Core/AgentContainerTests.swift，并同步 PlatformKit、Agents、App 的 README 和总体设计。无新目录、模块或依赖。回归覆盖：警告被订阅者收到并合并、根未启动/停止后订阅失败、relay 每次警告调用一次释放且 stop 后不再调用。真实设备的内存警告释放效果仍需独立验收，本次工程测试不能代替。
+
+## 20. Agent 内部控制函数迁入 Agents（useControls）
+
+问题：`task.start`、`task.end`、`task.send`、`loadSkills`、`releaseSkills` 在 BasicSkill 里登记为 Control Channel 的 Action，实际经 Gateway 调用 Signal 进入 Actions Shell 排队，再由 `TaskControlCapability` 回调 Assistant 执行；`task.send` 随后又经 AgentMessaging 第二次进入 Gateway。Actions 在其中不产生任何设备或业务效果，只是借用排队，形成 Actions 回调 Agents 的回环。按仿生设计，Signal 和认知控制是体内行为，不属于可表现的 Actions。
+
+分类（模块所有权）：
+- 可表现行为（相机、语音、机械臂、窗口、作品库）：Actions，经 Gateway 与 Shell。
+- 认知控制（上述五个函数）：Agents，Agent 内部处理，不经 Gateway 和 Shell，不属于任何 Channel。
+- 内部 Signal：Gateway，不是函数。
+
+`wait` 是成对标签的语法规则，继续由 FunctionTokenParser 识别，不经 JSON 登记；其说明与示例从共享 OutputProtocol 迁入 BasicSkill 的 Instructions。BasicSkill 因此成为这些规则、控制调用的唯一教学位置。
+
+Skill.json：新增列表 `useControls`，元素为 `{path, alias}`，与 `useActions`、`useStates`、`useInstructions` 并列，不带 `channel`。BasicSkill 的五个控制调用从 `useActions` 移到 `useControls`；`startListening`、`stopListening` 是真实 Speech Action，保留在 `useActions`。Skill 解码保持严格键集合，`useControls` 最多 16 项，路径唯一且不得同时出现在 `useActions`。加载、提示词和有效快照与其他 Skill 相同；BasicSkill 是基础 Skill，本来不可释放，不新增机制。
+
+声明：控制函数的参数与文案仍用中立的 `ActionDeclaration` 描述，由 Agents 持有（`AgentControls`），地址沿用 `Agent.Task.*`，以复用 FunctionCopy 本地化文案；`AgentFunctionCatalog` 新增 `controls`，与 `declarations`、`localTools` 的地址互斥。Actions 不再声明这些函数，也不再注入。
+
+生成与路由：
+- AgentCore 的 `CapabilityRegistry` 新增 `controls`（`ControlRegistration`，不带 Channel），`AgentConfiguration` 接受可选的 `controls` 键。`resolveAction` 命中 controls 时产生新的 `GenerationEvent.control(ControlCall)`，不产生 `ActionCall`，也就不会进入 OutputGateway 的 Action 路径。
+- 控制调用不得出现在 `<wait>` 内，AgentGenerator 拒绝并回报；其余数量约束沿用单响应 120 个调用上限。
+- Assistant 把控制调用登记为整轮调用，在发射时按输出顺序串行执行，不等待其他 Channel 的 Action（与原 Control Channel 相同：全双工下 `task.end` 在生成和其他 Channel 仍运行时即可提交终态），结果经 `acceptResult` 并入整轮，反馈给模型的格式不变；无整轮上下文时同样立即执行。
+- 固定调用（MemoryAgent 在新对话前结束任务）直接调用 Assistant 的控制入口，不再经 Actions。
+- 旧的 `Agent.Communication.send/publish` 本地拦截（`AgentCommunicationAdapter`、`AgentConfigurations.declaration` 中的特例、`modelCommunication`）没有任何生产 Skill 登记，仅由测试使用，与本次迁移无关，保持原状，另行清理；它与 `task.send` 是并存的两条路径，应在清理时择一保留。
+- 控制调用不再出现在 Actions 执行日志，只记录在 Assistant 的整轮记录与 Task 状态中。
+
+删除：Actions/System/Task（TaskActions、TaskControlModule、TaskControlEndpoint）、Contracts/TaskControlCapability、`BehaviorProtocolBindings` 的 Agent.Task 分支及 Control Channel、`ActionEndpoints.tasks`、`CapabilityModules`/`BehaviorAssembly` 的 taskControl 参数、`AgentHostBindings.tasks`、AgentRuntime 的 `business.tasks.handler`（改为 Agents 内部的 `AssistantControlLink`）、RuntimeLog 的 Control 颜色映射；BasicSkill 与 OutputProtocol 中“Control Channel Action”“Sole-call”类说法。
+
+受影响：Agents（AgentCore Capability/Generation、AgentConfigurations、AgentContracts、AssistantChatWorker、AgentRuntime、CapabilityCoverage）、Actions（上述删除项）、App（装配）、Resources（BasicSkill Skill.json、Instructions、OutputProtocol、ActionCatalog 模板）、UI（RuntimeLog）、文档与测试。无新目录、模块或第三方依赖。
+
+验收：`./scripts/check.sh`、`./scripts/build-ios.sh`；测试覆盖 `useControls` 解码与互斥校验、控制调用不触达 Gateway 与 Shell、`<wait>` 内控制调用被拒绝、整轮延后结算、BasicSkill 不可释放、MemoryAgent 固定结束任务。真实模型下提示词效果不在工程检查范围内，不得标记为已验证。
+
+## 21. Skill Channel 按互斥占用重新划分
+
+原则：Channel 是并发概念。同一 Channel 内按任务 FIFO，上一项完成后下一项才开始；因此只有互斥或占用同一表面、设备、会话的 Action 才共用 Channel，彼此独立的 Action 使用不同 Channel 才能并行。Channel 不替代资源 permit：硬件冲突仍由 Shell 的资源声明裁决。Channel 名不是模块名或页面名。
+
+问题：
+- `Display` 同时承载字幕、表情、网页加载、窗口管理、页面导航和灵动岛，多个互不冲突的操作（如最长数十秒的网页加载与窗口移动、字幕）被迫排队。
+- `Camera` 同时承载拍摄/录像与 Vision 感知，Vision 启动会阻塞拍照；`cancelCapture` 的语义是取消并 join 正在进行的拍照倒计时，而 takePhoto 在倒计时结束后才完成，二者同 Channel 时取消必须等拍照结束，等于失效。
+- `System` 将蓝牙设备控制与模型资源下载混放；`Query` 将互不相干的只读查询（会话历史、模型清单、Provider 设置、蓝牙状态）串成一条队列。
+
+新的划分（Skill.json 为准，同一 path 在多个 Skill 中保持相同绑定）：
+
+| Channel | 内容 | 互斥依据 |
+| --- | --- | --- |
+| `Speech`、`Display`（运行时固定） | 语音输出；字幕、回复等待与表情 | 同一扬声器；同一回复展示面 |
+| `ListeningControl`（BasicSkill）、`Listening`（运行时固定） | startListening/stopListening；感知更新 | 同一聆听会话 |
+| `Robot` | NexArm 全部动作 | 同一机械臂 |
+| `Camera` | Camera.Capture/Video 全部动作，除 cancelCapture | 同一相机会话 |
+| `CameraCancel` | cancelCapture | 取消不得排在被取消的拍照之后 |
+| `Vision` | Camera.Perception 的 open/close/flip/retry | 感知流与拍摄会话独立，冲突由资源 permit 裁决 |
+| `Window` | UI.Navigation.open 与 UI.Window.* | 窗口布局 |
+| `Island` | UI.Island.setPresentation | 灵动岛 |
+| `Web` | Web.browse/snapshot/inspect/navigate | 网页会话，加载耗时长且与窗口、字幕无关 |
+| `Device` | Bluetooth.control 与 Bluetooth.readStatus | 同一蓝牙设备会话，状态读取在控制提交之后 |
+| `ModelResources` | download/cancel/snapshot | 同一模型传输队列 |
+| `History` | History.list/read | 会话历史 |
+| `Provider` | Provider.readSettings | Provider 设置 |
+
+表情（ExpressionInteraction）保持在 `Display`，与字幕同属回复展示面；`Query` 与 `System` 不再使用。同时存活的 Channel 名不超过 16 个：以上共 15 个，且并非所有 Skill 同时加载。
+
+不变：固定运行时 Channel（`Speech`、`Display`、`Listening`）、Shell 的 Channel 语义与上限、原生 Tool 不使用 Channel。
+
+受影响：Resources/Skills 各 Skill.json（channel、revision）及 Instructions（en/zh）中的 Channel 表述、Skills 与 Agents 与主 README 的 Channel 描述、RuntimeLog 的 Channel 颜色、断言 Channel 名的测试。无新目录或模块，无 Swift 调度逻辑变更。
+
+验收：`./scripts/check.sh`、`./scripts/build-ios.sh`；新增测试确认各 Skill 的 channel 划分（cancelCapture 与 takePhoto 不同 Channel、Vision 与 Camera 不同、Window/Web/Display 互相独立）及总 Channel 数不超过 16。真实模型对新目录的编排效果不在工程检查范围内，不得标记为已验证。
+
+## 22. 控制函数归属与 AssistantChatWorker 按职责拆分
+
+事实：当前只有 Assistant 的 baseSkills 含 BasicSkill，因而只有 Assistant 注册并执行 `useControls`；Photographer、Memory、Writer、ApplicationControl 的 baseSkills 不含 BasicSkill，是无 Task/Skill 状态的专业角色。`task.start/end/loadSkills/releaseSkills` 变更的是宿主自己的 Task 记录、对话和 Skill 状态，`task.send` 向对等 Agent 发送信号。
+
+归属决定：
+- 契约通用：声明、`AgentControl`、注册、`resolveControl`、`permits`、`GenerationEvent.control` 属于 Agents/Support，任何会话型角色可通过 Skill 的 `useControls` 使用。
+- 执行跟随状态所有者：控制修改宿主自己的状态，因此由持有该状态的 Agent 执行；不新增只有一个实现者的协议。若出现第二个宿主，再把任务生命周期（`controlLocalTaskAndSkills` 的状态事务部分）上移为 Support/Context 中与 `AgentTaskSkillState` 并列的机制，并引入宿主协议。
+- 声明集中：五个控制的声明统一放 Support/AgentControls.swift，移除 `Support → Assistant` 的反向引用（当前 `AgentControls.all` 引用 `AssistantControls.all`）；`sendMessage` 的声明从 Support/Communication/AgentTasks.swift 并入，通信协议声明仍留在原处。
+- `AgentControl.operation` 由字符串改为 `AgentControlOperation` 枚举（startTask、finishTask、loadSkills、releaseSkills、sendMessage），`controlTask` 对其穷尽 switch，声明与执行不再靠字符串对应。
+
+AssistantChatWorker（4051 行，按职责拆成 Assistant 目录内的同名 extension 文件；存储属性、init 与 Registration 留在主文件）：
+
+| 文件 | 内容 | 约行数 |
+| --- | --- | --- |
+| AssistantChatWorker.swift | 接口、状态与依赖（存储属性）、Registration | 650 |
+| AssistantChatLifecycle.swift | 启停、恢复、暂停、清理 | 190 |
+| AssistantChatInput.swift | 输入处理、handleText、批处理、drain、beginReplyTurn（本次不再细分） | 720 |
+| AssistantChatGeneration.swift | generate、generateInLanguage、finishBatch、settleRound、executeRound、completeRound | 640 |
+| AssistantChatFeedback.swift | 整轮结果与反馈：persistFeedback、acceptPendingFeedback、publishPendingResults、enqueue*、acceptResult、文本辅助 | 290 |
+| AssistantChatEmission.swift | emitAction/emitFunctions/emitPlayback、collect、consumeActionText/NativeTools、emitImmediate、emit/emitFailure | 520 |
+| AssistantChatTaskCommunication.swift | communicate、modelCommunication、receiveTask*、委派与 forwardDirectedInput、sendTaskMessage/deliverTaskMessage/receiveTaskMessageRejection | 480 |
+| AssistantChatWriterEvents.swift | receiveWriterEvent/Completion、writerFacts、Writer notice 队列与播放 | 220 |
+| AssistantControls.swift | `executeControl`、`controlTask`、`controlLocalTaskAndSkills`、`completeForegroundTask`、`AssistantControlLink` | 210 |
+| AssistantChatStatus.swift | Context、Observability：prepareSignal、status、residentContext、effectiveCapabilities、decisionMetadata | 200 |
+
+约束与风险：extension 在其他文件不能访问 `private`，涉及成员改为模块内部可见；不改变行为、actor 隔离与顺序语义，不新增目录或模块。需同步 Package.swift 与 pbxproj 的文件登记、boundary checker 中直接读取 AssistantChatWorker.swift 文本的检查（约 1434、1783 行）以及 Assistant README 的文件职责。
+
+验收：`./scripts/check.sh`、`./scripts/build-ios.sh`；无新行为，现有测试不应变化，新增或调整仅限控制 operation 枚举与声明位置。
+
+决定：控制的执行暂留 Assistant（目前唯一宿主），出现第二个宿主再上移；`AgentTaskSkillState.control` 仍以模型别名字符串为入参，未改为枚举。
+
+修订：control 的执行不抽成宿主协议的通用库。Task、Skill、消息管理与 Assistant 的轮次、历史、任务记录和通信策略高度互相依赖，强行拆成按能力划分的宿主协议会把一个内聚的状态机切散，且目前只有 Assistant 一个宿主。保持高内聚：声明、解析、路由等机制在 Support，执行与它依赖的状态一起留在 Assistant；若将来出现第二个宿主，再按实际需求提取。
+
+## 23. Control 作为 Assistant 内置函数库，移出 Skill 配置
+
+决定：Task、Skill 与消息管理的 control 是 Assistant 的内置函数库，不再由 Skill 声明 `useControls`。别名、声明和执行都在 Assistant 内，随 Assistant 状态高内聚；Skill 只配置 Action 与 Tool。
+
+库（Assistant/AssistantControls.swift）：`AssistantControl`（alias、`ActionDeclaration`、`AgentControlOperation`）、`AssistantControls.all`、按 path 查找，以及执行扩展（`executeControl`、`controlTask` 等）。解析器把标签别名解析为 `ControlCall`（path 与参数）后，由库的 path 查找直接得到 operation，不再经 `AgentControls`（Support）转手。
+
+注册与暴露：
+- `ControlRegistration` 保存规范 `ActionDeclaration`，可按当前语言重新本地化；JSON `controls` 配置通道删除。
+- `AssistantContextState.runtimeCapabilities` 把库的注册加入固定能力（`CapabilityRegistry.adding(controls:)`）。`AgentSkillLoader.registry(_, fixed:)` 沿用 `fixed.controls`，并在中文语言下用 FunctionCopy 重新本地化。
+- 因此 Assistant 的 control 始终可用，不依赖 BasicSkill 的加载状态；其他 Agent 没有 control。
+- AgentContracts 的静态检查（control path 与已声明 Action/Tool path 互斥）改引用库。
+
+删除：Skill schema 的 `useControls` 与 `AgentConfigurations.Control`、`AgentSkillLoader.controls`、`AgentConfigurations.declaration/registry` 的 controls 参数、AgentConfiguration 的 `controls` 键、Support/AgentControls.swift 及其 pbxproj 与 checker 登记。BasicSkill 的 Skill.json 去掉 `useControls`，revision 递增；Instructions 不变。
+
+受影响：Agents/Support（Skill 解码、Loader、Configurations、Core Capability）、Assistant（库与固定能力）、AgentContracts、Resources/Skills（BasicSkill、README）、相关 README、boundary checker 与 pbxproj、测试（control 的来源由 BasicSkill 改为 Assistant 固定能力，`useControls` 断言删除）。无新目录或模块。
+
+验收：`./scripts/check.sh`、`./scripts/build-ios.sh`；测试覆盖 Skill 含 `useControls` 被拒绝、Assistant 固定能力含五个 control 且中文本地化、其他 Agent 无 control、`<wait>` 内 control 被拒绝仍成立。真实模型下提示词效果不在工程检查范围内。

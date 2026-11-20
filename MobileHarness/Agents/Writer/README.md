@@ -10,7 +10,7 @@ WriterAgent 是独立 AgentCore 角色，WriterContainer 随 Agents 根注册、
 
 工作区工具与内容续写共享同一个委托所有者，但完成边界不同：Actions 的 edit 结果仅创建编辑流；append/complete/abort 经宿主 ArtifactStreaming 直接进入已接纳会话，单次 complete 只完成文件写入。取消、根暂停和停止先取消已捕获的生成 worker 并 revoke 续写准入，再加入这些 worker；worker 负责加入模型、预览和 release 后才提交终态或允许恢复。revoke 不取消已开始的 abort；release 等待全部在途效果，不因取消者自身退出而提前释放。恢复经 Gateway start/resume 重新接纳，旧 streamID 无效。Actions 根另有 shutdown 兜底。普通 Scene 隐藏不撤销创作会话。服务的互斥、容量与失败契约见 [Artifacts 生命周期](../../Actions/Artifacts/README.md#执行与续写生命周期)。
 
-Assistant 不参与创作循环或通过聆听/对话关闭终止 Writer；应用根拥有角色暂停/关闭，显式cancel在清理完成后确认。任务输入队列上限八项，满时拒绝；追加要求在文件检查点取出，写入恢复上下文。ask 工具发送带 interactionID 的 waitingUser 进度，结束当前推理并释放编辑租约；匹配输入后重新读取草稿继续。显式取消加入执行清理；根的显式暂停保存未完成内容并中止请求，恢复重建工作区和私有上下文；普通Scene隐藏不触发该暂停链路。窗口生命周期不决定任务生命周期。终态发送简短文本和可选工作区 ID。纯库查询可以无绑定，终态回报不携带源文件。模型与文件清理完成即释放创作占用，SQLite 原子保存执行终态和通知；通知接纳、回复或播报不影响下一次委托。
+Assistant 不参与创作循环或通过聆听/对话关闭终止 Writer；应用根拥有角色暂停/关闭，显式cancel在清理完成后确认。任务输入队列上限八项，满时拒绝；追加要求在文件检查点取出，写入恢复上下文。ask 工具发送带 interactionID 的 waitingUser 进度，结束当前推理并释放编辑租约；匹配输入后重新读取草稿继续。显式取消加入执行清理；根的显式暂停保存未完成内容并中止请求，恢复重建工作区和私有上下文；普通Scene隐藏不触发该暂停链路。窗口生命周期不决定任务生命周期。终态发送简短文本和可选工作区 ID。纯库查询可以无绑定，终态回报不携带源文件。模型与文件清理完成即释放创作占用，执行终态保存到 Writer 自有的 writer_executions；终态回报的发布、回复或播报不影响下一次委托。
 
 控制工具失败以有界观察反馈供下一轮修正；同一规范化参数的失败调用在草稿未改变时只执行一次，再次生成只返回原错误及修复建议，不重复执行效果。未推进草稿的恢复阶段最多接纳三次失败修正，耗尽才结束。成功编辑/移动/删除/恢复草稿后清除失败屏障，读取/查询不清除。成功的作品查询清除依赖搜索结果的失败缓存；成功 render 只清除因 renderRequired 拒绝的 finish 缓存，重试仍经过发布校验，不重置恢复次数。可恢复请求进入 Writer 自有有限恢复；取消、提交不确定或清理失败立即终止。无效结束批次整体不执行并反馈修正；批次异常保留当前调用原始错误并为未执行兄弟调用补齐结果。完整配对后才添加截图或重复调用提醒。截图最多保留当前一张，不支持视觉的模型继续使用渲染文本和诊断。
 
@@ -49,9 +49,9 @@ flowchart TD
     Recovery -->|"内容请求可恢复，abort 后新建流"| Begin
     Recovery -->|"终止 / 提交不确定 / 清理失败"| Cleanup
     Cancel["显式 cancel / 根停止"] --> Cleanup
-    Cleanup --> Terminal["持久化终态与不可变通知<br/>创作占用不等待通知接纳"]
-    Terminal --> Retirement["独立 worker：调用运行时<br/>退休执行权限"]
-    Terminal --> Notification["独立 worker：agent.task.events.v1<br/>认证通知 Assistant"]
+    Cleanup --> Terminal["completeRequest：保存终态（closing）<br/>创作占用不等待回报"]
+    Terminal --> Notification["agent.task.events.v1<br/>发布一次，失败记入 deliveryFailure"]
+    Notification --> Retirement["retireTask 一次<br/>retireRequest 记录退休结果"]
 ```
 
 图中的恢复边返回所属控制/内容请求；内容重试必须先加入 abort，并创建新流，不能重复追加旧前缀。预览是独立 worker，源码接收不等待页面重载；步骤汇报才加入已安排的最新预览。完整渲染与发布失败保留实际证据，不能用通知接纳替代文件或清理成功。各队列、恢复次数、暂停/停止及补偿契约见下文对应章节和 [Artifacts](../../Actions/Artifacts/README.md)。
@@ -88,25 +88,25 @@ WriterRequestNaming 从工具与控制域派生请求行标题，包括作品查
 
 ## 委托与主动事件
 
-Writer 经认证的 agent.task.events.v1 发送接纳、追问及两类精选里程碑。首批文件改动完成检查点和工具记录后发送 draftUpdated，首次模型/写入重试或渲染检查异常发送 recovering。两种里程碑各保留一次，跨暂停和补充续作去重。逐轮进度、临时预览和普通读写观察由 Writer 自身呈现。投递队列每个事件类别最多保留一项待送达事实，另有一个不可变在途事件。终态释放过期的待送达进度，独立走持久通知。
+Writer 经认证的 agent.task.events.v1 发送接纳、追问及两类精选里程碑。首批文件改动完成检查点和工具记录后发送 draftUpdated，首次模型/写入重试或渲染检查异常发送 recovering。两种里程碑各保留一次，跨暂停和补充续作去重。逐轮进度、临时预览和普通读写观察由 Writer 自身呈现。投递队列每个事件类别最多保留一项待送达事实，另有一个不可变在途事件；每项只发布一次。终态释放过期的待送达进度，单独发布一次。
 
 Writer 通过 task.send(agent_id=writer,text) 接收认证正文，收件队列最多八项，满时拒绝。收件 worker 串行处理，暂停时保留待处理输入。空闲的新目标由 Writer 申请内部授权并建立任务。活跃期间 Writer 用自己的模型区分当前目标的补充、停止和无关新目标。可信追问关联必须匹配当前任务和问题，迟到答复回报拒绝。明确停止请求直接进入取消清理。
 
-AgentTaskContent.writerEvent 携带版本 3、UUID eventID、递增 sequence 和可选工作区及窗口身份。运行阶段由 reportWorker 投递 started、draftUpdated、recovering、userInput 和 inputAccepted，通过 AgentMessaging.publish 按需发布 agent.task.events.v1，Agent.json 的 publications 声明该生产能力，启动校验声明与代码及订阅配对；调用方不初始化业务发布会话。只等待 Gateway 接纳，准入失败每 500 ms 重试；不查询订阅、接收方状态或消费结果，不能触发对方订阅。completed、declined、failed 和 cancelled 经持久 agent.task.events.v1 独立投递。
+AgentTaskContent.writerEvent 携带版本 3、UUID eventID、递增 sequence 和可选工作区及窗口身份。运行阶段由 reportWorker 投递 started、draftUpdated、recovering、userInput 和 inputAccepted，通过 AgentMessaging.publish 按需发布 agent.task.events.v1，Agent.json 的 publications 声明该生产能力，启动校验声明与代码及订阅配对；调用方不初始化业务发布会话。只等待 Gateway 接纳；不查询订阅、接收方状态或消费结果，不能触发对方订阅。进度、终态和拒绝回报均只发布一次，不补发、不重试、无回退，失败只记入运行时快照 deliveryFailure；Writer 不把事件或拒绝写入 agent_messages。completed、declined、failed 和 cancelled 在终态保存后经 agent.task.events.v1 发布。
 
 Database 根目录拥有连接、schema 装配与生命周期；Shared 只保存编码、ID 与分页机制。Assistant 和 Writer 分别拥有消息/任务接口、历史 DTO、窗口及 SQL 实现。日志和 Agent 通信通过独立共享端口注入，不经统一 Chat/Task 门面。详见 [Database](../../Storage/Database/README.md)。
 
-暂停/关闭加入创作和投递 worker，未送达终态留在同一 SQLite；恢复或新进程只重投通知，不重跑创作，也不重建旧执行权限。跨进程退休遇到已关闭 scope 时保留证据并结束退休分支，用户通知继续独立递送。Assistant 使用可信 SQLite 执行状态对账 busy、替代和发送消息；对用户的通知不是任务释放条件。
+暂停/关闭加入创作和投递 worker。终态先经 completeRequest 写入 writer_executions（run_state 为 closing），随后发布一次完成回报，再调用一次 consumer.retireTask，并由 retireRequest 将 closing 转为终态，退休失败记为 cleanup_failed。执行授权不跨进程保留，重启恢复把遗留 closing 行直接转为其终态，不重发回报、不重跑创作，也不重建旧执行权限。对用户的通知不是任务释放条件。
 
 Writer 私有控制提示只教本角色的选择、文件操作、追问与完成；ask/finish 由宿主发送回报，Writer 不生成 XML 调度或自行拼接跨 Agent 消息。独立内容请求只处理格式与文件编写，不承担角色协调。
 
 ### Assistant 接收与用户汇报
 
-Writer 单任务准入覆盖等待、暂停及清理。无关新请求或过期关联通过 agent.task.events.v1 回报，关联原消息。任务清理完成后可接纳下一目标，终态消息通过既有持久路径独立投递。
+Writer 单任务准入覆盖等待、暂停及清理。无关新请求或过期关联先把 Writer 自有的已接收请求记录标记为已消费，再通过 agent.task.events.v1 发布一次拒绝，发布 scope 为 content.replyTo ?? content.id。任务清理完成后可接纳下一目标，终态回报单独发布一次。
 
-Writer 自有灵动岛显示接纳、补充、取消、进度、追问和终态。普通进度也更新窗口副标题和 State。Assistant 验证接纳、精选里程碑、追问和持久终态后更新委托视图。在全双工模式下，这些语义摘要保留 Agent 身份进入统一 Q，不经过 Decision；下一批 LLM 综合选择性呈现，不强制逐条播报。同步轮次兼容模式仍使用直接通知播报。追问保存 interactionID，补充必须匹配当前委托及追问。终态经 agent.task.events.v1 持久投递，Assistant 验证不可变通知后标记消费。
+Writer 自有灵动岛显示接纳、补充、取消、进度、追问和终态。普通进度也更新窗口副标题和 State。Assistant 验证接纳、精选里程碑、追问和终态后更新委托视图。在全双工模式下，这些语义摘要保留 Agent 身份进入统一 Q，不经过 Decision；下一批 LLM 综合选择性呈现，不强制逐条播报。同步轮次兼容模式仍使用直接通知播报。追问保存 interactionID，补充必须匹配当前委托及追问。终态经 agent.task.events.v1 发布一次，未收到即错过；Assistant 收到后写入追踪记录，记录不参与处理判断。
 
-Writer 接收 agent.task.v1，验证关联后以原子事务接纳停止请求，随后加入模型与文件操作清理、保留草稿并提交终态。agent.task.events.v1 使用身份绑定的 AgentMessaging.publish，仅确认本地发布准入。消息拒绝和任务终态共用持久投递；进度沿用有界队列。
+Writer 接收 agent.task.v1，验证关联后以原子事务接纳停止请求，随后加入模型与文件操作清理、保留草稿并提交终态。agent.task.events.v1 使用身份绑定的 AgentMessaging.publish，仅确认本地发布准入。消息拒绝和任务终态直接发布一次；进度沿用有界队列。
 
 ## Writer 自有任务与纯通信
 
@@ -128,7 +128,7 @@ WriterDiagnostics.swift 分类模型网络、HTTP、响应协议、模型配置�
 
 WriterIslandPresentation 根据 Writer 自身生命周期发布开始、真实步骤、等待补充、暂停恢复和取消清理。通过角色内部 UI.Island.present/end 工具经 Actions Shell direct 执行，不进入 ChannelScheduler，也不加入模型工具定义，不调用 Assistant 前台 startTask/finishTask。清理及终态持久化完成后展示结果、拒绝理由或失败摘要约 15 秒。Writer 拥有单个可取消的撤下定时器，新委派覆盖旧活动内容。收尾失败也显示失败摘要。诊断和独立通知保留错误证据。关闭活动不会关闭作品窗口，不影响语音或其他生产者。
 
-独立呈现 session、稳定活动 UUID 和递增 revision 与 Assistant 会话及执行权限分离；同一根后续任务复用活动，新委托、等待和终态改变 expansionID。旧委托 和终态后的迟到进度被域内围栏拒绝，通知重投不会重放呈现。发布机制复用 [AgentIslandPublication](../Support/README.md)，只有一个在途和一个最新待发命令，结束命令参与同一 revision 围栏。失败通过 presentationFailure 公开，暂不可用每500ms重试最新事实，不影响创作、SQLite终态、新委托或 Assistant 通知。根停止先取消并加入 worker，再通过仍有效的权限尝试撤下并加入最后一次 end；失败保留证据，不启动无限清理重试。Scene隐藏保留域内容，由 UI 决定本地隐藏和系统摘要。
+独立呈现 session、稳定活动 UUID 和递增 revision 与 Assistant 会话及执行权限分离；同一根后续任务复用活动，新委托、等待和终态改变 expansionID。旧委托 和终态后的迟到进度被域内围栏拒绝。发布机制复用 [AgentIslandPublication](../Support/README.md)，只有一个在途和一个最新待发命令，结束命令参与同一 revision 围栏。失败通过 presentationFailure 公开，暂不可用每500ms重试最新事实，不影响创作、SQLite终态、新委托或 Assistant 通知。根停止先取消并加入 worker，再通过仍有效的权限尝试撤下并加入最后一次 end；失败保留证据，不启动无限清理重试。Scene隐藏保留域内容，由 UI 决定本地隐藏和系统摘要。
 
 Writer 只构造简短目标/步骤、紫色图标、语义优先级和详情阶段；显示投影不会截断模型输出或持久历史。动画、几何、优先级仲裁、手动收起及语音顶部并存由通用 Island 组件统一拥有。Assistant/Task 日志不参与此链路。
 
@@ -195,7 +195,7 @@ Writer history uses the shared full recorder; screenshot files are not separatel
 
 Writer续写从保留的业务请求input、response和已完成native call/result组重建上下文，最多24条／32000字节，按整组裁剪。它不读取可删除的完整请求日志，清空日志不改变续写或工作区。失败诊断独立保留；未完成工具组不会被恢复成孤立tool消息。
 
-通知发布使用共享通信 outbox 的 claim token 与有界退避；暂停释放当前 claim，恢复只重投消息，不重做创作。权限退休与面向用户的完成通知分开确认。
+回报发布不补发；暂停保留尚未发布的进度，恢复后继续逐项发布一次，不重做创作。权限退休在完成回报发布后执行一次，结果单独记录。
 
 历史 Prompts 图片由日志独占；本目录不提供相册或预览缓存的历史图片回退接口。实时相机和独立相册的读取不受日志清理影响。
 
@@ -226,4 +226,4 @@ WriterLocalTools owns the native ask/finish/enter/create declarations and Writer
 
 Writer 模型由显式本地/云端选择决定：本地使用 Gemma，云端使用所选 Provider/Model；未配置报错。Gemma 提供原生工具适配；完整工具声明与历史超出本地窗口时明确失败，不自动选择云端。其他缺少原生工具的模型仍沿 unsupportedModel 路径结束。
 
-Task admission authenticates the original requester rather than an Assistant/Writer sender pair. Follow-up and cancellation must match the original sender and task association; the live role additionally verifies session ownership. Progress and durable terminal/rejection notifications return to that requester. Assistant is the current user-facing caller, not protocol-level authority.
+Task admission authenticates the original requester rather than an Assistant/Writer sender pair. Follow-up and cancellation must match the original sender and task association; the live role additionally verifies session ownership. Progress, terminal and rejection reports are published once to that requester. Assistant is the current user-facing caller, not protocol-level authority.

@@ -25,27 +25,6 @@ public enum IslandActions {
         return try await execute(command, context: IslandActionContext(invocation: invocation), using: island).json()
     }
     @Action(
-        domain: "UI", module: "Island", title: "update",
-        doc: "Submit shared local and system content; the component owns presentation and animations.",
-        parameters: [
-            .init(
-                "activityID", type: .string, required: true,
-                description: "Stable activity UUID from ui.island."),
-            .init("revision", type: .string, required: true, description: "Positive increasing owner revision."),
-            .init(
-                "content", type: .string, required: true,
-                description:
-                    "IslandContent JSON: title, priority:background|low|normal|high|attention|critical, primary/secondary {kind:symbol|loading|spectrum|progress|elapsed,startedAt (seconds since 2001-01-01 UTC),symbol,effect:none|pulse|bounce|variableColor,value}; detail {text,thumbnail UUID} enables expansion. New detail auto-opens; ordinary updates preserve manual collapse."
-            ),
-        ], timeout: .seconds(5))
-    public static func update(invocation: any FunctionInput, using island: any IslandControlCapability) async throws
-        -> String
-    {
-        let command = try IslandCommand(operation: .update, parameters: invocation.call.parameters)
-        try Task.checkCancellation()
-        return try await execute(command, context: IslandActionContext(invocation: invocation), using: island).json()
-    }
-    @Action(
         domain: "UI", module: "Island", title: "end",
         doc: "Submit shared local and system content; the component owns presentation and animations.",
         parameters: [
@@ -99,9 +78,6 @@ public struct IslandModule: CapabilityModule {
             IslandActions.presentDefinition(completing: { [island] in
                 .value(try await IslandActions.present(invocation: $0, using: island))
             }),
-            IslandActions.updateDefinition(completing: { [island] in
-                .value(try await IslandActions.update(invocation: $0, using: island))
-            }),
             IslandActions.endDefinition(completing: { [island] in
                 .value(try await IslandActions.end(invocation: $0, using: island))
             }),
@@ -115,7 +91,7 @@ public struct IslandModule: CapabilityModule {
 public enum IslandSize: String, Sendable { case compact, expanded }
 
 public struct IslandCommand: Sendable {
-    public enum Operation: String, Sendable { case present, update, end, setPresentation }
+    public enum Operation: String, Sendable { case present, end, setPresentation }
     public let operation: Operation
     public let id: UUID
     public let revision: UInt64
@@ -157,7 +133,7 @@ public struct IslandCommand: Sendable {
         operation: Operation, id: UUID, revision: UInt64 = 0, content: IslandContent? = nil, size: IslandSize? = nil
     ) throws {
         switch operation {
-        case .present, .update:
+        case .present:
             guard revision > 0, let content, size == nil else { throw IslandError.invalid }
             try content.validate()
             guard try JSONEncoder().encode(content).count <= 4096 else { throw IslandError.invalid }
@@ -220,11 +196,11 @@ public final class IslandPresentationService: IslandControlCapability, IslandThu
         let owner = context.owner
         let generation = state.generation
         switch command.operation {
-        case .present, .update:
+        case .present:
             guard let content = command.content else { throw IslandError.invalid }
             try state.publish(
                 id: command.id, owner: owner, revision: command.revision, content: content,
-                generation: generation, creating: command.operation == .present)
+                generation: generation, creating: true)
         case .end:
             try await state.end(id: command.id, owner: owner, revision: command.revision)
         case .setPresentation:
@@ -238,7 +214,7 @@ public final class IslandPresentationService: IslandControlCapability, IslandThu
                 try state.setExpanded(false, id: command.id)
             }
         }
-        if command.operation == .present || command.operation == .update {
+        if command.operation == .present {
             try await state.flushSystem(expectedGeneration: generation)
         }
         return IslandReceipt(

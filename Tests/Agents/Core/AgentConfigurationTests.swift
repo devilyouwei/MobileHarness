@@ -157,7 +157,8 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     #expect(config.version == 9 && config.agentID == .assistant)
     #expect(config.capabilities.actions.contains { $0.alias == "express" })
-    #expect(config.capabilities.actions.contains { $0.alias == "task.start" })
+    #expect(config.capabilities.controls.isEmpty)
+    #expect(!config.capabilities.actions.contains { $0.path.domain == "Agent" })
     #expect(config.capabilities.tools.isEmpty)
     var skills = AgentTaskSkillState()
     let maximum = try AssistantAgent.runtimeCapabilities(config.capabilities)
@@ -165,8 +166,8 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     let active = try skills.registry(fixed: maximum)
     #expect(active.tools.isEmpty)
     #expect(!active.actions.contains { $0.path.domain == "Camera" })
-    #expect(active.actions.contains { $0.alias == "task.start" })
-    #expect(active.actions.filter { $0.path.domain == "Agent" && $0.path.module == "Task" }.count == 5)
+    #expect(active.controls.contains { $0.alias == "task.start" })
+    #expect(active.controls.filter { $0.path.domain == "Agent" && $0.path.module == "Task" }.count == 5)
     let agent = try AssistantAgent(
         stateContext: try publicStateFixture(),
         chat: FixedTextChat(),
@@ -232,7 +233,7 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     }
     root["version"] = 4
     #expect(throws: AgentConfigurationError.unsupportedVersion(4)) { try decode(root) }
-    for key in ["channels", "textActions", "textOutput", "internal", "schemaVersion", "agentID"] {
+    for key in ["channels", "textActions", "textOutput", "internal", "schemaVersion", "agentID", "controls"] {
         var old = document()
         old[key] = []
         #expect(throws: AgentConfigurationError.self) { try decode(old) }
@@ -262,7 +263,11 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     let registry = try skills.registry(fixed: maximum)
     let prompt = try AssistantAgent.systemPrompt(capabilities: registry)
     #expect(!prompt.contains("Available Channels:"))
-    #expect(prompt.contains("Channel Control\nAction "))
+    #expect(
+        prompt.contains(
+            "Agent controls (run by this Agent, not Actions; self: own state, peer: another Agent;"
+                + " no Channel; never inside <wait>)\nControl "))
+    #expect(!prompt.contains("Channel Control"))
     #expect(prompt.contains("Action express:"))
     #expect(prompt.contains("Each Action uses its registered Channel, shown in the current Action catalog."))
     #expect(!prompt.contains("Action dance:"))
@@ -407,7 +412,7 @@ func malformedNativeToolsFailExplicitly(_ mutation: String) throws {
     let effective = try AgentSkillLoader.registry(["expression-interaction"], fixed: config.capabilities)
     let output = try AgentPrompts.capabilityContext()
     let generic = try output.build(effective)
-    #expect(generic.contains("SCHEDULING: CHANNEL, EXECUTION CONSTRAINTS, WAIT"))
+    #expect(generic.contains("SCHEDULING: CHANNEL AND EXECUTION CONSTRAINTS"))
     #expect(generic.contains("Action express:"))
     #expect(!generic.contains("is converted to speech and displayed as captions"))
     #expect(!generic.contains("audio playback"))
@@ -480,9 +485,6 @@ func threeLevelConfigurationRejectsAmbiguousBindings(_ mutation: String) throws 
         #expect(registration.defaultChannel == "Camera")
         #expect(registration.path.domain == "Camera")
     }
-    let catalog = try AgentCommunicationAdapter.catalog(
-        capabilities, policy: AgentConfigurations.load(named: "Photographer").communication)
-    #expect(catalog.tools.isEmpty)
 }
 
 @Test(.actionCatalog) func typedUIRequestsSubscribeOnlyAtTheirBusinessOwner() throws {
@@ -506,7 +508,7 @@ func threeLevelConfigurationRejectsAmbiguousBindings(_ mutation: String) throws 
 
 @Test(.actionCatalog) func eachAgentModelCatalogUsesOneProtocolPerFunction() throws {
     for role in try AgentConfigurations.all() {
-        let catalog = try AgentCommunicationAdapter.catalog(role.capabilities, policy: role.communication)
+        let catalog = role.capabilities
         let actions = catalog.actions.map { $0.path.description }
         let tools = catalog.tools.map(\.path)
         #expect(Set(actions).count == actions.count)
@@ -514,7 +516,7 @@ func threeLevelConfigurationRejectsAmbiguousBindings(_ mutation: String) throws 
         #expect(Set(actions).isDisjoint(with: Set(tools)))
     }
     let configuration = try AgentConfigurations.load(named: "ApplicationControl")
-    let catalog = try AgentCommunicationAdapter.catalog(configuration.capabilities, policy: configuration.communication)
+    let catalog = configuration.capabilities
     #expect(
         try catalog.resolveAction("openPage", parameters: ["destination": "settings"]).actionPath.description
             == "UI.Navigation.open")
@@ -532,64 +534,6 @@ func threeLevelConfigurationRejectsAmbiguousBindings(_ mutation: String) throws 
             ToolCall(
                 id: UUID().uuidString, toolPath: "UI.Navigation.open", arguments: ["destination": "settings"]
             )))
-}
-
-@Test(
-    .actionCatalog,
-    arguments: [
-        ("Assistant", "taskPhotographer", "request"),
-        ("Photographer", "assistant", "progress"),
-        ("Photographer", "assistant", "result"),
-        ("Memory", "assistant", "progress"),
-        ("Memory", "assistant", "result"),
-        ("ApplicationControl", "assistant", "progress"),
-        ("ApplicationControl", "assistant", "result"),
-    ])
-func historyPreviewRecognizesDirectedTaskActions(_ scenario: (String, String, String)) throws {
-    let (name, target, kind) = scenario
-    let configuration = try AgentConfigurations.load(named: name)
-    let runtime: CapabilityRegistry
-    switch name {
-    case "Photographer": runtime = try PhotographerAgent.runtimeCapabilities(configuration.capabilities)
-    case "Memory": runtime = try MemoryAgent.runtimeCapabilities(configuration.capabilities)
-    case "ApplicationControl":
-        runtime = try ApplicationControlAgent(
-            sessionID: UUID().uuidString,
-            context: try AgentContextRepository(
-                agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
-                state: ApplicationControlContextState())
-        ).descriptor.capabilities
-    default: runtime = try AssistantAgent.runtimeCapabilities(configuration.capabilities)
-    }
-    let declared = try AgentSkillLoader.registry(["basic-skill"], fixed: runtime)
-    let communication =
-        name == "Assistant" ? try taskFixtureConfiguration(parent: true).communication : configuration.communication
-    let catalog = try AgentCommunicationAdapter.catalog(
-        fixtureCatalogWithCommunication(declared), policy: communication)
-    var trace = try GenerationTrace(
-        capabilities: catalog, textMapping: AssistantAgent.mapText, segmentation: try AssistantAgent.textSegmentation)
-    let task = kind == "request" ? "" : " taskID=\"\(UUID().uuidString)\""
-    try trace.append("照片已拍摄。<se")
-    try trace.append("nd target=\"\(target)\" kind=\"\(kind)\"\(task) content=\"保存或忽略？\"/>")
-    trace.finish()
-    #expect(trace.parserError == nil)
-    #expect(!trace.events.contains { if case .rejected = $0 { true } else { false } })
-    let send = try #require(trace.calls.first { $0.actionPath.description == "Agent.Communication.send" })
-    #expect(send.channel == "Communication")
-    #expect(send.parameters["target"] == target && send.parameters["kind"] == kind)
-    #expect(trace.calls.contains { $0.actionPath.description == "UI.Caption.print" })
-
-    var invalid = try GenerationTrace(capabilities: catalog)
-    try invalid.append("<send target=\"\(target)\" content=\"missing kind\"/><unknown/>")
-    invalid.finish()
-    #expect(
-        invalid.events.contains {
-            $0 == .rejected(CallRejection(kind: .action, alias: "send", reason: .invalidParameters))
-        })
-    #expect(
-        invalid.events.contains {
-            $0 == .rejected(CallRejection(kind: .action, alias: "unknown", reason: .unknownCapability))
-        })
 }
 
 @Test(

@@ -81,7 +81,7 @@ import UI
                 "agent_messages", "assistant_conversations",
                 "assistant_messages", "assistant_tasks", "devices", "invocation_evidence",
                 "media_files",
-                "model_request_log", "task_observation_cursors", "workspace_files", "writer_executions",
+                "model_request_log", "workspace_files", "writer_executions",
                 "writer_messages", "writer_workspaces",
             ])
         #expect(try schemaRows(url, "SELECT COUNT(*) FROM assistant_messages") == [["2"]])
@@ -359,10 +359,6 @@ func storageSyntheticWriterUIFixture() async throws {
         id: #require(WorkspaceID(rawValue: task.workspaceID)), expecting: nil, title: "测试流程图",
         draft: ArtifactDraft(files: ["index.html": source, "empty.css": ""]))
     try await database.endSeedDelegation(task.delegateID, status: "completed")
-    for retirement in [false, true] {
-        try await database.writerExecutions.finishDelegationNotification(
-            task.delegateID, agent: "writer", retirement: retirement, completed: true, failure: nil)
-    }
     try await database.shutdown()
 }
 
@@ -738,52 +734,5 @@ func storageSyntheticWriterUIFixture() async throws {
         #expect(try await restored.input("a")?.turns.first?.modelRequests?.map(\.input) == [batch, "完整执行观察"])
         #expect(detail.turns.first?.user == "介绍北京")
         try await reopened.shutdown()
-    }
-
-    @Test(arguments: ["messages", "responses", "mismatch", "cleared"])
-    func assistantLegacyBatchDetailRecoversOnlyMatchingRecordedInput(format: String) async throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".sqlite")
-        defer { for suffix in ["", "-wal", "-shm"] { try? FileManager.default.removeItem(atPath: url.path + suffix) } }
-        let database = try SQLiteRepositories(url: url)
-        let records = try AssistantRecordStore(
-            repository: database.assistantMessages, tasks: database.assistantTasks,
-            conversations: database.assistantConversations, logs: database.logs)
-        let history = AssistantHistoryStore(records: records)
-        let snapshot = try await history.readCurrent()
-        _ = try await history.begin(id: "a", user: "原始主输入", request: [], expecting: snapshot.token, model: "fixture")
-        var evidence = AssistantInputCoordination(source: "speech", capturedAt: "1")
-        evidence.memberIDs = ["a", "b"]
-        evidence.batchID = "a"
-        try await history.recordCoordination(evidence, for: "a")
-        try await history.beginModelRequest(.init(id: "request", input: "原始主输入", requestJSON: "[]"), for: "a")
-        let batch =
-            format == "mismatch"
-            ? #"{"inputs":[{"id":"a"},{"id":"wrong"}]}"#
-            : #"{"inputs":[{"id":"a","text":"原始主输入"},{"id":"b","text":"第二条输入"}]}"#
-        let payload: [String: Any] =
-            format == "responses"
-            ? ["input": [["role": "user", "content": [["type": "input_text", "text": batch]]]]]
-            : ["messages": [["role": "user", "content": batch]]]
-        try await history.recordModelExchange(
-            requestJSON: String(decoding: JSONSerialization.data(withJSONObject: payload), as: UTF8.self),
-            response: "[]", for: "a", initial: true)
-        try await history.append("完整回复", to: "a")
-        try await history.finishModelRequest("a", reason: "stop")
-        try await history.finish("a", state: .completed)
-        var connection: OpaquePointer?
-        try #require(sqlite3_open(url.path, &connection) == SQLITE_OK)
-        #expect(
-            sqlite3_exec(
-                connection,
-                "UPDATE assistant_messages SET user_input_json=json_remove(user_input_json,'$.requestText')", nil, nil,
-                nil) == SQLITE_OK)
-        sqlite3_close(connection)
-        if format == "cleared" { try await records.clearRequestLogs(requestID: nil) }
-        let id = try #require(try database.assistantMessages.previews(dialog: snapshot.current.id).first?.id)
-        let detail = try await records.message(id)
-        #expect(
-            detail.turns.first?.modelRequests?.first?.input
-                == (["mismatch", "cleared"].contains(format) ? "原始主输入" : batch))
-        try await database.shutdown()
     }
 #endif

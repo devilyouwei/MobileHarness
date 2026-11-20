@@ -12,7 +12,7 @@
             let status = await session?.agent.status()
             let context = await session?.agent.residentContext()
             let speech = await session?.speech?.snapshot()
-            let observationFailure = await session?.agent.taskObservationFailure
+            let recordFailure = await session?.agent.messageRecordFailure
             let trackedCount = await session?.agent.trackedTaskCount
             return AgentStateSnapshot(
                 path: "agents.assistant",
@@ -31,8 +31,7 @@
                     "processedInputs": status.map { .count($0.processedInputs) } ?? .unknown,
                     "loadedSkills": context?.state.skillState.map { .count($0.loaded.count) } ?? .unknown,
                     "trackedTasks": trackedCount.map { .count($0) } ?? .unknown,
-                    "taskObservationFailed": .flag(observationFailure != nil),
-                    "taskObservationFailure": observationFailure.map { .text($0) } ?? .unknown,
+                    "messageRecordFailure": recordFailure.map { .text($0) } ?? .unknown,
                     "closed": .flag(closed), "installed": .flag(session != nil),
                 ])
         }

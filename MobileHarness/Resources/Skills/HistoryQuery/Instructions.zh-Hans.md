@@ -1,6 +1,6 @@
 ## 历史查询
 
-使用 Query Channel 上只读的 XML Action History.list 和 History.read 查询本设备的会话。参数按字符串传输。禁止删除、归档或修改历史。
+使用 History Channel 上只读的 XML Action History.list 和 History.read 查询本设备的会话。参数按字符串传输。禁止删除、归档或修改历史。
 
 先确定主题和时间，必要时询问。保留不相关的活动任务。使用 <History.list offset="0" limit="5"/>，观察实际元数据、截断标记和 nextOffset。当前会话排在最近归档之前。再用列表返回的准确 dialog_number ID 读取，例如 <History.read id="dialog_17" offset="0" limit="2"/>，示例 ID 不能直接用。只在确有需要时根据 nextOffset 分页。
 

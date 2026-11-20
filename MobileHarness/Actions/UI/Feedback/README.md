@@ -2,7 +2,7 @@
 
 ## 职责与关系
 
-反馈与装饰值先校验范围，再由注入端点执行；PCM 生成是纯算法，不操作设备。提示音等待实际排空，触觉等待有界脉冲提交；瞬时提示和光效期限由基础 UI 根拥有。
+反馈值先校验范围，再由注入端点执行；PCM 生成是纯算法，不操作设备。提示音等待实际排空，触觉等待有界脉冲提交。
 
 本目录由所属域目录绑定，接受标准 FunctionInput；调用权限、通用调度与资源仲裁由上游 Gateway 保持。下游只消费注入的基础能力。
 
@@ -12,9 +12,6 @@
 | --- | --- |
 | [FeedbackActions.swift](FeedbackActions.swift) | 业务函数的参数校验、能力调用与完成值 |
 | [FeedbackTone.swift](FeedbackTone.swift) | 固定六项提示音 PCM 的纯生成与音量缩放 |
-| [LightActions.swift](LightActions.swift) | 业务函数的参数校验、能力调用与完成值 |
-| [NoticeActions.swift](NoticeActions.swift) | 业务函数的参数校验、能力调用与完成值 |
-| [UIEffectTypes.swift](UIEffectTypes.swift) | 瞬时提示与装饰光的值及端口 |
 | [UIFeedbackTypes.swift](../../Support/Contracts/UIFeedbackTypes.swift) | 提示音、触觉请求和能力端口 |
 
 ## 反馈音频算法

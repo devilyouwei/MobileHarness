@@ -85,7 +85,7 @@ GatewayOutputConsumer.executeInternal requires the registered role's internalToo
 
 Task retirement is bound to the registered executor. OutputGateway closes grant admission, joins or cancels existing work according to terminal status, then revokes the admission generation. InputGateway records successful local retirement for diagnostics. Already missing grants from cleanup/restart can converge without fabricating an active grant.
 
-Writer may request execution authorization after admitting a new ordinary message. The port authenticates message/session/both incarnations; failed business admission rolls back that grant. Progress/terminal events retain the bound scope. Writer owns its durable settlement worker and joins it during pause/stop; user notification has an independent worker. OutputGateway depends only on AgentMessageRepository for durable communication, without Task/workspace ownership APIs.
+Writer may request execution authorization after admitting a new ordinary message. The port authenticates message/session/both incarnations; failed business admission rolls back that grant. Progress/terminal events retain the bound scope. Writer owns its report worker and joins it during pause/stop; reports are published once without redelivery, and user notification has an independent worker. OutputGateway depends only on AgentMessageRepository for communication trace records, without Task/workspace ownership APIs.
 
 ## Shared Island transport
 

@@ -10,6 +10,9 @@ public struct GenerationTrace: Sendable {
     public var calls: [ActionCall] {
         events.compactMap(\.actionCall)
     }
+    public var controls: [ControlCall] {
+        events.compactMap { if case .control(let call) = $0 { call } else { nil } }
+    }
     public private(set) var parserError: String?
     public private(set) var finished = false
     private var closed = false

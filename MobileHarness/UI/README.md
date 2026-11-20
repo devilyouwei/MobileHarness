@@ -131,7 +131,7 @@ Settings 的 Agent Models 总页管理共享 Cloud Providers 和本地下载，�
 
 Settings 历史只呈现实际发起的模型请求及其完整输入输出、来源、批次和失败证据。被丢弃的 Signal 不产生历史条目，Assistant 发布瞬时灵动岛反馈。
 
-HomeNotice 的独立 toast 由 Root 导航外层显示，Conversation 拥有单槽替换与到期清理；它与保留的双方字幕、错误 notice 独立，不写业务记录。
+HomeNotice 的错误 toast 由 Root 导航外层显示，Conversation 拥有单槽替换与到期清理；它与保留的双方字幕独立，不写业务记录。
 
 Conversation 将用户字幕固定上方、助手字幕固定下方，不随定稿或活动漂移；共用 Components 的文字淡入，布局与区域约束归 Conversation。
 

@@ -52,10 +52,6 @@ public struct BehaviorProtocolBindings {
                 function: function, protocols: [.action, .tool], executionPolicy: .direct,
                 directResultPolicy: .returning)
         }
-        if function.path.domain == "Agent", function.path.module == "Task" {
-            return ActionBinding(
-                function: function, protocols: [.action], executionPolicy: .scheduled(channel: "Control"))
-        }
         if function.path.domain == "UI", function.path.module == "Expression", function.path.function == "setLoading" {
             return ActionBinding(
                 function: function, protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
@@ -70,10 +66,10 @@ public struct BehaviorProtocolBindings {
             return ActionBinding(function: function, protocols: [.action, .tool], executionPolicy: .direct)
         }
         switch group {
-        case "UI.Expression", "UI.Feedback", "UI.Notice", "UI.Light", "Speech.Playback", "Speech.Listening",
+        case "UI.Expression", "UI.Feedback", "Speech.Playback", "Speech.Listening",
             "NexArm.Motion", "NexArm.Gesture":
             return ActionBinding(function: function)
-        case "Speech.Detection", "History.Conversation", "System.Runtime", "System.ModelResources", "System.Provider",
+        case "Speech.Detection", "History.Conversation", "System.ModelResources", "System.Provider",
             "UI.ResourcePresentation", "UI.BluetoothStatus", "System.Device":
             return ActionBinding(
                 function: function, protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)

@@ -1,6 +1,6 @@
 ## History query
 ### Scope and functions
-Find/read this device's conversations through the read-only XML Actions History.list and History.read on the Query Channel. This Skill cannot delete, archive or modify history. All arguments are strings, including integer offsets/limits. Queries return actual business data through Action feedback.
+Find/read this device's conversations through the read-only XML Actions History.list and History.read on the History Channel. This Skill cannot delete, archive or modify history. All arguments are strings, including integer offsets/limits. Queries return actual business data through Action feedback.
 ### Workflow
 1. Identify topic/time range; clarify if needed. A query aside keeps an unrelated active Task intact. If the user is considering replacing an unfinished goal but has not decided, follow BasicSkill's confirmation rule before new goal effects.
 2. Use History.list with offset="0", limit="5". Inspect actual metadata, preview truncation and nextOffset; current conversation precedes newest archives.

@@ -8,7 +8,6 @@ Shared Chat adapts ModelKit requests/events, records request evidence, renders i
 | --- | --- |
 | [AgentChatDriver.swift](AgentChatDriver.swift) | Provider-session consumption, bounded text/native streams, timing and joined cleanup. |
 | [AgentChatContextBuilder.swift](AgentChatContextBuilder.swift) | Stateless message budgeting, complete native call/result groups, State image projection and execution-result serialization. |
-| [AgentCommunicationAdapter.swift](AgentCommunicationAdapter.swift) | Model communication declarations and authenticated Task-message argument projection. |
 | [AgentModelRequestRecording.swift](AgentModelRequestRecording.swift) | Neutral request/event and HTTP transport evidence passed to an injected recorder. |
 | [AgentPrompts.swift](AgentPrompts.swift) | Locale-aware bundled template loading, rendering, caching and release. |
 
@@ -59,8 +58,6 @@ Callers own journal creation, dispatch checkpoints, persistence and deletion. St
 
 AgentPrompts loads immutable resources through an injected reader. JSON holds named templates; Markdown/text use body. The cache has at most 256 entries. Invalid paths/formats, missing required templates and rendering errors propagate. English is the canonical source; zh-Hans selects the translated sibling with the documented missing-file fallback. TaskLocal language scopes request assembly without changing canonical protocol identities.
 
-Shared convenience methods own shared output, catalog and request-context resources. AssistantInputBatch owns Assistant input guidance and canonical historical markers; ConversationTitleGenerator owns Memory title templates. The role supplies its own prompt assembly and locale. No shared helper embeds private role instructions or interprets a role's history schema.
+Shared convenience methods own shared output, catalog and request-context resources. AssistantInputBatch owns Assistant input guidance and canonical source markers; ConversationTitleGenerator owns Memory title templates. The role supplies its own prompt assembly and locale. No shared helper embeds private role instructions or interprets a role's history schema.
 
-## Communication projection
-
-AgentCommunicationAdapter projects declared send permissions into model guidance and validates target/kind/content and optional Task/artifact identity. Existing Task scopes retain authenticated requester/executor/session identity. Broadcast Task ownership is rejected; admission receipts do not prove business completion. Runtime execution and role admission remain separate owners. See [communication contracts](../Communication/README.md).
+Peer messaging is not a model-visible Action. The owning Agent exposes it as a `peer` control (Assistant `task.send`); see [Agent controls](../Core/Capability/README.md#agent-controls) and [communication contracts](../Communication/README.md).

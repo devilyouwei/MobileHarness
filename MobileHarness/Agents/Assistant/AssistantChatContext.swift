@@ -26,7 +26,6 @@ public protocol AssistantChatState: AgentTaskContextState {
     static func systemPrompt(
         _ capabilities: CapabilityRegistry, skills: AgentTaskSkillState?, communication: CommunicationDeclaration
     ) throws -> String
-    static func validateCommunication(_ signal: AgentTaskSignal, state: Self) throws
     init()
     var skillState: AgentTaskSkillState? { get set }
     var history: AssistantArchive { get set }
@@ -117,7 +116,6 @@ extension AssistantChatState {
     }
     public static var acceptsDirectedUserInput: Bool { false }
     public static var commitDependentTargets: Set<AgentID> { [] }
-    public static func validateCommunication(_ signal: AgentTaskSignal, state: Self) throws {}
 }
 
 public struct AssistantChatObservation: Sendable {

@@ -165,7 +165,7 @@ extension AgentMessageRepository {
     ) async throws {
         try await enqueueAgentMessage(
             .init(
-                id: id, sender: requester, receiver: executor, contract: "task.request",
+                id: id, sender: requester, receiver: executor, contract: "agent.task.v1",
                 payload: JSONSerialization.data(withJSONObject: ["description": goal, "input": input]),
                 correlationID: id, senderContext: sourceDialog, dedupeKey: id))
     }
@@ -196,11 +196,10 @@ extension SQLiteRepositories {
         let row = try await writerExecutions.request(id, agent: "writer")
 
         try await writerExecutions.completeRequest(
-            .init(delegateID: id, agent: "writer", eventID: UUID().uuidString, data: Data("{}".utf8)), status: status,
-            failure: failure)
+            id, eventID: UUID().uuidString, result: Data("{}".utf8), status: status, failure: failure,
+            cancellationReason: nil)
 
-        try await writerExecutions.finishDelegationNotification(
-            id, agent: "writer", retirement: true, completed: true, failure: nil)
+        try await writerExecutions.retireRequest(id, failure: nil)
 
         _ = row
     }
@@ -290,7 +289,7 @@ extension SQLiteRepositories {
     let messageID = UUID().uuidString
     try await records.agentMessages.enqueueAgentMessage(
         .init(
-            id: messageID, sender: "assistant", receiver: "writer", contract: "agent.task.request",
+            id: messageID, sender: "assistant", receiver: "writer", contract: "agent.task.v1",
             payload: Data(#"{"text":"Stop"}"#.utf8),
             correlationID: current.delegateID, replyTo: current.delegateID, dedupeKey: messageID))
     #expect(

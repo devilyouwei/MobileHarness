@@ -85,8 +85,9 @@ import StorageFiles
             skillObservation?.cancel()
             await skillObservation?.value
             business.bindTracking { false }
-            business.tasks.handler = nil
+            assistantControl.bind(nil)
         }
+        private let assistantControl: AssistantControlLink
         private let assistantContext: AgentContextRepository<AssistantContextState>
         let conversations: AssistantHistoryStore
         let observations: AgentObservationAccess
@@ -183,6 +184,7 @@ import StorageFiles
                     await photographerAgent?.hasFreshPose() ?? false
                 }
                 let historySessionID = applicationControlSessionID
+                let assistantControl = AssistantControlLink()
                 let policy = try CommunicationPolicy(
                     contracts: AgentContracts.communication,
                     configurations: [
@@ -196,14 +198,9 @@ import StorageFiles
                     sessionID: historySessionID, uiHistory: historyUI,
                     beforeNewConversation: {
                         if try await assistantContext.snapshot().state.skillState?.activeTaskID != nil {
-                            guard let control = await business.tasks.handler else {
-                                throw CommunicationError.unavailableTarget
-                            }
-                            _ = try await control(
-                                "task.end",
-                                ["summary": "The user started a new conversation and ended the current goal."],
-                                "assistant",
-                                applicationControlSessionID, UUID().uuidString, nil)
+                            try await assistantControl.finishForegroundTask(
+                                summary: "The user started a new conversation and ended the current goal.",
+                                sessionID: applicationControlSessionID)
                         }
                     }, context: memoryContext)
                 let catalog = business.catalog
@@ -254,6 +251,7 @@ import StorageFiles
                     try AgentRuntime(
                         facilities: facilities, business: business, contextScope: contextScope, home: home,
                         containerFailures: containerFailures, cache: cache, assistantContext: assistantContext,
+                        assistantControl: assistantControl,
                         conversations: conversations, communications: repositories.agentMessages,
                         applicationControlSessionID: applicationControlSessionID,
                         activity: activity, log: log, photographerAgent: photographerAgent,
@@ -270,7 +268,8 @@ import StorageFiles
         private init(
             facilities: AgentGatewayCapabilities, business: AgentBusinessBindings, contextScope: String,
             home: UIHomeContainer, containerFailures: ContainerFailureChannel, cache: CacheContainer,
-            assistantContext: AgentContextRepository<AssistantContextState>, conversations: AssistantHistoryStore,
+            assistantContext: AgentContextRepository<AssistantContextState>, assistantControl: AssistantControlLink,
+            conversations: AssistantHistoryStore,
             communications: any AgentMessageRepository,
             applicationControlSessionID: String, activity: AgentRuntimeLogWorkflow, log: (any RuntimeLogWriting)?,
             photographerAgent: PhotographerAgent,
@@ -289,6 +288,7 @@ import StorageFiles
             self.containerFailures = containerFailures
             self.cacheStorage = cache
             self.assistantContext = assistantContext
+            self.assistantControl = assistantControl
             self.conversations = conversations
             self.interactionSessionID = applicationControlSessionID
             let manager = facilities.manager
@@ -357,11 +357,7 @@ import StorageFiles
                 communications: communications,
                 modelName: modelName,
                 context: assistantContext, language: language)
-            business.tasks.handler = { operation, arguments, source, session, input, decision in
-                try await main.controlTask(
-                    operation, arguments: arguments, source: source, sessionID: session, inputID: input,
-                    decisionID: decision)
-            }
+            assistantControl.bind(main)
             let interaction = AssistantExecutionSession(
                 agent: main, manager: manager, output: gateway, speech: speechOutput,
                 report: { message in

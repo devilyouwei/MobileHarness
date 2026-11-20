@@ -345,14 +345,20 @@ import Foundation
         private func channelColor(_ channel: String) -> Color {
             switch channel {
             case "Camera": return .cyan
-            case "Control": return .purple
             case "Display": return .indigo
             case "Listening": return .teal
             case "ListeningControl": return .mint
-            case "Query": return .blue
+            case "CameraCancel": return .red
+            case "Device": return .blue
+            case "History": return .gray
+            case "Island": return .purple
+            case "ModelResources": return .brown
+            case "Provider": return .yellow
             case "Robot": return .orange
             case "Speech": return .pink
-            case "System": return .brown
+            case "Vision": return .green
+            case "Web": return .gray
+            case "Window": return .purple
             default:
                 let palette: [Color] = [.blue, .purple, .orange, .teal, .pink, .indigo, .brown, .cyan]
                 let hash = channel.utf8.reduce(UInt32(2_166_136_261)) { ($0 ^ UInt32($1)) &* 16_777_619 }

@@ -133,18 +133,3 @@ func fixtureRuntimeTool() throws -> ToolRegistration {
                 .utf8))
     return ToolRegistration(alias: "runtimeInfo", path: "System.Runtime.runtimeInfo", definition: definition)
 }
-
-/// Communication protocol tests explicitly opt in; production BasicSkill does not grant send.
-func fixtureCatalogWithCommunication(_ base: CapabilityRegistry) throws -> CapabilityRegistry {
-    let bindings = try JSONDecoder().decode(
-        [AgentConfigurations.Binding].self,
-        from: Data(
-            """
-            [{"path":"Agent.Communication.send","callType":"action","alias":"send","channel":"Communication"}]
-            """.utf8))
-    let communication = try AgentConfigurations.registry(bindings)
-    return try CapabilityRegistry(
-        actions: base.actions.filter { $0.path.description != "Agent.Communication.send" } + communication.actions,
-        tools: base.tools, channels: base.channels, internalActions: base.internalActions,
-        internalTools: base.internalTools)
-}

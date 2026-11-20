@@ -61,9 +61,9 @@ Writer 委托故障回归通过真实 Assistant XML、Gateway/Scheduler 和 SQLi
 Writer失败回归覆盖先list成功后第二次模型请求timeout，实际Gateway记录modelTransport分类并向Assistant传送完整诊断；SQLite重开及通用UI DTO还原诊断，模型/阶段/输入ID/耗时和独立清理原因均保留。模型为替身，不代表真实Qwen请求成功。
 
 
-Writer 自主任务回归覆盖接收端暂不可用时仍完成创作和发布、同事件重投、暂停恢复、Assistant 关闭后 Writer 继续执行、跨对话阶段汇报及共享 FIFO。语音回归使用受控识别与播放能力，验证连续转写、播放准入、恢复以及明确停止后的采集拒绝。
+Writer 自主任务回归覆盖接收端暂不可用时仍完成创作、报告不重发、暂停恢复、Assistant 关闭后 Writer 继续执行、跨对话阶段汇报及共享 FIFO。语音回归使用受控识别与播放能力，验证连续转写、播放准入、恢复以及明确停止后的采集拒绝。
 
-Writer independence regressions use real Gateway/SQLite with scripted models: rejected user notifications do not retain the creative slot, execution retirement supports successive delegations beyond the live-grant bound, and database reopen redelivers immutable events without another model lease or file creation. Assistant fixtures cover canonical-state reconciliation before new/resumed delegations and stale terminal messages after a new run.
+Writer independence regressions use real Gateway/SQLite with scripted models: dropped progress reports do not retain the creative slot, and execution retirement supports successive delegations beyond the live-grant bound. Assistant fixtures cover canonical-state reconciliation before new/resumed delegations and stale terminal messages after a new run.
 
 Writer task-Island regressions use actual Gateway direct, Island Actions/UI state and SQLite with scripted model/rendering. A rejecting Assistant does not prevent start/file-step/terminal display; unavailable presentation retains only the latest task state, old-run callbacks are ignored, and root stop joins its publisher. Component tests cover semantic priority independent of producer names, speech/status coexistence, manual collapse and new-stage expansion. No model is asked to call Island tools. These are not native animation or real-provider acceptance.
 

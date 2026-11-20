@@ -100,7 +100,7 @@ Actions 为可信业务调用和模型调用提供统一实现与元数据。Ski
 
 ## 公开 State 边界
 
-Skill schema v3 通过 useActions、useStates 和 useInstructions 声明函数、公开事实路径和教学来源。Agents 在每轮投影 CURRENT STATE。共享 Skill 使用 XML Action，公开查询使用 Query Channel。Writer 私有 Skill 提供原生 Tool，运行时内部调用另有固定授权。详见 [容器上下文契约](../Agents/Support/Context/README.md) 与 [Skill 配置](Skills/README.md)。
+Skill schema v3 通过 useActions、useStates 和 useInstructions 声明函数、公开事实路径和教学来源。Agents 在每轮投影 CURRENT STATE。共享 Skill 使用 XML Action，公开只读查询在各自所属子系统的 Channel 上。Writer 私有 Skill 提供原生 Tool，运行时内部调用另有固定授权。详见 [容器上下文契约](../Agents/Support/Context/README.md) 与 [Skill 配置](Skills/README.md)。
 
 ## ApplicationControl 异常展示
 

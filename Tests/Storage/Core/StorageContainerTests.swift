@@ -288,20 +288,3 @@ private actor StateReadSpyDatabase: DatabaseStorage {
     #expect(await database.observedReads() == 1)
     #expect(!FileManager.default.fileExists(atPath: location.path))
 }
-
-@Test func modelPreferenceMigrationPreservesSettingsWithoutModelStorageNamespace() throws {
-    let root = containerRoot().resolvingSymlinksInPath()
-    defer { try? FileManager.default.removeItem(at: root) }
-    let previous = root.appendingPathComponent("Models/download-source.json")
-    let destination = root.appendingPathComponent("Settings/download-source.json")
-    try FileManager.default.createDirectory(at: previous.deletingLastPathComponent(), withIntermediateDirectories: true)
-    let content = Data("saved-preference-envelope".utf8)
-    try content.write(to: previous)
-    let app = ApplicationContainer(root: root)
-    try app.migrateResourcePreferences()
-    #expect(try Data(contentsOf: destination) == content)
-    #expect(!FileManager.default.fileExists(atPath: previous.path))
-    try Data("older-copy".utf8).write(to: previous)
-    try app.migrateResourcePreferences()
-    #expect(try Data(contentsOf: destination) == content)
-}

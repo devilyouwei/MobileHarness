@@ -17,7 +17,7 @@ showHome 和 showSettings 以 Void 完成，调用方仍可收到结构化回执
 
 ## Island 执行与完成
 
-IslandModule 注册 UI.Island.present/update/end/setPresentation。前三项为内部 Tool，setPresentation 提供 Action/Tool；内部发布不进入模型目录。IslandCommand 统一解析与字段校验，IslandActions.execute 经 IslandPresentationService 使用 UI 公共端口执行。生产者身份来自可信 invocation 的 source/session，内容不能指定 owner。发布、更新、结束使用 UI 的 owner/revision 校验；不能修改或结束其他生产者的内容。setPresentation 保留 Skill 授权的共享展开／收起权限，这不授予内容写权限。
+IslandModule 注册 UI.Island.present/end/setPresentation。present 与 end 为内部 Tool，present 同时负责创建和按 revision 更新；setPresentation 提供 Action/Tool；内部发布不进入模型目录。IslandCommand 统一解析与字段校验，IslandActions.execute 经 IslandPresentationService 使用 UI 公共端口执行。生产者身份来自可信 invocation 的 source/session，内容不能指定 owner。发布、更新、结束使用 UI 的 owner/revision 校验；不能修改或结束其他生产者的内容。setPresentation 保留 Skill 授权的共享展开／收起权限，这不授予内容写权限。
 
 setPresentation 接受 compact/expanded；expanded 必须有 detail。large/custom/animation/width/height 拒绝。回执的 submitted/localStatus/systemStatus 区分接纳、本地完成和系统提交；系统禁用或失败不抹除本地内容。UI 拥有布局、优先级仲裁、手动收起、动画、挂载及 ActivityKit 串行提交。根停止关闭服务；角色在生产者权限退休前加入自己的 end 和重试 worker 清理。
 

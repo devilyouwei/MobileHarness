@@ -49,8 +49,7 @@ public struct AgentConfiguration: Sendable {
             throw AgentConfigurationError.invalidFormat
         }
         let root = try Self.dictionary(
-            raw, keys: ["version", "id", "category", "actions", "tools", "signals"],
-            field: "root")
+            raw, keys: Self.rootKeys, field: "root")
         let decoded: Document
         do { decoded = try JSONDecoder().decode(Document.self, from: data) } catch {
             throw AgentConfigurationError.invalidFormat
@@ -110,6 +109,8 @@ public struct AgentConfiguration: Sendable {
             }, channels: Set(decoded.actions.keys))
         agentID = AgentID(rawValue: decoded.id)
     }
+
+    private static let rootKeys: Set<String> = ["version", "id", "category", "actions", "tools", "signals"]
 
     private static func dictionary(_ raw: Any, keys: Set<String>, field: String) throws -> [String: Any] {
         guard let value = raw as? [String: Any], Set(value.keys) == keys else {

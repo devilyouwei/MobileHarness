@@ -13,10 +13,7 @@ import Gateway
                 stop: { await services.containerFailures.stop() }),
             ManagedService(
                 id: "storage", dependencies: ["diagnostics"],
-                start: {
-                    try services.registry.migrateResourcePreferences()
-                    try await services.storage.start()
-                },
+                start: { try await services.storage.start() },
                 stop: { try await services.storage.stop() }),
             ManagedService(
                 id: "model", dependencies: ["diagnostics"], continuesInBackground: true,

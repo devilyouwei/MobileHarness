@@ -73,7 +73,6 @@ public final class ConversationState {
     public internal(set) var listeningAnimationID: String?
     /// Normalized content-space origin; latched by the renderer on each new listening generation.
     public internal(set) var listeningLightOrigin: ListeningLightOrigin?
-    public internal(set) var decorativeLight: DecorativeLight?
     public internal(set) var graphicsMessage: String?
     public internal(set) var isReplyActive = false {
         didSet { if !isReplyActive { replyWaitingRequest = nil } }
@@ -196,23 +195,6 @@ public struct ConversationCaptionLayout: Sendable {
         replyHeight = min(120, viewportHeight * 0.20)
         // Reserve the same bottom area even while channels have no visible activity.
         replyCenterY = max(top + captionHeight + 24 + replyHeight * 0.5, viewportHeight - 240)
-    }
-}
-
-/// Decoration only: does not own listening consent or expression state.
-public struct DecorativeLight: Sendable, Equatable {
-    public let id: String
-    public let origin: ListeningLightOrigin
-    public let initialOpacity: Double
-    public let intensity: Double
-    public init(
-        id: String = UUID().uuidString, origin: ListeningLightOrigin, initialOpacity: Double,
-        intensity: Double
-    ) {
-        self.id = id
-        self.origin = origin
-        self.initialOpacity = initialOpacity
-        self.intensity = intensity
     }
 }
 
@@ -418,7 +400,6 @@ public protocol ConversationPresenting: UIPresentationAccess {
     var isVoiceActive: Bool { get }
     var listeningAnimationID: String? { get }
     var listeningLightOrigin: ListeningLightOrigin? { get }
-    var decorativeLight: DecorativeLight? { get }
     var graphicsMessage: String? { get }
     var isReplyActive: Bool { get }
     var listeningControlMessage: String? { get }

@@ -136,7 +136,7 @@ Artifacts拥有作品窗口的简洁标题/操作副标题、每项目最新快�
 
 Artifacts receives a neutral WorkspaceRepository through ActionsDependencies. StorageDatabase.WorkspaceStore coordinates current file publication and its SQL index. Actions owns editing, format validation and rendering.
 
-Camera owns memory-only photo capture, automatic latest and explicit image selections, and saving by previewID. Opening the camera and taking a photo are independent Actions ordered by Gateway on the Camera Channel; takePhoto accepts a single-shot countdown without changing capture preferences. Its scoped State reader supplies immutable image attachments; ordinary inspection remains metadata-only. Storage owns bytes/persistence, Agents owns Skill selection, and App binds the interfaces.
+Camera owns memory-only photo capture, automatic latest and explicit image selections, and saving by previewID. Opening the camera and taking a photo are independent Actions ordered by the Actions Shell on the Camera Channel (cancelCapture uses a separate CameraCancel Channel so it can cancel the pending countdown); takePhoto accepts a single-shot countdown without changing capture preferences. Its scoped State reader supplies immutable image attachments; ordinary inspection remains metadata-only. Storage owns bytes/persistence, Agents owns Skill selection, and App binds the interfaces.
 
 History validates recorded attachment identity and reads logged request bytes only. Clearing logs removes their images and generation metadata. No history read loads State or triggers model feedback.
 

@@ -114,10 +114,13 @@ public struct AgentFunctionCatalog: Equatable, Sendable {
     public let declarations: [ActionDeclaration]
     public let localTools: [AgentLocalTool]
     public init(declarations: [ActionDeclaration], localTools: [AgentLocalTool] = []) throws {
+        let controls = Set(try AssistantControls.all.map(\.declaration.path))
         guard !declarations.isEmpty, declarations.count <= 256, localTools.count <= 128,
             Set(declarations.map(\.path)).count == declarations.count,
             Set(localTools.map { $0.declaration.path }).count == localTools.count,
             Set(declarations.map(\.path)).isDisjoint(with: localTools.map { $0.declaration.path }),
+            controls.isDisjoint(with: declarations.map(\.path)),
+            controls.isDisjoint(with: localTools.map { $0.declaration.path }),
             localTools.allSatisfy({ ActionIdentifier.validName($0.owner.rawValue) })
         else { throw AgentConfigurationError.invalidField("function declarations") }
         for declaration in declarations { try declaration.validate() }

@@ -45,7 +45,7 @@ public enum AssistantHistoryProjection {
     public static func messages(
         for invocation: AssistantModelRequest, nativeHistory: Bool = true, templates: PromptTemplates
     ) throws -> [ChatMessage] {
-        let input = try AssistantInputBatch.historyText(invocation.input)
+        let input = invocation.input
         if !nativeHistory {
             let evidence = try invocation.toolCalls.map { call in
                 try templates.render(

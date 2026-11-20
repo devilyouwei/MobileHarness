@@ -422,7 +422,7 @@ Solid arrows carry the incoming Signal paths; dashed arrows carry outgoing execu
 
 - **Identity and authorization.** Direct inputs retain their source/session/generation. Internal Signals bind the actual producer/incarnation and communication contract; Gateway checks endpoint tokens, envelope version, size, hops, deadline and capacity. Execution Feedback retains the original endpoint and call identity. Retired identities cannot target replacement roles.
 - **Admission and completion.** Directed send returns a typed AgentRequestReply without an inbox receipt; publish confirms bounded admission and may have no subscribers. The business owner reports actual completion separately. Processing context carries causality; execution permissions remain owner-bound.
-- **Capacity and cleanup.** Native buffers, Agent input queues and Gateway delivery retain owner-defined bounds and overflow policies. Cancellation and endpoint retirement join affected deliveries; root shutdown closes admission and joins owned work. Business owners define retry, deduplication and durable-notification policies.
+- **Capacity and cleanup.** Native buffers, Agent input queues and Gateway delivery retain owner-defined bounds and overflow policies. Cancellation and endpoint retirement join affected deliveries; root shutdown closes admission and joins owned work. Business owners define deduplication policies; Agent pub/sub publishes once without redelivery.
 
 [Agents communication](Agents/Support/Core/Communication/README.md) · [Signal transport](Gateway/Input/README.md) · [Speech intake](#11-listening-asr-and-sound-source-observations) · [Vision intake](#13-camera-preview-vision-and-tracking)
 
@@ -441,12 +441,10 @@ sequenceDiagram
     participant S as Storage
     participant W as Writer
     A->>G: At startup, statically subscribe to Writer task channel
-    A->>S: Persist addressed text, dialog and optional reply association
-    A->>A: Track producer / task ID / session
+    A->>A: Track producer / task ID / session / origin dialog in memory
     A->>G: Send authenticated agent.task.v1
     G->>W: Deliver for verification and inbox admission
     G-->>A: Inbox admission receipt
-    A->>S: Record delivery
     W->>W: Decide how to handle the message
     alt New assignment
         W->>G: Obtain execution grant for the original message ID
@@ -458,29 +456,28 @@ sequenceDiagram
         W->>S: Associate the message with the active delegation
         W->>W: Apply input or begin cancellation cleanup
     else Decline message
-        W->>S: Persist rejection against the original message
-        W->>G: Publish durable rejection
+        W->>S: Mark its received request record consumed
+        W->>G: Publish rejection once
         G-->>W: Local publication admitted
         G-->>A: Async rejection if subscribed
+        A->>S: Write trace record
     end
     opt Accepted delegation reaches a terminal outcome
         W->>W: Join model and file cleanup
-        W->>S: Commit terminal outcome and notification together
-        par Independent notification publication
-            W->>G: Publish durable agent.task.events.v1
-            G-->>W: Local publication admitted
-            G-->>A: Async report if subscribed
-            A->>S: Apply live report or recover durable fact; acknowledge
-            A->>A: Remove terminal task tracking; retain static subscription
-        and Execution grant retirement
-            W->>G: Join scoped execution and retire the grant
-        end
+        W->>S: Commit terminal outcome in writer_executions (closing)
+        W->>G: Publish agent.task.events.v1 once
+        G-->>W: Local publication admitted
+        G-->>A: Async report if subscribed
+        A->>S: Write trace record
+        A->>A: Apply report; remove terminal task tracking; retain static subscription
+        W->>G: Retire the execution grant once
+        W->>S: Record retirement result (terminal or cleanup_failed)
     end
 ```
 
-The send control completes after Assistant records successful delivery. Writer separately reports task acceptance and selected progress through `agent.task.events.v1`. Message rejections and task outcomes use durable delivery, which can retry independently of grant retirement. Assistant validates and deduplicates reports against the original message or delegation. In full-duplex mode, eligible reports for the active originating dialog enter the semantic input queue directly, bypassing the human-input Decision model. Synchronous mode uses the notification playback path. Writer presents its own progress and results in its Island.
+The send control completes when the delivery reply confirms Writer admission. Writer separately reports task acceptance and selected progress through `agent.task.events.v1`. Every progress, rejection and terminal report is published once, with no redelivery, retry or fallback; a publication failure is recorded only in Writer's `deliveryFailure` snapshot. Assistant validates and deduplicates reports against the original message or delegation, and writes each received report to agent_messages as a trace record that never decides processing. In full-duplex mode, eligible reports for the active originating dialog enter the semantic input queue directly, bypassing the human-input Decision model. Synchronous mode adds the report to the originating dialog as a completed turn and uses the notification playback path. Writer presents its own progress and results in its Island.
 
-Task event publication is independent of subscription and consumption. Assistant listens to Writer's task channel throughout its role lifetime, and tracks producer/task/session separately before dispatch. Finishing a task removes tracking, while role stop retires the subscription. Writer declares its task-event production capability and publishes on demand without receiver readiness checks or subscription side effects. Startup validates publication/subscription pairs and real code capabilities, without requiring producer or consumer instances to be running. Gateway provides best-effort live events with no late-subscriber replay; direct send returns a typed peer Reply. Source outbox admission and consumer business reconciliation of stored task results are separate from the pub/sub protocol.
+Task event publication is independent of subscription and consumption. Assistant listens to Writer's task channel throughout its role lifetime, and tracks producer/task/session separately before dispatch. Finishing a task removes tracking, while role stop retires the subscription. Writer declares its task-event production capability and publishes on demand without receiver readiness checks or subscription side effects. Startup validates publication/subscription pairs and real code capabilities, without requiring producer or consumer instances to be running. Gateway provides best-effort live events with no late-subscriber replay; direct send returns a typed peer Reply. Task tracking is in memory and is not restored after restart; a missed report is simply missed.
 
 Fixed-task executors implement `agent.task.v1` with submit/update/answer/status/cancel and role-owned typed bodies. Their progress and terminal reports share the `agent.task.events.v1` contract and are distinguished by the signal kind. The Agents output adapter validates the execution grant and coordinates outstanding Gateway work before terminal delivery. Local publication admission retires the fixed-task grant; it does not await consumer acknowledgment.
 
@@ -890,7 +887,7 @@ The model-output path is **ModelKit stream → Agents parsing and catalog resolu
 | Boundary              | Contract                                                                                                                                                                                                                                                       |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Function Token syntax | Natural text mixed with restricted XML, without a document root. Self-closing tags name catalog aliases, which resolve to an Action or to an Agent control; paired wait scopes emit scheduling boundaries.                |
-| Agent control         | A self-closing tag registered through a Skill's `useControls` (`task.start`, `task.end`, `task.send`, `loadSkills`, `releaseSkills`). It resolves to a ControlCall with no Channel, never reaches Gateway or Actions, runs inside the owning Agent in emission order after the response's other calls settle, and is rejected inside `<wait>`. Cognitive control is Agents-owned; only expressible behavior is an Action. |
+| Agent control         | A self-closing tag that is a fixed capability of its owning Agent, not granted by Skills (Assistant: `task.start`, `task.end`, `loadSkills`, `releaseSkills` with destination `self`; `task.send` with destination `peer`). It resolves to a ControlCall with no Channel, never reaches Actions, runs in the owning Agent in emission order without waiting for Actions on other Channels, and is rejected inside `<wait>`. Actions (scheduled or direct tool calls) are the only functions that enter Actions through Gateway. |
 | FunctionToken         | An Agent-local parsed text, action, boundary or scheduling event. Its boundary is independent of provider tokenizer tokens and network fragments. Incremental parsing handles incomplete UTF-8 and markup across fragments.                                    |
 | ActionCall            | A resolved actionPath, channel and string parameter map. Agents resolves aliases and parameters against its effective catalog; text mapping, when configured, produces ordered calls through the same generation pipeline.                                     |
 | Scheduling events     | beginWait/endWait travel in order with calls. Each call uses its registered Channel. Dropping wait events changes execution semantics.                                           |
@@ -959,6 +956,8 @@ flowchart TB
 The Actions Shell owns Channel FIFO, wait trees and resource arbitration, and Actions declares required resources and owns actual device operations. Agents selects role takeover policy and App injects opaque policy values and native stop callbacks. The Shell compares neutral endpoint identities without understanding role semantics.
 
 Different Channels may run concurrently subject to live resource permits. A wait group first joins preceding work in its parent phase, then runs its own Channel lanes. The parent continuation becomes eligible once the group is closed and all its work settles. Handler failures retain their outcomes and allow eligible work to advance. Decisions requiring real outcomes wait for feedback. ToolCall direct execution uses the same resource mechanism while remaining outside Channel/wait ordering. ActionCall remains Channel-scheduled even when its catalog descriptor declares direct execution.
+
+A Channel is a concurrency concept, not a module or page name: Actions share one only when they are mutually exclusive or occupy the same surface, device or session, and independent work uses different Channels so it can overlap. Skill resources follow this: `Camera` (capture/recording session), `CameraCancel` (cancelCapture, which must not queue behind the countdown it cancels), `Vision`, `Window`, `Island`, `Web`, `Device`, `ModelResources`, `History`, `Provider`, `Robot` and `ListeningControl`, alongside the runtime-fixed `Speech`, `Display` and `Listening`. See [Skills](Resources/Skills/README.md).
 
 Owners, leases and revocable permits fence writes. Unconfigured conflicts fail busy without an implicit resource queue. Configured takeover blocks new writes, stops and joins the old owner, then grants authority. A timeout is not completed cleanup; late cleanup cannot grant a revoked request or replay an effect. Occupancy does not become a replacement device-health state. See [Scheduling](Actions/Support/Shell/README.md#scheduling) and [Resources](Actions/Support/Shell/README.md#resources).
 
@@ -1571,13 +1570,13 @@ See [Memory](Agents/Memory/README.md), [History](Actions/History/README.md) and 
 
 Storage separates Assistant conversation themes and foreground tasks from Writer workspaces and delegation executions. Writer stores delegation executions separately from dispatched model Messages. Each Message's optional workspace ownership is fixed at creation, and later workspace selection leaves earlier Messages in their original scope. AgentMessages retains original communication and delivery facts. The stable workspace key is `workspace_N`; completion ends one delegation, not the lifetime of a reusable workspace. Request/event records retain runtime trace identities, while models receive readable workspace/window/editing handles with owner-projected metadata. WindowState owns window mapping independently of the creator. See [Task storage](Storage/Database/README.md) and [artifact identities](Actions/Artifacts/README.md#workspace-and-editing-identities).
 
-Assistant and Writer create business Message rows at inference dispatch. Assistant stores the submitted timeline separately from the original input and batch coordination, and stores one reply for the batch. Actions presents that submitted text in request history. In full-duplex mode, `task.end` is an Agent control that runs inside Assistant after the round's Actions settle. Writer receives stop requests through `agent.task.v1` and owns its execution cleanup and terminal result. Agents commits the foreground task's terminal state and Message summary through Storage before the control returns success. The summary covers dispatched Messages, including the one that issued `task.end`. The existing Message receives the reply at generation completion and Action results at execution settlement. Historical requests remain readable, and older JSON batches are projected into the timeline when replayed as model context. See [Assistant task lifecycle](Agents/Assistant/README.md#task-and-skill-lifecycle) and [Assistant history storage](Storage/Database/AssistantMessages/README.md).
+Assistant and Writer create business Message rows at inference dispatch. Assistant stores the submitted timeline separately from the original input and batch coordination, and stores one reply for the batch. Actions presents that submitted text in request history. In full-duplex mode, `task.end` is an Agent control that runs inside Assistant at emission, independently of Actions still running. Writer receives stop requests through `agent.task.v1` and owns its execution cleanup and terminal result. Agents commits the foreground task's terminal state and Message summary through Storage before the control returns success. The summary covers dispatched Messages, including the one that issued `task.end`. The existing Message receives the reply at generation completion and Action results at execution settlement. Historical requests remain readable, and older JSON batches are projected into the timeline when replayed as model context. See [Assistant task lifecycle](Agents/Assistant/README.md#task-and-skill-lifecycle) and [Assistant history storage](Storage/Database/AssistantMessages/README.md).
 
 Writer uses its own WriterExecutionRepository and WriterMessageRepository, with WriterRecordStore/WriterHistoryStore owning its private history. Runtime history is scoped to the delegation; Settings queries delegation entries and workspace messages separately. Database message keys define ordering, while revision is a state version. A later delegation may reuse the same workspace while retaining separate execution history. Deleting the requesting Assistant dialog clears provenance without deleting the Writer workspace. App composes Writer's records interface and Actions' preview/export interface for Settings. Model timing flows through ModelKit → role history → Storage evidence → UI detail; Writer projects workspace start/update timestamps, request counts and operation summaries, while UI renders neutral values. Writer projects request overview, the current input, verified prior tool references, model output and host finalization through its Settings detail interface. The business sections survive request-log deletion, which clears prompt and generation diagnostics. Full persisted request/tool evidence is distinct from the Agent's selected model context. See [Writer history](Agents/Writer/README.md#sqlite-历史与设置页).
 
 Writer source lives in the current `writer/workspace_N` filesystem directory; SQLite indexes current files without retaining source bodies or workspace versions. StorageDatabase coordinates sandbox primitives and SQL leases, Actions owns validation/rendering/export, and Agents owns creative decisions. See [workspace storage](Storage/Database/WriterWorkspaces/README.md) and [Artifacts](Actions/Artifacts/README.md).
 
-Pending Writer terminal notices can survive restart without replaying creative work or reopening old execution permissions. The notification/outbox policy belongs to [Writer](Agents/Writer/README.md#委托与主动事件), not generic Gateway transport. Before publishing repositories, Storage prepares the current schema. The supported November 10–12 formats use migrations that preserve existing dispatched requests and Writer execution evidence. Earlier formats use the approved clean replacement, including the associated Writer files. Settings, credentials and models are outside that reset. Future schema versions are rejected. Database root owns connection/lifecycle/schema assembly; Shared owns neutral encoding, identity and paging mechanisms, while table directories own SQL and recovery. Agent consumers use role-specific task and communication ports. See [SQLite lifecycle](Storage/Database/README.md).
+On restart, Writer turns any leftover `closing` execution into its terminal state, without republishing reports, replaying creative work or reopening old execution permissions. The report publication policy belongs to [Writer](Agents/Writer/README.md#委托与主动事件), not generic Gateway transport. Before publishing repositories, Storage prepares the current schema. Any database whose version differs from the current one is erased and recreated, including the associated Writer files; stored data is never migrated. Settings, credentials and models are outside that reset. Database root owns connection/lifecycle/schema assembly; Shared owns neutral encoding, identity and paging mechanisms, while table directories own SQL and recovery. Agent consumers use role-specific task and communication ports. See [SQLite lifecycle](Storage/Database/README.md).
 
 ### 19. Model lifecycle and inference boundaries
 
@@ -1655,7 +1654,7 @@ flowchart TB
     end
     style Coordination fill:#fff2d9,stroke:#bf842c,color:#694511
     subgraph Execution["ACTIONS"]
-        X["Shell · Notice / conversation /<br/>state functions"]:::action
+        X["Shell · conversation /<br/>state functions"]:::action
     end
     style Execution fill:#ffecef,stroke:#b86178,color:#6b2b3d
     subgraph Display["UI"]

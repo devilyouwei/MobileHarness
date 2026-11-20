@@ -6,7 +6,6 @@ import UI
     public let presentation: RuntimePresentation
     public let speech: SpeechExecutionEndpoint
     public let camera: CameraExecutionEndpoint
-    public let tasks: TaskControlEndpoint
     public init(
         cameraControl: any CameraControlCapability, rootSessionID: String,
         effects: any HomeEffectsPresenting, expressions: any ExpressionPresenting,
@@ -17,11 +16,9 @@ import UI
         camera = CameraExecutionEndpoint(
             camera: cameraControl, rootSessionID: rootSessionID,
             validateSession: { try speech.validateCameraControl(invocation: $0) })
-        tasks = TaskControlEndpoint(rootSessionID: rootSessionID)
         presentation = RuntimePresentation(
             rootSessionID: rootSessionID, effects: effects, expressions: expressions,
-            homeBluetooth: homeBluetooth, deviceBluetooth: deviceBluetooth,
-            authorizeEffects: { try speech.validateEffects(invocation: $0) })
+            homeBluetooth: homeBluetooth, deviceBluetooth: deviceBluetooth)
         presentation.feedback = speech
     }
     public func bindVoice(_ voice: any VoiceOutputHandling) throws {

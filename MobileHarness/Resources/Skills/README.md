@@ -41,7 +41,7 @@ Skill 是可复用的流程与能力集合，Task 是运行时目标、状态和
 | `alias` | 组合目录内唯一的模型调用标识，作为 Action 的 XML 别名或原生 Tool 名称。保留名为 `wait`。 |
 | `channel` | Action 必填，用于调度。原生 Tool 省略此字段。 |
 
-加载了 Skill 即可使用其全部合法 Action，不再维护 Agent 权限上限或重复登记函数。不同 Skill 引用同一 path 时，绑定完全相同才合并；类型、别名或 Channel 冲突时整个加载失败。不同 path 也不能共享 alias；同一函数不能同时作为 Action 和 Tool。send 只能是 Action，不能作为原生 Tool。Task 控制 Actions 由 BasicSkill 注册，通过 baseSkills 常驻；组合器没有固定 Task 函数注入特例。
+加载了 Skill 即可使用其全部合法 Action，不再维护 Agent 权限上限或重复登记函数。不同 Skill 引用同一 path 时，绑定完全相同才合并；类型、别名或 Channel 冲突时整个加载失败。不同 path 也不能共享 alias；同一函数不能同时作为 Action 和 Tool。send 只能是 Action，不能作为原生 Tool。Task 与 Skill 控制是 Assistant 的固定 control（见 [Agent controls](../../Agents/Support/Core/Capability/README.md#agent-controls)），Skill 不登记、不释放 control；Skill.json 出现 `useControls` 时解码拒绝。组合器没有固定 Task 函数注入特例。
 
 `doc`、参数 Schema、必填项、约束和完成语义来自函数自己的 `@Action`，不放在 Skill.json。函数不注册 examples；全部业务示例放在 Instructions.md，并遵循真实函数参数与当前 Skill 别名。
 
@@ -101,13 +101,13 @@ BasicSkill读取agents.applicationcontrol、agents.writer、ui.navigation、全�
 
 ## 加载、释放与 Task 生命周期
 
-BasicSkill Instructions 按概念、上下文、决策、控制动作效果、生命周期、反馈/失败组织。Skill 明确提供教学、函数、State 选择及依赖；Task 保留持续目标和完成条件，单次工作的多次模型请求不构成创建 Task 的充分理由。七项控制 Action 分别负责加载／释放 Skill、开始／结束前台 Task、向同伴发送委托正文，以及开始／停止聆听。加载和释放影响后续请求，task.start 可携带初始能力，task.end 提交终态及摘要。task.send 的送达回执独立于同伴接纳与完成。参数和协议由 canonical 声明与 Core 拥有，JSON 只注册现有绑定、状态及指令来源。
+BasicSkill Instructions 按概念、上下文、决策、控制动作效果、生命周期、反馈/失败组织。Skill 明确提供教学、函数、State 选择及依赖；Task 保留持续目标和完成条件，单次工作的多次模型请求不构成创建 Task 的充分理由。五项 Agent 控制与两项聆听 Action 分别负责加载／释放 Skill、开始／结束前台 Task、向同伴发送委托正文，以及开始／停止聆听。加载和释放影响后续请求，task.start 可携带初始能力，task.end 提交终态及摘要。task.send 的送达回执独立于同伴接纳与完成。参数和协议由 canonical 声明与 Core 拥有，JSON 只注册现有绑定、状态及指令来源。
 
 显式 releaseSkills 可移除确认不再需要且允许释放的近期或任务非基础根，Task 本身继续存在；基础项、非根依赖和仍被其他根依赖的指定 Skill 拒绝释放。通常保留目标需要的能力并在终态清理，不能把使用建议写成运行时禁止。加载/释放失败原子保留先前能力状态；Task 替换预校验、旧目标收尾、新目标创建是分阶段流程，不能承诺收尾后的创建失败会自动恢复旧目标。
 
 BasicSkill 在加载前按用户目标匹配 AVAILABLE SKILLS / DELEGATABLE AGENTS 的公开 description。当前函数目录只是已加载子集；函数缺失不能直接作为不支持该能力的依据。事实已足够时直接回答，已声明函数直接按教学使用，缺失且匹配的单次能力通过 loadSkills 获取；新持续目标通过 task.start(skills) 获取。加载成功后的下一请求才读取新增私有教学并执行，不把加载与业务动作拼在一轮。拒绝能力前检查公开目录；实际未提供的操作或加载/执行失败仍如实报告，不重复加载。BasicSkill 只描述通用能力发现流程，不包含具体业务场景或业务 Skill ID 示例；业务教学由对应 Skill 拥有。只有公开目录没有相关 Skill 或可委托 Agent 时，才能说明能力未提供；加载或执行失败须报告具体阻塞，不能等同于能力不存在。
 
-默认基础能力由 Agent 的 baseSkills 初始化。`loadSkills` / `releaseSkills` 是 Control Channel Action Call；`task.start(description, skills?)` 在创建本 Agent 的前台目标任务时同时加载所需 Skill 组；BasicSkill 教学要求携带已知必要的初始 Skill 数组，成功反馈后下一轮使用提交后的函数，无需再 loadSkills。已有 Skill 可随启动转为任务持有；后续出现新的缺失能力才额外加载。输入参数及数组编码以 Agent.Task canonical 元数据为准。
+默认基础能力由 Agent 的 baseSkills 初始化。`loadSkills` / `releaseSkills` 是 Assistant 的 `self` control，不经 Channel 调度；`task.start(description, skills?)` 在创建本 Agent 的前台目标任务时同时加载所需 Skill 组；BasicSkill 教学要求携带已知必要的初始 Skill 数组，成功反馈后下一轮使用提交后的函数，无需再 loadSkills。已有 Skill 可随启动转为任务持有；后续出现新的缺失能力才额外加载。输入参数及数组编码以 Agent.Task canonical 元数据为准。
 
 BasicSkill Instructions.md先检查CURRENT STATE：已有足够事实直接回答，不加载Skill或重复查询；确需执行单步控制/查询/拍摄且函数缺失时才使用loadSkills，多轮持续目标使用startTask。一次拍照且无后续操作不强制创建Task。直接加载只扩展能力，不建立任务目标；默认决策链可包含多次模型请求；无 Task 的 Skill 跨链保留，加载/合法调用重置为 5，未使用的完整用户决策扣 1。Task 先设定目标及可判断的完成条件，等待用户时持续保留；模型根据真实结果判断目标达成或用户明确替换目标后使用 task.end，并如实记录结果；用户取消使用 task.end 并记录未完成结果。可恢复动作失败不等于任务结束；运行时决策异常进入 failed，重启进入 interrupted。在已有 Task 中 loadSkills 仅补充任务能力，不创建或替换目标。一次性历史查询仅在所需函数缺失时直接加载，多轮筛选与确认示例使用 Task。
 
@@ -162,7 +162,7 @@ Assistant 全双工中，`task.end` 成功即提交前台终态和历史摘要�
 
 BasicSkill 统一承载 Skill 选择/Task/表达/失败规则，Photography 专注就绪/镜头/捕获/照片处理；少量示例验证主要分支，不重述通用协议。公开 State 位于独立的每轮系统数据消息。
 
-BasicSkill 教学明确五种控制都是 XML、加载/替换关闭的独占响应与后续请求边界，查询旁支保留 Task，最近 Skill 不因短暂旁支而主动释放。Photography 明确 busy/needsSettings 门、真实 preview ID、已保存事实与未执行保存的区别；普通忽略成功经窗口收尾后结束匹配 Task，明确重拍则保留。RobotInteraction 以 connected/controlAvailable 同时为 true 作为动作前提，不以环境查询覆盖明确阻断。ApplicationControl/HistoryQuery 使用 Query Channel 的精确 XML 查询别名与跨请求结果示例。教学保持简洁，增加有针对性的正向分支示例，不扩展新能力。
+BasicSkill 教学明确五种控制都是 XML、加载/替换关闭的独占响应与后续请求边界，查询旁支保留 Task，最近 Skill 不因短暂旁支而主动释放。Photography 明确 busy/needsSettings 门、真实 preview ID、已保存事实与未执行保存的区别；普通忽略成功经窗口收尾后结束匹配 Task，明确重拍则保留。RobotInteraction 以 connected/controlAvailable 同时为 true 作为动作前提，不以环境查询覆盖明确阻断。ApplicationControl/HistoryQuery 使用各自子系统 Channel 的精确 XML 查询别名与跨请求结果示例。教学保持简洁，增加有针对性的正向分支示例，不扩展新能力。
 
 当前 Action 目录中的查询可直接使用，不重复加载 Skill；摄影示例区分“用户请求但尚未拍摄”和“收到成功反馈”，缺失 displayedMediaID 字段也不能传空 ID。沿用相同能力、用例和执行错误，不通过放宽校验兼容错误输出。
 
@@ -170,7 +170,7 @@ BasicSkill 教学明确五种控制都是 XML、加载/替换关闭的独占响�
 
 ## 调用协议
 
-共享 Skill 的函数绑定均为 Action，须声明 Channel。History.list/read、ModelResources.snapshot、Provider.readSettings 和 Bluetooth.readStatus 使用 Query。WriterWorkspace 与 WriterFileEditing 归 Writer 所有，使用原生 Tool 并省略 Channel。
+共享 Skill 的函数绑定均为 Action，须声明 Channel。Channel 是并发概念：只有互斥或占用同一表面、设备、会话的 Action 才共用 Channel，彼此独立的使用不同 Channel 才能并行。当前划分：`Camera`（拍摄与录像，除 cancelCapture）、`CameraCancel`（cancelCapture，取消不得排在被取消的拍照倒计时之后）、`Vision`（Vision.open/close/flip/retry，与拍摄会话独立）、`Window`（openPage 与 Window.*）、`Island`（Island.setPresentation）、`Web`（Web.browse/snapshot/inspect/navigate）、`Device`（Bluetooth.control/readStatus）、`ModelResources`（download/cancel/snapshot）、`History`（History.list/read）、`Provider`（Provider.readSettings）、`Robot`、`ListeningControl`，以及运行时固定的 `Speech`、`Display`（字幕、回复等待与表情）和 `Listening`。只读查询不再共用 Query。跨 Skill 复用的同一 path（如 Window.*、Island.setPresentation）绑定必须一致。Channel 不替代资源 permit，硬件冲突仍由 Shell 裁决。WriterWorkspace 与 WriterFileEditing 归 Writer 所有，使用原生 Tool 并省略 Channel。
 
 ## 基础相册实施契约
 
@@ -218,7 +218,7 @@ BasicSkill routes 打开视觉／跟踪／人物或姿态跟随 to application-c
 
 ## Photo/video workflow
 
-Photography exposes Capture.configure/cancelCapture plus Video.startRecording/stopRecording/saveVideo/ignoreVideo using the existing Camera channel and stable aliases. configureCamera updates supplied settings and preserves omitted fields. A native countdown belongs to takePhoto; video startup, file completion and App album inclusion remain distinct. takePhoto requires an already open visible Camera window and selects photo mode; optional delaySeconds overrides only this shot, with no configureCamera step. openCamera and takePhoto can be generated together and execute in order on Camera. Spoken preparation can sit between them in the same response: separate wait groups join open and then speech before capture, because speech uses a different Channel. startRecording internally opens/restores the Camera window and selects video mode. openCamera waits for a ready preview and completes without a business value. Same-channel lens or settings preparation can follow it in one response; window commands use ui.windows. startRecording accepts optional durationSeconds for timed recording. Photo and video have parallel start/disposition/Task-cleanup examples. startRecording defaults to awaiting the ready file before model feedback; Photographer's fixed interactive Tool requests startup-only acknowledgement. Ready feedback supplies actual media identity, fileName and duration, and requires an authorized save/ignore decision rather than reporting recording in progress. The Skill gives spoken preparation before recording, then relies on the stop button or configured duration while listening is paused. Failed/uncertain work is not automatically replayed. Confirmed photo save or video save/ignore can complete the matching Task while retaining its window; explicit close/discard intent is independent, as is background Vision.
+Photography exposes Capture.configure/cancelCapture plus Video.startRecording/stopRecording/saveVideo/ignoreVideo using the existing Camera channel (cancelCapture alone uses CameraCancel so it is not queued behind the pending countdown) and stable aliases. configureCamera updates supplied settings and preserves omitted fields. A native countdown belongs to takePhoto; video startup, file completion and App album inclusion remain distinct. takePhoto requires an already open visible Camera window and selects photo mode; optional delaySeconds overrides only this shot, with no configureCamera step. openCamera and takePhoto can be generated together and execute in order on Camera. Spoken preparation can sit between them in the same response: separate wait groups join open and then speech before capture, because speech uses a different Channel. startRecording internally opens/restores the Camera window and selects video mode. openCamera waits for a ready preview and completes without a business value. Same-channel lens or settings preparation can follow it in one response; window commands use ui.windows. startRecording accepts optional durationSeconds for timed recording. Photo and video have parallel start/disposition/Task-cleanup examples. startRecording defaults to awaiting the ready file before model feedback; Photographer's fixed interactive Tool requests startup-only acknowledgement. Ready feedback supplies actual media identity, fileName and duration, and requires an authorized save/ignore decision rather than reporting recording in progress. The Skill gives spoken preparation before recording, then relies on the stop button or configured duration while listening is paused. Failed/uncertain work is not automatically replayed. Confirmed photo save or video save/ignore can complete the matching Task while retaining its window; explicit close/discard intent is independent, as is background Vision.
 
 Photography与ApplicationControl增加Island.setPresentation以及ui.island事实，模型以size=compact/expanded控制已有内容，现有目标任务提供detail可展开，任务详情与实时状态按内容分组独立选择，状态切换保留任务描述和手动收起偏好；不指定尺寸/动画，不把展示当业务完成。Basic常驻目录不变。
 

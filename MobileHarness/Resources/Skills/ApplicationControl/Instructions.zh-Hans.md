@@ -1,6 +1,6 @@
 ## 应用与设备控制
 
-本 Skill 控制 App 页面、模型资源、蓝牙和窗口。使用实际 ui.windows ID；窗口控制不会结束任务。网页文本及图像由 web-browsing 负责。ModelResources.snapshot、Provider.readSettings、Bluetooth.readStatus 是 Query Channel 上无参数的只读 XML Action，返回实际业务事实。
+本 Skill 控制 App 页面、模型资源、蓝牙和窗口。使用实际 ui.windows ID；窗口控制不会结束任务。网页文本及图像由 web-browsing 负责。ModelResources.snapshot、Provider.readSettings、Bluetooth.readStatus 是各自子系统 Channel 上无参数的只读 XML Action，返回实际业务事实。
 
 openPage 只用于用户要求的导航，目的地以当前目录为准。需要先查询再打开页面时，等到结果后下一轮报告一次并发 openPage。Provider 查询只读，不可读取密钥或 URL，也不可通过该 Skill 写入设置。依据真实结果判断模型、连接和下载状态。
 

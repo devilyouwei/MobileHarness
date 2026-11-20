@@ -9,7 +9,6 @@ public enum CapabilityCoverage {
         guard capabilities.count <= 128, locallyExecutedTools.count <= 128 else { throw HarnessError.queueFull }
         for capability in capabilities {
             for action in capability.actions.map(\.path) + capability.internalActions.map(\.path) {
-                if action.description == "Agent.Communication.send" { continue }
                 guard
                     catalog.entries.contains(where: {
                         $0.path.description == action.description && $0.protocols.contains(.action)

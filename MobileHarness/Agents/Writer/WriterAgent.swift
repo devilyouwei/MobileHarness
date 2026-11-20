@@ -19,7 +19,6 @@ public actor WriterAgent: Agent {
     private let startBackground: WriterBackgroundExecution.Start?
     private let language: @Sendable () -> String
     private let island: WriterIslandPresentation
-    private let notifications: WriterNotifications
     private var messaging: AgentMessaging?
     private var consumer: GatewayOutputConsumer?
     private var lifecycle = AgentLifecycle.registered
@@ -103,7 +102,6 @@ public actor WriterAgent: Agent {
         self.startBackground = startBackground
         self.language = language
         island = WriterIslandPresentation(language: language)
-        notifications = WriterNotifications(executions: executions, communications: communications)
         self.history = history
         self.model = model
         self.streaming = streaming
@@ -123,17 +121,11 @@ public actor WriterAgent: Agent {
             guard let self else { throw WriterFailure.unavailable }
             try await self.presentIsland(operation, parameters: parameters, sessionID: session)
         }
-        await notifications.bind(
-            sender: { [weak self] report in
-                guard let self else { throw WriterFailure.unavailable }
-                return try await self.sendReport(report)
-            }, retire: consumer.retireTask)
     }
     public func start() async throws {
         guard lifecycle == .registered, consumer != nil else { throw WriterFailure.unavailable }
         lifecycle = .running
         await island.start()
-        await notifications.resume()
     }
     public func setSceneActive(_ active: Bool) async {
         sceneActive = active
@@ -152,7 +144,6 @@ public actor WriterAgent: Agent {
         for worker in selected.values { await worker.value }
         reportWorker?.cancel()
         await reportWorker?.value
-        await notifications.pause()
         for (id, _) in requests {
             await island.update(delegateID: id, phase: .paused)
             if requests[id] != nil {
@@ -178,14 +169,13 @@ public actor WriterAgent: Agent {
         }
         startReports()
         startInbox()
-        await notifications.resume()
     }
     public func stop() async {
         lifecycle = .stopped
         inboxWorker?.cancel()
         await inboxWorker?.value
         for (message, input) in inbox {
-            await rejectMessage(message.id, text: "Writer has stopped.", input: input)
+            await rejectMessage(message, text: "Writer has stopped.", input: input)
         }
         inbox.removeAll()
         for admission in Array(cancellationAdmissions.values) { _ = await admission.result }
@@ -203,7 +193,6 @@ public actor WriterAgent: Agent {
                     failures[id] = String(String(describing: error).prefix(256))
                 }
             }
-            // Durable terminal facts outlive this root; another start retries only delivery.
         }
         await reportWorker?.value
         for id in Array(inputs.keys) { forget(id) }
@@ -212,7 +201,6 @@ public actor WriterAgent: Agent {
         pendingReports.removeAll()
         reportedMilestones.removeAll()
         await island.stop()
-        await notifications.stop()
         messaging = nil
         continuation.finish()
         consumer = nil
@@ -224,7 +212,6 @@ public actor WriterAgent: Agent {
     }
     public func observationSnapshot() async -> AgentStateSnapshot {
         let presentationFailure = await island.lastFailure
-        let notificationFailure = await notifications.lastFailure
         let id = requests.keys.first
         return .init(
             path: "agents.writer",
@@ -245,8 +232,7 @@ public actor WriterAgent: Agent {
                 "lastFailure": failures.values.sorted().last.map { .text($0) } ?? .unknown,
                 "pendingReports": .count(pendingReports.values.reduce(0) { $0 + $1.count }),
                 "backgroundFailure": backgroundFailure.map { .text($0) } ?? .unknown,
-                "deliveryFailure": (notificationFailure ?? deliveryFailures.values.sorted().last).map { .text($0) }
-                    ?? .unknown,
+                "deliveryFailure": deliveryFailures.values.sorted().last.map { .text($0) } ?? .unknown,
             ])
     }
     public func receiveRequest(_ request: AgentProtocolRequest) async throws -> AgentRequestReply {
@@ -288,15 +274,18 @@ public actor WriterAgent: Agent {
         try await enqueue(content, input: input)
     }
 
+    /// The receiver owns the durable record of every peer message it admits.
     private func enqueue(_ content: AgentTaskRequest, input: AgentInput) async throws {
         try content.validate()
-        guard input.id == content.id, input.taskScope == nil,
-            let record = try await communications.agentMessage(input.id),
-            record.sender == input.metadata.source, record.receiver == descriptor.id.rawValue,
-            record.contract == AgentTaskRequest.contract,
-            try JSONDecoder().decode(AgentTaskRequest.self, from: record.payload) == content
-        else { throw CommunicationError.unauthorized }
+        guard input.id == content.id, input.taskScope == nil else { throw CommunicationError.unauthorized }
+        try await communications.enqueueAgentMessage(
+            .init(
+                id: content.id, sender: input.metadata.source, receiver: descriptor.id.rawValue,
+                contract: AgentTaskRequest.contract, payload: try content.message.encodedContent(),
+                correlationID: content.replyTo ?? content.id, replyTo: content.replyTo,
+                senderContext: content.senderContext, sourceSessionID: input.sessionID, dedupeKey: content.id))
         guard try await !communications.isAgentMessageConsumed(input.id) else { return }
+        try await communications.receiveAgentMessage(content.id, receiver: descriptor.id.rawValue, consumed: false)
         guard lifecycle == .running || lifecycle == .paused else { throw WriterFailure.unavailable }
         guard !inbox.contains(where: { $0.0.id == content.id }) else { return }
         guard inbox.count < 8 else { throw CommunicationError.capacityExceeded }
@@ -321,7 +310,7 @@ public actor WriterAgent: Agent {
                 return
             } catch {
                 let text = (error as? WriterToolFailure)?.description ?? "Writer could not process this message."
-                await rejectMessage(content.id, text: text, input: input)
+                await rejectMessage(content, text: text, input: input)
             }
             inbox.removeFirst()
         }
@@ -329,17 +318,16 @@ public actor WriterAgent: Agent {
 
     private var presentationCopy: AppLanguage { AppLanguage(preferredLanguage: language()) }
 
-    private func rejectMessage(_ id: String, text: String, input: AgentInput) async {
+    /// The rejection is published once; the receiver records it. Writer only closes its own received record.
+    private func rejectMessage(_ content: AgentTaskRequest, text: String, input: AgentInput) async {
         do {
-            guard try await !communications.isAgentMessageConsumed(id) else { return }
+            guard try await !communications.isAgentMessageConsumed(content.id) else { return }
+            try await communications.receiveAgentMessage(content.id, receiver: descriptor.id.rawValue, consumed: true)
             let report = try AgentTaskResponse(
-                rejecting: id, sessionID: input.sessionID, text: presentationCopy.text(text))
-            guard let rejection = report.rejection else { throw CommunicationError.invalidPayload }
-            try await communications.rejectAgentMessage(
-                id, eventID: rejection.eventID, payload: report.message.encodedContent())
-            await notifications.wake()
+                rejecting: content.id, sessionID: input.sessionID, text: presentationCopy.text(text))
+            try await sendReport(report, reference: content.replyTo ?? content.id)
         } catch {
-            backgroundFailure = String(describing: error)
+            deliveryFailures[content.id] = String(String(describing: error).prefix(256))
         }
     }
 
@@ -1259,7 +1247,8 @@ public actor WriterAgent: Agent {
             stage: status == nil ? (interactionID == nil ? .running : .waitingUser) : .completed,
             interactionID: interactionID, writerEvent: event)
         if let status {
-            let completion = try AgentTaskResponse(content.signal(.result, scope: scope, status: status))
+            let signal = try content.signal(.result, scope: scope, status: status)
+            let completion = try AgentTaskResponse(signal)
             let data = try JSONEncoder().encode(completion)
             // All model/file cleanup has joined. Release creation immediately, before awaiting
             // the independent metadata transaction or any Assistant/Gateway delivery.
@@ -1271,13 +1260,27 @@ public actor WriterAgent: Agent {
             inputs.removeValue(forKey: scope.id)
             phases.removeValue(forKey: scope.id)
             try await executions.completeRequest(
-                WriterDelegationNotification(delegateID: scope.id, agent: "writer", eventID: event.eventID, data: data),
+                scope.id, eventID: event.eventID, result: data,
                 status: persistedStatus ?? (status == .succeeded ? "completed" : status.rawValue),
                 failure: status == .failed ? failure.map(WriterDiagnostics.describe) ?? summary : nil,
                 cancellationReason: cancellationReason)
             await island.update(delegateID: scope.id, phase: displayPhase, step: summary)
             forget(scope.id)
-            await notifications.wake()
+            // Published once; a missed report is not resent.
+            do {
+                try await sendReport(completion, reference: scope.id)
+            } catch {
+                deliveryFailures[scope.id] =
+                    "Writer report not delivered: " + String(String(describing: error).prefix(256))
+            }
+            var retirement: String?
+            do {
+                guard let consumer else { throw WriterFailure.unavailable }
+                try await consumer.retireTask(signal)
+            } catch {
+                retirement = String(String(describing: error).prefix(1024))
+            }
+            try await executions.retireRequest(scope.id, failure: retirement)
             return
         }
         if let interactionID {
@@ -1350,20 +1353,15 @@ public actor WriterAgent: Agent {
             deliveringEvent = pending.content.writerEvent?.eventID
             do {
                 try await deliver(pending)
-                pendingReports[id]?.removeAll { $0.content.writerEvent?.eventID == deliveringEvent }
-                if pendingReports[id]?.isEmpty == true { pendingReports.removeValue(forKey: id) }
                 deliveryFailures.removeValue(forKey: id)
             } catch {
                 if Task.isCancelled || lifecycle == .paused { return }
-                if pendingReports[id] == nil { continue }
+                // Published once; a missed report is not resent.
                 deliveryFailures[id] =
-                    "Writer report delivery pending: " + String(String(describing: error).prefix(256))
-                if lifecycle == .stopped {
-                    pendingReports.removeValue(forKey: id)
-                    continue
-                }
-                do { try await Task.sleep(for: .milliseconds(500)) } catch { return }
+                    "Writer report not delivered: " + String(String(describing: error).prefix(256))
             }
+            pendingReports[id]?.removeAll { $0.content.writerEvent?.eventID == deliveringEvent }
+            if pendingReports[id]?.isEmpty == true { pendingReports.removeValue(forKey: id) }
         }
     }
     private func deliver(_ pending: PendingReport) async throws {
@@ -1386,24 +1384,12 @@ public actor WriterAgent: Agent {
             throw WriterToolFailure(result.failure ?? "Island presentation rejected", context: ["tool": call.toolPath])
         }
     }
-    private func sendReport(_ report: AgentTaskResponse) async throws {
+    private func sendReport(_ report: AgentTaskResponse, reference: String) async throws {
         guard let messaging, let sessionID = report.signal?.scope.sessionID ?? report.rejection?.sessionID
         else { throw WriterFailure.unavailable }
-        let message = report.message
         let parent = AgentInput(
             id: report.signal?.scope.id ?? report.rejection?.messageID ?? UUID().uuidString, sessionID: sessionID,
-            payload: .observation(message))
-        let reference: String
-        if let signal = report.signal {
-            reference = signal.scope.id
-        } else if let rejection = report.rejection,
-            let original = try await communications.agentMessage(rejection.messageID)
-        {
-            reference = original.correlationID
-        } else {
-            throw CommunicationError.unauthorized
-        }
-        try await messaging.publish(
-            report.publication(scope: reference), parent: parent)
+            payload: .observation(report.message))
+        try await messaging.publish(report.publication(scope: reference), parent: parent)
     }
 }

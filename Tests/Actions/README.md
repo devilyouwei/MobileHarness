@@ -25,7 +25,6 @@ Contracts：声明与双协议；Execution：装配、组合、资源和观察�
 | System | Unit Tests / Integration Tests | [ProviderSettingsTests](System/ProviderSettingsTests.swift) |
 | UI | Integration Tests | [AlbumNavigationTests](UI/AlbumNavigationTests.swift)、[UIToolTests](UI/UIToolTests.swift) |
 | UI | Unit Tests / Integration Tests | [FeedbackActionTests](UI/FeedbackActionTests.swift) |
-| UI | Unit Tests | [HomeEffectActionTests](UI/HomeEffectActionTests.swift) |
 
 ## 执行与替身边界
 

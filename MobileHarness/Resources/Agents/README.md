@@ -109,7 +109,7 @@ Agent.json 保留身份、基础 Skill 与通信契约。App 安装各 Action �
 
 ## Task controls through Action Calls
 
-BasicSkill 的 Task/Skill 控制函数使用 Control Channel Action Call；运行集成通过 ChannelScheduler 返回已提交状态。task.start/loadSkills/releaseSkills 返回的已提交业务状态在结果屏障后重建目录并 ReACT，task.end 按任务来源提交终态与摘要，Writer 通过 agent.task.v1 接收用户要求的转述，并解释正文。新目录仅影响后续请求，不允许加载轮提前调用新函数。可信固定调用复用同一实现。
+Task/Skill 控制是 Assistant 的固定 control（task.send 为 `peer`，其余为 `self`），由 Assistant 在发射时按输出顺序本地执行，不进入 Actions，不等待其他 Channel 的 Action，结果并入整轮并返回已提交状态。task.start/loadSkills/releaseSkills 返回的已提交业务状态在结果屏障后重建目录并 ReACT，task.end 按任务来源提交终态与摘要，Writer 通过 agent.task.v1 接收用户要求的转述，并解释正文。新目录仅影响后续请求，不允许加载轮提前调用新函数。可信固定调用（如新对话前结束任务）直接调用同一控制入口。
 
 ## Agent → Skill → Function registration
 

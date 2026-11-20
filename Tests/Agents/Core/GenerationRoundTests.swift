@@ -1041,7 +1041,7 @@ private actor RoundAdmissionGate {
     #expect(
         outputs.contains { envelope in
             if case .actionCall(let call) = envelope.output {
-                return call.actionPath.description == "System.Device.readStatus" && call.channel == "Query"
+                return call.actionPath.description == "System.Device.readStatus" && call.channel == "Device"
             }
             return false
         })

@@ -27,7 +27,7 @@ flowchart LR
 
 | 文件 | 职责 |
 | --- | --- |
-| [FunctionToken.swift](FunctionToken.swift) | 解析事件、CallRejection、GenerationError 与调度边界值 |
+| [FunctionToken.swift](FunctionToken.swift) | 解析事件（含 Agent 控制事件）、CallRejection、GenerationError 与调度边界值 |
 | [FunctionTokenParser.swift](FunctionTokenParser.swift) | 增量 UTF-8／XML 词法、实体与资源限制 |
 | [SentenceFunctionBuffer.swift](SentenceFunctionBuffer.swift) | 句子／安全词边界与首段／后续软长度分段 |
 | [AgentGenerator.swift](AgentGenerator.swift) | 文本映射、Action 目录解析及有序输出事件 |
@@ -120,3 +120,5 @@ Role assets are described by [shared Chat](../../Chat/README.md#templates-and-lo
 SentenceFunctionBuffer 支持首段软长度与后续长度，首段状态跨 XML／scope flush 保留；按句子／安全单词边界及显式长度 flush，无计时 flush。实际语音分段默认值由 Chat 调用者配置。
 
 GenerationEvent.runtimeAction保留代码展开来源；AgentGenerator把TextMapping输出的Action标为runtimeAction，XML显式调用保持action。actionCall统一读取两类执行值，GenerationTrace与历史预览显示两者；共享Chat按来源决定结果是否能进入模型观察，不能按函数路径推断。
+
+AgentGenerator resolves a self-closing tag against the registry's controls and actions. A control alias yields `GenerationEvent.control(ControlCall)`, never an ActionCall. The generator tracks wait depth and rejects a control written inside `<wait>` with `GenerationError.controlInsideWait`; unknown aliases and invalid parameters are rejected as for Actions. Controls count toward the 120-call response limit and keep emission order; execution belongs to the owning Agent.

@@ -9,7 +9,7 @@ import UI
 /// A whole role binds atomically. Closures in the handler registry never own session resources.
 @MainActor
 public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapability,
-    PosePresentationCapability, UIFeedbackCapability, UIEffectCapability,
+    PosePresentationCapability, UIFeedbackCapability,
     BluetoothStatusPresentationCapability, LoadingExpressionPresentationCapability
 {
     private let rootSessionID: String
@@ -50,42 +50,13 @@ public final class RuntimePresentation: UIPresentationCapability, UIUpdateCapabi
     public init(
         rootSessionID: String,
         effects: any HomeEffectsPresenting, expressions: any ExpressionPresenting,
-        homeBluetooth: any BluetoothConnectionPresenting, deviceBluetooth: any BluetoothConnectionPresenting,
-        authorizeEffects: @escaping @MainActor (any FunctionInput) throws -> Void = { _ in
-            throw ActionHostError.unauthorized
-        }
+        homeBluetooth: any BluetoothConnectionPresenting, deviceBluetooth: any BluetoothConnectionPresenting
     ) {
         self.homeBluetooth = homeBluetooth
         self.deviceBluetooth = deviceBluetooth
         homeEffects = effects
         self.expressions = expressions
-        self.authorizeEffects = authorizeEffects
         self.rootSessionID = rootSessionID
-    }
-    private let authorizeEffects: @MainActor (any FunctionInput) throws -> Void
-    private func validateEffects(_ invocation: any FunctionInput) throws {
-        try authorizeEffects(invocation)
-    }
-    public func showNotice(_ request: UIActions.NoticeRequest, invocation: any FunctionInput) async throws {
-        try validateEffects(invocation)
-        try await homeEffects.showNotice(
-            HomeNotice(text: request.text, tone: HomeNotice.Tone(rawValue: request.tone.rawValue) ?? .warning),
-            durationMS: request.durationMS,
-            owner: .init(source: invocation.context.source, session: invocation.context.sessionID))
-    }
-    public func dismissNotice(invocation: any FunctionInput) async throws {
-        try validateEffects(invocation)
-        try await homeEffects.dismissNotice(
-            owner: .init(source: invocation.context.source, session: invocation.context.sessionID))
-    }
-    public func updateLight(_ request: UIActions.LightRequest, invocation: any FunctionInput) async throws {
-        try validateEffects(invocation)
-        try await homeEffects.updateLight(
-            request.enabled
-                ? DecorativeLight(
-                    origin: .init(x: request.x, y: request.y), initialOpacity: request.initialOpacity,
-                    intensity: request.intensity) : nil, durationMS: request.durationMS,
-            owner: .init(source: invocation.context.source, session: invocation.context.sessionID))
     }
     private weak var voice: (any VoicePresentationHandling)?
     private weak var camera: (any CameraOutputHandling)?

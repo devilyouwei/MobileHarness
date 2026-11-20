@@ -8,23 +8,18 @@ public final class HomeNoticeState {
 
     public init() {}
 
-    public internal(set) var notice: HomeNotice?
     public var visibleNotice: HomeNotice? {
-        if let errorToast, errorToastPlacement == .caption {
-            return HomeNotice(
-                id: errorToast.id,
-                text: errorToast.userMessage ?? errorToast.message.replacingOccurrences(of: "agent.error: ", with: ""),
-                tone: .error)
-        }
-        return notice?.placement == .caption ? notice : nil
+        guard let errorToast, errorToastPlacement == .caption else { return nil }
+        return HomeNotice(
+            id: errorToast.id,
+            text: errorToast.userMessage ?? errorToast.message.replacingOccurrences(of: "agent.error: ", with: ""),
+            tone: .error)
     }
     public var transientToast: HomeNotice? {
-        if let errorToast, errorToastPlacement == .toast {
-            return HomeNotice(
-                id: errorToast.id, text: errorToast.userMessage ?? errorToast.message,
-                tone: .error, placement: .toast)
-        }
-        return notice?.placement == .toast ? notice : nil
+        guard let errorToast, errorToastPlacement == .toast else { return nil }
+        return HomeNotice(
+            id: errorToast.id, text: errorToast.userMessage ?? errorToast.message,
+            tone: .error, placement: .toast)
     }
     private var errorToastPlacement: HomeNotice.Placement = .caption
     public private(set) var errorToast: ExecutionIssue?
@@ -61,7 +56,6 @@ public final class HomeNoticeState {
         await toastExpiry?.value
         toastExpiry = nil
         errorToast = nil
-        notice = nil
     }
 }
 

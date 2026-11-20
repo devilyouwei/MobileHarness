@@ -12,7 +12,7 @@ import Testing
     let declarations = CapabilityModules.declarations
     #expect(Set(declarations.map(\.path)).count == declarations.count)
     #expect(declarations.contains(CameraActions.takePhotoDeclaration))
-    #expect(declarations.contains(SystemActions.startTaskDeclaration))
+    #expect(!declarations.contains { $0.path.domain == "Agent" })
     let function = CameraActions.takePhotoDefinition(handler: { _ in })
     #expect(function.declaration == CameraActions.takePhotoDeclaration)
     try function.validate()

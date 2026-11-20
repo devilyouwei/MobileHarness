@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "application-control",
-  "revision": 23,
+  "revision": 24,
   "description": "Manage all windows (including Writer), app pages/settings, Bluetooth and background vision.",
   "dependencies": [],
   "useActions": [
@@ -9,109 +9,109 @@
       "path": "UI.Navigation.open",
       "callType": "action",
       "alias": "openPage",
-      "channel": "Display"
+      "channel": "Window"
     },
     {
       "path": "System.ModelResources.snapshotResources",
       "callType": "action",
       "alias": "ModelResources.snapshot",
-      "channel": "Query"
+      "channel": "ModelResources"
     },
     {
       "path": "System.Provider.readSettings",
       "callType": "action",
       "alias": "Provider.readSettings",
-      "channel": "Query"
+      "channel": "Provider"
     },
     {
       "path": "System.Device.readStatus",
       "callType": "action",
       "alias": "Bluetooth.readStatus",
-      "channel": "Query"
+      "channel": "Device"
     },
     {
       "path": "System.Device.control",
       "callType": "action",
       "alias": "Bluetooth.control",
-      "channel": "System"
+      "channel": "Device"
     },
     {
       "path": "System.ModelResources.download",
       "callType": "action",
       "alias": "ModelResources.download",
-      "channel": "System"
+      "channel": "ModelResources"
     },
     {
       "path": "System.ModelResources.cancel",
       "callType": "action",
       "alias": "ModelResources.cancel",
-      "channel": "System"
+      "channel": "ModelResources"
     },
     {
       "path": "UI.Window.focus",
       "callType": "action",
       "alias": "Window.focus",
-      "channel": "Display"
+      "channel": "Window"
     },
     {
       "path": "UI.Window.minimize",
       "callType": "action",
       "alias": "Window.minimize",
-      "channel": "Display"
+      "channel": "Window"
     },
     {
       "path": "UI.Window.maximize",
       "callType": "action",
       "alias": "Window.maximize",
-      "channel": "Display"
+      "channel": "Window"
     },
     {
       "path": "UI.Window.restore",
       "callType": "action",
       "alias": "Window.restore",
-      "channel": "Display"
+      "channel": "Window"
     },
     {
       "path": "UI.Window.move",
       "callType": "action",
       "alias": "Window.move",
-      "channel": "Display"
+      "channel": "Window"
     },
     {
       "path": "UI.Window.close",
       "callType": "action",
       "alias": "Window.close",
-      "channel": "Display"
+      "channel": "Window"
     },
     {
       "path": "Camera.Perception.openVision",
       "callType": "action",
       "alias": "Vision.open",
-      "channel": "Camera"
+      "channel": "Vision"
     },
     {
       "path": "Camera.Perception.closeVision",
       "callType": "action",
       "alias": "Vision.close",
-      "channel": "Camera"
+      "channel": "Vision"
     },
     {
       "path": "Camera.Perception.flipVision",
       "callType": "action",
       "alias": "Vision.flip",
-      "channel": "Camera"
+      "channel": "Vision"
     },
     {
       "path": "Camera.Perception.retryVision",
       "callType": "action",
       "alias": "Vision.retry",
-      "channel": "Camera"
+      "channel": "Vision"
     },
     {
       "path": "UI.Island.setPresentation",
       "callType": "action",
       "alias": "Island.setPresentation",
-      "channel": "Display"
+      "channel": "Island"
     }
   ],
   "useStates": [

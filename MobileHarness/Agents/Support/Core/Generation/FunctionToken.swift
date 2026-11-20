@@ -12,6 +12,8 @@ public enum FunctionToken: Equatable, Sendable {
 public enum GenerationError: Error, Equatable, Sendable {
     case malformedMarkup, invalidUTF8, invalidEntity, incompleteDocument, closed, limitExceeded
     case unknownCapability, duplicateAlias, invalidParameters
+    /// Control functions are sequential Agent decisions, so they cannot join a wait scope.
+    case controlInsideWait
 }
 
 /// Structured execution boundaries, scoped to the trusted envelope's Agent/session/input.
@@ -21,7 +23,7 @@ public enum SchedulingDirective: Equatable, Sendable {
 
 /// A rejected model invocation carries no executable path or arguments.
 public struct CallRejection: Error, Equatable, Sendable {
-    public enum Kind: Equatable, Sendable { case action, tool }
+    public enum Kind: Equatable, Sendable { case action, control, tool }
     public let kind: Kind
     public let alias: String
     public let callID: String?
@@ -42,6 +44,8 @@ public enum GenerationEvent: Equatable, Sendable {
     /// Code-generated execution, including natural-text presentation. Never model feedback.
     case runtimeAction(ActionCall)
     case tool(ToolCall)
+    /// Control request run by the owning Agent (`self` or `peer`); never forwarded to Actions.
+    case control(ControlCall)
     case scheduling(SchedulingDirective)
 
     public var actionCall: ActionCall? {

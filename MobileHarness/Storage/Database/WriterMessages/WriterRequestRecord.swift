@@ -33,28 +33,3 @@ public struct WriterRequestRecord: Codable, Sendable, Identifiable {
         self.createdAt = createdAt
     }
 }
-
-/// Opaque durable report. The subject is the original message for a rejection and the task root for a terminal report.
-public struct WriterDelegationNotification: Sendable {
-    public let delegateID: String
-    public let claimToken: String?
-    public let position: Int64
-    public let agent: String
-    public let eventID: String
-    public let data: Data
-    public let published: Bool
-    public let retired: Bool
-    public init(
-        delegateID: String, agent: String, eventID: String, data: Data, published: Bool = false, retired: Bool = false,
-        position: Int64 = 0, claimToken: String? = nil
-    ) {
-        self.delegateID = delegateID
-        self.agent = agent
-        self.eventID = eventID
-        self.data = data
-        self.position = position
-        self.claimToken = claimToken
-        self.published = published
-        self.retired = retired
-    }
-}

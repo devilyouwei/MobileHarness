@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "history-query",
-  "revision": 15,
+  "revision": 16,
   "description": "Read-only search/recall of past Assistant chats. Current pages: web-browsing.",
   "dependencies": [],
   "useActions": [
@@ -9,13 +9,13 @@
       "path": "History.Conversation.list",
       "callType": "action",
       "alias": "History.list",
-      "channel": "Query"
+      "channel": "History"
     },
     {
       "path": "History.Conversation.read",
       "callType": "action",
       "alias": "History.read",
-      "channel": "Query"
+      "channel": "History"
     }
   ],
   "useStates": [],

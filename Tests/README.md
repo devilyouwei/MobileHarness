@@ -53,7 +53,7 @@ Tests 只放 Swift 源码和小型工程夹具，不做模型效果评估或 ben
 | --- | --- | --- |
 | 生产装配与生命周期 | App/Composition、App/Lifecycle；ProductionCompositionAcceptance | 根启动、设置请求、导航、前后台、停止及拒绝迟到请求；手工服务图另行验证顺序和回滚。 |
 | Assistant 执行与续轮 | Agents/Core/GenerationRoundTests、Agents/Assistant/AssistantChatTests | Action/Tool 关联、真实业务结果续轮、失败/取消和不重放；模型为脚本替身。 |
-| Writer 委派与发布 | Agents/Writer/WriterAgentTests、WriterWorkflowTests | 实际文件/SQLite、委派终态、通知重投及清理；模型/部分呈现为替身。 |
+| Writer 委派与发布 | Agents/Writer/WriterAgentTests、WriterWorkflowTests | 实际文件/SQLite、委派终态、报告单次发布及清理；模型/部分呈现为替身。 |
 | 语音交互 | Agents/SpeechPerception/VoiceTests、Actions/Speech/SpeechPlaybackTests | 最终识别到回复输出、音频所有权、捕获代际与停止；识别/合成/播放端点为受控替身。 |
 | 摄影与媒体保存 | Agents/Photographer、Storage/Database/AlbumTests | 图像身份、保存/回读、部分失败保留与不重复捕获；原生相机/Photos 端点独立验收。 |
 | 设置与模型资源 | Actions/System、Agents/Assistant、App/Settings、App/Resources | 校验、保存、应用、回执与错误恢复；凭据和原生服务按测试边界替换。 |

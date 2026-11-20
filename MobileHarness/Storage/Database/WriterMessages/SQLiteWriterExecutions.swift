@@ -34,8 +34,7 @@ extension SQLiteWriterExecutionRepository {
             }
             guard let incoming = try AgentMessageRow.fetchOne(db, key: delegateID),
                 incoming.receiverAgentID == "writer", !incoming.senderAgentID.isEmpty,
-                ["agent.task.v1", "agent.task.request", "agent.taskMessage", "task.request"].contains(
-                    incoming.contract),
+                incoming.contract == "agent.task.v1",
                 incoming.correlationID == delegateID, incoming.replyToID == nil, incoming.consumedAt == nil
             else { throw RecordStorageError.conflict }
             let busy =
@@ -71,7 +70,7 @@ extension SQLiteWriterExecutionRepository {
             }
             try db.execute(
                 sql:
-                    "UPDATE agent_messages SET delivery_state='received',received_at=COALESCE(received_at,?),consumed_at=?,claim_token=NULL,claim_expires_at=NULL WHERE id=?",
+                    "UPDATE agent_messages SET received_at=COALESCE(received_at,?),consumed_at=? WHERE id=?",
                 arguments: [now, now, delegateID])
             // Explicit test/host selection uses the same immutable binding operation as native select.
             if let workspaceID, !busy {
@@ -177,7 +176,7 @@ extension SQLiteWriterExecutionRepository {
                 ["running", "waiting_input", "paused"].contains(root["run_state"] as String)
             else { throw RecordStorageError.conflict }
             if incoming.consumedAt != nil { return false }
-            guard ["agent.task.v1", "agent.task.request"].contains(incoming.contract),
+            guard incoming.contract == "agent.task.v1",
                 let original = try AgentMessageRow.fetchOne(db, key: requestID),
                 incoming.senderAgentID == original.senderAgentID, incoming.sourceSessionID == original.sourceSessionID,
                 (root["pending_question_id"] as String?) == questionID
@@ -203,7 +202,7 @@ extension SQLiteWriterExecutionRepository {
         guard !reason.isEmpty, reason.utf8.count <= 4096 else { throw RecordStorageError.invalidRecord }
         return try database.write { db in
             guard let incoming = try AgentMessageRow.fetchOne(db, key: id),
-                ["agent.task.v1", "agent.task.request"].contains(incoming.contract),
+                incoming.contract == "agent.task.v1",
                 let original = try AgentMessageRow.fetchOne(db, key: requestID),
                 incoming.senderAgentID == original.senderAgentID, incoming.sourceSessionID == original.sourceSessionID,
                 incoming.receiverAgentID == "writer", incoming.correlationID == requestID
@@ -306,5 +305,9 @@ extension SQLiteWriterExecutionRepository {
                 "{\"message\":\"Process interrupted; external effects are never replayed\"}",
                 Date().timeIntervalSince1970,
             ])
+        // Execution grants do not survive the process, so an unfinished retirement has nothing left to release.
+        try db.execute(
+            sql: "UPDATE writer_executions SET run_state=terminal_state,updated_at=? WHERE run_state='closing'",
+            arguments: [Date().timeIntervalSince1970])
     }
 }

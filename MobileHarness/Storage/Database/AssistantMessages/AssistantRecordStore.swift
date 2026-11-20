@@ -72,32 +72,6 @@ public actor AssistantRecordStore {
         request.state = try Self.state(row.state)
         return request
     }
-    /// Recover only an exact recorded batch, never synthesize a past request from current state.
-    private static func restoreLegacyBatchInput(_ request: inout AssistantModelRequest, turn: AssistantRecord) {
-        guard request.input == turn.user, let members = turn.coordination?.memberIDs, members.count > 1,
-            let payload = request.requestParametersJSON,
-            let root = try? JSONSerialization.jsonObject(with: Data(payload.utf8))
-        else { return }
-        let object = root as? [String: Any]
-        let messages =
-            (root as? [[String: Any]]) ?? object?["messages"] as? [[String: Any]]
-            ?? object?["input"] as? [[String: Any]] ?? []
-        for message in messages.reversed() where message["role"] as? String == "user" {
-            let texts =
-                (message["content"] as? String).map { [$0] }
-                ?? (message["content"] as? [[String: Any]])?.compactMap { $0["text"] as? String } ?? []
-            for text in texts {
-                let json = text.components(separatedBy: "\nInterrupted intentions").first ?? text
-                guard let batch = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any],
-                    let inputs = batch["inputs"] as? [[String: Any]],
-                    inputs.count == members.count,
-                    Set(inputs.compactMap { $0["id"] as? String }) == Set(members)
-                else { continue }
-                request.input = text
-                return
-            }
-        }
-    }
     private func metadata(_ row: AssistantConversationRecord) -> AssistantConversation {
         var result = AssistantConversation(id: row.id, createdAt: row.createdAt)
         result.archivedAt = row.archivedAt
@@ -280,7 +254,6 @@ public actor AssistantRecordStore {
                         records.first { $0.clientID == response.clientID && $0.kind == "observation" }?.body
                         ?? item.body
                 }
-                Self.restoreLegacyBatchInput(&request, turn: turn)
                 if turn.request.isEmpty,
                     let original = try? JSONDecoder().decode(
                         [ModelMessage].self, from: Data(request.requestJSON.utf8))
@@ -399,7 +372,6 @@ extension AssistantRecordStore {
         if response.detail.isEmpty {
             request.input = rows.first(where: { $0.kind == "observation" })?.body ?? user.body
         }
-        Self.restoreLegacyBatchInput(&request, turn: turn)
         turn.modelRequests = [request]
         var result = AssistantConversation(id: "detail")
         result.turns = [turn]

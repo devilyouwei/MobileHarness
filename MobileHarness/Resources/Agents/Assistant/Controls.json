@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "alias": "loadSkills",
+      "operation": "loadSkills",
+      "destination": "self",
+      "declaration": {
+        "path": { "domain": "Agent", "module": "Task", "function": "loadSkills" },
+        "doc": "Atomically load Skills; returns committed state for the following request.",
+        "parameters": [
+          {
+            "name": "skills", "valueType": "string", "required": true,
+            "description": "JSON array of Skill IDs; atomic update", "constraints": "Unique nonempty IDs, at most 16",
+            "values": []
+          }
+        ]
+      }
+    },
+    {
+      "alias": "releaseSkills",
+      "operation": "releaseSkills",
+      "destination": "self",
+      "declaration": {
+        "path": { "domain": "Agent", "module": "Task", "function": "releaseSkills" },
+        "doc": "Atomically release non-base Skills; returns committed state for the following request.",
+        "parameters": [
+          {
+            "name": "skills", "valueType": "string", "required": true,
+            "description": "JSON array of Skill IDs; atomic update", "constraints": "Unique nonempty IDs, at most 16",
+            "values": []
+          }
+        ]
+      }
+    },
+    {
+      "alias": "task.start",
+      "operation": "task.start",
+      "destination": "self",
+      "declaration": {
+        "path": { "domain": "Agent", "module": "Task", "function": "startTask" },
+        "doc": "Start a foreground goal when none is active. End an existing foreground goal before starting another.",
+        "parameters": [
+          {
+            "name": "description", "valueType": "string", "required": true,
+            "description": "Foreground task description", "constraints": "", "values": []
+          },
+          {
+            "name": "skills", "valueType": "string", "required": false,
+            "description": "Optional JSON array of initial foreground Skill IDs", "constraints": "", "values": []
+          }
+        ]
+      }
+    },
+    {
+      "alias": "task.end",
+      "operation": "task.end",
+      "destination": "self",
+      "declaration": {
+        "path": { "domain": "Agent", "module": "Task", "function": "finishTask" },
+        "doc": "Finish foreground only; background completion belongs to its executor. continueDecision requires a remaining new goal.",
+        "parameters": [
+          {
+            "name": "summary", "valueType": "string", "required": true,
+            "description": "summary", "constraints": "Nonempty bounded text", "values": []
+          },
+          {
+            "name": "continueDecision", "valueType": "boolean", "required": false,
+            "description": "Continue only to a different goal still requested by this user input; omit after ordinary completion",
+            "constraints": "true or false; default false", "values": ["true", "false"]
+          }
+        ]
+      }
+    },
+    {
+      "alias": "task.send",
+      "operation": "task.send",
+      "destination": "peer",
+      "declaration": {
+        "path": { "domain": "Agent", "module": "Task", "function": "sendMessage" },
+        "doc": "Relay the user's request, reply or correction to a peer Agent. The receiver decides how to handle it.",
+        "parameters": [
+          {
+            "name": "agent_id", "valueType": "string", "required": true,
+            "description": "Target Agent ID", "constraints": "", "values": []
+          },
+          {
+            "name": "text", "valueType": "string", "required": true,
+            "description": "User request, reply, correction or stop request", "constraints": "", "values": []
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -20,7 +20,7 @@ import Foundation
                 transitionID: state.expressionTransitionID, gaze: gaze,
                 faceWidth: faceWidth, eyeCenter: eyeCenter,
                 active: state.isVoiceActive, generation: state.listeningAnimationID,
-                lightOrigin: state.listeningLightOrigin, decorativeLight: state.decorativeLight, held: held,
+                lightOrigin: state.listeningLightOrigin, held: held,
                 completion: { state.expressionAnimationCompletion?($0, $1) },
                 availability: { available in
                     state.expressionRendererAvailable = available

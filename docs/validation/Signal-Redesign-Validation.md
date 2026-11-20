@@ -106,3 +106,91 @@ NexArm/Bluetooth 最终定向回归退出 0：一个目标 11 tests / 0.006 秒�
 首次完整 check.sh 在普通阶段仅有 `resultRedeliveryStopsAtTheLimitAndFailsTheRound` 一项失败：满载并行下 300 ms 的重投期限在第二次重投前已到期。测试期限改为 2 秒后单独运行与完整运行均通过；这是测试时间余量问题，不改变 60 秒设计值，该值仍是未经测量的设计值。
 
 迁移后的执行生命周期用例（暂停/恢复 join 资源与动作清理、重复停止保留清理失败、停机 join 准备中任务、Channel 容量预留）由 GatewayContainerTests 迁入 ActionsContainerTests。Gateway 配置失败用例改为同一执行 Shell 的第二次绑定被拒绝；重复资源定义的拒绝不再由 Gateway 测试覆盖，也尚无 Actions 侧专项用例。未运行真实模型矩阵、iOS UI 专项或实机验收；修改位于 feat/signal-redesign，未提交。
+
+## 第 20 节：Agent 内部控制函数迁入 Agents 的验证
+
+对应需求第 20 节。`task.start/end/send`、`loadSkills`、`releaseSkills` 由 BasicSkill 通过 `useControls` 登记，Assistant 在发射时本地执行，不再经 Gateway 与 Actions；Actions 的 System/Task 模块、TaskControlCapability 及相关装配已删除。
+
+| 检查 | 当前源码证据 |
+| --- | --- |
+| `./scripts/check.sh` | 退出 0：边界、Python 离线回归、严格 Swift 格式、普通阶段 Integration 1211 tests / 64.294 秒、LiveRuntime 串行 231 tests / 208.625 秒、plist 通过。日志 `/tmp/ctl-check2.log`。 |
+| `./scripts/build-ios.sh` | 退出 0，五个 scheme 均 BUILD SUCCEEDED（含仅 iOS 编译的 AgentRuntime 改动）。日志 `/tmp/ctl-ios1.log`。 |
+
+验证中发现并修正的问题：(1) 初版把控制调用延后到整轮 Action 结算后执行，使全双工 `task.end` 不再独立于仍在运行的 Action，`fullDuplexTaskEndPersistsAndFolds...` 超时；已改为发射时按序执行。(2) 助手委派目录仍按旧的 Action 登记判断 `task.send`，导致提示词缺少 Writer；已改读 controls。(3) 一个因测试夹具把 `ActionCall` 下标取值导致的崩溃，随断言更新消除。照 BasicSkill 增加 wait 与控制示例后，Photography 提示词预算测试由 38,000 提高到 38,500 字节（实测 38,324）。
+
+未验证：真实模型下新提示词（wait 说明移入 BasicSkill、控制调用改为 Agent 内部控制）的行为；仅有离线解析与单元断言。`Agent.Communication.send` 旧本地路径无生产 Skill 登记，保持原状，另行清理。ConversationHistoryView 展示的目录计数不含控制。修改位于 feat/signal-redesign，未提交。
+
+## 第 21 节：Skill Channel 按互斥占用重新划分的验证
+
+对应需求第 21 节。Skill.json 的 Channel 改为按互斥占用划分：`Query`、`System` 不再使用；窗口/导航、灵动岛、网页、蓝牙设备、模型资源、会话历史、Provider 设置各自独立，`cancelCapture` 使用 `CameraCancel`，Vision 脱离 `Camera`；`Display` 仅保留字幕、回复等待与表情。涉及 ApplicationControl、HistoryQuery、Photography、WebBrowsing 的 Skill.json（revision 递增）、Instructions 中的 Channel 表述、RuntimeLog Channel 颜色及各 README。
+
+| 检查 | 当前源码证据 |
+| --- | --- |
+| `./scripts/check.sh` | 退出 0：边界、Python 离线回归、严格 Swift 格式、普通阶段 Integration 1212 tests、LiveRuntime 串行 231 tests、plist 通过。日志 `/tmp/check.log`。 |
+| 新增测试 | `skillChannelsSeparateIndependentWorkAndKeepExclusiveWorkTogether` 覆盖互斥项共用 Channel、cancelCapture/Vision/Web/Window/Island/History/Provider 独立，及 Channel 总数不超过 16。 |
+
+未验证：真实模型在新 Channel 目录下的编排效果（例如 cancelCapture 与 takePhoto 并行取消倒计时的实际运行行为）、实机行为；仅有离线解析、目录与调度单元断言。修改位于 feat/signal-redesign，未提交。
+
+## 第 22 节：控制函数声明集中与 AssistantChatWorker 拆分的验证
+
+对应需求第 22 节。五个控制的声明与 `AgentControlOperation` 枚举集中在 Support/AgentControls.swift，`AgentControl.operation` 与 `controlTask` 不再使用字符串；`Agent.Task.sendMessage` 的声明从 Support/Communication 并入；执行仍由 Assistant 承担。AssistantChatWorker.swift 由 4051 行拆为主文件（声明、状态、注册）与 Lifecycle、Input、Generation、Feedback、Emission、TaskCommunication、WriterEvents、Status 八个同名 extension 文件，控制执行位于 AssistantControls.swift；成员可见性由 `private` 放宽为模块内部，pbxproj 文件登记与 boundary checker 的读取范围同步更新。
+
+| 检查 | 当前源码证据 |
+| --- | --- |
+| `./scripts/check.sh` | 退出 0：边界、Python 离线回归、严格 Swift 格式、普通阶段 1212 tests、LiveRuntime 串行 231 tests、plist 通过。日志 `/tmp/check3.log`。 |
+| `./scripts/build-ios.sh` | 退出 0，五个 scheme 均 BUILD SUCCEEDED。日志 `/tmp/ios2.log`。 |
+
+测试调整：`controlTask` 的调用改用枚举；未知 operation 已无法表示，原“已移除 operation 返回 forbiddenFunction”的断言和 `task.delegate` 用例随之删除，伪造来源被拒绝的断言保留。
+
+未验证：真实模型与实机行为；本次为文件拆分与类型收紧，不改行为。`AgentTaskSkillState.control` 仍以别名字符串为入参。修改位于 feat/signal-redesign，未提交。
+
+## 第 23 节与 control 两类模型的验证
+
+对应 Signal 需求第 23 节（控制库移入 Assistant、Skill 不再配置控制）与 [Assistant 内部函数标记](../requirements/technical/Assistant-Internal-Function-Tokens.md)。模型可见函数分为 Action（经 Gateway 进入 Actions，含调度与直接 tool 协议）与 control（由拥有者 Agent 执行）。`ControlDestination`（`self`／`peer`）挂在 `ControlRegistration` 与 `ControlCall` 上，`task.send` 为 `peer`，其余四个为 `self`；目录标题行显示 destination。AssistantControls.swift 只保留定义，执行移至 AssistantControlExecution.swift。
+
+实施中发现并修复：第 23 节把控制注册放进 `AssistantContextState.runtimeCapabilities`，但 `AssistantAgent.runtimeCapabilities`（AgentRuntime 覆盖校验与测试所用）仍是 worker 的通用授权，不含控制，导致控制与 Agent 目录从这些入口消失。worker 的 `runtimeCapabilities` 现在转到 `State.runtimeCapabilities`，通用语音／字幕授权改名为 `chatRuntimeCapabilities`。AgentConfiguration 不再容忍已退役的 `controls` 根键。boundary checker 从禁用列表移除 `AssistantControl`。
+
+| 检查 | 当前源码证据 |
+| --- | --- |
+| `swift build --build-tests` | 退出 0。日志 `build/agent-build.log`。 |
+| `./scripts/check.sh` | 退出 0：边界、Python 离线回归、严格 Swift 格式、普通阶段与 LiveRuntime 串行 231 tests 全部通过，无失败项；plist 通过。日志 `build/agent-check.log`。 |
+| `./scripts/build-ios.sh` | 退出 0，五个 scheme 均 BUILD SUCCEEDED。日志 `build/agent-ios.log`。 |
+
+新增覆盖：`task.send` 解析为 `peer`、仅 `task.send` 为 `peer`；生成器对 `<task.start/><wait><task.send/></wait>` 产出 `self` control、wait 边界与 `controlInsideWait` 拒绝，且不产生 Action 调用；目录渲染 `Control task.start (self):` 与 `Control task.send (peer):`。
+
+未验证：真实模型在新目录标题下的选用效果（属于 experiments）、实机行为。`task.send` 投递、回执与 Writer 原生工具拆分仍按需求文档待定。修改位于 feat/signal-redesign，未提交。
+
+对照复查后的补充修改：`CallRejection.Kind` 新增 `control`，control 别名的拒绝不再标为 `action`（反馈文案与 round 记录同步）；Agent 目录按是否注册 `peer` control 显示；状态快照 controls 输出 `destination`；AgentConfiguration 的 `controls` 根键拒绝有测试覆盖；MobileHarness、Resources/Agents、Resources/Skills 与 Assistant README 中残留的 `useControls` 描述改为现行设计。复查后 `./scripts/check.sh` 再次退出 0、无失败项（日志 `build/agent-check.log`）；`./scripts/build-ios.sh` 退出 0，五个 scheme 均 BUILD SUCCEEDED（日志 `build/agent-ios.log`）。旧 `send` Action（`Agent.Communication.send`）在生产配置中已无授予，删除方案记录在需求文档待定段，未删除。
+
+## 旧实现清理（不保留兼容）的验证
+
+对应 [Assistant 内部函数标记](../requirements/technical/Assistant-Internal-Function-Tokens.md#旧实现清理不保留兼容)。用户确认不兼容旧实现、数据库可清空。
+
+- 删除旧 `send` Action 整条路径：`AgentCommunicationAdapter`（文件删除）、`modelCommunication`、`deferredCommunications` 与 PendingRound 中的保存、`sendDeclaration`、配置与覆盖校验特例、FunctionCopy 条目、CommunicationContext 中的 `rejection`/`taskDirectory` 模板、`validateCommunication` 要求；checker 拒绝 Skill 绑定 `Agent.Communication.*` 并禁用相关旧标识符。
+- 删除未使用 Action：`UI.Notice.showNotice`、`UI.Notice.dismissNotice`、`UI.Light.updateLight`、`UI.Island.update`、`System.Runtime.runtimeInfo`，及只为其存在的 UI 端口与状态。新增 `everyDeclaredActionIsGrantedOrComposedByCode` 防止再出现未授予的声明。
+- SQLite 只保留当前版本，其他版本一律清空重建；删除逐版本迁移、旧契约别名查询、`task.cancel` 取消原因回退、旧输入批次重投影与旧来源行模板、旧下载偏好文件搬迁，以及只覆盖这些旧行为的测试。
+- BasicSkill revision 59：task.end 不再称为 Action；control 目录标题缩短以保持 photography 提示词预算（38,500 字节）。
+
+| 检查 | 当前源码证据 |
+| --- | --- |
+| `swift build --build-tests` | 退出 0（子任务日志 `build/sub-build.log`）。 |
+| `./scripts/check.sh` | 退出 1：边界、Python 离线回归、严格格式通过；普通阶段 1200 项中仅 `bluetoothUnavailabilityIsPresentedAsStateWithoutFailureToast` 在并行负载下等待超时（`.expired`），单独重跑 0.098 秒通过；LiveRuntime 阶段无失败。日志 `build/agent-check.log`、`build/single.log`。 |
+
+中间运行：首轮 check.sh 暴露测试夹具仍写旧契约名（`task.request`、`agent.task.request`）、两条迁移测试、photography 提示词超预算 88 字节；第二轮只剩一条依赖 `task.cancel` 消息提供取消原因的断言，均已按新契约修正或删除。
+
+未验证：真实模型与实机行为。修改位于 feat/signal-redesign，未提交。
+
+## control 声明资源化与 Writer 到 Assistant 发后即丢的验证
+
+对应 [Assistant 内部函数标记](../requirements/technical/Assistant-Internal-Function-Tokens.md#control-声明放入资源文件已定) 与 [Writer 到 Assistant 的消息](../requirements/technical/Assistant-Internal-Function-Tokens.md#writer-到-assistant-的消息已定)。
+
+- control 声明改由 `Resources/Agents/Assistant/Controls.json` 与 `Controls.zh-Hans.json` 提供，`FunctionCopy` 不再含 `Agent.Task.*`。
+- 删除 Writer outbox（`WriterNotifications` 文件与 pbxproj 引用）、Assistant 依赖消息表的恢复与校验、存储中的 outbox/游标 API、列与 `task_observation_cursors` 表；schema 20261121。
+- 测试：删除只覆盖重发、游标、恢复跟踪的用例（`completionOutboxRejectsStaleClaimsAndStopsAfterEightFailures`、`taskEventCursorCannotSkipUnconsumedEventsAndIsReceiverScoped`、`consumerConfirmationDoesNotPublishAnEventOrControlItsPublicationQueue`、`assistantRestoresTaskTrackingAndReadsCompletionPublishedWithoutAnyConsumer`、`writerTerminalNotificationCommitRollsBackConflictsAndKeepsIndependentReceipts`）；新增 `completionWritesOnlyWriterExecutionAndRetirementRecordsCleanup`；二十任务用例改为 `writerCompletesTwentyTasksWhileProgressReportsAreDropped`；`WriterResultSink` 不再首投拒收，`WriterTestRequester` 只发送、不预写记录、不补读。
+
+| 检查 | 当前源码证据 |
+| --- | --- |
+| `swift build --build-tests` | 退出 0（`build/agent-build.log`，Build complete）。 |
+| `./scripts/check.sh`、`./scripts/build-ios.sh`、`swift test` | 未执行（按用户要求先只验证编译）。 |
+
+未验证：测试运行、真实模型与实机行为。

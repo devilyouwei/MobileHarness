@@ -7,154 +7,6 @@ import Testing
 
 @testable import StorageSQLite
 
-private let writerSchemaBeforeRequestBoundary = """
-    CREATE TABLE writer_messages(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    input_key TEXT NOT NULL,
-    root_input_key TEXT NOT NULL,
-    position INTEGER NOT NULL CHECK(position>=0),
-    input_kind TEXT NOT NULL DEFAULT 'user',
-    state TEXT NOT NULL DEFAULT 'generating',
-    created_at REAL NOT NULL,
-    updated_at REAL NOT NULL,
-    completed_at REAL,
-    schema_version INTEGER NOT NULL DEFAULT 1,
-    user_input_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(user_input_json)),
-    assistant_response_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(assistant_response_json)),
-    tool_catalog_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(tool_catalog_json)),
-    tool_calls_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(tool_calls_json)),
-    workspace_id INTEGER REFERENCES writer_workspaces(id) ON DELETE RESTRICT,
-    request_message_id TEXT REFERENCES agent_messages(id) ON DELETE RESTRICT,
-    delegation_id INTEGER REFERENCES writer_messages(id) ON DELETE RESTRICT,
-    selected_workspace_id INTEGER REFERENCES writer_workspaces(id) ON DELETE RESTRICT,
-    run_state TEXT,
-    request_goal TEXT,
-    request_revision INTEGER NOT NULL DEFAULT 0,
-    pending_question_id TEXT REFERENCES agent_messages(id) ON DELETE RESTRICT,
-    pending_question_json TEXT CHECK(pending_question_json IS NULL OR json_valid(pending_question_json)),
-    failure_json TEXT,
-    terminal_state TEXT,
-    result_json TEXT CHECK(result_json IS NULL OR json_valid(result_json)),
-    caused_by_message_id INTEGER REFERENCES writer_messages(id) ON DELETE SET NULL,
-    phase TEXT,
-    target_path TEXT,
-    runtime_results_json TEXT NOT NULL DEFAULT '[]' ,
-    CHECK(request_message_id IS NOT NULL),
-    CHECK((input_kind='delegation' AND delegation_id IS NULL AND workspace_id IS NULL AND run_state IS NOT NULL) OR (input_kind!='delegation' AND delegation_id IS NOT NULL AND run_state IS NULL)),
-    UNIQUE(input_key));
-    CREATE UNIQUE INDEX writer_delegation_identity ON writer_messages(request_message_id) WHERE input_kind='delegation';
-    CREATE UNIQUE INDEX single_writer_execution ON writer_messages((1)) WHERE input_kind='delegation' AND run_state IN ('running','waiting_input','paused','closing','cleanup_failed');
-    CREATE INDEX writer_message_delegation ON writer_messages(delegation_id,id);
-    CREATE INDEX writer_message_order ON writer_messages(workspace_id,position,id);
-    CREATE INDEX writer_message_request ON writer_messages(request_message_id,position,id);
-    CREATE INDEX writer_message_root ON writer_messages(root_input_key);
-    CREATE INDEX writer_message_cause ON writer_messages(caused_by_message_id);
-    CREATE UNIQUE INDEX writer_message_invocation ON writer_messages(json_extract(assistant_response_json,'$.id')) WHERE json_extract(assistant_response_json,'$.id') IS NOT NULL;
-    """
-
-@Test(arguments: [20_261_110, 20_261_111])
-func requestBoundaryMigrationRetainsInvocationsAndMovesWriterExecutions(version: Int) async throws {
-    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".sqlite")
-    defer { for suffix in ["", "-wal", "-shm"] { try? FileManager.default.removeItem(atPath: url.path + suffix) } }
-    let pool = try DatabasePool(path: url.path)
-    try await pool.write { db in
-        for statement in SQLiteSchema.statements
-        where statement != SQLiteWriterExecutionRepository.schemaSQL && statement != AgentMessageRow.cursorSchemaSQL {
-            try db.execute(
-                sql: statement == WriterMessageRow.schemaSQL
-                    ? writerSchemaBeforeRequestBoundary
-                    : statement.replacingOccurrences(of: "        source_session_id TEXT,\n", with: "")
-                        .replacingOccurrences(of: "source_session_id TEXT,", with: "").replacingOccurrences(
-                            of: "published_at REAL,", with: ""))
-        }
-        try db.execute(sql: "INSERT INTO assistant_conversations(id,created_at) VALUES(1,1)")
-        try db.execute(
-            sql:
-                "INSERT INTO assistant_messages(id,input_key,root_input_key,position,conversation_id,created_at,updated_at) VALUES(1,'discard','discard',1,1,1,1)"
-        )
-        try db.execute(
-            sql:
-                #"INSERT INTO assistant_messages(id,input_key,root_input_key,position,conversation_id,created_at,updated_at,state,assistant_response_json) VALUES(2,'sent','sent',2,1,2,2,'failed','{"id":"http-attempt","text":""}')"#
-        )
-        try db.execute(
-            sql:
-                "INSERT INTO model_request_log(assistant_message_id,invocation_id,method,created_at,updated_at) VALUES(2,'http-attempt','POST',2,2)"
-        )
-        try db.execute(
-            sql:
-                "INSERT INTO agent_messages(id,sender_agent_id,receiver_agent_id,contract,payload_json,correlation_id,dedupe_key,created_at) VALUES('delegate','assistant','writer','task.request','{}','delegate','delegate',1)"
-        )
-        try db.execute(sql: "INSERT INTO writer_workspaces(id,description,created_at,updated_at) VALUES(1,'draft',1,1)")
-        try db.execute(
-            sql:
-                #"INSERT INTO writer_messages(id,input_key,root_input_key,position,input_kind,request_message_id,selected_workspace_id,request_goal,run_state,user_input_json,result_json,created_at,updated_at) VALUES(10,'delegate','delegate',10,'delegation','delegate',1,'goal','completed','{"text":"write","source_agent":"assistant"}','{"result":"kept"}',1,1)"#
-        )
-        try db.execute(
-            sql:
-                #"INSERT INTO writer_messages(id,input_key,root_input_key,position,delegation_id,workspace_id,request_message_id,assistant_response_json,created_at,updated_at) VALUES(11,'writer-input','writer-input',11,10,1,'delegate','{"id":"writer-http","text":"reply"}',2,2)"#
-        )
-        try db.execute(
-            sql:
-                "INSERT INTO writer_messages(id,input_key,root_input_key,position,delegation_id,request_message_id,created_at,updated_at) VALUES(12,'queued','queued',12,10,'delegate',3,3)"
-        )
-        try db.execute(
-            sql:
-                "INSERT INTO model_request_log(writer_message_id,invocation_id,method,created_at,updated_at) VALUES(11,'writer-http','POST',2,2)"
-        )
-        try db.execute(sql: "PRAGMA user_version=\(version)")
-    }
-    try SQLiteSchema.prepare(pool)
-    try await pool.read { db throws -> Void in
-        #expect(try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM assistant_messages") == 1)
-        #expect(try String.fetchOne(db, sql: "SELECT state FROM assistant_messages WHERE id=2") == "failed")
-        #expect(try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM writer_messages") == 1)
-        #expect(try Int.fetchOne(db, sql: "SELECT delegation_id FROM writer_messages WHERE id=11") == 10)
-        #expect(
-            try String.fetchOne(db, sql: "SELECT result_json FROM writer_executions WHERE id=10")
-                == #"{"result":"kept"}"#)
-        #expect(try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM model_request_log") == 2)
-        #expect(try Int.fetchOne(db, sql: "PRAGMA user_version") == SQLiteSchema.currentVersion)
-        #expect(try Row.fetchAll(db, sql: "PRAGMA foreign_key_check").isEmpty)
-    }
-    try SQLiteSchema.prepare(pool)
-    try pool.close()
-}
-
-@Test func taskContractMigrationRetainsPendingWriterResponse() async throws {
-    let repository = try SQLiteRepositories.temporary()
-    let request = try await repository.seedDelegation(
-        workspaceID: nil, goal: "work", input: "work", sourceDialog: nil, agent: "writer")
-    let event = UUID().uuidString
-    let payload = Data("{}".utf8)
-    try await repository.writerExecutions.completeRequest(
-        .init(delegateID: request.delegateID, agent: "writer", eventID: event, data: payload),
-        status: "completed", failure: nil)
-    try repository.database.write { db in
-        try db.execute(
-            sql: "UPDATE agent_messages SET contract='agent.task.message' WHERE id=?",
-            arguments: [request.delegateID])
-        try db.execute(
-            sql: "UPDATE agent_messages SET contract='agent.task.report' WHERE id=?", arguments: [event])
-        try db.execute(
-            sql:
-                "DROP TABLE task_observation_cursors; DROP TABLE invocation_evidence; ALTER TABLE agent_messages DROP COLUMN source_session_id; ALTER TABLE agent_messages DROP COLUMN published_at; PRAGMA user_version=20261112"
-        )
-    }
-
-    try repository.database.prepareSchema { try SQLiteSchema.prepare($0) }
-    try repository.database.prepareSchema { try SQLiteSchema.prepare($0) }
-    let original = try #require(try await repository.agentMessages.agentMessage(request.delegateID))
-    #expect(original.contract == "agent.task.request")
-    let stored = try #require(try await repository.agentMessages.agentMessage(event))
-    #expect(stored.contract == "agent.task.response")
-    #expect(stored.replyTo == original.id)
-    #expect(stored.payload == payload)
-    let pending = try await repository.writerExecutions.pendingDelegationNotifications(
-        agent: "writer", retirement: false, after: nil, limit: 1)
-    #expect(pending.first?.eventID == event)
-    try await repository.shutdown()
-}
-
 @Test func independentAgentTablesAndForeignKeys() async throws {
     let repository = try SQLiteRepositories.temporary()
     try repository.database.write { db throws -> Void in
@@ -166,7 +18,7 @@ func requestBoundaryMigrationRetainsInvocationsAndMovesWriterExecutions(version:
                 "assistant_conversations", "assistant_tasks", "assistant_messages", "writer_workspaces",
                 "writer_messages", "writer_executions",
                 "workspace_files", "agent_messages", "model_request_log", "media_files", "devices",
-                "task_observation_cursors", "invocation_evidence",
+                "invocation_evidence",
             ])
         var conversation = AssistantConversationRow(createdAt: 1)
         try conversation.insert(db)
@@ -243,18 +95,21 @@ func requestBoundaryMigrationRetainsInvocationsAndMovesWriterExecutions(version:
     try await second.shutdown()
 }
 
-@Test func futureDatabaseVersionIsRejectedWithoutErasing() throws {
+@Test func otherDatabaseVersionIsReplacedWithoutMigration() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".sqlite")
     defer { for suffix in ["", "-wal", "-shm"] { try? FileManager.default.removeItem(atPath: url.path + suffix) } }
     let pool = try DatabasePool(path: url.path)
     try pool.write { db in
         try db.execute(
             sql:
-                "CREATE TABLE retained(value TEXT); INSERT INTO retained VALUES ('keep'); PRAGMA user_version=2147483647"
+                "CREATE TABLE retained(value TEXT); INSERT INTO retained VALUES ('drop'); PRAGMA user_version=2147483647"
         )
     }
-    #expect(throws: SQLiteSchemaError.unsupportedVersion(2_147_483_647)) { try SQLiteSchema.prepare(pool) }
-    #expect(try pool.read { try String.fetchOne($0, sql: "SELECT value FROM retained") } == "keep")
+    try SQLiteSchema.prepare(pool)
+    try pool.read { db throws -> Void in
+        #expect(try !db.tableExists("retained"))
+        #expect(try Int.fetchOne(db, sql: "PRAGMA user_version") == SQLiteSchema.currentVersion)
+    }
     try pool.close()
 }
 
@@ -303,58 +158,25 @@ func requestBoundaryMigrationRetainsInvocationsAndMovesWriterExecutions(version:
     try await repository.shutdown()
 }
 
-@Test(arguments: ["agent.task.events.v1", "agent.task.response", "writer.completion"])
-func completionOutboxRejectsStaleClaimsAndStopsAfterEightFailures(contract: String) async throws {
+@Test func completionWritesOnlyWriterExecutionAndRetirementRecordsCleanup() async throws {
     let repository = try SQLiteRepositories.temporary()
     let request = try await repository.seedDelegation(
         workspaceID: nil, goal: "work", input: "work", sourceDialog: nil, agent: "writer")
     let event = UUID().uuidString
     try await repository.writerExecutions.completeRequest(
-        .init(delegateID: request.delegateID, agent: "writer", eventID: event, data: Data("{}".utf8)),
-        status: "completed", failure: nil)
-    if contract != "agent.task.events.v1" {
-        try repository.database.write {
-            try $0.execute(sql: "UPDATE agent_messages SET contract=? WHERE id=?", arguments: [contract, event])
-        }
+        request.delegateID, eventID: event, result: Data("{}".utf8), status: "completed", failure: nil,
+        cancellationReason: nil)
+    #expect(try await repository.agentMessages.agentMessage(event) == nil)
+    await #expect(throws: RecordStorageError.conflict) {
+        try await repository.writerExecutions.completeRequest(
+            request.delegateID, eventID: UUID().uuidString, result: Data("{}".utf8), status: "failed",
+            failure: "late", cancellationReason: nil)
     }
-    #expect(try await repository.agentMessages.agentMessage(event)?.contract == contract)
-    var prior: String?
-    for attempt in 1...8 {
-        // Advance only the delivery clock; business work is never replayed.
-        try repository.database.write {
-            try $0.execute(sql: "UPDATE agent_messages SET next_attempt_at=0 WHERE id=?", arguments: [event])
-        }
-        let claimed = try #require(
-            try await repository.writerExecutions.pendingDelegationNotifications(
-                agent: "writer", retirement: false, after: nil, limit: 1
-            ).first)
-        if let prior {
-            await #expect(throws: RecordStorageError.conflict) {
-                try await repository.writerExecutions.finishDelegationNotification(
-                    request.delegateID, agent: "writer", retirement: false, completed: true, failure: nil,
-                    claimToken: prior)
-            }
-        }
-        #expect(
-            try await repository.writerExecutions.pendingDelegationNotifications(
-                agent: "writer", retirement: false, after: nil, limit: 1
-            ).isEmpty)
-        try await repository.writerExecutions.finishDelegationNotification(
-            request.delegateID, agent: "writer", retirement: false, completed: false, failure: "offline",
-            claimToken: claimed.claimToken)
-        prior = claimed.claimToken
-        let stored = try #require(try repository.database.read { try AgentMessageRow.fetchOne($0, key: event) })
-        #expect(stored.attemptCount == attempt)
-        #expect(stored.deliveryState == (attempt == 8 ? "dead_letter" : "pending"))
-    }
+    try await repository.writerExecutions.retireRequest(request.delegateID, failure: "grant busy")
     #expect(
-        try await repository.writerExecutions.pendingDelegationNotifications(
-            agent: "writer", retirement: false, after: nil, limit: 1
-        )
-        .isEmpty)
-    #expect(try repository.database.read { try WriterWorkspaceRow.fetchCount($0) } == 1)
-    try await repository.writerExecutions.finishDelegationNotification(
-        request.delegateID, agent: "writer", retirement: true, completed: true, failure: nil)
+        try await repository.writerExecutions.request(request.delegateID, agent: "writer").executionState
+            == "cleanup_failed")
+    try await repository.writerExecutions.retireRequest(request.delegateID, failure: nil)
     #expect(try await repository.writerExecutions.request(request.delegateID, agent: "writer").status == "completed")
     try await repository.shutdown()
 }
@@ -508,7 +330,7 @@ func completionOutboxRejectsStaleClaimsAndStopsAfterEightFailures(contract: Stri
     let supplement = UUID().uuidString
     try await records.agentMessages.enqueueAgentMessage(
         .init(
-            id: supplement, sender: "assistant", receiver: "writer", contract: "agent.task.request",
+            id: supplement, sender: "assistant", receiver: "writer", contract: "agent.task.v1",
             payload: Data("{\"text\":\"blue\"}".utf8), correlationID: id, replyTo: id, dedupeKey: supplement))
     #expect(
         try await records.writerExecutions.acceptWriterInput(
@@ -530,11 +352,9 @@ func completionOutboxRejectsStaleClaimsAndStopsAfterEightFailures(contract: Stri
     try reopened.recoverInFlight()
     #expect(try await reopened.writerExecutions.request(id, agent: "writer").status == "interrupted")
     #expect(try await reopened.writerExecutions.workspaces(agent: "writer", before: nil, limit: 20).isEmpty)
-    let completion = WriterDelegationNotification(
-        delegateID: id, agent: "writer", eventID: UUID().uuidString, data: Data("{\"result\":\"search complete\"}".utf8)
-    )
-    try await reopened.writerExecutions.completeRequest(completion, status: "completed", failure: nil)
-    try await reopened.writerExecutions.completeRequest(completion, status: "completed", failure: nil)
+    try await reopened.writerExecutions.completeRequest(
+        id, eventID: UUID().uuidString, result: Data("{\"result\":\"search complete\"}".utf8), status: "completed",
+        failure: nil, cancellationReason: nil)
     try await reopened.logs.clearRequestLogs(agent: "writer", requestID: nil)
     let done = try await reopened.writerExecutions.request(id, agent: "writer")
     #expect(done.workspaceID.isEmpty && done.status == "completed" && done.result?.contains("search complete") == true)
@@ -648,71 +468,6 @@ func completionOutboxRejectsStaleClaimsAndStopsAfterEightFailures(contract: Stri
     try await db.shutdown()
 }
 
-@Test func signalSchemaMigrationPreservesLegacyPayloadAndPendingDelivery() async throws {
-    let repository = try SQLiteRepositories.temporary()
-    let id = UUID().uuidString
-    let payload = Data(#"{"legacy":"unchanged"}"#.utf8)
-    try await repository.agentMessages.enqueueAgentMessage(
-        .init(
-            id: id, sender: "writer", receiver: "assistant", contract: "agent.task.response", payload: payload,
-            correlationID: id, dedupeKey: id))
-    try repository.database.write { db in
-        try db.execute(
-            sql:
-                "DROP TABLE task_observation_cursors; DROP TABLE invocation_evidence; ALTER TABLE agent_messages DROP COLUMN source_session_id; ALTER TABLE agent_messages DROP COLUMN published_at; PRAGMA user_version=20261113"
-        )
-    }
-    try repository.database.prepareSchema { try SQLiteSchema.prepare($0) }
-    let record = try #require(try await repository.agentMessages.agentMessage(id))
-    #expect(record.payload == payload && record.contract == "agent.task.response" && record.sourceSessionID == nil)
-    #expect(
-        try await repository.agentMessages.nextAgentDelivery(sender: "writer", contract: "agent.task.events.v1") != nil)
-    try await repository.shutdown()
-}
-
-@Test func taskEventCursorCannotSkipUnconsumedEventsAndIsReceiverScoped() async throws {
-    let repository = try SQLiteRepositories.temporary()
-    let records = repository.agentMessages
-    let root = UUID().uuidString
-    try await records.enqueueAgentMessage(
-        .init(
-            id: root, sender: "assistant", receiver: "writer", contract: "agent.task.v1", payload: Data("{}".utf8),
-            correlationID: root, sourceSessionID: "session", dedupeKey: root))
-    let ids = [UUID().uuidString, UUID().uuidString]
-    for id in ids {
-        try await records.enqueueAgentMessage(
-            .init(
-                id: id, sender: "writer", receiver: "assistant", contract: "agent.task.events.v1",
-                payload: Data("{}".utf8), correlationID: root, replyTo: root, dedupeKey: id))
-    }
-    let initial = try await records.taskEvents(reference: root, receiver: "assistant", after: nil, limit: 1)
-    #expect(initial.events.map(\.message.id) == [ids[0]])
-    try await records.receiveAgentMessage(ids[1], receiver: "assistant", consumed: true)
-    #expect(try await records.taskEvents(reference: root, receiver: "assistant", after: nil, limit: 2).cursor == 0)
-    try await records.receiveAgentMessage(ids[0], receiver: "assistant", consumed: true)
-    let consumed = try await records.taskEvents(reference: root, receiver: "assistant", after: nil, limit: 2)
-    #expect(consumed.cursor > initial.events[0].position && consumed.events.isEmpty)
-    let later = UUID().uuidString
-    let earlier = UUID().uuidString
-    for id in [earlier, later] {
-        try await records.enqueueAgentMessage(
-            .init(
-                id: id, sender: "writer", receiver: "assistant", contract: "agent.task.events.v1",
-                payload: Data("{}".utf8), correlationID: root, replyTo: root, dedupeKey: id))
-    }
-    let pending = try await records.taskEvents(reference: root, receiver: "assistant", after: nil, limit: 2)
-    try await records.consumeTaskEvents(reference: root, receiver: "assistant", through: pending.events[1].position)
-    #expect(try await records.isAgentMessageConsumed(later))
-    #expect(try await !records.isAgentMessageConsumed(earlier))
-    #expect(
-        try await records.taskEvents(reference: root, receiver: "assistant", after: nil, limit: 2).events.first?
-            .message.id == earlier)
-    await #expect(throws: RecordStorageError.invalidRecord) {
-        try await records.taskEvents(reference: root, receiver: "writer", after: nil, limit: 2)
-    }
-    try await repository.shutdown()
-}
-
 @Test func invocationEvidenceIsImmutableAndRecoverable() async throws {
     let repository = try SQLiteRepositories.temporary()
     let id = UUID().uuidString
@@ -754,59 +509,5 @@ func completionOutboxRejectsStaleClaimsAndStopsAfterEightFailures(contract: Stri
             id: update, sender: "memory", receiver: "writer", contract: "agent.task.v1", payload: Data("{}".utf8),
             correlationID: root, replyTo: root, sourceSessionID: "session", dedupeKey: update))
     #expect(try await repository.writerExecutions.acceptWriterInput(update, requestID: root, questionID: nil))
-    let event = UUID().uuidString
-    try await repository.writerExecutions.completeRequest(
-        .init(delegateID: root, agent: "writer", eventID: event, data: Data("{}".utf8)), status: "completed",
-        failure: nil)
-    #expect(try await repository.agentMessages.agentMessage(event)?.receiver == "memory")
     try await repository.shutdown()
-}
-
-@Test func consumerConfirmationDoesNotPublishAnEventOrControlItsPublicationQueue() async throws {
-    let records = try SQLiteRepositories.temporary()
-    let root = try await records.seedDelegation(
-        workspaceID: nil, goal: "work", input: "work", sourceDialog: nil, agent: "writer")
-    let eventID = UUID().uuidString
-    try await records.writerExecutions.completeRequest(
-        .init(delegateID: root.delegateID, agent: "writer", eventID: eventID, data: Data("{}".utf8)),
-        status: "completed", failure: nil)
-    try await records.agentMessages.receiveAgentMessage(eventID, receiver: "assistant", consumed: true)
-    let before = try #require(
-        try await records.writerExecutions.delegationNotification(root.delegateID, agent: "writer"))
-    #expect(!before.published)
-    #expect(try await records.agentMessages.isAgentMessageConsumed(eventID))
-    let pending = try await records.writerExecutions.pendingDelegationNotifications(
-        agent: "writer", retirement: false, after: nil, limit: 1)
-    let claim = try #require(pending.first)
-    #expect(claim.eventID == eventID)
-    try await records.writerExecutions.finishDelegationNotification(
-        root.delegateID, agent: "writer", retirement: false, completed: true, failure: nil, claimToken: claim.claimToken
-    )
-    #expect(
-        try await records.writerExecutions.delegationNotification(root.delegateID, agent: "writer")?.published == true)
-    #expect(try await records.agentMessages.isAgentMessageConsumed(eventID))
-    try await records.shutdown()
-}
-
-@Test func publicationStampMigrationFromSignalSchemaRetainsPendingFacts() async throws {
-    let records = try SQLiteRepositories.temporary()
-    let root = try await records.seedDelegation(
-        workspaceID: nil, goal: "work", input: "work", sourceDialog: nil, agent: "writer")
-    let eventID = UUID().uuidString
-    let payload = Data(#"{"original":"unchanged"}"#.utf8)
-    try await records.writerExecutions.completeRequest(
-        .init(delegateID: root.delegateID, agent: "writer", eventID: eventID, data: payload), status: "completed",
-        failure: nil)
-    try records.database.write {
-        try $0.execute(sql: "ALTER TABLE agent_messages DROP COLUMN published_at; PRAGMA user_version=20261119")
-    }
-    try records.database.prepareSchema { try SQLiteSchema.prepare($0) }
-    #expect(try await records.agentMessages.agentMessage(eventID)?.payload == payload)
-    #expect(
-        try await records.writerExecutions.delegationNotification(root.delegateID, agent: "writer")?.published == false)
-    #expect(
-        try await records.writerExecutions.pendingDelegationNotifications(
-            agent: "writer", retirement: false, after: nil, limit: 1
-        ).first?.eventID == eventID)
-    try await records.shutdown()
 }

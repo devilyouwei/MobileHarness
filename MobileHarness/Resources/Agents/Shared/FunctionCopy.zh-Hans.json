@@ -1,58 +1,5 @@
 {
   "entries": {
-    "Agent.Communication.send": {
-      "description": "用已授权通信契约发送消息。",
-      "parameters": {}
-    },
-    "Agent.Task.finishTask": {
-      "description": "根据实际结果结束当前前台任务并记录摘要。",
-      "parameters": {
-        "summary": {
-          "description": "简短且真实的结果摘要。"
-        },
-        "continueDecision": {
-          "description": "任务结束后是否继续处理本次输入中的新目标。"
-        }
-      }
-    },
-    "Agent.Task.loadSkills": {
-      "description": "加载真实 Skill ID 及其依赖供后续请求使用，失败保留当前状态。",
-      "parameters": {
-        "skills": {
-          "description": "由实际 Skill ID 组成的 JSON 数组。"
-        }
-      }
-    },
-    "Agent.Task.releaseSkills": {
-      "description": "释放确认不再需要的非基础根 Skill，保留共享依赖和任务。",
-      "parameters": {
-        "skills": {
-          "description": "由实际 Skill ID 组成的 JSON 数组。"
-        }
-      }
-    },
-    "Agent.Task.sendMessage": {
-      "description": "将完整目标、补充、回答或停止请求发送给实际可委托的同伴。送达仅代表接收。",
-      "parameters": {
-        "agent_id": {
-          "description": "可委托目录中的实际 Agent ID。"
-        },
-        "text": {
-          "description": "用户目标、补充、回答或实际文本。"
-        }
-      }
-    },
-    "Agent.Task.startTask": {
-      "description": "建立可判定完成条件的前台目标，并持有必要的初始 Skill。",
-      "parameters": {
-        "description": {
-          "description": "可判定完成条件的目标说明。"
-        },
-        "skills": {
-          "description": "由实际 Skill ID 组成的 JSON 数组。"
-        }
-      }
-    },
     "Agent.Writer.ask": {
       "description": "向用户询问继续工作所需的必要信息。",
       "parameters": {

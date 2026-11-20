@@ -63,7 +63,7 @@ final class ApplicationActionAssembly {
             writerModel: ports.writerModel, decisionConfiguration: ports.decisionConfiguration,
             decisionStatus: ports.decisionStatus,
             inputQueueStatus: ports.inputQueueStatus, settings: ports.settings,
-            discovery: ports.discovery, providerPresentation: ports.providerPresentation, tasks: ports.tasks,
+            discovery: ports.discovery, providerPresentation: ports.providerPresentation,
             resources: ports.resources, connectionFacts: ports.connectionFacts,
             trackingAvailable: ports.trackingAvailable,
             bindTracking: ports.bindTracking,

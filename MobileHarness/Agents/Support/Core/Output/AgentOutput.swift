@@ -27,7 +27,7 @@ public enum AgentOutput: Equatable, Sendable {
     public var kind: OutputKind {
         switch self {
         case .communication: .communication
-        case .rejectedCall(let rejection): rejection.kind == .action ? .actionCall : .toolCall
+        case .rejectedCall(let rejection): rejection.kind == .tool ? .toolCall : .actionCall
         case .actionCall: .actionCall
         case .toolCall: .toolCall
         case .control: .control

@@ -112,7 +112,7 @@ extension ActionActivityItem {
             isInternal: [
                 "UI.Caption.print", "UI.Caption.beginReplyTurn", "UI.Caption.setTranscript",
                 "UI.Caption.finishTranscript", "UI.Expression.setReplyWaiting", "UI.VoiceState.setVoiceState",
-                "Speech.Listening.update", "UI.Island.present", "UI.Island.update", "UI.Island.end",
+                "Speech.Listening.update", "UI.Island.present", "UI.Island.end",
                 "UI.Island.setPresentation",
             ].contains(execution.path.description),
             parameters: execution.parameters, output: mapped.output)

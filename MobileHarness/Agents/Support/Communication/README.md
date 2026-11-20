@@ -40,7 +40,7 @@ AgentFixedTaskInput.unwrap 只接受 request／input，核对已认证来源为 
 
 准入检查成功后才调用执行角色提供的 decode，再验证返回消息的内容和大小。生成的角色输入使用原 rootID 作为处理身份，保留 session、source、incarnation、capturedAt、sequence、root／parent、hops、deadline、turn 与 taskScope。具体契约选择、私有取消／retire 的来源限制由所属角色负责，公共机制不建立角色载荷分派表。
 
-本目录的值不拥有消费任务、队列或原生资源。消息投递接纳与 Task 终态分别建模；注册、输出消费和停止加入由各角色 ExecutionSession 拥有。当前边界不包含远程传输或通用持久化投递；Writer在域内持有有界投递worker，并通过 WriterExecutionRepository 原子保存终态与通信 outbox，AgentMessageRepository 提供独立通信读取/投递接口。
+本目录的值不拥有消费任务、队列或原生资源。消息投递接纳与 Task 终态分别建模；注册、输出消费和停止加入由各角色 ExecutionSession 拥有。当前边界不包含远程传输或持久化投递；Agent 之间的发布只发送一次，不补发、不重试、无回退。Writer在域内持有有界投递worker，终态只保存在 WriterExecutionRepository；AgentMessageRepository 只保存供追踪的通信记录，业务处理不读取它来决定是否处理。
 
 ## Native inputs and internal messages
 
@@ -52,7 +52,7 @@ WriterDelegationEvent 携带可选 workspace_N 和独立 delegateID，接收端�
 
 WriterDelegationEvent.failure 是可选 WriterFailureDiagnostic：分类、错误码、阶段、摘要、诊断字段和关联原因均为业务事实。通信值不依赖 Storage；Writer 拥有到持久化 DTO 的转换。失败消息通过认证、去重后更新 Assistant 任务视图；Writer 灵动岛展示任务摘要。
 
-AgentTaskResponse 携带 Writer 的原消息拒绝或已接纳任务的事实。Writer 的进度回报需要活跃执行授权。终态持久投递与授权回收由独立的 worker 处理。Assistant 核对持久拒绝或终态的原消息、事件身份和正文。固定任务共用 `agent.task.events.v1`，以 AgentTaskSignal 的 progress/result 区分进度与终态。Agents 的输出适配器验证执行授权，在终态投递前协调 Gateway 完成在途工作，成功递送后回收授权。固定任务通过同一 `agent.task.v1` 的 submit/update/answer/status/cancel 操作接收类型化请求。
+AgentTaskResponse 携带 Writer 的原消息拒绝或已接纳任务的事实。Writer 的进度回报需要活跃执行授权。终态保存后只发布一次，随后回收授权一次。Assistant 核对拒绝或终态的原消息、事件身份和正文。固定任务共用 `agent.task.events.v1`，以 AgentTaskSignal 的 progress/result 区分进度与终态。Agents 的输出适配器验证执行授权，在终态发布前协调 Gateway 完成在途工作；发布不补发，授权回收不以送达为前提。固定任务通过同一 `agent.task.v1` 的 submit/update/answer/status/cancel 操作接收类型化请求。
 
 普通运行步骤及请求编号由 Writer 自有展示和请求历史保留。跨角色消息承载接纳、首次草稿保存、首次恢复或渲染异常、追问和终态。Assistant 先验证并更新关联视图。全双工模式下，符合条件且属于当前来源对话的回报直接进入语义队列，由后续模型请求选择如何汇报；同步模式使用通知播报。
 

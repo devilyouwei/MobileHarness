@@ -9,10 +9,8 @@
     "writer": "Writer",
     "agent": "Agent",
     "action": "Action Result",
-    "unrestorable": "Earlier input could not be restored.",
     "pairedResults": "See the paired tool results.",
     "namedAgent": "Agent ({{name}})",
-    "sourceLine": "\n{{source}} ｜ {{time}}",
-    "legacySourcePattern": "^(?:User(?: \\(ASR\\))?|Writer|Action Result|Agent(?: \\([^()]+\\))?) ｜ [0-9]{2}:[0-9]{2}:[0-9]{2}$"
+    "sourceLine": "\n{{source}} ｜ {{time}}"
   }
 }

@@ -37,7 +37,7 @@ public final class UIHomeContainer {
         self.admission = admission
         conversation.presentationAdmission = admission
         notices.presentationAdmission = admission
-        effectOwner = HomeEffectsWorkflow(notices: notices)
+        effectOwner = HomeEffectsWorkflow()
         effectOwner.bind(conversation)
         effectOwner.presentationAdmission = admission
         expressionOwner = ConversationExpressionPresentation(state: conversation)
@@ -70,7 +70,7 @@ public final class UIHomeContainer {
         notices.dismissErrorToast(id: notices.errorToast?.id ?? "")
     }
     func stop() async {
-        await effectOwner.stopAndWait()
+        effectOwner.stopAndWait()
         await notices.stopPresentation()
         conversation.modelPreparation = .inactive
         conversation.isReady = false

@@ -14,7 +14,7 @@ AssistantRecord.coordination 是实际请求携带的可选来源证据，包含
 
 每次请求的完整业务文本保存于 user_input_json.requestText（首次请求和 ReACT 均在实际发起时写入），text 继续保存对应原始输入/观察，coordination 保存来源与批次。后续 checkpoint 保留 requestText；详情、窗口、分页预览和导出按本次 requestText 读取，不以原始主输入覆盖。清理完整调试日志不删除 requestText 或回复正文。旧多成员批次的完整详情仅在尚存日志包含相同成员ID集合时恢复实际批次文本；没有相应日志时保留既有原文，不重建或猜测。
 
-准备中的模型请求标记 awaitingDispatch；checkpoint 跳过未发出的请求与没有已发请求的输入，模型发送回调才清除标记并在同一事务保存输入/请求。传输失败仍更新原请求行；预览仅返回持有 invocation 的记录。旧库迁移规则见 [Database](../README.md)。
+准备中的模型请求标记 awaitingDispatch；checkpoint 跳过未发出的请求与没有已发请求的输入，模型发送回调才清除标记并在同一事务保存输入/请求。传输失败仍更新原请求行；预览仅返回持有 invocation 的记录。版本不同的旧库按 [Database](../README.md) 规则重建。
 
 模型生成结束的 checkpoint 更新已发请求的回复、生成终态及生成证据；Action journal 由执行轮次结算补写到原行。全双工 `task.end` 用同一历史写入边界确认已发请求、封存已关联的来源并提交任务摘要。已发请求继续更新原行，尚未发出的旧任务请求不能在结束后新建来源行。
 

@@ -52,7 +52,15 @@ public enum AgentSkillLoader {
         return try CapabilityRegistry(
             actions: selected.actions, tools: selected.tools,
             channels: selected.channels, internalActions: fixed.internalActions,
-            internalTools: fixed.internalTools)
+            internalTools: fixed.internalTools, controls: localizedControls(fixed.controls))
+    }
+    /// Fixed controls are re-presented in the current prompt language from their owner's resources.
+    private static func localizedControls(_ controls: [ControlRegistration]) throws -> [ControlRegistration] {
+        try controls.map {
+            ControlRegistration(
+                alias: $0.alias, declaration: try $0.localized(AgentPrompts.language),
+                destination: $0.destination, localized: $0.localized)
+        }
     }
     /// Actual UTF-8 prompt cost; shared/base bindings are counted only once.
     static func nonBaseBytes(_ loaded: [String], base: [String]) throws -> Int {

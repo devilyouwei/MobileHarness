@@ -153,11 +153,7 @@ extension LiveRuntimeTests {
         #expect(root.home.notices.errorToast?.id == "fault")
         try await uiFullEventually { root.home.notices.errorToast == nil }
         #expect(root.runtimeLog.issues.count == 1)
-        try await root.home.effects.showNotice(
-            .init(text: "temporary", tone: .warning), durationMS: 30_000,
-            owner: .init(source: "fixture", session: "fixture"))
         await root.stop()
-        #expect(root.home.notices.notice == nil)
         #expect(root.home.notices.errorToast == nil)
     }
 }

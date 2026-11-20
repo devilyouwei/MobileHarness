@@ -189,7 +189,7 @@ extension RuntimeLogState {
 @Test(arguments: [
     "UI.Caption.print", "UI.Caption.beginReplyTurn", "UI.Caption.setTranscript",
     "UI.Caption.finishTranscript", "UI.Expression.setReplyWaiting", "UI.VoiceState.setVoiceState",
-    "Speech.Listening.update", "UI.Island.present", "UI.Island.update", "UI.Island.end", "UI.Island.setPresentation",
+    "Speech.Listening.update", "UI.Island.present", "UI.Island.end", "UI.Island.setPresentation",
 ]) @MainActor func executionLogInternalFilteringMatchesHomeAndPreservesFailures(
     _ function: String
 ) {

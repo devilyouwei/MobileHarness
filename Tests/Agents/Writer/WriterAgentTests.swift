@@ -197,7 +197,6 @@ private actor WriterResultSink: Agent {
     nonisolated let outputs = AsyncStream<OutputEnvelope> { $0.finish() }
     var signals: [AgentTaskSignal] = []
     private var acceptedEvents: Set<String> = []
-    var rejectedCompletion: String?
     var blocksReports: Bool
     var rejectedReports: [String] = []
     var rejectionAttempts: [String: [String]] = [:]
@@ -215,7 +214,6 @@ private actor WriterResultSink: Agent {
             if let rejection = message.content(as: AgentTaskResponse.self)?.rejection {
                 if acceptedEvents.contains(rejection.eventID) { return }
                 rejectionAttempts[rejection.messageID, default: []].append(rejection.eventID)
-                if rejectionAttempts[rejection.messageID]?.count == 1 { throw HarnessError.queueFull }
                 acceptedEvents.insert(rejection.eventID)
                 return
             }
@@ -227,16 +225,9 @@ private actor WriterResultSink: Agent {
                 let signal = message.content(as: AgentTaskResponse.self)?.signal
                     ?? message.content(as: AgentTaskSignal.self)
             else { return }
-            if blocksReports {
+            if blocksReports, signal.kind != .result {
                 if let event = try AgentTaskContent.decode(signal).writerEvent { rejectedReports.append(event.eventID) }
                 throw CommunicationError.unavailableTarget
-            }
-            if signal.kind == .result, message.content(as: AgentTaskResponse.self) != nil,
-                let event = try AgentTaskContent.decode(signal).writerEvent,
-                event.kind == .completed, rejectedCompletion == nil
-            {
-                rejectedCompletion = event.eventID
-                throw HarnessError.queueFull
             }
             let eventID = try AgentTaskContent.decode(signal).writerEvent?.eventID ?? signal.id ?? signal.scope.id
             guard acceptedEvents.insert(eventID).inserted else { return }
@@ -373,13 +364,12 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
                     try await sendWriterMessage(message, through: messaging, records: records, session: session)
                         .delivered == [.writer])
             }
-            while await (sink.rejectionAttempts[independent.id]?.count ?? 0) < 2 {
+            while await (sink.rejectionAttempts[independent.id]?.count ?? 0) < 1 {
                 guard ContinuousClock.now < deadline else { throw WriterFailure.incomplete }
                 try await Task.sleep(for: .milliseconds(10))
             }
-            let rejection = try #require(
-                try await records.agentMessages.agentReply(to: independent.id, contract: "agent.task.events.v1"))
-            #expect(await sink.rejectionAttempts[independent.id] == [rejection.id, rejection.id])
+            #expect(await sink.rejectionAttempts[independent.id]?.count == 1)
+            #expect(try await records.agentMessages.isAgentMessageConsumed(independent.id))
             #expect(try await records.writerExecutions.request(scope.id, agent: "writer").status == "running")
             #expect(try await records.agentMessages.agentMessage(followUp.id)?.replyTo == scope.id)
             #expect(try await records.agentMessages.isAgentMessageConsumed(followUp.id))
@@ -403,22 +393,16 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
             let saved = try await records.writerExecutions.request(scope.id, agent: "writer")
             let presented = await islandState.detailActivity?.content.expansionID == scope.id + ":completed"
             if saved.status == "completed", presented {
-                #expect(await sink.signals.isEmpty)
+                #expect(await sink.signals.allSatisfy { $0.kind == .result })
                 #expect(await !sink.rejectedReports.isEmpty)
                 let firstEvent = await sink.rejectedReports.first
                 #expect(await writer.observationSnapshot().business["phase"] == .text("idle"))
                 await sink.allowReports()
                 verifiedIndependent = true
-                // All retries retain their identity; no extra model/file execution.
+                // Dropped progress is never resent; no extra model/file execution.
                 #expect(await model.requests == 6)
                 #expect(firstEvent != nil)
             }
-        }
-        if !asks, !pausedDelivery, await sink.rejectedCompletion != nil {
-            try await writer.pause()
-            #expect(await writer.status().lifecycle == .paused)
-            try await writer.resume()
-            pausedDelivery = true
         }
         if asks, !answered, let pending = await sink.signals.last(where: { $0.kind == .progress }),
             let content = try? AgentTaskContent.decode(pending), content.stage == .waitingUser
@@ -428,7 +412,6 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
                 #expect(
                     try await records.writerExecutions.request(scope.id, agent: "writer").status == "interrupted"
                 )
-                #expect(try await records.writerExecutions.delegationNotification(scope.id, agent: "writer") != nil)
                 await messaging.close()
                 await output.shutdown()
                 try await records.shutdown()
@@ -439,20 +422,13 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
             #expect(
                 try await sendWriterMessage(wrong, through: messaging, records: records, session: session).rejected
                     .isEmpty)
-            while try await records.agentMessages.agentReply(to: wrong.id, contract: "agent.task.events.v1") == nil {
+            while await (sink.rejectionAttempts[wrong.id]?.count ?? 0) < 1 {
                 guard ContinuousClock.now < deadline else { throw WriterFailure.incomplete }
                 try await Task.sleep(for: .milliseconds(10))
             }
             if mode == 2 {
-                while await (sink.rejectionAttempts[wrong.id]?.count ?? 0) < 2 {
-                    guard ContinuousClock.now < deadline else { throw WriterFailure.incomplete }
-                    try await Task.sleep(for: .milliseconds(10))
-                }
-                let rejection = try #require(
-                    try await records.agentMessages.agentReply(to: wrong.id, contract: "agent.task.events.v1"))
-                #expect(rejection.correlationID == scope.id)
-                #expect(await sink.rejectionAttempts[wrong.id] == [rejection.id, rejection.id])
-                #expect(try await records.writerExecutions.delegationNotification(scope.id, agent: "writer") == nil)
+                #expect(await sink.rejectionAttempts[wrong.id]?.count == 1)
+                #expect(try await records.agentMessages.isAgentMessageConsumed(wrong.id))
             }
             #expect(
                 try await records.writerExecutions.request(scope.id, agent: "writer").executionState == "waiting_input")
@@ -469,7 +445,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
         try await Task.sleep(for: .milliseconds(10))
     }
     let retiredDeadline = ContinuousClock.now + .seconds(5)
-    while try await records.writerExecutions.delegationNotification(scope.id, agent: "writer")?.retired != true {
+    while try await records.writerExecutions.request(scope.id, agent: "writer").executionState == "closing" {
         guard ContinuousClock.now < retiredDeadline else { throw WriterFailure.incomplete }
         try await Task.sleep(for: .milliseconds(10))
     }
@@ -607,7 +583,6 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     let saved = try await records.writerExecutions.workspace(execution.workspaceID, agent: "writer")
     #expect(saved.workspaceReady && saved.workspaceID == saved.id)
     if !asks { #expect(pausedDelivery) }
-    #expect(try AgentTaskContent.decode(result).writerEvent?.eventID == (await sink.rejectedCompletion))
     let evidence = await sink.signals.filter {
         $0.kind == .result && (try? AgentTaskContent.decode($0).writerEvent?.kind) == .completed
     }
@@ -1511,12 +1486,6 @@ private actor WriterStartupProbe {
         try await database.writerExecutions.prepareWorkspace(
             workspaceID: first.id, delegateID: first.delegateID, agent: "writer")
     }
-    let cancelID = UUID().uuidString
-    try await database.agentMessages.enqueueAgentMessage(
-        .init(
-            id: cancelID, sender: "assistant", receiver: "writer", contract: "task.cancel",
-            payload: Data("{\"text\":\"Assistant requested cancellation\"}".utf8), correlationID: second.delegateID,
-            replyTo: second.delegateID, dedupeKey: cancelID))
     try await database.endSeedDelegation(second.delegateID, status: "cancelled")
     let third = try await database.seedDelegation(
         workspaceID: nil, goal: "新作品", input: "另画一张", sourceDialog: source.id, agent: "writer")
@@ -1546,7 +1515,6 @@ private actor WriterStartupProbe {
         try await reopened.writerExecutions.request(resumedAgain.delegateID, agent: "writer").workspaceID == first.id)
     let runs = try await reopened.writerExecutions.requests(first.id, agent: "writer")
     #expect(runs.count == 3 && runs[1].status == "cancelled" && runs.last?.status == "completed")
-    #expect(runs[1].cancellationReason == "Assistant requested cancellation")
     let records = WriterHistoryStore(
         records: try WriterRecordStore(repository: reopened.writerMessages, logs: reopened.logs))
     let full = try await records.ownerHistory(first.workspaceID)
@@ -1602,10 +1570,9 @@ func fixtureWriterCompletion(
             eventID: event.eventID))
     let report = try AgentTaskResponse(canonical.signal(.result, scope: scope, status: status))
     try await executions.completeRequest(
-        .init(
-            delegateID: run.delegateID, agent: "writer", eventID: event.eventID,
-            data: JSONEncoder().encode(report)), status: status == .succeeded ? "completed" : status.rawValue,
-        failure: status == .failed ? content.text : nil)
+        run.delegateID, eventID: event.eventID, result: JSONEncoder().encode(report),
+        status: status == .succeeded ? "completed" : status.rawValue,
+        failure: status == .failed ? content.text : nil, cancellationReason: nil)
     return report
 }
 
@@ -1618,7 +1585,7 @@ private actor WriterModelCount {
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
-func writerAcceptsTwentyTasksWithAllUserNotificationsRejectedThenRestoresOnlyDelivery() async throws {
+func writerCompletesTwentyTasksWhileProgressReportsAreDropped() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -1654,7 +1621,6 @@ func writerAcceptsTwentyTasksWithAllUserNotificationsRejectedThenRestoresOnlyDel
     try await manager.start(.writer)
     _ = try await output.consumer(for: sink)
     let port = WriterTestRequester(port: try await output.messaging(for: .assistant), receiver: sink, records: records)
-    var eventIDs: Set<String> = []
     var runs: [String] = []
     for index in 0..<20 {
         let message = AgentTaskRequest(text: "Write greeting \(index)")
@@ -1663,15 +1629,7 @@ func writerAcceptsTwentyTasksWithAllUserNotificationsRejectedThenRestoresOnlyDel
         let deadline = ContinuousClock.now.advanced(by: .seconds(10))
         while true {
             let run = try? await records.writerExecutions.request(message.id, agent: "writer")
-            let retired =
-                try await records.writerExecutions.delegationNotification(message.id, agent: "writer")?.retired
-                == true
-            if run?.status == "completed", retired,
-                try await records.writerExecutions.delegationNotification(message.id, agent: "writer")?.published
-                    == true
-            {
-                break
-            }
+            if run?.status == "completed", run?.executionState == "completed" { break }
             guard ContinuousClock.now < deadline else { throw WriterFailure.incomplete }
             try await Task.sleep(for: .milliseconds(10))
         }
@@ -1681,10 +1639,6 @@ func writerAcceptsTwentyTasksWithAllUserNotificationsRejectedThenRestoresOnlyDel
         await #expect(throws: CommunicationError.scopeClosed) {
             try await manager.taskExecutions(scope)
         }
-        let notification = try #require(
-            try await records.writerExecutions.delegationNotification(message.id, agent: "writer"))
-        #expect(notification.published)
-        eventIDs.insert(notification.eventID)
         runs.append(message.id)
     }
     let presentationDeadline = ContinuousClock.now.advanced(by: .seconds(3))
@@ -1693,9 +1647,9 @@ func writerAcceptsTwentyTasksWithAllUserNotificationsRejectedThenRestoresOnlyDel
         guard ContinuousClock.now < presentationDeadline else { throw WriterFailure.incomplete }
         try await Task.sleep(for: .milliseconds(10))
     }
-    #expect(eventIDs.count == 20)
     #expect(await models.count == 20)
-    #expect(await sink.signals.allSatisfy { $0.kind != .result })
+    #expect(await sink.signals.allSatisfy { $0.kind == .result })
+    #expect(await !sink.rejectedReports.isEmpty)
     #expect(await sink.retirements.isEmpty)
     var diagnostics = try await input.observeTasks().makeAsyncIterator()
     let trace = try #require(await diagnostics.next())
@@ -1708,123 +1662,11 @@ func writerAcceptsTwentyTasksWithAllUserNotificationsRejectedThenRestoresOnlyDel
     #expect(terminalRuns.count == runs.count)
     #expect(Set(terminalRuns) == Set(runs))
     #expect(try await workspace.list().count == 20)
-    for run in runs {
-        #expect(try await records.writerExecutions.delegationNotification(run, agent: "writer")?.published == true)
-    }
     await writer.stop()
     await port.close()
     await output.shutdown()
     try await records.shutdown()
-
-    // Reopen with no execution grants, a new Writer incarnation and no delegated request.
-    let reopened = try SQLiteRepositories(url: recordsURL)
-    let restored = try WriterAgent(
-        model: { await models.acquire() }, streaming: artifacts, executions: reopened.writerExecutions,
-        communications: reopened.agentMessages)
-    let resumedSink = WriterResultSink()
-    let newManager = AgentManager()
-    try await newManager.register(resumedSink, sessionID: session)
-    try await newManager.register(restored)
-    let newInput = InputGateway(manager: newManager, policy: policy)
-    let newOutput = await OutputGateway(
-        manager: newManager, requests: newInput, tools: assembly.tools, policy: policy, sink: { _ in })
-    await restored.bind(
-        try await newOutput.consumer(for: restored), messaging: try await newOutput.messaging(for: .writer))
-    try await newManager.start(.writer)
-    _ = try await newOutput.consumer(for: resumedSink)
-    let recoveryClient = WriterTestRequester(
-        port: try await newOutput.messaging(for: .assistant), receiver: resumedSink, records: reopened)
-    for run in runs { try await recoveryClient.observe(run, session: session) }
-    let deadline = ContinuousClock.now.advanced(by: .seconds(35))
-    while await resumedSink.signals.filter({ $0.kind == .result }).count < 20 {
-        guard ContinuousClock.now < deadline else { throw WriterFailure.incomplete }
-        try await Task.sleep(for: .milliseconds(20))
-    }
-    while true {
-        let notices = try await reopened.writerExecutions.pendingDelegationNotifications(
-            agent: "writer", retirement: false, after: nil, limit: 1)
-        let retirements = try await reopened.writerExecutions.pendingDelegationNotifications(
-            agent: "writer", retirement: true, after: nil, limit: 1)
-        if notices.isEmpty && retirements.isEmpty { break }
-        guard ContinuousClock.now < deadline else { throw WriterFailure.incomplete }
-        try await Task.sleep(for: .milliseconds(20))
-    }
-    let delivered = await resumedSink.signals.filter { $0.kind == .result }
-    #expect(Set(try delivered.map { try #require(try AgentTaskContent.decode($0).writerEvent?.eventID) }) == eventIDs)
-    #expect(await models.count == 20)
-    #expect(await restored.observationSnapshot().business["phase"] == .text("idle"))
-    #expect(try await reopened.writerExecutions.workspaces(agent: "writer", before: nil, limit: 50).count == 20)
-    for run in runs {
-        #expect(try await reopened.writerExecutions.request(run, agent: "writer").status == "completed")
-    }
-    await recoveryClient.close()
-    await restored.stop()
-    await newOutput.shutdown()
-    try await reopened.shutdown()
     await islandState.stop()
-}
-
-@Test func writerTerminalNotificationCommitRollsBackConflictsAndKeepsIndependentReceipts() async throws {
-    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".sqlite")
-    defer { try? FileManager.default.removeItem(at: url) }
-    let database = try SQLiteRepositories(url: url)
-    let first = try await database.seedDelegation(
-        workspaceID: nil, goal: "First", input: "First input", sourceDialog: nil, agent: "writer")
-    let event = UUID().uuidString
-    let notification = WriterDelegationNotification(
-        delegateID: first.delegateID, agent: "writer", eventID: event, data: Data("{\"text\":\"immutable fact\"}".utf8))
-    try await database.writerExecutions.completeRequest(notification, status: "completed", failure: nil)
-    try await database.writerExecutions.completeRequest(notification, status: "completed", failure: nil)
-    try await database.writerExecutions.finishDelegationNotification(
-        first.delegateID, agent: "writer", retirement: true, completed: true, failure: nil)
-    let second = try await database.seedDelegation(
-        workspaceID: nil, goal: "Second", input: "Second input", sourceDialog: nil, agent: "writer")
-    await #expect(throws: (any Error).self) {
-        try await database.writerExecutions.completeRequest(
-            WriterDelegationNotification(
-                delegateID: second.delegateID, agent: "writer", eventID: event, data: notification.data),
-            status: "completed", failure: nil)
-    }
-    // The failed notification insert must roll back the execution terminal update too.
-    #expect(try await database.writerExecutions.request(second.delegateID, agent: "writer").status == "running")
-    #expect(try await database.writerExecutions.delegationNotification(second.delegateID, agent: "writer") == nil)
-    await #expect(throws: RecordStorageError.conflict) {
-        try await database.writerExecutions.completeRequest(
-            WriterDelegationNotification(
-                delegateID: first.delegateID, agent: "writer", eventID: event,
-                data: Data("{\"text\":\"different\"}".utf8)),
-            status: "completed", failure: nil)
-    }
-    await #expect(throws: RecordStorageError.invalidRecord) {
-        try await database.writerExecutions.request(first.delegateID, agent: "assistant")
-    }
-    try await database.writerExecutions.finishDelegationNotification(
-        first.delegateID, agent: "writer", retirement: true, completed: true, failure: nil)
-    #expect(
-        try await database.writerExecutions.pendingDelegationNotifications(
-            agent: "writer", retirement: true, after: nil, limit: 32
-        )
-        .isEmpty)
-    #expect(
-        try await database.writerExecutions.pendingDelegationNotifications(
-            agent: "writer", retirement: false, after: nil, limit: 32
-        )
-        .count == 1)
-    try await database.shutdown()
-    let reopened = try SQLiteRepositories(url: url)
-    let restored = try #require(
-        try await reopened.writerExecutions.delegationNotification(first.delegateID, agent: "writer"))
-    #expect(restored.data == notification.data && restored.eventID == event)
-    #expect(restored.retired && !restored.published)
-    try await reopened.writerExecutions.finishDelegationNotification(
-        first.delegateID, agent: "writer", retirement: false, completed: true, failure: nil,
-        claimToken: restored.claimToken)
-    #expect(
-        try await reopened.writerExecutions.pendingDelegationNotifications(
-            agent: "writer", retirement: false, after: nil, limit: 32
-        )
-        .isEmpty)
-    try await reopened.shutdown()
 }
 
 private struct WriterPermanentFixtureFailure: Error, ChatFailureProviding {
@@ -2848,16 +2690,16 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
             #expect(current.workspaceID.isEmpty)
             #expect(try await workspace.project(workspaceID).files["document.md"] == "# Draft\nKEEP")
             let deadline = ContinuousClock.now + .seconds(5)
-            while try await records.writerExecutions.delegationNotification(requestID, agent: "writer")?.retired != true
+            while try await records.writerExecutions.request(requestID, agent: "writer").executionState == "closing"
             {
                 guard ContinuousClock.now < deadline else { throw WriterFailure.incomplete }
                 try await Task.sleep(for: .milliseconds(10))
             }
             await #expect(throws: CommunicationError.scopeClosed) { try await manager.taskExecutions(scope) }
             let persisted = try #require(
-                try await records.writerExecutions.delegationNotification(requestID, agent: "writer"))
+                try await records.writerExecutions.request(requestID, agent: "writer").result)
             #expect(
-                try JSONDecoder().decode(AgentTaskResponse.self, from: persisted.data).signal == completion)
+                try JSONDecoder().decode(AgentTaskResponse.self, from: Data(persisted.utf8)).signal == completion)
         }
         #expect(try await workspace.inventory().count == 1)
         #expect(await startup.shown == false)
@@ -3081,13 +2923,6 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
     #expect(exportedWorkspace["workspaceID"] as? String == workspace.id)
     #expect(export["task"] == nil && exportedWorkspace["taskID"] == nil)
     try await records.endSeedDelegation(secondRequest, status: "completed")
-    for notification in try await records.writerExecutions.pendingDelegationNotifications(
-        agent: "writer", retirement: false, after: nil, limit: 32)
-    {
-        try await records.writerExecutions.finishDelegationNotification(
-            notification.delegateID, agent: "writer", retirement: false, completed: true, failure: nil,
-            claimToken: notification.claimToken)
-    }
     if let destination = ProcessInfo.processInfo.environment["WRITER_SEPARATION_UI_SEED"] {
         for number in 1...25 {
             let id = UUID().uuidString
@@ -3118,52 +2953,10 @@ actor WriterTestRequester {
     let port: AgentMessaging
     let receiver: any Agent
     let records: SQLiteRepositories
-    var trackedTasks: [String: String] = [:]
-    var worker: Task<Void, Never>?
-    var failure: String?
     init(port: AgentMessaging, receiver: any Agent, records: SQLiteRepositories) {
         self.port = port
         self.receiver = receiver
         self.records = records
-    }
-    func observe(_ reference: String, session: String) async throws {
-        if let existing = trackedTasks[reference] {
-            guard existing == session else { throw CommunicationError.unauthorized }
-            return
-        }
-        guard trackedTasks.count < 256 else { throw CommunicationError.capacityExceeded }
-        trackedTasks[reference] = session
-        if worker == nil { worker = Task { await recover() } }
-    }
-    private func recover() async {
-        defer { worker = nil }
-        while !Task.isCancelled, !trackedTasks.isEmpty {
-            for (reference, session) in trackedTasks {
-                do {
-                    let page = try await records.agentMessages.taskEvents(
-                        reference: reference, receiver: "assistant", after: nil, limit: 32)
-                    for event in page.events {
-                        guard try await !records.agentMessages.isAgentMessageConsumed(event.message.id) else {
-                            continue
-                        }
-                        let report = try JSONDecoder().decode(AgentTaskResponse.self, from: event.message.payload)
-                        let message = report.publication(scope: reference)
-                        let payload = InputPayload.observation(message)
-                        try await receiver.receive(
-                            AgentInput(
-                                id: event.message.id, sessionID: session, payload: payload,
-                                metadata: .init(payload: payload, source: "writer", origin: .local, rootID: reference)))
-                        try await records.agentMessages.receiveAgentMessage(
-                            event.message.id, receiver: "assistant", consumed: true)
-                        if report.signal?.kind == .result || (report.rejection?.messageID == reference) {
-                            trackedTasks.removeValue(forKey: reference)
-                        }
-                    }
-                    failure = nil
-                } catch { if !Task.isCancelled { failure = String(describing: error) } }
-            }
-            do { try await Task.sleep(for: .milliseconds(50)) } catch { break }
-        }
     }
     func send(_ message: AgentMessage, parent: AgentInput, to target: AgentID) async throws -> AgentRequestReply {
         try await port.send(message, parent: parent, to: target)
@@ -3171,37 +2964,14 @@ actor WriterTestRequester {
     func sendResult(_ message: AgentMessage, parent: AgentInput, to target: AgentID) async throws -> DeliveryReport {
         try await port.sendResult(message, parent: parent, to: target)
     }
-    func close() async {
-        worker?.cancel()
-        await worker?.value
-        worker = nil
-        trackedTasks.removeAll()
-    }
+    func close() async {}
 }
 
+/// The requester only sends; Writer records the message it receives.
 func sendWriterMessage(
     _ message: AgentTaskRequest, through port: WriterTestRequester, records: SQLiteRepositories, session: String
 ) async throws -> DeliveryReport {
-    if try await records.agentMessages.agentMessage(message.id) == nil {
-        try await records.storeWriterMessage(message)
-    }
-    try await port.observe(message.replyTo ?? message.id, session: session)
-    let result = try await port.sendResult(
+    try await port.sendResult(
         message.message, parent: .init(id: UUID().uuidString, sessionID: session, payload: .text(message.text)),
         to: .writer)
-    if result.delivered.contains(.writer) {
-        try await records.agentMessages.receiveAgentMessage(message.id, receiver: "writer", consumed: false)
-    }
-    return result
-}
-
-extension SQLiteRepositories {
-    fileprivate func storeWriterMessage(_ message: AgentTaskRequest) async throws {
-        try await agentMessages.enqueueAgentMessage(
-            .init(
-                id: message.id, sender: "assistant", receiver: "writer", contract: AgentTaskRequest.contract,
-                payload: message.message.encodedContent(), correlationID: message.replyTo ?? message.id,
-                replyTo: message.replyTo, dedupeKey: message.id))
-    }
-
 }

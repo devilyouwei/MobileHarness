@@ -577,7 +577,8 @@ for name in sorted(expected_domains):
     if not namespace.exists() or not re.search(r'public enum ' + namespace_name + r'\s*\{', namespace.read_text()):
         errors.append(f'Missing canonical capability namespace: {name}')
     catalogs = [source for source in domain.rglob(name + 'Module.swift') if f'{name}Module: CapabilityModule' in source.read_text()]
-    if len(catalogs) != 1:
+    # System registers only its sub-business catalogs (ModelResources/Provider/Device).
+    if len(catalogs) != (0 if name == 'System' else 1):
         errors.append(f'Expected one unified domain catalog: {name}')
     sources = {source: source.read_text() for source in domain.rglob('*.swift')}
     entries = {}
@@ -627,7 +628,7 @@ for relative in ('CapabilityModules.swift', 'Speech/SpeechModule.swift', 'UI/UIM
     if re.search(r'as\? any \w+Capability', (actions_root / relative).read_text()):
         errors.append(f'Catalog must inject capabilities explicitly: {relative}')
 for relative, forbidden in {
-    'UI/RuntimePresentation.swift': ('CameraControlCapability', 'SpeechPlaybackCapability', 'TaskControlCapability', 'AudioDetectionCapability'),
+    'UI/RuntimePresentation.swift': ('CameraControlCapability', 'SpeechPlaybackCapability', 'AudioDetectionCapability'),
     'Camera/CameraExecutionEndpoint.swift': ('JSONEncoder', 'JSONDecoder'),
 }.items():
     if any(marker in (actions_root / relative).read_text() for marker in forbidden):
@@ -1222,8 +1223,8 @@ for group, version in [('agents', 11), ('skills', 3)]:
                 errors.append(f'Invalid function binding: {relative}')
             if function['callType'] == 'action' and not function.get('channel'):
                 errors.append(f'Action Skill bindings require an explicit Channel: {relative}')
-            if function['path'] == 'Agent.Communication.send' and function['callType'] != 'action':
-                errors.append(f'send must be Action: {relative}')
+            if function['path'].startswith('Agent.Communication.'):
+                errors.append(f'Retired send Action: {relative}')
 if any(p for group in ('Agents', 'Skills') for p in (asset_root / group).rglob('*.swift')):
     errors.append('Agent Resources must not contain compiled code')
 if any((ROOT / 'MobileHarness/Agents').rglob('*.agent.json')):
@@ -1431,8 +1432,9 @@ for source in (ROOT / 'MobileHarness').rglob('*.swift'):
 context_repository = (ROOT / 'MobileHarness/Agents/Support/Context/AgentContextRepository.swift').read_text()
 if 'installPublicProjection' in context_repository:
     raise SystemExit('Private AgentContext must not be registered in public State.')
-for relative in ('Agents/Assistant/AssistantProcessing.swift', 'Agents/Assistant/AssistantChatWorker.swift'):
-    text = (ROOT / 'MobileHarness' / relative).read_text()
+for source in [ROOT / 'MobileHarness/Agents/Assistant/AssistantProcessing.swift', *sorted((ROOT / 'MobileHarness/Agents/Assistant').glob('AssistantChat*.swift'))]:
+    relative = source.relative_to(ROOT / 'MobileHarness')
+    text = source.read_text()
     if any(label in text for label in ('Task transition result (data)', 'Runtime camera facts (data', 'Current task and Skill state (data')):
         raise SystemExit(f'{relative}: Retired synthetic state-user injection must not return.')
 if 'ContextDocumentAdapter' in context_repository or 'AssistantConversationRecovery' in (ROOT / 'MobileHarness/Agents/Assistant/AssistantProcessing.swift').read_text():
@@ -1757,7 +1759,7 @@ print('Direct container inputs, independent foundations and authorized execution
 # Support owns shared mechanisms; role policy and App view composition stay with their owners.
 for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
     content = source.read_text()
-    if re.search(r'\b(?:AssistantControl|historyProjection|requiresParentCommit|awaitingParentCommit)\b', content):
+    if re.search(r'\b(?:historyProjection|requiresParentCommit|awaitingParentCommit|AgentCommunicationAdapter|modelCommunication|deferredCommunications)\b', content):
         raise SystemExit(f'Obsolete Chat compatibility policy: {source.relative_to(ROOT)}')
     if re.search(r'\b(?:ConversationHistoryView|MossValidationView|ChatValidationView)\s*\(', content):
         raise SystemExit(f'App must compose UI pages: {source.relative_to(ROOT)}')
@@ -1780,7 +1782,9 @@ for owner, names in {
 for retired in ('AgentApplicationUI.swift', 'InteractionServices.swift', 'ApplicationSignals.swift'):
     if list((ROOT / 'MobileHarness/Agents').rglob(retired)):
         raise SystemExit(f'Retired Support implementation remains: {retired}')
-chat_worker = (ROOT / 'MobileHarness/Agents/Assistant/AssistantChatWorker.swift').read_text()
+chat_worker = ''.join(
+    source.read_text() for source in sorted((ROOT / 'MobileHarness/Agents/Assistant').glob('AssistantChat*.swift'))
+)
 assistant_state = (ROOT / 'MobileHarness/Agents/Assistant/AssistantProcessing.swift').read_text()
 memory_agent = (ROOT / 'MobileHarness/Agents/Memory/MemoryAgent.swift').read_text()
 if not all((

@@ -19,10 +19,10 @@ This existing target imports Foundation and Synchronization only, with no projec
 | ExecutionOwner / ResourceDefinition / ResourceLease / ResourceExecutionPermit | Opaque endpoint owner, configured resource mechanisms and live revocable authority. No Agent identity or role lookup. |
 | ActionRequestSlot | Per-request typed attachment/result, session/input admission, single completion/take and explicit close; not a global table or role authorization gate. |
 | ActionAssemblyRequest / ActionMaintenancePorts / ActionUIFacades | Generic App-bound collaboration and UI-owned interfaces without foundation imports. |
-| TaskControlBinding / provider, camera, voice, detection ports | Narrow host collaboration; execution services cannot retain/search upstream containers. |
+| Provider, camera, voice, detection ports | Narrow host collaboration; execution services cannot retain/search upstream containers. |
 | ContainerContextValue / native fact values | Bounded encoded read-only observations supplied by their actual owners. |
 
-Action/Tool requests and response encoding are protocol-neutral values. ActionNamespaces.swift declares the shared Camera/Speech/UI namespace names only; domain files supply callable definitions. ToolResponse.swift owns response values and completion/report encoding. ActionReport.swift owns the shared exception-to-report normalization. TaskControlCapability.swift owns both the execution capability and host binding; ActionExecutionContext.swift owns opaque execution and conversation-turn correlation. Native business service implementations remain in Actions.
+Action/Tool requests and response encoding are protocol-neutral values. ActionNamespaces.swift declares the shared Camera/Speech/UI namespace names only; domain files supply callable definitions. ToolResponse.swift owns response values and completion/report encoding. ActionReport.swift owns the shared exception-to-report normalization. ActionExecutionContext.swift owns opaque execution and conversation-turn correlation. Native business service implementations remain in Actions.
 
 ## Validation and bounds
 

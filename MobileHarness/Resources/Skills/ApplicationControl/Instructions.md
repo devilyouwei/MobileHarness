@@ -1,7 +1,7 @@
 ## Application and device control
 ### Scope and functions
 App pages, provider/resources, Bluetooth and all windows (including Writer). Use ui.windows IDs; controls leave tasks running. Page text/images: web-browsing.
-Read-only queries are XML Actions on the Query Channel: ModelResources.snapshot reads installed resource groups, transfers and progress; Provider.readSettings reads confirmed cloud-enabled status and selected model; Bluetooth.readStatus reads power, connection and discovered device IDs. All take no arguments. Use the exact current catalog aliases. Query Actions return business data, not just completion acknowledgments.
+Read-only queries are XML Actions on their own subsystem Channels: ModelResources.snapshot reads installed resource groups, transfers and progress; Provider.readSettings reads confirmed cloud-enabled status and selected model; Bluetooth.readStatus reads power, connection and discovered device IDs. All take no arguments. Use the exact current catalog aliases. Query Actions return business data, not just completion acknowledgments.
 ### Navigation and queries
 Use openPage only for requested navigation, not as a substitute for a device operation/query or as recovery from a failed query. Valid destinations come from its catalog. Current State may answer a known connection fact; power/discovery, provider settings and resource inventory require the matching query when absent.
 For a query followed by navigation, first obtain the query result; on the next request describe it once and issue openPage. Do not infer a setting from requested changes, history or a previous model name. Provider settings are read-only: no key/URL, switch operation or settings-write function is exposed.

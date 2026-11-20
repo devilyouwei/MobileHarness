@@ -8,5 +8,4 @@ AlbumNavigationTests使用真实Skill目录／XML解析、NavigationModule／Act
 
 - [AlbumNavigationTests.swift](AlbumNavigationTests.swift)
 - [FeedbackActionTests.swift](FeedbackActionTests.swift)
-- [HomeEffectActionTests.swift](HomeEffectActionTests.swift)
 - [UIToolTests.swift](UIToolTests.swift)

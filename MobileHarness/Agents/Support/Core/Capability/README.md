@@ -31,6 +31,7 @@ Agents uses the frozen capability catalog before submission to Gateway. Gateway 
 | [ActionRegistration.swift](ActionRegistration.swift) | 模型可见 Action 与代码私有 InternalAction 声明 |
 | [ToolRegistration.swift](ToolRegistration.swift) | native Tool 定义、参数和代码私有 InternalTool 声明 |
 | [CapabilityRegistry.swift](CapabilityRegistry.swift) | 不可变可见目录、内部权限、别名解析与调用许可 |
+| [ControlRegistration.swift](ControlRegistration.swift) | Agent 内部控制注册（无 Channel）、`ControlDestination`（self／peer）与已校验的 ControlCall |
 | [CapabilityDocumentation.swift](CapabilityDocumentation.swift) | 函数及参数文档值 |
 | [CapabilityContextBuilder.swift](CapabilityContextBuilder.swift) | 读取固定输出协议，按有效目录渲染 Channel 和 Action |
 
@@ -83,3 +84,7 @@ Agent 配置只接受当前 version=8；Action 配置字段不包含内嵌 examp
 Native parameter values have no generic byte ceiling in capability resolution/permission checks. Required/optional keys, key names/count, alias ownership and declared enums remain validated; concrete domains own semantic constraints. XML generation retains its separate tag grammar limits.
 
 AgentConfiguration v9 必须携带合法 category；身份与类别随通信收窄原样保留。类别不参与权限验证或函数目录生成。旧版本、缺失类别、未知值和错误类型均拒绝，不猜测角色类别。
+
+## Agent controls
+
+Model-visible functions fall into two classes. Actions (`actions` scheduled through a Channel, `tools` called directly) enter Actions through Gateway. Controls are run by the owning Agent and never reach Actions. A ControlRegistration (alias, path, parameter schema, documentation, `destination`) is a fixed capability of its owner, added through `CapabilityRegistry.adding(controls:)`; Skills do not grant or release controls. `ControlDestination` is `self` (the owner's own Task/Skill/round state) or `peer` (another Agent). The owner keeps the declarations and the operation it dispatches on; today only Assistant hosts controls ([AssistantControls](../../../Assistant/AssistantControls.swift)). `resolveControl` validates parameters with the same rules as `resolveAction` and returns a ControlCall that carries the destination and no Channel. AgentGenerator rejects any control inside `<wait>`, including `peer`, as `controlInsideWait`; rejections of a control alias carry `CallRejection.Kind.control`. Controls share the alias and path namespace with actions and tools (duplicates, `wait` and invalid names are rejected) and count toward the 128-entry limit. `permits(ControlCall)` checks registration and parameter schema. CapabilityContextBuilder renders controls as a separate "Agent controls" block without a Channel heading; each entry heading shows its destination (`Control task.send (peer):`).

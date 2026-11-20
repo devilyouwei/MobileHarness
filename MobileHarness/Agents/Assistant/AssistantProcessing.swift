@@ -24,10 +24,11 @@ public struct AssistantContextState: AssistantChatState {
     public static let agentID = AgentID.assistant
     public static let configurationName = "Assistant"
     public static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {
-        return try AssistantChatWorker<Self>.runtimeCapabilities(capabilities).adding(internalTools: [
-            .init(path: "UI.Island.present", required: ["activityID", "revision", "content"]),
-            .init(path: "UI.Island.end", required: ["activityID", "revision"]),
-        ])
+        return try AssistantChatWorker<Self>.chatRuntimeCapabilities(capabilities).adding(
+            internalTools: [
+                .init(path: "UI.Island.present", required: ["activityID", "revision", "content"]),
+                .init(path: "UI.Island.end", required: ["activityID", "revision"]),
+            ], controls: try AssistantControls.registrations)
     }
     public static func preprocess(_ input: AgentInput, state: Self) throws -> SignalDisposition {
         try AssistantSignalPreprocessor().classify(input, state: state)
@@ -53,7 +54,7 @@ public struct AssistantContextState: AssistantChatState {
         }
         let skillInstructions = try (skills ?? base).instructions(includeOverview: false)
         let delegates =
-            capabilities.actions.contains { $0.path.description == "Agent.Task.sendMessage" }
+            capabilities.controls.contains { $0.destination == .peer }
             ? try AgentConfigurations.delegationOverview(requester: agentID, communication: communication) : ""
         let capabilityContext = try AgentPrompts.capabilityContext()
         let sections = [

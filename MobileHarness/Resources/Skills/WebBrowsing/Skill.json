@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "web-browsing",
-  "revision": 11,
+  "revision": 12,
   "description": "Open or browse websites requested by site name or HTTP/HTTPS URL; read page text, inspect screenshots, scroll and control web windows. Does not provide clicking, form entry, login, video playback control or local-work library operations.",
   "dependencies": [],
   "useActions": [
@@ -9,61 +9,61 @@
       "path": "Web.Page.browse",
       "callType": "action",
       "alias": "Web.browse",
-      "channel": "Display"
+      "channel": "Web"
     },
     {
       "path": "Web.Page.snapshot",
       "callType": "action",
       "alias": "Web.snapshot",
-      "channel": "Display"
+      "channel": "Web"
     },
     {
       "path": "Web.Page.inspect",
       "callType": "action",
       "alias": "Web.inspect",
-      "channel": "Display"
+      "channel": "Web"
     },
     {
       "path": "Web.Page.navigate",
       "callType": "action",
       "alias": "Web.navigate",
-      "channel": "Display"
+      "channel": "Web"
     },
     {
       "path": "UI.Window.focus",
       "callType": "action",
       "alias": "Window.focus",
-      "channel": "Display"
+      "channel": "Window"
     },
     {
       "path": "UI.Window.minimize",
       "callType": "action",
       "alias": "Window.minimize",
-      "channel": "Display"
+      "channel": "Window"
     },
     {
       "path": "UI.Window.maximize",
       "callType": "action",
       "alias": "Window.maximize",
-      "channel": "Display"
+      "channel": "Window"
     },
     {
       "path": "UI.Window.restore",
       "callType": "action",
       "alias": "Window.restore",
-      "channel": "Display"
+      "channel": "Window"
     },
     {
       "path": "UI.Window.move",
       "callType": "action",
       "alias": "Window.move",
-      "channel": "Display"
+      "channel": "Window"
     },
     {
       "path": "UI.Window.close",
       "callType": "action",
       "alias": "Window.close",
-      "channel": "Display"
+      "channel": "Window"
     }
   ],
   "useStates": [

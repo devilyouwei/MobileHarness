@@ -15,7 +15,7 @@ import UI
 
 private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, SpeechPlaybackCapability,
     PosePresentationCapability, CameraControlCapability, HistoryPresentationCapability, ResourcePresentationCapability,
-    TaskControlCapability, WindowControlCapability, IslandControlCapability, WebCapability, ArtifactCapability
+    WindowControlCapability, IslandControlCapability, WebCapability, ArtifactCapability
 {
     func perform(invocation: any FunctionInput) async throws -> String { throw CancellationError() }
     func perform(_ operation: String, invocation: any FunctionInput) async throws -> String {
@@ -27,11 +27,6 @@ private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, Sp
     func performWindow(_ operation: WindowOperation, id: String, x: Double?, y: Double?, invocation: any FunctionInput)
         async throws
     { throw CancellationError() }
-    func controlTask(_ operation: String, arguments: [String: String], invocation: any FunctionInput) async throws
-        -> ActionCompletion
-    {
-        throw CancellationError()
-    }
     func presentResources(_ inventory: ModelResourceInventory, generation: UInt64, invocation: any FunctionInput)
         async throws
     {}
@@ -100,7 +95,7 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
         modelResources: UnusedModelResourceCapability(),
         resourcePreferences: UnusedModelResourcePreferencesCapability(), resourceInventory: UnusedResourceInventory(),
         resourcePresentation: endpoint, providerDiscovery: UnusedProviderDiscovery(),
-        providerSettings: UnusedProviderSettings(), device: UnusedDeviceControl(), taskControl: endpoint,
+        providerSettings: UnusedProviderSettings(), device: UnusedDeviceControl(),
         gesture: { _, _ in throw CancellationError() },
         shakeBase: { _, _ in throw CancellationError() },
         aim: { _, _, _ in throw ActionExecutionFailure(code: .handlerFailed, message: "Fixture dependency unavailable")
@@ -139,7 +134,8 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
     #expect(await endpoint.emotion == nil)
     try await executor.execute(behaviorInvocation("express", parameters: ["emotion": "smile"]))
     #expect(await endpoint.emotion == .smile)
-    let tool = ToolCall(id: UUID().uuidString, toolPath: "System.Runtime.runtimeInfo", arguments: [:])
+    let tool = ToolCall(
+        id: UUID().uuidString, toolPath: "History.Conversation.list", arguments: ["offset": "0", "limit": "1"])
     let result = try await ToolExecutor(registry: assembly.tools).execute(
         tool, envelope: behaviorInvocation("express").testEnvelope)
     #expect(result?.callID == tool.id)
@@ -378,56 +374,23 @@ private func endpointInvocation(source: String, session: String, decision: Strin
     }
 }
 
-@Test(.actionCatalog) @MainActor func taskEndpointKeepsAdmissionAndOriginalHandlerFailure() async throws {
-    let endpoint = TaskControlEndpoint(rootSessionID: "root")
-    await #expect(throws: ActionHostError.scopeClosed) {
-        try await endpoint.controlTask(
-            "task.start", arguments: [:], invocation: endpointInvocation(source: "assistant", session: "root"))
-    }
-    let accepted = LockedTaskRequests()
-    endpoint.handler = { operation, _, source, session, _, _ in
-        await accepted.record(operation + ":" + source + ":" + session)
-        throw CancellationError()
-    }
-    await #expect(throws: ActionHostError.scopeClosed) {
-        try await endpoint.controlTask(
-            "task.start", arguments: [:], invocation: endpointInvocation(source: "assistant", session: "retired"))
-    }
-    await #expect(throws: CancellationError.self) {
-        try await endpoint.controlTask(
-            "task.start", arguments: [:], invocation: endpointInvocation(source: "memory", session: "root"))
-    }
-    #expect(await accepted.values == ["task.start:memory:root"])
-    await #expect(throws: CancellationError.self) {
-        try await endpoint.controlTask(
-            "task.start", arguments: [:], invocation: endpointInvocation(source: "assistant", session: "root"))
-    }
-    #expect(await accepted.values == ["task.start:memory:root", "task.start:assistant:root"])
-}
-
-private actor LockedTaskRequests {
-    private(set) var values: [String] = []
-    func record(_ value: String) { values.append(value) }
-}
-
-@Test(.actionCatalog) func taskFunctionsRequireAnExplicitCapabilityInsteadOfPresentationConformance() throws {
+@Test(.actionCatalog) func actionsDoNotDeclareAgentTaskControls() throws {
     let endpoint = BehaviorEndpoint()
-    func assemble(task: (any TaskControlCapability)?) throws -> BehaviorAssembly {
-        try BehaviorAssembly(
-            presentation: endpoint, playback: endpoint, pose: endpoint, historyPresentation: endpoint, camera: endpoint,
-            history: HistoryQueryService(store: AssistantHistoryStore()),
-            historyMutations: HistoryMutationService(
-                store: AssistantHistoryStore(), summarizeTitle: { _ in "fixture" }),
-            modelResources: UnusedModelResourceCapability(),
-            resourcePreferences: UnusedModelResourcePreferencesCapability(),
-            resourceInventory: UnusedResourceInventory(),
-            resourcePresentation: endpoint, providerDiscovery: UnusedProviderDiscovery(),
-            providerSettings: UnusedProviderSettings(), device: UnusedDeviceControl(), taskControl: task,
-            gesture: { _, _ in }, shakeBase: { _, _ in }, aim: { _, _, _ in })
-    }
+    let assembly = try BehaviorAssembly(
+        presentation: endpoint, playback: endpoint, pose: endpoint, historyPresentation: endpoint, camera: endpoint,
+        history: HistoryQueryService(store: AssistantHistoryStore()),
+        historyMutations: HistoryMutationService(
+            store: AssistantHistoryStore(), summarizeTitle: { _ in "fixture" }),
+        modelResources: UnusedModelResourceCapability(),
+        resourcePreferences: UnusedModelResourcePreferencesCapability(),
+        resourceInventory: UnusedResourceInventory(),
+        resourcePresentation: endpoint, providerDiscovery: UnusedProviderDiscovery(),
+        providerSettings: UnusedProviderSettings(), device: UnusedDeviceControl(),
+        gesture: { _, _ in }, shakeBase: { _, _ in }, aim: { _, _, _ in })
+    // Task and Skill controls belong to Agents and are never registered as Actions.
     let path = ActionIdentifier(domain: "Agent", module: "Task", function: "startTask")
-    #expect(try assemble(task: nil).functions.find(path) == nil)
-    #expect(try assemble(task: endpoint).functions.find(path) != nil)
+    #expect(assembly.functions.find(path) == nil)
+    #expect(!CapabilityModules.declarations.contains { $0.path.domain == "Agent" })
 }
 
 @MainActor private final class EndpointVoiceFixture: VoiceOutputHandling {

@@ -228,27 +228,30 @@ public struct AgentMessaging: Sendable {
 /// A peer message may carry a reply address captured by the runtime.
 public struct AgentTaskRequest: Codable, Equatable, Sendable {
     public static let contract = "agent.task.v1"
-    public static let persistedContracts = [contract, "agent.task.request", "agent.taskMessage", "task.request"]
     public let id: String
     public let text: String
     public let replyTo: String?
     public let interactionID: String?
     public let operation: AgentRequestOperation?
+    /// Sender's opaque conversation reference; the receiver records it and echoes it in replies.
+    public let senderContext: String?
 
     public init(
         id: String = UUID().uuidString, text: String, replyTo: String? = nil, interactionID: String? = nil,
-        operation: AgentRequestOperation? = nil
+        operation: AgentRequestOperation? = nil, senderContext: String? = nil
     ) {
         self.operation = operation
         self.id = id
         self.text = text
         self.replyTo = replyTo
         self.interactionID = interactionID
+        self.senderContext = senderContext
     }
 
     public func validate() throws {
         guard UUID(uuidString: id) != nil, text.utf8.count <= 4096,
             !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            senderContext.map({ !$0.isEmpty && $0.utf8.count <= 128 }) ?? true,
             operation.map({ [.submit, .update, .answer].contains($0) }) ?? true,
             operation == .update ? replyTo != nil && interactionID == nil : (replyTo == nil) == (interactionID == nil),
             replyTo.map({ UUID(uuidString: $0) != nil && $0 != id }) ?? true,

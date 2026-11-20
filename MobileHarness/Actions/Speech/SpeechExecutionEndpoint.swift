@@ -21,10 +21,6 @@ public final class SpeechExecutionEndpoint: SpeechPlaybackCapability, SpeechList
         guard let voice else { throw ActionHostError.scopeClosed }
         try voice.validateCameraControl(invocation: invocation)
     }
-    public func validateEffects(invocation: any FunctionInput) throws {
-        guard let voice else { throw ActionHostError.unauthorized }
-        try voice.validateCameraControl(invocation: invocation)
-    }
     public func prepareListening(pressed: Bool, invocation: any FunctionInput) async throws {
         guard let voice else { throw ActionHostError.scopeClosed }
         try await voice.prepareListening(pressed: pressed, invocation: invocation)

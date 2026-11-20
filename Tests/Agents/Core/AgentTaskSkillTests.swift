@@ -209,17 +209,6 @@ private actor SkillModel: ChatCapability {
         return pair.session
     }
 }
-private struct SkillControls: TaskControlCapability {
-    let agent: AssistantAgent
-    func controlTask(_ operation: String, arguments: [String: String], invocation: any FunctionInput) async throws
-        -> ActionCompletion
-    {
-        try await agent.controlTask(
-            operation, arguments: arguments, source: invocation.context.source,
-            sessionID: invocation.context.sessionID, inputID: invocation.context.inputID,
-            decisionID: invocation.context.decisionID)
-    }
-}
 private actor SkillEffects {
     private(set) var owners: [String] = []
     private(set) var completed = 0
@@ -312,8 +301,7 @@ func fullDuplexTaskEndPersistsAndFoldsWhileGenerationAndAnotherChannelAreRunning
     let manager = AgentManager()
     try await manager.register(agent)
     let input = InputGateway(manager: manager)
-    let controls = TaskControlModule(capability: SkillControls(agent: agent))
-    let assembly = try BehaviorAssembly(capabilityModules: [controls])
+    let assembly = try BehaviorAssembly(capabilityModules: [])
     struct Module: ActionModule { let definitions: [ActionBinding] }
     let express = ActionBinding(
         path: .init(domain: "UI", module: "Expression", function: "express"), displayName: "Fixture expression",
@@ -322,9 +310,7 @@ func fullDuplexTaskEndPersistsAndFoldsWhileGenerationAndAnotherChannelAreRunning
             if invocation.context.inputID == "foreground-end" { try await gate.wait() }
             return .completed
         })
-    let bindings = try controls.definitions.map { try assembly.actions.definition(for: $0.path) }
-    let scheduler = ChannelScheduler(registry: try ActionRegistry(modules: [Module(definitions: bindings + [express])]))
-    {
+    let scheduler = ChannelScheduler(registry: try ActionRegistry(modules: [Module(definitions: [express])])) {
         await input.deliverActionResult($0)
     }
     let gateway = await OutputGateway(
@@ -440,8 +426,7 @@ func fullDuplexInterruptedReplyPreservesPhotographyTaskAndPersistsSummary() asyn
         chat: InterruptedPhotographyModel(), conversations: store, context: context)
     let manager = AgentManager()
     let input = InputGateway(manager: manager)
-    let controls = TaskControlModule(capability: SkillControls(agent: agent))
-    let assembly = try BehaviorAssembly(capabilityModules: [controls])
+    let assembly = try BehaviorAssembly(capabilityModules: [])
     let gate = ForegroundEndActionGate()
     let express = ActionBinding(
         path: .init(domain: "UI", module: "Expression", function: "express"), displayName: "Fixture expression",
@@ -454,8 +439,7 @@ func fullDuplexInterruptedReplyPreservesPhotographyTaskAndPersistsSummary() asyn
         path: .init(domain: "Camera", module: "Capture", function: "close"), displayName: "Fixture camera",
         kind: .finite, completion: "Fixture camera closed",
         completing: { _ in .value(#"{"operation":"close","enabled":false}"#) })
-    let bindings = try controls.definitions.map { try assembly.actions.definition(for: $0.path) }
-    let scheduler = ChannelScheduler(registry: try ActionRegistry(definitions: bindings + [express, close])) {
+    let scheduler = ChannelScheduler(registry: try ActionRegistry(definitions: [express, close])) {
         await input.deliverActionResult($0)
     }
     let gateway = await OutputGateway(
@@ -465,7 +449,7 @@ func fullDuplexInterruptedReplyPreservesPhotographyTaskAndPersistsSummary() asyn
 
     let session = UUID().uuidString
     _ = try await agent.controlTask(
-        "task.start", arguments: ["description": "连续拍照", "skills": #"["photography"]"#],
+        .startTask, arguments: ["description": "连续拍照", "skills": #"["photography"]"#],
         source: AgentID.assistant.rawValue, sessionID: session, inputID: "photo-start", decisionID: nil)
     let task = try #require(try await context.snapshot().state.skillState?.activeTaskID)
     let dialog = try await store.readCurrent().current.id
@@ -644,23 +628,16 @@ private func photographyAcceptance(
             })
     }
     struct Module: ActionModule { let definitions: [ActionBinding] }
-    let controls = TaskControlModule(capability: SkillControls(agent: agent))
-    let controlAssembly = try BehaviorAssembly(capabilityModules: [controls])
-    let controlBindings = try controls.definitions.map { try controlAssembly.actions.definition(for: $0.path) }
-    for control in controlBindings {
-        #expect(control.protocols == [.action])
-        #expect(await controlAssembly.tools.handler(for: control.path.description) == nil)
-    }
     let history = HistoryModule(
         history: HistoryQueryService(store: store),
         mutations: HistoryMutationService(
             store: store, summarizeTitle: { try await ConversationTitleGenerator.summarize($0, using: model) }))
-    let historyAssembly = try BehaviorAssembly(capabilityModules: [controls, history])
+    let historyAssembly = try BehaviorAssembly(capabilityModules: [history])
     let historyBindings = try history.definitions.filter { ["list", "read"].contains($0.path.function) }
         .map { try historyAssembly.actions.definition(for: $0.path) }
     let scheduler = ChannelScheduler(
         registry: try ActionRegistry(modules: [
-            Module(definitions: definitions + controlBindings + historyBindings)
+            Module(definitions: definitions + historyBindings)
         ])
     ) { await input.deliverActionResult($0) }
     let tools = historyAssembly.tools
@@ -1127,23 +1104,18 @@ private func photographyAcceptance(
     try await agent.start()
     let session = UUID().uuidString
     _ = try await agent.controlTask(
-        "task.start", arguments: ["skills": "[\"photography\"]", "description": "fixed fixture"], source: "assistant",
+        .startTask, arguments: ["skills": "[\"photography\"]", "description": "fixed fixture"], source: "assistant",
         sessionID: session, inputID: UUID().uuidString, decisionID: nil)
     #expect(try await context.snapshot().state.skillState?.mode == "task")
     await #expect(throws: CommunicationError.unauthorized) {
         try await agent.controlTask(
-            "agent.task.v1", arguments: ["reason": "spoofed"], source: "photographer", sessionID: session,
+            .finishTask, arguments: ["summary": "spoofed"], source: "photographer", sessionID: session,
             inputID: UUID().uuidString,
             decisionID: nil)
     }
-    await #expect(throws: HarnessError.forbiddenFunction) {
-        try await agent.controlTask(
-            "agent.task.v1", arguments: ["reason": "removed"], source: "assistant", sessionID: session,
-            inputID: UUID().uuidString, decisionID: nil)
-    }
     #expect(try await context.snapshot().state.skillState?.mode == "task")
     _ = try await agent.controlTask(
-        "task.end", arguments: ["summary": "fixed finished"], source: "assistant", sessionID: session,
+        .finishTask, arguments: ["summary": "fixed finished"], source: "assistant", sessionID: session,
         inputID: UUID().uuidString, decisionID: nil)
     #expect(try await context.snapshot().state.skillState?.tasks.last?.status == "completed")
     #expect(try await context.snapshot().state.skillState?.mode == "default")
@@ -1250,12 +1222,12 @@ func legacyBackgroundStartIsRejectedWithoutChangingForegroundOrInvokingChat()
     try await assistant.start()
     await child.start()
     _ = try await assistant.controlTask(
-        "task.start", arguments: ["description": "继续拍摄", "skills": "[\"photography\"]"], source: "assistant",
+        .startTask, arguments: ["description": "继续拍摄", "skills": "[\"photography\"]"], source: "assistant",
         sessionID: session, inputID: UUID().uuidString, decisionID: nil)
     let before = try await context.snapshot().state.skillState
     await #expect(throws: CommunicationError.invalidPayload) {
         try await assistant.controlTask(
-            "task.start", arguments: ["description": "obsolete", "execution": "background", "executor": "memory"],
+            .startTask, arguments: ["description": "obsolete", "execution": "background", "executor": "memory"],
             source: "assistant", sessionID: session, inputID: UUID().uuidString, decisionID: nil)
     }
     #expect(try await context.snapshot().state.skillState?.activeTaskID == before?.activeTaskID)
@@ -1290,35 +1262,17 @@ func legacyBackgroundStartIsRejectedWithoutChangingForegroundOrInvokingChat()
     }
 }
 
-private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
-    func controlTask(_ operation: String, arguments: [String: String], invocation: any FunctionInput) async throws
-        -> ActionCompletion
-    {
-        .value("Committed \(operation)")
-    }
-}
-
-@Test(.actionCatalog) func everyTaskControlCompletionIsAcceptedByCanonicalExecutor() async throws {
-    let module = TaskControlModule(capability: TaskControlAcknowledgmentFixture())
-    for function in module.definitions {
-        let invocation = ActionInvocation(
-            call: .init(
-                actionPath: function.path, channel: "Control",
-                parameters: [
-                    "loadSkills": ["skills": "[]"], "releaseSkills": ["skills": "[]"],
-                    "startTask": ["description": "fixture"],
-                    "finishTask": ["summary": "fixture"],
-                    "sendMessage": ["agent_id": "writer", "text": "answer"],
-                ][function.path.function] ?? [:]),
-            context: .init(
-                source: "assistant", sessionID: UUID().uuidString, inputID: UUID().uuidString,
-                sequence: 0), executionID: UUID().uuidString)
-        #expect(
-            try await FunctionExecutor.perform(invocation, definition: function)
-                == .value(
-                    "Committed \(["startTask":"task.start","finishTask":"task.end","sendMessage":"task.send"][function.path.function] ?? function.path.function)"
-                ))
-    }
+@Test(.actionCatalog) func assistantControlsAreBuiltInAndDisjointFromActions() throws {
+    let controls = try AssistantControls.all
+    #expect(
+        controls.map(\.operation.rawValue).sorted() == [
+            "loadSkills", "releaseSkills", "task.end", "task.send", "task.start",
+        ])
+    #expect(Set(controls.map(\.declaration.path)).count == controls.count)
+    #expect(Set(controls.map(\.alias)).count == controls.count)
+    for control in controls { try control.declaration.validate() }
+    let actionPaths = Set(CapabilityModules.declarations.map(\.path))
+    #expect(actionPaths.isDisjoint(with: controls.map(\.declaration.path)))
 }
 
 @Test(.actionCatalog) func baseSkillsAreTheOnlyRoleModelFunctionSource() throws {
@@ -1337,11 +1291,9 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
     #expect(expression.tools.isEmpty)
     #expect(expression.actions.count == 2)
     #expect(!expression.actions.contains { $0.alias == "send" || $0.alias == "readEnvironment" })
-    let unregistered = try AgentCommunicationAdapter.catalog(expression, policy: assistant.communication)
-    #expect(!unregistered.actions.contains { $0.alias == "send" })
-    let basic = try AgentSkillLoader.registry(["basic-skill"], fixed: CapabilityRegistry())
+    let basic = try AgentSkillLoader.registry(["basic-skill"], fixed: assistant.assistantFixed)
     #expect(basic.tools.isEmpty)
-    #expect(basic.actions.contains { $0.alias == "task.start" })
+    #expect(basic.controls.contains { $0.alias == "task.start" })
     #expect(!basic.actions.contains { $0.alias == "send" })
     #expect(!basic.actions.contains { $0.alias == "readEnvironment" })
     let identity = try AgentConfigurations.identityInstructions(named: "Assistant")
@@ -1457,7 +1409,8 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
     ]
     for (alias, path, arguments) in commands {
         let call = try registry.resolveAction(alias, parameters: arguments)
-        #expect(call.actionPath.description == path && call.channel == "System")
+        let channel = path.hasPrefix("System.Device") ? "Device" : "ModelResources"
+        #expect(call.actionPath.description == path && call.channel == channel)
         #expect(throws: GenerationError.unknownCapability) { try registry.resolveTool(alias, arguments: arguments) }
         var parser = FunctionTokenParser()
         let attributes = arguments.sorted { $0.key < $1.key }.map { "\($0.key)=\"\($0.value)\"" }.joined(separator: " ")
@@ -1471,8 +1424,11 @@ private struct TaskControlAcknowledgmentFixture: TaskControlCapability {
             try registry.resolveAction(parsedAlias, parameters: parameters).actionPath.description
                 == path)
     }
-    for alias in ["ModelResources.snapshot", "Provider.readSettings", "Bluetooth.readStatus"] {
-        #expect(try registry.resolveAction(alias, parameters: [:]).channel == "Query")
+    for (alias, channel) in [
+        ("ModelResources.snapshot", "ModelResources"), ("Provider.readSettings", "Provider"),
+        ("Bluetooth.readStatus", "Device"),
+    ] {
+        #expect(try registry.resolveAction(alias, parameters: [:]).channel == channel)
         #expect(throws: GenerationError.unknownCapability) { try registry.resolveTool(alias, arguments: [:]) }
     }
     #expect(!registry.actions.contains { $0.path.domain == "NexArm" })
@@ -1537,16 +1493,9 @@ func assistantCapturesWithoutTaskWhenNoFollowUpIsRequested(supportsImages: Bool)
     #expect(robot.useActions.count == 11 && robot.useActions.allSatisfy { $0.path.hasPrefix("NexArm.") })
     for registry in try AgentConfigurations.skillRegistries() {
         #expect(!registry.actions.contains { $0.path.description.hasPrefix("UI.Feedback.") })
-        #expect(!registry.actions.contains { $0.path.description == "Agent.Communication.send" })
     }
     let base = try AgentConfigurations.load(named: "Assistant").capabilities
     #expect(throws: GenerationError.unknownCapability) { try base.resolveAction("vibrate", parameters: [:]) }
-    #expect(throws: GenerationError.unknownCapability) {
-        try base.resolveAction("updateLight", parameters: ["enabled": "true"])
-    }
-    #expect(throws: GenerationError.unknownCapability) {
-        try base.resolveAction("send", parameters: ["target": "memory", "kind": "request", "content": "x"])
-    }
     #expect(!base.actions.contains { $0.alias == "nodHead" })
 }
 
@@ -2549,7 +2498,10 @@ func assistantIdleExpiryChangesNextRequestCatalogButKeepsEarlierConversationEvid
 @Test(.actionCatalog) func migratedSkillQueriesHaveExecutableActionBindingsAndRetainedToolViews() async throws {
     let catalog = try AgentSkillLoader.registry(
         ["application-control", "history-query"], fixed: CapabilityRegistry())
-    let queries = catalog.actions.filter { $0.defaultChannel == "Query" }
+    let queryAliases: Set<String> = [
+        "Bluetooth.readStatus", "Provider.readSettings", "ModelResources.snapshot", "History.list", "History.read",
+    ]
+    let queries = catalog.actions.filter { queryAliases.contains($0.alias) }
     try #require(queries.count == 5 && catalog.tools.isEmpty)
     struct Module: CapabilityModule { let definitions: [ActionFunction] }
     let definitions = try queries.map { query in
@@ -2616,13 +2568,9 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
             displayName: path, kind: .finite, completion: "Fixture",
             completing: { _ in .completed })
     }
-    let assembly = try BehaviorAssembly(capabilityModules: [
-        TaskControlModule(capability: SkillControls(agent: assistant))
-    ])
-    let taskBindings = assembly.bindings.filter { $0.protocols == [.action] }
-    #expect(taskBindings.allSatisfy { if case .scheduled = $0.executionPolicy { true } else { false } })
+    let assembly = try BehaviorAssembly(capabilityModules: [])
     let scheduler = ChannelScheduler(
-        registry: try ActionRegistry(modules: [Module(definitions: definitions + taskBindings)])
+        registry: try ActionRegistry(modules: [Module(definitions: definitions)])
     ) {
         await input.deliverActionResult($0)
     }
@@ -2651,7 +2599,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
     }
     if foreground {
         _ = try await assistant.controlTask(
-            "task.start", arguments: ["description": "继续处理独立任务"],
+            .startTask, arguments: ["description": "继续处理独立任务"],
             source: "assistant", sessionID: session, inputID: UUID().uuidString, decisionID: nil)
     }
     let priorTask = try await context.snapshot().state.skillState?.activeTaskID
@@ -2675,7 +2623,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         // Failed delegation must not leave a generating history row that blocks archival.
         if foreground {
             _ = try await assistant.controlTask(
-                "task.end", arguments: ["summary": "test cleanup"], source: "assistant", sessionID: session,
+                .finishTask, arguments: ["summary": "test cleanup"], source: "assistant", sessionID: session,
                 inputID: UUID().uuidString, decisionID: nil)
         }
         _ = try await history.startNew()
@@ -2731,18 +2679,18 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
     if outcome == "writerCancellation" {
         let stable = try await database.writerExecutions.request(scope.id, agent: "writer").workspaceID
         try await skillEventually { await log.finishedDecisions.count == 1 }
-        for (operation, arguments) in [
-            ("task.delegate", ["target": "writer", "goal": "obsolete"]),
-            ("task.send", ["taskID": stable, "type": "cancel"]),
-            ("task.send", ["taskID": stable, "type": "input", "text": "obsolete"]),
-            ("task.end", ["taskID": stable, "summary": "not owned"]),
-            ("task.start", ["execution": "background", "target": "writer", "goal": "obsolete"]),
-            ("task.start", ["execution": "foreground", "executor": "writer", "goal": "wrong scope"]),
+        let rejected: [(AgentControlOperation, [String: String])] = [
+            (.sendMessage, ["taskID": stable, "type": "cancel"]),
+            (.sendMessage, ["taskID": stable, "type": "input", "text": "obsolete"]),
+            (.finishTask, ["taskID": stable, "summary": "not owned"]),
+            (.startTask, ["execution": "background", "target": "writer", "goal": "obsolete"]),
+            (.startTask, ["execution": "foreground", "executor": "writer", "goal": "wrong scope"]),
             (
-                "task.start",
+                .startTask,
                 ["execution": "background", "executor": "writer", "goal": "work", "businessContract": "writer.author"]
             ),
-        ] {
+        ]
+        for (operation, arguments) in rejected {
             await #expect(throws: (any Error).self) {
                 try await assistant.controlTask(
                     operation, arguments: arguments,
@@ -2753,7 +2701,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         #expect(try await context.snapshot().state.skillState?.activeTaskID == priorTask)
         if foreground {
             _ = try await assistant.controlTask(
-                "task.end", arguments: ["summary": "独立前台任务已结束"],
+                .finishTask, arguments: ["summary": "独立前台任务已结束"],
                 source: "assistant", sessionID: session, inputID: UUID().uuidString, decisionID: nil)
         }
         let started = try AgentTaskContent(
@@ -2801,10 +2749,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
             text: "first complete", stage: .completed, writerEvent: .init(sequence: 1, kind: .completed))
         let old = try await fixtureWriterCompletion(
             content, scope: scope, status: .succeeded, executions: database.writerExecutions)
-        // Consumer recovery may already apply the durable fact before live publication.
         try await writerRuntime.retireTask(#require(old.signal))
-        try await database.writerExecutions.finishDelegationNotification(
-            scope.id, agent: "writer", retirement: true, completed: true, failure: nil)
         await model.delegateAgain()
         try await assistant.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("继续或开始下一项任务")))
         try await skillEventually { await child.inputs.count == 2 }
@@ -2856,13 +2801,12 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
                 rawValue:
                     "count=\(decisionCount) work=\(state.work.values.map { $0.state }) errors=\(state.state.history.current.turns.map { $0.error ?? "none" }) output=\(outputFailure) controls=\(controls)"
             ))
-        #expect(
-            try await database.agentMessages.isAgentMessageConsumed(
-                (try #require(try await database.writerExecutions.delegationNotification(scope.id, agent: "writer")))
-                    .eventID))
+        let finalSignal = try #require(final.signal)
+        let finalEvent = try #require(try AgentTaskContent.decode(finalSignal).writerEvent?.eventID)
+        #expect(try await database.agentMessages.agentMessage(finalEvent)?.receiver == "assistant")
         if foreground {
             _ = try await assistant.controlTask(
-                "task.end", arguments: ["summary": "test cleanup"],
+                .finishTask, arguments: ["summary": "test cleanup"],
                 source: "assistant", sessionID: session, inputID: UUID().uuidString, decisionID: nil)
         }
         _ = try await history.startNew()
@@ -2965,11 +2909,9 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
     #expect(settled.work.count == previousWork.count + (outcome == "completed" ? 1 : 0))
     var decisions = outcome == "completed" ? 2 : 1
     #expect(await model.requests.count == decisions)
-    #expect(
-        try await database.agentMessages.isAgentMessageConsumed(
-            (try #require(try await database.writerExecutions.delegationNotification(scope.id, agent: "writer")))
-                .eventID)
-    )
+    let endedSignal = try #require(ended.signal)
+    let endedEvent = try #require(try AgentTaskContent.decode(endedSignal).writerEvent?.eventID)
+    #expect(try await database.agentMessages.isAgentMessageConsumed(endedEvent))
 
     if verifyAnnouncements {
         try await skillEventually { await log.writerSpokenTexts.count == 5 }
@@ -2992,7 +2934,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
 
     if foreground {
         _ = try await assistant.controlTask(
-            "task.end", arguments: ["summary": "test cleanup"], source: "assistant", sessionID: session,
+            .finishTask, arguments: ["summary": "test cleanup"], source: "assistant", sessionID: session,
             inputID: UUID().uuidString, decisionID: nil)
     }
     await assistant.stop()
@@ -3094,27 +3036,27 @@ private actor WriterOutputLog {
     try await assistant.start()
     let session = UUID().uuidString
     _ = try await assistant.controlTask(
-        "task.start", arguments: ["description": "first"], source: "assistant", sessionID: session,
+        .startTask, arguments: ["description": "first"], source: "assistant", sessionID: session,
         inputID: UUID().uuidString, decisionID: nil)
     let first = try #require(try await context.snapshot().state.skillState?.activeTaskID)
     for arguments in [["text": "前台补充"], ["agent_id": "assistant", "text": "前台补充"]] {
         await #expect(throws: CommunicationError.invalidPayload) {
             try await assistant.controlTask(
-                "task.send", arguments: arguments, source: "assistant", sessionID: session,
+                .sendMessage, arguments: arguments, source: "assistant", sessionID: session,
                 inputID: UUID().uuidString, decisionID: nil)
         }
     }
     await #expect(throws: CommunicationError.scopeClosed) {
         try await assistant.controlTask(
-            "task.start", arguments: ["description": "must not begin"], source: "assistant", sessionID: session,
+            .startTask, arguments: ["description": "must not begin"], source: "assistant", sessionID: session,
             inputID: UUID().uuidString, decisionID: nil)
     }
     #expect(try await context.snapshot().state.skillState?.activeTaskID == first)
     _ = try await assistant.controlTask(
-        "task.end", arguments: ["summary": "第一个目标未完成，用户换目标"], source: "assistant", sessionID: session,
+        .finishTask, arguments: ["summary": "第一个目标未完成，用户换目标"], source: "assistant", sessionID: session,
         inputID: UUID().uuidString, decisionID: nil)
     _ = try await assistant.controlTask(
-        "task.start", arguments: ["description": "second"], source: "assistant", sessionID: session,
+        .startTask, arguments: ["description": "second"], source: "assistant", sessionID: session,
         inputID: UUID().uuidString, decisionID: nil)
     let second = try #require(try await context.snapshot().state.skillState?.activeTaskID)
     #expect(second != first)
@@ -3134,75 +3076,6 @@ private func fixtureEventPublication(
     let admission = try await port.sendResult(message, parent: parent, to: target)
     await inputGateway.flushPublications()
     return admission
-}
-
-@Test(.actionCatalog) func assistantRestoresTaskTrackingAndReadsCompletionPublishedWithoutAnyConsumer()
-    async throws
-{
-    let records = try SQLiteRepositories.temporary()
-    let history = AssistantHistoryStore(
-        records: try AssistantRecordStore(
-            repository: records.assistantMessages, tasks: records.assistantTasks,
-            conversations: records.assistantConversations, logs: records.logs))
-    let dialog = try await history.readCurrent().current.id
-    let session = UUID().uuidString
-    let request = AgentTaskRequest(text: "restored task")
-    try await records.agentMessages.enqueueAgentMessage(
-        .init(
-            id: request.id, sender: "assistant", receiver: "writer", contract: "agent.task.v1",
-            payload: JSONEncoder().encode(request), correlationID: request.id, senderContext: dialog,
-            sourceSessionID: session, dedupeKey: request.id))
-    _ = try await records.writerExecutions.beginRequest(
-        delegateID: request.id, workspaceID: nil, goal: request.text, input: request.text,
-        sourceDialog: dialog, agent: "writer")
-    let scope = AgentTaskScope(
-        id: request.id, requester: .assistant, executor: .writer, sessionID: session, execution: .background)
-    let completion = try await fixtureWriterCompletion(
-        AgentTaskContent(
-            text: "completed while requester absent", stage: .completed,
-            writerEvent: .init(sequence: 1, kind: .completed, delegateID: scope.id)), scope: scope, status: .succeeded,
-        executions: records.writerExecutions)
-    let manager = AgentManager()
-    let writer = ObservationRecorder(id: "writer")
-    try await manager.register(writer)
-    await writer.start()
-    let policy = try CommunicationPolicy(
-        contracts: AgentContracts.communication, configurations: AgentConfigurations.all())
-    let signals = SignalTransport()
-    let input = InputGateway(manager: manager, policy: policy, signals: signals)
-    let output = await OutputGateway(
-        manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
-    try await output.bindCommunications(records.agentMessages)
-    let publishing = try await output.messaging(for: .writer)
-    try await publishing.publish(
-        completion.message, parent: AgentInput(id: scope.id, sessionID: session, payload: .text("source fact")))
-    await input.flushPublications()
-    #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(0))
-    let sourceClaim = try #require(
-        try await records.writerExecutions.pendingDelegationNotifications(
-            agent: "writer", retirement: false, after: nil, limit: 1
-        ).first)
-    try await records.writerExecutions.finishDelegationNotification(
-        scope.id, agent: "writer", retirement: false, completed: true, failure: nil, claimToken: sourceClaim.claimToken)
-    #expect(try await records.writerExecutions.delegationNotification(scope.id, agent: "writer")?.published == true)
-    #expect(try await !records.agentMessages.isAgentMessageConsumed(sourceClaim.eventID))
-    let context = try AgentContextRepository(
-        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState())
-    let assistant = try AssistantAgent(
-        stateContext: publicStateFixture(), presentsReply: false, chat: WriterNoticeModel(), conversations: history,
-        communications: records.agentMessages, context: context)
-    try await manager.register(assistant, sessionID: UUID().uuidString)
-    try await assistant.start()
-    _ = try await output.consumer(for: assistant)
-    try await skillEventually { try await context.snapshot().state.taskViews?[scope.id]?.terminal == true }
-    #expect(try await records.agentMessages.isAgentMessageConsumed(sourceClaim.eventID))
-    #expect(await assistant.trackedTaskCount == 0)
-    // All three static speech/interruption/Writer subscriptions remain.
-    #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(3))
-    await assistant.stop()
-    await output.shutdown()
-    await manager.stopAll()
-    try await records.shutdown()
 }
 
 @Test(.actionCatalog) func assistantStaticallyListensToWriterBeforeAnyTaskAndReleasesItsEndpointOnStop() async throws {
@@ -3233,4 +3106,55 @@ private func fixtureEventPublication(
         #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(0))
     }
     await output.shutdown()
+}
+
+@Test(.actionCatalog) func skillChannelsSeparateIndependentWorkAndKeepExclusiveWorkTogether() async throws {
+    let registry = try AgentSkillLoader.registry(
+        [
+            "application-control", "history-query", "photography", "robot-interaction", "web-browsing",
+            "expression-interaction",
+        ], fixed: CapabilityRegistry())
+    func channel(_ alias: String) throws -> String {
+        try #require(registry.actions.first { $0.alias == alias }).defaultChannel
+    }
+    // Exclusive work shares one Channel.
+    #expect(try channel("openCamera") == "Camera" && channel("takePhoto") == "Camera")
+    #expect(try channel("startRecording") == "Camera" && channel("stopRecording") == "Camera")
+    #expect(try channel("Window.focus") == "Window" && channel("openPage") == "Window")
+    #expect(try channel("Web.browse") == "Web" && channel("Web.navigate") == "Web")
+    #expect(try channel("Bluetooth.control") == "Device" && channel("Bluetooth.readStatus") == "Device")
+    #expect(try channel("ModelResources.download") == "ModelResources")
+    #expect(try channel("ModelResources.cancel") == "ModelResources")
+    // Cancellation, perception and unrelated surfaces never queue behind the work they are independent of.
+    #expect(try channel("cancelCapture") != channel("takePhoto"))
+    #expect(try channel("Vision.open") != channel("openCamera"))
+    #expect(try Set([channel("Web.browse"), channel("Window.move"), channel("express")]).count == 3)
+    #expect(
+        try Set([channel("History.list"), channel("Provider.readSettings"), channel("ModelResources.snapshot")]).count
+            == 3)
+    #expect(try channel("Island.setPresentation") != channel("Window.move"))
+    #expect(!registry.channels.contains("Query") && !registry.channels.contains("System"))
+    #expect(registry.channels.count <= 16)
+}
+
+@Test(.actionCatalog) func controlsAreBuiltInToTheAssistantAndSkillsCannotRegisterThem() throws {
+    let assistant = try AgentConfigurations.load(named: "Assistant")
+    let fixed = try AssistantAgent.runtimeCapabilities(assistant.capabilities)
+    #expect(fixed.controls.map(\.alias) == ["loadSkills", "releaseSkills", "task.start", "task.end", "task.send"])
+    for name in ["Photographer", "Memory", "Writer", "ApplicationControl"] {
+        #expect(try AgentConfigurations.load(named: name).capabilities.controls.isEmpty)
+    }
+    let registry = try AgentSkillLoader.registry(["photography"], fixed: fixed)
+    #expect(registry.controls.count == 5)
+    #expect(try AgentSkillLoader.registry(["basic-skill"], fixed: CapabilityRegistry()).controls.isEmpty)
+    let legacy = Data(
+        #"{"version":3,"id":"legacy","revision":1,"description":"x","dependencies":[],"useActions":[],"useControls":[],"useStates":[],"useInstructions":[]}"#
+            .utf8)
+    #expect(throws: (any Error).self) { try JSONDecoder().decode(AgentConfigurations.Skill.self, from: legacy) }
+    try AgentPrompts.$language.withValue("zh-Hans") {
+        let localized = try AgentSkillLoader.registry(["basic-skill"], fixed: fixed)
+        let english = try #require(fixed.controls.first { $0.alias == "loadSkills" })
+        let chinese = try #require(localized.controls.first { $0.alias == "loadSkills" })
+        #expect(english.documentation?.doc != chinese.documentation?.doc)
+    }
 }

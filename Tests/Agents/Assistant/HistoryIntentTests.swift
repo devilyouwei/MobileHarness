@@ -606,7 +606,7 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
     try await agent.start()
     let input = UUID().uuidString
     _ = try await agent.controlTask(
-        "task.start", arguments: ["description": "拍照并等待保存", "skills": "[\"photography\"]"],
+        .startTask, arguments: ["description": "拍照并等待保存", "skills": "[\"photography\"]"],
         source: "assistant", sessionID: session, inputID: input, decisionID: nil)
     let read = try await store.readCurrent()
     _ = try await store.begin(id: input, user: "帮我拍照", request: [], expecting: read.token, model: "fixture")
@@ -629,7 +629,7 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
         ConversationHistoryPresentation.turns(currentRecords).filter { $0.historyTaskID == historyTaskID }
             .count == 1)
     _ = try await agent.controlTask(
-        "task.end", arguments: ["summary": "用户开始新对话"], source: "assistant", sessionID: session,
+        .finishTask, arguments: ["summary": "用户开始新对话"], source: "assistant", sessionID: session,
         inputID: UUID().uuidString, decisionID: nil)
     let archived = try #require(try await store.startNew())
     #expect(archived.turns.first?.id == input)

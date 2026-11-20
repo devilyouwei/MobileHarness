@@ -4,6 +4,8 @@
     "section": "# EFFECTIVE ACTION CATALOG\n{{entries}}",
     "channel": "Channel {{name}}",
     "action": "Action {{alias}}:",
+    "controls": "Agent controls (run by this Agent, not Actions; self: own state, peer: another Agent; no Channel; never inside <wait>)",
+    "control": "Control {{alias}} ({{destination}}):",
     "parameter": "  {{name}}: {{type}}, {{presence}}. {{description}} {{constraints}}"
   }
 }

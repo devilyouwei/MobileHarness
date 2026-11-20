@@ -88,7 +88,6 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
     public let settings: any ProviderSettingsStaging
     public let discovery: any ProviderDiscoveryStaging
     public let providerPresentation: any ProviderPresentationRegistering
-    public let tasks: any TaskControlBinding
     public let resources: [ResourceDefinition]
     public let connectionFacts: @MainActor @Sendable () throws -> PlatformKit.StateSignalListener<NexArmConnectionFacts>
     public let trackingAvailable: @Sendable () async -> Bool
@@ -111,7 +110,7 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
         decisionStatus: @escaping @MainActor @Sendable (String) -> Void = { _ in },
         inputQueueStatus: @escaping @MainActor @Sendable (Int, Int) -> Void = { _, _ in },
         settings: any ProviderSettingsStaging, discovery: any ProviderDiscoveryStaging,
-        providerPresentation: any ProviderPresentationRegistering, tasks: any TaskControlBinding,
+        providerPresentation: any ProviderPresentationRegistering,
         resources: [ResourceDefinition],
         connectionFacts:
             @escaping @MainActor @Sendable () throws -> PlatformKit.StateSignalListener<NexArmConnectionFacts>,
@@ -136,7 +135,6 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
         self.settings = settings
         self.discovery = discovery
         self.providerPresentation = providerPresentation
-        self.tasks = tasks
         self.resources = resources
         self.connectionFacts = connectionFacts
         self.trackingAvailable = trackingAvailable

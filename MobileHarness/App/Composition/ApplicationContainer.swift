@@ -28,22 +28,6 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
         self.uiConfiguration = uiConfiguration
         self.recognitionLocale = recognitionLocale
     }
-    /// One-time application preference migration; model artifacts are never read or moved here.
-    public func migrateResourcePreferences() throws {
-        let root = root.standardizedFileURL.resolvingSymlinksInPath()
-        let previous = root.appendingPathComponent("Models/download-source.json")
-        let destination = root.appendingPathComponent("Settings/download-source.json")
-        let files = FileManager.default
-        guard files.fileExists(atPath: previous.path) else { return }
-        guard !files.fileExists(atPath: destination.path) else { return }
-        guard previous.resolvingSymlinksInPath() == previous.standardizedFileURL,
-            destination.resolvingSymlinksInPath() == destination.standardizedFileURL
-        else {
-            throw CocoaError(.fileReadInvalidFileName)
-        }
-        try files.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try files.moveItem(at: previous, to: destination)
-    }
     /// Structural projection only. Each independent SDK retains its own Failure definition.
     public nonisolated static func failureDetails(_ error: any Error) -> ContainerFailureDetails? {
         switch error {

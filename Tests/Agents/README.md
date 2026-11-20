@@ -41,4 +41,4 @@ Core：配置、Task/Skill、状态、通信、失败与轮次；Assistant：对
 - [Support](Support/README.md)
 - [Writer](Writer/README.md)
 
-消费者夹具自行绑定静态端点；Assistant 从启动起监听 Writer，跟踪任务与 session。其他需要动态订阅的任务发起者持有自己的句柄。发布只等待准入，消费断言通过独立状态或测试专用 flush 等待，不能要求生产者自动绑定或重发。
+消费者夹具自行绑定静态端点；Assistant 从启动起监听 Writer，在内存中跟踪任务与 session。其他需要动态订阅的任务发起者持有自己的句柄。发布只等待准入，消费断言通过独立状态或测试专用 flush 等待，不能要求生产者自动绑定或重发。

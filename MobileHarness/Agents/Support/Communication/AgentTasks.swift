@@ -109,7 +109,6 @@ public struct AgentTaskContent: Codable, Sendable, Equatable {
 /// A peer report refers to either an incoming message or an admitted task.
 public struct AgentTaskResponse: Codable, Sendable, Equatable {
     static let contract = AgentTaskSignal.responseContract
-    static let persistedContracts = [contract, "agent.task.response", "writer.completion"]
 
     struct Rejection: Codable, Sendable, Equatable {
         let eventID: String
@@ -305,22 +304,4 @@ enum AgentTaskMessaging {
             $0.protocolID == AgentTaskRequest.contract && $0.acceptsTextSubmission
         } ?? false
     }
-}
-
-/// Model registration metadata for the task communication protocol.
-enum AgentTaskCommunication {
-    /// Runtime-owned communication declaration; model exposure is selected only by Skills.
-    static let sendDeclaration = ActionDeclaration(
-        path: .init(domain: "Agent", module: "Communication", function: "send"),
-        doc: "Send directed task communication to a declared target. Admission is not task completion.",
-        parameters: [
-            .init("target", description: "Declared target Agent ID"),
-            .init("kind", description: "Declared task message kind"),
-            .init("content", description: "Public task content"),
-            .init(
-                "taskID", required: false, description: "Existing task identity",
-                constraints: "Omit for request. Required for input, cancel, progress, and result."),
-            .init("artifactID", required: false, description: "Authorized artifact reference"),
-        ])
-
 }

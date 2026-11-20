@@ -397,8 +397,8 @@ public actor OutputGateway {
             sequences[source, default: 0] += 1
             let payload = InputPayload.observation(observation)
             var eventID = observation.id
-            if eventID == nil, let legacy = observation.content(as: AgentTaskResponse.self)?.signal {
-                eventID = try AgentTaskContent.decode(legacy).writerEvent?.eventID
+            if eventID == nil, let signal = observation.content(as: AgentTaskResponse.self)?.signal {
+                eventID = try AgentTaskContent.decode(signal).writerEvent?.eventID
                 guard eventID != nil else { throw CommunicationError.invalidPayload }
             }
             let communicationID = task?.kind == .request ? task?.scope.id : eventID ?? messageID

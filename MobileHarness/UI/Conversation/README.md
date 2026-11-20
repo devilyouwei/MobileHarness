@@ -19,8 +19,8 @@ UIHomeContainer 唯一创建 ConversationState、HomeNoticeState、HomeEffectsWo
 | UIHomeContainer.swift | 子容器装配、共享根接纳及失活／停止 |
 | ConversationState.swift | 会话值、字幕几何、呈现协议与表情事务 |
 | ConversationView.swift | 首页和启动界面，隔离频谱、表情与字幕观察 |
-| HomeNoticeState.swift | 首页提示、错误 Toast 及到期任务 |
-| HomeEffectsWorkflow.swift | Notice／装饰光／回复清理及其到期任务 |
+| HomeNoticeState.swift | 首页错误提示、错误 Toast 及到期任务 |
+| HomeEffectsWorkflow.swift | 回复透明度恢复与回复等待清理 |
 
 首页日志由 Root 挂载 [RuntimeLog](../Components/RuntimeLog/README.md)，效果／表情协议与实现同文件；导航由 UI 根提供。首页消费真实状态，不包含另行构造的模拟记录或视觉演示页面。
 
@@ -36,11 +36,11 @@ ConversationCaptionLayout只计算字幕，任务目标由根灵动岛展开区�
 
 表情基态只提交状态；有限表演拥有独立身份和等待者，替换、失活、离窗或取消不能伪造成功。默认关闭眼睛跟随会话关闭；显式表情动作仍保留资格与真实完成校验。
 
-## 提示与装饰
+## 提示
 
-Toast 为最多三行的黄色图标／文字，不拦截触摸，无回复时占用状态区。事实异常优先于装饰 Notice；装饰光不改变聆听同意或设备状态。
+Toast 为最多三行的黄色图标／文字，不拦截触摸，无回复时占用状态区。首页提示只投影真实异常，不改变聆听同意或设备状态。
 
-HomeEffectsWorkflow 拥有独立、可替换且按身份隔离的 Notice 和光效到期任务，stopAndWait 等待这些任务退出。回复字幕保留至新回复开始、结束聆听或会话清理。ConversationState.clearReply 由回复开始调用，presentTranscript 由识别轮次更新。Toast 到期由根拥有。
+HomeEffectsWorkflow 不拥有到期任务；stop 恢复回复透明度，stopAndWait 同步停止并解除会话绑定。回复字幕保留至新回复开始、结束聆听或会话清理。ConversationState.clearReply 由回复开始调用，presentTranscript 由识别轮次更新。Toast 到期由根拥有。
 
 ## 生命周期与约束
 
@@ -100,7 +100,7 @@ NativeCompanionSurface、EyeGeometry、ListeningMotion、MetalHaloRenderer与Lis
 
 原生路径／shadowPath／变换从 presentation 当前值开始插值，持续基态和有限表演身份分开。常规变化650ms，唤醒180ms，闭合460ms，视线320ms；Reduce Motion 简化重复动画。眨眼和呼吸为独立图层动画，唤醒后延迟启动，休眠／失活／离窗时停止。完成回调不能将替换或不可用当作成功。
 
-ListeningLightOrigin 接受有限归一化坐标并逐轴回退／截断；ListeningMotion 仅在新 generation 锁定光源和起点。眼睛、光环使用同一时刻提交，稳定期改变光源不会移动正在运行的波。装饰光有独立身份；移除装饰覆盖不会重播聆听唤醒。
+ListeningLightOrigin 接受有限归一化坐标并逐轴回退／截断；ListeningMotion 仅在新 generation 锁定光源和起点。眼睛、光环使用同一时刻提交，稳定期改变光源不会移动正在运行的波。光环只跟随聆听 generation，没有独立装饰光覆盖。
 
 ## Metal 光环
 
@@ -122,6 +122,6 @@ loading双眼采用同拓扑睁眼轮廓，独立父图层由 Core Animation 按
 
 用户字幕由 SpeechPerception 驱动，回复字幕由 Assistant 对话工作器驱动。Decision 结果由 Assistant 会话发布到通用灵动岛。
 
-HomeNotice 的 placement 区分字幕槽提示和独立 toast；transientToast 不受助手字幕或错误 notice 抑制，交给 Root 渲染。两者复用一个最新提示槽，替换取消旧计时任务，到期/根关闭清理，不形成队列。
+HomeNotice 的 placement 区分字幕槽错误提示和独立 toast；transientToast 不受助手字幕抑制，交给 Root 渲染。两者复用一个错误槽，替换取消旧计时任务，到期/根关闭清理，不形成队列。
 
-HomeNoticeState 的错误呈现可选择字幕或全局 Toast 位置，默认字幕；全局错误通过 transientToast 投影，优先于普通 Toast，保留原有单错误槽、去重、到期和根停止清理，不被助手字幕遮蔽。位置是通用 UI 值，角色错误分类由生产者拥有。
+HomeNoticeState 的错误呈现可选择字幕或全局 Toast 位置，默认字幕；全局错误通过 transientToast 投影，保留原有单错误槽、去重、到期和根停止清理，不被助手字幕遮蔽。位置是通用 UI 值，角色错误分类由生产者拥有。

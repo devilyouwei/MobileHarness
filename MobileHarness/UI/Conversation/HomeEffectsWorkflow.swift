@@ -1,111 +1,21 @@
 import Foundation
 
-/// Root-owned latest-state decorations. Expiry is independent of page lifetime.
+/// Root-owned reply presentation hooks, independent of page lifetime.
 @MainActor
 public final class HomeEffectsWorkflow: HomeEffectsPresenting {
-    public enum Error: Swift.Error { case busy, unavailable, invalidArguments }
     var presentationAdmission: UIPresentationAdmission?
-    private let notices: HomeNoticeState
     private weak var conversation: ConversationState?
-    private var noticeExpiry: Task<Void, Never>?
-    private var lightExpiry: Task<Void, Never>?
-    private var noticeOwner: PresentationOwner?
-    private var lightOwner: PresentationOwner?
-    public init(notices: HomeNoticeState) { self.notices = notices }
+    public init() {}
     public func bind(_ state: ConversationState) { conversation = state }
-    deinit {
-        noticeExpiry?.cancel()
-        lightExpiry?.cancel()
-    }
     public func replyDidBegin() { conversation?.assistantReplyOpacity = 1 }
     public func replyDidFinish() {
         guard presentationAdmission?.acceptsLive() ?? true else { return }
         conversation?.replyWaitingRequest = nil
     }
-    public func stop() {
-        replyDidBegin()
-        noticeExpiry?.cancel()
-        lightExpiry?.cancel()
-        notices.notice = nil
-        conversation?.decorativeLight = nil
-        noticeOwner = nil
-        lightOwner = nil
-    }
-    public func stopAndWait() async {
-        let tasks = [noticeExpiry, lightExpiry]
+    public func stop() { replyDidBegin() }
+    public func stopAndWait() {
         stop()
-        for task in tasks { await task?.value }
-        noticeExpiry = nil
-        lightExpiry = nil
         conversation = nil
-    }
-    public func showNotice(_ notice: HomeNotice, durationMS: Int = 8000, owner: PresentationOwner) async throws {
-        try Task.checkCancellation()
-        try presentationAdmission?.requireLive()
-        guard (500...30000).contains(durationMS), !notice.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-            notice.text.utf8.count <= 1024
-        else { throw Error.invalidArguments }
-        guard notice.placement == .toast || notices.errorToast == nil else { throw Error.busy }
-        noticeExpiry?.cancel()
-        notices.notice = notice
-        noticeOwner = owner
-        let previousNotice = noticeExpiry
-        previousNotice?.cancel()
-        noticeExpiry = Task { [weak self] in
-            await previousNotice?.value
-            do { try await Task.sleep(for: .milliseconds(durationMS)) } catch { return }
-            guard let self, self.notices.notice?.id == notice.id else { return }
-            self.notices.notice = nil
-            self.noticeOwner = nil
-        }
-    }
-    public func dismissNotice(owner: PresentationOwner) async throws {
-        try Task.checkCancellation()
-        guard noticeOwner == nil || noticeOwner == owner else { throw Error.busy }
-        noticeExpiry?.cancel()
-        noticeOwner = nil
-        notices.notice = nil
-    }
-    public func updateLight(_ light: DecorativeLight?, durationMS: Int = 3000, owner: PresentationOwner)
-        async throws
-    {
-        try Task.checkCancellation()
-        if light != nil { try presentationAdmission?.requireLive() }
-        guard let conversation else { throw Error.unavailable }
-        guard (500...30000).contains(durationMS) else { throw Error.invalidArguments }
-        guard let light else {
-            guard lightOwner == nil || lightOwner == owner else { throw Error.busy }
-            lightExpiry?.cancel()
-            lightOwner = nil
-            conversation.decorativeLight = nil
-            return
-        }
-        guard conversation.expressionRendererAvailable else { throw Error.unavailable }
-        guard [light.initialOpacity, light.intensity].allSatisfy({ $0.isFinite && (0...1).contains($0) }) else {
-            throw Error.invalidArguments
-        }
-        lightExpiry?.cancel()
-        conversation.decorativeLight = light
-        lightOwner = owner
-        let previousLight = lightExpiry
-        previousLight?.cancel()
-        lightExpiry = Task { [weak self] in
-            await previousLight?.value
-            do { try await Task.sleep(for: .milliseconds(durationMS)) } catch { return }
-            guard let self, self.conversation?.decorativeLight?.id == light.id else { return }
-            self.conversation?.decorativeLight = nil
-            self.lightOwner = nil
-        }
-    }
-}
-
-/// Opaque UI ownership; presentation never interprets business transport types.
-public struct PresentationOwner: Sendable, Equatable {
-    public let source: String
-    public let session: String
-    public init(source: String, session: String) {
-        self.source = source
-        self.session = session
     }
 }
 
@@ -114,7 +24,4 @@ public protocol HomeEffectsPresenting: AnyObject, Sendable {
     func replyDidBegin()
     func replyDidFinish()
     func stop()
-    func showNotice(_ notice: HomeNotice, durationMS: Int, owner: PresentationOwner) async throws
-    func dismissNotice(owner: PresentationOwner) async throws
-    func updateLight(_ light: DecorativeLight?, durationMS: Int, owner: PresentationOwner) async throws
 }

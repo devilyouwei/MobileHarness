@@ -20,14 +20,10 @@ public protocol WriterExecutionRepository: Sendable {
     func requestStatus(_ delegateID: String, agent: String) async throws -> String?
     func request(_ delegateID: String, agent: String) async throws -> WriterRequestRecord
     func completeRequest(
-        _ notification: WriterDelegationNotification, status: String, failure: String?, cancellationReason: String?
+        _ delegateID: String, eventID: String, result: Data, status: String, failure: String?,
+        cancellationReason: String?
     ) async throws
-    func delegationNotification(_ delegateID: String, agent: String) async throws -> WriterDelegationNotification?
-    func pendingDelegationNotifications(agent: String, retirement: Bool, after: Int64?, limit: Int) async throws
-        -> [WriterDelegationNotification]
-    func finishDelegationNotification(
-        _ delegateID: String, agent: String, retirement: Bool, completed: Bool, failure: String?, claimToken: String?)
-        async throws
+    func retireRequest(_ delegateID: String, failure: String?) async throws
     func prepareWorkspace(workspaceID: String, delegateID: String, agent: String, ready: Bool)
         async throws
     func updateRequestPhase(requestID: String, phase: String) async throws
@@ -37,11 +33,6 @@ public protocol WriterExecutionRepository: Sendable {
 }
 
 extension WriterExecutionRepository {
-    public func completeRequest(_ notification: WriterDelegationNotification, status: String, failure: String?)
-        async throws
-    {
-        try await completeRequest(notification, status: status, failure: failure, cancellationReason: nil)
-    }
     public func delegations(before: UInt64?, limit: Int) async throws -> [WriterRequestRecord] {
         throw RecordStorageError.invalidRecord
     }
@@ -72,31 +63,13 @@ extension WriterExecutionRepository {
         throw RecordStorageError.missingRecord
     }
     public func completeRequest(
-        _ notification: WriterDelegationNotification, status: String, failure: String?, cancellationReason: String?
+        _ delegateID: String, eventID: String, result: Data, status: String, failure: String?,
+        cancellationReason: String?
     ) async throws {
         throw RecordStorageError.invalidRecord
     }
-    public func delegationNotification(_ delegateID: String, agent: String) async throws
-        -> WriterDelegationNotification?
-    {
+    public func retireRequest(_ delegateID: String, failure: String?) async throws {
         throw RecordStorageError.invalidRecord
-    }
-    public func pendingDelegationNotifications(agent: String, retirement: Bool, after: Int64?, limit: Int) async throws
-        -> [WriterDelegationNotification]
-    {
-        throw RecordStorageError.invalidRecord
-    }
-    public func finishDelegationNotification(
-        _ delegateID: String, agent: String, retirement: Bool, completed: Bool, failure: String?,
-        claimToken: String?
-    ) async throws {
-        throw RecordStorageError.invalidRecord
-    }
-    public func finishDelegationNotification(
-        _ delegateID: String, agent: String, retirement: Bool, completed: Bool, failure: String?
-    ) async throws {
-        try await finishDelegationNotification(
-            delegateID, agent: agent, retirement: retirement, completed: completed, failure: failure, claimToken: nil)
     }
     public func prepareWorkspace(workspaceID: String, delegateID: String, agent: String) async throws {
         try await prepareWorkspace(workspaceID: workspaceID, delegateID: delegateID, agent: agent, ready: true)

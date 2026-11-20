@@ -927,37 +927,6 @@ extension LiveRuntimeTests {
     }
 }
 
-@Test(.actionCatalog) func communicationCatalogDefinesRequestKindsAndExcludesTelemetryPublish() throws {
-    let configuration = try taskFixtureConfiguration(parent: true)
-    for role in try AgentConfigurations.all() {
-        let catalog = try AgentCommunicationAdapter.catalog(role.capabilities, policy: role.communication)
-        #expect(catalog.tools.map(\.path) == role.capabilities.tools.map(\.path))
-        #expect(!catalog.tools.contains { $0.alias == "Agent.send" || $0.path.hasPrefix("Agent.Communication.") })
-        #expect(
-            catalog.actions.contains { $0.alias == "send" }
-                == (role.capabilities.actions.contains { $0.path.description == "Agent.Communication.send" }))
-    }
-    let catalog = try AgentCommunicationAdapter.catalog(
-        fixtureCatalogWithCommunication(configuration.capabilities), policy: configuration.communication)
-    let send = try #require(catalog.actions.first { $0.alias == "send" })
-    #expect(!catalog.actions.contains { $0.alias == "publish" })
-    #expect(send.documentation?.doc.contains("request") == true)
-    let invalid = try CapabilityRegistry(tools: [
-        ToolRegistration(alias: "Agent.send", path: "Agent.Communication.send")
-    ])
-    #expect(throws: CommunicationError.invalidPayload) {
-        try AgentCommunicationAdapter.catalog(invalid, policy: configuration.communication)
-    }
-    #expect(throws: CommunicationError.invalidPayload) {
-        try AgentCommunicationAdapter.action(
-            path: "Agent.Communication.send",
-            arguments: ["kind": "task", "target": "photographer", "content": "关闭摄像头"], sender: .assistant,
-            input: .init(
-                id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("close")),
-            policy: configuration.communication)
-    }
-}
-
 @Test(.actionCatalog) func userSignalsHaveNoImplicitDeadline() throws {
     let text = InputMetadata(payload: .text("hello"), rootID: UUID().uuidString)
     #expect(text.deadline == nil && !text.expired)
@@ -1091,4 +1060,32 @@ private struct ControlAgnosticChatState: AssistantChatState {
     #expect(await repository.residentSnapshot()?.revision == before.revision + 1)
     entered.continuation.finish()
     release.continuation.finish()
+}
+
+@Test(.actionCatalog) func everyDeclaredActionIsGrantedOrComposedByCode() throws {
+    var granted = Set<String>()
+    func add(_ registry: CapabilityRegistry) {
+        granted.formUnion(registry.actions.map(\.path.description))
+        granted.formUnion(registry.tools.map(\.path))
+        granted.formUnion(registry.internalActions.map(\.path.description))
+        granted.formUnion(registry.internalTools.map(\.path))
+    }
+    for registry in try AgentConfigurations.skillRegistries() { add(registry) }
+    add(try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities))
+    add(try SpeechPerceptionAgent.runtimeCapabilities(AgentConfigurations.load(named: "SpeechPerception").capabilities))
+    add(try VisionPerceptionAgent.runtimeCapabilities(AgentConfigurations.load(named: "VisionPerception").capabilities))
+    add(try PhotographerAgent.runtimeCapabilities(AgentConfigurations.load(named: "Photographer").capabilities))
+    add(try MemoryAgent.runtimeCapabilities(AgentConfigurations.load(named: "Memory").capabilities))
+    add(
+        try ApplicationControlAgent(
+            sessionID: UUID().uuidString,
+            context: try AgentContextRepository(
+                agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
+                state: ApplicationControlContextState())
+        ).descriptor.capabilities)
+    add(try WriterAgent.capabilities())
+    granted.formUnion(AgentContracts.localToolPaths)
+    let declared = Set(CapabilityModules.declarations.map(\.path.description))
+    // Feedback cues are composed by camera and listening code rather than granted to a model.
+    #expect(declared.subtracting(granted) == ["UI.Feedback.playCue", "UI.Feedback.vibrate"])
 }

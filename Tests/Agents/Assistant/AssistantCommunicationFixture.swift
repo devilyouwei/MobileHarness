@@ -172,17 +172,6 @@ final class QwenFacts: Sendable {
     func change(_ update: @Sendable (inout FixtureCameraFact) -> Void) throws { camera.update(update) }
 
 }
-struct QwenControls: TaskControlCapability {
-    let agent: AssistantAgent
-    func controlTask(_ operation: String, arguments: [String: String], invocation: any FunctionInput) async throws
-        -> ActionCompletion
-    {
-        try await agent.controlTask(
-            operation, arguments: arguments, source: invocation.context.source,
-            sessionID: invocation.context.sessionID, inputID: invocation.context.inputID,
-            decisionID: invocation.context.decisionID)
-    }
-}
 struct QwenTools: ToolModule { let definitions: [ActionBinding] }
 
 actor QwenEffects {
@@ -508,9 +497,7 @@ func qwenRun(_ scenario: QwenCase, provider: OpenAIChat, requestLimit: Int = 32)
     try await manager.register(agent)
     let inputGateway = InputGateway(manager: manager)
     let effects = QwenEffects(scenario: scenario, facts: facts)
-    let controls = TaskControlModule(capability: QwenControls(agent: agent))
-    let assembly = try BehaviorAssembly(capabilityModules: [controls])
-    var actionBindings = try controls.definitions.map { try assembly.actions.definition(for: $0.path) }
+    var actionBindings: [ActionBinding] = []
     var toolBindings: [ActionBinding] = []
     var aliases: [String: String] = [:]
     var installed = Set(actionBindings.map { $0.path.description })
@@ -599,10 +586,8 @@ func qwenRun(_ scenario: QwenCase, provider: OpenAIChat, requestLimit: Int = 32)
     pump.cancel()
     await pump.value
     let archive = try await history.snapshot()
-    let recordedCalls = await effects.calls
     for request in archive.current.turns.flatMap({ $0.modelRequests ?? [] }) {
-        for alias in ["task.start", "loadSkills", "releaseSkills"]
-        where recordedCalls.contains(where: { $0.round == request.id && $0.alias == alias }) {
+        for alias in ["task.start", "loadSkills", "releaseSkills"] where request.response.contains("<\(alias)") {
             let text = request.response.trimmingCharacters(in: .whitespacesAndNewlines)
             if text.range(of: "^<\(alias)\\b[^<>]*/>$", options: .regularExpression) == nil {
                 await effects.fail("controlMustBeOnlyOutput:\(alias)")

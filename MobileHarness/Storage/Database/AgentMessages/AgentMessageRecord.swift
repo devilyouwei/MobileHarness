@@ -27,20 +27,3 @@ public struct AgentCommunicationRecord: Sendable {
         self.dedupeKey = dedupeKey
     }
 }
-
-public struct AgentTaskEventRecord: Sendable {
-    public let position: Int64
-    public let message: AgentCommunicationRecord
-    public init(position: Int64, message: AgentCommunicationRecord) {
-        self.position = position
-        self.message = message
-    }
-}
-public struct AgentTaskEventPage: Sendable {
-    public let events: [AgentTaskEventRecord]
-    public let cursor: Int64
-    public init(events: [AgentTaskEventRecord], cursor: Int64) {
-        self.events = events
-        self.cursor = cursor
-    }
-}

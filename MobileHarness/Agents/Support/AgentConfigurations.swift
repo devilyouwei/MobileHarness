@@ -65,8 +65,7 @@ public enum AgentConfigurations {
                     .isSubset(
                         of: Set([
                             "version", "id", "revision", "description", "owner", "dependencies", "useActions",
-                            "useStates",
-                            "useInstructions",
+                            "useStates", "useInstructions",
                         ]))
             else {
                 throw AgentConfigurationError.invalidFormat
@@ -318,14 +317,16 @@ public enum AgentConfigurations {
     }
     public static func registry(_ bindings: [Binding], owner: AgentID? = nil) throws -> CapabilityRegistry {
         let d = try declaration(bindings, owner: owner, localize: AgentPrompts.language == "zh-Hans")
-        let root: [String: Any] = [
+        var root: [String: Any] = [
             "version": 9, "id": "catalog", "category": "perception", "actions": d.actions, "tools": d.tools,
             "signals": ["requests": [], "feedback": [], "publications": [], "subscriptions": []],
         ]
         let configuration = try AgentConfiguration(data: JSONSerialization.data(withJSONObject: root))
         return configuration.capabilities
     }
-    private static func declaration(_ bindings: [Binding], owner: AgentID? = nil, localize: Bool = false) throws -> (
+    private static func declaration(
+        _ bindings: [Binding], owner: AgentID? = nil, localize: Bool = false
+    ) throws -> (
         actions: [String: [[String: Any]]], tools: [[String: Any]]
     ) {
         guard bindings.count <= 128, Set(bindings.map(\.path)).count == bindings.count else {
@@ -336,12 +337,8 @@ public enum AgentConfigurations {
         var tools: [[String: Any]] = []
         let copy = localize ? try functionCopy() : nil
         for binding in bindings {
-            let selected: ActionDeclaration?
-            if binding.path == "Agent.Communication.send" {
-                selected = AgentTaskCommunication.sendDeclaration
-            } else {
-                selected = try functions.declaration(path: binding.path, callType: binding.callType, owner: owner)
-            }
+            let selected = try functions.declaration(
+                path: binding.path, callType: binding.callType, owner: owner)
             guard let canonical = selected, ["action", "tool"].contains(binding.callType)
             else {
                 throw AgentConfigurationError.invalidField(binding.path)
@@ -352,9 +349,6 @@ public enum AgentConfigurations {
                 guard let channel = binding.channel else { throw AgentConfigurationError.invalidField("channel") }
                 actions[channel, default: []].append(definition)
             } else {
-                guard binding.path != "Agent.Communication.send" else {
-                    throw AgentConfigurationError.invalidField("send must be Action")
-                }
                 tools.append([
                     "path": definition["path"] ?? [:],
                     "definition": [
@@ -370,7 +364,7 @@ public enum AgentConfigurations {
         return (actions, tools)
     }
 
-    private static func functionCopy() throws -> AgentFunctionCopy? {
+    static func functionCopy() throws -> AgentFunctionCopy? {
         if let value = cache.lock.withLock({ cache.functionCopy }) { return value }
         do {
             let copy = try JSONDecoder().decode(
@@ -380,7 +374,7 @@ public enum AgentConfigurations {
         } catch let error as CocoaError where error.code == .fileReadNoSuchFile { return nil }
     }
 
-    private static func localized(_ declaration: ActionDeclaration, copy: AgentFunctionCopy) -> ActionDeclaration {
+    static func localized(_ declaration: ActionDeclaration, copy: AgentFunctionCopy) -> ActionDeclaration {
         guard let text = copy.entries[declaration.path.description] else { return declaration }
         let parameters = declaration.parameters.map { parameter in
             let translation = text.parameters[parameter.name]
@@ -393,7 +387,7 @@ public enum AgentConfigurations {
     }
 }
 
-private struct AgentFunctionCopy: Decodable {
+struct AgentFunctionCopy: Decodable {
     struct Entry: Decodable {
         struct Parameter: Decodable {
             let description: String

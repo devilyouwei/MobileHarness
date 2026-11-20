@@ -66,11 +66,11 @@ flowchart LR
 
 ## 投递、任务与完成
 
-AgentMessaging.send 直接返回 AgentRequestReply（可选 observationFailure 字段保留旧接口读取兼容，新 Reply 不填写也不建立观察）；接纳与 Task 终态分离，不在源 Agent inbox 合成通信回执。publish 只等待 Gateway 接纳，有界独立分支负责尽力实时递送，失败写入被动证据；无消费者、迟订阅或拒收均不提供接收确认或 broker 补发。发布成功不包含订阅数、ready 或消费确认；publicationAccepted 只表示本地准入。subscribe 返回由调用者持有并显式取消的句柄；来源、scope、session 共同过滤。消费者独立确认持久事件，不能推进或阻止源端发布 outbox。生产者身份和消费者身份分别认证。
+AgentMessaging.send 直接返回 AgentRequestReply（可选 observationFailure 字段保留旧接口读取兼容，新 Reply 不填写也不建立观察）；接纳与 Task 终态分离，不在源 Agent inbox 合成通信回执。publish 只等待 Gateway 接纳，有界独立分支负责尽力实时递送，失败写入被动证据；无消费者、迟订阅或拒收均不提供接收确认或 broker 补发。发布成功不包含订阅数、ready 或消费确认；publicationAccepted 只表示本地准入。subscribe 返回由调用者持有并显式取消的句柄；来源、scope、session 共同过滤。发布只发送一次，错过的消息即错过，不补发、不重试、无回退。生产者身份和消费者身份分别认证。
 
 Task request/input/progress/result/cancel 保存中立作用域与业务 Data，业务最多 65536 字节，编码信封最多 131072；只有 result 表达终态。Registry 最多 256 条记录、16 个非终态后台任务，每任务 128 个已接纳 Signal ID；校验 requester/executor/session/incarnation、重复和终态后输入。满载只淘汰终态，已淘汰身份拒绝迟到报告，迟到接纳不得覆盖真实终态。
 
 Task execution 前台／后台是中立值，反序列化缺少 execution 字段时按 foreground 读入；Core 不加载 Skill。DeliveryHistory 历史最多 128，最旧淘汰计数。SignalTraceRecord 保存因果、摘要及最多 16 个目标分支；Task 消息可附带业务 Data 不超过 64 KiB 的原任务信封，其他消息不保留原始内容。该快照是被动证据，不向发布者确认。AgentMessaging defines cognitive identity-bound messaging ports for Agents adapters and isolated hosts; Gateway SignalTransport exposes its separate generic endpoint API. Production roles use bound AgentMessaging for direct replies and events; model communication calls are intercepted before function execution.
 后台 agent.task.v1 请求 可省略业务类型标记。接收角色验证来源、任务授权及载荷。其他任务消息使用自身的类型标记解释内容。
 
-Every role retains the unified observation entry, including request-only callers. Consumers select static subscriptions for role lifetime or own dynamic handles for narrower lifetimes. Assistant statically listens to Writer and keeps task/session tracking separate; task completion never unsubscribes that channel. Trusted termination facts retain their authenticated host binding. Durable task-state reconciliation belongs to the consuming business owner and is not broker replay.
+Every role retains the unified observation entry, including request-only callers. Consumers select static subscriptions for role lifetime or own dynamic handles for narrower lifetimes. Assistant statically listens to Writer and keeps task/session tracking separate; task completion never unsubscribes that channel. Trusted termination facts retain their authenticated host binding. Task tracking is in-memory and owned by the consuming business owner; there is no broker replay or stored-record reconciliation.

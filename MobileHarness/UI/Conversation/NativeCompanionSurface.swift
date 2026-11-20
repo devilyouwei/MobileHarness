@@ -49,7 +49,6 @@ import Foundation
         var active: Bool
         var generation: String?
         var lightOrigin: ListeningLightOrigin?
-        var decorativeLight: DecorativeLight?
         var held = false
         var completion: (@MainActor (String, Bool) -> Void)?
         var availability: (@MainActor (Bool) -> Void)?
@@ -198,33 +197,22 @@ import Foundation
             let visible = window != nil && foreground
             latest?.availability?(visible)
             let newGeneration = input.active && (previous?.active != true || previous?.generation != input.generation)
-            let lightActive = input.active || input.decorativeLight != nil
-            let lightGeneration = input.decorativeLight?.id ?? input.generation
-            let wasLightActive = (previous?.active ?? false) || previous?.decorativeLight != nil
-            let restoringListening =
-                input.active && input.decorativeLight == nil && previous?.decorativeLight != nil
-                && input.generation == previous?.generation
-            let newLight =
-                lightActive && !restoringListening
-                && (!wasLightActive
-                    || (previous?.decorativeLight?.id ?? previous?.generation) != lightGeneration)
             let source =
-                input.decorativeLight?.origin ?? input.lightOrigin
+                input.lightOrigin
                 ?? ListeningLightOrigin(
                     x: input.eyeCenter.x / bounds.width, y: input.eyeCenter.y / bounds.height)
             let origin = ListeningLightOrigin(
                 x: (source.x * bounds.width - haloLayer.frame.minX) / max(1, haloLayer.bounds.width),
                 y: (source.y * bounds.height - haloLayer.frame.minY) / max(1, haloLayer.bounds.height))
             motion.update(
-                active: lightActive, generation: lightGeneration, reduceMotion: input.reduceMotion,
-                origin: origin, initialOpacity: input.decorativeLight?.initialOpacity ?? 0.85,
-                intensity: input.decorativeLight?.intensity ?? 1, replayEntry: !restoringListening, at: now)
+                active: input.active, generation: input.generation, reduceMotion: input.reduceMotion,
+                origin: origin, at: now)
             renderer?.update(
                 motion: motion, size: haloLayer.bounds.size, visible: visible,
                 maximumFPS: window?.screen.maximumFramesPerSecond ?? 60)
             CATransaction.begin()
             CATransaction.setDisableActions(true)
-            if haloEnabled, newLight, !input.reduceMotion {
+            if haloEnabled, newGeneration, !input.reduceMotion {
                 let flashOrder = CAKeyframeAnimation(keyPath: "zPosition")
                 flashOrder.values = [1, 1, -1]
                 flashOrder.keyTimes = [0, 0.999, 1]

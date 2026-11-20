@@ -173,17 +173,6 @@ private actor SpecialistRobotModel: ChatCapability {
         return pair.session
     }
 }
-private struct SpecialistTaskControls: TaskControlCapability {
-    let agent: AssistantAgent
-    func controlTask(_ operation: String, arguments: [String: String], invocation: any FunctionInput) async throws
-        -> ActionCompletion
-    {
-        try await agent.controlTask(
-            operation, arguments: arguments, source: invocation.context.source,
-            sessionID: invocation.context.sessionID, inputID: invocation.context.inputID,
-            decisionID: invocation.context.decisionID)
-    }
-}
 
 // Deadline-sensitive integration runs in the isolated serial phase.
 extension LiveRuntimeTests {
@@ -216,11 +205,8 @@ extension LiveRuntimeTests {
                 await effects.capture(invocation.context.source)
                 return .completed
             })
-        let controls = TaskControlModule(capability: SpecialistTaskControls(agent: assistant))
-        let assembly = try BehaviorAssembly(capabilityModules: [controls])
-        let taskBindings = try controls.definitions.map { try assembly.actions.definition(for: $0.path) }
         let scheduler = ChannelScheduler(
-            registry: try ActionRegistry(definitions: [binding] + taskBindings), resources: resources
+            registry: try ActionRegistry(definitions: [binding]), resources: resources
         ) {
             await input.deliverActionResult($0)
         }

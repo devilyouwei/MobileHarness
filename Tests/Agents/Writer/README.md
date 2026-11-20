@@ -13,4 +13,4 @@ Agent 生命周期、角色和评测中本目录能力的测试。测试通过�
 
 [WriterCommunicationFixture.swift](WriterCommunicationFixture.swift) 拥有单次 delegate smoke、原生渲染/schema工程回归所需的临时工作区与宿主；不提供批量模型评估入口。
 
-WriterTestRequester 是仅限工程测试的请求方所有者：装配时绑定常驻 Writer 频道，发请求前只登记任务/session，独立补读持久结果、去重/确认和清理跟踪。消费者拒收回归由该请求方恢复，不要求 Writer 根据消费结果重发；发布状态与消费状态分别断言。
+WriterTestRequester 是仅限工程测试的请求方：只按协议发送并返回投递回包，不写消息记录、不补读结果；Writer 作为接收方记录收到的请求。报告发后即丢，丢失的报告不重发。
