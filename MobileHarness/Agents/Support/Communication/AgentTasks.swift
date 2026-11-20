@@ -3,17 +3,17 @@ import Foundation
 import FunctionContracts
 import StorageCore
 
-/// Writer-owned failure facts; persistence and presentation adapters project this value explicitly.
-public struct WriterFailureDiagnostic: Codable, Sendable, Equatable {
+/// Structured failure facts reported by a peer task executor.
+public struct AgentTaskFailure: Codable, Sendable, Equatable {
     public let category: String
     public let code: String
     public let stage: String
     public let message: String
     public let details: [String: String]
-    public let causes: [WriterFailureDiagnostic]
+    public let causes: [AgentTaskFailure]
     public init(
         category: String, code: String, stage: String, message: String,
-        details: [String: String] = [:], causes: [WriterFailureDiagnostic] = []
+        details: [String: String] = [:], causes: [AgentTaskFailure] = []
     ) {
         self.category = category
         self.code = code
@@ -24,42 +24,35 @@ public struct WriterFailureDiagnostic: Codable, Sendable, Equatable {
     }
 }
 
-/// Writer business evidence carried by the authenticated task transport.
-public struct WriterDelegationEvent: Codable, Sendable, Equatable {
+/// Ordered peer task evidence carried by the authenticated task transport.
+public struct AgentTaskEvent: Codable, Sendable, Equatable {
     public enum Kind: String, Codable, Sendable {
         case started, draftUpdated, recovering, userInput, inputAccepted, completed, declined, failed, cancelled
 
         var isMilestone: Bool { self == .draftUpdated || self == .recovering }
     }
+    static let version = 1
     public let version: Int
     public let eventID: String
     public let sequence: UInt64
     public let kind: Kind
-    public let workspaceID: String?
     public let goal: String?
     public let windowID: String?
-    public let delegateID: String?
-    public let failure: WriterFailureDiagnostic?
+    public let failure: AgentTaskFailure?
     public init(
-        sequence: UInt64, kind: Kind, workspaceID: String? = nil, goal: String? = nil, windowID: String? = nil,
-        delegateID: String? = nil, failure: WriterFailureDiagnostic? = nil,
-        eventID: String = UUID().uuidString
+        sequence: UInt64, kind: Kind, goal: String? = nil, windowID: String? = nil,
+        failure: AgentTaskFailure? = nil, eventID: String = UUID().uuidString
     ) {
-        version = 3
+        version = Self.version
         self.eventID = eventID
         self.sequence = sequence
         self.kind = kind
         self.goal = goal
-        self.workspaceID = workspaceID
         self.windowID = windowID
-        self.delegateID = delegateID
         self.failure = failure
     }
     public func validate() throws {
-        guard version == 3, UUID(uuidString: eventID) != nil, sequence > 0,
-            workspaceID.map({ WorkspaceID(rawValue: $0) != nil }) ?? true,
-            delegateID.map({ !$0.isEmpty && $0.utf8.count <= 128 }) ?? true
-        else {
+        guard version == Self.version, UUID(uuidString: eventID) != nil, sequence > 0 else {
             throw CommunicationError.invalidPayload
         }
     }
@@ -72,18 +65,18 @@ public struct AgentTaskContent: Codable, Sendable, Equatable {
     public let stage: Stage
     public let interactionID: String?
     public let artifactID: String?
-    public let writerEvent: WriterDelegationEvent?
+    public let event: AgentTaskEvent?
     public init(
         text: String, stage: Stage = .running, interactionID: String? = nil, artifactID: String? = nil,
-        writerEvent: WriterDelegationEvent? = nil
+        event: AgentTaskEvent? = nil
     )
         throws
     {
         guard !text.isEmpty, text.utf8.count <= 4096,
             stage != .waitingUser || interactionID != nil
         else { throw CommunicationError.invalidPayload }
-        try writerEvent?.validate()
-        self.writerEvent = writerEvent
+        try event?.validate()
+        self.event = event
         self.text = text
         self.stage = stage
         self.interactionID = interactionID
@@ -95,14 +88,14 @@ public struct AgentTaskContent: Codable, Sendable, Equatable {
     {
         return try AgentTaskSignal(
             kind: kind, scope: scope, businessContract: Self.contract,
-            data: JSONEncoder().encode(self), status: status, id: writerEvent?.eventID)
+            data: JSONEncoder().encode(self), status: status, id: event?.eventID)
     }
     public static func decode(_ signal: AgentTaskSignal) throws -> Self {
         guard signal.businessContract == contract else { throw CommunicationError.unsupportedContract }
         let content = try JSONDecoder().decode(Self.self, from: signal.data)
         return try Self(
             text: content.text, stage: content.stage,
-            interactionID: content.interactionID, artifactID: content.artifactID, writerEvent: content.writerEvent)
+            interactionID: content.interactionID, artifactID: content.artifactID, event: content.event)
     }
 }
 
@@ -144,7 +137,7 @@ public struct AgentTaskResponse: Codable, Sendable, Equatable {
         try signal.validate()
         let content = try AgentTaskContent.decode(signal)
         guard signal.scope.requester != signal.scope.executor, signal.scope.execution == .background,
-            let event = content.writerEvent, event.delegateID == nil || event.delegateID == signal.scope.id
+            let event = content.event
         else { throw CommunicationError.invalidPayload }
         if signal.kind == .progress {
             guard [.started, .draftUpdated, .recovering, .userInput, .inputAccepted].contains(event.kind),
@@ -154,7 +147,7 @@ public struct AgentTaskResponse: Codable, Sendable, Equatable {
             else { throw CommunicationError.invalidPayload }
             return
         }
-        guard signal.kind == .result, content.stage == .completed, event.delegateID == signal.scope.id,
+        guard signal.kind == .result, content.stage == .completed,
             (event.kind == .completed && signal.status == .succeeded)
                 || ([.failed, .declined].contains(event.kind) && signal.status == .failed)
                 || (event.kind == .cancelled && signal.status == .cancelled)
@@ -170,8 +163,8 @@ public struct AgentTaskResponse: Codable, Sendable, Equatable {
     }
 }
 
-struct WriterContextFact: Codable, Sendable {
-    let kind: WriterDelegationEvent.Kind
+struct AgentTaskFact: Codable, Sendable {
+    let kind: AgentTaskEvent.Kind
     let text: String
     let receivedAt: Date
 }
@@ -186,12 +179,12 @@ public struct AgentTaskView: Codable, Sendable {
     public var skills: [String]?
     public var createdAt: Date?
     public var terminal: Bool
-    public var writerEvent: WriterDelegationEvent?
+    public var event: AgentTaskEvent?
     public var originDialog: String?
-    var writerFacts: [WriterContextFact]?
+    var facts: [AgentTaskFact]?
     public init(scope: AgentTaskScope, content: AgentTaskContent, terminal: Bool = false) {
         self.scope = scope
-        writerEvent = content.writerEvent
+        event = content.event
         stage = content.stage
         text = content.text
         interactionID = content.interactionID
@@ -199,11 +192,11 @@ public struct AgentTaskView: Codable, Sendable {
         self.terminal = terminal
     }
 
-    mutating func retainWriterFacts(from previous: Self?) {
-        guard let writerEvent else { return }
-        var facts = previous?.writerFacts ?? []
-        facts.append(.init(kind: writerEvent.kind, text: String(text.prefix(240)), receivedAt: Date()))
-        writerFacts = Array(facts.suffix(6))
+    mutating func retainFacts(from previous: Self?) {
+        guard let event else { return }
+        var retained = previous?.facts ?? []
+        retained.append(.init(kind: event.kind, text: String(text.prefix(240)), receivedAt: Date()))
+        facts = Array(retained.suffix(6))
     }
 }
 
@@ -292,9 +285,14 @@ enum AgentTaskSkillIDs {
     }
 }
 
-/// Implemented public task adapters, shared by discovery and execution admission.
+/// Implemented peer task adapters, shared by discovery and execution admission.
+/// A peer receives `AgentTaskRequest` messages and reports only through `AgentTaskResponse`.
 /// A resource description or a communication grant alone cannot create an adapter.
 enum AgentTaskMessaging {
+    private static let peers: Set<AgentID> = [.writer]
+
+    static func isPeer(_ executor: AgentID) -> Bool { peers.contains(executor) }
+
     static func permits(
         target: AgentID, requester: AgentID, communication: CommunicationDeclaration
     ) -> Bool {

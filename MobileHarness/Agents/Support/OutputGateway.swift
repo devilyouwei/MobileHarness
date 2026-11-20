@@ -398,7 +398,7 @@ public actor OutputGateway {
             let payload = InputPayload.observation(observation)
             var eventID = observation.id
             if eventID == nil, let signal = observation.content(as: AgentTaskResponse.self)?.signal {
-                eventID = try AgentTaskContent.decode(signal).writerEvent?.eventID
+                eventID = try AgentTaskContent.decode(signal).event?.eventID
                 guard eventID != nil else { throw CommunicationError.invalidPayload }
             }
             let communicationID = task?.kind == .request ? task?.scope.id : eventID ?? messageID

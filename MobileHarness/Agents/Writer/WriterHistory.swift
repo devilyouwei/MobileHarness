@@ -29,7 +29,7 @@ public actor WriterHistory {
         let archive = try await store.readCurrent()
         let controls = archive.current.turns.flatMap { $0.modelRequests ?? [] }.filter {
             $0.decisionMetadata?.delegateID == delegateID
-                && WriterRequestNaming.phase($0.decisionMetadata?.mode ?? "") == "Control request"
+                && $0.decisionMetadata?.mode == "Control request"
                 && (domain == nil || $0.producerMetadata?["controlDomain"] == domain)
         }
         guard let last = controls.last else { return [] }
@@ -224,7 +224,7 @@ public actor WriterHistory {
         try await store.recordModelTiming(
             startedAt: timing.startedAt, firstTokenAt: timing.firstTokenAt, latency: timing.firstTokenLatency, for: id)
     }
-    public func finish(_ id: String, error: (any Error)? = nil, diagnostic: WriterFailureDiagnostic? = nil)
+    public func finish(_ id: String, error: (any Error)? = nil, diagnostic: AgentTaskFailure? = nil)
         async throws
     {
         let state: WriterRecord.State =

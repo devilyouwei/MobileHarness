@@ -14,6 +14,21 @@ Assistant 不参与创作循环或通过聆听/对话关闭终止 Writer；应�
 
 控制工具失败以有界观察反馈供下一轮修正；同一规范化参数的失败调用在草稿未改变时只执行一次，再次生成只返回原错误及修复建议，不重复执行效果。未推进草稿的恢复阶段最多接纳三次失败修正，耗尽才结束。成功编辑/移动/删除/恢复草稿后清除失败屏障，读取/查询不清除。成功的作品查询清除依赖搜索结果的失败缓存；成功 render 只清除因 renderRequired 拒绝的 finish 缓存，重试仍经过发布校验，不重置恢复次数。可恢复请求进入 Writer 自有有限恢复；取消、提交不确定或清理失败立即终止。无效结束批次整体不执行并反馈修正；批次异常保留当前调用原始错误并为未执行兄弟调用补齐结果。完整配对后才添加截图或重复调用提醒。截图最多保留当前一张，不支持视觉的模型继续使用渲染文本和诊断。
 
+## 文件职责
+
+| 文件 | 职责 |
+| --- | --- |
+| [WriterAgent.swift](WriterAgent.swift) | AgentCore 角色：收件、准入、执行 worker、工具端口绑定与 agent.task.response 回报队列。状态全部 private，同一编译目标内的 Assistant 不可访问。 |
+| [WriterWorkflow.swift](WriterWorkflow.swift) | 控制/内容模型循环、收件意图判定（inboxIntent）及 WriterBudget 字节预算。 |
+| [WriterTools.swift](WriterTools.swift) | 宿主绑定的 WriterTools 端口、工具结果、控制域和本地工具声明，以及共享的 WriterToolGroup 工具分组。 |
+| [WriterContainer.swift](WriterContainer.swift) | 根拥有的注册、暂停、恢复、关闭与存储装配。 |
+| [WriterRecords.swift](WriterRecords.swift) | 设置页记录读模型：委托、工作区、请求详情与导出。 |
+| [WriterRequestNaming.swift](WriterRequestNaming.swift) | 请求行标题与状态推导。 |
+| [WriterHistory.swift](WriterHistory.swift) / [WriterRecovery.swift](WriterRecovery.swift) / [WriterDiagnostics.swift](WriterDiagnostics.swift) | 请求历史与恢复上下文、有界恢复、失败分类。 |
+| [WriterPreview.swift](WriterPreview.swift) / [WriterIslandPresentation.swift](WriterIslandPresentation.swift) / [WriterNotifications.swift](WriterNotifications.swift) | 预览刷新、自有灵动岛、终态持久投递。 |
+
+对外只暴露 Agent 通信协议（agent.task.request / agent.task.response）及根装配接口。作品导出端口 WriterArtifactsControlling 由宿主经 AgentContainer.writerArtifacts 直接提供给设置页，Writer 不持有 UI 导出能力。
+
 ## 创作执行流程
 
 本目录拥有 WriterAgent/WriterContainer 的业务工作流。Assistant 发起委托的通用认证与调度链路见[总体委托流程](../../README.md#assistant-agent-delegation)；下图只展开 Writer 接纳后的执行、文件、呈现和通知边界。
@@ -78,21 +93,21 @@ WriterHistory 在每次请求准入时截取最后一个 assistant 之后的 use
 
 模型输入截图字节只在 model_request_log 保存，历史页读取 HTTP 或 local 请求中的实际图片，清日志后不回退相册。独立媒体库不参与聊天图片关联。
 
-WriterContainer 通过 UI 自有 WriterRecordsControlling 提供分页委托、工作区消息、请求详情及完整记录分享。列表每次读取 21 条并返回前 20 条，存在第 21 条时游标指向已返回的第 20 条。工作区消息按消息位置从新到旧，委托按入口主键从新到旧。工作区的增量状态刷新按锚点之后的消息顺序读取，导出仍按原始消息顺序遍历。空页及恰好整页的末页均无下一游标，UI 不自行猜测。请求详情按稳定记录 ID 返回 WriterRequestDetails，聚合轮次标题、所选模型调用、已核实的工具来源及历史宿主收尾。App 组合记录接口与 Actions.Artifacts 的文件预览和导出能力。
+WriterRecords（由 WriterContainer 在存储配置后创建并随根关闭）实现 UI 自有 WriterRecordsControlling，提供分页委托、工作区消息、请求详情及完整记录分享。列表每次读取 21 条并返回前 20 条，存在第 21 条时游标指向已返回的第 20 条。工作区消息按消息位置从新到旧，委托按入口主键从新到旧。工作区的增量状态刷新按锚点之后的消息顺序读取，导出仍按原始消息顺序遍历。空页及恰好整页的末页均无下一游标，UI 不自行猜测。请求详情按稳定记录 ID 返回 WriterRequestDetails，聚合轮次标题、所选模型调用、已核实的工具来源及历史宿主收尾。App 组合记录接口与 Actions.Artifacts 的文件预览和导出能力。
 
 WriterWorkflow 为控制/内容的每次实际请求创建独立 ChatTiming，并将同一请求及采样器交给模型；成功、失败和取消收尾均把已有Provider采样写入WriterHistory。未知Provider计时保持未知，不由文本消费时刻补造。请求完成时间由Storage记录，工具执行不改变模型完成边界。WriterContainer 投影工作区开始时间、更新时间和累计轮数，标题与工作区身份跨委托保留；不再遍历委托累计时长或提供任务级最新状态。执行轮次仍保留自己的运行状态与失败证据。
 
 生成指标使用所选调用的日志证据，缺少参数或耗时可独立呈现。新委托的完成结果归属显式 finish 工具调用。历史宿主收尾按模型调用 ID 读取。
 
-WriterRequestNaming 从工具与控制域派生请求行标题，包括作品查询、进入、创建、呈现、文件编辑与保存。文件内容阶段按目标路径命名，多工具按顺序去重合并，过长/含源码标记的instruction不作标题。没有操作事实时使用中性描述，不请求模型生成标题。请求失败/取消/中断优先保留，其后才判断工具失败、取消和在途状态；模型结束不等同工具操作成功。完整证据始终在请求详情。
+WriterRequestNaming（[WriterRequestNaming.swift](WriterRequestNaming.swift)）只识别规范英文阶段名，从工具与控制域派生请求行标题，包括作品查询、进入、创建、呈现、文件编辑与保存。文件内容阶段按目标路径命名，多工具按顺序去重合并，过长/含源码标记的instruction不作标题。没有操作事实时使用中性描述，不请求模型生成标题。请求失败/取消/中断优先保留，其后才判断工具失败、取消和在途状态；模型结束不等同工具操作成功。完整证据始终在请求详情。
 
 ## 委托与主动事件
 
 Writer 经认证的 agent.task.events.v1 发送接纳、追问及两类精选里程碑。首批文件改动完成检查点和工具记录后发送 draftUpdated，首次模型/写入重试或渲染检查异常发送 recovering。两种里程碑各保留一次，跨暂停和补充续作去重。逐轮进度、临时预览和普通读写观察由 Writer 自身呈现。投递队列每个事件类别最多保留一项待送达事实，另有一个不可变在途事件；每项只发布一次。终态释放过期的待送达进度，单独发布一次。
 
-Writer 通过 task.send(agent_id=writer,text) 接收认证正文，收件队列最多八项，满时拒绝。收件 worker 串行处理，暂停时保留待处理输入。空闲的新目标由 Writer 申请内部授权并建立任务。活跃期间 Writer 用自己的模型区分当前目标的补充、停止和无关新目标。可信追问关联必须匹配当前任务和问题，迟到答复回报拒绝。明确停止请求直接进入取消清理。
+Writer 通过 task.send(agent_id=writer,text) 接收认证正文，收件队列最多八项，满时拒绝。收件 worker 串行处理，暂停时保留待处理输入。空闲的新目标由 Writer 申请内部授权并建立任务。活跃期间每条消息都由 Writer 自己的模型（inboxIntent）区分当前目标的补充、停止和无关新目标，不做关键词匹配。可信追问关联必须匹配当前任务和问题，迟到答复回报拒绝。判定为停止的请求进入取消清理。
 
-AgentTaskContent.writerEvent 携带版本 3、UUID eventID、递增 sequence 和可选工作区及窗口身份。运行阶段由 reportWorker 投递 started、draftUpdated、recovering、userInput 和 inputAccepted，通过 AgentMessaging.publish 按需发布 agent.task.events.v1，Agent.json 的 publications 声明该生产能力，启动校验声明与代码及订阅配对；调用方不初始化业务发布会话。只等待 Gateway 接纳；不查询订阅、接收方状态或消费结果，不能触发对方订阅。进度、终态和拒绝回报均只发布一次，不补发、不重试、无回退，失败只记入运行时快照 deliveryFailure；Writer 不把事件或拒绝写入 agent_messages。completed、declined、failed 和 cancelled 在终态保存后经 agent.task.events.v1 发布。
+AgentTaskContent.event 携带通用 AgentTaskEvent（版本 1）：UUID eventID、递增 sequence、kind、当前目标、可选窗口身份和失败诊断。工作区身份（workspace_N）经 AgentTaskContent.artifactID 传递，正文不再拼接工作区前缀。运行阶段由 reportWorker 投递 started、draftUpdated、recovering、userInput 和 inputAccepted，通过 AgentMessaging.publish 按需发布 agent.task.events.v1，Agent.json 的 publications 声明该生产能力，启动校验声明与代码及订阅配对；调用方不初始化业务发布会话。只等待 Gateway 接纳；不查询订阅、接收方状态或消费结果，不能触发对方订阅。进度、终态和拒绝回报均只发布一次，不补发、不重试、无回退，失败只记入运行时快照 deliveryFailure；Writer 不把事件或拒绝写入 agent_messages。completed、declined、failed 和 cancelled 在终态保存后经 agent.task.events.v1 发布。
 
 Database 根目录拥有连接、schema 装配与生命周期；Shared 只保存编码、ID 与分页机制。Assistant 和 Writer 分别拥有消息/任务接口、历史 DTO、窗口及 SQL 实现。日志和 Agent 通信通过独立共享端口注入，不经统一 Chat/Task 门面。详见 [Database](../../Storage/Database/README.md)。
 
@@ -122,7 +137,7 @@ Artifacts 使用 WorkspaceID(workspace_N)。显式 create 建立空目录并准�
 
 WriterDiagnostics.swift 分类模型网络、HTTP、响应协议、模型配置、工具、存储、工作流、取消和清理错误。每次控制/内容请求保留阶段、模型、输入ID、尝试次数和单调耗时；WriterDiagnosticCapture保存最新未恢复请求失败，成功请求清除过期原因，不拥有重试。工具失败附实际命令/路径并区分读取、编辑、渲染和发布。清理失败独立保留原始原因及清理原因，不覆盖主错误。
 
-通信使用 WriterFailureDiagnostic；Writer目录显式投影为 StorageChat.ModelFailureDiagnostic，存入请求/工具 evidence，另将分类摘要保存到任务 failure。失败经 Gateway control 输出 AgentFailureDiagnostic，同时通过 WriterDelegationEvent.failure 传给 Assistant。首页显示简短摘要，请求历史展示结构化分类/阶段/字段；无法从过去仅有 transport 字符串的记录反推已丢失的 URLError。
+通信使用通用 AgentTaskFailure；Writer目录显式投影为 StorageChat.ModelFailureDiagnostic，存入请求/工具 evidence，另将分类摘要保存到任务 failure。失败经 Gateway control 输出 AgentFailureDiagnostic，同时通过 AgentTaskEvent.failure 传给 Assistant。首页显示简短摘要，请求历史展示结构化分类/阶段/字段；无法从过去仅有 transport 字符串的记录反推已丢失的 URLError。
 
 ## 自有任务岛
 
@@ -162,7 +177,7 @@ Each workspace tool has its own parameter schema projected from the registered f
 
 每个实际模型attempt在SQLite建立身份和producerMetadata后，调用模型前只更新Writer自己的任务岛，包含inputID、跨run累计number、phase、attempt和path。本地进度对应已经结束的模型生成及其实际步骤：控制请求成功准备编辑后汇报准备结果，再进入独立内容模型；内容提交及父工具结果持久化后汇报文件修改；普通控制轮在工具结果后汇报。进入下一模型请求前先加入已安排的最新预览，未改源码不额外重载。请求ID去重，同一请求不会因多个工具重复汇报；最终请求用终态，取消后迟到步骤不会覆盖取消状态。首画面与失败恢复仍报告实际事实，追问独立投递。收尾前处理已接纳补充，finish 的结果保存在该轮的工具调用和结果中。历史目录保存每个工具的真实地址和参数。恢复只向模型提供当前工具集可识别的调用配对，旧工具调用以历史事实的形式提供。
 
-指令要求最小满足目标、尽早产生可见主体，不添加未请求动画/图纸信息，不反复读取刚生成文件；窗口不可见记录验证受限并收尾。Provider输出默认值及现有有限恢复不变。WriterContainer提供轻量WriterRequestItem分页，完整内容按消息ID按需读取；任务摘要以受控对话创建时间和中立timelineCount查询计算总轮次，不以已加载页数计数。
+指令要求最小满足目标、尽早产生可见主体，不添加未请求动画/图纸信息，不反复读取刚生成文件；窗口不可见记录验证受限并收尾。Provider输出默认值及现有有限恢复不变。WriterRecords提供轻量WriterRequestItem分页，完整内容按消息ID按需读取；任务摘要以受控对话创建时间和中立timelineCount查询计算总轮次，不以已加载页数计数。
 
 请求累计计数不等于已经完成的文件数。
 

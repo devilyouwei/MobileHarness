@@ -394,7 +394,7 @@ import Testing
     #expect(try await records.writerExecutions.workspace(fixture.id, agent: "writer").status == "deleted")
     #expect(try records.writerMessages.timelineCount(ownerID: fixture.workspaceID) == 2)
     let entry = try await records.writerExecutions.request(fixture.delegateID, agent: "writer")
-    #expect(try records.writerMessages.timelineCount(ownerID: "writer/preflight_\(entry.messageID)") == 0)
+    #expect(try records.writerMessages.timelineCount(ownerID: WriterPreflightOwner.id(entry.messageID)) == 0)
     await #expect(throws: RecordStorageError.conflict) {
         try await records.workspaces.claim(id, expecting: nil, lease: UUID())
     }

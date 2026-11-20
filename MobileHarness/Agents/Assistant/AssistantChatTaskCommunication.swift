@@ -128,7 +128,8 @@ extension AssistantChatWorker {
         } else {
             content = try AgentTaskContent.decode(signal)
         }
-        if signal.scope.executor == .writer, signal.scope.execution == .background, signal.kind == .result,
+        if AgentTaskMessaging.isPeer(signal.scope.executor), signal.scope.execution == .background,
+            signal.kind == .result,
             signal.businessContract == "runtime.taskTermination"
         {
             // The Writer persists and reports its own terminal outcome independently of the grant.
@@ -219,7 +220,7 @@ extension AssistantChatWorker {
     @discardableResult
     func receiveTaskReport(_ report: AgentTaskResponse, input: AgentInput) async throws -> Bool {
         guard lifecycle == .running || lifecycle == .paused, State.agentID == .assistant,
-            input.metadata.origin == .agent, input.metadata.source == AgentID.writer.rawValue,
+            input.metadata.origin == .agent, AgentTaskMessaging.isPeer(AgentID(rawValue: input.metadata.source)),
             input.metadata.incarnation != nil
         else { throw CommunicationError.unauthorized }
         try report.validate()
@@ -227,7 +228,7 @@ extension AssistantChatWorker {
             throw CommunicationError.invalidPayload
         }
         await recordReceived(report, reference: reference, input: input)
-        guard let tracked = trackedTasks[reference], tracked.producer == .writer,
+        guard let tracked = trackedTasks[reference], tracked.producer == AgentID(rawValue: input.metadata.source),
             tracked.sessionID == input.sessionID
         else { return false }
         if let rejection = report.rejection {
@@ -236,16 +237,17 @@ extension AssistantChatWorker {
             if rejection.messageID == reference { await stopTrackingTask(reference) }
             return true
         }
-        guard let signal = report.signal, signal.scope.requester == descriptor.id, signal.scope.executor == .writer,
+        guard let signal = report.signal, signal.scope.requester == descriptor.id,
+            signal.scope.executor.rawValue == input.metadata.source,
             signal.scope.sessionID == input.sessionID
         else { throw CommunicationError.unauthorized }
         let content = try AgentTaskContent.decode(signal)
-        guard let event = content.writerEvent else { throw CommunicationError.invalidPayload }
+        guard let event = content.event else { throw CommunicationError.invalidPayload }
         if signal.kind == .result {
-            try await receiveWriterCompletion(signal: signal, content: content, event: event, input: input)
+            try await receivePeerCompletion(signal: signal, content: content, event: event, input: input)
             await stopTrackingTask(reference)
         } else {
-            try await receiveWriterEvent(signal, content: content, event: event, input: input)
+            try await receivePeerEvent(signal, content: content, event: event, input: input)
         }
         return true
     }
@@ -407,10 +409,10 @@ extension AssistantChatWorker {
         }
         try await recordPeerTurn(id: rejection.eventID, text: rejection.text, originDialog: origin)
         if presentsReply {
-            enqueueWriterNotice(
+            enqueuePeerTaskNotice(
                 .init(
                     input: notice, scopeID: rejection.messageID, originDialog: origin, kind: nil, interactionID: nil,
-                    text: "Writer。 " + String(rejection.text.prefix(180))))
+                    text: try Self.peerNoticeText(rejection.text, from: AgentID(rawValue: input.metadata.source))))
         }
     }
 }

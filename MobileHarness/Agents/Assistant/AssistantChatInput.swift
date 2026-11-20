@@ -22,7 +22,8 @@ extension AssistantChatWorker {
             ordered = true
         } else if case .observation(let message) = input.payload,
             message.content(as: AgentTaskResponse.self) != nil
-                || message.content(as: AgentTaskSignal.self)?.scope.executor == .writer
+                || message.content(as: AgentTaskSignal.self).map({ AgentTaskMessaging.isPeer($0.scope.executor) })
+                    == true
         {
             ordered = true
         } else {
@@ -101,7 +102,7 @@ extension AssistantChatWorker {
             let signal = message.content(as: AgentTaskSignal.self)
         {
             guard
-                input.metadata.origin == .runtime || signal.scope.executor != .writer
+                input.metadata.origin == .runtime || !AgentTaskMessaging.isPeer(signal.scope.executor)
                     || (signal.kind != .progress && signal.kind != .result)
             else { throw CommunicationError.unauthorized }
             try await receiveTask(signal, input: input)
@@ -200,7 +201,7 @@ extension AssistantChatWorker {
                 let closesSession = control == .close
                 if closesSession {
                     if decisionTurn?.sessionID == input.sessionID { decisionTurn = nil }
-                    writerNotices.removeAll { $0.input.sessionID == input.sessionID }
+                    peerNotices.removeAll { $0.input.sessionID == input.sessionID }
                     if input.sessionID == speechSessionID { speechInterruptionID = nil }
                 }
                 guard !hostCancellationInProgress else { throw HarnessError.invalidTransition }
@@ -498,7 +499,7 @@ extension AssistantChatWorker {
         let views = try await contextRepository.snapshot().state.taskViews ?? [:]
         return views.values.filter {
             !$0.terminal && $0.scope.sessionID == sessionID && $0.stage == .waitingUser
-                && ($0.scope.id == foreground || $0.scope.executor == .writer)
+                && ($0.scope.id == foreground || AgentTaskMessaging.isPeer($0.scope.executor))
         }
     }
 
@@ -702,11 +703,11 @@ extension AssistantChatWorker {
                 return
             }
         }
-        if lifecycle == .running, !writerNotices.isEmpty {
-            let notice = writerNotices.removeFirst()
-            activeWriterNoticeID = notice.input.id
+        if lifecycle == .running, !peerNotices.isEmpty {
+            let notice = peerNotices.removeFirst()
+            activePeerTaskNoticeID = notice.input.id
             activeInput = notice.input
-            worker = Task { await playWriterNotice(notice) }
+            worker = Task { await playPeerTaskNotice(notice) }
         }
     }
     func beginReplyTurn(_ input: AgentInput) throws {

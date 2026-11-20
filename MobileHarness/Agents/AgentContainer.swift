@@ -337,6 +337,8 @@ import StorageFiles
             guard let runtimeValue else { throw AgentContainerError.unavailable }
             return runtimeValue
         }
+        /// Host export port for Writer records; Writer itself never holds UI export capability.
+        public var writerArtifacts: (any WriterArtifactsControlling)? { runtimeValue?.business.writerArtifacts }
         @ObservationIgnored private var preparation: Task<Void, Error>?
         private var foreground = true
         public func foregroundDecisionModelID() async throws -> String? {

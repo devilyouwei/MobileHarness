@@ -53,7 +53,7 @@ extension AssistantChatWorker {
         let controlInput = parked?.input ?? activeInput
         guard parked?.cancelled != true else { throw CommunicationError.scopeClosed }
         if fixed {
-            let idleForControl = (activeInput == nil && worker == nil) || activeWriterNoticeID != nil
+            let idleForControl = (activeInput == nil && worker == nil) || activePeerTaskNoticeID != nil
             guard idleForControl, queue.count == 0, admitting == 0 else {
                 throw AssistantHistoryError.busy
             }

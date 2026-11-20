@@ -88,13 +88,13 @@
                     ConversationHistoryView(state: state, controls: controls)
                 }
             ]
-            if let artifacts = features.writer.artifacts {
+            if let records = features.writer.records, let artifacts = features.writerArtifacts {
                 destinations.append(
                     AgentRecordDestination(
                         id: "writer", name: language().text("My Writer"),
                         summary: language().text("Delegated tasks, conversations, and project files")
                     ) {
-                        WriterRecordsView(controls: self.features.writer, artifacts: artifacts)
+                        WriterRecordsView(controls: records, artifacts: artifacts)
                     })
             }
             return destinations

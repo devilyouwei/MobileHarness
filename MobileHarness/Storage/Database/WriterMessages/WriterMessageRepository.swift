@@ -1,6 +1,12 @@
 import Foundation
 import StorageCore
 
+/// Timeline owner for model messages a request produced before it was bound to a workspace.
+public enum WriterPreflightOwner {
+    public static let prefix = "writer/preflight_"
+    public static func id(_ requestMessageID: UInt64) -> String { prefix + String(requestMessageID) }
+}
+
 public protocol WriterMessageRepository: Sendable {
     var storageScope: UUID { get }
     func current() async throws -> WriterHistoryMetadata

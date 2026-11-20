@@ -48,9 +48,9 @@ Native CameraFrame/PCM and typed UI/container observations reach their owning ro
 
 Assistant 通过 `task.send(agent_id,text)` 发送 `agent.task.v1`，载荷为 AgentTaskRequest。新目标、补充、答复和停止请求共用该正文契约。Writer 校验已持久化的消息后接收入队；决定开启新任务时，以原消息 ID 作为委托 ID 申请执行授权。Writer 统一发送 `agent.task.events.v1`，包含接纳、进度、追问、答复接纳、消息拒绝及任务终态。
 
-WriterDelegationEvent 携带可选 workspace_N 和独立 delegateID，接收端认证 scope 并校验事件顺序。当前委托的补充和追问答复沿用原 scope；任务终态后再次委托，即使复用同一个工作区，也使用新消息 ID 建立新 scope。历史请求保存稳定身份，实时传输/去重使用执行身份。
+AgentTaskEvent 只携带事件身份、顺序、kind、目标、窗口与失败事实；产物引用（如 workspace_N）由 AgentTaskContent.artifactID 携带，执行身份即 scope.id，接收端认证 scope 并校验事件顺序。当前委托的补充和追问答复沿用原 scope；任务终态后再次委托，即使复用同一个工作区，也使用新消息 ID 建立新 scope。历史请求保存稳定身份，实时传输/去重使用执行身份。
 
-WriterDelegationEvent.failure 是可选 WriterFailureDiagnostic：分类、错误码、阶段、摘要、诊断字段和关联原因均为业务事实。通信值不依赖 Storage；Writer 拥有到持久化 DTO 的转换。失败消息通过认证、去重后更新 Assistant 任务视图；Writer 灵动岛展示任务摘要。
+AgentTaskEvent.failure 是可选 AgentTaskFailure：分类、错误码、阶段、摘要、诊断字段和关联原因均为业务事实。通信值不依赖 Storage；执行方拥有到持久化 DTO 的转换。失败消息通过认证、去重后更新 Assistant 任务视图；Writer 灵动岛展示任务摘要。
 
 AgentTaskResponse 携带 Writer 的原消息拒绝或已接纳任务的事实。Writer 的进度回报需要活跃执行授权。终态保存后只发布一次，随后回收授权一次。Assistant 核对拒绝或终态的原消息、事件身份和正文。固定任务共用 `agent.task.events.v1`，以 AgentTaskSignal 的 progress/result 区分进度与终态。Agents 的输出适配器验证执行授权，在终态发布前协调 Gateway 完成在途工作；发布不补发，授权回收不以送达为前提。固定任务通过同一 `agent.task.v1` 的 submit/update/answer/status/cancel 操作接收类型化请求。
 
@@ -58,7 +58,7 @@ AgentTaskResponse 携带 Writer 的原消息拒绝或已接纳任务的事实。
 
 The sender creates a message UUID. The receiver uses it as the execution identity when admitting new work. Replies may carry a captured task and question address. Writer validates the address against its current assignment.
 
-WriterDelegationEvent version 3 carries one optional workspaceID, the current goal and window evidence alongside the delegation and event identity.
+AgentTaskEvent version 1 carries the event identity, sequence, kind, current goal, optional window and failure. Assistant treats every executor listed by `AgentTaskMessaging.isPeer` uniformly: notices, questions and facts are rendered from generic `task*` prompt templates with the peer agent ID, never with executor-specific branches.
 
 ## 公开委派适配
 

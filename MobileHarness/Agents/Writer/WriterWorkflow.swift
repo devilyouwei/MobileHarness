@@ -10,130 +10,13 @@ public enum WriterFailure: String, Error, Sendable {
 
 enum WriterInboxIntent: String { case followUp, stop, newWork }
 
-/// Host ports bind authenticated request identity. Writer may select its work, never its execution owner.
-public struct WriterTools: Sendable {
-    public let definitions: [ChatToolDefinition]
-    let library: [ChatToolDefinition]?
-    public let execute: @Sendable (ChatToolCall) async throws -> WriterToolOutcome
-    public let append: @Sendable (String, String) async throws -> Void
-    public let complete: @Sendable (String) async throws -> String
-    public let refresh: @Sendable () async -> Void
-    public let abort: @Sendable (String) async throws -> Void
-    public init(
-        definitions: [ChatToolDefinition],
-        execute: @escaping @Sendable (ChatToolCall) async throws -> WriterToolOutcome,
-        append: @escaping @Sendable (String, String) async throws -> Void,
-        complete: @escaping @Sendable (String) async throws -> String,
-        abort: @escaping @Sendable (String) async throws -> Void,
-        refresh: @escaping @Sendable () async -> Void = {},
-        library: [ChatToolDefinition]? = nil
-    ) {
-        self.definitions = definitions
-        self.execute = execute
-        self.append = append
-        self.complete = complete
-        self.abort = abort
-        self.refresh = refresh
-        self.library = library
-    }
-}
-public struct WriterWorkspaceContext: Sendable, Encodable {
-    let workspaceID: String
-    let title: String
-    let entry: String
-    let entryExists: Bool
-    let entryEmpty: Bool
-    let presentationStatus: String
-
-    var domain: String { "workspace:" + workspaceID }
-}
-
-enum WriterMilestone: Sendable {
-    case draftUpdated, recovering, renderIssue
-}
-
-enum WriterControlDomain: String {
-    case library
-    case editing = "workspace"
-
-    func skillIDs() throws -> [String] {
-        let roots: [String]
-        switch self {
-        case .library: roots = try AgentConfigurations.baseSkills(named: "Writer")
-        case .editing: roots = ["writer-file-editing"]
-        }
-        return try AgentSkillLoader.expand(roots, owner: .writer)
-    }
-
-    func registry() throws -> CapabilityRegistry {
-        try AgentConfigurations.registry(AgentSkillLoader.bindings(skillIDs(), owner: .writer), owner: .writer)
-    }
-
-    func definitions(_ registry: CapabilityRegistry) throws -> [ChatToolDefinition] {
-        try registry.tools.map { tool in
-            guard let definition = tool.definition else { throw WriterFailure.invalidOutput }
-            return try ChatToolDefinition(declaration: JSONEncoder().encode(definition))
-        }
-    }
-
-    func toolDefinitions(_ tools: WriterTools) -> [ChatToolDefinition] {
-        switch self {
-        case .library: tools.library ?? []
-        case .editing: tools.definitions
-        }
-    }
-}
-enum WriterLocalTools {
-    static let declarations: [ActionDeclaration] = [
-        tool(
-            "ask", "Pause for essential user information.",
-            [.init("question", description: "Nonempty question for the user, up to 2048 UTF-8 bytes.")]),
-        tool(
-            "finish", "End the delegation in a separate tool round. Report actual results.",
-            [
-                .init("summary", description: "Brief factual completion summary."),
-                .init(
-                    "outcome", required: false,
-                    description:
-                        "Use artifact for publishing or library operations, explanation for a completed answer, declined for infeasible work, or cancelled when the user asks you to stop. Cancelled preserves the draft without publishing.",
-                    values: ["artifact", "explanation", "declined", "cancelled"]),
-            ]),
-        tool(
-            "enter", "Enter a saved workspace for editing or switch to another saved workspace. Call alone.",
-            [
-                .init(
-                    "workspaceID",
-                    description: "Exact workspace_N known from the user, current context, or workspace.search.")
-            ]),
-        tool(
-            "create", "Create a new workspace, initialize an empty entry file and enter it for editing. Call alone.",
-            [
-                .init("title", description: "Nonempty display title in the user’s language."),
-                .init(
-                    "entry",
-                    description:
-                        "Workspace-relative file path ending in .html, .md or .txt, such as flowchart.html or docs/flowchart.md. Pass the path only. Write source content with edit."
-                ),
-            ]),
-    ]
-
-    static func contains(_ path: String) -> Bool {
-        declarations.contains { $0.path.description == path }
-    }
-
-    private static func tool(_ name: String, _ doc: String, _ parameters: [ActionParameter]) -> ActionDeclaration {
-        .init(path: .init(domain: "Agent", module: "Writer", function: name), doc: doc, parameters: parameters)
-    }
-}
-
-public struct WriterNeedsInput: Error, Sendable { public let question: String }
-public enum WriterToolOutcome: Sendable {
-    case waiting(String)
-    case observation(String)
-    case entered(WriterWorkspaceContext, evidence: String)
-    case visual(String, ChatImage)
-    case write(ArtifactEditPreparation)
-    case finished(String)
+/// UTF-8 byte and message budgets for one Writer assignment.
+enum WriterBudget {
+    static let request = 12_000
+    static let goal = 13_000
+    static let revision = 4096
+    static let context = 48_000
+    static let contextMessages = 32
 }
 
 /// Identity and phase of an actual model request, used by Writer presentation.
@@ -198,20 +81,8 @@ public struct WriterWorkflow: Sendable {
     private let requestProgress: @Sendable (WriterRequestProgress) async -> Void
     private let roundCompleted: @Sendable (WriterRequestProgress?, String) async -> Void
     private let milestone: @Sendable (WriterMilestone) async -> Void
-    public init(
-        model: any ChatCapability, history: WriterHistory? = nil,
-        requestProgress: @escaping @Sendable (WriterRequestProgress) async -> Void = { _ in },
-        roundCompleted: @escaping @Sendable (WriterRequestProgress?, String) async -> Void = { _, _ in }
-    ) {
-        self.requestProgress = requestProgress
-        self.roundCompleted = roundCompleted
-        self.model = model
-        self.history = history
-        diagnostics = nil
-        milestone = { _ in }
-    }
     init(
-        model: any ChatCapability, history: WriterHistory?, diagnostics: WriterDiagnosticCapture,
+        model: any ChatCapability, history: WriterHistory? = nil, diagnostics: WriterDiagnosticCapture? = nil,
         requestProgress: @escaping @Sendable (WriterRequestProgress) async -> Void = { _ in },
         roundCompleted: @escaping @Sendable (WriterRequestProgress?, String) async -> Void = { _, _ in },
         milestone: @escaping @Sendable (WriterMilestone) async -> Void = { _ in }
@@ -230,7 +101,7 @@ public struct WriterWorkflow: Sendable {
         workspace initialWorkspace: WriterWorkspaceContext? = nil
     ) async throws -> String {
         guard await model.supportsToolCalls else { throw WriterFailure.unsupportedModel }
-        guard !goal.isEmpty, goal.utf8.count <= 13_000 else { throw WriterFailure.capacity }
+        guard !goal.isEmpty, goal.utf8.count <= WriterBudget.goal else { throw WriterFailure.capacity }
         var workspace = initialWorkspace
         var domain = workspace?.domain ?? (tools.library == nil ? nil : "library")
         var controlDomain: WriterControlDomain = workspace == nil && tools.library != nil ? .library : .editing
@@ -245,20 +116,20 @@ public struct WriterWorkflow: Sendable {
         var recoveryFailures = 0
         var previousSignature: String?
         var repetitions = 0
+        func absorb(_ revisions: [String]) throws {
+            for text in revisions {
+                guard text.utf8.count <= WriterBudget.revision else { throw WriterFailure.capacity }
+                let requirement = try AgentPrompts.text("Writer/Prompts", "additionalRequirement", ["text": text])
+                currentGoal += "\n" + requirement
+                guard currentGoal.utf8.count <= WriterBudget.context else { throw WriterFailure.capacity }
+                messages[1] = try Self.controlInput(currentGoal, workspace: workspace)
+                messages.append(.init(role: .user, content: requirement))
+            }
+        }
         controlLoop: while true {
             try Task.checkCancellation()
-            let updates = try await revisions()
-            for text in updates {
-                guard text.utf8.count <= 4096 else { throw WriterFailure.capacity }
-                currentGoal += "\n" + (try AgentPrompts.text("Writer/Prompts", "additionalRequirement", ["text": text]))
-                guard currentGoal.utf8.count <= 48_000 else { throw WriterFailure.capacity }
-                messages[1] = try Self.controlInput(currentGoal, workspace: workspace)
-                messages.append(
-                    .init(
-                        role: .user,
-                        content: try AgentPrompts.text("Writer/Prompts", "additionalRequirement", ["text": text])))
-            }
-            while messages.count > 32 || Self.bytes(messages) > 48_000 {
+            try absorb(try await revisions())
+            while messages.count > WriterBudget.contextMessages || Self.bytes(messages) > WriterBudget.context {
                 guard messages.count > 3 else { throw WriterFailure.capacity }
                 var end = 3
                 while end < messages.count, messages[end].role == .tool { end += 1 }
@@ -273,7 +144,7 @@ public struct WriterWorkflow: Sendable {
             messages.append(.init(role: .assistant, content: response.text, toolCalls: response.calls))
             let terminalCandidate =
                 response.calls.isEmpty
-                || response.calls.contains { ["finish", "workspace.enter", "workspace.create"].contains($0.name) }
+                || response.calls.contains { WriterToolGroup.boundaries.contains($0.name) }
             let late = terminalCandidate ? try await revisions() : []
             if !late.isEmpty {
                 for call in response.calls {
@@ -281,17 +152,7 @@ public struct WriterWorkflow: Sendable {
                     try await history?.toolOutcome(call.id, output: notice)
                     messages.append(.init(role: .tool, content: notice, toolCallID: call.id))
                 }
-                for text in late {
-                    guard text.utf8.count <= 4096 else { throw WriterFailure.capacity }
-                    currentGoal +=
-                        "\n" + (try AgentPrompts.text("Writer/Prompts", "additionalRequirement", ["text": text]))
-                    guard currentGoal.utf8.count <= 48_000 else { throw WriterFailure.capacity }
-                    messages[1] = try Self.controlInput(currentGoal, workspace: workspace)
-                    messages.append(
-                        .init(
-                            role: .user,
-                            content: try AgentPrompts.text("Writer/Prompts", "additionalRequirement", ["text": text])))
-                }
+                try absorb(late)
                 await completeRound(
                     Self.copy.text("New instructions received. The previous actions were skipped."), tools: tools)
                 continue
@@ -317,9 +178,7 @@ public struct WriterWorkflow: Sendable {
             var steps: [String] = []
             do {
                 if response.calls.count > 1,
-                    response.calls.contains(where: {
-                        ["finish", "ask", "workspace.enter", "workspace.create"].contains($0.name)
-                    })
+                    response.calls.contains(where: { WriterToolGroup.exclusive.contains($0.name) })
                 {
                     recoveryFailures += 1
                     for call in response.calls {
@@ -402,7 +261,7 @@ public struct WriterWorkflow: Sendable {
                         continue controlLoop
                     case .observation(let value):
                         observation = value
-                        if ["replace", "move", "removeTree", "remove", "restore"].contains(call.name) {
+                        if WriterToolGroup.fileMutations.contains(call.name) {
                             failedCalls.removeAll()
                             recoveryFailures = 0
                         }
@@ -438,7 +297,7 @@ public struct WriterWorkflow: Sendable {
                         }
                     }
                     try await history?.toolOutcome(call.id, output: observation)
-                    if generatedContent || ["replace", "move", "removeTree", "remove", "restore"].contains(call.name) {
+                    if generatedContent || WriterToolGroup.fileMutations.contains(call.name) {
                         await milestone(.draftUpdated)
                     } else if call.name == "render", observation.contains("\"errors\"") {
                         await milestone(.renderIssue)
@@ -446,7 +305,7 @@ public struct WriterWorkflow: Sendable {
                     pending.remove(call.id)
                     let observationBudget = max(
                         0,
-                        (48_000 - Self.bytes(Array(messages.prefix(2)))
+                        (WriterBudget.context - Self.bytes(Array(messages.prefix(2)))
                             - response.text.utf8.count - 2048) / max(1, response.calls.count))
                     messages.append(
                         .init(

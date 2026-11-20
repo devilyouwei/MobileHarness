@@ -7,16 +7,16 @@ import StorageFiles
 
 /// One run's latest failed model request; it never schedules work or retries a request.
 actor WriterDiagnosticCapture {
-    private(set) var latest: WriterFailureDiagnostic?
-    func record(_ diagnostic: WriterFailureDiagnostic) { latest = diagnostic }
+    private(set) var latest: AgentTaskFailure?
+    func record(_ diagnostic: AgentTaskFailure) { latest = diagnostic }
     func clear() { latest = nil }
 }
 
 enum WriterDiagnostics {
     static func make(
         _ error: any Error, stage: String, details: [String: String] = [:],
-        request: WriterFailureDiagnostic? = nil, depth: Int = 0
-    ) -> WriterFailureDiagnostic {
+        request: AgentTaskFailure? = nil, depth: Int = 0
+    ) -> AgentTaskFailure {
         if depth < 4, let combined = error as? WriterCleanupFailure {
             return .init(
                 category: "cleanup", code: "writer.cleanup", stage: "Cleanup",
@@ -139,7 +139,8 @@ enum WriterDiagnostics {
             case "start", "resume": toolStage = "Workspace preparation"
             case "render": toolStage = "Rendering"
             case "finish": toolStage = "Publishing"
-            case "edit", "replace", "move", "remove", "removeTree", "restore": toolStage = "File editing"
+            case "edit": toolStage = "File editing"
+            case let command? where WriterToolGroup.fileMutations.contains(command): toolStage = "File editing"
             case "read", "list", "search", "diff": toolStage = "File reading"
             default: toolStage = stage
             }
@@ -175,19 +176,19 @@ enum WriterDiagnostics {
         }
         evidence["errorType"] = String(reflecting: type(of: error))
         return .init(
-            category: stage.hasPrefix("History") || stage.contains("历史") ? "storage" : "runtime",
+            category: stage.hasPrefix("History") ? "storage" : "runtime",
             code: "writer.runtime.failed",
             stage: stage, message: "Writer execution failed.", details: evidence)
     }
 
-    static func describe(_ failure: WriterFailureDiagnostic) -> String {
+    static func describe(_ failure: AgentTaskFailure) -> String {
         ([failure.message, "category=\(failure.category)", "code=\(failure.code)", "stage=\(failure.stage)"]
             + failure.details.sorted(by: { $0.key < $1.key }).map { "\($0.key)=\($0.value)" }
             + failure.causes.enumerated().map { "cause[\($0.offset)]:\n" + describe($0.element) }).joined(
                 separator: "\n")
     }
 
-    static func output(_ failure: WriterFailureDiagnostic) -> AgentFailureDiagnostic {
+    static func output(_ failure: AgentTaskFailure) -> AgentFailureDiagnostic {
         let category: AgentFailureDiagnostic.Category =
             failure.category == "modelTransport" || failure.category == "modelHTTP"
             ? .modelTransport
@@ -196,7 +197,7 @@ enum WriterDiagnostics {
     }
 }
 
-extension WriterFailureDiagnostic {
+extension AgentTaskFailure {
     var storageValue: ModelFailureDiagnostic {
         .init(
             category: category, code: code, stage: stage, message: message,

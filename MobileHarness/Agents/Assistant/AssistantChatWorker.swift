@@ -103,7 +103,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     /// The receiver records each received peer message for tracing; the record never drives processing.
     func recordReceived(_ report: AgentTaskResponse, reference: String, input: AgentInput) async {
         do {
-            let id = report.signal.flatMap { try? AgentTaskContent.decode($0).writerEvent?.eventID }
+            let id = report.signal.flatMap { try? AgentTaskContent.decode($0).event?.eventID }
                 ?? report.rejection?.eventID ?? input.id
             let records = try requireCommunications()
             try await records.enqueueAgentMessage(
@@ -377,16 +377,16 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     var immediateInputs: Set<String> = []
     var routingWorkers: [String: Task<Void, Never>] = [:]
     var routingSessions: [String: String] = [:]
-    struct WriterNotice {
+    struct PeerTaskNotice {
         let input: AgentInput
         let scopeID: String
         let originDialog: String
-        let kind: WriterDelegationEvent.Kind?
+        let kind: AgentTaskEvent.Kind?
         let interactionID: String?
         let text: String
     }
-    var writerNotices: [WriterNotice] = []
-    var activeWriterNoticeID: String?
+    var peerNotices: [PeerTaskNotice] = []
+    var activePeerTaskNoticeID: String?
 
     static var beginReply: InternalAction {
         InternalAction(

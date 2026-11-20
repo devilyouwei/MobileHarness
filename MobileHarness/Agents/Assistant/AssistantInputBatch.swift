@@ -76,9 +76,6 @@ struct AssistantInputBatch {
             return (source, message.content)
         case .agent:
             let name = String(message.channel.dropFirst("agent.".count))
-            if name == AgentID.writer.rawValue {
-                return (try AgentPrompts.inputMarker("writer"), message.content)
-            }
             let validName = name.range(of: #"^[A-Za-z0-9_.-]+$"#, options: .regularExpression) != nil
             return (
                 validName
@@ -109,7 +106,7 @@ struct AssistantInputBatch {
     }
 
     private static func isSourceLine(_ line: String) throws -> Bool {
-        let labels = try ["user", "asr", "writer", "agent", "action"].map {
+        let labels = try ["user", "asr", "agent", "action"].map {
             NSRegularExpression.escapedPattern(for: try AgentPrompts.inputMarker($0))
         }
         let named = NSRegularExpression.escapedPattern(

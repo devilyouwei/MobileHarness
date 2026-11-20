@@ -57,7 +57,7 @@ extension AssistantChatWorker {
             do {
                 let views = (try await contextRepository.snapshot()).state.taskViews ?? [:]
                 for view in views.values
-                where !view.terminal && view.stage == .running && view.scope.executor != .writer {
+                where !view.terminal && view.stage == .running && !AgentTaskMessaging.isPeer(view.scope.executor) {
                     let anchor = AgentInput(
                         id: UUID().uuidString, sessionID: view.scope.sessionID,
                         payload: .event("inference.suspended"))
@@ -142,7 +142,7 @@ extension AssistantChatWorker {
 
         await stopUIInputs()
         lifecycle = .stopped
-        writerNotices.removeAll()
+        peerNotices.removeAll()
         var seen: Set<String> = []
         let queued =
             (queue.inputs + pendingRounds.values.map(\.input) + batchMembers.values.flatMap { $0 }).filter {

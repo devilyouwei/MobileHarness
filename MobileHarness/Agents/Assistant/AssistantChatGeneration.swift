@@ -371,16 +371,19 @@ extension AssistantChatWorker {
                 if let manifest = imageProjection.manifest {
                     block += try contextTemplates.render("images", variables: ["manifest": manifest])
                 }
-                if let waiting = inputInteractions[input.id]?.first(where: { $0.scope.executor == .writer }),
+                if let waiting = inputInteractions[input.id]?.first(where: {
+                    AgentTaskMessaging.isPeer($0.scope.executor)
+                }),
                     let current = decisionContext.state.taskViews?[waiting.scope.id], !current.terminal,
                     current.interactionID == waiting.interactionID
                 {
                     let question = String(decoding: try JSONEncoder().encode(current.text), as: UTF8.self)
                     block += try AgentPrompts.load(named: State.configurationName).render(
-                        "writerQuestion", variables: ["question": question])
+                        "taskQuestion",
+                        variables: ["agent": waiting.scope.executor.rawValue, "question": question])
                 }
                 guard block.utf8.count <= 16 * 1024 else { throw CommunicationError.capacityExceeded }
-                block += try Self.writerFacts(
+                block += try Self.peerTaskFacts(
                     from: decisionContext.state.taskViews ?? [:], dialog: decisionContext.state.history.current.id,
                     budget: min(3_072, 16 * 1024 - block.utf8.count),
                     templates: AgentPrompts.load(named: State.configurationName))

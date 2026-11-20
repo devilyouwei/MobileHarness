@@ -48,7 +48,7 @@ public actor WriterAgent: Agent {
     private var deliveringEvent: String?
     private var deliveryFailures: [String: String] = [:]
     private var eventSequences: [String: UInt64] = [:]
-    private var reportedMilestones: [String: Set<WriterDelegationEvent.Kind>] = [:]
+    private var reportedMilestones: [String: Set<AgentTaskEvent.Kind>] = [:]
     private var lastSteps: [String: String] = [:]
     private var windowIDs: [String: String] = [:]
     private var phases: [String: String] = [:]
@@ -333,7 +333,6 @@ public actor WriterAgent: Agent {
 
     private func processMessage(_ content: AgentTaskRequest, input: AgentInput) async throws {
         guard try await !communications.isAgentMessageConsumed(content.id) else { return }
-        let explicitStop = Self.isExplicitStopMessage(content.text)
         if let active = inputs.values.first, let scope = active.taskScope {
             guard scope.sessionID == input.sessionID, scope.requester.rawValue == input.metadata.source,
                 let request = requests[scope.id]
@@ -342,15 +341,13 @@ public actor WriterAgent: Agent {
                 !finalizing.contains(scope.id)
             else { throw WriterToolFailure("Writer is finishing the current assignment. Wait for cleanup.") }
             let question = waiting[scope.id]
-            let direction: WriterInboxIntent
             if let replyTo = content.replyTo {
                 guard replyTo == scope.id, content.operation == .update || content.interactionID == question
                 else { throw WriterToolFailure("That question has closed. Send your request again.") }
             }
+            let direction: WriterInboxIntent
             if content.operation == .update || content.operation == .answer {
                 direction = .followUp
-            } else if explicitStop {
-                direction = .stop
             } else {
                 let held = models[scope.id]
                 let selected: ChatModel
@@ -379,7 +376,7 @@ public actor WriterAgent: Agent {
             }
             return
         }
-        guard content.replyTo == nil, !explicitStop
+        guard content.replyTo == nil
         else { throw WriterToolFailure("This Writer assignment has ended.") }
         guard let consumer else { throw WriterFailure.unavailable }
         let scope = AgentTaskScope(
@@ -414,7 +411,7 @@ public actor WriterAgent: Agent {
             }
             request.request +=
                 "\n" + (try AgentPrompts.text("Writer/Prompts", "clarification", ["text": content.text]))
-            guard request.request.utf8.count <= 12_000 else { throw WriterFailure.capacity }
+            guard request.request.utf8.count <= WriterBudget.request else { throw WriterFailure.capacity }
             guard
                 try await executions.acceptWriterInput(
                     messageID, requestID: id, questionID: interaction)
@@ -425,17 +422,19 @@ public actor WriterAgent: Agent {
             if lifecycle == .running, workers[id] == nil {
                 workers[id] = Task { await run(request, input: original, scope: scope, userInitiated: true) }
             }
-            let event = WriterDelegationEvent(
-                sequence: (eventSequences[id] ?? 0) + 1, kind: .inputAccepted, delegateID: id)
+            let event = AgentTaskEvent(
+                sequence: (eventSequences[id] ?? 0) + 1, kind: .inputAccepted)
             eventSequences[id] = event.sequence
             enqueueReport(
                 try AgentTaskContent(
-                    text: presentationCopy.text("Got your update. Continuing the project."), writerEvent: event),
+                    text: presentationCopy.text("Got your update. Continuing the project."), event: event),
                 scope: scope, input: original, kind: .inputAccepted)
             await island.update(delegateID: id, phase: .running, step: "Got your update. Continuing the project.")
         } else {
             let pendingBytes = updates[id, default: []].reduce(0) { $0 + $1.utf8.count + 32 }
-            guard (requests[id]?.request.utf8.count ?? 0) + pendingBytes + content.text.utf8.count + 32 <= 12_000
+            guard
+                (requests[id]?.request.utf8.count ?? 0) + pendingBytes + content.text.utf8.count + 32
+                    <= WriterBudget.request
             else {
                 throw WriterFailure.capacity
             }
@@ -454,7 +453,7 @@ public actor WriterAgent: Agent {
         let id = scope.id
         guard lifecycle == .running, requests[id] == nil
         else { throw WriterFailure.unavailable }
-        guard request.request.utf8.count <= 12_000,
+        guard request.request.utf8.count <= WriterBudget.request,
             !request.request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         else { throw WriterFailure.capacity }
         let goal = request.request
@@ -482,18 +481,6 @@ public actor WriterAgent: Agent {
         }
         workers[id] = Task { await run(request, input: input, scope: scope, userInitiated: true) }
         processed += 1
-    }
-
-    private static func isExplicitStopMessage(_ text: String) -> Bool {
-        let command = text.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ".。!！")))
-            .lowercased()
-        switch command {
-        case "取消当前创作", "请取消当前创作", "停止当前创作", "请停止当前创作",
-            "cancel this assignment", "please cancel this assignment", "stop this assignment":
-            return true
-        default:
-            return false
-        }
     }
 
     private func acceptCancellation(_ messageID: String, scope: AgentTaskScope, reason: String) async throws {
@@ -630,7 +617,7 @@ public actor WriterAgent: Agent {
                 requestProgress: { fact in
                     let text =
                         copy.format(
-                            "Round %@ · %@", String(fact.number), copy.text(WriterRequestNaming.phase(fact.phase)))
+                            "Round %@ · %@", String(fact.number), copy.text(fact.phase))
                         + (fact.path.map { " · " + $0 } ?? "")
                         + (fact.attempt > 1 ? copy.format(" · Retry %@", String(fact.attempt)) : "")
                     await self.updateSubtitle(
@@ -862,9 +849,7 @@ public actor WriterAgent: Agent {
                         args["summary"] ?? "",
                         input: input, outcome: args["outcome"] ?? "artifact")
                     : try await self.execute(operation, args: args, input: input)
-                if ["replace", "move", "remove", "removeTree", "restore"].contains(
-                    operation)
-                {
+                if WriterToolGroup.fileMutations.contains(operation) {
                     await preview.changed()
                 }
                 if operation == "edit" {
@@ -1197,8 +1182,8 @@ public actor WriterAgent: Agent {
 
     private func report(
         _ text: String, scope: AgentTaskScope, input: AgentInput, status: AgentTaskSignal.Status? = nil,
-        interactionID: String? = nil, kind: WriterDelegationEvent.Kind? = nil,
-        failure: WriterFailureDiagnostic? = nil, persistedStatus: String? = nil, cancellationReason: String? = nil
+        interactionID: String? = nil, kind: AgentTaskEvent.Kind? = nil,
+        failure: AgentTaskFailure? = nil, persistedStatus: String? = nil, cancellationReason: String? = nil
     )
         async throws
     {
@@ -1214,7 +1199,6 @@ public actor WriterAgent: Agent {
             unverified
             ? savedSummary + "\n" + presentationCopy.text("The project was saved without visual verification.")
             : savedSummary
-        let display = (workspaceID.map { "Workspace " + $0 + "\n" } ?? "") + summary
         let eventKind =
             kind
             ?? (status == nil
@@ -1233,19 +1217,19 @@ public actor WriterAgent: Agent {
         let eventSequence = (eventSequences[scope.id] ?? 0) + 1
         eventSequences[scope.id] = eventSequence
         phases[scope.id] = status == .cancelled ? "cancelling" : interactionID == nil ? "running" : "waitingUser"
-        lastSteps[scope.id] = String(display.prefix(1000))
+        lastSteps[scope.id] = String(summary.prefix(1000))
         if status == nil, requests[scope.id] != nil {
             try await executions.updateRequestPhase(
                 requestID: scope.id, phase: interactionID == nil ? "running" : "waitingUser")
         }
-        let event = WriterDelegationEvent(
+        let event = AgentTaskEvent(
             sequence: eventSequence, kind: eventKind,
-            workspaceID: workspaceID, goal: requests[scope.id].map { String($0.request.prefix(240)) },
-            windowID: windowIDs[scope.id], delegateID: scope.id, failure: failure)
+            goal: requests[scope.id].map { String($0.request.prefix(240)) },
+            windowID: windowIDs[scope.id], failure: failure)
         let content = try AgentTaskContent(
-            text: String(display.prefix(1000)),
+            text: String(summary.prefix(1000)),
             stage: status == nil ? (interactionID == nil ? .running : .waitingUser) : .completed,
-            interactionID: interactionID, writerEvent: event)
+            interactionID: interactionID, artifactID: workspaceID, event: event)
         if let status {
             let signal = try content.signal(.result, scope: scope, status: status)
             let completion = try AgentTaskResponse(signal)
@@ -1296,7 +1280,7 @@ public actor WriterAgent: Agent {
         guard let scope = input.taskScope, let request = requests[scope.id],
             waiting[scope.id] == nil, !cancelling.contains(scope.id), !suspending.contains(scope.id)
         else { return }
-        let kind: WriterDelegationEvent.Kind
+        let kind: AgentTaskEvent.Kind
         let text: String
         switch milestone {
         case .draftUpdated:
@@ -1312,13 +1296,14 @@ public actor WriterAgent: Agent {
         guard reportedMilestones[scope.id, default: []].insert(kind).inserted else { return }
         let sequence = (eventSequences[scope.id] ?? 0) + 1
         eventSequences[scope.id] = sequence
-        let event = WriterDelegationEvent(
-            sequence: sequence, kind: kind, workspaceID: workspaceContexts[scope.id]?.workspaceID,
-            goal: String(request.request.prefix(240)), windowID: windowIDs[scope.id], delegateID: scope.id)
+        let event = AgentTaskEvent(
+            sequence: sequence, kind: kind, goal: String(request.request.prefix(240)), windowID: windowIDs[scope.id])
         do {
             enqueueReport(
-                try AgentTaskContent(text: presentationCopy.text(text), writerEvent: event), scope: scope, input: input,
-                kind: kind)
+                try AgentTaskContent(
+                    text: presentationCopy.text(text), artifactID: workspaceContexts[scope.id]?.workspaceID,
+                    event: event),
+                scope: scope, input: input, kind: kind)
         } catch {
             deliveryFailures[scope.id] =
                 "Writer report preparation failed: " + String(String(describing: error).prefix(256))
@@ -1326,11 +1311,11 @@ public actor WriterAgent: Agent {
     }
 
     private func enqueueReport(
-        _ content: AgentTaskContent, scope: AgentTaskScope, input: AgentInput, kind: WriterDelegationEvent.Kind
+        _ content: AgentTaskContent, scope: AgentTaskScope, input: AgentInput, kind: AgentTaskEvent.Kind
     ) {
         var queue = pendingReports[scope.id] ?? []
         queue.removeAll {
-            $0.content.writerEvent?.kind == kind && $0.content.writerEvent?.eventID != deliveringEvent
+            $0.content.event?.kind == kind && $0.content.event?.eventID != deliveringEvent
         }
         queue.append(PendingReport(content: content, scope: scope, input: input))
         pendingReports[scope.id] = queue
@@ -1350,7 +1335,7 @@ public actor WriterAgent: Agent {
         while !Task.isCancelled, lifecycle != .paused,
             let id = pendingReports.keys.sorted().first, let pending = pendingReports[id]?.first
         {
-            deliveringEvent = pending.content.writerEvent?.eventID
+            deliveringEvent = pending.content.event?.eventID
             do {
                 try await deliver(pending)
                 deliveryFailures.removeValue(forKey: id)
@@ -1360,7 +1345,7 @@ public actor WriterAgent: Agent {
                 deliveryFailures[id] =
                     "Writer report not delivered: " + String(String(describing: error).prefix(256))
             }
-            pendingReports[id]?.removeAll { $0.content.writerEvent?.eventID == deliveringEvent }
+            pendingReports[id]?.removeAll { $0.content.event?.eventID == deliveringEvent }
             if pendingReports[id]?.isEmpty == true { pendingReports.removeValue(forKey: id) }
         }
     }
