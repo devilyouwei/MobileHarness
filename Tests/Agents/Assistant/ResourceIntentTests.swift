@@ -5,6 +5,7 @@ import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import Gateway
+import ModelKit
 import PlatformKit
 import StorageCore
 import Testing
@@ -81,7 +82,7 @@ func resourceFixturePolicy() throws -> CommunicationPolicy {
     device: any DeviceControlCapability = UnusedDeviceControl(),
     camera: any CameraControlCapability = UnusedCameraControl(),
     uiResources: UIModelResourcesContainer? = nil, uiSettings: UISettingsContainer? = nil,
-    resourceChanges: (@MainActor @Sendable () async throws -> AsyncStream<UInt64>)? = nil,
+    resourceChanges: (@MainActor @Sendable () async throws -> ModelKit.StateSignalListener<UInt64>)? = nil,
     observationFailure: @escaping @Sendable (any Error) -> Void = { _ in },
     uiProviderSettings: ProviderSettingsRequests? = nil, uiProviderDiscovery: ProviderDiscoveryRequests? = nil,
     uiProviderPresentation: ProviderPresentationAdapter? = nil,

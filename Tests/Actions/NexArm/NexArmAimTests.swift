@@ -31,7 +31,8 @@ private func observation(_ pose: PoseObservation, session: String) -> AgentInput
         id: UUID().uuidString,
         sessionID: session, payload: payload,
         metadata: InputMetadata(
-            payload: payload, source: "visionPerception", sequence: pose.sequence, rootID: UUID().uuidString)
+            payload: payload, source: "visionPerception", sequence: pose.sequence, rootID: UUID().uuidString,
+            topic: "perception.vision.pose")
     )
 }
 

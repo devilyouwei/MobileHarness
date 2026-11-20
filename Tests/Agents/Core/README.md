@@ -90,3 +90,7 @@ Camera preparation also uses a padded synthetic mirrored JPEG to verify that nor
 GenerationRoundTests 的 compactRoundObservationsKeepSameAliasCallsDistinctAndPreserveNativeAndJournalIDs 是 Integration Tests：启动真实轮次/执行链，并读取后续请求与 journal，验证调用身份和协议配对。其他轮次用例继续保留其独立的取消、容量、全双工与媒体边界。
 
 TaskSkill、Writer、视觉和蓝牙的大文件审查按不变量区分：Skill 授权/释放、轮次屏障、文件提交、原生连接恢复和 UI 分页各自保护不同边界，不因出现相似取消或失败断言而删除。文件层级索引见 [Agents](../README.md)。
+
+## Writer 常驻事件订阅
+
+AgentTaskSkillTests 验证 Assistant 在发布配置合法、没有 Writer 运行实例或任何任务时独立建立静态监听，任务前后频道数量不变，未知任务/错误 session 不修改跟踪，停止与替换清理旧端点。CommunicationTests 区分尽力发布和直接请求 Reply，验证迟订阅不补发及发布不探测消费者 readiness。持久任务对账单独验证，不将其视为 broker replay。

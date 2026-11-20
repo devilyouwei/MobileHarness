@@ -46,8 +46,8 @@ flowchart LR
  subgraph Peers["其他 Agent：仅经 Gateway 通信"]
  AS["Assistant"]:::agent
  end
- AS -->|"task.request／input／cancel"| G
- G -->|"agent.task.response"| AS
+ AS -->|"agent.task.v1 operations"| G
+ G -->|"agent.task.events.v1"| AS
 
  classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
  classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d

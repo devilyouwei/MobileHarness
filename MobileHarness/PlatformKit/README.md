@@ -27,7 +27,7 @@ flowchart LR
 | [Vision](Vision/README.md) | Camera/immutable frames/photo and audio-video file access, bounded media preparation; camera/Photos authorization queries. |
 | [Connectivity](Connectivity/README.md) | NexArm device constraints and bounded USB/BLE writes, protocol values, connection observations, passive IP path monitoring and Bluetooth authorization queries. |
 
-Native observation capabilities are injected directly into their responsible Agent or execution owner. They never generate business Signals. Read-only capture subscription does not start hardware; capture control stays with its owner. PCM remains ordered and bounded, while camera/native state observations retain newest values under the owning contracts.
+Native observation capabilities are injected directly into their responsible Agent or execution owner. They never generate business Signals. Read-only capture subscription does not start hardware; capture control stays with its owner. PCM remains ordered and bounded, while camera/native state observations retain newest values under the owning contracts. System memory warnings are a root-lifetime native fact ([Core](Core/README.md#memory-warnings)); the App composition layer, not an Agent, connects them to model release.
 
 ## Internal flow
 
@@ -93,3 +93,5 @@ Audio reports media-services reset as a native event and terminates affected PCM
 Audio 的语音模式复用同一采集/播放引擎并报告实际 voice-processing 能力，采集与播放分别取消；单声道对话不能启用处理器时明确失败，空间等独立后端仍报告其实际能力。双工业务策略和字幕由调用方拥有，原生图与 PCM 适配见 [Audio](Audio/README.md)。
 
 Audio 捕获事实包含实际回声消除路径。手机与耳机的单声道原生路径统一使用包含回消、降噪的双 I/O Voice Processing；输入/输出均启用且未旁路才提供全双工能力，不依据蓝牙类型降级；路由失效交由原有生命周期终止/重建。SDK 不用识别文本推断回声，具体接口见 [Audio](Audio/README.md)。
+
+Native external inputs use the module-owned [SignalListener family](Core/README.md#module-owned-signallistener). Audio/Vision producers expose MediaSignalListener, native fact producers expose StateSignalListener, and typed scalar/vector sensors use SensorSignalListener with explicit validity metadata. Agents and execution owners consume these directly. Listener cancellation detaches one subscription; device control and capture lifetime remain source-owned.

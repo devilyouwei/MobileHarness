@@ -19,7 +19,7 @@ Use the unsuffixed resource for English and a `.zh-Hans` sibling for Simplified 
 | `Shared/OutputProtocol.md` | 跨角色通用输出协议。 |
 | `Shared/SkillCatalog.json`、`Shared/AgentCatalog.json`、`Shared/ActionCatalog.json` | 目录标题及条目排版。Swift 填入公开 Skill、获准委派的 Agent 和本轮有效 Action。 |
 | `Shared/RequestContext.json` | Task／Skill／State 快照和图片清单在独立 system 消息中的事实框架。 |
-| `<AgentName>/Agent.json` | 必需。v10 身份、角色自有公开 description、通信权限和基础 Skill。 |
+| `<AgentName>/Agent.json` | 必需。v11 身份、角色自有公开 description、通信权限和基础 Skill。 |
 | `Assistant/Instructions.md` | Assistant 自身的身份、用户沟通和如实汇报责任。业务流程归 Skill，共用协议提示词归 `Shared/`。 |
 | `Assistant/Prompts.json` | Assistant 主请求的执行证据、任务历史摘要及 Writer 协作事实模板。 |
 | `Assistant/InputDecision.json` and its Simplified Chinese sibling | Localized Decision action definitions and templates for execution/playback state (including unknown playback), the pending question, history, buffered user input and the quoted latest-input question, plus cloud tool prose. Dialog text retains its original language. |
@@ -38,33 +38,27 @@ Use the unsuffixed resource for English and a `.zh-Hans` sibling for Simplified 
 
 | 字段 | 类型 | 作用 |
 | --- | --- | --- |
-| `version` | integer | 资源 Schema 版本，当前固定为 10；不是角色发布版本。加载器投影为 AgentCore v8 函数/通信契约。 |
+| `version` | integer | 资源 Schema 版本，当前固定为 11；不是角色发布版本。加载器投影为 AgentCore v9 函数/通信契约。 |
 | `id` | string | 实际 Agent 身份，用于执行所有权、通信和上下文隔离；必须与代码创建的身份一致且全局唯一。 |
 | `category` | string | 必填的静态类别，只接受 `perception` 或 `cognition`；缺失、null、错误类型及未知值拒绝加载。加载后进入 AgentConfiguration 和 AgentDescriptor。 |
 | `description` | string | 角色自己维护的公开用途、输入要求与对外约束；非空，最多 2048 UTF-8 字节。不包含私有执行指令，不授予权限。 |
-| `communication` | object | 输入接纳协议、广播订阅、发布权限和定向发送权限，见下表。 |
+| `signals` | object | 版本化请求、反馈、频道发布与订阅，见下表。 |
 | `baseSkills` | string array | 基础 Skill ID，无重复、最多 16 个；对支持 Skill 的角色用于初始化有效目录。确定性角色通常为空，不会因填写而自动获得 Skill worker。 |
 
-### communication 字段
+### signals 字段
 
-| 字段 / 条目字段 | 作用与校验 |
+| 字段 | 作用与校验 |
 | --- | --- |
-| `inputs` | 可接纳的定向消息和运行时反馈，最多 32 项。 |
-| `inputs[].contract` | 已在通信契约注册表中存在的协议名，如 `camera.state`。新增业务协议必须同时实现 Schema 和验证器。 |
-| `inputs[].version` | 当前为 1，指 Signal 协议版本，不是 Agent 配置版本。 |
-| `inputs[].kind` | 必须与契约注册的 InputKind 一致，如 `text`、`observation`、`audio`、`actionResult`、`toolResult`、`roundResult`、`communicationReceipt`。不得仅为通过校验而随意改 kind。 |
-| `subscriptions` | 独立授权广播接纳，最多 16 项。 |
-| `subscriptions[].contract` | 订阅的协议。 |
-| `subscriptions[].source` | 真实发布者的运行时 Agent ID 或已授权外部来源，如 `speechPerception`、`phone.camera`。不是配置名 `SpeechPerception`。 |
-| `subscriptions[].topic` | 必须匹配契约注册表定义的主题。 |
-| `publications` | 可发布的 observation 协议名数组，最多 64 项。 |
-| `sends` | 定向发送权限，最多 64 项。每项为 `contract` 和 `target`，目标用运行时 Agent ID；协议必须是 observation，且目标声明相应 input。 |
+| `requests` | 本角色启用的版本化请求协议；启动必须匹配唯一代码处理器及协议要求的完整操作集合。 |
+| `feedback` | 本角色消费的可信运行时反馈，如 `action.result.v1` 和 `agent.round.result.v1`。 |
+| `publications` | `{channel, protocol}` 声明本角色可发布的协议；启动校验实际生产代码及订阅配对，允许无订阅者。频道不携带协议版本，不由协议名推导。 |
+| `subscriptions` | `{channel, protocol, sources, events?}`；来源为实际运行时 Agent ID，events 可筛选同一协议的变体。 |
 
-Assistant 订阅 SpeechPerception 在 user.input 主题发布的 user.input.asr.final。SpeechPerception 还在同主题发布 user.input.asr.partial。Assistant 向 Writer 定向发送 agent.task.request。Writer 和固定任务执行方使用 agent.task.response 回报。运行时反馈使用 runtime.action.result、runtime.tool.result、runtime.round.result 和 runtime.message.receipt，各 Agent 仅声明其消费的反馈。
+SpeechPerception 发布 `user.input.speech` / `user.input.speech.v1`，变体为 partial/final；Assistant 只订阅 final。姿态和声源分别绑定 `perception.vision.pose`、`perception.audio.source`。ApplicationControl 发布 `agent.interruption` / `agent.interruption.v1`，Assistant 的确定性处理器消费，不进入普通 Decision。
 
-各数组不得有重复条目。来源如果是 Agent，必须由该 Agent 声明相应 publication；外部来源必须在运行时外部来源集合中授权。全局最多 64 个主题，每个主题最多 16 个订阅者。
+Writer、Memory、Photographer、ApplicationControl 启用 `agent.task.v1`，包含 submit/update/answer/status/cancel。代码目录声明正文能力；当前模型可见的文本适配器为 Writer，其他角色消费自身的类型化 scoped 正文。任务进度与终态通过 `agent.task.events.v1` 在 `agent.task` 频道按任务身份订阅，Assistant 从启动装配起静态订阅 Writer 的 agent.task 频道，按任务/session 跟踪返回；任务结束只清理跟踪，停止角色才关闭常驻频道。Writer 等任务执行角色通过 publications 声明 agent.task / agent.task.events.v1，实际按需发布，不能触发对方订阅。启动校验订阅来源配置及匹配的 publication，并验证双方真实代码能力；不要求双方在线，允许 publication 没有订阅者。任务恢复/消费失败由消费角色诊断。请求直接返回类型化 Reply；publish 只确认接纳。配置不包含发送者/接收者配对白名单。
 
-publish 是单向广播，不等目标接纳回包；目标失败不影响发布者，但发送者自身的协议、权限及资源错误仍可报错。send 有投递接纳回执，接纳不代表业务完成，任务结果需另行报告。外部输入按 publish / subscribe 路由。ActionResult 使用运行时捕获的实际执行所有者定向返回，不通过任意订阅或父任务身份猜测接收者。具体通信设计见 [Communication](../../Agents/Support/Communication/README.md)。
+未知字段、旧 inputs/sends/communication、重复或重叠订阅、协议/频道不一致及未实现处理器都拒绝加载。角色目录只投影已启用协议和真实代码适配能力；公开介绍不创造权限。动作反馈按实际执行所有者返回，不能通过任意订阅获得。
 
 ## 函数注册来源
 
@@ -97,7 +91,7 @@ Assistant 先拼接 Shared 的输出协议和 Assistant 的输入协议，再读
 
 1. 先确定 Agent 是否必要。用户对话流程优先作为 Skill；独立感知、设备状态机、事务或后台流程才由独立 Agent 承担。先更新代码目录设计，说明上下文所有权、输入预处理、容量、取消、清理、失败和重启行为。
 2. 新目录必须按仓库规则取得批准。角色代码放 Agents，纯资源放本目录，索引登记到 Catalog；不新增顶层模块或第二套加载路径。
-3. 创建 v10 Agent.json，维护自身公开介绍并声明已实现的通信契约和基础 Skill；不创建 Permissions.json，不复制 Skill 的业务函数。配置名、运行时 id、代码身份、通信 source / target 分别核对，不能混用。
+3. 创建 v11 Agent.json，维护自身公开介绍并声明已实现的通信契约和基础 Skill；不创建 Permissions.json，不复制 Skill 的业务函数。配置名、运行时 id、代码身份、通信 source / target 分别核对，不能混用。
 4. 需要对话时遵守 Assistant + Skill 边界；确定性 Agent 不复制 Assistant Chat worker。需要标题等模型事务时使用事务专用模板，不创建普通历史记录。
 5. 能力变更更新 canonical 元数据、拥有者代码 README 和对应 Skills；同一函数绑定保持一致。身份和协议不兼容变更必须设计迁移，不能用改文件名隐式迁移持久化数据。
 6. 新增可委派角色需要实现接收、执行、取消和终态，并在通信中声明消息权限。投递接纳与终态分别确认。角色的私有上下文由自己持有。
@@ -115,7 +109,7 @@ Agent.json 保留身份、基础 Skill 与通信契约。App 安装各 Action �
 
 ## Task controls through Action Calls
 
-BasicSkill 的 Task/Skill 控制函数使用 Control Channel Action Call；运行集成通过 ChannelScheduler 返回已提交状态。task.start/loadSkills/releaseSkills 返回的已提交业务状态在结果屏障后重建目录并 ReACT，task.end 按任务来源提交终态与摘要，Writer 通过 agent.task.request 接收用户要求的转述，并解释正文。新目录仅影响后续请求，不允许加载轮提前调用新函数。可信固定调用复用同一实现。
+BasicSkill 的 Task/Skill 控制函数使用 Control Channel Action Call；运行集成通过 ChannelScheduler 返回已提交状态。task.start/loadSkills/releaseSkills 返回的已提交业务状态在结果屏障后重建目录并 ReACT，task.end 按任务来源提交终态与摘要，Writer 通过 agent.task.v1 接收用户要求的转述，并解释正文。新目录仅影响后续请求，不允许加载轮提前调用新函数。可信固定调用复用同一实现。
 
 ## Agent → Skill → Function registration
 
@@ -144,17 +138,13 @@ Assistant 的 Agent/Provider 异常终止当前 Decision 并保留历史/效果�
 
 每轮状态数据由 CURRENT STATE 统一注入，删除独立 activeTask/taskReports/taskReport 模板；保留执行观察、历史证据及 Tool 失败模板。
 
-## 统一容器异常通道
+## 容器异常观察
 
-Assistant 配置显式声明 container.failure 标准输入及 runtime 来源订阅；不添加模型函数或 Skill 暴露。其他 Agent 可按能力声明订阅，不强制向不支持的角色投递。
-
-## ApplicationControl 异常展示
-
-ApplicationControl 的配置声明 container.failure/runtime.failure observation 输入和 runtime 来源订阅。Assistant 保留容器异常的被动订阅；异常呈现使用角色代码中的内部权限，不向模型扩展函数目录。
+Assistant 和 ApplicationControl 通过宿主注入的独立故障观察入口接收容器/运行时事实。配置不声明 container.failure/runtime.failure 的 Signal 订阅，不添加模型函数或 Skill 权限；异常呈现由角色代码拥有。
 
 通信注册表描述 Agent 消息和执行反馈。本地 UI、媒体、环境及故障输入使用各自的类型化接口。
 
-Writer 是面向作品的独立生成角色。Writer 接收 agent.task.request，由私有工作流决定接纳、补充、停止或拒绝。agent.task.response 将接纳、精选里程碑、追问、消息拒绝及终态送回 Assistant。普通进度由 Writer 自有灵动岛呈现。接纳、首次草稿保存、首次异常、追问和终态进入 Assistant 的统一 Q，由下一批模型选择性呈现，并保留后续对话事实。工作流与原生工具目录由 Writer 代码拥有。
+Writer 是面向作品的独立生成角色。Writer 接收 agent.task.v1，由私有工作流决定接纳、补充、停止或拒绝。agent.task.events.v1 将接纳、精选里程碑、追问、消息拒绝及终态送回 Assistant。普通进度由 Writer 自有灵动岛呈现。接纳、首次草稿保存、首次异常、追问和终态进入 Assistant 的统一 Q，由下一批模型选择性呈现，并保留后续对话事实。工作流与原生工具目录由 Writer 代码拥有。
 
 Writer 的公开 description 说明独立执行、委托生命周期和回馈。
 
@@ -164,9 +154,9 @@ BasicSkill 统一教 start/send 平级与按目标所有者选择，不维护具
 
 ## 公开目录装配与失败
 
-AgentConfigurations 按 Catalog 读取 v10 资源并校验必填字段、身份、通信声明与容量；缺失、未知字段、错误类型、旧版本和超限均明确失败，不用旧介绍兜底。最多 32 个角色，每条介绍最多 2048 UTF-8 字节，最终目录最多 8192 字节，超限不截断。
+AgentConfigurations 按 Catalog 读取 v11 资源并校验必填字段、身份、通信声明与容量；缺失、未知字段、错误类型、旧版本和超限均明确失败，不用旧介绍兜底。最多 32 个角色，每条介绍最多 2048 UTF-8 字节，最终目录最多 8192 字节，超限不截断。
 
-Assistant 用当前实例的通信权限和 AgentTaskMessaging 组装公开目录。有效函数目录包含 task.send 时展示获准接收 agent.task.request 的角色，目前为 Writer。
+Assistant 用已启用协议和 AgentTaskMessaging 的代码适配能力 组装公开目录。有效函数目录包含 task.send 时展示实际接收 agent.task.v1 的角色，目前为 Writer。
 
 Writer 控制请求组合 Instructions.md 与 Prompts.json 的 control.library 或 control.workspace。内容请求读取 ContentPrompts.json 的 instructions、format 字段、编辑事实模板和可选 retry。Writer 根据实际文件路径选格式，并拥有请求顺序、工具参数 Schema、恢复和校验。公开目录读取 Agent.json 的自描述。
 

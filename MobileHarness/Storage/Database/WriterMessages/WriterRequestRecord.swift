@@ -42,10 +42,10 @@ public struct WriterDelegationNotification: Sendable {
     public let agent: String
     public let eventID: String
     public let data: Data
-    public let delivered: Bool
+    public let published: Bool
     public let retired: Bool
     public init(
-        delegateID: String, agent: String, eventID: String, data: Data, delivered: Bool = false, retired: Bool = false,
+        delegateID: String, agent: String, eventID: String, data: Data, published: Bool = false, retired: Bool = false,
         position: Int64 = 0, claimToken: String? = nil
     ) {
         self.delegateID = delegateID
@@ -54,7 +54,7 @@ public struct WriterDelegationNotification: Sendable {
         self.data = data
         self.position = position
         self.claimToken = claimToken
-        self.delivered = delivered
+        self.published = published
         self.retired = retired
     }
 }

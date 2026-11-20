@@ -238,16 +238,16 @@
         }
 
         /// No suspension inside graph mutation/start/stop; all operations are actor serialized.
-        public func subscribeFrames() throws -> AsyncThrowingStream<CameraFrame, Error> {
+        public func listenFrames() throws -> MediaSignalListener<CameraFrame> {
             do {
                 try admission?.check()
-                return try receiver.subscribe()
+                return try receiver.listen()
             } catch {
-                admission?.report("vision.camera", "subscribeFrames", error)
+                admission?.report("vision.camera", "listenFrames", error)
                 throw error
             }
         }
-        public func start(facing: CameraFacing) throws -> AsyncThrowingStream<CameraFrame, Error> {
+        public func start(facing: CameraFacing) throws -> MediaSignalListener<CameraFrame> {
             do {
                 try admission?.check()
                 guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else {
@@ -324,7 +324,7 @@
         }
 
         /// Keep a healthy session/output graph running; only replace its video input.
-        public func switchCamera(facing: CameraFacing) throws -> AsyncThrowingStream<CameraFrame, Error> {
+        public func switchCamera(facing: CameraFacing) throws -> MediaSignalListener<CameraFrame> {
             do {
                 try admission?.check()
                 try Task.checkCancellation()

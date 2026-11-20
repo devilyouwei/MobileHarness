@@ -25,6 +25,13 @@ extension ActionInvocation {
     }
 }
 extension ChannelScheduler {
+    func finish(inputID: String, source: AgentID) async throws {
+        try await finish(inputID: inputID, source: source.rawValue)
+    }
+    func cancel(inputID: String, source: AgentID) async { await cancel(inputID: inputID, source: source.rawValue) }
+    func cancel(agent: AgentID, incarnation: String, sessionID: String? = nil) async {
+        await cancel(endpoint: agent.rawValue, incarnation: incarnation, sessionID: sessionID)
+    }
     func enqueue(invocation: any FunctionInput) async throws -> String {
         try await enqueue(invocation: ScheduledAction(envelope: invocation.testEnvelope))
     }

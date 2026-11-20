@@ -53,8 +53,8 @@ flowchart LR
  subgraph Peers["其他 Agent：仅经 Gateway 通信"]
  AS["Assistant"]:::agent
  end
- A -->|"user.input.asr.partial／final · user.input"| G
- G -->|"user.input.asr.final"| AS
+ A -->|"user.input.speech.v1（partial）／final · user.input"| G
+ G -->|"user.input.speech.v1（final）"| AS
 
  classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
  classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
@@ -68,7 +68,7 @@ flowchart LR
 
 角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。角色、Skill 与 Task 授权归 Agents；Actions 来源的协作接口由 App 以中立窄端口绑定，Agents 不导入 Actions、CallRuntime 或 ExecutionRuntime。
 
-SpeechPerception 在 user.input 主题发布 user.input.asr.partial 和 user.input.asr.final。Assistant 订阅最终文本，片段可由诊断或显式订阅者观察。声源诊断观察 sound.source。
+SpeechPerception 在 user.input 主题发布 user.input.speech.v1（partial） 和 user.input.speech.v1（final）。Assistant 订阅最终文本，片段可由诊断或显式订阅者观察。声源诊断观察 sound.source。
 
 ## 内部结构与执行链
 
@@ -135,8 +135,8 @@ flowchart TB
 
 | Contract / function | Payload and semantics |
 | --- | --- |
-| user.input.asr.partial | Latest transcript preview ≤16 KiB encoded, two-second validity |
-| user.input.asr.final | Nonempty final text ≤4096 UTF-8 bytes; published once per nonempty turn, with lifecycle-owned completion |
+| user.input.speech.v1（partial） | Latest transcript preview ≤16 KiB encoded, two-second validity |
+| user.input.speech.v1（final） | Nonempty final text ≤4096 UTF-8 bytes; published once per nonempty turn, with lifecycle-owned completion |
 | sound.source | Native direction/quality/RMS and active/inactive/uncertain/unavailable; ≤10 Hz and 500 ms freshness |
 | UI.Caption.setTranscript / finishTranscript | Internal completion-only calls; final text precedes sealing, including explicit empty result |
 | UI.VoiceState.setVoiceState | Internal hearing/processing/listening display, no device control |

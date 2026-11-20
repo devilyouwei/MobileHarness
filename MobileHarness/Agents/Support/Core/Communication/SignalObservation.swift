@@ -45,7 +45,7 @@ public struct SignalTraceRecord: Identifiable, Sendable {
         parentID = input.metadata.parentID
         taskScope = input.taskScope
         if case .observation(let message) = input.payload,
-            let signal = message.content(as: AgentTaskSignal.self), signal.data.count <= 65_536
+            let signal = message.taskSignal ?? message.content(as: AgentTaskSignal.self), signal.data.count <= 65_536
         {
             task = signal
         } else {

@@ -68,3 +68,7 @@ ModelContext's management SPI reads an existing resource's inferenceActive flag.
 InferenceSession.phase exposes queued/running/finished/failed/cancelled; emitter marks execution start. Chat adapters bind waitForCompletion to their native worker cleanup. Cancelling a stream suppresses delivery immediately, while its owner can join actual provider exit before releasing serial execution.
 
 InferenceSession.withCleanup scopes event consumption and joins native cleanup on success, parse/storage errors, early return and cancellation. An already drained normal terminal remains finished; cancelling unconsumed buffered output still suppresses its delivery.
+
+## External state listeners
+
+SignalListener.swift defines ModelKit-owned SignalListener and StateSignalListener for passive SDK facts. Artifact revisions are latest-value, generation-bound, single-consumer subscriptions; source capacity is 16. cancel/join detach only the observer and do not unload a model or cancel downloads. ApplicationControl owns the observation task, cancels/joins it across foreground replacement, and then closes the handle. ModelKit imports no UI/Agents contract for this path.

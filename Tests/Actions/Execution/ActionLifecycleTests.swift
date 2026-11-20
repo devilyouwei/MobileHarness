@@ -215,7 +215,7 @@ func cancelledResourceOwnerCleanupWaitsForAcknowledgmentAndAllowsAssistant(scope
     let closing = Task {
         withUnsafeCurrentTask { $0?.cancel() }
         switch scope {
-        case "agent": await resources.close(agent: owner.agent, incarnation: owner.incarnation)
+        case "agent": await resources.close(endpoint: owner.endpoint, incarnation: owner.incarnation)
         case "session": await resources.close(sessionID: owner.sessionID)
         default: await resources.shutdown()
         }
@@ -524,6 +524,42 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
                 AgentInput(id: UUID().uuidString, sessionID: session, payload: .actionResult(result)),
                 to: .assistant)
         }
+    }
+}
+
+@Test(.actionCatalog) func resultRedeliveryStopsAtTheLimitAndFailsTheRound() async throws {
+    let counter = LifecycleCounter()
+    let attempts = LifecycleCounter()
+    let registry = try ActionRegistry(definitions: [
+        ActionBinding(path: lifecyclePath, displayName: "测试动作", kind: .finite, completion: "Effect completed.") {
+            _ in
+            await counter.increment()
+        }
+    ])
+    let scheduler = ChannelScheduler(registry: registry, resultDeliveryTimeout: .seconds(2)) { _ in
+        await attempts.increment()
+        return .retry
+    }
+    let owner = lifecycleOwner()
+    let roundID = UUID().uuidString
+    let invocation = try ScheduledAction(
+        envelope: OutputEnvelope(
+            source: owner.agent,
+            context: AgentInput(id: UUID().uuidString, sessionID: owner.sessionID, payload: .event("test")).context,
+            output: .actionCall(ActionCall(actionPath: lifecyclePath, channel: "Ordered")), roundID: roundID),
+        owner: owner, feedback: .terminal)
+    try await scheduler.enqueue(invocation: invocation)
+    try await scheduler.finish(inputID: roundID, source: owner.agent)
+    await scheduler.finishResultDelivery()
+    #expect(await counter.value == 1)
+    #expect(await attempts.value > 1)
+    let record = try #require(await scheduler.resultSnapshot().last)
+    #expect(record.delivery == "expired" && record.result?.invocation != nil)
+    do {
+        try await scheduler.finishRoundDelivery(roundID)
+        Issue.record("An expired result must fail round delivery")
+    } catch ActionSchedulingError.resultDeliveryFailed(_, _, let state) {
+        #expect(state == "expired")
     }
 }
 

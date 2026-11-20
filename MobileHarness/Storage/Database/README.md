@@ -4,11 +4,11 @@ DatabaseStorage 拥有数据库生命周期及 AssistantConversations、Assistan
 
 ## 表与目录
 
-Database 采用三层职责：根目录是数据库核心与整体装配；[Shared](#shared-mechanisms) 是不含 Agent 业务的编码、ID 和分页机制；业务表按持久化责任归属到对应目录，集中保存定义、映射、仓库操作和专属规则；WriterMessages 同时拥有请求表与执行表。共十一张业务表，版本迁移集中在 SQLiteSchema，无兼容视图。
+Database 采用三层职责：根目录是数据库核心与整体装配；[Shared](#shared-mechanisms) 是不含 Agent 业务的编码、ID 和分页机制；业务表按持久化责任归属到对应目录，集中保存定义、映射、仓库操作和专属规则；WriterMessages 同时拥有请求表与执行表。共十三张业务表，版本迁移集中在 SQLiteSchema，无兼容视图。
 
 ## 数据库核心
 
-根目录只保留五个 Swift 文件：SQLiteDatabase 管理连接池、读写准入、事务和关闭；SQLiteSchema 组合十一张表及版本策略；SQLiteRepositories 创建仓库并协调恢复；DatabaseStorage 定义总入口；SQLiteDatabaseStorage 实现启动/关闭和失败清理。SQLiteDatabase 接收外层传入的初始化闭包，不引用业务表或 schema 版本。不存在单独 SQLite 子目录。
+根目录只保留五个 Swift 文件：SQLiteDatabase 管理连接池、读写准入、事务和关闭；SQLiteSchema 组合十三张表及版本策略；SQLiteRepositories 创建仓库并协调恢复；DatabaseStorage 定义总入口；SQLiteDatabaseStorage 实现启动/关闭和失败清理。SQLiteDatabase 接收外层传入的初始化闭包，不引用业务表或 schema 版本。不存在单独 SQLite 子目录。
 
 Assistant 的会话、消息、前台任务和摘要接口分别由对应目录拥有；Writer 的执行接口由 WriterMessages 拥有，workspace 文件接口由 WriterWorkspaces 拥有。ModelRequestLogRepository、AgentMessageRepository 各自是独立共享表接口，没有统一 Chat/Task 仓库，也没有根据 agent 或 ID 选择两套业务表的门面。
 
@@ -187,9 +187,11 @@ erDiagram
         TEXT correlation_id
         TEXT reply_to_id FK
         TEXT sender_context
+        TEXT source_session_id
         TEXT dedupe_key "unique with sender and receiver"
         TEXT delivery_state
         REAL created_at
+        REAL published_at
         REAL received_at
         REAL consumed_at
         INTEGER attempt_count
@@ -227,17 +229,17 @@ erDiagram
 
 日志的三类 owner 恰好一个非空。一次业务轮可关联多次传输；ReACT 自身另建消息，不因多次 ReACT 共用一行。HTTP 日志是 URLSession 提供的应用层请求/响应字节，含 SSE；凭据型 header 和 URL 参数脱敏。非 HTTP 模型标为 local。每次采集以 64 KiB 块背压写入；后续回调只 UPDATE，清空后不会复建。图片与 generation meta 仅在 logs，清日志不删消息、任务、通信、workspace 或独立相册。
 
-received 表示投递，consumed 表示接收方已持久化安排处理，均不代表任务完成。通信正文包含实际发送内容，不提取另一份目标任务模型。Writer 的业务终态与完成 outbox 同事务提交；权限退休保留在 Writer 本地收尾，结果投递采用 token 领取、最多八次重试和退避，耗尽进入 dead_letter。消息体上限 128 KiB。接收失败与目标明确拒绝分别记录。
+received 表示投递，consumed 表示接收方已持久化安排处理，均不代表任务完成。通信正文包含实际发送内容，不提取另一份目标任务模型。Writer 的业务终态与完成 outbox 同事务提交；权限退休保留在 Writer 本地收尾，结果发布采用 token 领取、最多八次准入失败重试和退避，耗尽进入 dead_letter；消费者缺席或拒收不触发源端重发。published_at 与消费确认独立。消息体上限 128 KiB。接收失败与目标明确拒绝分别记录。
 
 ## 编译与生命周期
 
 Package.swift 显式将同目录公共契约编入 StorageChat/Tasks/Media/Devices，文件协调编入 StorageDatabase，全部 GRDB 实现仅编入 StorageSQLite；检查脚本验证每份源码只有一个编译拥有者。各表借用同一事务，不自行提交嵌套业务事务。
 
-当前 schema 20261113 直接打开，高于当前程序的版本拒绝打开。启动在 schema 准备和中断状态恢复后发布仓库。关闭先停止准入，再加入在途操作。重启将未完成的生成和业务标记为中断，历史记录保留已提交事实。
+当前 schema 20261120 直接打开，高于当前程序的版本拒绝打开。启动在 schema 准备和中断状态恢复后发布仓库。关闭先停止准入，再加入在途操作。重启将未完成的生成和业务标记为中断，历史记录保留已提交事实。
 
 历史窗口重建保留在途输入的完整运行时状态；最后一条模型轮完成不代表整个输入已结束，等待 ReACT 的输入不能被另一个消息的完成刷新改写为 completed。
 
-[SQLiteSchema.swift](SQLiteSchema.swift) 对 20261112 事务性更新 `agent_messages.contract`。Assistant → Writer 的委托使用 `agent.task.request`，Writer → Assistant 的报告与固定任务进度／终态统一使用 `agent.task.response`。消息 ID、关联、正文与投递状态保留。20261110 和 20261111 先迁移请求表，拆出 `writer_executions`，清理无 invocation 的旧输入及其日志和失效因果引用，提交前检查外键。实际请求及独立委托证据保留，日志此前已清理的请求也保留。更早格式走清格式初始化，重建十一张表并清理显式传入的 Writer 文件根。
+[SQLiteSchema.swift](SQLiteSchema.swift) 从 20261113 非破坏迁移到 20261120：增加可空 source_session_id、published_at、task_observation_cursors 和 invocation_evidence；20261119 仅补充发布标记并回填历史已递送证据，不修改历史协议名或正文。新写入使用 agent.task.v1 / agent.task.events.v1，读取显式接受 agent.task.request / agent.task.response / writer.completion 历史别名。20261112 先运行原有任务契约迁移；20261110/111 先拆出 writer_executions 并保留真实推理证据，再应用本次迁移。更早格式沿用原清格式初始化策略，重建十三张表并清理显式传入的 Writer 文件根。
 
 <a id="devices"></a>
 
@@ -262,3 +264,16 @@ Package.swift 显式将同目录公共契约编入 StorageChat/Tasks/Media/Devic
 [`WorkspaceFiles/`](WorkspaceFiles/)
 
 [WorkspaceFileRow.swift](WorkspaceFiles/WorkspaceFileRow.swift) 使用 `(workspace_id, path)` 复合主键，随工作区级联删除。行只保存字节数、指纹和更新时间。读取返回有序索引；替换与工作区租约元数据在调用方事务中提交，重复路径等约束错误使整个更新回滚。文件操作见 [WriterWorkspaces](WriterWorkspaces/README.md)。
+
+## Signal evidence tables
+
+```mermaid
+flowchart LR
+    Messages[agent_messages · immutable payload and delivery facts] -->|root FK, receiver and position| Cursors[task_observation_cursors]
+    Consumer[Task consumer confirmation] -->|same transaction| Messages
+    Consumer -->|contiguous consumed prefix| Cursors
+    Snapshots[Invocation archive port] --> Evidence[invocation_evidence · UUID, owner, Data, time]
+    Replay[Historical snapshot resolver] --> Evidence
+```
+
+The task cursor root is a foreign key with cascading deletion. Invocation owner_context is an opaque correlation string, not a business foreign key. Archives are immutable and not age-evicted; missing evidence is a real replay failure. Capacity, page limits, unknown legacy sessions and explicit protocol aliases are owned by [AgentMessages](AgentMessages/README.md#signal-evidence-and-task-cursors).

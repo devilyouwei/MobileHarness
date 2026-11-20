@@ -9,6 +9,7 @@ import StorageCore
 import Testing
 
 @testable import Agents
+@testable import ExecutionRuntime
 @testable import Gateway
 @testable import UI
 

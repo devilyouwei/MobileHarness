@@ -49,11 +49,13 @@ public struct CameraFrame: @unchecked Sendable {
 
         private let state = Mutex(State())
         private let observations = NativeInputBroadcast<CameraFrame>()
-        func subscribe() throws -> AsyncThrowingStream<CameraFrame, Error> { try observations.subscribe(.latest) }
+        func listen() throws -> MediaSignalListener<CameraFrame> {
+            try observations.listenMedia(.latest, producer: "platform.vision.camera")
+        }
 
         func setPortraitRotation(_ rotation: Int?) { state.withLock { $0.portraitRotation = rotation } }
         func setRotation(_ rotation: Int) { state.withLock { $0.rotation = rotation } }
-        func begin() -> AsyncThrowingStream<CameraFrame, Error> {
+        func begin() -> MediaSignalListener<CameraFrame> {
             if state.withLock({ $0.active }) { observations.finish() }
             let stream = AsyncThrowingStream<CameraFrame, Error>.makeStream(bufferingPolicy: .bufferingNewest(1))
             let generation = UUID().uuidString
@@ -72,7 +74,15 @@ public struct CameraFrame: @unchecked Sendable {
                 return previous
             }
             previous?.finish()
-            return stream.stream
+            return MediaSignalListener(
+                source: .init(producer: "platform.vision.camera.preview", generation: generation, delivery: .latest),
+                stream: stream.stream,
+                detach: { [weak self] in
+                    self?.state.withLock { value in
+                        if value.generation == generation { value.output = nil }
+                    }
+                    stream.continuation.finish()
+                })
         }
         func finish() {
             let output = state.withLock { value in

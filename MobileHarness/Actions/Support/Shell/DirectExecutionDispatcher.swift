@@ -6,16 +6,16 @@ public actor DirectExecutionDispatcher {
     private let validateScope: @Sendable (FunctionInvocation, ExecutionOwner?) async throws -> Void
     private let executor: ActionsExecutionPort
     private let resources: ResourceCoordinator
-    private let admission: GatewayAdmission
-    public func stateSnapshot() async throws -> GatewayStateSnapshot {
+    private let admission: ActionsAdmission
+    public func stateSnapshot() async throws -> ExecutionRuntimeFacts {
         try Task.checkCancellation()
-        return GatewayStateSnapshot(
-            path: "gateway.direct", runtime: ["executing": .count(work.count), "closed": .flag(closed)])
+        return ExecutionRuntimeFacts(
+            path: "actions.direct", runtime: ["executing": .count(work.count), "closed": .flag(closed)])
     }
     private var work: [UUID: Task<ActionCompletion, any Error>] = [:]
     private var closed = false
     init(
-        executor: ActionsExecutionPort, resources: ResourceCoordinator, admission: GatewayAdmission,
+        executor: ActionsExecutionPort, resources: ResourceCoordinator, admission: ActionsAdmission,
         validateScope: @escaping @Sendable (FunctionInvocation, ExecutionOwner?) async throws -> Void = { _, _ in }
     ) {
         self.validateScope = validateScope
@@ -24,9 +24,9 @@ public actor DirectExecutionDispatcher {
         self.admission = admission
     }
     public func execute(_ input: FunctionInvocation, owner: ExecutionOwner) async throws -> ActionCompletion {
-        guard !closed else { throw SignalTransportError.closed }
+        guard !closed else { throw ActionSchedulingError.shutdown }
         try admission.check()
-        guard work.count < 128 else { throw SignalTransportError.capacityExceeded }
+        guard work.count < 128 else { throw ActionSchedulingError.directCapacityExceeded }
         let id = UUID()
         let executor = executor
         let resources = resources

@@ -21,10 +21,10 @@ public struct AgentConfiguration: Sendable {
         to allowed: Set<String>, contracts: CommunicationContracts = .standard
     ) throws -> AgentConfiguration {
         let declaration = CommunicationDeclaration(
-            inputs: communication.inputs.filter { allowed.contains($0.contract) },
-            subscriptions: communication.subscriptions.filter { allowed.contains($0.contract) },
-            publications: communication.publications.filter { allowed.contains($0) },
-            sends: communication.sends.filter { allowed.contains($0.contract) })
+            requests: communication.requests.filter(allowed.contains),
+            feedback: communication.feedback.filter(allowed.contains),
+            publications: communication.publications.filter { allowed.contains($0.protocol) },
+            subscriptions: communication.subscriptions.filter { allowed.contains($0.protocol) })
         try declaration.validate(contracts: contracts)
         return AgentConfiguration(
             version: version, communication: declaration, agentID: agentID, category: category,
@@ -49,30 +49,19 @@ public struct AgentConfiguration: Sendable {
             throw AgentConfigurationError.invalidFormat
         }
         let root = try Self.dictionary(
-            raw, keys: ["version", "id", "category", "actions", "tools", "communication"],
+            raw, keys: ["version", "id", "category", "actions", "tools", "signals"],
             field: "root")
         let decoded: Document
         do { decoded = try JSONDecoder().decode(Document.self, from: data) } catch {
             throw AgentConfigurationError.invalidFormat
         }
-        guard decoded.version == 8 else {
+        guard decoded.version == 9 else {
             throw AgentConfigurationError.unsupportedVersion(decoded.version)
         }
         version = decoded.version
         category = decoded.category
-        let communicationObject = try Self.dictionary(
-            root["communication"] ?? NSNull(),
-            keys: ["inputs", "subscriptions", "publications", "sends"], field: "communication")
-        for (key, keys) in [
-            ("inputs", Set(["contract", "version", "kind"])),
-            ("subscriptions", Set(["contract", "source", "topic"])),
-            ("sends", Set(["contract", "target"])),
-        ] {
-            guard let entries = communicationObject[key] as? [Any] else { throw AgentConfigurationError.invalidFormat }
-            for entry in entries { _ = try Self.dictionary(entry, keys: keys, field: "communication.\(key)") }
-        }
-        try decoded.communication.validate(contracts: contracts)
-        communication = decoded.communication
+        try decoded.signals.validate(contracts: contracts, agentID: .init(rawValue: decoded.id))
+        communication = decoded.signals
         guard let groups = root["actions"] as? [String: [Any]], let tools = root["tools"] as? [Any],
             groups.values.reduce(0, { $0 + $1.count }) + tools.count <= 128
         else { throw AgentConfigurationError.invalidField("actions/tools") }
@@ -197,7 +186,7 @@ public struct AgentConfiguration: Sendable {
     }
 
     private struct Document: Decodable {
-        let communication: CommunicationDeclaration
+        let signals: CommunicationDeclaration
         let version: Int
         let id: String
         let category: AgentCategory
@@ -216,5 +205,21 @@ public struct AgentConfiguration: Sendable {
                 let function: String
             }
         }
+    }
+}
+
+public struct AgentProtocolStartupError: Error, Sendable, Equatable {
+    public enum Reason: String, Sendable {
+        case unknownProtocol, missingHandler, missingRequiredOperation, schemaMismatch, missingRequiredProtocol
+    }
+    public let agentID: AgentID
+    public let field: String
+    public let protocolID: String
+    public let reason: Reason
+    public init(agentID: AgentID, field: String, protocolID: String, reason: Reason) {
+        self.agentID = agentID
+        self.field = field
+        self.protocolID = protocolID
+        self.reason = reason
     }
 }

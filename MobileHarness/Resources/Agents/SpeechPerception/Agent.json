@@ -1,23 +1,24 @@
 {
-  "version": 10,
+  "version": 11,
   "category": "perception",
   "id": "speechPerception",
   "description": "I own listening consent, microphone intake, voice detection, speech recognition and sound-source observations. I publish recognized speech and enforce listening/playback lifecycle policy.",
-  "communication": {
-    "inputs": [
+  "baseSkills": [],
+  "signals": {
+    "requests": [],
+    "feedback": [
+      "action.result.v1"
+    ],
+    "publications": [
       {
-        "contract": "runtime.action.result",
-        "version": 1,
-        "kind": "actionResult"
+        "channel": "user.input.speech",
+        "protocol": "user.input.speech.v1"
+      },
+      {
+        "channel": "perception.audio.source",
+        "protocol": "perception.audio.source.v1"
       }
     ],
-    "subscriptions": [],
-    "publications": [
-      "user.input.asr.partial",
-      "user.input.asr.final",
-      "sound.source"
-    ],
-    "sends": []
-  },
-  "baseSkills": []
+    "subscriptions": []
+  }
 }

@@ -511,9 +511,10 @@ func resourceConflictFailsWithoutWaitingAndAdvancesItsChannel(sharedWriterGroup:
     #expect(await coordinator.snapshot()[firstResource] == .unlocked)
 }
 
-private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> OutputEnvelope {
+private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> ExecutionEnvelope {
     OutputEnvelope(
-        source: .assistant, context: input.context, output: .scheduling(directive), taskScope: input.taskScope)
+        source: .assistant, context: input.context, output: .scheduling(directive), taskScope: input.taskScope
+    ).schedulingEnvelope
 }
 
 @Test(.actionCatalog) func waitGroupsJoinBeforeAndAfterWithoutBlockingIndependentTasks() async throws {

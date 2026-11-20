@@ -6,15 +6,12 @@
     import ModelKitDefaults
     import ModelKitRuntime
     import PlatformKit
-    import Synchronization
     import UI
-    import UIKit
 
     /// Resolves default capabilities once; consumers receive shared, managed capability instances.
     @MainActor
     @available(iOS 27, *)
     final class VoiceInteractionSession {
-        private var memoryWarnings: Task<Void, Never>?
         private var starting: Task<Void, any Error>?
         private var started = false
         private let voiceAgents: VoiceAgentSession
@@ -67,8 +64,6 @@
         func shutdown() async throws {
             starting?.cancel()
             _ = await starting?.result
-            memoryWarnings?.cancel()
-            await memoryWarnings?.value
             var cleanupErrors: [any Error] = []
             await detectionInvalidation?.value
             await audioDetection.stopAndWait()
@@ -98,14 +93,10 @@
             public let validateVoiceModels: @Sendable () async throws -> String
         #endif
 
-        deinit {
-            memoryWarnings?.cancel()
-        }
-
         init(
             home: UIHomeContainer, diagnostics: UIDiagnosticsContainer,
             language: any ModelLanguageProviding, speech: any ModelSpeechProviding,
-            memoryPressure: @escaping @Sendable () async -> Void, audio: AudioContainer, runtime: AgentRuntime,
+            audio: AudioContainer, runtime: AgentRuntime,
             perceptionContainer: SpeechPerceptionContainer,
             modelName: @escaping @Sendable () async throws -> String,
             progress: @MainActor (String) -> Void
@@ -148,33 +139,6 @@
             self.audioDetection = native.detection
             detectionRequests = diagnostics.detectionRequests
             conversation = state
-            let warnings = memoryWarningStream()
-            memoryWarnings = Task {
-                for await _ in warnings {
-                    guard !Task.isCancelled else { break }
-                    await memoryPressure()
-                }
-            }
-        }
-    }
-
-    /// Memory warnings are coalescible notifications: retain only the latest pending warning.
-    private func memoryWarningStream() -> AsyncStream<Void> {
-        let token = Mutex<(any NSObjectProtocol)?>(nil)
-        return AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
-            token.withLock {
-                $0 = NotificationCenter.default.addObserver(
-                    forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: nil
-                ) { _ in continuation.yield(()) }
-            }
-            continuation.onTermination = { _ in
-                let observer = token.withLock { value in
-                    let observer = value
-                    value = nil
-                    return observer
-                }
-                if let observer { NotificationCenter.default.removeObserver(observer) }
-            }
         }
     }
 

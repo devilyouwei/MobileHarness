@@ -9,4 +9,8 @@
 - [NativeAttachmentTests.swift](NativeAttachmentTests.swift)
 - [WindowGatewayTests.swift](WindowGatewayTests.swift)
 
-[ChannelSchedulerTests.swift](ChannelSchedulerTests.swift) 验证同 Channel 顺序、跨 Channel 并行、wait、容量、资源竞争和取消 join。被测 ChannelScheduler 属于 Gateway，文件不再归 Actions。
+Channel 调度、资源仲裁、直接调用和结果账本属于 Actions Shell，其测试位于 [Tests/Actions/Execution](../../Actions/Execution/README.md)；GatewayContainerTests 只验证 Signal 端点、准入、暂停/恢复围栏和执行端口转发。
+
+GatewayContainerTests 的频道事件回归验证 scope/session/来源过滤、独立队列和取消；消费回调关闭自身订阅后仍可完成当前确认，后续事件不再接收。
+
+频道级无 scope 监听的回归覆盖多个任务 scope、无 scope 事件及交叠绑定拒绝；它不增加 broker 持久性或迟订阅重放。

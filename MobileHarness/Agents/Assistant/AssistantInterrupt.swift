@@ -7,7 +7,7 @@ public struct AssistantInterrupt: Codable, Sendable, Equatable {
         case current
         case reply(UUID)
     }
-    public static let contract = "assistant.interrupt"
+    public static let contract = "agent.interruption.v1"
     public let id: UUID
     public let target: Target
     public init(id: UUID = UUID(), target: Target = .current) {
@@ -15,7 +15,7 @@ public struct AssistantInterrupt: Codable, Sendable, Equatable {
         self.target = target
     }
     public func message() -> AgentMessage {
-        AgentMessage(contract: Self.contract, content: self, maximumBytes: 1024, validate: { _ in })
+        AgentMessage(contract: Self.contract, content: self, maximumBytes: 1024, id: id.uuidString, validate: { _ in })
     }
 }
 

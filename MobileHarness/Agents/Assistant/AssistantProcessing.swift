@@ -100,7 +100,7 @@ public struct AssistantSignalPreprocessor: SignalPreprocessor {
     public func classify(_ input: AgentInput, state: AssistantContextState) throws -> SignalDisposition {
         guard !input.metadata.expired else { throw CommunicationError.expired }
         switch input.payload {
-        case .communicationReceipt, .actionResult, .toolResult, .roundResult: return .feedback
+        case .actionResult, .toolResult, .roundResult: return .feedback
         case .text: return .enqueue(priority: 0)
         case .observation(let message):
             return ["assistant.control", AssistantInterrupt.contract].contains(message.contract)

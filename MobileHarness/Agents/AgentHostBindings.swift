@@ -84,18 +84,16 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
     public let decisionStatus: @MainActor @Sendable (String) -> Void
     public let decisionConfiguration:
         (@Sendable () async throws -> (String?, (@Sendable () async throws -> ChatModel)?))?
-    public let executor: ActionsExecutionPort
     public let catalog: ActionCatalogSnapshot
     public let settings: any ProviderSettingsStaging
     public let discovery: any ProviderDiscoveryStaging
     public let providerPresentation: any ProviderPresentationRegistering
     public let tasks: any TaskControlBinding
     public let resources: [ResourceDefinition]
-    public let connectionFacts: @MainActor @Sendable () throws -> AsyncThrowingStream<NexArmConnectionFacts, any Error>
+    public let connectionFacts: @MainActor @Sendable () throws -> PlatformKit.StateSignalListener<NexArmConnectionFacts>
     public let trackingAvailable: @Sendable () async -> Bool
     public let bindTracking: @MainActor (@escaping @Sendable () async -> Bool) -> Void
     public let bindDeferredFailure: @MainActor (@escaping @Sendable (DeferredActionFailure) async -> Bool) -> Void
-    public let bindResources: @MainActor (ResourceCoordinator, ChannelScheduler) -> Void
     public let observeTranscript: @MainActor @Sendable (String, String) throws -> Void
     public let output: @Sendable (ActionOutputObservation) async -> Void
     public let speechEnhancementEnabled: @Sendable () async throws -> Bool
@@ -103,7 +101,7 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
     public let decodeResources: @Sendable (String) throws -> ModelResourceViewSnapshot
     public let makeVoice: @MainActor (AgentVoiceHost) throws -> AgentVoiceExecution
     public init(
-        executor: ActionsExecutionPort, catalog: ActionCatalogSnapshot,
+        catalog: ActionCatalogSnapshot,
         readWebScreenshot: @escaping @Sendable (String) async throws -> MultimodalContextSnapshot,
         artifactStreaming: (any ArtifactStreaming)? = nil,
         writerArtifacts: (any WriterArtifactsControlling)? = nil,
@@ -116,11 +114,10 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
         providerPresentation: any ProviderPresentationRegistering, tasks: any TaskControlBinding,
         resources: [ResourceDefinition],
         connectionFacts:
-            @escaping @MainActor @Sendable () throws -> AsyncThrowingStream<NexArmConnectionFacts, any Error>,
+            @escaping @MainActor @Sendable () throws -> PlatformKit.StateSignalListener<NexArmConnectionFacts>,
         trackingAvailable: @escaping @Sendable () async -> Bool,
         bindTracking: @escaping @MainActor (@escaping @Sendable () async -> Bool) -> Void,
         bindDeferredFailure: @escaping @MainActor (@escaping @Sendable (DeferredActionFailure) async -> Bool) -> Void,
-        bindResources: @escaping @MainActor (ResourceCoordinator, ChannelScheduler) -> Void,
         observeTranscript: @escaping @MainActor @Sendable (String, String) throws -> Void,
         output: @escaping @Sendable (ActionOutputObservation) async -> Void,
         speechEnhancementEnabled: @escaping @Sendable () async throws -> Bool = { false },
@@ -135,7 +132,6 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
         self.decisionConfiguration = decisionConfiguration
         self.decisionStatus = decisionStatus
         self.inputQueueStatus = inputQueueStatus
-        self.executor = executor
         self.catalog = catalog
         self.settings = settings
         self.discovery = discovery
@@ -146,7 +142,6 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
         self.trackingAvailable = trackingAvailable
         self.bindTracking = bindTracking
         self.bindDeferredFailure = bindDeferredFailure
-        self.bindResources = bindResources
         self.observeTranscript = observeTranscript
         self.output = output
         self.speechEnhancementEnabled = speechEnhancementEnabled

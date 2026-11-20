@@ -33,8 +33,9 @@ extension SQLiteWriterExecutionRepository {
                 return try Self.requestView(delegateID, db: db)
             }
             guard let incoming = try AgentMessageRow.fetchOne(db, key: delegateID),
-                incoming.receiverAgentID == "writer", incoming.senderAgentID == "assistant",
-                ["agent.task.request", "agent.taskMessage", "task.request"].contains(incoming.contract),
+                incoming.receiverAgentID == "writer", !incoming.senderAgentID.isEmpty,
+                ["agent.task.v1", "agent.task.request", "agent.taskMessage", "task.request"].contains(
+                    incoming.contract),
                 incoming.correlationID == delegateID, incoming.replyToID == nil, incoming.consumedAt == nil
             else { throw RecordStorageError.conflict }
             let busy =
@@ -176,7 +177,9 @@ extension SQLiteWriterExecutionRepository {
                 ["running", "waiting_input", "paused"].contains(root["run_state"] as String)
             else { throw RecordStorageError.conflict }
             if incoming.consumedAt != nil { return false }
-            guard incoming.contract == "agent.task.request", incoming.senderAgentID == "assistant",
+            guard ["agent.task.v1", "agent.task.request"].contains(incoming.contract),
+                let original = try AgentMessageRow.fetchOne(db, key: requestID),
+                incoming.senderAgentID == original.senderAgentID, incoming.sourceSessionID == original.sourceSessionID,
                 (root["pending_question_id"] as String?) == questionID
             else {
                 throw RecordStorageError.conflict
@@ -200,7 +203,9 @@ extension SQLiteWriterExecutionRepository {
         guard !reason.isEmpty, reason.utf8.count <= 4096 else { throw RecordStorageError.invalidRecord }
         return try database.write { db in
             guard let incoming = try AgentMessageRow.fetchOne(db, key: id),
-                incoming.contract == "agent.task.request", incoming.senderAgentID == "assistant",
+                ["agent.task.v1", "agent.task.request"].contains(incoming.contract),
+                let original = try AgentMessageRow.fetchOne(db, key: requestID),
+                incoming.senderAgentID == original.senderAgentID, incoming.sourceSessionID == original.sourceSessionID,
                 incoming.receiverAgentID == "writer", incoming.correlationID == requestID
             else { throw RecordStorageError.conflict }
             if incoming.consumedAt != nil { return false }
@@ -276,7 +281,8 @@ extension SQLiteWriterExecutionRepository {
                     .init(
                         id: interactionID, sender: "writer", receiver: request.senderAgentID,
                         contract: "writer.question", payload: data, correlationID: request.correlationID,
-                        replyTo: delegateID, senderContext: request.senderContext, dedupeKey: interactionID), db: db)
+                        replyTo: delegateID, senderContext: request.senderContext,
+                        sourceSessionID: request.sourceSessionID, dedupeKey: interactionID), db: db)
             }
             try db.execute(
                 sql:

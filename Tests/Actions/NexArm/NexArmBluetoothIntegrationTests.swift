@@ -82,14 +82,16 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
         snapshot.feedbackPacket = packet
         snapshot.feedbackReceivedAt = .now
         snapshot.feedbackHealthy = true
-        emit.yield(snapshot)
+        emit.send(snapshot)
     }
     func health(_ healthy: Bool) {
         snapshot.feedbackHealthy = healthy
-        emit.yield(snapshot)
+        emit.send(snapshot)
     }
-    nonisolated let updates: AsyncStream<NexArmBluetoothSnapshot>
-    private let emit: AsyncStream<NexArmBluetoothSnapshot>.Continuation
+    nonisolated func listenUpdates() throws -> PlatformKit.StateSignalListener<NexArmBluetoothSnapshot> {
+        try emit.listen(.latest, producer: "fixture.bluetooth")
+    }
+    private nonisolated let emit = NativeInputBroadcast<NexArmBluetoothSnapshot>()
     nonisolated let id = UUID().uuidString
     nonisolated let records = Result { try SQLiteRepositories.temporary() }
     nonisolated var businessID: String {
@@ -110,12 +112,12 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
     func power(_ value: NexArmBluetoothPower) {
         snapshot.power = value
         if value != .poweredOn { snapshot.phase = .disconnected }
-        emit.yield(snapshot)
+        emit.send(snapshot)
     }
-    func lateSnapshot(_ value: NexArmBluetoothSnapshot) { emit.yield(value) }
+    func lateSnapshot(_ value: NexArmBluetoothSnapshot) { emit.send(value) }
     func setRevision(_ value: UInt64) {
         snapshot.revision = value
-        emit.yield(snapshot)
+        emit.send(snapshot)
     }
     var missingVersion = false
     var reportedVersion: [UInt8]?
@@ -151,7 +153,7 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
         if ContinuousClock.now - blockedSince! >= .seconds(2) {
             snapshot.failure = .sendBlocked
             snapshot.phase = .disconnected
-            emit.yield(snapshot)
+            emit.send(snapshot)
             throw NexArmError.timeout
         }
         return false
@@ -204,7 +206,7 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
             failLiveAfterDisconnect = false
             snapshot.phase = .disconnected
             snapshot.failure = .timeout(.writing)
-            emit.yield(snapshot)
+            emit.send(snapshot)
             await withCheckedContinuation { pendingLiveFailure = $0 }
             throw NexArmError.timeout
         }
@@ -239,9 +241,7 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
     private(set) var writes = 0
     private(set) var disconnects = 0
     init() {
-        let pair = AsyncStream<NexArmBluetoothSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
-        updates = pair.stream
-        emit = pair.continuation
+
     }
     func configure(
         wrong: Bool = false, hold: Bool = false, fail: Bool = false, missing: Bool = false,
@@ -256,20 +256,20 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
     }
     func simulateDiscovery(_ devices: [NexArmBluetoothDevice]) {
         snapshot.devices = devices
-        emit.yield(snapshot)
+        emit.send(snapshot)
     }
     func loseConnectionOnNextFeedback() { loseLinkOnFeedback = true }
     func loseConnectionOnNextMotion() { loseLinkOnMotion = true }
     func nativeWriteFailure() throws {
         snapshot.failure = .timeout(.writing)
         snapshot.phase = .disconnected
-        emit.yield(snapshot)
+        emit.send(snapshot)
         throw NexArmError.timeout
     }
     func loseConnection() {
         snapshot.phase = .disconnected
         snapshot.failure = .timeout(.response)
-        emit.yield(snapshot)
+        emit.send(snapshot)
     }
     func invalidatePose() { z = 0 }
     func setResetHeight(_ height: Int) { resetHeight = height }
@@ -281,24 +281,24 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
         snapshot.power = .poweredOn
         snapshot.scanning = true
         snapshot.devices = [.init(id: id, name: displayName, rssi: -45)]
-        emit.yield(snapshot)
+        emit.send(snapshot)
     }
     func stopScan() {
         snapshot.scanning = false
-        emit.yield(snapshot)
+        emit.send(snapshot)
     }
     func clearDiscovery() {
         stopScan()
         snapshot.devices = []
         snapshot.discoveryLimitReached = false
-        emit.yield(snapshot)
+        emit.send(snapshot)
     }
     func forgetDevice() throws {
         guard snapshot.phase == .disconnected else { throw NexArmError.busy }
         clearDiscovery()
         snapshot.selected = nil
         snapshot.failure = nil
-        emit.yield(snapshot)
+        emit.send(snapshot)
     }
     func connect(_ id: String) async throws {
         guard id == self.id else { throw NexArmBluetoothError.unknownDevice }
@@ -307,13 +307,13 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
         snapshot.selected = .init(id: id, name: displayName, rssi: -45)
         if failedConnectionsRemaining > 0 {
             failedConnectionsRemaining -= 1
-            emit.yield(snapshot)
+            emit.send(snapshot)
             throw NexArmError.timeout
         }
         snapshot.selected = .init(id: id, name: displayName, rssi: -45)
         snapshot.failure = nil
         snapshot.phase = .connecting
-        emit.yield(snapshot)
+        emit.send(snapshot)
         if holdConnection { try await Task.sleep(for: .seconds(30)) }
         try Task.checkCancellation()
         if incompatibleService { throw NexArmBluetoothError.incompatibleService }
@@ -323,7 +323,7 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
         telemetry = NexArmTelemetryCache()
         liveSession = nil
         observation = nil
-        emit.yield(snapshot)
+        emit.send(snapshot)
     }
     func disconnect() {
         disconnects += 1
@@ -334,7 +334,7 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
         snapshot.phase = disconnectUnconfirmed ? .disconnecting : .disconnected
         if disconnectUnconfirmed { snapshot.failure = .disconnectUnconfirmed }
         snapshot.scanning = false
-        emit.yield(snapshot)
+        emit.send(snapshot)
     }
     func close() { disconnect() }
     func write(_ packet: NexArmPacket) throws {
@@ -414,7 +414,7 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
             snapshot.feedbackHealthy = false
             snapshot.queriesQuarantined = true
             snapshot.failure = .responseTimeout(command: 11, expectedBytes: 24, receivedBytes: 0)
-            emit.yield(snapshot)
+            emit.send(snapshot)
             throw NexArmError.timeout
         }
         if packet.command == 7 {
@@ -422,7 +422,7 @@ private actor BluetoothArmFixture: NexArmBluetoothLink {
             if rejectIK {
                 snapshot.failure = .responseTimeout(command: 7, expectedBytes: 24, receivedBytes: 0)
                 snapshot.queriesQuarantined = true
-                emit.yield(snapshot)
+                emit.send(snapshot)
                 throw NexArmError.timeout
             }
             return try ik.reply(packet)

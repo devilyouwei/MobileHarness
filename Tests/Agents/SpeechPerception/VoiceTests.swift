@@ -124,7 +124,7 @@ private func preparedSpeech(
     let response = await OutputGateway(
         manager: manager, requests: gateway, tools: tools, actions: scheduler, policy: policy
     ) { _ in }
-    try bindFixtureCommunications(agent, port: await response.messaging(for: .assistant))
+    try await bindFixtureCommunications(agent, port: await response.messaging(for: .assistant))
     try await agent.start()
     let recognition = RecognitionFixture(text: "你好", includeFinal: true)
     let sessionID = UUID().uuidString
@@ -519,8 +519,10 @@ func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop(profile: String) async t
     }
     let output = await OutputGateway(
         manager: manager, requests: input, tools: tools, actions: scheduler, policy: policy,
-        observedContracts: [PerceptionMessage.asrPartialContract],
+        observedContracts: [PerceptionMessage.speechProtocol],
         observeEvent: { value in observed.continuation.yield(value) }, sink: { _ in })
+    // Static consumers bind themselves at assembly; publishing never initializes them.
+    _ = try await output.consumer(for: assistant)
     try await speech.bind(output.messaging(for: .speechPerception))
     try await speech.start()
     let outputTask = Task {
@@ -569,7 +571,7 @@ func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop(profile: String) async t
     await input.flushPublications()
     var previews = observed.stream.makeAsyncIterator()
     let preview = try #require(await previews.next())
-    #expect(preview.metadata.contract == PerceptionMessage.asrPartialContract)
+    #expect(preview.metadata.contract == PerceptionMessage.speechProtocol)
     #expect(preview.metadata.topic == PerceptionMessage.userInputTopic)
     if let value = finals.first, case .observation(let event) = value.payload {
         #expect(event.perception == .transcript("你好", final: true))
@@ -1348,7 +1350,7 @@ func coldRecognitionRejectsOverflowWithoutDroppingPreviouslyQueuedPCM() async th
 
 @Test(.actionCatalog) func nativeMicrophoneQueueRejectsPacket65AndTerminates() async throws {
     let source = NativeMicrophoneFixture()
-    let input = try await source.subscribeCapture()
+    let input = try await source.listenCapture()
     let frame = MicrophoneFrame(samples: [0], sampleRate: 16000, sequence: 0)
     for _ in 0..<64 { #expect(try source.capture.send(frame)) }
     #expect(throws: AudioIOError.overflow) { try source.capture.send(frame) }

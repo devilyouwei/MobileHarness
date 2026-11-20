@@ -315,7 +315,7 @@ public final class UIModelResourcesContainer {
             ])
     }
 
-    public let requests = UIRequests<ResourcesInput, ResourcesReply>()
+    public let requests = UIRequests<ResourcesInput, ResourcesReply>(producer: "ui.settings.resources")
 
     public let state = ModelResourcesState()
     public var presentation: any ModelResourcesPresenting { state }

@@ -2,6 +2,7 @@ import AgentCore
 import Foundation
 import Gateway
 
+/// Agents-side adapter for internal Signals: role policy, authenticated endpoints, requests, events and Action feedback delivery to roles.
 public actor InputGateway {
 
     private var signalRecords: [SignalTraceRecord] = []
@@ -14,9 +15,8 @@ public actor InputGateway {
     private var taskObservers: [String: AsyncStream<SignalTraceSnapshot>.Continuation] = [:]
     private let signalAggregation: @Sendable (AgentInput) -> Bool
     private let signalSummary: @Sendable (AgentInput) -> String
-    private var publications: [String: Task<Void, Never>] = [:]
-    private var publicationBranches = 0
-    private var publicationBytes = 0
+    private var eventFacility: SignalEventTransport?
+    private var eventPublishers: [SignalEndpoint: [String: SignalEventPublisher<AgentInput>]] = [:]
     private var closed = false
     private let publicationFailure: @Sendable (AgentInput, AgentID?, String) async -> Void
     private var activeAdmissions = 0
@@ -25,9 +25,13 @@ public actor InputGateway {
     private let policy: CommunicationPolicy?
     private let admission: GatewayAdmission?
     private let manager: AgentManager
+    private let requestImplementations: [AgentID: [AgentRequestImplementation]]
+    private let eventImplementations: [AgentID: [AgentEventImplementation]]
     private let signals: SignalTransport
     public init(
         manager: AgentManager, policy: CommunicationPolicy? = nil, signals: SignalTransport,
+        requestImplementations: [AgentID: [AgentRequestImplementation]] = [:],
+        eventImplementations: [AgentID: [AgentEventImplementation]] = [:],
         signalAggregation: @escaping @Sendable (AgentInput) -> Bool = {
             [.audio, .image, .activityEvent].contains($0.payload.kind)
         },
@@ -35,6 +39,8 @@ public actor InputGateway {
         publicationFailure: @escaping @Sendable (AgentInput, AgentID?, String) async -> Void = { _, _, _ in },
         admission: GatewayAdmission? = nil
     ) {
+        self.requestImplementations = requestImplementations
+        self.eventImplementations = eventImplementations
         self.signals = signals
         self.admission = admission
         self.signalAggregation = signalAggregation
@@ -44,14 +50,129 @@ public actor InputGateway {
         self.manager = manager
     }
 
-    func bindEndpoint(_ agent: any Agent, incarnation: String) async throws {
-        _ = try await signals.register(address: agent.descriptor.id.rawValue, incarnation: incarnation) { signal in
+    private var requestBindings: [AgentID: (SignalEndpoint, Task<Void, any Error>)] = [:]
+    @discardableResult func bindEndpoint(_ agent: any Agent, incarnation: String) async throws -> SignalEndpoint {
+        let id = agent.descriptor.id
+        let port = try await signals.register(address: id.rawValue, incarnation: incarnation) {
+            [weak self, manager] signal in
+            guard let self else { throw CommunicationError.scopeClosed }
             guard let value = signal.payload as? AgentInput else { throw CommunicationError.invalidPayload }
-            try await agent.receive(value)
+            _ = try await self.validatePayload(value)
+            if let source = signal.source {
+                guard value.metadata.origin == .agent, value.metadata.source == source.address,
+                    value.metadata.incarnation == source.incarnation
+                else { throw CommunicationError.unauthorized }
+                try await manager.validate(
+                    .init(rawValue: source.address), incarnation: source.incarnation, sessionID: value.sessionID)
+            } else {
+                guard value.metadata.origin == .runtime else { throw CommunicationError.unauthorized }
+            }
+            try await manager.validate(id, incarnation: incarnation, sessionID: value.sessionID)
+            guard agent.descriptor.inputs.contains(value.payload.kind) else { throw HarnessError.unsupportedInput }
+            if value.metadata.origin == .agent,
+                let implementation = self.eventImplementations[id]?.first(where: {
+                    $0.protocolID == value.metadata.contract && $0.channel == value.metadata.topic
+                })
+            {
+                try await implementation.handle(agent, value)
+            } else {
+                try await agent.receive(value)
+            }
         }
+        if let existing = requestBindings[id], existing.0 == port {
+            try await existing.1.value
+            return port
+        }
+        let enabled = policy?.agents[id]?.requests ?? []
+        let declaration = policy?.agents[id]
+        let task = Task { [signals] in
+            for protocolID in enabled {
+                let descriptor = try Self.requestDescriptor(protocolID)
+                try await signals.registerContextualRequest(descriptor, endpoint: port) { request, context in
+                    let input = request.input
+                    guard context.source.address == input.metadata.source,
+                        context.source.incarnation == input.metadata.incarnation,
+                        input.metadata.origin == .agent, input.metadata.contract == context.protocolID
+                    else { throw CommunicationError.unauthorized }
+                    _ = try await self.validatePayload(input)
+                    try await self.manager.validate(
+                        .init(rawValue: context.source.address), incarnation: context.source.incarnation,
+                        sessionID: input.sessionID)
+                    try await self.manager.validate(id, incarnation: incarnation, sessionID: input.sessionID)
+                    if let implementation = self.requestImplementations[id]?.first(where: {
+                        $0.protocolID == protocolID
+                    }) {
+                        return try await implementation.handle(agent, request)
+                    }
+                    return try await agent.receiveRequest(request)
+                }
+            }
+            if let declaration {
+                let bus = try await eventBus()
+                for publication in declaration.publications {
+                    let descriptor = try eventDescriptor(publication.protocol)
+                    let publisher = try await bus.registerProducer(
+                        endpoint: port, channel: EventChannel(publication.channel), using: descriptor)
+                    eventPublishers[port, default: [:]][publication.channel] = publisher
+                }
+                for subscription in declaration.subscriptions {
+                    _ = try await bus.subscribe(
+                        endpoint: port, channel: EventChannel(subscription.channel),
+                        using: eventDescriptor(subscription.protocol), sources: Set(subscription.sources),
+                        variants: subscription.events.map(Set.init))
+                }
+            }
+        }
+        requestBindings[id] = (port, task)
+        do { try await task.value } catch {
+            await signals.unregister(port)
+            if requestBindings[id]?.0 == port { requestBindings[id] = nil }
+            eventPublishers[port] = nil
+            throw error
+        }
+        return port
+    }
+    private func eventBus() async throws -> SignalEventTransport {
+        if let eventFacility { return eventFacility }
+        let bus = try await signals.events()
+        eventFacility = bus
+        return bus
+    }
+    private func eventDescriptor(_ protocolID: String) throws -> SignalEventProtocol<AgentInput> {
+        guard let contracts = policy?.contracts, let definition = contracts[protocolID], definition.channel != nil
+        else {
+            throw CommunicationError.unsupportedContract
+        }
+        return try .init(
+            id: protocolID, variants: definition.events, maximumBytes: definition.maximumBytes,
+            measure: { input in
+                guard case .observation(let message) = input.payload, message.contract == protocolID else {
+                    throw CommunicationError.invalidPayload
+                }
+                return try contracts.validatedSize(message)
+            },
+            variant: { input in
+                if case .observation(let message) = input.payload { return message.event }
+                return nil
+            })
+    }
+    private static func requestDescriptor(_ protocolID: String) throws -> SignalRequestProtocol<
+        AgentProtocolRequest, AgentRequestReply
+    > {
+        try .init(
+            id: protocolID, maximumRequestBytes: 262_144, maximumReplyBytes: 4096,
+            requestSize: { request in
+                let input = request.input
+                guard case .observation(let message) = input.payload else { throw CommunicationError.invalidPayload }
+                return try message.validatedSize()
+            }, replySize: { try JSONEncoder().encode($0).count })
     }
     func retireEndpoint(_ id: AgentID, incarnation: String) async {
         await signals.unregister(address: id.rawValue, incarnation: incarnation)
+        if let binding = requestBindings[id], binding.0.incarnation == incarnation {
+            eventPublishers[binding.0] = nil
+            requestBindings[id] = nil
+        }
     }
 
     public func observeSignals() throws -> AsyncStream<SignalTraceSnapshot> {
@@ -155,12 +276,14 @@ public actor InputGateway {
         }
         guard let index = signalRecords.firstIndex(where: { $0.id == id }) else { return }
         if let report {
-            signalRecords[index].branches = signalRecords[index].branches.map { branch in
-                if let reason = report.rejected[branch.target] {
+            let targets = Set(signalRecords[index].branches.map(\.target))
+                .union(report.delivered).union(report.rejected.keys)
+            signalRecords[index].branches = targets.sorted { $0.rawValue < $1.rawValue }.prefix(16).map { target in
+                if let reason = report.rejected[target] {
                     return .init(
-                        target: branch.target, phase: reason == "inputBusy" ? .suppressed : .rejected, reason: reason)
+                        target: target, phase: reason == "inputBusy" ? .suppressed : .rejected, reason: reason)
                 }
-                return .init(target: branch.target, phase: .accepted)
+                return .init(target: target, phase: .accepted)
             }
             signalRecords[index].phase =
                 report.rejected.isEmpty
@@ -193,6 +316,24 @@ public actor InputGateway {
         signalChanged()
     }
 
+    /// The requesting owner explicitly creates and retains this generic subscription handle.
+    func subscribe(_ filter: AgentEventFilter, consumer: AgentID, incarnation: String) async throws
+        -> AgentEventSubscription
+    {
+        guard !closed, let definition = policy?.contracts[filter.protocolID], definition.channel == filter.channel,
+            !filter.sources.isEmpty, !filter.sessionID.isEmpty
+        else { throw CommunicationError.unsupportedContract }
+        guard try await manager.identity(consumer) == incarnation else { throw CommunicationError.unauthorized }
+        let role = try await manager.agent(consumer)
+        let port = try await bindEndpoint(role, incarnation: incarnation)
+        let bus = try await eventBus()
+        let subscription = try await bus.subscribe(
+            endpoint: port, channel: EventChannel(filter.channel),
+            using: eventDescriptor(filter.protocolID), sources: Set(filter.sources.map(\.rawValue)),
+            scope: filter.scope, sessionID: filter.sessionID)
+        return AgentEventSubscription(cancel: { await bus.cancel(subscription) })
+    }
+
     // Module-internal: only OutputGateway supplies resolved targets and a bound source identity.
     func sendInternal(_ input: AgentInput, targets: [(AgentID, String)]) async throws -> DeliveryReport {
         guard input.metadata.origin == .agent, input.metadata.incarnation != nil else {
@@ -201,6 +342,7 @@ public actor InputGateway {
         return try await deliver(input, targets: targets.map { ($0.0, Optional($0.1)) })
     }
     private func validatePayload(_ input: AgentInput) throws -> Int {
+        guard !closed else { throw CommunicationError.scopeClosed }
         guard !input.metadata.expired else { throw CommunicationError.expired }
         guard input.metadata.contract == InputMetadata(payload: input.payload, rootID: input.metadata.rootID).contract,
             input.metadata.version == 1, input.metadata.hops >= 0, input.metadata.hops <= 8,
@@ -245,65 +387,91 @@ public actor InputGateway {
     /// Bound Agent publication retains one-way diagnostics without business acknowledgment.
 
     func publishInternal(
-        _ input: AgentInput, targets: [(AgentID, String?)],
-        observe: (@Sendable (AgentInput) async -> Void)? = nil
-    ) async throws {
-        let traceID = beginSignal(input, mode: .publish, targets: targets.map(\.0))
+        _ input: AgentInput,
+        observe: (@Sendable (AgentInput) async throws -> Void)? = nil, scope: String? = nil,
+        audience: Set<AgentID>? = nil
+    ) async throws -> DeliveryReport {
+        let traceID = beginSignal(input, mode: .publish, targets: [])
         do {
-            try Task.checkCancellation()
-            let branches = targets.count + (observe == nil ? 0 : 1)
-            let bytes = try validatePayload(input) * branches
-
-            guard !closed else { throw CommunicationError.scopeClosed }
-            try checkAdmission(input)
-            guard branches > 0 else {
-                finishSignal(traceID, phase: .unobserved)
-                return
-            }
-            guard targets.count <= 16, Set(targets.map(\.0)).count == targets.count,
-                publications.count < 128, publicationBranches + branches <= 256,
-                publicationBytes + bytes <= 8 * 1024 * 1024
-            else {
-                finishSignal(traceID, phase: .dropped, reason: "Publication capacity exceeded")
-                return
-            }
-            let id = UUID().uuidString
-            publicationBranches += branches
-            publicationBytes += bytes
-            publications[id] = Task {
-                defer {
-                    publications[id] = nil
-                    publicationBranches -= branches
-                    publicationBytes -= bytes
-                }
-                async let observation: Void = {
-                    if let observe { await observe(input) }
-                }()
-                do {
-                    let report: DeliveryReport
-                    if targets.isEmpty {
-                        finishSignal(traceID, phase: .unobserved)
-                        report = DeliveryReport()
-                    } else {
-                        report = try await deliver(input, targets: targets, traceID: traceID, publication: true)
-                    }
-                    for (target, reason) in report.rejected {
-                        // Expected paused media admission is suppression, not an execution issue.
-                        if !["inputBusy", "notRunning"].contains(reason) {
-                            await publicationFailure(input, target, reason)
-                        }
-                    }
-                } catch is CancellationError {
-                    finishSignal(traceID, phase: .dropped, reason: "Publication cancelled")
-                } catch {
-                    finishSignal(traceID, phase: .rejected, reason: String(describing: error))
-                    await publicationFailure(input, nil, String(describing: error))
-                }
-                await observation
-            }
+            _ = try await publishEvent(
+                input, observe: observe, scope: scope, audience: audience, traceID: traceID)
+            return DeliveryReport(publicationAccepted: true)
         } catch {
             finishSignal(traceID, phase: .rejected, reason: String(describing: error))
             throw error
+        }
+    }
+    private func publishEvent(
+        _ input: AgentInput,
+        observe: (@Sendable (AgentInput) async throws -> Void)? = nil,
+        scope: String?, audience: Set<AgentID>?, traceID: String
+    ) async throws -> SignalPublication {
+        guard !closed else { throw CommunicationError.scopeClosed }
+        try checkAdmission(input)
+        try Task.checkCancellation()
+        let bytes = try validatePayload(input)
+        guard input.metadata.origin == .agent, let incarnation = input.metadata.incarnation,
+            let definition = policy?.contracts[input.metadata.contract], let channel = definition.channel
+        else { throw CommunicationError.unauthorized }
+        let sourceID = AgentID(rawValue: input.metadata.source)
+        try await manager.validate(sourceID, incarnation: incarnation, sessionID: input.sessionID)
+        let source = try await manager.agent(sourceID)
+        let sourcePort = try await bindEndpoint(source, incarnation: incarnation)
+        let bus = try await eventBus()
+        guard let publisher = eventPublishers[sourcePort]?[channel] else {
+            throw CommunicationError.unauthorized
+        }
+        let initialFailures: [AgentID: String] = [:]
+        let observer: (@Sendable () async throws -> Void)?
+        if let observe { observer = { try await observe(input) } } else { observer = nil }
+        let cleanup =
+            input.metadata.origin == .runtime
+            || {
+                if case .observation(let message) = input.payload { return message.taskSignal?.kind == .result }
+                return false
+            }()
+        return try await bus.publish(
+            input, from: publisher,
+            envelope: .init(
+                id: input.id, sessionID: input.sessionID, contract: input.metadata.contract,
+                version: input.metadata.version, hops: input.metadata.hops, payloadBytes: bytes,
+                expiresAt: input.metadata.deadline, cleanup: cleanup,
+                control: input.metadata.contract == "agent.interruption.v1"),
+            scope: scope, audience: audience.map { Set($0.map(\.rawValue)) }, observer: observer
+        ) { [self] results in
+            await settlePublication(input, traceID: traceID, results: results, initialFailures: initialFailures)
+        }
+    }
+    private func settlePublication(
+        _ input: AgentInput, traceID: String, results: [SignalEventBranchResult], initialFailures: [AgentID: String]
+    ) async {
+        var delivered: [AgentID] = []
+        var rejected = initialFailures
+        for result in results {
+            if result.target == "@observer" {
+                if result.status != .accepted {
+                    await publicationFailure(input, nil, result.reason ?? "Observer closed")
+                }
+            } else if result.status == .accepted {
+                delivered.append(.init(rawValue: result.target))
+            } else {
+                rejected[.init(rawValue: result.target)] = result.reason ?? result.status.rawValue
+            }
+        }
+        if delivered.isEmpty && rejected.isEmpty {
+            finishSignal(traceID, phase: .unobserved)
+        } else {
+            finishSignal(traceID, report: .init(delivered: delivered, rejected: rejected))
+        }
+        for (target, reason) in rejected {
+            if !["inputBusy", "notRunning"].contains(reason) || input.metadata.contract == "agent.interruption.v1"
+                || {
+                    if case .observation(let message) = input.payload { return message.event == "final" }
+                    return false
+                }()
+            {
+                await publicationFailure(input, target, reason)
+            }
         }
     }
 
@@ -318,21 +486,13 @@ public actor InputGateway {
         try admission.check()
     }
     func suspend() async {
-        let pending = Array(publications.values)
-        for task in pending { task.cancel() }
-        for task in pending { await task.value }
+        await eventFacility?.cancelPublications(sources: Set(requestBindings.values.map { $0.0 }))
     }
-
-    /// Runtime/test cleanup barrier; producers never use this as publication acknowledgment.
-    public func flushPublications() async {
-        let pending = Array(publications.values)
-        for operation in pending { await operation.value }
-    }
+    /// Runtime/test barrier; publication callers receive admission only.
+    public func flushPublications() async { await eventFacility?.flush() }
     public func shutdown() async {
         closed = true
-        let pending = Array(publications.values)
-        for operation in pending { operation.cancel() }
-        for operation in pending { await operation.value }
+        await eventFacility?.cancelPublications(sources: Set(requestBindings.values.map { $0.0 }), includeCleanup: true)
         for observer in signalObservers.values { observer.finish() }
         signalObservers.removeAll()
         for observer in taskObservers.values { observer.finish() }
@@ -390,12 +550,6 @@ public actor InputGateway {
                 owner: event.recipient)
         } catch { return .closed }
     }
-    func deliverCommunicationReceipt(_ result: CommunicationReceipt) async throws {
-        let outcome = await deliverFeedback(
-            .communicationReceipt(result), owner: result.owner, causality: result.causality)
-        guard outcome == .accepted else { throw CommunicationError.scopeClosed }
-    }
-
     public func deliverActionResult(_ result: ActionResult) async -> ActionResultDelivery {
         await deliverFeedback(.actionResult(result), owner: result.owner, causality: result.causality)
     }
@@ -444,14 +598,14 @@ public actor InputGateway {
     }
 
     private func deliver(
-        _ input: AgentInput, targets: [(AgentID, String?)], traceID: String? = nil, publication: Bool = false
+        _ input: AgentInput, targets: [(AgentID, String?)], traceID: String? = nil
     ) async throws
         -> DeliveryReport
     {
         let mode: SignalTraceRecord.Mode = input.metadata.origin == .runtime ? .feedback : .send
         let id = traceID ?? beginSignal(input, mode: mode, targets: targets.map(\.0))
         do {
-            let report = try await admit(input, targets: targets, publication: publication)
+            let report = try await admit(input, targets: targets)
             finishSignal(id, report: report)
             return report
         } catch {
@@ -459,7 +613,7 @@ public actor InputGateway {
             throw error
         }
     }
-    private func admit(_ input: AgentInput, targets: [(AgentID, String?)], publication: Bool = false) async throws
+    private func admit(_ input: AgentInput, targets: [(AgentID, String?)]) async throws
         -> DeliveryReport
     {
         guard !closed else { throw CommunicationError.scopeClosed }
@@ -472,8 +626,9 @@ public actor InputGateway {
         }
 
         let retainedBytes = encodedBytes * targets.count
-        guard activeAdmissions < 128, activeBranches + targets.count <= 256,
-            observationBytes + retainedBytes <= 8 * 1024 * 1024
+        let control = input.metadata.contract == "agent.interruption.v1" || input.metadata.origin == .runtime
+        guard activeAdmissions < (control ? 128 : 112), activeBranches + targets.count <= (control ? 256 : 240),
+            observationBytes + retainedBytes <= 8 * 1024 * 1024 - (control ? 0 : 256 * 1024)
         else { throw CommunicationError.capacityExceeded }
         activeAdmissions += 1
         activeBranches += targets.count
@@ -484,16 +639,14 @@ public actor InputGateway {
             observationBytes -= retainedBytes
         }
         // Structured calls only: no retained tasks, timeout racers or communication mailbox.
-        return await withTaskGroup(of: (AgentID, String?).self) { group in
+        return try await withThrowingTaskGroup(of: (AgentID, String?, AgentRequestReply?).self) { group in
             for (target, expectedIncarnation) in targets {
-                group.addTask { [manager, policy, admission, signals] in
+                let operation: @Sendable () async throws -> (AgentID, String?, AgentRequestReply?) = {
+                    [manager, policy, admission, signals] in
                     do {
                         try Task.checkCancellation()
                         if let policy {
-                            let accepted =
-                                publication
-                                ? policy.acceptsPublication(input, target: target)
-                                : policy.accepts(input, target: target)
+                            let accepted = policy.accepts(input, target: target)
                             guard accepted else { throw CommunicationError.unsupportedContract }
                         }
                         if input.metadata.incarnation != nil, policy == nil {
@@ -507,10 +660,6 @@ public actor InputGateway {
                         }
                         try await manager.validate(target, incarnation: incarnation, sessionID: input.sessionID)
                         let agent = try await manager.agent(target)
-                        if publication {
-                            let lifecycle = await agent.status().lifecycle
-                            guard lifecycle == .running || lifecycle == .paused else { return (target, "notRunning") }
-                        }
                         guard agent.descriptor.inputs.contains(input.payload.kind) else {
                             throw HarnessError.unsupportedInput
                         }
@@ -531,13 +680,7 @@ public actor InputGateway {
                             }
                             if task?.kind != .cancel && task?.kind != .result { try admission.check() }
                         }
-                        let targetPort = try await signals.register(address: target.rawValue, incarnation: incarnation)
-                        { signal in
-                            guard let value = signal.payload as? AgentInput else {
-                                throw CommunicationError.invalidPayload
-                            }
-                            try await agent.receive(value)
-                        }
+                        let targetPort = try await self.bindEndpoint(agent, incarnation: incarnation)
                         let sourcePort: SignalEndpoint?
                         if let sourceIncarnation = input.metadata.incarnation {
                             let source = try await manager.agent(AgentID(rawValue: input.metadata.source))
@@ -552,27 +695,77 @@ public actor InputGateway {
                         } else {
                             sourcePort = nil
                         }
-                        try await signals.send(
-                            source: sourcePort, target: targetPort,
-                            envelope: SignalEnvelope(
-                                id: input.id, sessionID: input.sessionID, contract: input.metadata.contract,
-                                version: input.metadata.version, hops: input.metadata.hops, payloadBytes: encodedBytes,
-                                expiresAt: input.metadata.deadline,
-                                cleanup: input.metadata.origin == .runtime
-                                    || {
+                        if input.metadata.origin == .agent,
+                            policy?.agents[target]?.requests.contains(input.metadata.contract) == true,
+                            let sourcePort
+                        {
+                            let reply = try await signals.request(
+                                source: sourcePort, target: targetPort,
+                                using: Self.requestDescriptor(input.metadata.contract),
+                                request: try AgentProtocolRequest(
+                                    input: input,
+                                    operation: {
                                         guard case .observation(let message) = input.payload,
-                                            let task = message.content(as: AgentTaskSignal.self)
-                                        else { return false }
-                                        return task.kind == .cancel || task.kind == .result
-                                    }()), payload: input)
-                        return (target, nil)
-                    } catch { return (target, String(describing: error)) }
+                                            let operation = message.operation
+                                        else {
+                                            throw CommunicationError.invalidPayload
+                                        }
+                                        return operation
+                                    }()),
+                                envelope: SignalEnvelope(
+                                    id: input.id, sessionID: input.sessionID,
+                                    contract: input.metadata.contract, version: input.metadata.version,
+                                    hops: input.metadata.hops, payloadBytes: encodedBytes,
+                                    expiresAt: input.metadata.deadline,
+                                    control: {
+                                        if case .observation(let message) = input.payload {
+                                            return message.operation == .cancel
+                                        }
+                                        return false
+                                    }()))
+                            guard reply.requestID == input.id else { throw CommunicationError.invalidPayload }
+                            return (target, nil, reply)
+                        } else {
+                            try await signals.send(
+                                source: sourcePort, target: targetPort,
+                                envelope: SignalEnvelope(
+                                    id: input.id, sessionID: input.sessionID, contract: input.metadata.contract,
+                                    version: input.metadata.version, hops: input.metadata.hops,
+                                    payloadBytes: encodedBytes,
+                                    expiresAt: input.metadata.deadline,
+                                    cleanup: input.metadata.origin == .runtime
+                                        || {
+                                            guard case .observation(let message) = input.payload,
+                                                let task = message.content(as: AgentTaskSignal.self)
+                                            else { return false }
+                                            return task.kind == .cancel || task.kind == .result
+                                        }(), control: input.metadata.contract == "agent.interruption.v1"),
+                                payload: input)
+                        }
+                        return (target, nil, nil)
+                    } catch {
+                        if input.metadata.origin == .agent,
+                            policy?.agents[target]?.requests.contains(input.metadata.contract) == true
+                        {
+                            throw error
+                        }
+                        return (target, String(describing: error), nil)
+                    }
                 }
+                group.addTask { try await operation() }
             }
             var delivered: [AgentID] = []
             var rejected: [AgentID: String] = [:]
-            for await (id, error) in group { if let error { rejected[id] = error } else { delivered.append(id) } }
-            return DeliveryReport(delivered: delivered, rejected: rejected)
+            var reply: AgentRequestReply?
+            for try await (id, error, result) in group {
+                if let error {
+                    rejected[id] = error
+                } else {
+                    delivered.append(id)
+                    if let result { reply = result }
+                }
+            }
+            return DeliveryReport(delivered: delivered, rejected: rejected, reply: reply)
         }
     }
 }

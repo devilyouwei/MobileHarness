@@ -135,9 +135,11 @@ private actor SpecialistPendingModel: ChatCapability {
     let model = SpecialistPendingModel()
     let failing = try AssistantAgent(stateContext: try publicStateFixture(), chat: model, context: context)
     try await failing.bind(
-        AgentMessaging { _, _, target in
-            DeliveryReport(rejected: target.map { [$0: "Target unavailable"] } ?? [:])
-        })
+        AgentMessaging(
+            subscribe: { _ in AgentEventSubscription(cancel: {}) },
+            operation: { _, _, target in
+                DeliveryReport(rejected: target.map { [$0: "Target unavailable"] } ?? [:])
+            }))
     try await failing.start()
     let session = UUID().uuidString
     let scope = AgentTaskScope(
@@ -249,12 +251,12 @@ extension LiveRuntimeTests {
             #expect(await effects.failures.isEmpty)
             let snapshot = try await context.snapshot()
             #expect(snapshot.state.taskViews?.isEmpty != false)
-            #expect(snapshot.records.contains { $0.kind == "runtime.action.result" })
+            #expect(snapshot.records.contains { $0.kind == "action.result.v1" })
             var observations = try await input.observeSignals().makeAsyncIterator()
             let signals = try #require(await observations.next()).records
             #expect(!signals.contains { $0.task?.kind == .request })
             #expect(
-                signals.contains { $0.contract == "runtime.action.result" && $0.branches.first?.target == .assistant })
+                signals.contains { $0.contract == "action.result.v1" && $0.branches.first?.target == .assistant })
         } catch {
             await manager.stopAll()
             await gateway.shutdown()

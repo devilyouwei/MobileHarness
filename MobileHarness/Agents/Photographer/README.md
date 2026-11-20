@@ -44,8 +44,8 @@ flowchart LR
  AS["Assistant"]:::agent
  end
  V -->|"vision.pose"| G
- AS -->|"task.request／input／cancel"| G
- G -->|"agent.task.response"| AS
+ AS -->|"agent.task.v1 operations"| G
+ G -->|"agent.task.events.v1"| AS
 
  classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
  classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
@@ -111,7 +111,7 @@ pause/stop 关闭接纳、取消并加入订阅／事务／跟踪；resume 加�
 
 通信以 [Agent.json](../../Resources/Agents/Photographer/Agent.json) 为准，函数契约见 [Camera](../../Actions/Camera/README.md)、[NexArm](../../Actions/NexArm/README.md)。
 
-本角色通过 [固定任务准入](../Support/Communication/README.md#固定任务准入) 接收 Assistant 委派。PhotographerCameraIntent.taskMessage 只解释 photography.camera；PhotographerCameraWorkflow 要求私有 cancel 来自本地 runtime 且匹配根会话与请求身份，远程业务载荷不能获得清理权。Task 取消通过 task.cancel 契约进入协调器。
+本角色通过 [固定任务准入](../Support/Communication/README.md#固定任务准入) 接收 Assistant 委派。PhotographerCameraIntent.taskMessage 只解释 photography.camera；PhotographerCameraWorkflow 要求私有 cancel 来自本地 runtime 且匹配根会话与请求身份，远程业务载荷不能获得清理权。Task 取消通过 agent.task.v1 cancel 操作进入协调器。
 
 ## 基础相册实施契约
 

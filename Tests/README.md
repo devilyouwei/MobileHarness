@@ -43,6 +43,8 @@ Contract、Regression、Smoke、Performance、Acceptance 描述目的或类型�
 | `./scripts/simulator/test-writer-records-simulator.sh` | XCTest UI 自动化；要求隔离模拟器及合成 seed，见 [脚本说明](../scripts/README.md)。 |
 | Assistant/Writer model smoke | `MH_ASSISTANT_SMOKE=1` / `MH_WRITER_SMOKE=1`，显式 `MH_SMOKE_API_URL`、`MH_SMOKE_API_KEY`、`MH_SMOKE_MODEL`；每个输入/delegate 最多 8 次请求，过滤 assistantSingleModelRequestCompletesThroughGateway / writerSingleDelegatePublishesAndCompletes。 |
 
+Tests 只放 Swift 源码和小型工程夹具，不做模型效果评估或 benchmark（归 [experiments](../experiments/README.md)），也不保存模型制品、`.build`、`.local` 或独立 Package；集成测试需要的权重来自根目录 [Models](../Models/README.md)，由 `./scripts/check.sh` 的边界检查守护。
+
 权重、系统语音、真实服务、串口/触觉和规模测试各自保留所属 README 的显式开关。平台受限的普通回归使用函数级 @available 并报告跳过；已显式启用的模型验收在不支持环境报错。跳过、构建或替身结果不等于真实模型、UI 或设备验收。
 
 ## 核心集成覆盖

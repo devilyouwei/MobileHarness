@@ -11,8 +11,9 @@ This directory constructs and connects public module interfaces, installs static
 | ApplicationContainer | FactoryKit instance cache for seven roots, root capability aliases and the failure channel; compiled as AppStorage. |
 | ServiceFactories | Scoped backend selection, deferred repositories, module roots and thin public capability adapters. |
 | ApplicationActionAssembly | Supplies Actions dependencies and adapts public cognitive/execution ports. |
-| ActionServiceAdapters / AgentResourceBindings | Narrow camera/device/voice/detection and resource-run adapters; no business service registry. |
+| ActionServiceAdapters | Narrow camera/device/voice/detection and resource-run adapters; no business service registry. |
 | ModuleRegistration | Public lifecycle bindings and explicit startup/rollback/stop graph. |
+| MemoryPressureRelay | Owns the single subscription to the PlatformKit memory-warning listener and calls ModelContainer.handleMemoryPressure once per delivered warning; compiled as AppStorage so it is testable. |
 | AppComposition | Services lifetime, bootstrap, retry and scope replacement. |
 | ApplicationPresentation | UI application/session interfaces, existing role state/control and navigation/preparation callbacks. |
 
@@ -32,6 +33,8 @@ flowchart LR
     P --> B
     U --> B
     B ==> X["actions"] ==> G["gateway"] ==> A["agents"] --> H["homePreparation"]
+    M --> R["memoryPressure"]
+    P --> R
     classDef host fill:#eaf2ff,stroke:#5078b8,color:#203b64
     classDef action fill:#ffecef,stroke:#b86178,color:#6b2b3d
     classDef gateway fill:#fff2d9,stroke:#bf842c,color:#694511
@@ -53,7 +56,7 @@ Initial startup requires an active Scene. Once running, model/platform/UI/Action
 
 Background URLSession completion can use the same model/storage scope before foreground startup. Replacement joins those roots even if they never reached the graph's started set. No camera/audio/UI inference is started by background restoration.
 
-ApplicationContainer projects each module's structured Failure, including ActionsFailure and GatewayFailure, into the existing diagnostic channel while preserving original errors. ModuleRegistration normalizes only pure cancellation after recording evidence; mixed cleanup errors remain failures. App supplies bootstrap failure before roles can present diagnostics. App binds the main Gateway scheduler to [RuntimeLog](../../UI/Components/RuntimeLog/README.md) with a newest-one snapshot buffer and joins that consumer when execution bindings stop.
+ApplicationContainer projects each module's structured Failure, including ActionsFailure and GatewayFailure, into the existing diagnostic channel while preserving original errors. ModuleRegistration normalizes only pure cancellation after recording evidence; mixed cleanup errors remain failures. App supplies bootstrap failure before roles can present diagnostics. App binds the main Actions Shell scheduler to [RuntimeLog](../../UI/Components/RuntimeLog/README.md) with a newest-one snapshot buffer and joins that consumer when execution bindings stop.
 
 ForegroundPreparation is activated after the lifecycle foreground barrier and visible-home check. ModelKit reports actual load transitions; App updates interaction readiness and forwards facts to Agents for presentation. Ordinary checks, already-ready state and cloud configuration do not fabricate loading. See [Lifecycle](../Lifecycle/README.md) and [overall flows](../../README.md).
 
@@ -81,7 +84,7 @@ ModuleRegistration directly calls GatewayContainer.configureExecution after Agen
 
 ServiceFactories supplies ActionsDependencies through the App callback bridge, asks ActionsContainer.makeBusiness for the root and host capabilities, and registers that same root in ApplicationContainer. AppCameraAccess/AppDeviceAccess adapt Actions-owned public protocols to Agent-owned protocols; they never retain the private assembly or concrete execution workflows. Runtime configuration calls ActionsContainer.configureBusiness(request:) after foundations start.
 
-ApplicationPresentation requires bootstrap and delegates complete session availability to SpeechPerception.presentation. Gateway owns runInCurrentContext, coordinated acquire and isSettled; the resource adapter contains only forwarding and boundary error conversion. Foreground model requirements come from Agents and preparation steps come from ModelKit. ServiceFactories maps those generic steps into the App-owned lifecycle coordinator without inspecting ModelState or selecting model providers.
+ApplicationPresentation requires bootstrap and delegates complete session availability to SpeechPerception.presentation. The Actions Shell owns runInCurrentContext, coordinated acquire and isSettled; the resource adapter contains only forwarding and boundary error conversion. Foreground model requirements come from Agents and preparation steps come from ModelKit. ServiceFactories maps those generic steps into the App-owned lifecycle coordinator without inspecting ModelState or selecting model providers.
 
 ApplicationContainer caches the root window capability; AgentContainer and ApplicationPresentation receive that same WindowState. The root attaches WindowHost above persistent navigation. Navigation visibility gates home model preparation. Actions handles camera scene and window lifecycle.
 
@@ -130,3 +133,5 @@ Foreground model preparation adds an optional enhancement step: prepare/read art
 ModelContainer 自行构造模型文件与下载能力；ApplicationContainer 不计算模型路径、不注入 Storage 文件接口。模型生命周期只依赖 diagnostics。App 启动 Storage 前将旧 Models/download-source.json 一次移动到 Settings/download-source.json，已有新位置优先，迁移失败阻止启动并报告；该兼容逻辑仅处理业务偏好，不读取或搬迁模型制品。
 
 ServiceFactories.make 接收可选存储根，默认仍为 App Application Support。AppComposition 接收构造服务的闭包与语言偏好对象，首次启动及替换复用同一工厂，ModuleRegistration 图保持唯一；stop 加入正在进行的替换后关闭当前根。隔离 Simulator 验收使用这些接口覆盖实际生产装配，测试不提供另一份生命周期图。
+
+Composition injects module-owned external listener ports without introducing a shared foundation dependency: PlatformKit supplies media/native state, UI supplies requests/presentation facts, and ModelKit supplies artifact revisions. The responsible role or execution service owns the consumer task and cancellation/join. Gateway remains the internal Request/Reply, event and execution root; production handler catalogs are supplied by Agents assembly.

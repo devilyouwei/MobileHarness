@@ -11,7 +11,7 @@
 
 | 文件 | 职责 |
 | --- | --- |
-| [check-modelkit-boundaries.py](checks/check-modelkit-boundaries.py) | 编译目标、依赖无环、源码所有权、模块/资源边界的静态约束 |
+| [check-modelkit-boundaries.py](checks/check-modelkit-boundaries.py) | 编译目标、依赖无环、源码所有权、模块/资源边界的静态约束；Tests 下不得出现模型制品、`.build`、`.local`、`__pycache__` 或独立 Package |
 | [test_model_download.py](checks/test_model_download.py) | ZIP 下载安装的路径、hash、符号链接与替换保护；不联网 |
 
 新增工程 Python 工具回归放本目录，命名 `test_*.py`，由 check.sh 发现。App 工程测试使用 [Tests](../Tests/README.md) 的 Swift；模型/提示词多用例实验归 [experiments](../experiments/README.md)。

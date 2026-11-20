@@ -42,7 +42,7 @@ public actor ResourceCoordinator {
         case success
         case failure(any Error)
     }
-    private let admission: GatewayAdmission?
+    private let admission: ActionsAdmission?
     private let definitions: [ResourceID: ResourceDefinition]
     // The sole authority for occupancy; leases/uses/cleanups retain lifecycle metadata only.
     private var holdings: [ResourceID: Holding] = [:]
@@ -51,21 +51,19 @@ public actor ResourceCoordinator {
     private var cleanups: [String: Cleanup] = [:]
     private var expiry: Task<Void, Never>?
     private var closed = false
-    public private(set) var cleanupFailure: GatewayFailure?
+    public private(set) var cleanupFailure: NativeCleanupFailure?
 
-    public func stateSnapshot() async throws -> GatewayStateSnapshot {
+    public func stateSnapshot() async throws -> ExecutionRuntimeFacts {
         try Task.checkCancellation()
-        return GatewayStateSnapshot(
-            path: "gateway.resources",
+        return ExecutionRuntimeFacts(
+            path: "actions.resources",
             runtime: [
                 "holdings": .count(holdings.count), "leases": .count(leases.count),
                 "uses": .count(uses.count), "cleanups": .count(cleanups.count),
                 "closed": .flag(closed),
-            ],
-            health: cleanupFailure == nil ? .unknown : .fault,
-            issues: cleanupFailure == nil ? [] : [.init(code: "cleanupFailed", impact: "resourceReleaseUnconfirmed")])
+            ], cleanupFailed: cleanupFailure != nil)
     }
-    public init(definitions: [ResourceDefinition], admission: GatewayAdmission? = nil) throws {
+    public init(definitions: [ResourceDefinition], admission: ActionsAdmission? = nil) throws {
         self.admission = admission
         guard definitions.count <= 64 else {
             throw ResourceError.invalidDefinition
@@ -405,9 +403,7 @@ public actor ResourceCoordinator {
         for use in active { await use.join() }
         await expiring?.value
         if let primary = errors.first {
-            cleanupFailure = GatewayFailure(
-                component: "resources", operation: "close", underlying: primary,
-                cleanupErrors: Array(errors.dropFirst()), code: .cleanupFailed)
+            cleanupFailure = NativeCleanupFailure(errors: errors)
         }
         if let cleanupFailure { throw cleanupFailure }
     }
@@ -416,9 +412,7 @@ public actor ResourceCoordinator {
     public func shutdown() async {
         do { try await closeLifecycle(permanently: true) } catch {
             if cleanupFailure == nil {
-                cleanupFailure = GatewayFailure(
-                    component: "resources", operation: "shutdown", underlying: error,
-                    code: .cleanupFailed)
+                cleanupFailure = NativeCleanupFailure(errors: [error])
             }
         }
     }
@@ -517,9 +511,7 @@ public actor ResourceCoordinator {
                 guard let primary = errors.first else { return .success }
                 if errors.count == 1 { return .failure(primary) }
                 return .failure(
-                    GatewayFailure(
-                        component: "resources", operation: "cleanup", underlying: primary,
-                        cleanupErrors: Array(errors.dropFirst()), code: .cleanupFailed))
+                    NativeCleanupFailure(errors: errors))
             }
             self.cleanupFinished(id, result: result)
             pair.continuation.yield(result)

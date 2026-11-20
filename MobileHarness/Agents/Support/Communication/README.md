@@ -28,7 +28,7 @@ flowchart LR
 
 ## 消息内容与约束
 
-PerceptionMessage 包含 user.input.asr.partial、user.input.asr.final、sound.source 和 vision.pose。语音片段与最终文本共用 user.input 主题，订阅按契约、主题和来源匹配。AgentMessage 持有类型化内容及验证闭包。编码上限通常为 16 KiB，姿态为 256 KiB；最终文本非空且最多 4096 UTF-8 字节，片段最多 16300 字节。
+PerceptionMessage 包含 user.input.speech.v1（partial）、user.input.speech.v1（final）、perception.audio.source.v1 和 perception.vision.pose.v1。语音片段与最终文本共用 user.input.speech 频道，订阅按契约、主题和来源匹配。AgentMessage 持有类型化内容及验证闭包。编码上限通常为 16 KiB，姿态为 256 KiB；最终文本非空且最多 4096 UTF-8 字节，片段最多 16300 字节。
 
 姿态、声源和识别阶段由对应角色拥有。见 [VisionPerception](../../VisionPerception/README.md) 与 [SpeechPerception](../../SpeechPerception/README.md)。
 
@@ -36,7 +36,7 @@ AgentTaskContent 保存最多 4096 字节的业务文本与 running／waitingUse
 
 ## 固定任务准入
 
-AgentFixedTaskInput.unwrap 只接受 request／input，核对 requester 为 Assistant、executor 为接收角色、输入 taskScope 与信封一致，并要求 agent 来源、Assistant source 和非空 incarnation。实际实例身份已由 Gateway 认证；此处不凭载荷创建或授予身份。
+AgentFixedTaskInput.unwrap 只接受 request／input，核对已认证来源为 scope.requester、executor 为接收角色、输入 taskScope 与信封一致，并要求 agent 来源、scope.requester source 和非空 incarnation。实际实例身份已由 Gateway 认证；此处不凭载荷创建或授予身份。
 
 准入检查成功后才调用执行角色提供的 decode，再验证返回消息的内容和大小。生成的角色输入使用原 rootID 作为处理身份，保留 session、source、incarnation、capturedAt、sequence、root／parent、hops、deadline、turn 与 taskScope。具体契约选择、私有取消／retire 的来源限制由所属角色负责，公共机制不建立角色载荷分派表。
 
@@ -46,13 +46,13 @@ AgentFixedTaskInput.unwrap 只接受 request／input，核对 requester 为 Assi
 
 Native CameraFrame/PCM and typed UI/container observations reach their owning roles directly. This directory owns derived semantic messages and role-originated coordination, not a universal external-media Signal format. Perception and cognition use the same Agent communication boundary; neither denotes a new module or container. Execution requests are separate from role messages and share Gateway only for their respective transport/scheduling facilities. The cross-module view is maintained in the [overall input and Signal design](../../../README.md#native-input-and-internal-signals).
 
-Assistant 通过 `task.send(agent_id,text)` 发送 `agent.task.request`，载荷为 AgentTaskRequest。新目标、补充、答复和停止请求共用该正文契约。Writer 校验已持久化的消息后接收入队；决定开启新任务时，以原消息 ID 作为委托 ID 申请执行授权。Writer 统一发送 `agent.task.response`，包含接纳、进度、追问、答复接纳、消息拒绝及任务终态。
+Assistant 通过 `task.send(agent_id,text)` 发送 `agent.task.v1`，载荷为 AgentTaskRequest。新目标、补充、答复和停止请求共用该正文契约。Writer 校验已持久化的消息后接收入队；决定开启新任务时，以原消息 ID 作为委托 ID 申请执行授权。Writer 统一发送 `agent.task.events.v1`，包含接纳、进度、追问、答复接纳、消息拒绝及任务终态。
 
 WriterDelegationEvent 携带可选 workspace_N 和独立 delegateID，接收端认证 scope 并校验事件顺序。当前委托的补充和追问答复沿用原 scope；任务终态后再次委托，即使复用同一个工作区，也使用新消息 ID 建立新 scope。历史请求保存稳定身份，实时传输/去重使用执行身份。
 
 WriterDelegationEvent.failure 是可选 WriterFailureDiagnostic：分类、错误码、阶段、摘要、诊断字段和关联原因均为业务事实。通信值不依赖 Storage；Writer 拥有到持久化 DTO 的转换。失败消息通过认证、去重后更新 Assistant 任务视图；Writer 灵动岛展示任务摘要。
 
-AgentTaskResponse 携带 Writer 的原消息拒绝或已接纳任务的事实。Writer 的进度回报需要活跃执行授权。终态持久投递与授权回收由独立的 worker 处理。Assistant 核对持久拒绝或终态的原消息、事件身份和正文。固定任务共用 `agent.task.response`，以 AgentTaskSignal 的 progress/result 区分进度与终态。Agents 的输出适配器验证执行授权，在终态投递前协调 Gateway 完成在途工作，成功递送后回收授权。固定任务使用独立的 `task.request`、`task.input` 和 `task.cancel` 控制契约。
+AgentTaskResponse 携带 Writer 的原消息拒绝或已接纳任务的事实。Writer 的进度回报需要活跃执行授权。终态持久投递与授权回收由独立的 worker 处理。Assistant 核对持久拒绝或终态的原消息、事件身份和正文。固定任务共用 `agent.task.events.v1`，以 AgentTaskSignal 的 progress/result 区分进度与终态。Agents 的输出适配器验证执行授权，在终态投递前协调 Gateway 完成在途工作，成功递送后回收授权。固定任务通过同一 `agent.task.v1` 的 submit/update/answer/status/cancel 操作接收类型化请求。
 
 普通运行步骤及请求编号由 Writer 自有展示和请求历史保留。跨角色消息承载接纳、首次草稿保存、首次恢复或渲染异常、追问和终态。Assistant 先验证并更新关联视图。全双工模式下，符合条件且属于当前来源对话的回报直接进入语义队列，由后续模型请求选择如何汇报；同步模式使用通知播报。
 
@@ -62,4 +62,4 @@ WriterDelegationEvent version 3 carries one optional workspaceID, the current go
 
 ## 公开委派适配
 
-AgentTaskMessaging 供角色目录与发送端校验已实现的后台消息路由。当前允许 assistant→writer，须具备 agent.task.request 权限。Gateway 校验实际身份，Writer 决定业务准入。
+AgentTaskMessaging 供角色目录与发送端校验已实现的后台消息路由。目标须启用 agent.task.v1 并具备真实文本适配器；当前文本适配器由 Writer 实现，不以发送者/目标配对授权。Gateway 校验实际身份，Writer 决定业务准入。

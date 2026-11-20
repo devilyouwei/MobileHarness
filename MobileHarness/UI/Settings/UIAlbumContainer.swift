@@ -61,7 +61,7 @@ public enum AlbumReply: Sendable {
             ])
     }
 
-    public let requests = UIRequests<AlbumInput, AlbumReply>()
+    public let requests = UIRequests<AlbumInput, AlbumReply>(producer: "ui.album")
     public private(set) var items: [AlbumPhoto] = []
     public private(set) var next: AlbumPageToken?
     public private(set) var loading = false

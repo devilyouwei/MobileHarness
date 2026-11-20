@@ -14,6 +14,8 @@ struct AgentMessageRow: Codable, FetchableRecord, MutablePersistableRecord {
         correlation_id TEXT NOT NULL,
         reply_to_id TEXT REFERENCES agent_messages(id) ON DELETE RESTRICT,
         sender_context TEXT,
+        source_session_id TEXT,
+        published_at REAL,
         dedupe_key TEXT NOT NULL,
         delivery_state TEXT NOT NULL DEFAULT 'pending' CHECK(delivery_state IN ('pending','in_flight','received','dead_letter')),
         created_at REAL NOT NULL,
@@ -29,6 +31,19 @@ struct AgentMessageRow: Codable, FetchableRecord, MutablePersistableRecord {
         CREATE INDEX agent_message_correlation ON agent_messages(correlation_id,created_at);
         CREATE INDEX agent_message_reply ON agent_messages(reply_to_id);
         """
+    static let cursorSchemaSQL = """
+        CREATE TABLE task_observation_cursors(
+            task_ref TEXT NOT NULL REFERENCES agent_messages(id) ON DELETE CASCADE,
+            receiver_agent_id TEXT NOT NULL,
+            position INTEGER NOT NULL CHECK(position>=0),
+            PRIMARY KEY(task_ref,receiver_agent_id));
+        CREATE TABLE invocation_evidence(
+            id TEXT PRIMARY KEY NOT NULL,
+            owner_context TEXT NOT NULL,
+            payload BLOB NOT NULL,
+            created_at REAL NOT NULL);
+        CREATE INDEX invocation_evidence_owner ON invocation_evidence(owner_context);
+        """
     var id: String
     var senderAgentID: String
     var receiverAgentID: String
@@ -38,6 +53,7 @@ struct AgentMessageRow: Codable, FetchableRecord, MutablePersistableRecord {
     var correlationID: String
     var replyToID: String? = nil
     var senderContext: String? = nil
+    var sourceSessionID: String? = nil
     var dedupeKey: String
     var deliveryState: String = "pending"
     var createdAt: Double
@@ -58,6 +74,7 @@ struct AgentMessageRow: Codable, FetchableRecord, MutablePersistableRecord {
         case correlationID = "correlation_id"
         case replyToID = "reply_to_id"
         case senderContext = "sender_context"
+        case sourceSessionID = "source_session_id"
         case dedupeKey = "dedupe_key"
         case deliveryState = "delivery_state"
         case createdAt = "created_at"

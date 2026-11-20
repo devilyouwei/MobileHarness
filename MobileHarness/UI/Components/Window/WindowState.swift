@@ -90,7 +90,7 @@ public struct WindowPresentation: Identifiable, Sendable {
     public private(set) var maximizedFrame: WindowGeometry?
     public private(set) var cardTitleSize = WindowCardLayout.defaultTitleSize
     @ObservationIgnored private var waiters: [UUID: CheckedContinuation<Void, any Error>] = [:]
-    public let requests = UIRequests<WindowInput, Void>()
+    public let requests = UIRequests<WindowInput, Void>(producer: "ui.window")
     @ObservationIgnored private var inputs: [UUID: Task<Void, Never>] = [:]
     @ObservationIgnored private var inputTokens: [UUID: UUID] = [:]
     @ObservationIgnored private var prompts:

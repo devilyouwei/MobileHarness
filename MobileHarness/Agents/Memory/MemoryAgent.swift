@@ -32,7 +32,6 @@ public actor MemoryAgent: Agent {
     private var history = MemoryHistoryWorkflow()
 
     private let taskCoordinator: AgentFixedTaskCoordinator<MemoryContextState>
-    private var taskPump: Task<Void, Never>?
     private var fixedTaskInputs: [String: AgentInput] = [:]
     private let admission = AgentAdmissionGate(capacity: 32)
 
@@ -68,20 +67,37 @@ public actor MemoryAgent: Agent {
 
     // MARK: - Lifecycle
 
+    public func receiveRequest(_ request: AgentProtocolRequest) async throws -> AgentRequestReply {
+        let input = request.input
+        guard case .observation(let message) = input.payload, message.operation == request.operation else {
+            throw CommunicationError.invalidPayload
+        }
+        if request.operation == .status {
+            guard let query = message.content(as: AgentTaskQuery.self) else { throw CommunicationError.invalidPayload }
+            return try await taskCoordinator.requestStatus(query, input: input)
+        }
+        if request.operation == .cancel, let query = message.content(as: AgentTaskQuery.self) {
+            _ = try await taskCoordinator.requestStatus(query, input: input)
+            try await receive(AgentFixedTaskInput.cancellation(query, input: input))
+            return AgentRequestReply(requestID: input.id, reference: query.scope.id)
+        }
+        guard let signal = message.content(as: AgentTaskSignal.self),
+            (request.operation == .submit && signal.kind == .request)
+                || ([.update, .answer].contains(request.operation) && signal.kind == .input)
+                || (request.operation == .cancel && signal.kind == .cancel)
+        else { throw CommunicationError.invalidPayload }
+        try await receive(input)
+        return AgentRequestReply(requestID: input.id, reference: signal.scope.id)
+    }
+    public func bindMessaging(_ messaging: AgentMessaging) async {
+        await taskCoordinator.bindMessaging(messaging)
+    }
     public func start() async throws {
         guard lifecycle == .registered else { throw HarnessError.invalidTransition }
         _ = try await contextRepository.snapshot()
         try await taskCoordinator.start()
         lifecycle = .running
-        taskPump = Task { [taskCoordinator] in
-            for await envelope in taskCoordinator.outputs {
-                guard !Task.isCancelled else { return }
-                if !relay(envelope) {
-                    await taskCoordinator.stop()
-                    return
-                }
-            }
-        }
+
         try await startUIInputs()
     }
 
@@ -111,19 +127,13 @@ public actor MemoryAgent: Agent {
         history.reset()
         fixedTaskInputs.removeAll()
         await taskCoordinator.stop()
-        taskPump?.cancel()
-        await taskPump?.value
-        taskPump = nil
         continuation.finish()
     }
 
     // MARK: - Input processing
 
     public func receive(_ input: AgentInput) async throws {
-        if await taskCoordinator.ownsFeedback(input) {
-            try await taskCoordinator.receive(input)
-            return
-        }
+
         var input = input
         if case .observation(let message) = input.payload, let signal = message.content(as: AgentTaskSignal.self) {
             if signal.kind == .cancel,

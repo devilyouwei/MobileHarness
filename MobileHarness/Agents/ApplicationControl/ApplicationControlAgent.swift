@@ -2,6 +2,7 @@ import AgentCore
 import Foundation
 import FunctionContracts
 import Gateway
+import ModelKit
 import PlatformKit
 import StorageCore
 import UI
@@ -16,8 +17,8 @@ public actor ApplicationControlAgent: Agent {
 
     // MARK: - State and dependencies
 
-    let connectionFacts: (@MainActor @Sendable () throws -> AsyncThrowingStream<NexArmConnectionFacts, any Error>)?
-    let resourceChanges: (@MainActor @Sendable () async throws -> AsyncStream<UInt64>)?
+    let connectionFacts: (@MainActor @Sendable () throws -> PlatformKit.StateSignalListener<NexArmConnectionFacts>)?
+    let resourceChanges: (@MainActor @Sendable () async throws -> ModelKit.StateSignalListener<UInt64>)?
     let observationFailure: @Sendable (any Error) -> Void
     var resourceObservation: ResourceObservationSession?
     let uiDiagnostics: UIDiagnosticsContainer?
@@ -70,8 +71,8 @@ public actor ApplicationControlAgent: Agent {
     private let diagnosticContracts: Set<String> = [ContainerFailureEvent.contract, RuntimeFailureEvent.contract]
 
     private var deviceResults = ActionResultInbox()
+    private var messaging: AgentMessaging?
     private let taskCoordinator: AgentFixedTaskCoordinator<ApplicationControlContextState>
-    private var taskPump: Task<Void, Never>?
     private var fixedTaskInputs: [String: AgentInput] = [:]
     private let admission = AgentAdmissionGate(capacity: 32)
     private var stagedOutputs: [OutputEnvelope]?
@@ -83,9 +84,9 @@ public actor ApplicationControlAgent: Agent {
         uiSettings: UISettingsContainer? = nil, uiResources: UIModelResourcesContainer? = nil,
         uiDevices: UIDeviceSettingsContainer? = nil, uiDiagnostics: UIDiagnosticsContainer? = nil,
         uiWindows: WindowState? = nil,
-        connectionFacts: (@MainActor @Sendable () throws -> AsyncThrowingStream<NexArmConnectionFacts, any Error>)? =
+        connectionFacts: (@MainActor @Sendable () throws -> PlatformKit.StateSignalListener<NexArmConnectionFacts>)? =
             nil,
-        resourceChanges: (@MainActor @Sendable () async throws -> AsyncStream<UInt64>)? = nil,
+        resourceChanges: (@MainActor @Sendable () async throws -> ModelKit.StateSignalListener<UInt64>)? = nil,
         observationFailure: @escaping @Sendable (any Error) -> Void = { _ in },
         uiProviderSettings: (any ProviderSettingsStaging)? = nil,
         uiProviderDiscovery: (any ProviderDiscoveryStaging)? = nil,
@@ -226,20 +227,45 @@ public actor ApplicationControlAgent: Agent {
     }
     // MARK: - Lifecycle
 
+    public func receiveRequest(_ request: AgentProtocolRequest) async throws -> AgentRequestReply {
+        let input = request.input
+        guard case .observation(let message) = input.payload, message.operation == request.operation else {
+            throw CommunicationError.invalidPayload
+        }
+        if request.operation == .status {
+            guard let query = message.content(as: AgentTaskQuery.self) else { throw CommunicationError.invalidPayload }
+            return try await taskCoordinator.requestStatus(query, input: input)
+        }
+        if request.operation == .cancel, let query = message.content(as: AgentTaskQuery.self) {
+            _ = try await taskCoordinator.requestStatus(query, input: input)
+            try await receive(AgentFixedTaskInput.cancellation(query, input: input))
+            return AgentRequestReply(requestID: input.id, reference: query.scope.id)
+        }
+        guard let signal = message.content(as: AgentTaskSignal.self),
+            (request.operation == .submit && signal.kind == .request)
+                || ([.update, .answer].contains(request.operation) && signal.kind == .input)
+                || (request.operation == .cancel && signal.kind == .cancel)
+        else { throw CommunicationError.invalidPayload }
+        try await receive(input)
+        return AgentRequestReply(requestID: input.id, reference: signal.scope.id)
+    }
+    public func bindMessaging(_ messaging: AgentMessaging) async {
+        self.messaging = messaging
+        await taskCoordinator.bindMessaging(messaging)
+    }
+    /// Publishes authorized semantic control; return establishes publication admission, not interruption completion.
+    public func publishInterruption(sessionID: String, target: AssistantInterrupt.Target = .current) async throws {
+        guard lifecycle == .running, let messaging else { throw CommunicationError.unavailableTarget }
+        let signal = AssistantInterrupt(target: target)
+        let parent = AgentInput(id: signal.id.uuidString, sessionID: sessionID, payload: .event("interrupt"))
+        try await messaging.publish(signal.message(), parent: parent)
+    }
     public func start() async throws {
         guard lifecycle == .registered else { throw HarnessError.invalidTransition }
         _ = try await contextRepository.snapshot()
         try await taskCoordinator.start()
         lifecycle = .running
-        taskPump = Task { [taskCoordinator] in
-            for await envelope in taskCoordinator.outputs {
-                guard !Task.isCancelled else { return }
-                if !relay(envelope) {
-                    await taskCoordinator.stop()
-                    return
-                }
-            }
-        }
+
         try await startUIInputs()
     }
     public func pause() async throws {
@@ -284,9 +310,6 @@ public actor ApplicationControlAgent: Agent {
         terminalFailureCalls.removeAll()
         fixedTaskInputs.removeAll()
         await taskCoordinator.stop()
-        taskPump?.cancel()
-        await taskPump?.value
-        taskPump = nil
         continuation.finish()
     }
 
@@ -344,10 +367,7 @@ public actor ApplicationControlAgent: Agent {
             statePresentationCalls.remove(result.callID)
             return
         }
-        if await taskCoordinator.ownsFeedback(input) {
-            try await taskCoordinator.receive(input)
-            return
-        }
+
         var input = input
         if case .observation(let message) = input.payload, let signal = message.content(as: AgentTaskSignal.self) {
             if signal.kind == .cancel,
@@ -527,7 +547,7 @@ public actor ApplicationControlAgent: Agent {
 
     private func acceptsPassive(_ input: AgentInput) -> Bool {
         switch input.payload {
-        case .actionResult, .toolResult, .roundResult, .communicationReceipt: return true
+        case .actionResult, .toolResult, .roundResult: return true
         case .observation(let message):
             if case .retire? = message.resourceIntent {
                 return input.metadata.origin == .local && input.metadata.source == "runtime"

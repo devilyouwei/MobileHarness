@@ -17,7 +17,7 @@ private enum FixtureCommunicationStreams {
         }
     }
     nonisolated(unsafe) private static var streams: [ObjectIdentifier: Entry] = [:]
-    static func bind(_ agent: any Agent, port: AgentMessaging) throws {
+    static func bind(_ agent: any Agent, port: AgentMessaging) async throws {
         let key = ObjectIdentifier(agent)
         let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(4096))
         try lock.withLock {
@@ -25,6 +25,7 @@ private enum FixtureCommunicationStreams {
             guard streams[key]?.agent == nil else { throw HarnessError.invalidTransition }
             streams[key] = Entry(agent: agent, stream: stream.stream)
         }
+        try await agent.bindMessaging(port)
         Task {
             await withTaskGroup(of: Void.self) { group in
                 var active = 0
@@ -51,22 +52,7 @@ private enum FixtureCommunicationStreams {
                             } catch {
                                 report = DeliveryReport(failure: String(describing: error))
                             }
-                            let receipt = CommunicationReceipt(
-                                callID: action.id, report: report,
-                                owner: ExecutionOwner(
-                                    agent: output.source, incarnation: UUID().uuidString,
-                                    sessionID: output.sessionID),
-                                causality: SignalCausality(envelope: output))
-                            let payload = InputPayload.communicationReceipt(receipt)
-                            do {
-                                try await agent.receive(
-                                    AgentInput(
-                                        id: UUID().uuidString,
-                                        sessionID: output.sessionID, payload: payload,
-                                        metadata: InputMetadata(
-                                            payload: payload, source: "runtime", origin: .runtime,
-                                            rootID: UUID().uuidString)))
-                            } catch {}
+
                         }
                     } else {
                         guard case .enqueued = stream.continuation.yield(output) else { break }
@@ -85,22 +71,22 @@ private enum FixtureCommunicationStreams {
     }
 }
 
-func bindFixtureCommunications(_ agent: any Agent, port: AgentMessaging) throws {
-    try FixtureCommunicationStreams.bind(agent, port: port)
+func bindFixtureCommunications(_ agent: any Agent, port: AgentMessaging) async throws {
+    try await FixtureCommunicationStreams.bind(agent, port: port)
 }
 
 func fixtureOutputs(_ agent: any Agent) -> AsyncStream<OutputEnvelope> { FixtureCommunicationStreams.outputs(agent) }
 extension AssistantChatWorker {
-    func bind(_ port: AgentMessaging) throws {
+    func bind(_ port: AgentMessaging) async throws {
         if speechOutput == nil { try bindSpeechOutput(SpeechRequestProbe()) }
-        try FixtureCommunicationStreams.bind(self, port: port)
+        try await FixtureCommunicationStreams.bind(self, port: port)
     }
 }
 extension SpeechPerceptionAgent {
-    func bind(_ port: AgentMessaging) throws { try FixtureCommunicationStreams.bind(self, port: port) }
+    func bind(_ port: AgentMessaging) async throws { try await FixtureCommunicationStreams.bind(self, port: port) }
 }
 extension VisionPerceptionAgent {
-    func bind(_ port: AgentMessaging) throws { try FixtureCommunicationStreams.bind(self, port: port) }
+    func bind(_ port: AgentMessaging) async throws { try await FixtureCommunicationStreams.bind(self, port: port) }
 }
 
 /// Explicit synthetic native-call role; its fixture catalog is independent of production Skill loading.
@@ -122,7 +108,7 @@ struct FixtureNativeChatState: AssistantChatState {
     }
     static func preprocess(_ input: AgentInput, state: Self) throws -> SignalDisposition {
         switch input.payload {
-        case .communicationReceipt, .actionResult, .toolResult, .roundResult: return .feedback
+        case .actionResult, .toolResult, .roundResult: return .feedback
         default: return .enqueue(priority: 0)
         }
     }

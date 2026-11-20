@@ -530,7 +530,7 @@ public final class UIHistoryContainer {
             ], runtime: ["available": .flag(state.isPresentationAvailable)])
     }
 
-    public let requests = UIRequests<HistoryInput, HistoryReply>()
+    public let requests = UIRequests<HistoryInput, HistoryReply>(producer: "ui.history")
 
     public let state: ConversationHistoryState
     public var presentation: any HistoryPresenting { state }

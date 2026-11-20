@@ -16,3 +16,5 @@ Photography完成示例使用明确的“App相册”文案；保持与BasicSkil
 - [StorageRepositoryContractTests.swift](StorageRepositoryContractTests.swift)
 - [StorageSchemaTests.swift](StorageSchemaTests.swift)
 - [WorkspaceRepositoryTests.swift](WorkspaceRepositoryTests.swift)
+
+DatabaseTableRecordTests 验证 published_at 与消费确认独立、先补读消费不改变源端发布队列，以及 schema 20261119 到 20261120 的非破坏迁移。

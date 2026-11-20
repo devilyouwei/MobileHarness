@@ -16,13 +16,8 @@ public enum AgentCommunicationAdapter {
             throw CommunicationError.invalidPayload
         }
         var actions = functions.actions.filter { $0.path.description != "Agent.Communication.send" }
-        let grants = Set(
-            policy.sends.flatMap { send in
-                AgentTaskSignal.Kind.allCases.filter { $0.contract == send.contract }.map {
-                    "\(send.target): \($0.rawValue)"
-                }
-            }
-        ).sorted()
+        let directory = try AgentConfigurations.delegationOverview(requester: .assistant, communication: policy)
+        let grants = directory.isEmpty ? [] : [directory]
         if !grants.isEmpty {
             let required: Set<String> = ["target", "kind", "content"]
             let optional: Set<String> = ["taskID", "artifactID"]
@@ -34,7 +29,7 @@ public enum AgentCommunicationAdapter {
                         CapabilityDocumentation.self,
                         from: JSONSerialization.data(withJSONObject: [
                             "doc": (registration.documentation?.doc ?? "")
-                                + (try AgentPrompts.text("Shared/CommunicationContext", "allowedPairs"))
+                                + (try AgentPrompts.text("Shared/CommunicationContext", "taskDirectory"))
                                 + grants.joined(separator: ", ") + ".",
                             "parameters": (registration.documentation?.parameters ?? []).map {
                                 [
@@ -64,12 +59,12 @@ public enum AgentCommunicationAdapter {
             let kind = AgentTaskSignal.Kind(rawValue: kindText), let text = arguments["content"]
         else { throw CommunicationError.invalidPayload }
         let target = arguments["target"].map { AgentID(rawValue: $0) }
-        let contract = kind.contract
         if path.hasSuffix(".send") {
-            guard let target, policy.sends.contains(where: { $0.target == target.rawValue && $0.contract == contract })
-            else { throw CommunicationError.unauthorized }
+            guard let target, !target.rawValue.isEmpty && target.rawValue.utf8.count <= 64 else {
+                throw CommunicationError.invalidPayload
+            }
         } else {
-            guard target == nil, policy.publications.contains(contract) else { throw CommunicationError.unauthorized }
+            guard target == nil else { throw CommunicationError.invalidPayload }
             // Task ownership is directed; broadcasting a task would create ambiguous execution ownership.
             throw CommunicationError.unauthorized
         }

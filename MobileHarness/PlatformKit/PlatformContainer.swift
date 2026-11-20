@@ -32,6 +32,7 @@ public final class PlatformContainer: PlatformStateReading {
     private let admission: PlatformAdmission
     private let systemState: NativeSystemState
     private let stateCollection = NativeStateCollection()
+    private let memoryWarnings: NativeMemoryWarnings
     private var rootFailure: PlatformFailure?
     private var started = false
     private var stopped = false
@@ -39,7 +40,7 @@ public final class PlatformContainer: PlatformStateReading {
     private var foregroundRevision = UUID()
     private var suspension: Task<Void, any Error>?
     private var shutdown: Task<Void, any Error>?
-    public init(
+    public convenience init(
         makeConnectivity: @MainActor (PlatformAdmission) -> ConnectivityContainer = {
             ConnectivityContainer(admission: $0)
         },
@@ -47,6 +48,18 @@ public final class PlatformContainer: PlatformStateReading {
         timeZone: @escaping @Sendable () -> TimeZone = { .current },
         onFailure: @escaping @Sendable (String, String, any Error) -> Void = { _, _, _ in }
     ) {
+        self.init(
+            makeConnectivity: makeConnectivity, now: now, timeZone: timeZone, memoryWarnings: NativeMemoryWarnings(),
+            onFailure: onFailure)
+    }
+    init(
+        makeConnectivity: @MainActor (PlatformAdmission) -> ConnectivityContainer,
+        now: @escaping @Sendable () -> Date,
+        timeZone: @escaping @Sendable () -> TimeZone,
+        memoryWarnings: NativeMemoryWarnings,
+        onFailure: @escaping @Sendable (String, String, any Error) -> Void
+    ) {
+        self.memoryWarnings = memoryWarnings
         let admission = PlatformAdmission(onFailure: onFailure)
         self.admission = admission
         systemState = NativeSystemState(now: now, timeZone: timeZone)
@@ -113,6 +126,7 @@ public final class PlatformContainer: PlatformStateReading {
             guard !stopped else { throw PlatformError.stopped }
             guard !started else { return }
             started = true
+            memoryWarnings.start()
             startStateObservation()
             admission.setOpen(true)
         } catch {
@@ -169,6 +183,7 @@ public final class PlatformContainer: PlatformStateReading {
         do {
             if let shutdown { return try await shutdown.value }
             stopped = true
+            memoryWarnings.stop()
             invalidate()
             let suspension = suspension
             let task = Task { if let suspension { try await suspension.value } }
@@ -210,6 +225,13 @@ public final class PlatformContainer: PlatformStateReading {
             throw PlatformStateError.invalidSnapshot
         }
         return facts
+    }
+    /// System memory warnings for the root's whole lifetime, including background; fails before start and after stop.
+    public func listenMemoryWarnings() throws -> StateSignalListener<MemoryWarning> {
+        do { return try memoryWarnings.listen() } catch {
+            admission.report("system", "listenMemoryWarnings", error)
+            throw error
+        }
     }
     public func systemStatus() throws -> PlatformSystemStatus {
         try PlatformSystemStatus(power: snapshot(.power), network: snapshot(.network))

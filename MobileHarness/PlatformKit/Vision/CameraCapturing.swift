@@ -43,14 +43,14 @@ struct CameraOutputDimensions: Equatable, Sendable {
 
 /// Native capability only. Permission requests and capture require an explicit caller operation.
 public protocol CameraFrameObserving: Sendable {
-    func subscribeFrames() async throws -> AsyncThrowingStream<CameraFrame, Error>
+    func listenFrames() async throws -> MediaSignalListener<CameraFrame>
 }
 public protocol CameraCapturing: CameraFrameObserving {
     var events: AsyncStream<CameraEvent> { get }
     var captureRotation: CGFloat { get async }
     func requestPermission() async -> Bool
-    func start(facing: CameraFacing) async throws -> AsyncThrowingStream<CameraFrame, Error>
-    func switchCamera(facing: CameraFacing) async throws -> AsyncThrowingStream<CameraFrame, Error>
+    func start(facing: CameraFacing) async throws -> MediaSignalListener<CameraFrame>
+    func switchCamera(facing: CameraFacing) async throws -> MediaSignalListener<CameraFrame>
     func capturePhoto(rotation: CGFloat) async throws -> Data
     func setVideoMode(_ enabled: Bool) async throws
     func beginRecording(durationSeconds: Int, rotation: CGFloat) async throws -> String

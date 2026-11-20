@@ -1,22 +1,22 @@
 # Architecture
 
-Agents directly consume typed UI container requests, native PlatformKit streams and model/device/failure observations. Perception roles turn sensory input into semantic role messages; cognitive roles consume those messages through Gateway or receive already typed local intent directly. Internal messages can also originate from any authorized role without new sensor input. The [source/perception/cognition/execution overview](../MobileHarness/README.md#native-input-and-internal-signals) distinguishes those paths and their feedback. UI, PlatformKit, ModelKit and Storage remain independent. Input observation and business execution have separate capabilities and owners.
+Agents directly consume module-owned SignalListener subtypes for External UI request listeners, native PlatformKit media/sensors and model/device facts. Perception roles turn sensory input into semantic role messages; cognitive roles consume those messages through Gateway or receive already typed local intent directly. Internal messages can also originate from any authorized role without new sensor input. The [source/perception/cognition/execution overview](../MobileHarness/README.md#native-input-and-internal-signals) distinguishes those paths and their feedback. UI, PlatformKit, ModelKit and Storage remain independent. Input observation and business execution have separate capabilities and owners.
 
 ```mermaid
 flowchart LR
- UI[UI requests] --> A[Owning Agent]
- Native[Native frames and facts] --> A
+ UI[External UI request listeners] --> A[Owning Agent]
+ Native[External media and state listeners] --> A
  A --> G[Gateway]
  G --> F[Actions]
  F --> Base[Foundational capabilities]
  G -->|Agent messages and execution feedback| A
 ```
 
-User and model decisions share registered Actions, resource ownership, cancellation and genuine completion. Local inputs retain lightweight request/session/generation/turn/causal context and do not become external Signals. Agent communication and execution feedback keep their bound transport authority.
+User and model decisions share registered Actions, resource ownership, cancellation and genuine completion. External inputs retain lightweight request/session/generation/turn/causal context and use direct listeners. Agent communication and execution feedback keep their bound transport authority.
 
 Each Agent owns its constructor-injected UI subscriptions independently of pages and joins cleanup; the application root assembles and starts/stops the owners. UI request receipts distinguish acceptance from business completion; State contains limited public facts with one owning writer. Raw frames, queues and full AgentContext remain private. Direct delivery never automatically retries a failed effect or claims physical completion.
 
-App caches one ActionsContainer, GatewayContainer and AgentContainer per registration scope. Foundations → executionBindings → Actions → Gateway → Agents → homePreparation defines readiness; inverse cleanup retains all host ports until Gateway and Actions join. Actions owns canonical registration, pure preparation, validation and business/native execution; Agents owns role/Skill/Task authorization; Gateway owns neutral endpoint/envelope/scope admission, communication, scheduling, resources and delivery. Domains, modules and individual actions remain composable business library values without containers. The module APIs and ownership rules are defined in the [overall technical design](../MobileHarness/README.md).
+App caches one ActionsContainer, GatewayContainer and AgentContainer per registration scope. Foundations → executionBindings → Actions → Gateway → Agents → homePreparation defines readiness; inverse cleanup retains all host ports until Gateway and Actions (including its engine) join. Actions owns canonical registration, pure preparation, validation and business/native execution; Agents owns role/Skill/Task authorization; Gateway owns the four internal Signals (endpoint/envelope/scope admission and delivery); the Actions Shell owns scheduling, resources, direct calls and result retention. Domains, modules and individual actions remain composable business library values without containers. The module APIs and ownership rules are defined in the [overall technical design](../MobileHarness/README.md).
 
 The complete current module graph, source ownership, speech/camera/history/model/resource flows and lifecycle contracts are maintained in [the overall technical design](../MobileHarness/README.md). Local interfaces and limits belong to each module README. [ADR 0218](adr/0218-direct-container-input.md) records the change in input boundaries; [validation](validation/Direct-Container-Input.md) separates automated, build and physical evidence.
 
@@ -51,3 +51,7 @@ Assistant runs Decision on trusted final ASR and local user text. Verified peer 
 Both Assistant and Writer message tables represent dispatched model requests: queued or discarded Signals never create message rows. Assistant presents committed discard and successful interruption as transient expanded details on the in-app Island. At HTTP dispatch or local inference start, one atomic message records the full frozen batch; completion and errors update it. Writer delegation lifecycle is stored separately in writer_executions. Storage migrates existing request and execution identities without resetting current databases; see [database design](../MobileHarness/Storage/Database/README.md).
 
 ModelKit owns model acquisition end to end: bundled declarations, custom artifact metadata, cache/installation paths, receipts, downloads and native background handoff. App does not supply Storage space. Actions owns selection and download-source preferences; UI projects artifact facts. D3 Lite is not a supported production model. See [ModelKit](../MobileHarness/ModelKit/README.md).
+
+Agent–Agent requests return typed Replies directly; task events use explicitly bound channels and requester/executor/session scopes. Gateway owns independent bounded event branches and joined cancellation. Agents validates enabled protocols against real code handlers before model activation. Agent–Action invocation snapshots are captured before effects and retained in success/failure; large snapshots are archived before dispatch. Direct Tool returns are consumed once. IPC is outside the implemented runtime boundary.
+
+Task events follow consumer-owned subscription semantics: Assistant statically listens to Writer from startup until role stop and separately tracks tasks and sessions before sending direct requests. Writer declares its publication capabilities and publishes on demand; startup validates matching pub/sub declarations and code handlers without checking online readiness. Publication cannot discover or initialize consumers. Pub/sub is best-effort live notification with no delivery acknowledgment or broker replay; send returns a typed Reply. Durable task-state reconciliation belongs to Assistant business logic. Details are in [Signal requirements](requirements/technical/Signal-Architecture-Redesign.md).

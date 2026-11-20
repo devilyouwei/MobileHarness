@@ -4,9 +4,9 @@ import FunctionContracts
 import Gateway
 
 /// Dispatches resolved calls; alias resolution belongs to the Agent.
-/// The channel scheduler retains FIFO ordering and completion/cancellation barriers.
+/// The Actions engine retains FIFO ordering and completion/cancellation barriers.
 struct ActionDispatcher: Sendable {
-    let executor: ChannelScheduler
+    let executor: any ActionExecutionEngine
 
     func dispatch(
         _ token: ActionCall, envelope: OutputEnvelope, owner: ExecutionOwner,

@@ -3,7 +3,7 @@ import FunctionContracts
 
 /// Scheduler-owned bounded outbox: every feedback-producing admission reserves its terminal slot.
 struct ActionResultLedger {
-    enum DeliveryState: String, Sendable { case reserved, pending, accepted, closed }
+    enum DeliveryState: String, Sendable { case reserved, pending, accepted, closed, expired }
     struct Record: Sendable {
         let executionID: String
         let result: ExecutionResult?
@@ -12,7 +12,9 @@ struct ActionResultLedger {
     private struct Entry {
         let invocation: ScheduledAction
         let order: UInt64
+        let snapshot: ActionInvocationSnapshot
         var result: ExecutionResult?
+        var completedAt: ContinuousClock.Instant?
         var attempts = 0
         var nextAttempt: ContinuousClock.Instant = .now
     }
@@ -20,23 +22,34 @@ struct ActionResultLedger {
     private var history: [Record] = []
     private var order: UInt64 = 0
     private(set) var evictedHistory: UInt64 = 0
+    private(set) var expiredResults: UInt64 = 0
     let capacity: Int
+    let deliveryTimeout: Duration
 
-    init(capacity: Int) {
-        precondition((1...1024).contains(capacity))
+    init(capacity: Int, deliveryTimeout: Duration = .seconds(60)) {
+        precondition((1...1024).contains(capacity) && deliveryTimeout > .zero)
         self.capacity = capacity
+        self.deliveryTimeout = deliveryTimeout
     }
 
     func checkCapacity(_ invocation: ScheduledAction) throws {
         guard invocation.feedback != .none else { return }
         guard invocation.owner != nil else { throw ActionExecutionError.invalidInvocation }
+        let snapshot = try ActionInvocationSnapshot(invocation.call)
+        let retained = entries.values.reduce(0) { sum, entry in
+            sum + entry.invocation.call.parameters.reduce(0) { $0 + $1.key.utf8.count + $1.value.utf8.count }
+        }
+        guard retained + snapshot.retainedBytes <= 32 * 1024 * 1024 else {
+            throw ActionSchedulingError.resultCapacityExceeded
+        }
         guard entries.count < capacity else { throw ActionSchedulingError.resultCapacityExceeded }
     }
 
-    mutating func reserve(_ invocation: ScheduledAction) {
+    mutating func reserve(_ invocation: ScheduledAction) throws {
         guard invocation.feedback != .none else { return }
         order &+= 1
-        entries[invocation.executionID] = Entry(invocation: invocation, order: order)
+        entries[invocation.executionID] = Entry(
+            invocation: invocation, order: order, snapshot: try ActionInvocationSnapshot(invocation.call))
     }
 
     mutating func complete(
@@ -51,7 +64,9 @@ struct ActionResultLedger {
         entry.result = ExecutionResult(
             executionID: invocation.executionID, owner: owner, path: invocation.call.actionPath,
             envelope: invocation.envelope,
-            status: status, effect: effect, completion: completion, failure: failure)
+            status: status, effect: effect, completion: completion, failure: failure,
+            invocation: entry.snapshot)
+        entry.completedAt = .now
         entries[invocation.executionID] = entry
     }
 
@@ -68,6 +83,12 @@ struct ActionResultLedger {
         case .accepted: finish(id, state: .accepted)
         case .closed: finish(id, state: .closed)
         case .retry:
+            // Retry covers temporary receiver pressure only; an unresolved result must end as a visible failure.
+            if let completedAt = entry.completedAt, completedAt.duration(to: .now) >= deliveryTimeout {
+                expiredResults &+= 1
+                finish(id, state: .expired)
+                return
+            }
             entry.attempts = min(entry.attempts + 1, 10)
             entry.nextAttempt = .now.advanced(by: .milliseconds(100 * entry.attempts))
             entries[id] = entry
@@ -96,5 +117,9 @@ struct ActionResultLedger {
             evictedHistory &+= 1
         }
         history.append(Record(executionID: id, result: entry.result, state: state))
+        while history.reduce(0, { $0 + ($1.result?.invocation?.retainedBytes ?? 0) }) > 32 * 1024 * 1024 {
+            history.removeFirst()
+            evictedHistory &+= 1
+        }
     }
 }

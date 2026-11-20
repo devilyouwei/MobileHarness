@@ -201,13 +201,18 @@ private struct PortUnusedVAD: VoiceActivityCapability {
         calls.append("permission")
         if denied { throw AudioIOError.microphoneDenied }
     }
-    func subscribeEvents() throws -> AsyncThrowingStream<NativeAudioEvent, any Error> { events.stream }
+    func listenEvents() throws -> PlatformKit.StateSignalListener<NativeAudioEvent> {
+        let current = events
+        return .init(
+            source: .init(producer: "fixture.audio", generation: "one", delivery: .latest),
+            stream: current.stream, detach: { current.continuation.finish() })
+    }
     func startCapture(preferSpatial: Bool) async throws {
         try Task.checkCancellation()
         calls.append("capture.start")
         try source.send(MicrophoneFrame(samples: Array(repeating: 0.01, count: 1024), sampleRate: 16000, sequence: 0))
     }
-    func subscribeCapture() async throws -> MicrophoneCaptureInput { try source.subscribe() }
+    func listenCapture() async throws -> MicrophoneCaptureInput { try source.subscribe() }
     func stopCapture() async {
         calls.append("capture.stop")
         source.finish()

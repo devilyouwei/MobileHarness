@@ -117,7 +117,7 @@ func soundSourceCadenceAndQuietClearUseSamples(_ rate: Int) throws {
         .init(
             state: .active, direction: .init(x: 0, y: 1, z: 0), quality: 1, rms: 0.1,
             timestamp: 0, duration: 0.1))
-    #expect(message.contract == "sound.source")
+    #expect(message.contract == "perception.audio.source.v1")
     #expect(try JSONDecoder().decode(PerceptionMessage.self, from: message.encodedContent()) == message.perception)
     try SoundSourceObservation(state: .unavailable, timestamp: 0, duration: 0).validate()
     #expect(throws: SoundSourceValidationError.self) {
@@ -187,15 +187,14 @@ extension LiveRuntimeTests {
     {
         let original = try AgentConfigurations.load(named: "SpeechPerception")
         let configuration = try original.restrictingCommunication(
-            to: ["media.audio", "sound.source"], contracts: AgentContracts.communication)
-        #expect(configuration.communication.inputs.isEmpty)
+            to: ["media.audio", "perception.audio.source.v1"], contracts: AgentContracts.communication)
+        #expect(configuration.communication.requests.isEmpty)
         #expect(configuration.communication.subscriptions.isEmpty)
-        #expect(configuration.communication.publications == ["sound.source"])
-        #expect(configuration.communication.sends.isEmpty)
+        #expect(configuration.communication.publications.map(\.protocol) == ["perception.audio.source.v1"])
         #expect(original.communication.subscriptions.isEmpty)
         #expect(
-            original.communication.publications == [
-                PerceptionMessage.asrPartialContract, PerceptionMessage.asrFinalContract, "sound.source",
+            original.communication.publications.map(\.protocol) == [
+                PerceptionMessage.speechProtocol, "perception.audio.source.v1",
             ])
         #expect(configuration.agentID == original.agentID && configuration.version == original.version)
         let policy = try CommunicationPolicy(
@@ -213,14 +212,13 @@ extension LiveRuntimeTests {
         #expect(speech.descriptor.capabilities.internalActions.isEmpty)
         let root = await GatewayContainer()
         let assembly = await AgentGatewayAssembly(
-            signals: root.signals, admission: root.admissionPort,
-            configuration: .init(
-                executor: fixtureExecutionPort(actions: []), catalog: .init(revision: UUID(), entries: [])))
+            signals: root.signals, admission: root.admissionPort, engine: DetachedActionExecution(),
+            configuration: .init(catalog: .init(revision: UUID(), entries: [])))
         let ports = try await root.configureExecution(assembly.configuration)
         let main = await assembly.bind(ports: ports, observations: root.observations)
         try await root.start()
         let diagnostic = try await main.observations.open(
-            policy: policy, observedContracts: ["sound.source"],
+            policy: policy, observedContracts: ["perception.audio.source.v1"],
             observeEvent: { input in
                 if case .soundSource(let value)? = input.payload.perception { await values.append(value) }
             })
@@ -365,11 +363,16 @@ extension LiveRuntimeTests {
     @Test(.actionCatalog) func soundSourceBroadcastCrossesGatewaysWithBoundIdentityAndCaptureDeadline() async throws {
         let speechConfiguration = try AgentConfigurations.load(named: "SpeechPerception")
         let listenerData: [String: Any] = [
-            "version": 8, "category": "cognition", "id": "soundListener", "actions": [:], "tools": [],
-            "communication": [
-                "inputs": [["contract": "sound.source", "version": 1, "kind": "observation"]],
-                "subscriptions": [["contract": "sound.source", "source": "speechPerception", "topic": "sound.source"]],
-                "publications": [], "sends": [],
+            "version": 9, "category": "cognition", "id": "soundListener", "actions": [:], "tools": [],
+            "signals": [
+                "requests": [], "feedback": [],
+                "subscriptions": [
+                    [
+                        "channel": "perception.audio.source", "protocol": "perception.audio.source.v1",
+                        "sources": ["speechPerception"],
+                    ]
+                ],
+                "publications": [],
             ],
         ]
         let listener = try AgentConfiguration(
@@ -394,6 +397,7 @@ extension LiveRuntimeTests {
         let input = InputGateway(manager: manager, policy: policy)
         let output = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
+        _ = try await output.consumer(for: recorder)
         try await speech.bind(output.messaging(for: .speechPerception))
         try await speech.start()
         // This test verifies routing of fresh capture; expired capture has separate rejection coverage.
@@ -408,7 +412,7 @@ extension LiveRuntimeTests {
         #expect(received.metadata.parentID != nil && received.metadata.rootID == received.metadata.parentID)
         #expect(received.sessionID == session && received.turn == nil)
         #expect(try #require(received.metadata.deadline) <= capturedAt.advanced(by: .milliseconds(600)))
-        #expect(received.payload.perception?.contract == "sound.source")
+        #expect(received.payload.perception?.contract == "perception.audio.source.v1")
         await manager.stopAll()
         await output.shutdown()
     }
@@ -420,7 +424,7 @@ extension LiveRuntimeTests {
     {
         let session = UUID().uuidString
         let configuration = try AgentConfigurations.load(named: "SpeechPerception").restrictingCommunication(
-            to: ["sound.source"], contracts: AgentContracts.communication)
+            to: ["perception.audio.source.v1"], contracts: AgentContracts.communication)
         let microphone = DirectSoundMicrophone()
         let speech = try SpeechPerceptionAgent(
             recognition: NoSoundASR(), vad: ForbiddenSoundVAD(), sessionID: session,
@@ -447,7 +451,7 @@ extension LiveRuntimeTests {
         let received = try #require(await iterator.next())
         #expect(received.metadata.sequence == 10)
         #expect(received.sessionID == session)
-        #expect(received.payload.perception?.contract == "sound.source")
+        #expect(received.payload.perception?.contract == "perception.audio.source.v1")
         #expect(received.metadata.generation == microphone.source.generation)
         await speech.stop()
         #expect(await speech.status().lifecycle == .stopped)
@@ -458,7 +462,7 @@ private actor DirectSoundMicrophone: AudioCaptureObserving {
     nonisolated let source = MicrophoneCapture()
     private var replacement: MicrophoneCapture?
     private(set) var subscriptions = 0
-    func subscribeCapture() throws -> MicrophoneCaptureInput {
+    func listenCapture() throws -> MicrophoneCaptureInput {
         subscriptions += 1
         return try (replacement ?? source).subscribe()
     }

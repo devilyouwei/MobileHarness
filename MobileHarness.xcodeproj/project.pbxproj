@@ -16,7 +16,6 @@
 		59BD361C3553FD7FF9BB6D80 /* MobileHarness/App/Composition/AppComposition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F5CE39A7891046C2FD84ED0 /* MobileHarness/App/Composition/AppComposition.swift */; };
 		631882B730A8541E00AEA923 /* MobileHarness/App/Composition/ApplicationActionAssembly.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83988DC0FD1654417627AD78 /* MobileHarness/App/Composition/ApplicationActionAssembly.swift */; };
 		631882B830A8541E00AEA923 /* MobileHarness/App/Composition/ActionServiceAdapters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D9A2E27294F4C25B0EA09B1 /* MobileHarness/App/Composition/ActionServiceAdapters.swift */; };
-		631882B930A8541E00AEA923 /* MobileHarness/App/Composition/AgentResourceBindings.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF173D4854F0E76D231E09CA /* MobileHarness/App/Composition/AgentResourceBindings.swift */; };
 		631882BA30A8541E00AEA923 /* MobileHarness/App/Composition/ApplicationPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CBC83BAB34BBED6BA93B932 /* MobileHarness/App/Composition/ApplicationPresentation.swift */; };
 		631882BB30A8541E00AEA923 /* MobileHarness/App/MobileHarnessApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 672BC0582D236854CD27A778 /* MobileHarness/App/MobileHarnessApp.swift */; };
 		631882BC30A8541E00AEA923 /* MobileHarness/App/Lifecycle/ApplicationSystemDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F5E2DB2B54264BFB8F9FE98 /* MobileHarness/App/Lifecycle/ApplicationSystemDelegate.swift */; };
@@ -36,7 +35,6 @@
 		A1C026000000000000000002 /* MobileHarness/Resources/Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1C026000000000000000001 /* MobileHarness/Resources/Assets.xcassets */; };
 		A80B0D79FED80B5BAEC6AB60 /* MobileHarness/App/Composition/ModuleRegistration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85D51708E00BEF24A896ADA8 /* MobileHarness/App/Composition/ModuleRegistration.swift */; };
 		C6D1514C8DC297687EAF454E /* MobileHarness/Resources/PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 033921DB57B8F2B4CE6B88D5 /* MobileHarness/Resources/PrivacyInfo.xcprivacy */; };
-		D66297F0F6C7427F0002620E /* MobileHarness/App/Composition/AgentResourceBindings.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF173D4854F0E76D231E09CA /* MobileHarness/App/Composition/AgentResourceBindings.swift */; };
 		EB10C550D59B871FCC0BD815 /* MobileHarness/App/Lifecycle/ApplicationSystemDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F5E2DB2B54264BFB8F9FE98 /* MobileHarness/App/Lifecycle/ApplicationSystemDelegate.swift */; };
 		F0141EB5E9679932802EFD12 /* MobileHarness/App/Composition/ApplicationActionAssembly.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83988DC0FD1654417627AD78 /* MobileHarness/App/Composition/ApplicationActionAssembly.swift */; };
 		F178867DA2879CAE0F60630A /* HarnessKit in Frameworks */ = {isa = PBXBuildFile; productRef = E55A8CC6397119BC2F346606 /* HarnessKit */; };
@@ -86,6 +84,11 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+			9D5BAC32FA283F503253B4CB /* MobileHarness/Gateway/GatewayExecution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Gateway/GatewayExecution.swift; sourceTree = SOURCE_ROOT; };
+			2FFE8CC6492EB394E069F32E /* MobileHarness/Actions/Camera/CameraResourceBinding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Camera/CameraResourceBinding.swift; sourceTree = SOURCE_ROOT; };
+			527E4459BC57DAEA14CAFDFB /* MobileHarness/Actions/Support/Contracts/ActionExecutionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ActionExecutionEngine.swift; sourceTree = SOURCE_ROOT; };
+			CCE94058A4E720D2CD30BE28 /* MobileHarness/Actions/Support/Contracts/ExecutionRuntimeFacts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ExecutionRuntimeFacts.swift; sourceTree = SOURCE_ROOT; };
+			81B3F90DF18939B949CB948D /* MobileHarness/Actions/Support/Shell/ActionExecutionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Shell/ActionExecutionCoordinator.swift; sourceTree = SOURCE_ROOT; };
 		0072D6CE707356443991750D /* MobileHarness/Agents/Support/CapabilityCoverage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/CapabilityCoverage.swift; sourceTree = SOURCE_ROOT; };
 		007DD7E720A54C631013319A /* MobileHarness/Agents/Support/Core/Communication/SignalObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Core/Communication/SignalObservation.swift; sourceTree = SOURCE_ROOT; };
 		00B4D04A6368F4EE6D50466C /* MobileHarness/Resources/Skills/HistoryQuery/Instructions.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/Resources/Skills/HistoryQuery/Instructions.md; sourceTree = SOURCE_ROOT; };
@@ -114,7 +117,7 @@
 		069BF642411CC089BEA9AE91 /* MobileHarness/Actions/History/HistoryActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/History/HistoryActions.swift; sourceTree = SOURCE_ROOT; };
 		06C6A27994EBF0A3826DE374 /* MobileHarness/Actions/Speech/Listening/VoiceSessionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Speech/Listening/VoiceSessionCoordinator.swift; sourceTree = SOURCE_ROOT; };
 		083F9CB9FA3114ABA8C91F5A /* MobileHarness/Resources/Agents/Writer/Prompts.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Resources/Agents/Writer/Prompts.json; sourceTree = SOURCE_ROOT; };
-		08636EA24BA78B9745FD27D5 /* MobileHarness/Gateway/Output/Scheduling/ChannelScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Gateway/Output/Scheduling/ChannelScheduler.swift; sourceTree = SOURCE_ROOT; };
+		08636EA24BA78B9745FD27D5 /* MobileHarness/Actions/Support/Shell/Scheduling/ChannelScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Shell/Scheduling/ChannelScheduler.swift; sourceTree = SOURCE_ROOT; };
 		08D278FCA7ED20A6031B6D0A /* MobileHarness/UI/Root/NavigationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/UI/Root/NavigationState.swift; sourceTree = SOURCE_ROOT; };
 		09E8E893C716E39E17995888 /* MobileHarness/Actions/UI/Runtime/BluetoothStatusActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/UI/Runtime/BluetoothStatusActions.swift; sourceTree = SOURCE_ROOT; };
 		0A3E4AA9A14261003B409EF2 /* MobileHarness/Actions/System/Provider/ProviderSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/System/Provider/ProviderSettingsStore.swift; sourceTree = SOURCE_ROOT; };
@@ -139,7 +142,7 @@
 		1054ADAB5969C7BA6F3CB6B3 /* MobileHarness/Resources/Agents/Memory/Agent.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Resources/Agents/Memory/Agent.json; sourceTree = SOURCE_ROOT; };
 		1069E96BA3E9EAC9B07A4423 /* MobileHarness/Actions/System/Provider/ProviderSettingsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/System/Provider/ProviderSettingsService.swift; sourceTree = SOURCE_ROOT; };
 		108EA0410652EAC3804B4996 /* MobileHarness/Agents/Assistant/AssistantInputDecision.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Assistant/AssistantInputDecision.swift; sourceTree = SOURCE_ROOT; };
-		10A83A8D0F1D2A0CF45E891D /* MobileHarness/Gateway/Output/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/Gateway/Output/README.md; sourceTree = SOURCE_ROOT; };
+		10A83A8D0F1D2A0CF45E891D /* MobileHarness/Actions/Support/Shell/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/Actions/Support/Shell/README.md; sourceTree = SOURCE_ROOT; };
 		116C0F1467639C0ACB510302 /* MobileHarness/UI/Camera/CameraState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/UI/Camera/CameraState.swift; sourceTree = SOURCE_ROOT; };
 		11D68C368F28D081A630CE1A /* MobileHarness/UI/Camera/CameraVideoFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/UI/Camera/CameraVideoFrame.swift; sourceTree = SOURCE_ROOT; };
 		11DEB50193268B4CE8B69B42 /* MobileHarness/Agents/ApplicationControl/ApplicationControlUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/ApplicationControl/ApplicationControlUI.swift; sourceTree = SOURCE_ROOT; };
@@ -167,11 +170,11 @@
 		177240278F39519CD8B8D2C7 /* MobileHarness/Agents/Support/ActionDispatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/ActionDispatcher.swift; sourceTree = SOURCE_ROOT; };
 		17A52A1A2FF472A54145201F /* MobileHarness/Actions/Support/Contracts/ActionRequestSlot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ActionRequestSlot.swift; sourceTree = SOURCE_ROOT; };
 		17A89BEF103F66D53F8302DE /* MobileHarness/App/Lifecycle/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/App/Lifecycle/README.md; sourceTree = SOURCE_ROOT; };
-		17FE5EC277653C915080E689 /* MobileHarness/Actions/Support/ToolModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/ToolModule.swift; sourceTree = SOURCE_ROOT; };
+		17FE5EC277653C915080E689 /* MobileHarness/Actions/Support/Call/ToolModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Call/ToolModule.swift; sourceTree = SOURCE_ROOT; };
 		1865D41E99308B92600BEB8F /* MobileHarness/Actions/UI/Pose/PoseOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/UI/Pose/PoseOverlay.swift; sourceTree = SOURCE_ROOT; };
 		18A2CBA97437E4599D2F6CEB /* MobileHarness/Actions/NexArm/Connection/BluetoothPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/NexArm/Connection/BluetoothPresentation.swift; sourceTree = SOURCE_ROOT; };
 		18AA0738606F858C4C719D15 /* MobileHarness/ModelKit/Speech/VAD/Silero/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/ModelKit/Speech/VAD/Silero/README.md; sourceTree = SOURCE_ROOT; };
-		19A0E33FD2F204FDEA0661D6 /* Tests/Gateway/Output/ChannelSchedulerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Gateway/Output/ChannelSchedulerTests.swift; sourceTree = SOURCE_ROOT; };
+		19A0E33FD2F204FDEA0661D6 /* Tests/Actions/Execution/ChannelSchedulerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Actions/Execution/ChannelSchedulerTests.swift; sourceTree = SOURCE_ROOT; };
 		19E9839BE3D7739A8BDC8E7E /* Tests/ModelKit/Speech/TTS/MossNano/README.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = Tests/ModelKit/Speech/TTS/MossNano/README.md; sourceTree = SOURCE_ROOT; };
 		1A5F5762F4CAA2F3AEF36325 /* MobileHarness/Agents/Assistant/AssistantContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Assistant/AssistantContainer.swift; sourceTree = SOURCE_ROOT; };
 		1A84001D55113EAC32B97A4E /* MobileHarness/Actions/NexArm/Motion/NexArmJointCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/NexArm/Motion/NexArmJointCommand.swift; sourceTree = SOURCE_ROOT; };
@@ -226,7 +229,7 @@
 		2A76EF350A88660EA0DA32BE /* MobileHarness/Actions/Support/Contracts/TaskControlCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/TaskControlCapability.swift; sourceTree = SOURCE_ROOT; };
 		2AE97B2868336F4C98509B3B /* MobileHarness/Agents/ApplicationControl/ApplicationControlFunctions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/ApplicationControl/ApplicationControlFunctions.swift; sourceTree = SOURCE_ROOT; };
 		2B1DE861C51E3FA945CD0120 /* MobileHarness/Actions/Speech/Listening/VoiceNativeEffects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Speech/Listening/VoiceNativeEffects.swift; sourceTree = SOURCE_ROOT; };
-		2BB2CE634A7C45DF91B9605B /* MobileHarness/Actions/Support/ActionDeadline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/ActionDeadline.swift; sourceTree = SOURCE_ROOT; };
+		2BB2CE634A7C45DF91B9605B /* MobileHarness/Actions/Support/Function/ActionDeadline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Function/ActionDeadline.swift; sourceTree = SOURCE_ROOT; };
 		2BFB0AD732FBA598CF60EC12 /* MobileHarness/ModelKit/Support/Core/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/ModelKit/Support/Core/README.md; sourceTree = SOURCE_ROOT; };
 		2C2BA7F554CF2F1E5E47AE26 /* MobileHarness/Agents/SpeechPerception/SpeechPerceptionContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/SpeechPerception/SpeechPerceptionContainer.swift; sourceTree = SOURCE_ROOT; };
 		2C7DF6421E0B6BFF24A263F7 /* MobileHarness/Actions/Support/Contracts/UIPresentationTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/UIPresentationTypes.swift; sourceTree = SOURCE_ROOT; };
@@ -241,16 +244,16 @@
 		2F5E2DB2B54264BFB8F9FE98 /* MobileHarness/App/Lifecycle/ApplicationSystemDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/App/Lifecycle/ApplicationSystemDelegate.swift; sourceTree = SOURCE_ROOT; };
 		30452BE4C73BD40A73AF88EB /* MobileHarness/ModelKit/Vision/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/ModelKit/Vision/README.md; sourceTree = SOURCE_ROOT; };
 		3049AD3CC47D1D743641DBFE /* MobileHarness/Actions/UI/Runtime/IslandActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/UI/Runtime/IslandActions.swift; sourceTree = SOURCE_ROOT; };
-		30B06D68BD46720A60635D82 /* MobileHarness/Gateway/Output/Results/ActionResultLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Gateway/Output/Results/ActionResultLedger.swift; sourceTree = SOURCE_ROOT; };
+		30B06D68BD46720A60635D82 /* MobileHarness/Actions/Support/Shell/Results/ActionResultLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Shell/Results/ActionResultLedger.swift; sourceTree = SOURCE_ROOT; };
 		30B7C3B8767117C59961D885 /* MobileHarness/Agents/Support/Core/Runtime/ActionResultInbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Core/Runtime/ActionResultInbox.swift; sourceTree = SOURCE_ROOT; };
 		30C2B5A7A1F14E4C8E3BF999 /* MobileHarness/Agents/Assistant/AssistantInputBatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Assistant/AssistantInputBatch.swift; sourceTree = SOURCE_ROOT; };
 		30C9AEBEDB3A30A3FABE1AB9 /* MobileHarness/ModelKit/Support/Management/ChatDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/ModelKit/Support/Management/ChatDefaults.swift; sourceTree = SOURCE_ROOT; };
 		30EAB7CCC9B9B64645DA8CC2 /* MobileHarness/Agents/Support/Core/Output/ActionReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Core/Output/ActionReport.swift; sourceTree = SOURCE_ROOT; };
-		3183E52B357A4B0E5DE560BD /* MobileHarness/Actions/Support/ActionBindingModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/ActionBindingModule.swift; sourceTree = SOURCE_ROOT; };
+		3183E52B357A4B0E5DE560BD /* MobileHarness/Actions/Support/Call/ActionBindingModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Call/ActionBindingModule.swift; sourceTree = SOURCE_ROOT; };
 		31AB194E865CBDC832B224AF /* MobileHarness/ModelKit/Vision/PoseCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/ModelKit/Vision/PoseCapability.swift; sourceTree = SOURCE_ROOT; };
 		3243C6CE3D047B5D026E6D9B /* MobileHarness/Resources/Agents/Assistant/Prompts.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Resources/Agents/Assistant/Prompts.json; sourceTree = SOURCE_ROOT; };
 		326B8E70EFEA2688232FD88D /* MobileHarness/Actions/System/ModelResources/ModelResourcesClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/System/ModelResources/ModelResourcesClient.swift; sourceTree = SOURCE_ROOT; };
-		32EAA1A798BA523C78A0E871 /* MobileHarness/Gateway/Output/Scheduling/ActionExecutionLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Gateway/Output/Scheduling/ActionExecutionLedger.swift; sourceTree = SOURCE_ROOT; };
+		32EAA1A798BA523C78A0E871 /* MobileHarness/Actions/Support/Shell/Scheduling/ActionExecutionLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Shell/Scheduling/ActionExecutionLedger.swift; sourceTree = SOURCE_ROOT; };
 		3314CD4193E638E9F9164B28 /* MobileHarness/Agents/AgentFailure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/AgentFailure.swift; sourceTree = SOURCE_ROOT; };
 		331A5EBAD14D83CEB04429D3 /* MobileHarness/UI/Components/Island/IslandState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/UI/Components/Island/IslandState.swift; sourceTree = SOURCE_ROOT; };
 		338D00ADAEE9C0204B59C120 /* Tests/ModelKit/Management/Runtime/RuntimeBoundaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ModelKit/Management/Runtime/RuntimeBoundaryTests.swift; sourceTree = SOURCE_ROOT; };
@@ -323,7 +326,7 @@
 		4D8C49E19D2AFCCD70708CBB /* MobileHarness/ModelKit/Support/Management/HuggingFace/HubBackgroundTransfer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/ModelKit/Support/Management/HuggingFace/HubBackgroundTransfer.swift; sourceTree = SOURCE_ROOT; };
 		4DEB5F7CD35749EF2DCD7179 /* MobileHarness/Resources/Skills/Photography/Skill.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Resources/Skills/Photography/Skill.json; sourceTree = SOURCE_ROOT; };
 		4E5A7E28EA707CE546F95B25 /* MobileHarness/PlatformKit/Audio/AppleAudioIO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/PlatformKit/Audio/AppleAudioIO.swift; sourceTree = SOURCE_ROOT; };
-		4E7961F688A0A459835AF28E /* MobileHarness/Actions/Support/ActionBinding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/ActionBinding.swift; sourceTree = SOURCE_ROOT; };
+		4E7961F688A0A459835AF28E /* MobileHarness/Actions/Support/Call/ActionBinding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Call/ActionBinding.swift; sourceTree = SOURCE_ROOT; };
 		4F929861DB7550269C8A92EC /* MobileHarness/ModelKit/Speech/TTS/MossNano/MossTtsNanoTensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/ModelKit/Speech/TTS/MossNano/MossTtsNanoTensor.swift; sourceTree = SOURCE_ROOT; };
 		4FD6861999696D6BF7E361F0 /* MobileHarness/Actions/Camera/VideoActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Camera/VideoActions.swift; sourceTree = SOURCE_ROOT; };
 		502E2493021212709FB50132 /* MobileHarness/Agents/Assistant/AssistantChatWorker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Assistant/AssistantChatWorker.swift; sourceTree = SOURCE_ROOT; };
@@ -331,14 +334,13 @@
 		51B597E7B7F2CC25BF6E99B3 /* docs/validation/Nemotron-Validation.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = "docs/validation/Nemotron-Validation.md"; sourceTree = SOURCE_ROOT; };
 		52006927698EA697F0AA59F4 /* MobileHarness/Actions/Camera/CameraRuntimePorts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Camera/CameraRuntimePorts.swift; sourceTree = SOURCE_ROOT; };
 		52628EE405041AD7C347AA3C /* MobileHarness/UI/Components/Island/IslandActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/UI/Components/Island/IslandActivityAttributes.swift; sourceTree = SOURCE_ROOT; };
-		52C53A58E540AA3626E65D9D /* MobileHarness/Gateway/Output/Results/ExecutionResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Gateway/Output/Results/ExecutionResult.swift; sourceTree = SOURCE_ROOT; };
+		52C53A58E540AA3626E65D9D /* MobileHarness/Actions/Support/Contracts/ExecutionResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ExecutionResult.swift; sourceTree = SOURCE_ROOT; };
 		52CD11F77B660A7A7614B3FE /* MobileHarness/PlatformKit/Connectivity/NexArm/NexArmSerial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/PlatformKit/Connectivity/NexArm/NexArmSerial.swift; sourceTree = SOURCE_ROOT; };
 		53048DAC66CA602C5A3A9176 /* MobileHarness/Agents/SpeechPerception/SoundSourceEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/SpeechPerception/SoundSourceEstimator.swift; sourceTree = SOURCE_ROOT; };
 		53233853E56AC3A28369CCD0 /* MobileHarness/Actions/Camera/CameraExecutionEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Camera/CameraExecutionEndpoint.swift; sourceTree = SOURCE_ROOT; };
 		53B5BD92CBCB2A203E5B8748 /* MobileHarness/Agents/Support/Core/Runtime/AgentContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Core/Runtime/AgentContext.swift; sourceTree = SOURCE_ROOT; };
 		5426FFF6F0D85D8D88521856 /* MobileHarness/Actions/System/SystemActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/System/SystemActions.swift; sourceTree = SOURCE_ROOT; };
 		54DECDE82F751C0F1306C22F /* MobileHarness/ModelKit/Speech/VAD/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/ModelKit/Speech/VAD/README.md; sourceTree = SOURCE_ROOT; };
-		552576B122A2FE8C3F5DED5A /* MobileHarness/Gateway/Output/Scheduling/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/Gateway/Output/Scheduling/README.md; sourceTree = SOURCE_ROOT; };
 		553229D85A24487B8F56918B /* MobileHarness/Resources/Agents/Shared/RequestContext.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Resources/Agents/Shared/RequestContext.json; sourceTree = SOURCE_ROOT; };
 		558451651E99AF7F005E80A4 /* MobileHarness/Agents/Support/Core/Communication/AgentMessaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Core/Communication/AgentMessaging.swift; sourceTree = SOURCE_ROOT; };
 		5588DDB0CC2A63CD21D79636 /* MobileHarness/Actions/UI/Navigation/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/Actions/UI/Navigation/README.md; sourceTree = SOURCE_ROOT; };
@@ -368,14 +370,13 @@
 		5E709F19FA9EDD8265B7827D /* MobileHarness/Actions/Support/Contracts/ActionAssemblyPorts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ActionAssemblyPorts.swift; sourceTree = SOURCE_ROOT; };
 		5EA6FEDBD923BB085837F847 /* MobileHarness/Actions/Support/Contracts/ActionExecutionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ActionExecutionState.swift; sourceTree = SOURCE_ROOT; };
 		5EDFFAC6EB2DC680CB89A088 /* MobileHarness/Actions/NexArm/NexArmBehaviorAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/NexArm/NexArmBehaviorAdapter.swift; sourceTree = SOURCE_ROOT; };
-		5EFE1F08AD98B481D4F2645F /* MobileHarness/Gateway/Output/Dispatch/DirectExecutionDispatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Gateway/Output/Dispatch/DirectExecutionDispatcher.swift; sourceTree = SOURCE_ROOT; };
+		5EFE1F08AD98B481D4F2645F /* MobileHarness/Actions/Support/Shell/DirectExecutionDispatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Shell/DirectExecutionDispatcher.swift; sourceTree = SOURCE_ROOT; };
 		5FDBA133A8DB92DC7FD0B1DB /* MobileHarness/Actions/Artifacts/WorkspaceActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Artifacts/WorkspaceActions.swift; sourceTree = SOURCE_ROOT; };
 		60132F689827D8C7121FCE58 /* MobileHarness/Gateway/GatewayFailure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Gateway/GatewayFailure.swift; sourceTree = SOURCE_ROOT; };
 		605842BA24AE6CF0D8DD9DA7 /* MobileHarness/Agents/ApplicationControl/ApplicationControlContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/ApplicationControl/ApplicationControlContainer.swift; sourceTree = SOURCE_ROOT; };
 		60BFE427EEC1B38F7F0C4989 /* MobileHarness/Actions/Artifacts/ArtifactsActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Artifacts/ArtifactsActions.swift; sourceTree = SOURCE_ROOT; };
 		6254115BBE0C8811CC904A71 /* MobileHarness/Resources/Agents/Assistant/Agent.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Resources/Agents/Assistant/Agent.json; sourceTree = SOURCE_ROOT; };
 		62AF08716774B223F1489C13 /* MobileHarness/Gateway/GatewayContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Gateway/GatewayContainer.swift; sourceTree = SOURCE_ROOT; };
-		6458623CFCC7220F0E00A559 /* MobileHarness/Gateway/Output/Resources/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/Gateway/Output/Resources/README.md; sourceTree = SOURCE_ROOT; };
 		64AB0B2DB48F331AF945EB58 /* MobileHarness/Agents/VisionPerception/VisionPerceptionProcessing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/VisionPerception/VisionPerceptionProcessing.swift; sourceTree = SOURCE_ROOT; };
 		654DE9B1AC6837ACEB545FD7 /* Tests/Agents/Core/RuntimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Agents/Core/RuntimeTests.swift; sourceTree = SOURCE_ROOT; };
 		65FC6669F98A33BB543FEC2F /* MobileHarness/PlatformKit/Audio/ListeningCaptureWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/PlatformKit/Audio/ListeningCaptureWorkflow.swift; sourceTree = SOURCE_ROOT; };
@@ -403,7 +404,7 @@
 		6C6E93BC3A52ABF2D363C0E1 /* MobileHarness/PlatformKit/Connectivity/NexArm/NexArmMotorCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/PlatformKit/Connectivity/NexArm/NexArmMotorCommands.swift; sourceTree = SOURCE_ROOT; };
 		6DA6BE8DDA4EFCEAA1A73AB0 /* MobileHarness/Agents/ApplicationControl/ApplicationControlExecutionSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/ApplicationControl/ApplicationControlExecutionSession.swift; sourceTree = SOURCE_ROOT; };
 		6DDB8E417B913FE030673580 /* MobileHarness/ModelKit/Support/Config/model-catalog.json */ = {isa = PBXFileReference; lastKnownFileType = text; path = "MobileHarness/ModelKit/Support/Config/model-catalog.json"; sourceTree = SOURCE_ROOT; };
-		6E46A3A5CD5F048899975480 /* MobileHarness/Gateway/Output/Scheduling/ActionDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Gateway/Output/Scheduling/ActionDiagnostics.swift; sourceTree = SOURCE_ROOT; };
+		6E46A3A5CD5F048899975480 /* MobileHarness/Actions/Support/Shell/Scheduling/ActionDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Shell/Scheduling/ActionDiagnostics.swift; sourceTree = SOURCE_ROOT; };
 		6E841018D4ADBD5D0966426D /* MobileHarness/Agents/Assistant/AssistantHistoryProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Assistant/AssistantHistoryProjection.swift; sourceTree = SOURCE_ROOT; };
 		6F0354CEFF37A213E7E857DD /* MobileHarness/Agents/Support/Core/Output/AgentOutputMailbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Core/Output/AgentOutputMailbox.swift; sourceTree = SOURCE_ROOT; };
 		6F385448A274EC7F313994BC /* MobileHarness/Actions/Support/Contracts/ActionRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ActionRequest.swift; sourceTree = SOURCE_ROOT; };
@@ -418,11 +419,11 @@
 		73B81ED29EE8B2161418F338 /* MobileHarness/ModelKit/Speech/TTS/Apple/AppleSpeechSynthesis.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/ModelKit/Speech/TTS/Apple/AppleSpeechSynthesis.swift; sourceTree = SOURCE_ROOT; };
 		7437767C223D4380307D12FF /* MobileHarness/Agents/Support/Core/Output/OutputEnvelope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Core/Output/OutputEnvelope.swift; sourceTree = SOURCE_ROOT; };
 		7510DF4B4FD4DAE03E22FA7F /* MobileHarness/Actions/System/Task/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/Actions/System/Task/README.md; sourceTree = SOURCE_ROOT; };
-		764EE40D2D908071AEAA09FA /* MobileHarness/Gateway/Output/Dispatch/ScheduledAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Gateway/Output/Dispatch/ScheduledAction.swift; sourceTree = SOURCE_ROOT; };
+		764EE40D2D908071AEAA09FA /* MobileHarness/Actions/Support/Contracts/ScheduledAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ScheduledAction.swift; sourceTree = SOURCE_ROOT; };
 		7746A2C6C3BB1E7F81E1DA67 /* MobileHarness/Resources/Skills/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/Resources/Skills/README.md; sourceTree = SOURCE_ROOT; };
 		778DA5B9CA625C944A7582F8 /* MobileHarness/Actions/NexArm/Tracking/NexArmTrackingSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/NexArm/Tracking/NexArmTrackingSession.swift; sourceTree = SOURCE_ROOT; };
 		78C4881278F1B4FCC628CD07 /* MobileHarness/Actions/NexArm/Motion/NexArmJogSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/NexArm/Motion/NexArmJogSession.swift; sourceTree = SOURCE_ROOT; };
-		78D7A37A1490EFACD7521723 /* MobileHarness/Actions/Support/FunctionExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/FunctionExecutor.swift; sourceTree = SOURCE_ROOT; };
+		78D7A37A1490EFACD7521723 /* MobileHarness/Actions/Support/Function/FunctionExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Function/FunctionExecutor.swift; sourceTree = SOURCE_ROOT; };
 		78EE334F1923FDA2D1478675 /* MobileHarness/Actions/System/Task/TaskControlModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/System/Task/TaskControlModule.swift; sourceTree = SOURCE_ROOT; };
 		7987430665CFEDE9BE0114D2 /* MobileHarness/Actions/Artifacts/ArtifactsModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Artifacts/ArtifactsModule.swift; sourceTree = SOURCE_ROOT; };
 		79BFDDB8C22B13AB2271CC8F /* MobileHarness/ModelKit/Support/Management/SpeechDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/ModelKit/Support/Management/SpeechDefaults.swift; sourceTree = SOURCE_ROOT; };
@@ -456,7 +457,7 @@
 		82FBEDE847B0D73B5D445BE3 /* MobileHarness/PlatformKit/Connectivity/NexArm/NexArmBluetooth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/PlatformKit/Connectivity/NexArm/NexArmBluetooth.swift; sourceTree = SOURCE_ROOT; };
 		832B462F32120652B694A305 /* MobileHarness/Agents/Support/Context/AgentTaskSkillState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Context/AgentTaskSkillState.swift; sourceTree = SOURCE_ROOT; };
 		835ED4A2CC90209A84D23B00 /* docs/Platform-Boundaries.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = "docs/Platform-Boundaries.md"; sourceTree = SOURCE_ROOT; };
-		8387090CD9BD5FF733AECA75 /* MobileHarness/Actions/Support/ToolRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/ToolRegistry.swift; sourceTree = SOURCE_ROOT; };
+		8387090CD9BD5FF733AECA75 /* MobileHarness/Actions/Support/Call/ToolRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Call/ToolRegistry.swift; sourceTree = SOURCE_ROOT; };
 		83988DC0FD1654417627AD78 /* MobileHarness/App/Composition/ApplicationActionAssembly.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/App/Composition/ApplicationActionAssembly.swift; sourceTree = SOURCE_ROOT; };
 		83A8F5FEA9F3C5698E044B24 /* MobileHarness/Agents/ApplicationControl/ProviderInputs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/ApplicationControl/ProviderInputs.swift; sourceTree = SOURCE_ROOT; };
 		843F43B9B331B2852D526054 /* MobileHarness/Agents/Support/Core/Communication/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/Agents/Support/Core/Communication/README.md; sourceTree = SOURCE_ROOT; };
@@ -468,7 +469,7 @@
 		8685A7F09AF045225D58E368 /* MobileHarness/Actions/Artifacts/ArtifactExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Artifacts/ArtifactExport.swift; sourceTree = SOURCE_ROOT; };
 		86F114B1295DEDD4EB228D12 /* MobileHarness/Agents/SpeechPerception/SpeechRecognitionTurn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/SpeechPerception/SpeechRecognitionTurn.swift; sourceTree = SOURCE_ROOT; };
 		87AEE7003AA91B22E442EDE4 /* MobileHarness/ModelKit/Language/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/ModelKit/Language/README.md; sourceTree = SOURCE_ROOT; };
-		88606DF7D3512232C3C8F6D2 /* MobileHarness/Gateway/Output/Resources/ResourceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Gateway/Output/Resources/ResourceCoordinator.swift; sourceTree = SOURCE_ROOT; };
+		88606DF7D3512232C3C8F6D2 /* MobileHarness/Actions/Support/Shell/Resources/ResourceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Shell/Resources/ResourceCoordinator.swift; sourceTree = SOURCE_ROOT; };
 		889534E8875244241ED837CF /* MobileHarness/PlatformKit/Audio/MicrophoneFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/PlatformKit/Audio/MicrophoneFrame.swift; sourceTree = SOURCE_ROOT; };
 		8929ED92FB15D5BA80FAB61B /* MobileHarness/UI/UIContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/UI/UIContainer.swift; sourceTree = SOURCE_ROOT; };
 		8943ED14FA78A9ED0048A9FE /* MobileHarness/ModelKit/Speech/ASR/Nemotron/NemotronASR.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/ModelKit/Speech/ASR/Nemotron/NemotronASR.swift; sourceTree = SOURCE_ROOT; };
@@ -484,7 +485,7 @@
 		8C6F240BE39B5D4B7D973352 /* MobileHarness/UI/Components/VoiceBars.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/UI/Components/VoiceBars.swift; sourceTree = SOURCE_ROOT; };
 		8C906CBD7ED3E73440425D8C /* MobileHarness/Actions/NexArm/Connection/NexArmDeviceAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/NexArm/Connection/NexArmDeviceAdapter.swift; sourceTree = SOURCE_ROOT; };
 		8D3A661C72016A841BA7F94F /* MobileHarness/Actions/Web/WebModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Web/WebModule.swift; sourceTree = SOURCE_ROOT; };
-		8D5123832B150B9B62754069 /* MobileHarness/Actions/Support/FunctionRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/FunctionRegistry.swift; sourceTree = SOURCE_ROOT; };
+		8D5123832B150B9B62754069 /* MobileHarness/Actions/Support/Function/FunctionRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Function/FunctionRegistry.swift; sourceTree = SOURCE_ROOT; };
 		8D6FA9F05C56F7EBDFAE1183 /* MobileHarness/Resources/Agents/Assistant/InputDecision.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Resources/Agents/Assistant/InputDecision.json; sourceTree = SOURCE_ROOT; };
 		8DE78A06135679539F5D0E3E /* MobileHarness/Agents/Support/Core/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/Agents/Support/Core/README.md; sourceTree = SOURCE_ROOT; };
 		8E8CA291F29796BE778B9680 /* MobileHarness/Actions/NexArm/Support/NexArmMotorProfiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/NexArm/Support/NexArmMotorProfiles.swift; sourceTree = SOURCE_ROOT; };
@@ -493,7 +494,7 @@
 		8F0FB54FF75D445984AEBD6D /* MobileHarness/Resources/Agents/Shared/ActionCatalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Resources/Agents/Shared/ActionCatalog.json; sourceTree = SOURCE_ROOT; };
 		8F1F66FBB3E2F3EC48FFD7C1 /* MobileHarness/Actions/Artifacts/ArtifactWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Artifacts/ArtifactWorkspace.swift; sourceTree = SOURCE_ROOT; };
 		8FA77833D482F7D50F5B5567 /* MobileHarness/Agents/Support/ToolDispatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/ToolDispatcher.swift; sourceTree = SOURCE_ROOT; };
-		8FCE66837CC1F56B05138750 /* MobileHarness/Actions/Support/CooperativeExecution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/CooperativeExecution.swift; sourceTree = SOURCE_ROOT; };
+		8FCE66837CC1F56B05138750 /* MobileHarness/Actions/Support/Function/CooperativeExecution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Function/CooperativeExecution.swift; sourceTree = SOURCE_ROOT; };
 		90A71C720F2680C3FC7D822F /* Tests/ModelKit/Speech/Apple/AppleSpeechTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ModelKit/Speech/Apple/AppleSpeechTests.swift; sourceTree = SOURCE_ROOT; };
 		90BC6F20474E684124DD9505 /* MobileHarness/Agents/ApplicationControl/ApplicationControlPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/ApplicationControl/ApplicationControlPolicy.swift; sourceTree = SOURCE_ROOT; };
 		90DA4806B1D8A1FAD8EA5064 /* Tests/ModelKit/Management/Runtime/CompositionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ModelKit/Management/Runtime/CompositionTests.swift; sourceTree = SOURCE_ROOT; };
@@ -502,7 +503,7 @@
 		923C0CE5D511764466F4028E /* MobileHarness/Agents/ApplicationControl/ApplicationControlInputs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/ApplicationControl/ApplicationControlInputs.swift; sourceTree = SOURCE_ROOT; };
 		92C8D80BA894084463E66228 /* MobileHarness/ModelKit/Support/Core/AudioFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/ModelKit/Support/Core/AudioFrame.swift; sourceTree = SOURCE_ROOT; };
 		92D311D7357F6A5A59C4A841 /* MobileHarness/ModelKit/Speech/TTS/MossNano/MossTtsNanoTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/ModelKit/Speech/TTS/MossNano/MossTtsNanoTypes.swift; sourceTree = SOURCE_ROOT; };
-		9383D74BF742AAF24A3F87C1 /* MobileHarness/Gateway/Output/Scheduling/ActionSchedulingError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Gateway/Output/Scheduling/ActionSchedulingError.swift; sourceTree = SOURCE_ROOT; };
+		9383D74BF742AAF24A3F87C1 /* MobileHarness/Actions/Support/Contracts/ActionSchedulingError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ActionSchedulingError.swift; sourceTree = SOURCE_ROOT; };
 		940BF7C580D777288C7CE760 /* Tests/PlatformKit/Core/PlatformContainerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/PlatformKit/Core/PlatformContainerTests.swift; sourceTree = SOURCE_ROOT; };
 		94CE5D4A6B6A6F5FC968B26C /* MobileHarness/Actions/History/HistoryPresentationActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/History/HistoryPresentationActions.swift; sourceTree = SOURCE_ROOT; };
 		95BC3FA1DEFCA570D7567E66 /* MobileHarness/ModelKit/Support/Core/InferenceSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/ModelKit/Support/Core/InferenceSession.swift; sourceTree = SOURCE_ROOT; };
@@ -518,7 +519,7 @@
 		99A07E8872A5D2814C35C43A /* MobileHarness/Actions/System/Provider/ProviderDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/System/Provider/ProviderDiscovery.swift; sourceTree = SOURCE_ROOT; };
 		99C0A98ED0415AA9499D5A03 /* MobileHarness/Actions/Support/Contracts/ActionNamespaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ActionNamespaces.swift; sourceTree = SOURCE_ROOT; };
 		99C81E6E87729700A3B5FD6F /* MobileHarness/PlatformKit/Vision/CameraVisionRestartWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/PlatformKit/Vision/CameraVisionRestartWorkflow.swift; sourceTree = SOURCE_ROOT; };
-		99EAAB2154D5C07D493D0805 /* MobileHarness/Gateway/Output/Scheduling/Channel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Gateway/Output/Scheduling/Channel.swift; sourceTree = SOURCE_ROOT; };
+		99EAAB2154D5C07D493D0805 /* MobileHarness/Actions/Support/Shell/Scheduling/ExecutionChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Shell/Scheduling/ExecutionChannel.swift; sourceTree = SOURCE_ROOT; };
 		9A089CA6EA81D28A7E46C35B /* MobileHarness/UI/Conversation/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/UI/Conversation/README.md; sourceTree = SOURCE_ROOT; };
 		9BDD929B1E21D2C0BD5659E8 /* Tests/ModelKit/Core/SessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ModelKit/Core/SessionTests.swift; sourceTree = SOURCE_ROOT; };
 		9C3DDE07040C201AD9838124 /* MobileHarness/Agents/AgentHostBindings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/AgentHostBindings.swift; sourceTree = SOURCE_ROOT; };
@@ -572,7 +573,7 @@
 		AB5ABCAD29F7CA8E9223FF20 /* docs/adr/0006-nemotron-streaming-asr.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = "docs/adr/0006-nemotron-streaming-asr.md"; sourceTree = SOURCE_ROOT; };
 		AB919418C110A79A7EC68844 /* MobileHarness/Actions/UI/Runtime/MicrophoneSpectrumPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/UI/Runtime/MicrophoneSpectrumPresentation.swift; sourceTree = SOURCE_ROOT; };
 		ABEBEC86B36D1AF927DD3129 /* MobileHarness/Agents/Photographer/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/Agents/Photographer/README.md; sourceTree = SOURCE_ROOT; };
-		ABFA9C90A2C34A746E222DA9 /* MobileHarness/Actions/Support/ActionMacro.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/ActionMacro.swift; sourceTree = SOURCE_ROOT; };
+		ABFA9C90A2C34A746E222DA9 /* MobileHarness/Actions/Support/Call/ActionMacro.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Call/ActionMacro.swift; sourceTree = SOURCE_ROOT; };
 		AC6E5427D9343878D1581BB7 /* docs/validation/Bootstrap-Validation.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = "docs/validation/Bootstrap-Validation.md"; sourceTree = SOURCE_ROOT; };
 		AC9D884306DC50C86098490E /* MobileHarness/Actions/Camera/CameraCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Camera/CameraCoordinator.swift; sourceTree = SOURCE_ROOT; };
 		ACB1A20911B48DAA02123C07 /* MobileHarness/Agents/Support/Core/Generation/FunctionTokenParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Core/Generation/FunctionTokenParser.swift; sourceTree = SOURCE_ROOT; };
@@ -665,7 +666,7 @@
 		C6C5855F51D81014EB7D2ACC /* MobileHarness/Actions/Artifacts/ArtifactPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Artifacts/ArtifactPresentation.swift; sourceTree = SOURCE_ROOT; };
 		C714D863F28709B388EDDF3F /* MobileHarnessLiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; path = MobileHarnessLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C817B3CE9CD3986F56A203F6 /* MobileHarness/UI/Diagnostics/SpeechDiagnosticState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/UI/Diagnostics/SpeechDiagnosticState.swift; sourceTree = SOURCE_ROOT; };
-		C8202A85F51AA2DF2026460D /* MobileHarness/Actions/Support/ActionExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/ActionExecutor.swift; sourceTree = SOURCE_ROOT; };
+		C8202A85F51AA2DF2026460D /* MobileHarness/Actions/Support/Call/ActionExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Call/ActionExecutor.swift; sourceTree = SOURCE_ROOT; };
 		C87B7FBCBD32D636561E7040 /* MobileHarness/Actions/Support/Contracts/VoiceOutputHandling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/VoiceOutputHandling.swift; sourceTree = SOURCE_ROOT; };
 		C89FD17300A8D57B7101F147 /* MobileHarness/Actions/Speech/Listening/ListeningActivationFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Speech/Listening/ListeningActivationFeedback.swift; sourceTree = SOURCE_ROOT; };
 		C8F3D876CA3B605E8E613D96 /* MobileHarness/Actions/History/HistoryCapabilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/History/HistoryCapabilities.swift; sourceTree = SOURCE_ROOT; };
@@ -706,7 +707,6 @@
 		CE985697EE05A5CC6E315299 /* MobileHarness/UI/Settings/BluetoothSettingsState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/UI/Settings/BluetoothSettingsState.swift; sourceTree = SOURCE_ROOT; };
 		CEE1B981FE5B154B8403FBE8 /* MobileHarness/PlatformKit/Connectivity/NexArm/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/PlatformKit/Connectivity/NexArm/README.md; sourceTree = SOURCE_ROOT; };
 		CF0115BE7482665058AEA975 /* MobileHarness/Agents/ApplicationControl/ApplicationControlAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/ApplicationControl/ApplicationControlAgent.swift; sourceTree = SOURCE_ROOT; };
-		CF173D4854F0E76D231E09CA /* MobileHarness/App/Composition/AgentResourceBindings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/App/Composition/AgentResourceBindings.swift; sourceTree = SOURCE_ROOT; };
 		CF29A60C02E5D05096DE29D4 /* MobileHarness/Actions/System/SystemModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/System/SystemModule.swift; sourceTree = SOURCE_ROOT; };
 		CF3EFDC61078CAA3309AC0BB /* MobileHarness/UI/Diagnostics/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/UI/Diagnostics/README.md; sourceTree = SOURCE_ROOT; };
 		CF521EBFB440C416BBB7D462 /* MobileHarness/Actions/BehaviorProtocolBindings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/BehaviorProtocolBindings.swift; sourceTree = SOURCE_ROOT; };
@@ -749,7 +749,7 @@
 		DC553A3CCE09B4B3E34C921C /* MobileHarness/Agents/Support/Core/Input/ImageInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Core/Input/ImageInput.swift; sourceTree = SOURCE_ROOT; };
 		DC7E896C79C9305CD9272AA6 /* MobileHarness/Agents/Support/Core/Runtime/SignalProcessing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Core/Runtime/SignalProcessing.swift; sourceTree = SOURCE_ROOT; };
 		DC97193CB44BBCEF3985CC87 /* MobileHarness/Actions/Support/Contracts/ActionResource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ActionResource.swift; sourceTree = SOURCE_ROOT; };
-		DD4E403D07BBE93DB2217752 /* MobileHarness/Actions/Support/ActionComposition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/ActionComposition.swift; sourceTree = SOURCE_ROOT; };
+		DD4E403D07BBE93DB2217752 /* MobileHarness/Actions/Support/Function/ActionComposition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Function/ActionComposition.swift; sourceTree = SOURCE_ROOT; };
 		DEAC735890C4909C5DC9AF25 /* MobileHarness/ModelKit/Speech/TTS/Apple/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/ModelKit/Speech/TTS/Apple/README.md; sourceTree = SOURCE_ROOT; };
 		DF5CB60A0D92A260F0CC580F /* MobileHarness/UI/Components/Window/WindowHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/UI/Components/Window/WindowHost.swift; sourceTree = SOURCE_ROOT; };
 		DF6C56BFC816AB3397B578A6 /* MobileHarness/Agents/Support/AgentRuntimeLogWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/AgentRuntimeLogWorkflow.swift; sourceTree = SOURCE_ROOT; };
@@ -787,7 +787,7 @@
 		EB39C3C57341BC5CC48D8F37 /* MobileHarness/ModelKit/Support/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/ModelKit/Support/README.md; sourceTree = SOURCE_ROOT; };
 		EBA33F149DA6147AE7594E5E /* MobileHarness/Actions/System/Task/TaskControlEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/System/Task/TaskControlEndpoint.swift; sourceTree = SOURCE_ROOT; };
 		EBD458AA8B13FF4D3D364712 /* MobileHarness/Actions/Support/Contracts/SpeechTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/SpeechTypes.swift; sourceTree = SOURCE_ROOT; };
-		EBE07F00FF88C9A4B8991B30 /* MobileHarness/Actions/Support/ToolExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/ToolExecutor.swift; sourceTree = SOURCE_ROOT; };
+		EBE07F00FF88C9A4B8991B30 /* MobileHarness/Actions/Support/Call/ToolExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Call/ToolExecutor.swift; sourceTree = SOURCE_ROOT; };
 		EBE6D60D0E85341D54FD14AB /* MobileHarness/Actions/System/Task/TaskActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/System/Task/TaskActions.swift; sourceTree = SOURCE_ROOT; };
 		ED0B2358F8FF56CCAC4B5738 /* MobileHarness/Actions/UI/Runtime/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/Actions/UI/Runtime/README.md; sourceTree = SOURCE_ROOT; };
 		ED6F5ED98B8383E8F43C1225 /* MobileHarness/ModelKit/Language/LLM/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/ModelKit/Language/LLM/README.md; sourceTree = SOURCE_ROOT; };
@@ -823,7 +823,7 @@
 		F854E88C445D32779FF52FD6 /* MobileHarness/Actions/UI/Pose/GazeActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/UI/Pose/GazeActions.swift; sourceTree = SOURCE_ROOT; };
 		F87DD3B33F937AF781310FD6 /* MobileHarness/ModelKit/Speech/TTS/MossNano/MossTtsNanoSynthesizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/ModelKit/Speech/TTS/MossNano/MossTtsNanoSynthesizer.swift; sourceTree = SOURCE_ROOT; };
 		F89FF7CA2D7B3655F268416F /* MobileHarness/Actions/NexArm/Connection/BluetoothInteractionWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/NexArm/Connection/BluetoothInteractionWorkflow.swift; sourceTree = SOURCE_ROOT; };
-		F8DF3FF3EAA85446EE87868B /* MobileHarness/Actions/Support/ActionRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/ActionRegistry.swift; sourceTree = SOURCE_ROOT; };
+		F8DF3FF3EAA85446EE87868B /* MobileHarness/Actions/Support/Call/ActionRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Call/ActionRegistry.swift; sourceTree = SOURCE_ROOT; };
 		F8E4DA4E618C0F3514F37106 /* MobileHarness/Actions/Support/Contracts/ToolResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ToolResponse.swift; sourceTree = SOURCE_ROOT; };
 		F913940C58E8744A2AF1C68B /* Package.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Package.swift; sourceTree = SOURCE_ROOT; };
 		FB1093BC997555924676C3B8 /* docs/adr/0005-design-aligned-layout.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = "docs/adr/0005-design-aligned-layout.md"; sourceTree = SOURCE_ROOT; };
@@ -1337,6 +1337,10 @@
 		65E22B73EE23086BCEEC464D /* Tests/Actions/NexArm/NexArmBluetoothIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Actions/NexArm/NexArmBluetoothIntegrationTests.swift; sourceTree = SOURCE_ROOT; };
 		C019F1D7B5B63D4CB5F086FC /* Tests/Actions/NexArm/NexArmConnectionPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Actions/NexArm/NexArmConnectionPolicyTests.swift; sourceTree = SOURCE_ROOT; };
 		0465C7AA2B4197A4527B0943 /* Tests/Agents/Core/GenerationObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Agents/Core/GenerationObservationTests.swift; sourceTree = SOURCE_ROOT; };
+		13F399147A1E6623CD4DFDE1 /* MobileHarness/Gateway/Input/SignalRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Gateway/Input/SignalRequest.swift; sourceTree = SOURCE_ROOT; };
+		F5D40FC89643B034C4E3488B /* MobileHarness/Gateway/Input/SignalEvents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Gateway/Input/SignalEvents.swift; sourceTree = SOURCE_ROOT; };
+		DE703699ED967C52AF58E0DC /* MobileHarness/PlatformKit/Core/SignalListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/PlatformKit/Core/SignalListener.swift; sourceTree = SOURCE_ROOT; };
+		8DAB672F9DE49170043FC07A /* MobileHarness/ModelKit/Support/Core/SignalListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/ModelKit/Support/Core/SignalListener.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1367,6 +1371,73 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+				E2A3107031B085BF4AB4A5C7 /* Call */ = {
+					isa = PBXGroup;
+					children = (
+					4E7961F688A0A459835AF28E /* MobileHarness/Actions/Support/Call/ActionBinding.swift */,
+					3183E52B357A4B0E5DE560BD /* MobileHarness/Actions/Support/Call/ActionBindingModule.swift */,
+					C8202A85F51AA2DF2026460D /* MobileHarness/Actions/Support/Call/ActionExecutor.swift */,
+					ABFA9C90A2C34A746E222DA9 /* MobileHarness/Actions/Support/Call/ActionMacro.swift */,
+					F8DF3FF3EAA85446EE87868B /* MobileHarness/Actions/Support/Call/ActionRegistry.swift */,
+					EBE07F00FF88C9A4B8991B30 /* MobileHarness/Actions/Support/Call/ToolExecutor.swift */,
+					17FE5EC277653C915080E689 /* MobileHarness/Actions/Support/Call/ToolModule.swift */,
+					8387090CD9BD5FF733AECA75 /* MobileHarness/Actions/Support/Call/ToolRegistry.swift */,
+					);
+					name = Call;
+					sourceTree = "<group>";
+				};
+				8E393625B2487EF1BE7F3A5A /* Shell */ = {
+					isa = PBXGroup;
+					children = (
+					ABF09A58CE7A9C7946FF3D5D /* Resources */,
+					02FD5A54953A0E694D83E84C /* Results */,
+					C776DE65B95EA9F326929919 /* Scheduling */,
+					81B3F90DF18939B949CB948D /* MobileHarness/Actions/Support/Shell/ActionExecutionCoordinator.swift */,
+					5EFE1F08AD98B481D4F2645F /* MobileHarness/Actions/Support/Shell/DirectExecutionDispatcher.swift */,
+					10A83A8D0F1D2A0CF45E891D /* MobileHarness/Actions/Support/Shell/README.md */,
+					);
+					name = Shell;
+					sourceTree = "<group>";
+				};
+				ABF09A58CE7A9C7946FF3D5D /* Resources */ = {
+					isa = PBXGroup;
+					children = (
+					88606DF7D3512232C3C8F6D2 /* MobileHarness/Actions/Support/Shell/Resources/ResourceCoordinator.swift */,
+					);
+					name = Resources;
+					sourceTree = "<group>";
+				};
+				02FD5A54953A0E694D83E84C /* Results */ = {
+					isa = PBXGroup;
+					children = (
+					30B06D68BD46720A60635D82 /* MobileHarness/Actions/Support/Shell/Results/ActionResultLedger.swift */,
+					);
+					name = Results;
+					sourceTree = "<group>";
+				};
+				C776DE65B95EA9F326929919 /* Scheduling */ = {
+					isa = PBXGroup;
+					children = (
+					6E46A3A5CD5F048899975480 /* MobileHarness/Actions/Support/Shell/Scheduling/ActionDiagnostics.swift */,
+					32EAA1A798BA523C78A0E871 /* MobileHarness/Actions/Support/Shell/Scheduling/ActionExecutionLedger.swift */,
+					08636EA24BA78B9745FD27D5 /* MobileHarness/Actions/Support/Shell/Scheduling/ChannelScheduler.swift */,
+					99EAAB2154D5C07D493D0805 /* MobileHarness/Actions/Support/Shell/Scheduling/ExecutionChannel.swift */,
+					);
+					name = Scheduling;
+					sourceTree = "<group>";
+				};
+				67BE84B181D1B383F182D29A /* Function */ = {
+					isa = PBXGroup;
+					children = (
+					DD4E403D07BBE93DB2217752 /* MobileHarness/Actions/Support/Function/ActionComposition.swift */,
+					2BB2CE634A7C45DF91B9605B /* MobileHarness/Actions/Support/Function/ActionDeadline.swift */,
+					8FCE66837CC1F56B05138750 /* MobileHarness/Actions/Support/Function/CooperativeExecution.swift */,
+					78D7A37A1490EFACD7521723 /* MobileHarness/Actions/Support/Function/FunctionExecutor.swift */,
+					8D5123832B150B9B62754069 /* MobileHarness/Actions/Support/Function/FunctionRegistry.swift */,
+					);
+					name = Function;
+					sourceTree = "<group>";
+				};
 		08468B799CAD53619FE91E80 /* History */ = {
 			isa = PBXGroup;
 			children = (
@@ -1404,18 +1475,6 @@
 			name = Audio;
 			sourceTree = "<group>";
 		};
-		09261177AFF3666548304339 /* Output */ = {
-			isa = PBXGroup;
-			children = (
-				7EB9F342700ECBE7C5ECED6E /* Dispatch */,
-				099E711F0264A58EC303352A /* Resources */,
-				AC75AAC257649FBDCC762D09 /* Results */,
-				BC7755B5F9284BC802A69B2C /* Scheduling */,
-				10A83A8D0F1D2A0CF45E891D /* MobileHarness/Gateway/Output/README.md */,
-			);
-			name = Output;
-			sourceTree = "<group>";
-		};
 		0974C65AC68413510A224097 /* Writer */ = {
 			isa = PBXGroup;
 			children = (
@@ -1447,15 +1506,6 @@
 			name = Provider;
 			sourceTree = "<group>";
 		};
-		099E711F0264A58EC303352A /* Resources */ = {
-			isa = PBXGroup;
-			children = (
-				6458623CFCC7220F0E00A559 /* MobileHarness/Gateway/Output/Resources/README.md */,
-				88606DF7D3512232C3C8F6D2 /* MobileHarness/Gateway/Output/Resources/ResourceCoordinator.swift */,
-			);
-			name = Resources;
-			sourceTree = "<group>";
-		};
 		0B294BD138AE286DBAC06EB2 /* Skills */ = {
 			isa = PBXGroup;
 			children = (
@@ -1472,10 +1522,10 @@
 			isa = PBXGroup;
 			children = (
 				529C5EFC914300BA8D2CEB57 /* Input */,
-				09261177AFF3666548304339 /* Output */,
 				62AF08716774B223F1489C13 /* MobileHarness/Gateway/GatewayContainer.swift */,
 				60132F689827D8C7121FCE58 /* MobileHarness/Gateway/GatewayFailure.swift */,
 				1B41C4F2E19D2262E470D99F /* MobileHarness/Gateway/README.md */,
+				9D5BAC32FA283F503253B4CB /* MobileHarness/Gateway/GatewayExecution.swift */,
 			);
 			name = Gateway;
 			sourceTree = "<group>";
@@ -1544,20 +1594,10 @@
 			isa = PBXGroup;
 			children = (
 				E8C841F2823A2898EDE69A41 /* Contracts */,
-				4E7961F688A0A459835AF28E /* MobileHarness/Actions/Support/ActionBinding.swift */,
-				3183E52B357A4B0E5DE560BD /* MobileHarness/Actions/Support/ActionBindingModule.swift */,
-				DD4E403D07BBE93DB2217752 /* MobileHarness/Actions/Support/ActionComposition.swift */,
-				2BB2CE634A7C45DF91B9605B /* MobileHarness/Actions/Support/ActionDeadline.swift */,
-				C8202A85F51AA2DF2026460D /* MobileHarness/Actions/Support/ActionExecutor.swift */,
-				ABFA9C90A2C34A746E222DA9 /* MobileHarness/Actions/Support/ActionMacro.swift */,
-				F8DF3FF3EAA85446EE87868B /* MobileHarness/Actions/Support/ActionRegistry.swift */,
-				8FCE66837CC1F56B05138750 /* MobileHarness/Actions/Support/CooperativeExecution.swift */,
-				78D7A37A1490EFACD7521723 /* MobileHarness/Actions/Support/FunctionExecutor.swift */,
-				8D5123832B150B9B62754069 /* MobileHarness/Actions/Support/FunctionRegistry.swift */,
 				8EC2DF48279B7F4AC3AB9706 /* MobileHarness/Actions/Support/README.md */,
-				EBE07F00FF88C9A4B8991B30 /* MobileHarness/Actions/Support/ToolExecutor.swift */,
-				17FE5EC277653C915080E689 /* MobileHarness/Actions/Support/ToolModule.swift */,
-				8387090CD9BD5FF733AECA75 /* MobileHarness/Actions/Support/ToolRegistry.swift */,
+				E2A3107031B085BF4AB4A5C7 /* Call */,
+				8E393625B2487EF1BE7F3A5A /* Shell */,
+				67BE84B181D1B383F182D29A /* Function */,
 			);
 			name = Support;
 			sourceTree = "<group>";
@@ -1755,6 +1795,7 @@
 				B903D4F6FE2626AC9E7B38C4 /* MobileHarness/Actions/Camera/PhotoAlbumService.swift */,
 				E6209F2B55B2E22F3B786CBF /* MobileHarness/Actions/Camera/PhotoDispositionWorkflow.swift */,
 				B7D6B868B3844C8FB033ACD4 /* MobileHarness/Actions/Camera/README.md */,
+				2FFE8CC6492EB394E069F32E /* MobileHarness/Actions/Camera/CameraResourceBinding.swift */,
 			);
 			name = Camera;
 			sourceTree = "<group>";
@@ -1812,6 +1853,7 @@
 			children = (
 				A7A220EC029637C85F5117E6 /* MobileHarness/PlatformKit/Core/NativeSystemState.swift */,
 				A4CE8DE1BEB65EC6B5E24894 /* MobileHarness/PlatformKit/Core/NativeInputBroadcast.swift */,
+				DE703699ED967C52AF58E0DC /* MobileHarness/PlatformKit/Core/SignalListener.swift */,
 				CD3900000000000000000005 /* MobileHarness/PlatformKit/Core/README.md */,
 				425E6401A5C21F621AD95EBD /* MobileHarness/PlatformKit/Core/NativeBackgroundAllowance.swift */,
 			);
@@ -1844,6 +1886,8 @@
 			children = (
 				33AC1B625192F62BF528BDEF /* MobileHarness/Gateway/Input/README.md */,
 				B32E342028C32B8852230C7F /* MobileHarness/Gateway/Input/SignalTransport.swift */,
+				F5D40FC89643B034C4E3488B /* MobileHarness/Gateway/Input/SignalEvents.swift */,
+				13F399147A1E6623CD4DFDE1 /* MobileHarness/Gateway/Input/SignalRequest.swift */,
 			);
 			name = Input;
 			sourceTree = "<group>";
@@ -1938,6 +1982,7 @@
 				95BC3FA1DEFCA570D7567E66 /* MobileHarness/ModelKit/Support/Core/InferenceSession.swift */,
 				C04E611B8EE51626DF5160CF /* MobileHarness/ModelKit/Support/Core/InferenceTaskControl.swift */,
 				C35F4F95656FA9166AC664D9 /* MobileHarness/ModelKit/Support/Core/ModelResource.swift */,
+				8DAB672F9DE49170043FC07A /* MobileHarness/ModelKit/Support/Core/SignalListener.swift */,
 				C4A80AC833CC885F908F7353 /* MobileHarness/ModelKit/Support/Core/OperationAdmission.swift */,
 				2BFB0AD732FBA598CF60EC12 /* MobileHarness/ModelKit/Support/Core/README.md */,
 			);
@@ -2089,15 +2134,6 @@
 				AD70B4E27BF039A32D201CA5 /* MobileHarness/Agents/Support/Core/Output/ToolResult.swift */,
 			);
 			name = Output;
-			sourceTree = "<group>";
-		};
-		7EB9F342700ECBE7C5ECED6E /* Dispatch */ = {
-			isa = PBXGroup;
-			children = (
-				5EFE1F08AD98B481D4F2645F /* MobileHarness/Gateway/Output/Dispatch/DirectExecutionDispatcher.swift */,
-				764EE40D2D908071AEAA09FA /* MobileHarness/Gateway/Output/Dispatch/ScheduledAction.swift */,
-			);
-			name = Dispatch;
 			sourceTree = "<group>";
 		};
 		85DCB31D26884B48A2EB65F6 /* Shared */ = {
@@ -2384,15 +2420,6 @@
 			name = Storage;
 			sourceTree = "<group>";
 		};
-		AC75AAC257649FBDCC762D09 /* Results */ = {
-			isa = PBXGroup;
-			children = (
-				30B06D68BD46720A60635D82 /* MobileHarness/Gateway/Output/Results/ActionResultLedger.swift */,
-				52C53A58E540AA3626E65D9D /* MobileHarness/Gateway/Output/Results/ExecutionResult.swift */,
-			);
-			name = Results;
-			sourceTree = "<group>";
-		};
 		AD341DDDB6E686E6174AF920 /* Support */ = {
 			isa = PBXGroup;
 			children = (
@@ -2500,19 +2527,6 @@
 			name = Motion;
 			sourceTree = "<group>";
 		};
-		BC7755B5F9284BC802A69B2C /* Scheduling */ = {
-			isa = PBXGroup;
-			children = (
-				6E46A3A5CD5F048899975480 /* MobileHarness/Gateway/Output/Scheduling/ActionDiagnostics.swift */,
-				32EAA1A798BA523C78A0E871 /* MobileHarness/Gateway/Output/Scheduling/ActionExecutionLedger.swift */,
-				9383D74BF742AAF24A3F87C1 /* MobileHarness/Gateway/Output/Scheduling/ActionSchedulingError.swift */,
-				99EAAB2154D5C07D493D0805 /* MobileHarness/Gateway/Output/Scheduling/Channel.swift */,
-				08636EA24BA78B9745FD27D5 /* MobileHarness/Gateway/Output/Scheduling/ChannelScheduler.swift */,
-				552576B122A2FE8C3F5DED5A /* MobileHarness/Gateway/Output/Scheduling/README.md */,
-			);
-			name = Scheduling;
-			sourceTree = "<group>";
-		};
 		BFF365BCED2D4FA92C2F548E /* Listening */ = {
 			isa = PBXGroup;
 			children = (
@@ -2534,7 +2548,6 @@
 				11F11E8A5427111D40C9AF50 /* MobileHarness/App/Composition/README.md */,
 				353FE0125CCB11AB5BD88A35 /* MobileHarness/App/Composition/ServiceFactories.swift */,
 				7CBC83BAB34BBED6BA93B932 /* MobileHarness/App/Composition/ApplicationPresentation.swift */,
-				CF173D4854F0E76D231E09CA /* MobileHarness/App/Composition/AgentResourceBindings.swift */,
 			);
 			name = Composition;
 			sourceTree = "<group>";
@@ -2885,6 +2898,11 @@
 				F5DA6EA7766AF354D7FF21E8 /* MobileHarness/Actions/Support/Contracts/VoicePerceptionHandling.swift */,
 				C3AD5B0A293B8C3C9459CA80 /* MobileHarness/Actions/Support/Contracts/VoicePresentationHandling.swift */,
 				3A6B6BA857B619F78FD43ED9 /* MobileHarness/Actions/Support/Contracts/ArtifactStreaming.swift */,
+				527E4459BC57DAEA14CAFDFB /* MobileHarness/Actions/Support/Contracts/ActionExecutionEngine.swift */,
+				9383D74BF742AAF24A3F87C1 /* MobileHarness/Actions/Support/Contracts/ActionSchedulingError.swift */,
+				52C53A58E540AA3626E65D9D /* MobileHarness/Actions/Support/Contracts/ExecutionResult.swift */,
+				CCE94058A4E720D2CD30BE28 /* MobileHarness/Actions/Support/Contracts/ExecutionRuntimeFacts.swift */,
+				764EE40D2D908071AEAA09FA /* MobileHarness/Actions/Support/Contracts/ScheduledAction.swift */,
 			);
 			name = Contracts;
 			sourceTree = "<group>";
@@ -3159,6 +3177,7 @@
 				BFEA6BAC8FD3D1EEBAE768EC /* Tests/Actions/Execution/ActionsContainerTests.swift */,
 				285185AD24BF8708736A1343 /* Tests/Actions/Execution/BehaviorAssemblyTests.swift */,
 				947B8EEF47F6F85DD033ACA6 /* Tests/Actions/Execution/README.md */,
+				19A0E33FD2F204FDEA0661D6 /* Tests/Actions/Execution/ChannelSchedulerTests.swift */,
 			);
 			name = Execution;
 			sourceTree = "<group>";
@@ -3466,7 +3485,6 @@
 		CE9FB8C617F41D6661FDBE28 /* Output */ = {
 			isa = PBXGroup;
 			children = (
-				19A0E33FD2F204FDEA0661D6 /* Tests/Gateway/Output/ChannelSchedulerTests.swift */,
 				886C7714A0D2814AD2F649D9 /* Tests/Gateway/Output/GatewayContainerTests.swift */,
 				3581F0B2F9E6F69D36D2003B /* Tests/Gateway/Output/MediaTransportTests.swift */,
 				13CB15A4639F288478FF9B71 /* Tests/Gateway/Output/NativeAttachmentTests.swift */,
@@ -4456,7 +4474,6 @@
 				A1C0A11A0000000000000001 /* Composition acceptance in Sources */,
 				631882B730A8541E00AEA923 /* MobileHarness/App/Composition/ApplicationActionAssembly.swift in Sources */,
 				631882B830A8541E00AEA923 /* MobileHarness/App/Composition/ActionServiceAdapters.swift in Sources */,
-				631882B930A8541E00AEA923 /* MobileHarness/App/Composition/AgentResourceBindings.swift in Sources */,
 				631882BA30A8541E00AEA923 /* MobileHarness/App/Composition/ApplicationPresentation.swift in Sources */,
 				631882BB30A8541E00AEA923 /* MobileHarness/App/MobileHarnessApp.swift in Sources */,
 				631882BC30A8541E00AEA923 /* MobileHarness/App/Lifecycle/ApplicationSystemDelegate.swift in Sources */,
@@ -4472,7 +4489,6 @@
 			files = (
 				F0141EB5E9679932802EFD12 /* MobileHarness/App/Composition/ApplicationActionAssembly.swift in Sources */,
 				3ABDA061A7BD9F353A253CA4 /* MobileHarness/App/Composition/ActionServiceAdapters.swift in Sources */,
-				D66297F0F6C7427F0002620E /* MobileHarness/App/Composition/AgentResourceBindings.swift in Sources */,
 				2861C3C6A8891B083DD52666 /* MobileHarness/App/Composition/ApplicationPresentation.swift in Sources */,
 				921DF75E4F167CF5706C076C /* MobileHarness/App/MobileHarnessApp.swift in Sources */,
 				EB10C550D59B871FCC0BD815 /* MobileHarness/App/Lifecycle/ApplicationSystemDelegate.swift in Sources */,

@@ -134,11 +134,19 @@ public actor VisionPerceptionAgent: Agent {
     }
     private func startCameraInput() async throws {
         guard let cameraInput else { return }
-        let frames = try await cameraInput.subscribeFrames()
+        let frames = try await cameraInput.listenFrames()
         try Task.checkCancellation()
         guard lifecycle == .running else { throw HarnessError.notRunning }
         let generation = sessionID
-        nativeInput = Task { try await self.consumeCamera(frames, generation: generation) }
+        nativeInput = Task {
+            do { try await self.consumeCamera(frames, generation: generation) } catch {
+                await frames.cancel()
+                await frames.join()
+                throw error
+            }
+            await frames.cancel()
+            await frames.join()
+        }
     }
     public func waitForInput() async throws { try await nativeInput?.value }
     public func stopInput() async {
@@ -440,7 +448,8 @@ public actor VisionPerceptionAgent: Agent {
             case "UI.Gaze.moveEyes": return "gaze"
             default: return nil
             }
-        case .communication(let action) where action.target == nil && action.message.contract == "vision.pose":
+        case .communication(let action)
+        where action.target == nil && action.message.contract == "perception.vision.pose.v1":
             return "pose"
         default: return nil
         }

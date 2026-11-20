@@ -374,22 +374,25 @@ public enum VoiceReplyCancellation {
 
         private func observeAudioEvents(generation: String) throws {
             routeTask?.cancel()
-            let events = try audio.subscribeEvents()
+            let events = try audio.listenEvents()
             routeTask = Task { [weak self] in
                 do {
                     for try await event in events {
-                        guard !Task.isCancelled, let self, self.voiceGeneration == generation else { return }
+                        guard !Task.isCancelled, let self, self.voiceGeneration == generation else { break }
                         self.captureFault(
                             event == .mediaServicesReset
                                 ? "System audio service reset"
                                 : (event == .interrupted ? "System interrupted audio" : "Audio device changed"),
                             restart: event == .mediaServicesReset)
-                        return
+                        break
                     }
                 } catch {
-                    guard !Task.isCancelled, let self, self.voiceGeneration == generation else { return }
-                    self.captureFault("Could not connect to audio events: \(error)")
+                    if !Task.isCancelled, let self, self.voiceGeneration == generation {
+                        self.captureFault("Could not connect to audio events: \(error)")
+                    }
                 }
+                await events.cancel()
+                await events.join()
             }
         }
 

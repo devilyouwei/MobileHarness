@@ -1,11 +1,12 @@
-import FunctionContracts
-
 public enum ActionSchedulingError: Error, Equatable, Sendable {
+    case unavailable
+    case signalsAlreadyBound
     case resultDeliveryFailed(executionID: String, path: String, state: String)
     case resultCapacityExceeded
     case channelCapacityExceeded(String)
     case channelCountExceeded
     case inputCapacityExceeded
+    case directCapacityExceeded
     case inputSessionMismatch
     case inputClosing
     case duplicateFinish

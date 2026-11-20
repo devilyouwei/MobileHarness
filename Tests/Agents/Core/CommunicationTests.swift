@@ -4,31 +4,53 @@ import CallRuntime
 import ExecutionRuntime
 import Foundation
 import FunctionContracts
-import Gateway
 import StorageCore
 import StorageTasks
 import Testing
 
 @testable import Agents
+@testable import Gateway
+
+private func communicationFixtureContracts() throws -> CommunicationContracts {
+    try CommunicationContracts(
+        additional: AgentContracts.communication.registered.filter { $0.kind == .observation } + [
+            .init(
+                name: "fixture.transcript.v1", kind: .observation,
+                validateMessage: { message in
+                    guard let value = message.perception, message.operation == .submit else {
+                        throw CommunicationError.invalidPayload
+                    }
+                    try value.validate()
+                })
+        ])
+}
+extension AgentMessage {
+    fileprivate static func requestedTranscript(_ text: String, final: Bool) -> AgentMessage {
+        AgentMessage(
+            contract: "fixture.transcript.v1", content: PerceptionMessage.transcript(text, final: final),
+            operation: .submit, validate: { try $0.validate() })
+    }
+}
 
 func communicationConfiguration(_ id: String, subscribes: Bool = false, publishes: Bool = false) throws
     -> AgentConfiguration
 {
     let communication: [String: Any] = [
-        "inputs": [
-            ["contract": "user.input.asr.final", "version": 1, "kind": "observation"],
-            ["contract": "user.input.asr.partial", "version": 1, "kind": "observation"],
-        ],
+        "requests": id == "direct" ? ["fixture.transcript.v1"] : [], "feedback": [],
         "subscriptions": subscribes
-            ? [["contract": "user.input.asr.final", "topic": "user.input", "source": "producer"]] : [],
-        "publications": publishes ? ["user.input.asr.final", "user.input.asr.partial"] : [],
-        "sends": publishes ? [["contract": "user.input.asr.final", "target": "direct"]] : [],
+            ? [
+                [
+                    "channel": "user.input.speech", "protocol": "user.input.speech.v1", "sources": ["producer"],
+                    "events": ["final"],
+                ]
+            ] : [],
+        "publications": publishes ? [["channel": "user.input.speech", "protocol": "user.input.speech.v1"]] : [],
     ]
     return try AgentConfiguration(
-        contracts: AgentContracts.communication,
+        contracts: communicationFixtureContracts(),
         data: JSONSerialization.data(withJSONObject: [
-            "version": 8, "category": "cognition", "id": id, "actions": [String: [String]](), "tools": [],
-            "communication": communication,
+            "version": 9, "category": "cognition", "id": id, "actions": [String: [String]](), "tools": [],
+            "signals": communication,
         ]))
 }
 
@@ -37,6 +59,7 @@ actor ObservationRecorder: Agent {
     nonisolated let outputs = AsyncStream<OutputEnvelope> { $0.finish() }
     var inputs: [AgentInput] = []
     var attempts = 0
+    var statusCalls = 0
     var lifecycle: AgentLifecycle = .registered
     let reject: Bool
     let blockText: String?
@@ -54,7 +77,14 @@ actor ObservationRecorder: Agent {
     func pause() { lifecycle = .paused }
     func resume() { lifecycle = .running }
     func stop() { lifecycle = .stopped }
-    func status() -> AgentStatus { AgentStatus(lifecycle: lifecycle, queuedInputs: 0, processedInputs: inputs.count) }
+    func status() -> AgentStatus {
+        statusCalls += 1
+        return AgentStatus(lifecycle: lifecycle, queuedInputs: 0, processedInputs: inputs.count)
+    }
+    func receiveRequest(_ request: AgentProtocolRequest) async throws -> AgentRequestReply {
+        try await receive(request.input)
+        return .init(requestID: request.input.id, reference: request.input.id)
+    }
     func receive(_ input: AgentInput) async throws {
         attempts += 1
         guard lifecycle == .running else { throw HarnessError.notRunning }
@@ -87,7 +117,7 @@ extension LiveRuntimeTests {
             communicationConfiguration("consumer", subscribes: true), communicationConfiguration("direct"),
         ]
         let policy = try CommunicationPolicy(
-            contracts: AgentContracts.communication, configurations: configurations)
+            contracts: communicationFixtureContracts(), configurations: configurations)
         let manager = AgentManager()
         let source = ObservationRecorder(id: "producer")
         let consumer = ObservationRecorder(id: "consumer")
@@ -100,16 +130,21 @@ extension LiveRuntimeTests {
         let input = InputGateway(manager: manager, policy: policy)
         let output = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
+        for descriptor in await manager.descriptors() {
+            _ = try await output.consumer(for: manager.agent(descriptor.id))
+        }
         let port = try await output.messaging(for: source.descriptor.id)
         let parent = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("source"))
         try await port.publish(.transcript("hello", final: true), parent: parent)
         await input.flushPublications()
         #expect(await consumer.inputs.first?.metadata.origin == .agent)
         #expect(await direct.inputs.isEmpty)
-        let sent = try await port.send(.transcript("direct", final: true), parent: parent, to: direct.descriptor.id)
-        #expect(sent.delivered == [direct.descriptor.id])
-        await #expect(throws: CommunicationError.unauthorized) {
-            try await port.send(.transcript("forbidden", final: true), parent: parent, to: consumer.descriptor.id)
+        let sent = try await port.send(
+            .requestedTranscript("direct", final: true), parent: parent, to: direct.descriptor.id)
+        #expect(sent.requestID == sent.reference)
+        await #expect(throws: CommunicationError.unsupportedContract) {
+            try await port.send(
+                .requestedTranscript("forbidden", final: true), parent: parent, to: consumer.descriptor.id)
         }
         try await port.publish(.transcript("preview", final: false), parent: parent)
         try await manager.remove(source.descriptor.id)
@@ -124,7 +159,7 @@ private func directFixture(blockText: String? = nil, reject: Bool = false) async
     -> (AgentManager, InputGateway, OutputGateway, AgentMessaging, ObservationRecorder, String)
 {
     let policy = try CommunicationPolicy(
-        contracts: AgentContracts.communication,
+        contracts: communicationFixtureContracts(),
         configurations: [
             communicationConfiguration("producer", publishes: true),
             communicationConfiguration("consumer", subscribes: true), communicationConfiguration("direct"),
@@ -141,6 +176,7 @@ private func directFixture(blockText: String? = nil, reject: Bool = false) async
     let input = InputGateway(manager: manager, policy: policy)
     let output = await OutputGateway(
         manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
+    for descriptor in await manager.descriptors() { _ = try await output.consumer(for: manager.agent(descriptor.id)) }
     return (manager, input, output, try await output.messaging(for: source.descriptor.id), direct, session)
 }
 
@@ -154,7 +190,8 @@ extension LiveRuntimeTests {
             metadata: InputMetadata(
                 payload: payload, rootID: UUID().uuidString, deadline: .now.advanced(by: .seconds(-1))))
         await #expect(throws: CommunicationError.expired) {
-            try await port.send(.transcript("hello", final: true), parent: expired, to: .init(rawValue: "direct"))
+            try await port.send(
+                .requestedTranscript("hello", final: true), parent: expired, to: .init(rawValue: "direct"))
         }
         await #expect(throws: CommunicationError.scopeClosed) {
             try await port.publish(
@@ -163,8 +200,8 @@ extension LiveRuntimeTests {
                     id: UUID().uuidString, sessionID: UUID().uuidString, payload: payload))
         }
         try await manager.stop(target.descriptor.id)
-        let report = try await port.send(
-            .transcript("stopped", final: true),
+        let report = try await port.sendResult(
+            .requestedTranscript("stopped", final: true),
             parent: AgentInput(id: UUID().uuidString, sessionID: session, payload: payload),
             to: target.descriptor.id)
         #expect(report.delivered.isEmpty && report.rejected[target.descriptor.id] != nil)
@@ -179,18 +216,21 @@ extension LiveRuntimeTests {
         let (manager, _, output, port, target, session) = try await directFixture(blockText: "block")
         let parent = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("parent"))
         let first = Task {
-            try await port.send(.transcript("block", final: true), parent: parent, to: target.descriptor.id)
+            try await port.sendResult(
+                .requestedTranscript("block", final: true), parent: parent, to: target.descriptor.id)
         }
         var events = target.admissions.stream.makeAsyncIterator()
         _ = await events.next()
-        let second = try await port.send(.transcript("second", final: true), parent: parent, to: target.descriptor.id)
+        let second = try await port.sendResult(
+            .requestedTranscript("second", final: true), parent: parent, to: target.descriptor.id)
         #expect(second.delivered == [target.descriptor.id])
         #expect(await target.inputs.count == 1)
         first.cancel()
-        #expect(try await first.value.rejected[target.descriptor.id] != nil)
+        await #expect(throws: CancellationError.self) { try await first.value }
         // Cancelling the first call does not retract the second accepted message.
         #expect(await target.inputs.count == 1)
-        let third = try await port.send(.transcript("third", final: true), parent: parent, to: target.descriptor.id)
+        let third = try await port.sendResult(
+            .requestedTranscript("third", final: true), parent: parent, to: target.descriptor.id)
         #expect(third.delivered == [target.descriptor.id])
         await manager.stopAll()
         await output.shutdown()
@@ -208,17 +248,18 @@ extension LiveRuntimeTests {
         for _ in 0..<16 {
             tasks.append(
                 Task {
-                    try await port.send(.transcript("block", final: true), parent: parent, to: target.descriptor.id)
+                    try await port.sendResult(
+                        .requestedTranscript("block", final: true), parent: parent, to: target.descriptor.id)
                 })
             _ = await events.next()
         }
         await #expect(throws: CommunicationError.capacityExceeded) {
-            try await port.send(.transcript("overflow", final: true), parent: parent, to: target.descriptor.id)
+            try await port.send(.requestedTranscript("overflow", final: true), parent: parent, to: target.descriptor.id)
         }
         for task in tasks { task.cancel() }
-        for task in tasks { #expect(try await task.value.rejected[target.descriptor.id] != nil) }
-        let report = try await port.send(
-            .transcript("recovered", final: true), parent: parent, to: target.descriptor.id)
+        for task in tasks { await #expect(throws: CancellationError.self) { try await task.value } }
+        let report = try await port.sendResult(
+            .requestedTranscript("recovered", final: true), parent: parent, to: target.descriptor.id)
         #expect(report.delivered == [target.descriptor.id])
         await manager.stopAll()
         await output.shutdown()
@@ -228,7 +269,7 @@ extension LiveRuntimeTests {
 extension LiveRuntimeTests {
     @Test(.actionCatalog) func publicationReportsReceiverRejectionIndependently() async throws {
         let policy = try CommunicationPolicy(
-            contracts: AgentContracts.communication,
+            contracts: communicationFixtureContracts(),
             configurations: [
                 communicationConfiguration("producer", publishes: true), communicationConfiguration("direct"),
                 communicationConfiguration("good", subscribes: true),
@@ -246,6 +287,9 @@ extension LiveRuntimeTests {
         let input = InputGateway(manager: manager, policy: policy)
         let output = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
+        for descriptor in await manager.descriptors() {
+            _ = try await output.consumer(for: manager.agent(descriptor.id))
+        }
         let port = try await output.messaging(for: source.descriptor.id)
         try await port.publish(
             .transcript("hello", final: true),
@@ -260,11 +304,11 @@ extension LiveRuntimeTests {
 
 @Test(.actionCatalog) func assistantSubscribesOnlyToFinalASRInTheSharedTopic() throws {
     let policy = try CommunicationPolicy(
-        contracts: AgentContracts.communication, configurations: AgentConfigurations.all())
+        contracts: communicationFixtureContracts(), configurations: AgentConfigurations.all())
     let assistant = try #require(policy.agents[.assistant])
     let speech = try #require(policy.agents[AgentID(rawValue: "speechPerception")])
     let session = UUID().uuidString
-    func signal(final: Bool, source: String = "speechPerception", topic: String = "user.input") -> AgentInput {
+    func signal(final: Bool, source: String = "speechPerception", topic: String = "user.input.speech") -> AgentInput {
         let id = UUID().uuidString
         let payload = InputPayload.observation(.transcript("hello", final: final))
         return AgentInput(
@@ -276,45 +320,55 @@ extension LiveRuntimeTests {
     #expect(policy.destinations(for: final) == [.assistant])
     #expect(policy.acceptsPublication(final, target: .assistant))
     #expect(!policy.accepts(final, target: .assistant))
+    let runtime = AgentInput(
+        id: UUID().uuidString, sessionID: final.sessionID, payload: final.payload,
+        metadata: .init(payload: final.payload, source: "runtime", origin: .runtime, rootID: final.id))
+    #expect(policy.accepts(runtime, target: .assistant))
     #expect(policy.destinations(for: signal(final: false)).isEmpty)
     #expect(policy.destinations(for: signal(final: true, source: "writer")).isEmpty)
-    #expect(policy.destinations(for: signal(final: true, topic: "user.input.asr.final")).isEmpty)
-    #expect(Set(speech.publications) == ["user.input.asr.partial", "user.input.asr.final", "sound.source"])
-    #expect(assistant.publications.isEmpty && speech.subscriptions.isEmpty)
+    #expect(policy.destinations(for: signal(final: true, topic: "user.input.speech.v1")).isEmpty)
+    #expect(Set(speech.publications.map(\.protocol)) == ["user.input.speech.v1", "perception.audio.source.v1"])
+    #expect(assistant.publications == [.init(channel: "agent.task", protocol: "agent.task.events.v1")])
+    #expect(speech.subscriptions.isEmpty)
 
-    let commands: Set<String> = ["agent.task.request"]
-    #expect(
-        Set(assistant.inputs.map(\.contract))
-            == [
-                "agent.task.response", "runtime.action.result", "runtime.tool.result", "runtime.round.result",
-                "runtime.message.receipt", "assistant.interrupt",
-            ])
-    #expect(Set(assistant.sends.map(\.target)) == ["writer"])
-    #expect(Set(assistant.sends.map(\.contract)) == commands)
+    #expect(assistant.requests.isEmpty)
+    #expect(Set(assistant.feedback) == ["action.result.v1", "agent.round.result.v1"])
+    #expect(assistant.subscriptions.contains { $0.channel == "agent.interruption" })
 }
 
-@Test(.actionCatalog) func communicationSchemaRejectsOldVersionsUnknownFieldsAndUnknownSources() throws {
+@Test(.actionCatalog) func communicationSchemaRejectsOldVersionsFieldsAndInvalidPublicationPairs() throws {
     let config = try communicationConfiguration("receiver")
     #expect(config.agentID.rawValue == "receiver")
     var root: [String: Any] = [
         "version": 3, "category": "cognition", "id": "receiver", "actions": [String: [String]](), "tools": [],
-        "communication": ["inputs": [], "subscriptions": [], "publications": [], "sends": []],
+        "signals": ["requests": [], "feedback": [], "publications": [], "subscriptions": []],
     ]
     #expect(throws: AgentConfigurationError.unsupportedVersion(3)) {
         try AgentConfiguration(
-            contracts: AgentContracts.communication, data: JSONSerialization.data(withJSONObject: root))
+            contracts: communicationFixtureContracts(), data: JSONSerialization.data(withJSONObject: root))
     }
-    root["version"] = 6
-    root["communication"] = ["inputs": [], "subscriptions": [], "publications": [], "sends": [], "requests": []]
+    root["version"] = 9
+    root["signals"] = ["inputs": [], "subscriptions": [], "publications": [], "sends": [], "requests": []]
     #expect(throws: AgentConfigurationError.self) {
         try AgentConfiguration(
-            contracts: AgentContracts.communication, data: JSONSerialization.data(withJSONObject: root))
+            contracts: communicationFixtureContracts(), data: JSONSerialization.data(withJSONObject: root))
     }
-    #expect(throws: CommunicationError.unauthorized) {
-        try CommunicationPolicy(
-            contracts: AgentContracts.communication,
-            configurations: [communicationConfiguration("receiver", subscribes: true)])
+    for producer in [false, true] {
+        let configurations =
+            try [communicationConfiguration("receiver", subscribes: true)]
+            + (producer ? [communicationConfiguration("producer")] : [])
+        #expect(throws: CommunicationError.unauthorized) {
+            try CommunicationPolicy(contracts: communicationFixtureContracts(), configurations: configurations)
+        }
     }
+    let policy = try CommunicationPolicy(
+        contracts: communicationFixtureContracts(),
+        configurations: [
+            communicationConfiguration("receiver", subscribes: true),
+            communicationConfiguration("producer", publishes: true),
+        ])
+    #expect(policy.agents[.init(rawValue: "receiver")]?.subscriptions.count == 1)
+
 }
 
 @Test(.actionCatalog) func domainValueErrorsPreserveCommunicationAdmissionRejection() throws {
@@ -337,7 +391,7 @@ private func registeredFixtureContract(
     startsNewWork: Bool = false, maximumBytes: Int = 64
 ) -> CommunicationContract {
     CommunicationContract(
-        name: "fixture.custom", kind: .observation, maximumBytes: maximumBytes,
+        name: "fixture.custom.v1", kind: .observation, channel: "fixture.custom", maximumBytes: maximumBytes,
         startsNewWork: startsNewWork,
         validateMessage: { message in
             guard let value = message.content(as: RegisteredFixtureMessage.self), value.value >= 0 else {
@@ -351,12 +405,12 @@ private func registeredFixtureConfiguration(
     try AgentConfiguration(
         contracts: contracts,
         data: JSONSerialization.data(withJSONObject: [
-            "version": 8, "category": "cognition", "id": id, "actions": [String: [String]](), "tools": [],
-            "communication": [
-                "inputs": [["contract": "fixture.custom", "version": 1, "kind": "observation"]],
+            "version": 9, "category": "cognition", "id": id, "actions": [String: [String]](), "tools": [],
+            "signals": [
+                "requests": [], "feedback": [],
                 "subscriptions": publishes
-                    ? [] : [["contract": "fixture.custom", "topic": "fixture.custom", "source": "producer"]],
-                "publications": publishes ? ["fixture.custom"] : [], "sends": [],
+                    ? [] : [["channel": "fixture.custom", "protocol": "fixture.custom.v1", "sources": ["producer"]]],
+                "publications": publishes ? [["channel": "fixture.custom", "protocol": "fixture.custom.v1"]] : [],
             ],
         ]))
 }
@@ -383,6 +437,9 @@ extension LiveRuntimeTests {
         let gateway = InputGateway(manager: manager, policy: policy)
         let output = await OutputGateway(
             manager: manager, requests: gateway, tools: ToolRegistry(), policy: policy, sink: { _ in })
+        for descriptor in await manager.descriptors() {
+            _ = try await output.consumer(for: manager.agent(descriptor.id))
+        }
         let port = try await output.messaging(for: producer.descriptor.id)
         let payload = InputPayload.event("parent")
         let expired = AgentInput(
@@ -391,7 +448,7 @@ extension LiveRuntimeTests {
             metadata: InputMetadata(
                 payload: payload, rootID: UUID().uuidString, deadline: .now.advanced(by: .seconds(-1))))
         let content = RegisteredFixtureMessage(value: 7)
-        let message = AgentMessage(contract: "fixture.custom", content: content, validate: { _ in })
+        let message = AgentMessage(contract: "fixture.custom.v1", content: content, validate: { _ in })
         if startsNewWork {
             try await port.publish(message, parent: expired)
         } else {
@@ -414,17 +471,17 @@ extension LiveRuntimeTests {
 
 @Test(.actionCatalog) func registeredSchemasRejectUnknownSpoofedOversizedAndInvalidAssembly() throws {
     let contracts = try CommunicationContracts(additional: [registeredFixtureContract()])
-    let spoof = AgentMessage(contract: "fixture.custom", content: "wrong type", validate: { _ in })
+    let spoof = AgentMessage(contract: "fixture.custom.v1", content: "wrong type", validate: { _ in })
     #expect(throws: CommunicationError.invalidPayload) { try contracts.validatedSize(spoof) }
     let invalid = AgentMessage(
-        contract: "fixture.custom", content: RegisteredFixtureMessage(value: -1), validate: { _ in })
+        contract: "fixture.custom.v1", content: RegisteredFixtureMessage(value: -1), validate: { _ in })
     #expect(throws: CommunicationError.invalidPayload) { try contracts.validatedSize(invalid) }
     let unknown = AgentMessage(
         contract: "fixture.unknown", content: RegisteredFixtureMessage(value: 1), validate: { _ in })
     #expect(throws: CommunicationError.unsupportedContract) { try contracts.validatedSize(unknown) }
     let tiny = try CommunicationContracts(additional: [registeredFixtureContract(maximumBytes: 4)])
     let large = AgentMessage(
-        contract: "fixture.custom", content: RegisteredFixtureMessage(value: 1), validate: { _ in })
+        contract: "fixture.custom.v1", content: RegisteredFixtureMessage(value: 1), validate: { _ in })
     #expect(throws: CommunicationError.invalidPayload) { try tiny.validatedSize(large) }
     #expect(throws: CommunicationError.invalidPayload) {
         try CommunicationContracts(additional: [CommunicationContract(name: "fixture.custom", kind: .text)])
@@ -448,7 +505,7 @@ extension LiveRuntimeTests {
         let session = UUID().uuidString
         let manager = AgentManager()
         let policy = try CommunicationPolicy(
-            contracts: AgentContracts.communication,
+            contracts: communicationFixtureContracts(),
             configurations: [
                 communicationConfiguration("producer", publishes: true),
                 communicationConfiguration("consumer", subscribes: true), communicationConfiguration("direct"),
@@ -462,6 +519,9 @@ extension LiveRuntimeTests {
         let input = InputGateway(manager: manager, policy: policy)
         let output = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
+        for descriptor in await manager.descriptors() {
+            _ = try await output.consumer(for: manager.agent(descriptor.id))
+        }
         let port = try await output.messaging(for: source.descriptor.id)
         let started = ContinuousClock.now
         try await port.publish(
@@ -489,7 +549,7 @@ extension LiveRuntimeTests {
         let session = UUID().uuidString
         let manager = AgentManager()
         let policy = try CommunicationPolicy(
-            contracts: AgentContracts.communication,
+            contracts: communicationFixtureContracts(),
             configurations: [
                 communicationConfiguration("producer", publishes: true),
                 communicationConfiguration("consumer", subscribes: true),
@@ -505,12 +565,15 @@ extension LiveRuntimeTests {
         let input = InputGateway(manager: manager, policy: policy)
         let output = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(), policy: policy,
-            observedContracts: ["user.input.asr.final"],
+            observedContracts: ["user.input.speech.v1"],
             observeEvent: { value in
                 observed.continuation.yield(value.id)
                 if blocking { try await Task.sleep(for: .seconds(30)) }
                 throw HarnessError.queueFull
             }, sink: { _ in })
+        for descriptor in await manager.descriptors() {
+            _ = try await output.consumer(for: manager.agent(descriptor.id))
+        }
         let port = try await output.messaging(for: producer.descriptor.id)
         let start = ContinuousClock.now
         try await port.publish(
@@ -529,13 +592,14 @@ extension LiveRuntimeTests {
 }
 
 extension LiveRuntimeTests {
-    @Test(.actionCatalog, .timeLimit(.minutes(1))) func publicationOverflowDoesNotWaitForDiagnosticCallbacks()
+    @Test(.actionCatalog, .timeLimit(.minutes(1)))
+    func publicationObserverOverflowRecordsDiagnosticsWithoutBlockingPublisher()
         async throws
     {
         let session = UUID().uuidString
         let manager = AgentManager()
         let policy = try CommunicationPolicy(
-            contracts: AgentContracts.communication,
+            contracts: communicationFixtureContracts(),
             configurations: [
                 communicationConfiguration("producer", publishes: true),
                 communicationConfiguration("direct"),
@@ -543,17 +607,19 @@ extension LiveRuntimeTests {
         let producer = ObservationRecorder(id: "producer")
         try await manager.register(producer, sessionID: session)
         await producer.start()
+        let diagnostics = AsyncStream<String>.makeStream(bufferingPolicy: .bufferingNewest(1))
         let input = InputGateway(
             manager: manager, policy: policy,
-            publicationFailure: { _, _, _ in
-                Issue.record("Overflow diagnostics must not call back into the publisher path")
-            })
+            publicationFailure: { _, _, error in diagnostics.continuation.yield(String(describing: error)) })
         let output = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(), policy: policy,
-            observedContracts: ["user.input.asr.partial"],
+            observedContracts: ["user.input.speech.v1"],
             observeEvent: { _ in
                 try await Task.sleep(for: .seconds(30))
             }, sink: { _ in })
+        for descriptor in await manager.descriptors() {
+            _ = try await output.consumer(for: manager.agent(descriptor.id))
+        }
         let port = try await output.messaging(for: producer.descriptor.id)
         let observations = try await input.observeSignals()
         let start = ContinuousClock.now
@@ -563,11 +629,98 @@ extension LiveRuntimeTests {
                 parent: AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("parent")))
         }
         #expect(start.duration(to: .now) < .seconds(2))
+        var failures = diagnostics.stream.makeAsyncIterator()
+        #expect(await failures.next() != nil)
         var snapshots = observations.makeAsyncIterator()
         let latest = try #require(await snapshots.next())
-        #expect(latest.records.last?.phase == .dropped)
+        #expect(latest.records.allSatisfy { $0.phase != .dropped })
         #expect(await port.history.snapshot().isEmpty)
         await output.shutdown()
         await manager.stopAll()
     }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func taskPublicationNeverCreatesSubscriptionsOrProbesConsumerReadiness()
+    async throws
+{
+    func configuration(_ id: String, requests: [String] = []) throws -> AgentConfiguration {
+        try AgentConfiguration(
+            contracts: AgentContracts.communication,
+            data: JSONSerialization.data(withJSONObject: [
+                "version": 9, "id": id, "category": "cognition", "actions": [String: [String]](), "tools": [],
+                "signals": [
+                    "requests": requests, "feedback": [], "subscriptions": [],
+                    "publications": requests.contains("agent.task.v1")
+                        ? [["channel": "agent.task", "protocol": "agent.task.events.v1"]] : [],
+                ],
+            ]))
+    }
+    let manager = AgentManager()
+    let session = UUID().uuidString
+    let requester = ObservationRecorder(id: "requester")
+    let executor = ObservationRecorder(id: "executor")
+    let other = ObservationRecorder(id: "other")
+    for role in [requester, executor, other] {
+        try await manager.register(role, sessionID: session)
+        await role.start()
+    }
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication,
+        configurations: [
+            configuration("requester"), configuration("executor", requests: ["agent.task.v1"]), configuration("other"),
+        ])
+    let signals = SignalTransport()
+    let input = InputGateway(manager: manager, policy: policy, signals: signals)
+    let output = await OutputGateway(
+        manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
+    for role in [requester, executor, other] { _ = try await output.consumer(for: role) }
+    let requesting = try await output.messaging(for: requester.descriptor.id)
+    let publishing = try await output.messaging(for: executor.descriptor.id)
+    let scope = AgentTaskScope(
+        id: UUID().uuidString, requester: requester.descriptor.id, executor: executor.descriptor.id, sessionID: session)
+    let parent = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("request"))
+    _ = try await requesting.send(
+        AgentTaskSignal(kind: .request, scope: scope, businessContract: "fixture.task", data: Data()).message(),
+        parent: parent, to: executor.descriptor.id)
+    let event = try AgentTaskContent(text: "progress").signal(.progress, scope: scope).message()
+    try await publishing.publish(event, parent: parent)
+    await input.flushPublications()
+    #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(0))
+    #expect(await requester.inputs.isEmpty)
+    #expect(await requester.statusCalls == 0)
+    let owned = try await requesting.subscribe(
+        .init(
+            channel: "agent.task", protocolID: "agent.task.events.v1", sources: [executor.descriptor.id],
+            scope: scope.id, sessionID: session))
+    await input.flushPublications()
+    // Subscribing later never replays the publication that had no consumer.
+    #expect(await requester.inputs.isEmpty)
+    let unrelated = try await output.messaging(for: other.descriptor.id).subscribe(
+        .init(
+            channel: "agent.task", protocolID: "agent.task.events.v1", sources: [executor.descriptor.id],
+            scope: scope.id, sessionID: session))
+    await requester.pause()
+    try await publishing.publish(event, parent: parent)
+    await input.flushPublications()
+    #expect(await requester.inputs.isEmpty)
+    #expect(await other.inputs.isEmpty)
+    #expect(await requester.statusCalls == 0)
+    await requester.resume()
+    try await publishing.publish(event, parent: parent)
+    await input.flushPublications()
+    #expect(await requester.inputs.count == 1)
+    #expect(await other.inputs.isEmpty)
+    var traces = try await input.observeSignals().makeAsyncIterator()
+    let trace = try #require(await traces.next()?.records.last { $0.contract == "agent.task.events.v1" })
+    #expect(trace.branches.map(\.target) == [requester.descriptor.id])
+    #expect(trace.branches.first?.phase == .accepted)
+    await owned.cancel()
+    try await publishing.publish(event, parent: parent)
+    await input.flushPublications()
+    #expect(await requester.inputs.count == 1)
+    #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(1))
+    await unrelated.cancel()
+    await manager.stopAll()
+    await output.shutdown()
+    await signals.shutdown()
 }

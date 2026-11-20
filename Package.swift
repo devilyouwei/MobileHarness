@@ -163,7 +163,7 @@ let testSources: [String: [String]] = [
         "Tests/Actions/Contracts/ActionDeclarationTests.swift",
         "Tests/Actions/Contracts/UnifiedCapabilityTests.swift",
         "Tests/Actions/Execution/ActionCompositionTests.swift",
-        "Tests/Gateway/Output/ChannelSchedulerTests.swift",
+        "Tests/Actions/Execution/ChannelSchedulerTests.swift",
         "Tests/Actions/Execution/ActionLifecycleTests.swift",
         "Tests/Actions/Execution/ActionObservationTests.swift",
         "Tests/Actions/Execution/ActionsContainerTests.swift",
@@ -538,32 +538,18 @@ let package = Package(
         .target(
             name: "ExecutionRuntime", dependencies: ["FunctionContracts"],
             path: "MobileHarness/Actions/Support",
-            exclude: [
-                "ActionBinding.swift", "ActionBindingModule.swift", "ActionExecutor.swift", "ActionMacro.swift",
-                "ActionRegistry.swift", "Contracts", "README.md", "ToolExecutor.swift", "ToolModule.swift",
-                "ToolRegistry.swift",
-            ],
-            sources: [
-                "FunctionExecutor.swift", "FunctionRegistry.swift", "ActionDeadline.swift",
-                "CooperativeExecution.swift", "ActionComposition.swift",
-            ]),
+            exclude: ["Call", "Contracts", "Shell/README.md", "README.md"],
+            sources: ["Function", "Shell"]),
         .target(
             name: "CallRuntime", dependencies: ["FunctionContracts", "ExecutionRuntime"],
             path: "MobileHarness/Actions/Support",
-            exclude: [
-                "ActionComposition.swift", "ActionDeadline.swift", "ActionMacro.swift", "Contracts",
-                "CooperativeExecution.swift", "FunctionExecutor.swift", "FunctionRegistry.swift", "README.md",
-            ],
-            sources: [
-                "ActionBindingModule.swift", "ToolRegistry.swift", "ActionRegistry.swift", "ActionBinding.swift",
-                "ToolModule.swift", "ActionExecutor.swift", "ToolExecutor.swift",
-            ]),
+            exclude: ["Call/ActionMacro.swift", "Contracts", "Function", "Shell", "README.md"],
+            sources: ["Call"]),
         .target(
             name: "Gateway", dependencies: ["FunctionContracts"],
             path: "MobileHarness/Gateway",
             exclude: [
-                "README.md", "Input/README.md", "Output/README.md", "Output/Scheduling/README.md",
-                "Output/Resources/README.md",
+                "README.md", "Input/README.md",
             ]),
         .target(
             name: "Actions",
@@ -600,19 +586,15 @@ let package = Package(
                 "UI/Resources/README.md",
                 "UI/Runtime/README.md",
                 "Support/Contracts",
-                "Support/FunctionExecutor.swift",
-                "Support/FunctionRegistry.swift",
-                "Support/ActionDeadline.swift",
-                "Support/CooperativeExecution.swift",
-                "Support/ActionComposition.swift",
-                "Support/ActionBindingModule.swift",
-                "Support/ToolRegistry.swift",
-                "Support/ActionRegistry.swift",
-                "Support/ActionBinding.swift",
-                "Support/ToolModule.swift",
-                "Support/ActionExecutor.swift",
-                "Support/ToolExecutor.swift",
-
+                "Support/Function",
+                "Support/Shell",
+                "Support/Call/ActionBinding.swift",
+                "Support/Call/ActionBindingModule.swift",
+                "Support/Call/ActionExecutor.swift",
+                "Support/Call/ActionRegistry.swift",
+                "Support/Call/ToolExecutor.swift",
+                "Support/Call/ToolModule.swift",
+                "Support/Call/ToolRegistry.swift",
             ]),
         .target(
             name: "Agents",
@@ -635,6 +617,7 @@ let package = Package(
                 "Agents/Support/Core/Runtime/README.md", "Agents/Support/README.md",
                 "Agents/VisionPerception/README.md", "App", "Gateway", "ModelKit", "PlatformKit", "README.md",
                 "Resources/Agents/README.md", "Resources/AppIconVariants", "Resources/Assets.xcassets",
+                "Resources/Models",
                 "Resources/PrivacyInfo.xcprivacy", "Resources/README.md", "Storage", "UI",
             ], sources: ["Agents"],
             resources: [.copy("Resources/Agents"), .copy("Resources/Skills"), .copy("Resources/Catalog.json")]),
@@ -682,10 +665,10 @@ let package = Package(
             path: "MobileHarness/App/Composition",
             exclude: [
                 "README.md", "AppComposition.swift", "ModuleRegistration.swift", "ServiceFactories.swift",
-                "AgentResourceBindings.swift", "ActionServiceAdapters.swift", "ApplicationActionAssembly.swift",
+                "ActionServiceAdapters.swift", "ApplicationActionAssembly.swift",
                 "ApplicationPresentation.swift",
             ],
-            sources: ["ApplicationContainer.swift", "ApplicationStateInspection.swift"]),
+            sources: ["ApplicationContainer.swift", "ApplicationStateInspection.swift", "MemoryPressureRelay.swift"]),
         .target(
             name: "ModelKit", dependencies: [], path: "MobileHarness/ModelKit",
             exclude: [

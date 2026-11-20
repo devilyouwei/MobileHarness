@@ -19,7 +19,25 @@ public final class NativeInputBroadcast<Value: Sendable>: Sendable {
     public init(onFailure: @escaping @Sendable (any Error) -> Void = { _ in }) { self.onFailure = onFailure }
     deinit { finish() }
     public var replacements: UInt64 { state.withLock { $0.replacements } }
-    public func subscribe(_ policy: Policy) throws -> AsyncThrowingStream<Value, any Error> {
+    public func listen(_ policy: Policy, producer: String = "platform.native") throws -> StateSignalListener<Value> {
+        let (stream, id) = try makeSubscription(policy)
+        return StateSignalListener(
+            source: .init(
+                producer: producer, generation: id, delivery: policy == .latest ? .latest : .ordered(capacity: 64)),
+            stream: stream, detach: { [weak self] in self?.detach(id) })
+    }
+    public func listenMedia(_ policy: Policy, producer: String) throws -> MediaSignalListener<Value> {
+        let (stream, id) = try makeSubscription(policy)
+        return MediaSignalListener(
+            source: .init(
+                producer: producer, generation: id, delivery: policy == .latest ? .latest : .ordered(capacity: 64)),
+            stream: stream, detach: { [weak self] in self?.detach(id) })
+    }
+    private func detach(_ id: String) {
+        let entry = state.withLock { $0.entries.removeValue(forKey: id) }
+        entry?.continuation.finish()
+    }
+    private func makeSubscription(_ policy: Policy) throws -> (AsyncThrowingStream<Value, any Error>, String) {
         let pair = AsyncThrowingStream<Value, any Error>.makeStream(
             bufferingPolicy: policy == .latest ? .bufferingNewest(1) : .bufferingOldest(64))
         let id = UUID().uuidString
@@ -30,7 +48,7 @@ public final class NativeInputBroadcast<Value: Sendable>: Sendable {
             guard $0.entries.count < 16 else { throw NativeSubscriptionError.capacityExceeded }
             $0.entries[id] = Entry(continuation: pair.continuation, policy: policy)
         }
-        return pair.stream
+        return (pair.stream, id)
     }
     public func send(_ value: Value) {
         let entries = state.withLock { $0.entries }

@@ -1132,13 +1132,13 @@ private func photographyAcceptance(
     #expect(try await context.snapshot().state.skillState?.mode == "task")
     await #expect(throws: CommunicationError.unauthorized) {
         try await agent.controlTask(
-            "task.cancel", arguments: ["reason": "spoofed"], source: "photographer", sessionID: session,
+            "agent.task.v1", arguments: ["reason": "spoofed"], source: "photographer", sessionID: session,
             inputID: UUID().uuidString,
             decisionID: nil)
     }
     await #expect(throws: HarnessError.forbiddenFunction) {
         try await agent.controlTask(
-            "task.cancel", arguments: ["reason": "removed"], source: "assistant", sessionID: session,
+            "agent.task.v1", arguments: ["reason": "removed"], source: "assistant", sessionID: session,
             inputID: UUID().uuidString, decisionID: nil)
     }
     #expect(try await context.snapshot().state.skillState?.mode == "task")
@@ -1246,7 +1246,7 @@ func legacyBackgroundStartIsRejectedWithoutChangingForegroundOrInvokingChat()
     let input = InputGateway(manager: manager, policy: policy)
     let output = await OutputGateway(
         manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
-    try bindFixtureCommunications(assistant, port: await output.messaging(for: .assistant))
+    try await bindFixtureCommunications(assistant, port: await output.messaging(for: .assistant))
     try await assistant.start()
     await child.start()
     _ = try await assistant.controlTask(
@@ -2606,7 +2606,8 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
     try await manager.register(child, sessionID: session)
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication, configurations: AgentConfigurations.all())
-    let input = InputGateway(manager: manager, policy: policy)
+    let signals = SignalTransport()
+    let input = InputGateway(manager: manager, policy: policy, signals: signals)
     struct Module: ActionModule { let definitions: [ActionBinding] }
     let definitions = ["UI.Caption.print", "UI.Caption.beginReplyTurn", "Speech.Playback.speak"].map { path in
         let parts = path.split(separator: ".").map(String.init)
@@ -2635,6 +2636,8 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
             await log.synthesized(id: id, text: text)
         }))
     let consumer = try await output.consumer(for: assistant)
+    #expect(await assistant.trackedTaskCount == 0)
+    #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(3))
     let collection = Task {
         do {
             try await IndependentOutputWorkflow.consumeGeneration(assistant.outputs) { envelope in
@@ -2684,6 +2687,8 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         return
     }
     #expect(await model.requests.count == 1)
+    #expect(await assistant.trackedTaskCount == 1)
+    #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(3))
     let received = try #require(await child.inputs.last)
     guard case .observation(let message) = received.payload else { throw CommunicationError.invalidPayload }
     let request = try #require(message.content(as: AgentTaskRequest.self))
@@ -2691,6 +2696,32 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
     #expect(request.replyTo == nil)
     let scope = AgentTaskScope(
         id: request.id, requester: .assistant, executor: .writer, sessionID: session, execution: .background)
+    if outcome == "duplicate" {
+        let writerIdentity = try await manager.identity(.writer)
+        for foreign in [
+            AgentTaskScope(
+                id: UUID().uuidString, requester: .assistant, executor: .writer,
+                sessionID: session, execution: .background),
+            AgentTaskScope(
+                id: scope.id, requester: .assistant, executor: .writer,
+                sessionID: UUID().uuidString, execution: .background),
+        ] {
+            let response = try AgentTaskResponse(
+                AgentTaskContent(
+                    text: "unrelated terminal", stage: .completed,
+                    writerEvent: .init(sequence: 1, kind: .completed, delegateID: foreign.id)
+                ).signal(.result, scope: foreign, status: .succeeded))
+            let payload = InputPayload.observation(response.message)
+            try await assistant.receive(
+                AgentInput(
+                    id: UUID().uuidString, sessionID: foreign.sessionID, payload: payload,
+                    metadata: .init(
+                        payload: payload, source: "writer", incarnation: writerIdentity,
+                        origin: .agent, rootID: foreign.id)))
+            #expect(await assistant.trackedTaskCount == 1)
+            #expect(try await context.snapshot().state.taskViews?[scope.id]?.terminal != true)
+        }
+    }
     let port = try await output.messaging(for: .writer)
     let writerRuntime = try await output.consumer(for: child)
     _ = try await writerRuntime.authorizeReceivedTask(scope, received)
@@ -2727,8 +2758,9 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         }
         let started = try AgentTaskContent(
             text: "已接纳", writerEvent: .init(sequence: 1, kind: .started))
-        _ = try await port.sendResult(
-            AgentTaskResponse(started.signal(.progress, scope: scope)).message, parent: received, to: .assistant)
+        _ = try await fixtureEventPublication(
+            AgentTaskResponse(started.signal(.progress, scope: scope)).message, parent: received, to: .assistant,
+            port: port, inputGateway: input)
         let afterForegroundEnd = try await context.snapshot().state
         #expect(afterForegroundEnd.skillState?.activeTaskID == nil)
         #expect(afterForegroundEnd.taskViews?[scope.id]?.terminal == false)
@@ -2751,7 +2783,8 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
                 writerEvent: .init(sequence: 2, kind: .cancelled)),
             scope: scope, status: .cancelled, executions: database.writerExecutions)
         try await writerRuntime.retireTask(#require(ended.signal))
-        _ = try await port.sendResult(ended.message, parent: received, to: .assistant)
+        _ = try await fixtureEventPublication(
+            ended.message, parent: received, to: .assistant, port: port, inputGateway: input)
         #expect(await model.requests.count == 2)
         #expect(try await context.snapshot().state.taskViews?[scope.id]?.terminal == true)
         #expect(try await context.snapshot().state.skillState?.activeTaskID == nil)
@@ -2768,7 +2801,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
             text: "first complete", stage: .completed, writerEvent: .init(sequence: 1, kind: .completed))
         let old = try await fixtureWriterCompletion(
             content, scope: scope, status: .succeeded, executions: database.writerExecutions)
-        #expect(try await context.snapshot().state.taskViews?[scope.id]?.terminal != true)
+        // Consumer recovery may already apply the durable fact before live publication.
         try await writerRuntime.retireTask(#require(old.signal))
         try await database.writerExecutions.finishDelegationNotification(
             scope.id, agent: "writer", retirement: true, completed: true, failure: nil)
@@ -2786,17 +2819,25 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
             delegateID: next.id, workspaceID: nil, goal: next.text, input: next.text, sourceDialog: nil, agent: "writer"
         )
         #expect(next.id != scope.id)
-        #expect(try await context.snapshot().state.taskViews?[scope.id] == nil)
+        let oldView = try await context.snapshot().state.taskViews?[scope.id]
+        #expect(oldView == nil || (oldView?.terminal == true && oldView?.scope == scope))
         // Even an old completion that arrives after the new delegation cannot overwrite it.
-        #expect(try await port.sendResult(old.message, parent: received, to: .assistant).rejected.isEmpty)
-        #expect(try await port.sendResult(old.message, parent: received, to: .assistant).rejected.isEmpty)
+        #expect(
+            try await fixtureEventPublication(
+                old.message, parent: received, to: .assistant, port: port, inputGateway: input
+            ).rejected.isEmpty)
+        #expect(
+            try await fixtureEventPublication(
+                old.message, parent: received, to: .assistant, port: port, inputGateway: input
+            ).rejected.isEmpty)
         #expect(try await context.snapshot().state.taskViews?[nextScope.id] == nil)
         let final = try await fixtureWriterCompletion(
             AgentTaskContent(
                 text: "second complete", stage: .completed, writerEvent: .init(sequence: 1, kind: .completed)),
             scope: nextScope, status: .succeeded, executions: database.writerExecutions)
         try await writerRuntime.retireTask(#require(final.signal))
-        _ = try await port.sendResult(final.message, parent: nextInput, to: .assistant)
+        _ = try await fixtureEventPublication(
+            final.message, parent: nextInput, to: .assistant, port: port, inputGateway: input)
         let expected = 2
         let deadline = ContinuousClock.now + .seconds(10)
         while await log.finishedDecisions.count < expected && ContinuousClock.now < deadline {
@@ -2816,8 +2857,9 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
                     "count=\(decisionCount) work=\(state.work.values.map { $0.state }) errors=\(state.state.history.current.turns.map { $0.error ?? "none" }) output=\(outputFailure) controls=\(controls)"
             ))
         #expect(
-            try await database.writerExecutions.delegationNotification(scope.id, agent: "writer")?.delivered
-                == true)
+            try await database.agentMessages.isAgentMessageConsumed(
+                (try #require(try await database.writerExecutions.delegationNotification(scope.id, agent: "writer")))
+                    .eventID))
         if foreground {
             _ = try await assistant.controlTask(
                 "task.end", arguments: ["summary": "test cleanup"],
@@ -2842,8 +2884,9 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
     let started = try AgentTaskContent(
         text: "已接纳", writerEvent: .init(sequence: 1, kind: .started))
     for _ in 1...(outcome == "duplicate" ? 5 : 1) {
-        let receipt = try await port.sendResult(
-            AgentTaskResponse(started.signal(.progress, scope: scope)).message, parent: received, to: .assistant)
+        let receipt = try await fixtureEventPublication(
+            AgentTaskResponse(started.signal(.progress, scope: scope)).message, parent: received, to: .assistant,
+            port: port, inputGateway: input)
         #expect(receipt.rejected.isEmpty)
     }
     #expect(try await context.snapshot().state.taskViews?[scope.id]?.writerEvent?.sequence == 1)
@@ -2855,8 +2898,9 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         for (index, (kind, text)) in milestones.enumerated() {
             let fact = try AgentTaskContent(text: text, writerEvent: .init(sequence: UInt64(index) + 2, kind: kind))
             for _ in 1...2 {
-                let receipt = try await port.sendResult(
-                    AgentTaskResponse(fact.signal(.progress, scope: scope)).message, parent: received, to: .assistant)
+                let receipt = try await fixtureEventPublication(
+                    AgentTaskResponse(fact.signal(.progress, scope: scope)).message, parent: received, to: .assistant,
+                    port: port, inputGateway: input)
                 #expect(receipt.rejected.isEmpty)
             }
         }
@@ -2867,7 +2911,10 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         writerEvent: .init(sequence: questionSequence, kind: .userInput))
     let progress = try AgentTaskResponse(question.signal(.progress, scope: scope))
     for _ in 1...2 {
-        #expect(try await port.sendResult(progress.message, parent: received, to: .assistant).rejected.isEmpty)
+        #expect(
+            try await fixtureEventPublication(
+                progress.message, parent: received, to: .assistant, port: port, inputGateway: input
+            ).rejected.isEmpty)
     }
     let waiting = try await context.snapshot()
     #expect(waiting.state.taskViews?[scope.id]?.interactionID == interactionID)
@@ -2903,10 +2950,15 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         completion, scope: scope, status: kind == .completed ? .succeeded : .failed,
         executions: database.writerExecutions)
     for _ in 1...2 {
-        #expect(try await port.sendResult(ended.message, parent: received, to: .assistant).rejected.isEmpty)
+        #expect(
+            try await fixtureEventPublication(
+                ended.message, parent: received, to: .assistant, port: port, inputGateway: input
+            ).rejected.isEmpty)
     }
     try await writerRuntime.retireTask(#require(ended.signal))
     let settled = try await context.snapshot()
+    #expect(await assistant.trackedTaskCount == 0)
+    #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(3))
     #expect(settled.state.taskViews?[scope.id]?.terminal == true)
     #expect(settled.state.taskViews?[scope.id]?.writerEvent?.kind == kind)
     #expect(settled.state.skillState?.activeTaskID == priorTask)
@@ -2914,7 +2966,9 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
     var decisions = outcome == "completed" ? 2 : 1
     #expect(await model.requests.count == decisions)
     #expect(
-        try await database.writerExecutions.delegationNotification(scope.id, agent: "writer")?.delivered == true
+        try await database.agentMessages.isAgentMessageConsumed(
+            (try #require(try await database.writerExecutions.delegationNotification(scope.id, agent: "writer")))
+                .eventID)
     )
 
     if verifyAnnouncements {
@@ -3070,4 +3124,113 @@ private actor WriterOutputLog {
     #expect(tasks.last?.goal == "second" && tasks.last?.status == "running")
     await assistant.stop()
     try await database.shutdown()
+}
+
+/// Test barrier only: the publishing role never waits for consumer processing.
+private func fixtureEventPublication(
+    _ message: AgentMessage, parent: AgentInput, to target: AgentID,
+    port: AgentMessaging, inputGateway: InputGateway
+) async throws -> DeliveryReport {
+    let admission = try await port.sendResult(message, parent: parent, to: target)
+    await inputGateway.flushPublications()
+    return admission
+}
+
+@Test(.actionCatalog) func assistantRestoresTaskTrackingAndReadsCompletionPublishedWithoutAnyConsumer()
+    async throws
+{
+    let records = try SQLiteRepositories.temporary()
+    let history = AssistantHistoryStore(
+        records: try AssistantRecordStore(
+            repository: records.assistantMessages, tasks: records.assistantTasks,
+            conversations: records.assistantConversations, logs: records.logs))
+    let dialog = try await history.readCurrent().current.id
+    let session = UUID().uuidString
+    let request = AgentTaskRequest(text: "restored task")
+    try await records.agentMessages.enqueueAgentMessage(
+        .init(
+            id: request.id, sender: "assistant", receiver: "writer", contract: "agent.task.v1",
+            payload: JSONEncoder().encode(request), correlationID: request.id, senderContext: dialog,
+            sourceSessionID: session, dedupeKey: request.id))
+    _ = try await records.writerExecutions.beginRequest(
+        delegateID: request.id, workspaceID: nil, goal: request.text, input: request.text,
+        sourceDialog: dialog, agent: "writer")
+    let scope = AgentTaskScope(
+        id: request.id, requester: .assistant, executor: .writer, sessionID: session, execution: .background)
+    let completion = try await fixtureWriterCompletion(
+        AgentTaskContent(
+            text: "completed while requester absent", stage: .completed,
+            writerEvent: .init(sequence: 1, kind: .completed, delegateID: scope.id)), scope: scope, status: .succeeded,
+        executions: records.writerExecutions)
+    let manager = AgentManager()
+    let writer = ObservationRecorder(id: "writer")
+    try await manager.register(writer)
+    await writer.start()
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication, configurations: AgentConfigurations.all())
+    let signals = SignalTransport()
+    let input = InputGateway(manager: manager, policy: policy, signals: signals)
+    let output = await OutputGateway(
+        manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
+    try await output.bindCommunications(records.agentMessages)
+    let publishing = try await output.messaging(for: .writer)
+    try await publishing.publish(
+        completion.message, parent: AgentInput(id: scope.id, sessionID: session, payload: .text("source fact")))
+    await input.flushPublications()
+    #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(0))
+    let sourceClaim = try #require(
+        try await records.writerExecutions.pendingDelegationNotifications(
+            agent: "writer", retirement: false, after: nil, limit: 1
+        ).first)
+    try await records.writerExecutions.finishDelegationNotification(
+        scope.id, agent: "writer", retirement: false, completed: true, failure: nil, claimToken: sourceClaim.claimToken)
+    #expect(try await records.writerExecutions.delegationNotification(scope.id, agent: "writer")?.published == true)
+    #expect(try await !records.agentMessages.isAgentMessageConsumed(sourceClaim.eventID))
+    let context = try AgentContextRepository(
+        agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState())
+    let assistant = try AssistantAgent(
+        stateContext: publicStateFixture(), presentsReply: false, chat: WriterNoticeModel(), conversations: history,
+        communications: records.agentMessages, context: context)
+    try await manager.register(assistant, sessionID: UUID().uuidString)
+    try await assistant.start()
+    _ = try await output.consumer(for: assistant)
+    try await skillEventually { try await context.snapshot().state.taskViews?[scope.id]?.terminal == true }
+    #expect(try await records.agentMessages.isAgentMessageConsumed(sourceClaim.eventID))
+    #expect(await assistant.trackedTaskCount == 0)
+    // All three static speech/interruption/Writer subscriptions remain.
+    #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(3))
+    await assistant.stop()
+    await output.shutdown()
+    await manager.stopAll()
+    try await records.shutdown()
+}
+
+@Test(.actionCatalog) func assistantStaticallyListensToWriterBeforeAnyTaskAndReleasesItsEndpointOnStop() async throws {
+    let configuration = try AgentConfigurations.load(named: "Assistant")
+    #expect(
+        configuration.communication.subscriptions.contains {
+            $0.channel == "agent.task" && $0.protocol == "agent.task.events.v1" && $0.sources == ["writer"]
+        })
+    // Validate declared producers without starting any publisher instance.
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication, configurations: AgentConfigurations.all())
+    let manager = AgentManager()
+    let signals = SignalTransport()
+    let input = InputGateway(manager: manager, policy: policy, signals: signals)
+    let output = await OutputGateway(
+        manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
+    for _ in 0..<2 {
+        let assistant = try AssistantAgent(
+            stateContext: publicStateFixture(), presentsReply: false,
+            context: AgentContextRepository(agent: .assistant, scope: UUID().uuidString, state: AssistantContextState())
+        )
+        try await manager.register(assistant, sessionID: UUID().uuidString)
+        _ = try await output.consumer(for: assistant)
+        try await assistant.start()
+        #expect(await assistant.trackedTaskCount == 0)
+        #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(3))
+        try await manager.remove(.assistant)
+        #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(0))
+    }
+    await output.shutdown()
 }

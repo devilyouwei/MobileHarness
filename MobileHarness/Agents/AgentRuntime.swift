@@ -94,9 +94,8 @@ import StorageFiles
         let input: InputGateway
         let output: OutputGateway
         let business: AgentBusinessBindings
-        let actions: ChannelScheduler
         let runtimeLogWorkflow: AgentRuntimeLogWorkflow
-        let resources: ResourceCoordinator
+        let execution: GatewayExecution
 
         static func prepare(
             makeInputDecision: @escaping @MainActor (AgentBusinessBindings) -> AssistantInputDecision,
@@ -111,7 +110,7 @@ import StorageFiles
             settingsUI: UISettingsContainer,
             resourcesUI: UIModelResourcesContainer, devicesUI: UIDeviceSettingsContainer, historyUI: UIHistoryContainer,
             diagnosticsUI: UIDiagnosticsContainer, cameraControl: any AgentCameraAccess,
-            resourceChanges: @escaping @MainActor @Sendable () async throws -> AsyncStream<UInt64>,
+            resourceChanges: @escaping @MainActor @Sendable () async throws -> ModelKit.StateSignalListener<UInt64>,
             summarizeTitle: @escaping @Sendable (AssistantConversation) async throws -> String,
             modelName: @escaping @Sendable () async throws -> String = { "Unspecified model" },
             chatProvider: @escaping @Sendable () async throws -> any ChatCapability,
@@ -207,7 +206,6 @@ import StorageFiles
                                 applicationControlSessionID, UUID().uuidString, nil)
                         }
                     }, context: memoryContext)
-                let execution = business.executor
                 let catalog = business.catalog
                 try CapabilityCoverage.validate(
                     catalog: catalog,
@@ -223,7 +221,7 @@ import StorageFiles
                         WriterAgent.capabilities(),
                     ] + AgentConfigurations.skillRegistries(), locallyExecutedTools: AgentContracts.localToolPaths)
                 let configuration = AgentGatewayConfiguration(
-                    executor: execution, catalog: catalog, policy: policy, resources: business.resources,
+                    catalog: catalog, policy: policy,
                     signalSummary: { input in
                         switch input.payload {
                         case .text(let text): return String(text.prefix(256))
@@ -246,7 +244,7 @@ import StorageFiles
                         default: return ""
                         }
                     },
-                    observedContracts: [PerceptionMessage.asrFinalContract],
+                    observedContracts: [PerceptionMessage.speechProtocol],
                     observeEvent: { input in
                         if case .transcript(let text, true)? = input.payload.perception {
                             try await business.observeTranscript(text, input.sessionID)
@@ -295,14 +293,11 @@ import StorageFiles
             self.interactionSessionID = applicationControlSessionID
             let manager = facilities.manager
             let input = facilities.input
-            let resources = facilities.resources
-            let actions = facilities.actions
             let gateway = facilities.output
             self.observations = facilities.observations
             self.manager = manager
             self.input = input
-            self.resources = resources
-            self.actions = actions
+            self.execution = facilities.execution
             self.output = gateway
             self.business = business
             guard let streaming = business.artifactStreaming, let writerModel = business.writerModel else {
@@ -312,7 +307,6 @@ import StorageFiles
             try writerContainer.install(
                 manager: manager, output: gateway, model: writerModel, streaming: streaming, language: language)
             runtimeLogWorkflow = activity
-            business.bindResources(resources, actions)
             business.bindDeferredFailure { result in
                 let feedback = ActionResult(
                     executionID: result.executionID, owner: result.owner,

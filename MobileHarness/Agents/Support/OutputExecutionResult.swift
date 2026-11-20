@@ -5,6 +5,7 @@ import Gateway
 
 /// A single output outcome. Action terminal details remain in the scheduler's execution records.
 public struct OutputExecutionResult: Sendable {
+    public let invocation: ActionInvocationSnapshot?
     public let source: AgentID
     public let inputID: String
     public let sequence: UInt64
@@ -14,8 +15,9 @@ public struct OutputExecutionResult: Sendable {
     public let failureCode: ActionExecutionFailureCode?
     public init(
         source: AgentID, inputID: String, sequence: UInt64, tool: ToolResponse?, failure: String?,
-        failureCode: ActionExecutionFailureCode? = nil
+        failureCode: ActionExecutionFailureCode? = nil, invocation: ActionInvocationSnapshot? = nil
     ) {
+        self.invocation = invocation
         self.source = source
         self.inputID = inputID
         self.sequence = sequence

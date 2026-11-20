@@ -43,7 +43,7 @@ func bindSpeechRequests(_ agent: any Agent) async throws -> SpeechRequestProbe {
     let probe = SpeechRequestProbe()
     guard let target = agent as? any FixtureSpeechBindable else { throw HarnessError.unsupportedInput }
     try await target.bindSpeechOutput(probe)
-    try bindFixtureCommunications(
+    try await bindFixtureCommunications(
         agent, port: AgentMessaging { _, _, target in DeliveryReport(delivered: target.map { [$0] } ?? []) })
     return probe
 }
@@ -77,25 +77,7 @@ struct FixtureGenerationOutputs: AsyncSequence {
         mutating func next() async throws -> OutputEnvelope? {
             while let envelope = await base.next() {
                 await observer(envelope)
-                if case .communication(let action) = envelope.output {
-                    guard action.target != nil else { continue }
-                    let payload = InputPayload.communicationReceipt(
-                        .init(
-                            callID: action.id,
-                            report: DeliveryReport(delivered: action.target.map { [$0] } ?? []),
-                            owner: ExecutionOwner(
-                                agent: envelope.source, incarnation: UUID().uuidString,
-                                sessionID: envelope.sessionID),
-                            causality: SignalCausality(envelope: envelope)))
-                    try await agent.receive(
-                        AgentInput(
-                            id: UUID().uuidString,
-                            sessionID: envelope.sessionID, payload: payload,
-                            metadata: InputMetadata(
-                                payload: payload, source: "runtime", origin: .runtime,
-                                rootID: UUID().uuidString)))
-                    continue
-                }
+                if case .communication = envelope.output { continue }
                 if let roundID = envelope.roundID {
                     let payload: InputPayload?
                     switch envelope.output {

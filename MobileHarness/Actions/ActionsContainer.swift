@@ -12,9 +12,12 @@ import Foundation
     public func stateSnapshot() async throws -> ActionsStateSnapshot {
         try Task.checkCancellation()
         var children: [ActionsStateSnapshot.Reference] = []
+        if executionEngine != nil {
+            children += ["actions.scheduler", "actions.direct", "actions.resources"].map { .init(path: $0) }
+        }
         #if os(iOS)
             if #available(iOS 27, *), businessOwner is ActionsBusinessAssembly {
-                children = [.init(path: "actions.camera"), .init(path: "actions.robot"), .init(path: "actions.web")]
+                children += [.init(path: "actions.camera"), .init(path: "actions.robot"), .init(path: "actions.web")]
             }
         #endif
         return ActionsStateSnapshot(
@@ -31,6 +34,17 @@ import Foundation
         var readers: [String: ActionsStateSnapshot.Reader] = [
             "actions": ActionsStateSnapshot.reader(of: self) { try await $0.stateSnapshot() }
         ]
+        if let engine = executionEngine {
+            readers["actions.scheduler"] = ActionsStateSnapshot.reader(of: engine.scheduler) {
+                Self.snapshot(try await $0.stateSnapshot())
+            }
+            readers["actions.direct"] = ActionsStateSnapshot.reader(of: engine.direct) {
+                Self.snapshot(try await $0.stateSnapshot())
+            }
+            readers["actions.resources"] = ActionsStateSnapshot.reader(of: engine.resources) {
+                Self.snapshot(try await $0.stateSnapshot())
+            }
+        }
         #if os(iOS)
             if #available(iOS 27, *), let owner = businessOwner as? ActionsBusinessAssembly {
                 readers.merge(try await owner.stateReaders()) { _, new in new }
@@ -39,6 +53,17 @@ import Foundation
         return readers
     }
     public var isShutdownRequested: Bool { shutdown != nil }
+    private nonisolated static func snapshot(_ facts: ExecutionRuntimeFacts) -> ActionsStateSnapshot {
+        ActionsStateSnapshot(
+            path: facts.path,
+            runtime: facts.runtime.mapValues {
+                switch $0 {
+                case .count(let value): .count(value)
+                case .flag(let value): .flag(value)
+                }
+            }, health: facts.cleanupFailed ? .fault : .unknown,
+            issues: facts.cleanupFailed ? [.init(code: "cleanupFailed", impact: "resourceReleaseUnconfirmed")] : [])
+    }
     private struct Preparation {
         let invocation: FunctionInvocation
         let definition: ActionFunction
@@ -58,7 +83,35 @@ import Foundation
     private var suspension: Task<Void, any Error>?
     private var revision: UInt64 = 0
     private let onFailure: @Sendable (ActionsFailure) -> Void
+    public private(set) var executionEngine: ActionExecutionCoordinator?
+    private var executionBindings: [@MainActor @Sendable (ActionExecutionCoordinator) -> Void] = []
     public init(onFailure: @escaping @Sendable (ActionsFailure) -> Void = { _ in }) { self.onFailure = onFailure }
+
+    /// Domains register engine-dependent wiring (for example resource runs) before the engine is built.
+    public func addExecutionBinding(
+        _ binding: @escaping @MainActor @Sendable (ActionExecutionCoordinator) -> Void
+    ) throws {
+        guard executionEngine == nil, state == .cold || state == .configured else {
+            throw ActionsContainerError.alreadyConfigured
+        }
+        executionBindings.append(binding)
+    }
+
+    /// Builds the execution engine over this container's own preparation and execution. Admission opens at start.
+    @discardableResult public func configureExecution(
+        resources: [ResourceDefinition], resultDeliveryTimeout: Duration = .seconds(60),
+        onExecutionSnapshot: (@Sendable (ActionExecutionSnapshot) -> Void)? = nil
+    ) throws -> ActionExecutionCoordinator {
+        guard state == .configured, executionEngine == nil else { throw ActionsContainerError.alreadyConfigured }
+        do {
+            let engine = try ActionExecutionCoordinator(
+                executor: execution, resources: resources, resultDeliveryTimeout: resultDeliveryTimeout,
+                onExecutionSnapshot: onExecutionSnapshot)
+            executionEngine = engine
+            for binding in executionBindings { binding(engine) }
+            return engine
+        } catch { throw failure("configureExecution", error) }
+    }
 
     public var execution: ActionsExecutionPort {
         ActionsExecutionPort(
@@ -120,6 +173,7 @@ import Foundation
         guard state == .configured || state == .running else { throw ActionsContainerError.unavailable }
         if state == .running { return }
         state = .running
+        executionEngine?.open()
         runningWorkers = workers.map { work in Task { await work() } }
     }
     public func addCleanup(_ operation: @escaping @MainActor @Sendable () async throws -> Void) throws {
@@ -179,6 +233,7 @@ import Foundation
     public func invalidate() {
         guard state == .running || state == .suspended else { return }
         state = .suspended
+        executionEngine?.closeAdmission()
         invalidateNative()
         revision &+= 1
         prepared.removeAll()
@@ -186,9 +241,13 @@ import Foundation
         for task in selected { task.cancel() }
         if suspension == nil {
             let nativeForeground = nativeForeground
+            let engine = executionEngine
             suspension = Task {
+                var failure: (any Error)?
+                do { try await engine?.suspend() } catch { failure = error }
                 for task in selected { _ = await task.result }
                 try await nativeForeground(false)
+                if let failure { throw failure }
             }
         }
     }
@@ -210,6 +269,7 @@ import Foundation
             guard current == revision, state != .stopping, state != .stopped, state != .failed else { return }
             suspension = nil
             state = .running
+            executionEngine?.open()
         }
     }
     public func stop() async throws {
@@ -219,6 +279,7 @@ import Foundation
         }
         state = .stopping
         revision &+= 1
+        executionEngine?.closeAdmission()
         prepared.removeAll()
         let selected = Array(active.values)
         for task in selected { task.cancel() }
@@ -227,9 +288,11 @@ import Foundation
         for worker in nativeWorkers { worker.cancel() }
         let cleanup = self.cleanup
         let suspension = suspension
+        let engine = executionEngine
         let task = Task {
             var errors: [any Error] = []
             do { try await suspension?.value } catch { errors.append(error) }
+            do { try await engine?.shutdown() } catch { errors.append(error) }
             for task in selected { _ = await task.result }
             for close in cleanup.reversed() { do { try await close() } catch { errors.append(error) } }
             for worker in nativeWorkers { await worker.value }
@@ -245,6 +308,8 @@ import Foundation
             definitions.removeAll()
             snapshot = nil
             self.cleanup.removeAll()
+            executionEngine = nil
+            executionBindings.removeAll()
             businessOwner = nil
             state = .stopped
         } catch {
@@ -408,7 +473,7 @@ public struct ActionsStateSnapshot: Codable, Sendable {
                 workspaces: dependencies.workspaces,
                 model: dependencies.model, platform: dependencies.platform, ui: dependencies.ui,
                 photos: photos, bluetooth: bluetooth, presentationLanguage: dependencies.presentationLanguage,
-                makeCameraRuntime: dependencies.makeCameraRuntime, connectVision: dependencies.connectVision)
+                connectVision: dependencies.connectVision)
             root.businessOwner = assembly
             root.cleanup = [
                 { try await assembly.camera.previews.close() },

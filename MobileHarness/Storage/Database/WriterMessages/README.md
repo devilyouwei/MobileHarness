@@ -22,7 +22,7 @@ WriterHistoryStore.requestPreviews 透传有界 limit（默认 20，仓库上限
 
 Writer 从普通消息正文识别明确停止请求后，在同一事务确认来源及执行身份、标记原消息已消费、进入 closing 并保存原因。清理结果由 Writer 随独立终态通知提交。私有模型选择取消时，终态事务保存它的事实摘要。既有取消记录可按历史消息读取。
 
-新入口接纳 agent.task.request，消息身份成为执行入口的来源。Writer 判定为补充或停止后将消息关联到原入口，存储核对来源、关联身份和当前执行状态后消费。消息级拒绝留在 Agent 消息表，与任务终态共用 agent.task.response 的持久投递；退休查询只选择任务终态。旧 writer.completion 数据仍可读取，待投递记录以当前契约发出。
+新入口接纳 agent.task.v1，消息身份成为执行入口的来源。Writer 判定为补充或停止后将消息关联到原入口，存储核对来源、关联身份和当前执行状态后消费。消息级拒绝留在 Agent 消息表，与任务终态共用 agent.task.events.v1 的持久投递；退休查询只选择任务终态。旧 writer.completion 数据仍可读取，待投递记录以当前契约发出。
 
 忙碌拒绝使用 rejected 入口并记录失败原因与完成时间，计入委托列表但不参与运行上下文选择。委托终态结果由入口 result_json 保存，通知删除或日志清理不改变业务结果。
 
@@ -31,3 +31,7 @@ Writer 控制请求将作品库、编辑或查看域写入 producerMetadata.cont
 运行中切换工作区要求委托当前绑定与预期旧目标一致。SQLite 在同一事务中确认新工作区可绑定并更新委托选择，已有消息的 workspace_id 和请求身份保留。新建后切换先分配目标，当前绑定在目标准备成功后更新。
 
 WriterHistory.begin 准备内存请求，awaitingDispatch 在 HTTP 发送或本地推理开始时清除；仅此时原子创建消息与输入快照。配置失败或发起前取消没有 message，真实网络失败保留请求身份、输入与失败信息。每次真实重试独立记录；workspace 绑定取实际创建消息时的执行目标。
+
+Task admission authenticates the original requester rather than an Assistant/Writer sender pair. Follow-up and cancellation must match the original sender and task association; the live role additionally verifies session ownership. Progress and durable terminal/rejection notifications return to that requester. Assistant is the current user-facing caller, not protocol-level authority.
+
+WriterDelegationNotification.published reflects published_at (local publication admission), independently of retired and consumer received/consumed timestamps. finishDelegationNotification updates only the source publication or retirement state. An absent, paused or rejecting consumer does not control this queue; durable facts remain readable by their owner for recovery.

@@ -15,24 +15,20 @@ public final class GatewayAdmission: Sendable {
 
 /// Neutral application-supplied configuration; contains no concrete business owners.
 public struct GatewayConfiguration: Sendable {
-    public let executor: ActionsExecutionPort
-    public let resources: [ResourceDefinition]
+    public let engine: any ActionExecutionEngine
     public let deliverResult: @Sendable (ExecutionResult) async -> ActionResultDelivery
     public init(
-        executor: ActionsExecutionPort, resources: [ResourceDefinition] = [],
+        engine: any ActionExecutionEngine,
         deliverResult: @escaping @Sendable (ExecutionResult) async -> ActionResultDelivery = { _ in .closed }
     ) {
-        self.executor = executor
-        self.resources = resources
+        self.engine = engine
         self.deliverResult = deliverResult
     }
 }
 public struct GatewayCapabilities: Sendable {
     public let admission: GatewayAdmission
     public let signals: SignalTransport
-    public let actions: ChannelScheduler
-    public let direct: DirectExecutionDispatcher
-    public let resources: ResourceCoordinator
+    public let execution: GatewayExecution
 }
 public struct GatewayObservationSession: Sendable {
     fileprivate let id: UUID
@@ -50,7 +46,7 @@ public struct GatewayObservationAccess: Sendable {
     }
 }
 
-/// App-scoped root. Configuration constructs facilities; only start opens admission.
+/// App-scoped root. Configuration binds the execution edge; only start opens admission.
 @MainActor public final class GatewayContainer {
     public enum State: String, CaseIterable, Sendable {
         case cold, configured, running, suspended, stopping, stopped, failed
@@ -59,9 +55,6 @@ public struct GatewayObservationAccess: Sendable {
     public func stateSnapshot() async throws -> GatewayStateSnapshot {
         try Task.checkCancellation()
         var children: [GatewayStateSnapshot.Reference] = [.init(path: "gateway.signals")]
-        if configured != nil {
-            children += ["gateway.scheduler", "gateway.direct", "gateway.resources"].map { .init(path: $0) }
-        }
         return GatewayStateSnapshot(
             path: "gateway",
             runtime: [
@@ -72,21 +65,10 @@ public struct GatewayObservationAccess: Sendable {
             children: children, stateValues: ["runtime.phase": State.allCases.map(\.rawValue)])
     }
     public func stateReaders() async throws -> [String: GatewayStateSnapshot.Reader] {
-        var readers: [String: GatewayStateSnapshot.Reader] = [
+        let readers: [String: GatewayStateSnapshot.Reader] = [
             "gateway": GatewayStateSnapshot.reader(of: self) { try await $0.stateSnapshot() },
             "gateway.signals": GatewayStateSnapshot.reader(of: signals) { try await $0.stateSnapshot() },
         ]
-        if let configured {
-            readers["gateway.scheduler"] = GatewayStateSnapshot.reader(of: configured.actions) {
-                try await $0.stateSnapshot()
-            }
-            readers["gateway.direct"] = GatewayStateSnapshot.reader(of: configured.direct) {
-                try await $0.stateSnapshot()
-            }
-            readers["gateway.resources"] = GatewayStateSnapshot.reader(of: configured.resources) {
-                try await $0.stateSnapshot()
-            }
-        }
         return readers
     }
 
@@ -107,11 +89,16 @@ public struct GatewayObservationAccess: Sendable {
     private var suspensionFailure: (any Error)?
     private var desiredForeground = true
     private var revision: UInt64 = 0
+    private let eventConfiguration: SignalEventConfiguration
     private let onFailure: @Sendable (GatewayFailure) -> Void
-    public init(onFailure: @escaping @Sendable (GatewayFailure) -> Void = { _ in }) {
+    public init(
+        eventConfiguration: SignalEventConfiguration = .standard,
+        onFailure: @escaping @Sendable (GatewayFailure) -> Void = { _ in }
+    ) {
         let admission = GatewayAdmission()
         self.admission = admission
-        self.signals = SignalTransport(admission: admission)
+        self.eventConfiguration = eventConfiguration
+        self.signals = SignalTransport(admission: admission, eventConfiguration: eventConfiguration)
         self.onFailure = onFailure
     }
     public var capabilities: GatewayCapabilities {
@@ -123,12 +110,11 @@ public struct GatewayObservationAccess: Sendable {
         }
     }
     @discardableResult public func configureExecution(
-        _ configuration: GatewayConfiguration,
-        onExecutionSnapshot: (@Sendable (ActionExecutionSnapshot) -> Void)? = nil
+        _ configuration: GatewayConfiguration
     ) throws(GatewayFailure) -> GatewayCapabilities {
         do {
             guard state == .cold else { throw GatewayContainerError.alreadyConfigured }
-            let capabilities = try assemble(configuration, onExecutionSnapshot: onExecutionSnapshot)
+            let capabilities = try assemble(configuration)
             configured = capabilities
             state = .configured
             return capabilities
@@ -138,24 +124,19 @@ public struct GatewayObservationAccess: Sendable {
         }
     }
     private func assemble(
-        _ configuration: GatewayConfiguration, admission supplied: GatewayAdmission? = nil,
-        onExecutionSnapshot: (@Sendable (ActionExecutionSnapshot) -> Void)? = nil
+        _ configuration: GatewayConfiguration, admission supplied: GatewayAdmission? = nil
     ) throws -> GatewayCapabilities {
         let admission = supplied ?? self.admission
-        let signals = supplied == nil ? self.signals : SignalTransport(admission: admission)
-        let validateScope: @Sendable (FunctionInvocation, ExecutionOwner?) async throws -> Void = {
-            try await signals.validateExecution($0, owner: $1)
-        }
-        let resources = try ResourceCoordinator(definitions: configuration.resources, admission: admission)
-        let actions = ChannelScheduler(
-            executor: configuration.executor, resources: resources,
-            admission: admission, validateScope: validateScope, deliverResult: configuration.deliverResult,
-            onExecutionSnapshot: onExecutionSnapshot)
+        let signals =
+            supplied == nil
+            ? self.signals : SignalTransport(admission: admission, eventConfiguration: eventConfiguration)
+        try configuration.engine.bindSignals(
+            ActionSignalBinding(
+                validate: { try await signals.validateExecution($0, owner: $1) },
+                deliver: configuration.deliverResult))
         return GatewayCapabilities(
-            admission: admission, signals: signals, actions: actions,
-            direct: DirectExecutionDispatcher(
-                executor: configuration.executor, resources: resources, admission: admission,
-                validateScope: validateScope), resources: resources)
+            admission: admission, signals: signals,
+            execution: GatewayExecution(engine: configuration.engine, admission: admission))
     }
     fileprivate func openObservationSession(_ configuration: GatewayConfiguration) throws -> GatewayObservationSession {
         try admission.check()
@@ -293,26 +274,10 @@ public struct GatewayObservationAccess: Sendable {
         }
     }
     private nonisolated static func finish(_ ports: GatewayCapabilities) async throws {
-        var errors: [any Error] = []
-        do { try await pause(ports) } catch { errors.append(error) }
-        await ports.actions.shutdown()
-        await ports.direct.shutdown()
         await ports.signals.shutdown()
-        do { try await ports.resources.closeLifecycle(permanently: true) } catch { errors.append(error) }
-        if let primary = errors.first {
-            throw GatewayFailure(
-                operation: "stop", underlying: primary,
-                cleanupErrors: Array(errors.dropFirst()), code: .cleanupFailed)
-        }
     }
     private nonisolated static func pause(_ capabilities: GatewayCapabilities) async throws {
-        async let signals: Void = capabilities.signals.suspend()
-        async let output: Void = capabilities.actions.suspend()
-        async let direct: Void = capabilities.direct.suspend()
-        var failure: (any Error)?
-        do { try await capabilities.resources.closeLifecycle(permanently: false) } catch { failure = error }
-        _ = await (output, direct, signals)
-        if let failure { throw failure }
+        await capabilities.signals.suspend()
     }
     private func failure(_ operation: String, _ error: any Error, code: GatewayFailure.Code? = nil) -> GatewayFailure {
         let value: GatewayFailure

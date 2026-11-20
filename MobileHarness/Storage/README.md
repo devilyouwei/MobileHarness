@@ -79,3 +79,7 @@ Camera photos use the dedicated [Image cache](Cache/README.md#session-image-cach
 Database owns schema assembly and recovery. Assistant and Writer have independent history ports and projections. Their actual model requests retain the full business input and original input, including applicable coordination evidence. Writer delegations have independent execution records. Request preparation and discarded input create no message row.
 
 Model artifacts and transfer indexes are owned entirely by ModelKit. StorageFiles exposes settings, photos and workspaces only; model-selection and download-source preferences remain ordinary application settings.
+
+Signal evidence uses the existing AgentMessageRepository boundary. Database adds receiver-scoped task observation cursors and immutable invocation archives; source sessions are stored when known. Task consumer confirmation and contiguous cursor advancement share a transaction. Existing business histories remain distinct from execution evidence, and older payloads are read under explicit legacy protocol names. See [Agent messages](Database/AgentMessages/README.md#signal-evidence-and-task-cursors).
+
+Schema 20261120 separates source publication (published_at) from consumer acknowledgment (received_at/consumed_at and cursors). Storage exposes bounded owner-scoped recovery reads; the consuming Agent owns replay and subscriptions. It neither waits for consumers on behalf of a producer nor creates subscriptions.

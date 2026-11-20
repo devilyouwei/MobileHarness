@@ -100,7 +100,6 @@ public enum SignalOrigin: String, Codable, Sendable {
 }
 
 public enum InputPayload: Sendable {
-    case communicationReceipt(CommunicationReceipt)
     case text(String)
     case event(String)
     case toolResult(ToolResult)
@@ -112,7 +111,6 @@ public enum InputPayload: Sendable {
     case observation(AgentMessage)
     public var kind: InputKind {
         switch self {
-        case .communicationReceipt: .communicationReceipt
         case .audio: .audio
         case .observation: .observation
         case .image: .image
@@ -179,14 +177,13 @@ public struct InputMetadata: Sendable {
         let contract: String
         var defaultSource = "runtime"
         switch payload {
-        case .communicationReceipt: contract = "runtime.message.receipt"
         case .text:
             contract = "user.text"
             defaultSource = "user"
         case .event: contract = "runtime.event"
-        case .toolResult: contract = "runtime.tool.result"
-        case .actionResult: contract = "runtime.action.result"
-        case .roundResult: contract = "runtime.round.result"
+        case .toolResult: contract = "action.result.v1"
+        case .actionResult: contract = "action.result.v1"
+        case .roundResult: contract = "agent.round.result.v1"
         case .activityEvent: contract = "activity.event"
         case .audio:
             contract = "media.audio"
@@ -201,7 +198,7 @@ public struct InputMetadata: Sendable {
         self.origin = origin
         self.contract = contract
         version = 1
-        self.topic = topic ?? contract
+        self.topic = topic ?? ""
         self.source = source ?? defaultSource
         self.incarnation = incarnation
         self.capturedAt = capturedAt ?? ProcessInfo.processInfo.systemUptime
@@ -215,6 +212,6 @@ public struct InputMetadata: Sendable {
 }
 
 public enum InputKind: String, Codable, Sendable {
-    case communicationReceipt, text, event, toolResult, actionResult, roundResult, activityEvent, audio, image,
+    case text, event, toolResult, actionResult, roundResult, activityEvent, audio, image,
         observation
 }

@@ -2,16 +2,17 @@
 
 ## Ownership and compilation
 
-Support contains mechanisms shared across business domains. Explicit Package.swift source lists preserve three existing compilation targets; directory placement never grants business or role dependencies.
+Support contains mechanisms shared across business domains. Each directory has one responsibility and maps to one compilation target; Package.swift selects sources by directory, and placement never grants business or role dependencies.
 
-| Target / sources | Responsibility and dependencies |
-| --- | --- |
-| [FunctionContracts](Contracts/README.md) | Neutral catalog, invocation, preparation/execution, resource and host ports; Foundation/Synchronization only. |
-| ExecutionRuntime: FunctionRegistry, FunctionExecutor, ActionDeadline, CooperativeExecution, ActionComposition | Canonical function table, validation, cooperative deadlines, composition and report preservation; FunctionContracts only. |
-| CallRuntime: ActionBindingModule, ActionBinding, ActionRegistry, ToolModule, ToolRegistry, ActionExecutor, ToolExecutor | Action/Tool projections over common functions and protocol metadata; FunctionContracts/ExecutionRuntime only. |
-| Actions: ActionMacro | @Action / @ActionCatalog author API; [macro implementation](../../../Macros/BehaviorDefinitions/README.md) emits definitions and pure preflight. |
+| Directory | Target | Responsibility and dependencies |
+| --- | --- | --- |
+| [Contracts](Contracts/README.md) | FunctionContracts | Neutral catalog, invocation, preparation/execution, resource, host and Agent–Action Signal contracts (ExecutionEnvelope, ScheduledAction, ExecutionResult, ActionExecutionEngine); Foundation/Synchronization only. |
+| Function: FunctionRegistry, FunctionExecutor, ActionDeadline, CooperativeExecution, ActionComposition | ExecutionRuntime | Canonical function table, validation, cooperative deadlines, composition and report preservation; FunctionContracts only. |
+| [Shell](Shell/README.md): ActionExecutionCoordinator, DirectExecutionDispatcher; Scheduling, Resources and Results subdirectories | ExecutionRuntime | The execution Shell behind ActionExecutionEngine: Channel scheduling, direct Tool calls, resource arbitration, execution ledgers and result feedback; FunctionContracts only. |
+| Call: ActionBindingModule, ActionBinding, ActionRegistry, ToolModule, ToolRegistry, ActionExecutor, ToolExecutor | CallRuntime | Action/Tool projections over common functions and protocol metadata; FunctionContracts/ExecutionRuntime only. |
+| Call: ActionMacro | Actions | @Action / @ActionCatalog author API; [macro implementation](../../../Macros/BehaviorDefinitions/README.md) emits definitions and pure preflight. |
 
-Actual App execution uses ActionsContainer's port. Gateway does not import these registries/executors or invoke raw handlers. Agents reads neutral metadata and performs cognitive authorization separately. Business-specific services remain in their owning domains.
+Actual App execution uses ActionsContainer's port and the [execution Shell](Shell/README.md) built over it. Gateway reaches the Shell only through the neutral ActionExecutionEngine contract and does not import these registries/executors or invoke raw handlers. Agents reads neutral metadata and performs cognitive authorization separately. Business-specific services remain in their owning domains.
 
 ## Validation and preparation
 
@@ -28,3 +29,11 @@ Call adapters project Action/Tool syntax into the same canonical function implem
 NativeCleanupFailure, neutral outcomes and resource permits live in FunctionContracts. The actual lifecycle owner performs cleanup and preserves errors; these values do not perform retry or device stop. See [ActionsContainer](../README.md) for root bounds/lifetime and [Contracts](Contracts/README.md) for value constraints.
 
 Function value completions are not rejected by a generic byte ceiling. Activity identities, completion kinds and report validity remain checked; consumers select bounded model context separately from actual execution results.
+
+## Function and call mechanisms
+
+[`Function/`](Function/) holds the canonical function table and executor, cooperative deadlines and composition. [`Call/`](Call/) holds the Action/Tool registries, bindings and executors that project common functions into call protocols, plus the ActionMacro author API. Neither owns scheduling, resources or feedback.
+
+## Execution Shell
+
+[Shell](Shell/README.md) is the Actions-owned Shell that runs admitted Agent → Action invocation Signals and returns Action → Agent feedback Signals: Channel scheduling, direct Tool calls, resource arbitration and result feedback. Gateway reaches it only through the neutral ActionExecutionEngine contract in [Contracts](Contracts/README.md).

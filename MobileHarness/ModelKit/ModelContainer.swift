@@ -58,7 +58,7 @@ public protocol ModelVisionProviding: PoseCapability, ModelResourceControlling {
 public protocol ModelArtifactsManaging: Sendable {
     func upsertArtifact(_ artifact: ModelArtifact) async throws
     func prepare() async throws
-    func observeArtifactChanges() async throws -> AsyncStream<UInt64>
+    func observeArtifactChanges() async throws -> ModelKit.StateSignalListener<UInt64>
     func artifactSnapshots() async throws -> [ModelArtifactSnapshot]
     func downloadArtifact(_ id: String, source: ModelDownloadSource) async throws
     func cancelArtifact(_ id: String) async throws
@@ -816,7 +816,7 @@ public final class ModelArtifactsContainer: ModelArtifactsManaging, Sendable {
     private let scope: ModelScope
     fileprivate init(scope: ModelScope) { self.scope = scope }
     public func prepare() async throws { try await scope.perform("artifacts", "prepare", inference: false) { _ in } }
-    public func observeArtifactChanges() async throws -> AsyncStream<UInt64> {
+    public func observeArtifactChanges() async throws -> ModelKit.StateSignalListener<UInt64> {
         try await scope.perform("artifacts", "observe", inference: false) { try await $0.observeArtifactChanges() }
     }
     public func artifactSnapshots() async throws -> [ModelArtifactSnapshot] {

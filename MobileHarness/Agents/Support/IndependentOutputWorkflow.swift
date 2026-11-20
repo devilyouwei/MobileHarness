@@ -490,7 +490,7 @@ actor AgentIslandPublication {
         await worker?.value
         pending = nil
         // Join one final registered end call before producer permissions are retired.
-        // Gateway owns its bounded call deadline; shutdown never starts another retry worker.
+        // The Actions engine owns its bounded call deadline; shutdown never starts another retry worker.
         if touched, let sender {
             revision += 1
             do {

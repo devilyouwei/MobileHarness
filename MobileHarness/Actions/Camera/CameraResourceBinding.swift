@@ -1,36 +1,33 @@
-import Actions
-
 #if os(iOS)
-
+    import ExecutionRuntime
     import FunctionContracts
     import Foundation
-    import Gateway
     import PlatformKit
 
+    /// Camera resource access over the Actions-owned execution engine.
     struct CameraResourceBinding: CameraResourceAccess {
-        let resources: ResourceCoordinator
-        let actions: ChannelScheduler
+        let engine: ActionExecutionCoordinator
         func acquire(resources requested: Set<ResourceID>, owner: ExecutionOwner, duration: Duration) async throws
             -> ResourceLease
         {
-            try await resources.acquire(resources: requested, owner: owner, duration: duration, cancelling: actions)
+            try await engine.acquireLease(resources: requested, owner: owner, duration: duration)
         }
         func run(
             resources requested: Set<ResourceID>, owner: ExecutionOwner, lease: ResourceLease,
-            operation: @escaping @Sendable () async throws -> AsyncThrowingStream<CameraFrame, Error>
-        ) async throws -> AsyncThrowingStream<CameraFrame, Error> {
-            try await resources.run(resources: requested, owner: owner, lease: lease, operation: operation)
+            operation: @escaping @Sendable () async throws -> MediaSignalListener<CameraFrame>
+        ) async throws -> MediaSignalListener<CameraFrame> {
+            try await engine.resources.run(resources: requested, owner: owner, lease: lease, operation: operation)
         }
         func renew(_ lease: ResourceLease, owner: ExecutionOwner, duration: Duration) async throws -> ResourceLease {
-            try await resources.renew(lease, owner: owner, duration: duration)
+            try await engine.renewLease(lease, owner: owner, duration: duration)
         }
         func release(_ lease: ResourceLease, owner: ExecutionOwner) async throws {
-            do { try await resources.release(lease, owner: owner) } catch ResourceError.staleLease {
+            do { try await engine.releaseLease(lease, owner: owner) } catch ResourceError.staleLease {
                 throw CameraResourceFailure.staleLease
             }
         }
         func isSettled(_ resource: ResourceID) async -> Bool {
-            await resources.isSettled(resource)
+            await engine.resources.isSettled(resource)
         }
     }
 #endif

@@ -7,6 +7,7 @@ import ModelKitDefaults
 import PlatformKit
 import Testing
 
+@testable import PlatformKit
 @testable import UI
 
 @Test @MainActor func platformSuspensionAndStopFenceTheRoot() async throws {
@@ -27,8 +28,34 @@ import Testing
     await #expect(throws: PlatformFailure.self) { try await root.setForeground(true) }
 }
 
+@Test @MainActor func platformMemoryWarningsAreRootLifetimeSignalsThatCoalesce() async throws {
+    let center = NotificationCenter()
+    let name = Notification.Name("test.memoryWarning")
+    let root = PlatformContainer(
+        makeConnectivity: { ConnectivityContainer(admission: $0) }, now: { Date() }, timeZone: { .current },
+        memoryWarnings: NativeMemoryWarnings(center: center, name: name), onFailure: { _, _, _ in })
+    #expect(throws: PlatformError.self) { try root.listenMemoryWarnings() }
+    try root.start()
+    let listener = try root.listenMemoryWarnings()
+    #expect(listener.source.producer == "platform.system.memory")
+    root.invalidate()
+    center.post(name: name, object: nil)
+    center.post(name: name, object: nil)
+    var iterator = listener.makeAsyncIterator()
+    #expect(try await iterator.next() != nil)
+    try await root.stop()
+    #expect(try await iterator.next() == nil)
+    #expect(throws: PlatformError.self) { try root.listenMemoryWarnings() }
+    center.post(name: name, object: nil)
+}
+
 private actor UnconfirmedPlatformLink: NexArmBluetoothLink {
-    nonisolated let updates = AsyncStream<NexArmBluetoothSnapshot> { $0.finish() }
+    nonisolated func listenUpdates() throws -> PlatformKit.StateSignalListener<NexArmBluetoothSnapshot> {
+        let broadcast = NativeInputBroadcast<NexArmBluetoothSnapshot>()
+        let listener = try broadcast.listen(.latest, producer: "fixture.bluetooth")
+        broadcast.finish()
+        return listener
+    }
     private(set) var disconnects = 0
     private var holdClose: Bool
     private let unconfirmed: Bool

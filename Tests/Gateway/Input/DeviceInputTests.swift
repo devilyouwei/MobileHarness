@@ -11,8 +11,8 @@ import Testing
 extension LiveRuntimeTests {
     @Test func nativeBroadcastSeparatesSubscribersAndBoundsSlowConsumers() async throws {
         let source = NativeInputBroadcast<Int>()
-        let first = try source.subscribe(.latest)
-        let second = try source.subscribe(.latest)
+        let first = try source.listen(.latest)
+        let second = try source.listen(.latest)
         source.send(1)
         source.send(2)
         var a = first.makeAsyncIterator()
@@ -29,8 +29,8 @@ extension LiveRuntimeTests {
 extension LiveRuntimeTests {
     @Test func nativeOrderedOverflowRetainsAcceptedPacketsAndFailsOnlySlowSubscriber() async throws {
         let source = NativeInputBroadcast<Int>()
-        let ordered = try source.subscribe(.ordered)
-        let latest = try source.subscribe(.latest)
+        let ordered = try source.listen(.ordered)
+        let latest = try source.listen(.latest)
         for value in 0...64 { source.send(value) }
         var packets = ordered.makeAsyncIterator()
         for value in 0..<64 { #expect(try await packets.next() == value) }
@@ -45,18 +45,18 @@ extension LiveRuntimeTests {
 
 @Test func nativeBroadcastRejectsExcessSubscriptionsAndReleasesClosedGeneration() throws {
     let source = NativeInputBroadcast<Int>()
-    let streams = try (0..<16).map { _ in try source.subscribe(.latest) }
+    let streams = try (0..<16).map { _ in try source.listen(.latest) }
     #expect(streams.count == 16)
-    #expect(throws: NativeSubscriptionError.self) { try source.subscribe(.latest) }
+    #expect(throws: NativeSubscriptionError.self) { try source.listen(.latest) }
     source.finish()
-    _ = try source.subscribe(.latest)
+    _ = try source.listen(.latest)
     source.finish()
 }
 
 extension LiveRuntimeTests {
     @Test func nativeBroadcastPropagatesProducerFailureToObservers() async throws {
         let broadcast = NativeInputBroadcast<Int>()
-        var observer = try broadcast.subscribe(.ordered).makeAsyncIterator()
+        var observer = try broadcast.listen(.ordered).makeAsyncIterator()
         broadcast.finish(throwing: NativeSubscriptionError.overflow)
         await #expect(throws: NativeSubscriptionError.self) { _ = try await observer.next() }
     }
@@ -94,12 +94,15 @@ private struct DirectPose: PoseCapability {
 private actor DirectCameraFrames: CameraFrameObserving {
     private var frames = AsyncThrowingStream<CameraFrame, any Error>.makeStream(bufferingPolicy: .bufferingNewest(1))
     private(set) var subscriptions = 0
-    func subscribeFrames() -> AsyncThrowingStream<CameraFrame, any Error> {
+    func listenFrames() -> MediaSignalListener<CameraFrame> {
         if subscriptions > 0 {
             frames = AsyncThrowingStream<CameraFrame, any Error>.makeStream(bufferingPolicy: .bufferingNewest(1))
         }
         subscriptions += 1
-        return frames.stream
+        let current = frames
+        return MediaSignalListener(
+            source: .init(producer: "fixture.camera", generation: UUID().uuidString, delivery: .latest),
+            stream: current.stream, detach: { current.continuation.finish() })
     }
     @discardableResult func send(_ frame: CameraFrame) -> Bool {
         if case .terminated = frames.continuation.yield(frame) { return false }
@@ -198,7 +201,7 @@ extension LiveRuntimeTests {
     ] {
         #expect(contracts[name] == nil)
     }
-    #expect(contracts["vision.pose"] != nil && contracts["runtime.action.result"] != nil)
+    #expect(contracts["perception.vision.pose.v1"] != nil && contracts["action.result.v1"] != nil)
 }
 
 extension LiveRuntimeTests {
@@ -241,4 +244,42 @@ extension LiveRuntimeTests {
         #expect(try await b.next()?.samples == [0.2])
         await #expect(throws: AudioIOError.interrupted) { try await b.next() }
     }
+}
+
+@Test func signalListenerRejectsASecondIteratorAndDetachesItsSource() async throws {
+    let source = NativeInputBroadcast<Int>()
+    let listener = try source.listen(.ordered, producer: "fixture.native")
+    var first = listener.makeAsyncIterator()
+    var duplicate = listener.makeAsyncIterator()
+    await #expect(throws: PlatformKit.SignalListenerError.duplicateConsumer) { try await duplicate.next() }
+    source.send(1)
+    #expect(try await first.next() == 1)
+    await listener.cancel()
+    await listener.join()
+    source.send(2)
+    #expect(try await first.next() == nil)
+    let restored = try (0..<16).map { _ in try source.listen(.latest) }
+    #expect(restored.count == 16)
+    #expect(throws: NativeSubscriptionError.capacityExceeded) { try source.listen(.latest) }
+    source.finish()
+}
+
+@Test func sensorSignalListenerPreservesUnitsRangeValidityAndMissingValues() async throws {
+    typealias Reading = SensorMeasurement<Float>
+    let source = NativeInputBroadcast<Reading>()
+    let listener = SensorSignalListener(try source.listen(.latest, producer: "fixture.temperature"))
+    let missing = try Reading(
+        value: nil, unit: "degC", sampledAt: .now, validity: .unavailable,
+        range: .init(lower: -40, upper: 125), samplingFrequency: 10, calibrationID: "fixture-calibration")
+    source.send(missing)
+    var values = listener.makeAsyncIterator()
+    let value = try #require(try await values.next())
+    #expect(value.value == nil && value.validity == .unavailable)
+    #expect(value.unit == "degC" && value.range?.upper == 125 && value.samplingFrequency == 10)
+    #expect(throws: PlatformKit.SignalListenerError.invalidMeasurement) {
+        try Reading(value: nil, unit: "degC", sampledAt: .now, validity: .valid)
+    }
+    await listener.cancel()
+    await listener.join()
+    #expect(try await values.next() == nil)
 }

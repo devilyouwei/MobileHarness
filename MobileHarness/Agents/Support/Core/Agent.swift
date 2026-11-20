@@ -3,6 +3,8 @@ import Foundation
 public protocol Agent: Actor {
     nonisolated var descriptor: AgentDescriptor { get }
     nonisolated var outputs: AsyncStream<OutputEnvelope> { get }
+    func receiveRequest(_ request: AgentProtocolRequest) async throws -> AgentRequestReply
+    func bindMessaging(_ messaging: AgentMessaging) async throws
     func start() async throws
     func pause() async throws
     func resume() async throws
@@ -16,5 +18,9 @@ public protocol Agent: Actor {
 }
 
 extension Agent {
+    public func receiveRequest(_ request: AgentProtocolRequest) async throws -> AgentRequestReply {
+        throw CommunicationError.unsupportedContract
+    }
+    public func bindMessaging(_ messaging: AgentMessaging) async {}
     public func effectiveCapabilities(for roundID: String) async throws -> CapabilityRegistry? { nil }
 }

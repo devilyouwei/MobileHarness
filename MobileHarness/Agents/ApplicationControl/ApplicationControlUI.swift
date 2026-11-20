@@ -29,7 +29,13 @@ extension ApplicationControlAgent {
                         }
                     } catch { if !Task.isCancelled { observationFailure(error) } }
                 }
-                uiInputs.append(AgentUISubscription(task: task, close: {}))
+                uiInputs.append(
+                    AgentUISubscription(
+                        task: task,
+                        close: {
+                            await stream.cancel()
+                            await stream.join()
+                        }))
             }
             await setResourceObservationForeground(true)
             if let uiDiagnostics {

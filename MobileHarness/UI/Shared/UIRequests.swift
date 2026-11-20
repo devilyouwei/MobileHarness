@@ -43,10 +43,14 @@ public enum UIRequestError: Error, Sendable, Equatable {
     private var available = false
     private var stopped = false
     private let controlOnly: Bool
+    private let producer: String
     public var outstanding: Int { pending.count }
     public var acceptedCount: Int { pending.values.filter(\.accepted).count }
-    public init(controlOnly: Bool = false) { self.controlOnly = controlOnly }
-    public func listen() throws -> AsyncThrowingStream<UIRequest<Value, Reply>, any Error> {
+    public init(producer: String = "ui.requests", controlOnly: Bool = false) {
+        self.producer = producer
+        self.controlOnly = controlOnly
+    }
+    public func listen() throws -> RequestSignalListener<Value, Reply> {
         guard !stopped else { throw UIRequestError.unavailable }
         guard consumer == nil else { throw UIRequestError.duplicateConsumer }
         let id = UUID()
@@ -57,16 +61,20 @@ public enum UIRequestError: Error, Sendable, Equatable {
         pair.continuation.onTermination = { [weak self] _ in
             Task { @MainActor in self?.disconnect(id) }
         }
-        return pair.stream
+        return RequestSignalListener(
+            producer: producer, capacity: 64, stream: pair.stream,
+            detach: { [weak self] in await self?.stopListening(token: id) })
     }
-    public func listenControls() throws -> AsyncThrowingStream<UIRequest<Value, Reply>, any Error> {
+    public func listenControls() throws -> RequestSignalListener<Value, Reply> {
         guard !stopped, let id = consumerID else { throw UIRequestError.unavailable }
         guard controlConsumer == nil else { throw UIRequestError.duplicateConsumer }
         let pair = AsyncThrowingStream<UIRequest<Value, Reply>, any Error>.makeStream(
             bufferingPolicy: .bufferingOldest(1))
         controlConsumer = pair.continuation
         pair.continuation.onTermination = { [weak self] _ in Task { @MainActor in self?.disconnect(id) } }
-        return pair.stream
+        return RequestSignalListener(
+            producer: producer + ".control", capacity: 1, stream: pair.stream,
+            detach: { [weak self] in await self?.stopListening(token: id) })
     }
     public func stopListening() {
         guard let id = consumerID else { return }

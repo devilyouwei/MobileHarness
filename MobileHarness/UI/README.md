@@ -138,3 +138,5 @@ Conversation 将用户字幕固定上方、助手字幕固定下方，不随定�
 The Speech Recognition settings page exposes stepped onset-window and probability sliders via injected model-resource controls. UI owns only the editable values and feedback; see [Settings](Settings/README.md).
 
 Speech Recognition presents the optional DeepFilterNet3 artifact and independent denoising control through existing resource requests. UI owns drafts/presentation, while Actions validates and persists installed-model requirements; it does not run audio inference.
+
+Typed external request and fact subscriptions use UI-owned [SignalListener](Shared/README.md#ui-owned-signallistener). UI owns producer identity, request receipt, bound and generation. The injected Agent owns the consumer and joined business processing. UI page lifetime does not own long-running work.

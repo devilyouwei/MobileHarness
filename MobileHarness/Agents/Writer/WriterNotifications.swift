@@ -5,7 +5,7 @@ import StorageTasks
 
 /// Durable task reports have a lifetime independent of creative work and execution grants.
 actor WriterNotifications {
-    typealias Sender = @Sendable (AgentTaskResponse) async throws -> DeliveryReport
+    typealias Sender = @Sendable (AgentTaskResponse) async throws -> Void
     typealias Retirement = @Sendable (AgentTaskSignal) async throws -> Void
     private let communications: any AgentMessageRepository
     private let executions: any WriterExecutionRepository
@@ -97,10 +97,8 @@ actor WriterNotifications {
                             failure = nil
                         } else {
                             guard let sender else { throw CommunicationError.unavailableTarget }
-                            let delivery = try await sender(report)
-                            failure =
-                                delivery.failure ?? delivery.rejected[.assistant]
-                                ?? (delivery.delivered.contains(.assistant) ? nil : "Assistant unavailable")
+                            try await sender(report)
+                            failure = nil
                         }
                         try await executions.finishDelegationNotification(
                             row.delegateID, agent: "writer", retirement: retirement,

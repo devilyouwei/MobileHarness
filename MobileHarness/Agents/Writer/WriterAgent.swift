@@ -249,9 +249,39 @@ public actor WriterAgent: Agent {
                     ?? .unknown,
             ])
     }
+    public func receiveRequest(_ request: AgentProtocolRequest) async throws -> AgentRequestReply {
+        let input = request.input
+        guard case .observation(let message) = input.payload, message.operation == request.operation else {
+            throw CommunicationError.invalidPayload
+        }
+        if let query = message.content(as: AgentTaskQuery.self) {
+            guard query.scope.executor == .writer, query.scope.sessionID == input.sessionID,
+                query.scope.requester.rawValue == input.metadata.source,
+                let original = try await communications.agentMessage(query.scope.id),
+                original.sender == input.metadata.source, original.receiver == "writer",
+                original.sourceSessionID == query.scope.sessionID
+            else { throw CommunicationError.unauthorized }
+            let reference = original.replyTo ?? original.id
+            if request.operation == .status {
+                let status = try await executions.requestStatus(reference, agent: "writer")
+                return AgentRequestReply(requestID: input.id, reference: reference, state: status ?? "messageAdmitted")
+            }
+            guard request.operation == .cancel, let originalInput = inputs[reference],
+                let scope = originalInput.taskScope, scope.requester == query.scope.requester,
+                scope.executor == query.scope.executor, scope.sessionID == query.scope.sessionID
+            else { throw CommunicationError.scopeClosed }
+            try await acceptCancellation(input.id, scope: scope, reason: query.reason ?? "Task cancelled")
+            return AgentRequestReply(requestID: input.id, reference: reference, state: "cancelling")
+        }
+        guard [.submit, .update, .answer].contains(request.operation) else {
+            throw CommunicationError.unsupportedContract
+        }
+        try await receive(input)
+        return AgentRequestReply(requestID: input.id, reference: input.id, state: "messageAdmitted")
+    }
     public func receive(_ input: AgentInput) async throws {
         guard case .observation(let message) = input.payload, input.metadata.origin == .agent,
-            input.metadata.source == AgentID.assistant.rawValue, input.metadata.incarnation != nil
+            !input.metadata.source.isEmpty, input.metadata.incarnation != nil
         else { throw CommunicationError.unauthorized }
         guard let content = message.content(as: AgentTaskRequest.self)
         else { throw CommunicationError.unsupportedContract }
@@ -317,7 +347,8 @@ public actor WriterAgent: Agent {
         guard try await !communications.isAgentMessageConsumed(content.id) else { return }
         let explicitStop = Self.isExplicitStopMessage(content.text)
         if let active = inputs.values.first, let scope = active.taskScope {
-            guard scope.sessionID == input.sessionID, let request = requests[scope.id]
+            guard scope.sessionID == input.sessionID, scope.requester.rawValue == input.metadata.source,
+                let request = requests[scope.id]
             else { throw WriterToolFailure("Writer is working on another assignment.") }
             guard !cancelling.contains(scope.id), cancellationAdmissions[scope.id] == nil,
                 !finalizing.contains(scope.id)
@@ -325,10 +356,12 @@ public actor WriterAgent: Agent {
             let question = waiting[scope.id]
             let direction: WriterInboxIntent
             if let replyTo = content.replyTo {
-                guard replyTo == scope.id, content.interactionID == question
+                guard replyTo == scope.id, content.operation == .update || content.interactionID == question
                 else { throw WriterToolFailure("That question has closed. Send your request again.") }
             }
-            if explicitStop {
+            if content.operation == .update || content.operation == .answer {
+                direction = .followUp
+            } else if explicitStop {
                 direction = .stop
             } else {
                 let held = models[scope.id]
@@ -362,7 +395,8 @@ public actor WriterAgent: Agent {
         else { throw WriterToolFailure("This Writer assignment has ended.") }
         guard let consumer else { throw WriterFailure.unavailable }
         let scope = AgentTaskScope(
-            id: input.id, requester: .assistant, executor: .writer, sessionID: input.sessionID, execution: .background)
+            id: input.id, requester: AgentID(rawValue: input.metadata.source), executor: .writer,
+            sessionID: input.sessionID, execution: .background)
         try Task.checkCancellation()
         guard lifecycle == .running else { throw CancellationError() }
         let release = try await consumer.authorizeReceivedTask(scope, input)
@@ -1137,7 +1171,7 @@ public actor WriterAgent: Agent {
         let output = OutputEnvelope(
             source: .writer, context: input.context, output: .toolCall(call), sequence: sequence,
             taskScope: input.taskScope)
-        let result = try await consumer.executeReturning(output)
+        let result = try await consumer.executeDirect(output)
         if result.isCancellationOnly { throw CancellationError() }
         guard !result.isError, let response = result.tool else {
             var details = ["tool": path]
@@ -1337,10 +1371,7 @@ public actor WriterAgent: Agent {
         let content = pending.content
         let scope = pending.scope
         let report = try AgentTaskResponse(content.signal(.progress, scope: scope))
-        let delivered = try await messaging.sendResult(report.message, parent: pending.input, to: .assistant)
-        guard delivered.failure == nil, delivered.rejected.isEmpty, delivered.delivered.contains(.assistant) else {
-            throw WriterToolFailure(delivered.rejected[.assistant] ?? delivered.failure ?? "Assistant unavailable")
-        }
+        try await messaging.publish(report.message, parent: pending.input)
     }
     private func presentIsland(_ operation: String, parameters: [String: String], sessionID: String) async throws {
         guard let consumer else { throw WriterFailure.unavailable }
@@ -1355,11 +1386,24 @@ public actor WriterAgent: Agent {
             throw WriterToolFailure(result.failure ?? "Island presentation rejected", context: ["tool": call.toolPath])
         }
     }
-    private func sendReport(_ report: AgentTaskResponse) async throws -> DeliveryReport {
+    private func sendReport(_ report: AgentTaskResponse) async throws {
         guard let messaging, let sessionID = report.signal?.scope.sessionID ?? report.rejection?.sessionID
         else { throw WriterFailure.unavailable }
         let message = report.message
-        let parent = AgentInput(id: UUID().uuidString, sessionID: sessionID, payload: .observation(message))
-        return try await messaging.sendResult(message, parent: parent, to: .assistant)
+        let parent = AgentInput(
+            id: report.signal?.scope.id ?? report.rejection?.messageID ?? UUID().uuidString, sessionID: sessionID,
+            payload: .observation(message))
+        let reference: String
+        if let signal = report.signal {
+            reference = signal.scope.id
+        } else if let rejection = report.rejection,
+            let original = try await communications.agentMessage(rejection.messageID)
+        {
+            reference = original.correlationID
+        } else {
+            throw CommunicationError.unauthorized
+        }
+        try await messaging.publish(
+            report.publication(scope: reference), parent: parent)
     }
 }

@@ -40,7 +40,6 @@
         let workspaces: @Sendable () throws -> any WorkspaceRepository
         let media: @Sendable () throws -> any MediaRepository
         let devices: @Sendable () throws -> any DeviceRepository
-        let makeCameraRuntime: @MainActor () throws -> CameraRuntimeDependencies
         let connectVision: @MainActor (String, Bool, any CameraOutputHandling) async throws -> Void
         public init(
             files: FilesContainer, cache: CacheContainer = CacheContainer(), model: ModelContainer,
@@ -49,7 +48,6 @@
             workspaces: @escaping @Sendable () throws -> any WorkspaceRepository,
             media: @escaping @Sendable () throws -> any MediaRepository,
             devices: @escaping @Sendable () throws -> any DeviceRepository,
-            makeCameraRuntime: @escaping @MainActor () throws -> CameraRuntimeDependencies,
             connectVision: @escaping @MainActor (String, Bool, any CameraOutputHandling) async throws -> Void
         ) {
             self.cache = cache
@@ -61,7 +59,6 @@
             self.workspaces = workspaces
             self.media = media
             self.devices = devices
-            self.makeCameraRuntime = makeCameraRuntime
             self.connectVision = connectVision
         }
     }
@@ -121,7 +118,6 @@
         public let decisionStatus: @MainActor @Sendable (String) -> Void
         public let decisionConfiguration:
             (@Sendable () async throws -> (String?, (@Sendable () async throws -> ChatModel)?))?
-        public let executor: ActionsExecutionPort
         public let catalog: ActionCatalogSnapshot
         public let settings: any ProviderSettingsStaging
         public let discovery: any ProviderDiscoveryStaging
@@ -129,14 +125,10 @@
         public let tasks: any TaskControlBinding
         public let resources: [ResourceDefinition]
         public let connectionFacts:
-            @MainActor @Sendable () throws -> AsyncThrowingStream<NexArmConnectionFacts, any Error>
+            @MainActor @Sendable () throws -> PlatformKit.StateSignalListener<NexArmConnectionFacts>
         public let trackingAvailable: @Sendable () async -> Bool
         public let bindTracking: @MainActor (@escaping @Sendable () async -> Bool) -> Void
         public let bindDeferredFailure: @MainActor (@escaping @Sendable (DeferredActionFailure) async -> Bool) -> Void
-        public let bindResourceRun:
-            @MainActor (
-                @escaping @Sendable (Set<ResourceID>, @escaping @Sendable () async throws -> Void) async throws -> Void
-            ) -> Void
         public let observeTranscript: @MainActor @Sendable (String, String) throws -> Void
         public let output: @Sendable (ActionOutputObservation) async -> Void
         public let speechEnhancementEnabled: @Sendable () async throws -> Bool
@@ -144,7 +136,7 @@
         public let decodeResources: @Sendable (String) throws -> ModelResourceViewSnapshot
         public let makeVoice: @MainActor (ActionsVoiceHost) throws -> ActionsVoiceExecution
         public init(
-            executor: ActionsExecutionPort, catalog: ActionCatalogSnapshot,
+            catalog: ActionCatalogSnapshot,
             readWebScreenshot: @escaping @Sendable (String) async throws -> MultimodalContextSnapshot,
             artifactStreaming: (any ArtifactStreaming)? = nil,
             writerArtifacts: (any WriterArtifactsControlling)? = nil,
@@ -159,16 +151,11 @@
             providerPresentation: any ProviderPresentationRegistering, tasks: any TaskControlBinding,
             resources: [ResourceDefinition],
             connectionFacts:
-                @escaping @MainActor @Sendable () throws -> AsyncThrowingStream<NexArmConnectionFacts, any Error>,
+                @escaping @MainActor @Sendable () throws -> PlatformKit.StateSignalListener<NexArmConnectionFacts>,
             trackingAvailable: @escaping @Sendable () async -> Bool,
             bindTracking: @escaping @MainActor (@escaping @Sendable () async -> Bool) -> Void,
             bindDeferredFailure:
                 @escaping @MainActor (@escaping @Sendable (DeferredActionFailure) async -> Bool) -> Void,
-            bindResourceRun:
-                @escaping @MainActor (
-                    @escaping @Sendable (Set<ResourceID>, @escaping @Sendable () async throws -> Void) async throws ->
-                        Void
-                ) -> Void,
             observeTranscript: @escaping @MainActor @Sendable (String, String) throws -> Void,
             output: @escaping @Sendable (ActionOutputObservation) async -> Void,
             speechEnhancementEnabled: @escaping @Sendable () async throws -> Bool = { false },
@@ -183,7 +170,6 @@
             self.decisionConfiguration = decisionConfiguration
             self.decisionStatus = decisionStatus
             self.inputQueueStatus = inputQueueStatus
-            self.executor = executor
             self.catalog = catalog
             self.settings = settings
             self.discovery = discovery
@@ -194,7 +180,6 @@
             self.trackingAvailable = trackingAvailable
             self.bindTracking = bindTracking
             self.bindDeferredFailure = bindDeferredFailure
-            self.bindResourceRun = bindResourceRun
             self.observeTranscript = observeTranscript
             self.output = output
             self.speechEnhancementEnabled = speechEnhancementEnabled

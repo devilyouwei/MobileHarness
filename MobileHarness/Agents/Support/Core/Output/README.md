@@ -18,7 +18,7 @@ flowchart LR
 | --- | --- |
 | [AgentOutput.swift](AgentOutput.swift) | OutputKind, ActionCall, ToolCall, unified output, bounded failure diagnostic and round acknowledgment. |
 | [OutputEnvelope.swift](OutputEnvelope.swift) | Producer/processing/round identity, private execution resources and ExecutionOwner's AgentID adapter. |
-| [CommunicationAction.swift](CommunicationAction.swift) | Role communication intent, admission receipt and bounded receipt correlation. |
+| [CommunicationAction.swift](CommunicationAction.swift) | Role communication intent and direct request-reply projection. |
 | [AgentOutputMailbox.swift](AgentOutputMailbox.swift) | Shared-capacity discrete output and explicit latest-state replacement. |
 | [ActionResult.swift](ActionResult.swift) | Cognitive completion, causal evidence, Action feedback and activity events. |
 | [ToolResult.swift](ToolResult.swift) | Native Tool value, failure code and reasoning-continuation evidence. |
@@ -30,7 +30,7 @@ flowchart LR
     Calls["Action / Tool / communication / control"] --> Envelope
     Context["ProcessingContext + explicit authorization"] --> Envelope
     Envelope --> Mailbox
-    Results["Action / Tool / round / receipt"] --> Evidence["Reports and passive snapshots"]
+    Results["Action / Tool / round"] --> Evidence["Reports and passive snapshots"]
 ```
 
 ## Calls and causality
@@ -41,14 +41,15 @@ OutputEnvelope retains input/session/task/turn, root/parent/hops, round/call and
 
 ## Completion and failure
 
-ActionResult, ToolResult, GenerationRoundResult and CommunicationReceipt use runtime.action.result, runtime.tool.result, runtime.round.result and runtime.message.receipt. A send receipt establishes target admission; publish has no receipt. Sealing a round does not finish a reply. Completion values are not truncated or rejected by a delivery-byte quota; model projections are caller-owned.
+ActionResult and ToolResult use action.result.v1; GenerationRoundResult uses agent.round.result.v1. Direct Agent requests return AgentRequestReply without a receipt input. Publish confirms bounded admission only. Sealing a round does not finish a reply. Completion values are not truncated or rejected by a delivery-byte quota; model projections are caller-owned.
 
 AgentActionReport permits at most 256 entries, paths up to 128 bytes, codes of 1–64 bytes and at most 16 detail keys per entry (keys up to 64 bytes, values up to 512). Partial success, failure, timeout and cancellation remain distinct. Explicit values, including an empty string, are business output. Reports/completed/activity handles are completion evidence; real failures may permit continuation, pure cancellation does not. Tool results without completion retain value semantics; Action results normalize missing completion to completed.
 
 AgentFailureDiagnostic bounds code to 64 bytes and detail to 2,048 characters. Passive observations neither trigger inference nor acknowledge delivery. Neutral execution snapshots retain identity, address, phase, completion and bounded failure evidence, without media attachments.
 
-## Mailbox and receipts
+## Mailbox and completion
 
 The mailbox has one shared capacity. Discrete entries cannot be replaced. An explicit same-key latest state may replace a pending state and returns the displaced item; a new key at capacity fails. Terminal closure retains admitted discrete work and can replace pending state. Roles own replacement keys and displaced-call settlement.
 
-CommunicationReceipts has at most 16 correlation slots. Evidence is committed before acknowledgment; commit failure closes the slot and wakes the waiter with the real error. Repeated submission cannot convert failure into success. Resource permits require execution-owner validation and do not establish device health or physical safety.
+
+ActionResult/ToolResult retain the immutable ActionInvocationSnapshot captured before dispatch. Function identity and original string arguments survive success and failure, including empty values and absent optional keys. Inputs are limited to 4 MiB; snapshots above 128 KiB are archived before effects and stored as references. Live memory retains original arguments; replay resolves immutable evidence through Storage. Legacy results with no invocation remain unknown. executeDirect has the caller as its sole cognitive consumer and does not enter the inbox. Existing multi-step UI workflows use executeReturning: their paired ToolResult is the sole cognitive input; the returned value only projects the UI response.

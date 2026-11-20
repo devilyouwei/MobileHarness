@@ -36,7 +36,6 @@ MobileHarness/Resources/Models/*/
 
 # Reproducible Mac model test assets, environments and output.
 /experiments/decision/benchmark/.local/
-/Tests/ModelKit/Language/Gemma4/.local/
 
 # Shared local model artifacts, grouped by model.
 /Models/*/

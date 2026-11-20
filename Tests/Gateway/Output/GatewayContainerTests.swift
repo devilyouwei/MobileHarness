@@ -3,6 +3,7 @@ import AgentCore
 import AppLifecycle
 import AppStorage
 import CallRuntime
+import ExecutionRuntime
 import Foundation
 import FunctionContracts
 import Testing
@@ -29,12 +30,12 @@ private actor GatewayCounter {
     func increment() { count += 1 }
 }
 private let gatewayPath = ActionIdentifier(domain: "Fixture", module: "Execution", function: "perform")
-private let gatewayResource = ResourceID(rawValue: "fixture.writer")
 private enum GatewayTestError: Error { case cleanup }
 private struct GatewayFixtureModule: CapabilityModule { let definitions: [ActionFunction] }
 
 @MainActor private struct GatewayHarness {
     let actions: ActionsContainer
+    let engine: ActionExecutionCoordinator
     let root: GatewayContainer
     let ports: GatewayCapabilities
     init(resources: [ResourceDefinition] = [], handler: @escaping ActionHandler = { _ in }) async throws {
@@ -47,11 +48,13 @@ private struct GatewayFixtureModule: CapabilityModule { let definitions: [Action
                         handler: handler)
                 ])
             ]))
+        let engine = try actions.configureExecution(resources: resources)
         try actions.start()
         let root = GatewayContainer()
-        self.ports = try root.configureExecution(.init(executor: actions.execution, resources: resources))
+        self.ports = try root.configureExecution(.init(engine: engine))
         _ = try await ports.signals.register(address: "producer", incarnation: "generation") { _ in }
         self.actions = actions
+        self.engine = engine
         self.root = root
     }
     func stop() async throws {
@@ -82,10 +85,10 @@ private func gatewaySignal(id: String = UUID().uuidString, cleanup: Bool = false
 @Test(.actionCatalog) @MainActor func gatewayAcceptsOnlyOneConfigurationAndCachedPortsClose() async throws {
     let harness = try await GatewayHarness()
     #expect(throws: GatewayFailure.self) {
-        try harness.root.configureExecution(.init(executor: harness.actions.execution))
+        try harness.root.configureExecution(.init(engine: harness.engine))
     }
     await #expect(throws: GatewayContainerError.self) {
-        try await harness.ports.actions.enqueue(invocation: gatewayJob())
+        try await harness.ports.execution.enqueue(invocation: gatewayJob())
     }
     async let one: Void = harness.root.start()
     async let two: Void = harness.root.start()
@@ -94,17 +97,15 @@ private func gatewaySignal(id: String = UUID().uuidString, cleanup: Bool = false
     async let closeTwo: Void = harness.root.stop()
     _ = try await (closeOne, closeTwo)
     #expect(harness.root.state == .stopped)
-    await #expect(throws: Error.self) { try await harness.ports.actions.enqueue(invocation: gatewayJob()) }
+    await #expect(throws: Error.self) { try await harness.ports.execution.enqueue(invocation: gatewayJob()) }
     try await harness.actions.stop()
 }
 
 @Test(.actionCatalog) @MainActor func gatewayConfigurationFailureDoesNotPublishPorts() async throws {
     let harness = try await GatewayHarness()
     let root = GatewayContainer()
-    let definition = ResourceDefinition(id: gatewayResource, allowedOwners: Set<String>()) {}
-    #expect(throws: GatewayFailure.self) {
-        try root.configureExecution(.init(executor: harness.actions.execution, resources: [definition, definition]))
-    }
+    // An engine serves one Signal root; a second binding fails without publishing ports.
+    #expect(throws: GatewayFailure.self) { try root.configureExecution(.init(engine: harness.engine)) }
     #expect(root.state == .failed && !root.isAvailable)
     #expect(throws: GatewayFailure.self) { _ = try root.capabilities }
     try await root.stop()
@@ -164,93 +165,14 @@ private func gatewaySignal(id: String = UUID().uuidString, cleanup: Bool = false
             source: endpoint, target: endpoint, envelope: gatewaySignal(), payload: "data")
     }
     await #expect(throws: GatewayContainerError.self) {
-        try await harness.ports.actions.enqueue(invocation: gatewayJob())
+        try await harness.ports.execution.enqueue(invocation: gatewayJob())
     }
     try await harness.root.setForeground(true)
     try await harness.ports.signals.send(source: endpoint, target: endpoint, envelope: gatewaySignal(), payload: "data")
     let job = try gatewayJob()
-    try await harness.ports.actions.enqueue(invocation: job)
-    try await harness.ports.actions.finish(inputID: job.envelope.schedulingID, source: job.envelope.source)
+    try await harness.ports.execution.enqueue(invocation: job)
+    try await harness.ports.execution.finish(inputID: job.envelope.schedulingID, source: job.envelope.source)
     #expect(await count.count == 1)
-    try await harness.stop()
-}
-
-@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor func gatewayPauseJoinsResourceCleanupBeforeResume()
-    async throws
-{
-    let started = GatewayTestGate()
-    let stopping = GatewayTestGate()
-    let release = GatewayTestGate()
-    let harness = try await GatewayHarness(resources: [
-        ResourceDefinition(id: gatewayResource, allowedOwners: Set<String>()) {
-            await stopping.release()
-            await release.wait()
-        }
-    ])
-    try await harness.root.start()
-    let worker = Task {
-        try await harness.ports.resources.run(resources: [gatewayResource], owner: nil, lease: nil) {
-            await started.release()
-            try await Task.sleep(for: .seconds(30))
-        }
-    }
-    await started.wait()
-    harness.root.invalidate()
-    await stopping.wait()
-    let resume = Task { try await harness.root.setForeground(true) }
-    #expect(!harness.root.isAvailable)
-    await release.release()
-    try await resume.value
-    _ = await worker.result
-    #expect(harness.root.isAvailable)
-    #expect(await harness.ports.resources.snapshot()[gatewayResource] == .unlocked)
-    try await harness.stop()
-}
-
-@Test(.actionCatalog) @MainActor func gatewayRetainsCleanupFailureAcrossRepeatedStop() async throws {
-    let started = GatewayTestGate()
-    let harness = try await GatewayHarness(resources: [
-        ResourceDefinition(id: gatewayResource, allowedOwners: Set<String>()) {
-            throw GatewayTestError.cleanup
-        }
-    ])
-    try await harness.root.start()
-    let worker = Task {
-        try await harness.ports.resources.run(resources: [gatewayResource], owner: nil, lease: nil) {
-            await started.release()
-            try await Task.sleep(for: .seconds(30))
-        }
-    }
-    await started.wait()
-    harness.root.invalidate()
-    await #expect(throws: GatewayFailure.self) { try await harness.root.setForeground(true) }
-    await #expect(throws: GatewayFailure.self) { try await harness.root.stop() }
-    await #expect(throws: GatewayFailure.self) { try await harness.root.stop() }
-    _ = await worker.result
-    try await harness.actions.stop()
-}
-
-@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor func gatewayPauseJoinsAcceptedActionCleanup() async throws {
-    let started = GatewayTestGate()
-    let cleaning = GatewayTestGate()
-    let release = GatewayTestGate()
-    let harness = try await GatewayHarness { _ in
-        await started.release()
-        do { try await Task.sleep(for: .seconds(30)) } catch {
-            await cleaning.release()
-            await release.wait()
-            throw error
-        }
-    }
-    try await harness.root.start()
-    try await harness.ports.actions.enqueue(invocation: gatewayJob())
-    await started.wait()
-    harness.root.invalidate()
-    await cleaning.wait()
-    let resume = Task { try await harness.root.setForeground(true) }
-    #expect(!harness.root.isAvailable)
-    await release.release()
-    try await resume.value
     try await harness.stop()
 }
 
@@ -285,7 +207,7 @@ private func gatewaySignal(id: String = UUID().uuidString, cleanup: Bool = false
 @Test(.actionCatalog) @MainActor func gatewayObservationScopesAreBoundedIsolatedAndRootOwned() async throws {
     let harness = try await GatewayHarness()
     try await harness.root.start()
-    let configuration = GatewayConfiguration(executor: harness.actions.execution)
+    let configuration = GatewayConfiguration(engine: DetachedActionExecution())
     let first = try harness.root.observations.open(configuration: configuration)
     #expect(throws: Error.self) { try harness.root.observations.open(configuration: configuration) }
     #expect(first.capabilities.signals !== harness.ports.signals)
@@ -326,70 +248,412 @@ private func gatewaySignal(id: String = UUID().uuidString, cleanup: Bool = false
     try await harness.root.start()
     await harness.ports.signals.unregister(address: "producer", incarnation: "generation")
     await #expect(throws: SignalTransportError.staleEndpoint) {
-        try await harness.ports.actions.enqueue(invocation: gatewayJob())
+        try await harness.ports.execution.enqueue(invocation: gatewayJob())
     }
     _ = try await harness.ports.signals.register(address: "producer", incarnation: "replacement") { _ in }
     await #expect(throws: SignalTransportError.staleEndpoint) {
-        try await harness.ports.actions.enqueue(invocation: gatewayJob())
+        try await harness.ports.execution.enqueue(invocation: gatewayJob())
     }
     #expect(await count.count == 0)
     try await harness.stop()
 }
 
-@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor func gatewayStopJoinsInProgressPreparation() async throws {
-    let harness = try await GatewayHarness()
-    let live = harness.actions.execution
-    let started = GatewayTestGate()
+@Test(.actionCatalog) @MainActor func gatewaySignalCleanupRetainsCapacityUnderOrdinaryLoad() async throws {
+    let transport = SignalTransport()
+    let entered = GatewayTestGate()
     let release = GatewayTestGate()
-    let prepared = ActionsExecutionPort(
-        catalog: live.catalog,
-        prepare: { input, syntax in
-            await started.release()
+    let endpoint = try await transport.register(address: "receiver", incarnation: "one") { signal in
+        if !signal.envelope.cleanup {
+            await entered.release()
             await release.wait()
-            return try await live.prepare(input, syntax)
-        }, execute: live.execute, discard: live.discard)
-    let root = GatewayContainer()
-    let ports = try root.configureExecution(.init(executor: prepared))
-    _ = try await ports.signals.register(address: "producer", incarnation: "generation") { _ in }
-    try await root.start()
-    let admission = Task { try await ports.actions.enqueue(invocation: gatewayJob()) }
-    await started.wait()
-    let stopping = Task { try await root.stop() }
-    while root.state != .stopping { await Task.yield() }
-    #expect(root.state == .stopping)
+        }
+    }
+    let ordinary = Task {
+        try await transport.send(
+            source: nil, target: endpoint,
+            envelope: .init(id: "large", sessionID: "session", contract: "fixture.data", payloadBytes: 7936 * 1024),
+            payload: 1)
+    }
+    await entered.wait()
+    await #expect(throws: SignalTransportError.capacityExceeded) {
+        try await transport.send(source: nil, target: endpoint, envelope: gatewaySignal(), payload: 1)
+    }
+    try await transport.send(source: nil, target: endpoint, envelope: gatewaySignal(cleanup: true), payload: 1)
+    await #expect(throws: SignalTransportError.capacityExceeded) {
+        try await transport.send(
+            source: nil, target: endpoint,
+            envelope: .init(
+                id: "oversized", sessionID: "session", contract: "fixture.data",
+                payloadBytes: 256 * 1024 + 1, cleanup: true), payload: 1)
+    }
     await release.release()
-    try await stopping.value
-    await #expect(throws: (any Error).self) { try await admission.value }
-    #expect(root.state == .stopped)
-    try await harness.stop()
+    try await ordinary.value
+    await transport.shutdown()
 }
 
-@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor func gatewayReservesChannelCapacityBeforePreparation()
-    async throws
+@Test(.actionCatalog) @MainActor func gatewaySignalReplacementRejectsOldCompletionAndPreservesFailure() async throws {
+    for replaceSource in [true, false] {
+        for fails in [true, false] {
+            let transport = SignalTransport()
+            let entered = GatewayTestGate()
+            let release = GatewayTestGate()
+            let source = try await transport.register(address: "source", incarnation: "one") { _ in }
+            let target = try await transport.register(address: "target", incarnation: "one") { _ in
+                await entered.release()
+                await release.wait()
+                if fails { throw GatewayTestError.cleanup }
+            }
+            let pending = Task {
+                try await transport.send(source: source, target: target, envelope: gatewaySignal(), payload: 1)
+            }
+            await entered.wait()
+            _ = try await transport.register(address: replaceSource ? "source" : "target", incarnation: "two") { _ in }
+            await release.release()
+            if fails {
+                await #expect(throws: GatewayTestError.cleanup) { try await pending.value }
+            } else {
+                await #expect(throws: CancellationError.self) { try await pending.value }
+            }
+            await transport.shutdown()
+        }
+    }
+}
+
+private func integerSignalProtocol(id: String = "fixture.request.v1", timeout: Duration = .seconds(2)) throws
+    -> SignalRequestProtocol<Int, Int>
 {
-    let harness = try await GatewayHarness()
-    let live = harness.actions.execution
-    let started = GatewayTestGate()
-    let release = GatewayTestGate()
+    try .init(
+        id: id, maximumRequestBytes: 8, maximumReplyBytes: 8, timeout: timeout,
+        requestSize: { _ in 8 }, replySize: { _ in 8 })
+}
+
+@Test(.actionCatalog) @MainActor func gatewayRequestRepliesWithoutSourceInboxAndRejectsUnknownProtocol() async throws {
+    let transport = SignalTransport()
     let calls = GatewayCounter()
-    let port = ActionsExecutionPort(
-        catalog: live.catalog,
-        prepare: { input, syntax in
-            await calls.increment()
-            await started.release()
-            await release.wait()
-            return try await live.prepare(input, syntax)
-        }, execute: live.execute, discard: live.discard)
-    let scheduler = ChannelScheduler(executor: port, capacityPerChannel: 1)
-    let first = Task { try await scheduler.enqueue(invocation: gatewayJob()) }
-    await started.wait()
-    await #expect(throws: ActionSchedulingError.channelCapacityExceeded("main")) {
-        try await scheduler.enqueue(invocation: gatewayJob())
+    let source = try await transport.register(address: "caller", incarnation: "one") { _ in
+        Issue.record("A direct reply must never enter the caller inbox")
+    }
+    let target = try await transport.register(address: "receiver", incarnation: "one") { _ in
+        Issue.record("A typed request must enter its handler")
+    }
+    let descriptor = try integerSignalProtocol()
+    try await transport.registerRequest(descriptor, endpoint: target) { value in
+        await calls.increment()
+        return value + 1
+    }
+    #expect(try await transport.request(source: source, target: target, using: descriptor, request: 41) == 42)
+    await #expect(throws: SignalTransportError.unsupportedProtocol) {
+        try await transport.request(
+            source: source, target: target, using: integerSignalProtocol(id: "fixture.other.v1"), request: 1)
     }
     #expect(await calls.count == 1)
-    first.cancel()
+    await transport.shutdown()
+}
+
+extension LiveRuntimeTests {
+    @Test(.actionCatalog) func gatewayRequestTimeoutJoinsHandlerAndReleasesBudget() async throws {
+        let transport = SignalTransport()
+        let source = try await transport.register(address: "caller", incarnation: "one") { _ in }
+        let target = try await transport.register(address: "receiver", incarnation: "one") { _ in }
+        let joined = GatewayCounter()
+        let descriptor = try integerSignalProtocol(timeout: .milliseconds(20))
+        try await transport.registerRequest(descriptor, endpoint: target) { value in
+            do { try await Task.sleep(for: .seconds(10)) } catch {
+                await joined.increment()
+                throw error
+            }
+            return value
+        }
+        await #expect(throws: SignalTransportError.expired) {
+            try await transport.request(source: source, target: target, using: descriptor, request: 1)
+        }
+        #expect(await joined.count == 1)
+        let snapshot = try await transport.stateSnapshot()
+        #expect(snapshot.runtime["active"] == .count(0))
+        #expect(snapshot.runtime["bytes"] == .count(0))
+        await transport.shutdown()
+    }
+
+}
+
+@Test(.actionCatalog) @MainActor func gatewayRequestRejectsCycleBeforeReenteringHandler() async throws {
+    let transport = SignalTransport()
+    let source = try await transport.register(address: "caller", incarnation: "one") { _ in }
+    let target = try await transport.register(address: "receiver", incarnation: "one") { _ in }
+    let descriptor = try integerSignalProtocol()
+    try await transport.registerRequest(descriptor, endpoint: source) { $0 }
+    try await transport.registerRequest(descriptor, endpoint: target) { value in
+        try await transport.request(source: target, target: source, using: descriptor, request: value)
+    }
+    await #expect(throws: SignalTransportError.cyclicRequest) {
+        try await transport.request(source: source, target: target, using: descriptor, request: 1)
+    }
+    await transport.shutdown()
+}
+
+private actor GatewayEventValues {
+    private(set) var values: [Int] = []
+    func append(_ value: Int) { values.append(value) }
+}
+private func gatewayEventEnvelope(_ id: String = UUID().uuidString) -> SignalEnvelope {
+    .init(id: id, sessionID: "session", contract: "fixture.events.v1", payloadBytes: 8)
+}
+private func awaitEventBranchDrain(_ events: SignalEventTransport, target: SignalEndpoint) async throws {
+    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+    while await events.pendingBranches(to: target) != 0 {
+        guard ContinuousClock.now < deadline else { throw GatewayTestError.cleanup }
+        await Task.yield()
+    }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func gatewayEventsKeepSubscriberQueuesIndependentAndPreserveSourceOrder() async throws {
+    let config = try SignalEventConfiguration(
+        publications: 8, branches: 16, bytes: 65536, branchCapacity: 2,
+        controlSlots: 1, controlBytes: 1024, observers: 1)
+    let transport = SignalTransport(eventConfiguration: config)
+    let events = try await transport.events()
+    let source = try await transport.register(address: "source", incarnation: "one") { _ in }
+    let slowValues = GatewayEventValues()
+    let fastValues = AsyncStream<Int>.makeStream(bufferingPolicy: .bufferingOldest(8))
+    var fast = fastValues.stream.makeAsyncIterator()
+    let entered = GatewayTestGate()
+    let release = GatewayTestGate()
+    let slow = try await transport.register(address: "slow", incarnation: "one") { signal in
+        let value = try #require(signal.payload as? Int)
+        if value == 0 {
+            await entered.release()
+            await release.wait()
+        }
+        await slowValues.append(value)
+    }
+    let quick = try await transport.register(address: "quick", incarnation: "one") { signal in
+        fastValues.continuation.yield(try #require(signal.payload as? Int))
+    }
+    let descriptor = try SignalEventProtocol<Int>(id: "fixture.events.v1", maximumBytes: 8, measure: { _ in 8 })
+    let channel = try EventChannel("fixture.events")
+    let publisher = try await events.registerProducer(endpoint: source, channel: channel, using: descriptor)
+    _ = try await events.subscribe(endpoint: slow, channel: channel, using: descriptor, sources: ["source"])
+    _ = try await events.subscribe(endpoint: quick, channel: channel, using: descriptor, sources: ["source"])
+    var receipts: [SignalPublication] = []
+    for value in 0..<4 {
+        receipts.append(try await events.publish(value, from: publisher, envelope: gatewayEventEnvelope()))
+        if value == 0 { await entered.wait() }
+        #expect(await fast.next() == value)
+        try await awaitEventBranchDrain(events, target: quick)
+    }
+    let rejected = try await events.wait(receipts[2])
+    #expect(rejected.contains { $0.target == "slow" && $0.status == .rejected && $0.reason == "capacityExceeded" })
+    #expect(rejected.contains { $0.target == "quick" && $0.status == .accepted })
     await release.release()
-    _ = await first.result
-    await scheduler.shutdown()
-    try await harness.stop()
+    await events.flush()
+    #expect(await slowValues.values == [0, 1])
+    await transport.shutdown()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func gatewayEventFullSubscriberQueueDoesNotConsumeSharedBranchBudget() async throws {
+    let config = try SignalEventConfiguration(
+        publications: 8, branches: 6, bytes: 65536, branchCapacity: 2,
+        controlSlots: 1, controlBytes: 1024, observers: 1)
+    let transport = SignalTransport(eventConfiguration: config)
+    let events = try await transport.events()
+    let source = try await transport.register(address: "source", incarnation: "one") { _ in }
+    let fastValues = AsyncStream<Int>.makeStream(bufferingPolicy: .bufferingOldest(8))
+    var fast = fastValues.stream.makeAsyncIterator()
+    let entered = GatewayTestGate()
+    let release = GatewayTestGate()
+    let slow = try await transport.register(address: "slow", incarnation: "one") { signal in
+        if try #require(signal.payload as? Int) == 0 {
+            await entered.release()
+            await release.wait()
+        }
+    }
+    let quick = try await transport.register(address: "quick", incarnation: "one") { signal in
+        fastValues.continuation.yield(try #require(signal.payload as? Int))
+    }
+    let descriptor = try SignalEventProtocol<Int>(id: "fixture.events.v1", maximumBytes: 8, measure: { _ in 8 })
+    let channel = try EventChannel("fixture.events")
+    let publisher = try await events.registerProducer(endpoint: source, channel: channel, using: descriptor)
+    _ = try await events.subscribe(endpoint: slow, channel: channel, using: descriptor, sources: ["source"])
+    _ = try await events.subscribe(endpoint: quick, channel: channel, using: descriptor, sources: ["source"])
+    var receipts: [SignalPublication] = []
+    for value in 0..<3 {
+        receipts.append(try await events.publish(value, from: publisher, envelope: gatewayEventEnvelope()))
+        if value == 0 { await entered.wait() }
+        #expect(await fast.next() == value)
+        try await awaitEventBranchDrain(events, target: quick)
+    }
+    let results = try await events.wait(receipts[2])
+    #expect(results.contains { $0.target == "slow" && $0.status == .rejected && $0.reason == "capacityExceeded" })
+    #expect(results.contains { $0.target == "quick" && $0.status == .accepted })
+    await release.release()
+    await events.flush()
+    await transport.shutdown()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func gatewayEventSubscriptionCancellationJoinsOnlyItsOwnBranch() async throws {
+    let transport = SignalTransport()
+    let events = try await transport.events()
+    let source = try await transport.register(address: "source", incarnation: "one") { _ in }
+    let entered = GatewayTestGate()
+    let joined = GatewayCounter()
+    let received = GatewayCounter()
+    let slow = try await transport.register(address: "slow", incarnation: "one") { _ in
+        await entered.release()
+        do { try await Task.sleep(for: .seconds(60)) } catch {
+            await joined.increment()
+            throw error
+        }
+    }
+    let quick = try await transport.register(address: "quick", incarnation: "one") { _ in await received.increment() }
+    let descriptor = try SignalEventProtocol<Int>(id: "fixture.events.v1", maximumBytes: 8, measure: { _ in 8 })
+    let channel = try EventChannel("fixture.events")
+    let publisher = try await events.registerProducer(endpoint: source, channel: channel, using: descriptor)
+    let subscription = try await events.subscribe(
+        endpoint: slow, channel: channel, using: descriptor, sources: ["source"])
+    _ = try await events.subscribe(endpoint: quick, channel: channel, using: descriptor, sources: ["source"])
+    let first = try await events.publish(1, from: publisher, envelope: gatewayEventEnvelope())
+    await entered.wait()
+    await events.cancel(subscription)
+    #expect(await joined.count == 1)
+    let outcomes = try await events.wait(first)
+    #expect(outcomes.contains { $0.target == "quick" && $0.status == .accepted })
+    let second = try await events.publish(2, from: publisher, envelope: gatewayEventEnvelope())
+    _ = try await events.wait(second)
+    #expect(await received.count == 2)
+    #expect(await joined.count == 1)
+    await transport.shutdown()
+}
+
+@Test(.actionCatalog) @MainActor
+func gatewayEventBindingsAreExplicitVersionedAndFilterVariants() async throws {
+    #expect(throws: SignalTransportError.invalidEnvelope) { try EventChannel("fixture") }
+    #expect(throws: SignalTransportError.invalidEnvelope) { try EventChannel("fixture.events.v1") }
+    let transport = SignalTransport()
+    let events = try await transport.events()
+    let source = try await transport.register(address: "source", incarnation: "one") { _ in }
+    let count = GatewayCounter()
+    let target = try await transport.register(address: "target", incarnation: "one") { _ in await count.increment() }
+    let descriptor = try SignalEventProtocol<Int>(
+        id: "fixture.events.v1", variants: ["partial", "final"], maximumBytes: 8,
+        measure: { _ in 8 }, variant: { $0 == 0 ? "partial" : "final" })
+    let channel = try EventChannel("fixture.events")
+    let publisher = try await events.registerProducer(endpoint: source, channel: channel, using: descriptor)
+    _ = try await events.subscribe(
+        endpoint: target, channel: channel, using: descriptor, sources: ["source"], variants: ["final"])
+    _ = try await events.wait(events.publish(0, from: publisher, envelope: gatewayEventEnvelope()))
+    #expect(await count.count == 0)
+    _ = try await events.wait(events.publish(1, from: publisher, envelope: gatewayEventEnvelope()))
+    #expect(await count.count == 1)
+    await #expect(throws: SignalTransportError.schemaMismatch) {
+        try await events.registerProducer(
+            endpoint: source, channel: channel,
+            using: SignalEventProtocol<String>(
+                id: "fixture.events.v1", variants: ["partial", "final"], maximumBytes: 8, measure: { _ in 8 }))
+    }
+    _ = try await transport.register(address: "source", incarnation: "two") { _ in }
+    await #expect(throws: SignalTransportError.staleEndpoint) {
+        try await events.publish(1, from: publisher, envelope: gatewayEventEnvelope())
+    }
+    await transport.shutdown()
+}
+
+@Test func invocationSnapshotRoundTripPreservesEmptyAndArchivedArguments() throws {
+    let original = try ActionInvocationSnapshot(
+        .init(actionPath: gatewayPath, parameters: ["text": "", "source": "用户原文\n\\$()"]))
+    let decoded = try JSONDecoder().decode(ActionInvocationSnapshot.self, from: JSONEncoder().encode(original))
+    #expect(decoded == original && decoded.arguments?["text"] == "" && decoded.arguments?["missing"] == nil)
+    let large = try ActionInvocationSnapshot(
+        .init(
+            actionPath: gatewayPath,
+            parameters: ["text": String(repeating: "x", count: ActionInvocationSnapshot.inlineBytes + 1)]))
+    let bytes = try JSONEncoder().encode(large)
+    let archived = try large.archived(at: UUID().uuidString)
+    let reference = try JSONDecoder().decode(ActionInvocationSnapshot.self, from: JSONEncoder().encode(archived))
+    #expect(reference.arguments == nil && reference.reference != nil)
+    #expect(try reference.restoring(from: bytes).arguments == large.arguments)
+    #expect(throws: (any Error).self) { try reference.restoring(from: JSONEncoder().encode(original)) }
+    #expect(throws: ActionInvocationSnapshot.InvalidSnapshot.capacityExceeded) {
+        try ActionInvocationSnapshot(
+            .init(
+                actionPath: gatewayPath,
+                parameters: ["text": String(repeating: "x", count: ActionInvocationSnapshot.maximumBytes)]))
+    }
+}
+
+private actor OwnedEventSubscription {
+    private var value: SignalEventSubscription?
+    func install(_ value: SignalEventSubscription) { self.value = value }
+    func close(_ broker: SignalEventTransport) async {
+        if let value {
+            self.value = nil
+            await broker.cancel(value)
+        }
+    }
+}
+
+@Test(.actionCatalog) func consumerCanCloseItsSubscriptionAfterConsumptionWithoutCancellingItsAcknowledgment()
+    async throws
+{
+    let transport = SignalTransport()
+    let events = try await transport.events()
+    let owner = OwnedEventSubscription()
+    let received = GatewayCounter()
+    let source = try await transport.register(address: "source", incarnation: "one") { _ in }
+    let target = try await transport.register(address: "consumer", incarnation: "one") { _ in
+        await received.increment()
+        await owner.close(events)
+    }
+    let descriptor = try SignalEventProtocol<Int>(id: "fixture.events.v1", maximumBytes: 8, measure: { _ in 8 })
+    let channel = try EventChannel("fixture.events")
+    let publisher = try await events.registerProducer(endpoint: source, channel: channel, using: descriptor)
+    await owner.install(
+        try await events.subscribe(
+            endpoint: target, channel: channel, using: descriptor, sources: ["source"], scope: "owned",
+            sessionID: "session"))
+    let wrongSession = SignalEnvelope(
+        id: UUID().uuidString, sessionID: "other", contract: descriptor.id, payloadBytes: 8)
+    #expect(try await events.wait(events.publish(0, from: publisher, envelope: wrongSession, scope: "owned")).isEmpty)
+    #expect(await received.count == 0)
+    #expect(
+        try await events.wait(events.publish(1, from: publisher, envelope: gatewayEventEnvelope(), scope: "other"))
+            .isEmpty)
+    let outcomes = try await events.wait(
+        events.publish(2, from: publisher, envelope: gatewayEventEnvelope(), scope: "owned"))
+    #expect(outcomes.count == 1 && outcomes[0].status == .accepted)
+    #expect(
+        try await events.wait(events.publish(3, from: publisher, envelope: gatewayEventEnvelope(), scope: "owned"))
+            .isEmpty)
+    #expect(await received.count == 1)
+    await transport.shutdown()
+}
+
+@Test(.actionCatalog) @MainActor func unscopedEventSubscriptionReceivesAllScopesWithoutOverlappingBindings()
+    async throws
+{
+    let transport = SignalTransport()
+    let source = try await transport.register(address: "source", incarnation: "one") { _ in }
+    let values = GatewayEventValues()
+    let target = try await transport.register(address: "target", incarnation: "one") { input in
+        try await values.append(#require(input.payload as? Int))
+    }
+    let events = try await transport.events()
+    let channel = try EventChannel("fixture.events")
+    let descriptor = try SignalEventProtocol<Int>(id: "fixture.events.v1", maximumBytes: 8, measure: { _ in 8 })
+    let publisher = try await events.registerProducer(endpoint: source, channel: channel, using: descriptor)
+    let subscription = try await events.subscribe(
+        endpoint: target, channel: channel, using: descriptor, sources: ["source"])
+    await #expect(throws: SignalTransportError.duplicateProtocol) {
+        try await events.subscribe(
+            endpoint: target, channel: channel, using: descriptor, sources: ["source"], scope: "task-a")
+    }
+    for (value, scope) in [(1, Optional("task-a")), (2, Optional("task-b")), (3, nil)] {
+        let receipt = try await events.publish(value, from: publisher, envelope: gatewayEventEnvelope(), scope: scope)
+        #expect(try await events.wait(receipt).first?.status == .accepted)
+    }
+    #expect(await values.values == [1, 2, 3])
+    await events.cancel(subscription)
+    await transport.shutdown()
 }

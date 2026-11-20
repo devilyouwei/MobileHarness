@@ -155,12 +155,7 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
         guard let send = catalog.actions.first(where: { $0.alias == "send" }) else { continue }
         let doc = try #require(send.documentation)
         #expect(!doc.doc.contains("Example:"))
-        let targets = configuration.communication.sends.filter { send in
-            AgentTaskSignal.Kind.allCases.contains { $0.contract == send.contract }
-        }.map(\.target)
-        for target in Set(targets) {
-            #expect(doc.doc.contains(target))
-        }
+        #expect(doc.doc.contains("protocol"))
     }
 }
 
@@ -243,26 +238,25 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
     #expect(!facts.contains("inputIDs") && !facts.contains("updatedAt") && !facts.contains("loadedSkills"))
 }
 
-@Test(.actionCatalog) func communicationCatalogDescribesOnlyPermittedTargetKindPairs() throws {
+@Test(.actionCatalog) func communicationCatalogDescribesEnabledProtocolAdapters() throws {
     let config = try taskFixtureConfiguration(parent: true)
     let registry = try AgentCommunicationAdapter.catalog(
         fixtureCatalogWithCommunication(config.capabilities), policy: config.communication)
     let send = try #require(registry.actions.first { $0.alias == "send" })
     let doc = try #require(send.documentation?.doc)
     #expect(
-        doc.hasSuffix(
-            "Allowed target/kind pairs: taskPhotographer: cancel, taskPhotographer: input, taskPhotographer: request."))
+        doc.contains("agent.task.v1") && doc.contains("Agent ID=writer;") && !doc.contains("Allowed target/kind pairs"))
     let taskID = try #require(send.documentation?.parameters.first { $0.name == "taskID" })
     #expect(taskID.constraints.contains("Omit for request"))
 }
 
-@Test(.actionCatalog) func communicationCatalogDocumentsFixedTaskResponseKinds() throws {
+@Test(.actionCatalog) func communicationCatalogDoesNotInventPairPermissions() throws {
     let config = try taskFixtureConfiguration(parent: false)
     let registry = try AgentCommunicationAdapter.catalog(
         fixtureCatalogWithCommunication(config.capabilities), policy: config.communication)
     let send = try #require(registry.actions.first { $0.alias == "send" })
     let doc = try #require(send.documentation?.doc)
-    #expect(doc.hasSuffix("Allowed target/kind pairs: taskParent: progress, taskParent: result."))
+    #expect(doc.contains("submit/update/answer/status/cancel") && !doc.contains("taskParent:"))
 }
 
 private func skillResponseExamples(_ id: String) throws -> [String] {
@@ -803,7 +797,7 @@ func webSkillExamplesParseAgainstTheirEffectiveCatalogAndStayWithinBudget(skill:
         #expect(throws: GenerationError.unknownCapability) { try basic.resolveTool(name, arguments: arguments) }
     }
     #expect(!basic.actions.contains { $0.alias == "task.delegate" })
-    #expect(!basic.actions.contains { $0.alias == "task.cancel" })
+    #expect(!basic.actions.contains { $0.alias == "agent.task.v1" })
     #expect(throws: GenerationError.unknownCapability) {
         try basic.resolveAction("task.delegate", parameters: ["target": "writer", "goal": "old"])
     }
@@ -866,10 +860,10 @@ func webSkillExamplesParseAgainstTheirEffectiveCatalogAndStayWithinBudget(skill:
     #expect(allowed == "Agent ID=writer; description=" + description)
     #expect(
         try AgentConfigurations.delegationOverview(requester: .writer, communication: configuration.communication)
-            .isEmpty)
-    #expect(try AgentConfigurations.delegationOverview(requester: .assistant, communication: .empty).isEmpty)
+            == allowed)
+    #expect(try AgentConfigurations.delegationOverview(requester: .assistant, communication: .empty) == allowed)
     let deniedPrompt = try AssistantContextState.systemPrompt(fixed, skills: nil, communication: .empty)
-    #expect(!deniedPrompt.contains(description) && !deniedPrompt.contains("Agent ID=writer;"))
+    #expect(deniedPrompt.contains(description) && deniedPrompt.contains("Agent ID=writer;"))
     let allowedPrompt = try AssistantContextState.systemPrompt(
         fixed, skills: nil, communication: configuration.communication)
     let privateInstructions = try AgentConfigurations.identityInstructions(named: "Writer")

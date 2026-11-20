@@ -3,35 +3,6 @@ import Foundation
 import FunctionContracts
 import StorageCore
 
-/// A peer message may carry a reply address captured by the runtime.
-struct AgentTaskRequest: Codable, Equatable, Sendable {
-    static let contract = "agent.task.request"
-    let id: String
-    let text: String
-    let replyTo: String?
-    let interactionID: String?
-
-    init(id: String = UUID().uuidString, text: String, replyTo: String? = nil, interactionID: String? = nil) {
-        self.id = id
-        self.text = text
-        self.replyTo = replyTo
-        self.interactionID = interactionID
-    }
-
-    func validate() throws {
-        guard UUID(uuidString: id) != nil, text.utf8.count <= 4096,
-            !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-            (replyTo == nil) == (interactionID == nil),
-            replyTo.map({ UUID(uuidString: $0) != nil && $0 != id }) ?? true,
-            interactionID.map({ UUID(uuidString: $0) != nil }) ?? true
-        else { throw CommunicationError.invalidPayload }
-    }
-
-    var message: AgentMessage {
-        AgentMessage(contract: Self.contract, content: self, maximumBytes: 32768, validate: { try $0.validate() })
-    }
-}
-
 /// Writer-owned failure facts; persistence and presentation adapters project this value explicitly.
 public struct WriterFailureDiagnostic: Codable, Sendable, Equatable {
     public let category: String
@@ -124,7 +95,7 @@ public struct AgentTaskContent: Codable, Sendable, Equatable {
     {
         return try AgentTaskSignal(
             kind: kind, scope: scope, businessContract: Self.contract,
-            data: JSONEncoder().encode(self), status: status)
+            data: JSONEncoder().encode(self), status: status, id: writerEvent?.eventID)
     }
     public static func decode(_ signal: AgentTaskSignal) throws -> Self {
         guard signal.businessContract == contract else { throw CommunicationError.unsupportedContract }
@@ -138,6 +109,7 @@ public struct AgentTaskContent: Codable, Sendable, Equatable {
 /// A peer report refers to either an incoming message or an admitted task.
 public struct AgentTaskResponse: Codable, Sendable, Equatable {
     static let contract = AgentTaskSignal.responseContract
+    static let persistedContracts = [contract, "agent.task.response", "writer.completion"]
 
     struct Rejection: Codable, Sendable, Equatable {
         let eventID: String
@@ -190,8 +162,12 @@ public struct AgentTaskResponse: Codable, Sendable, Equatable {
         else { throw CommunicationError.invalidPayload }
     }
 
-    var message: AgentMessage {
-        AgentMessage(contract: Self.contract, content: self, maximumBytes: 131072, validate: { try $0.validate() })
+    var message: AgentMessage { publication() }
+    func publication(scope: String? = nil) -> AgentMessage {
+        AgentMessage(
+            contract: Self.contract, content: self, maximumBytes: 131072, task: signal,
+            id: rejection?.eventID ?? signal?.id, eventScope: scope ?? signal?.scope.id ?? rejection?.messageID,
+            eventOwner: signal?.scope.requester, validate: { try $0.validate() })
     }
 }
 
@@ -238,9 +214,9 @@ public enum AgentFixedTaskInput {
         _ signal: AgentTaskSignal, input: AgentInput, executor: AgentID,
         decode: (AgentTaskSignal) throws -> AgentMessage
     ) throws -> AgentInput {
-        guard signal.kind == .request || signal.kind == .input, signal.scope.requester == .assistant,
+        guard signal.kind == .request || signal.kind == .input,
             signal.scope.executor == executor, input.taskScope == signal.scope,
-            input.metadata.origin == .agent, input.metadata.source == AgentID.assistant.rawValue,
+            input.metadata.origin == .agent, input.metadata.source == signal.scope.requester.rawValue,
             input.metadata.incarnation != nil
         else { throw CommunicationError.unauthorized }
         let message = try decode(signal)
@@ -256,10 +232,23 @@ public enum AgentFixedTaskInput {
                 deadline: input.metadata.deadline), turn: input.turn, taskScope: signal.scope)
     }
 
+    public static func cancellation(_ query: AgentTaskQuery, input: AgentInput) throws -> AgentInput {
+        guard query.operation == .cancel, input.metadata.source == query.scope.requester.rawValue,
+            input.metadata.origin == .agent, input.metadata.incarnation != nil,
+            input.sessionID == query.scope.sessionID
+        else { throw CommunicationError.unauthorized }
+        let signal = try AgentTaskSignal(
+            kind: .cancel, scope: query.scope, businessContract: "agent.task.control",
+            data: Data((query.reason ?? "Cancelled").utf8), id: query.id)
+        return AgentInput(
+            id: input.id, sessionID: input.sessionID, payload: .observation(try signal.message()),
+            metadata: input.metadata, turn: input.turn, taskScope: query.scope)
+    }
+
     public static func isTrusted(_ input: AgentInput) -> Bool {
         input.metadata.origin == .agent && input.metadata.incarnation != nil
-            && input.metadata.source == AgentID.assistant.rawValue
-            && input.taskScope?.requester == .assistant && input.taskScope?.sessionID == input.sessionID
+            && input.metadata.source == input.taskScope?.requester.rawValue
+            && input.taskScope?.sessionID == input.sessionID
     }
 }
 
@@ -310,10 +299,11 @@ enum AgentTaskMessaging {
     static func permits(
         target: AgentID, requester: AgentID, communication: CommunicationDeclaration
     ) -> Bool {
-        requester == .assistant && target == .writer
-            && communication.sends.contains {
-                $0.contract == AgentTaskRequest.contract && $0.target == target.rawValue
-            }
+        // Public protocol support belongs to the target capability catalog, never a sender/target pair.
+        guard !requester.rawValue.isEmpty && requester.rawValue.utf8.count <= 64 else { return false }
+        return AgentContracts.requestImplementations[target]?.contains {
+            $0.protocolID == AgentTaskRequest.contract && $0.acceptsTextSubmission
+        } ?? false
     }
 }
 

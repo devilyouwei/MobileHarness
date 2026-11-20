@@ -26,6 +26,7 @@ import UI
         let actionAssembly: ApplicationActionAssembly
         let ui: ApplicationPresentation
         let homePreparation: ForegroundPreparation
+        let memoryPressure: MemoryPressureRelay
     }
     static func make(
         root: URL = URL.applicationSupportDirectory.appendingPathComponent("MobileHarness", isDirectory: true),
@@ -43,7 +44,7 @@ import UI
         let camera = platform.vision.camera
         let model = registry.model()
         let gateway = registry.gateway()
-        let actionAssembly = ApplicationActionAssembly(gateway: gateway, language: language)
+        let actionAssembly = ApplicationActionAssembly(language: language)
         let actionHost = ActionsContainer.makeBusiness(
             dependencies: actionAssembly.dependencies(
                 storage: storage, model: model, platform: platform, ui: uiContainer, language: language),
@@ -80,7 +81,7 @@ import UI
                 facades: hosts.facades,
                 audio: platform.audio,
                 languageModels: model.language, speechModels: model.speech, visionModels: model.vision,
-                modelArtifacts: model.artifacts, memoryPressure: { await model.handleMemoryPressure() },
+                modelArtifacts: model.artifacts,
                 language: { language().rawValue })
         }
         let inspection = ApplicationStateInspection()
@@ -185,6 +186,13 @@ import UI
                 features: agents, home: home, web: uiContainer.web, runtimeLog: uiContainer.runtimeLog,
                 speechDiagnostic: uiContainer.diagnostics.speech,
                 language: language),
-            homePreparation: homePreparation)
+            homePreparation: homePreparation,
+            memoryPressure: MemoryPressureRelay(
+                listen: { try platform.listenMemoryWarnings() },
+                release: { await model.handleMemoryPressure() },
+                failed: { [containerFailures] error in
+                    containerFailures.report(
+                        module: "app", component: "memoryPressure", operation: "observe", error: error)
+                }))
     }
 }

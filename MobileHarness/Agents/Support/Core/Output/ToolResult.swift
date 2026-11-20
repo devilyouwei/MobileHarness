@@ -1,6 +1,8 @@
 import Foundation
+import FunctionContracts
 
 public struct ToolResult: Codable, Equatable, Sendable {
+    public let invocation: ActionInvocationSnapshot?
     public let roundID: String?
     public let completion: AgentActionCompletion?
     public let callID: String
@@ -26,8 +28,9 @@ public struct ToolResult: Codable, Equatable, Sendable {
     }
     public init(
         callID: String, value: String, isError: Bool = false, failureCode: String? = nil,
-        completion: AgentActionCompletion? = nil, roundID: String? = nil
+        completion: AgentActionCompletion? = nil, roundID: String? = nil, invocation: ActionInvocationSnapshot? = nil
     ) {
+        self.invocation = invocation
         self.roundID = roundID
         self.completion = completion
         self.callID = callID

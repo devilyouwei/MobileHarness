@@ -34,8 +34,8 @@ public final class NexArmControlService {
     public var manualOrigin: NexArmControlOrigin?
     private let connectionFacts = NativeInputBroadcast<NexArmConnectionFacts>()
     private var lastConnectionFacts: NexArmConnectionFacts?
-    public func observeConnectionFacts() throws -> AsyncThrowingStream<NexArmConnectionFacts, any Error> {
-        let stream = try connectionFacts.subscribe(.latest)
+    public func observeConnectionFacts() throws -> PlatformKit.StateSignalListener<NexArmConnectionFacts> {
+        let stream = try connectionFacts.listen(.latest, producer: "actions.nexarm.connection")
         publishConnectionFacts(force: true)
         return stream
     }
@@ -224,10 +224,20 @@ public final class NexArmControlService {
             state.error = "Could not load device records: \(error.localizedDescription)"
         }
         scheduleReconnect()
-        for await value in link.updates {
-            if Task.isCancelled { break }
-            await apply(value)
+        var listener: PlatformKit.StateSignalListener<NexArmBluetoothSnapshot>?
+        do {
+            let updates = try link.listenUpdates()
+            listener = updates
+            if let current = link.reflectedState?.snapshot() { await apply(current) }
+            for try await value in updates {
+                if Task.isCancelled { break }
+                await apply(value)
+            }
+        } catch {
+            if !Task.isCancelled { state.error = "Bluetooth observation failed: \(error.localizedDescription)" }
         }
+        await listener?.cancel()
+        await listener?.join()
         disconnect(preserveReconnect: true)
         await waitUntilIdle()
     }

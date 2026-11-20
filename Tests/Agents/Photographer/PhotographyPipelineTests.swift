@@ -230,25 +230,31 @@ extension LiveRuntimeTests {
         let secondConfig = try AgentConfiguration(
             contracts: AgentContracts.communication,
             data: JSONSerialization.data(withJSONObject: [
-                "version": 8, "category": "cognition", "id": "second", "actions": [String: [String]](), "tools": [],
-                "communication": [
-                    "inputs": [["contract": "vision.pose", "version": 1, "kind": "observation"]],
+                "version": 9, "category": "cognition", "id": "second", "actions": [String: [String]](), "tools": [],
+                "signals": [
+                    "requests": [], "feedback": [],
                     "subscriptions": [
-                        ["contract": "vision.pose", "source": "visionPerception", "topic": "vision.pose"]
+                        [
+                            "channel": "perception.vision.pose", "protocol": "perception.vision.pose.v1",
+                            "sources": ["visionPerception"],
+                        ]
                     ],
-                    "publications": [], "sends": [],
+                    "publications": [],
                 ],
             ]))
         let thirdConfig = try AgentConfiguration(
             contracts: AgentContracts.communication,
             data: JSONSerialization.data(withJSONObject: [
-                "version": 8, "category": "cognition", "id": "third", "actions": [String: [String]](), "tools": [],
-                "communication": [
-                    "inputs": [["contract": "vision.pose", "version": 1, "kind": "observation"]],
+                "version": 9, "category": "cognition", "id": "third", "actions": [String: [String]](), "tools": [],
+                "signals": [
+                    "requests": [], "feedback": [],
                     "subscriptions": [
-                        ["contract": "vision.pose", "source": "visionPerception", "topic": "vision.pose"]
+                        [
+                            "channel": "perception.vision.pose", "protocol": "perception.vision.pose.v1",
+                            "sources": ["visionPerception"],
+                        ]
                     ],
-                    "publications": [], "sends": [],
+                    "publications": [],
                 ],
             ]))
         let policy = try CommunicationPolicy(
@@ -278,6 +284,10 @@ extension LiveRuntimeTests {
         let output = await OutputGateway(
             manager: manager, requests: input, tools: tools, actions: actions, policy: policy,
             sink: { _ in })
+        if withSubscribers {
+            _ = try await output.consumer(for: second)
+            _ = try await output.consumer(for: third)
+        }
         try await vision.bind(output.messaging(for: .visionPerception))
         try await vision.start()
         var envelopes = fixtureOutputs(vision).makeAsyncIterator()

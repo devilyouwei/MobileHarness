@@ -1,8 +1,8 @@
 # Gateway tests
 
-输入广播、调度、资源与结果/媒体传输。实际执行端口和受控函数/资源构成集成边界，参数附件与局部策略可独立验证。
+内部 Signal 通道：端点身份、信封、有界传输、事件分发和执行准入；媒体与窗口路由。调度、资源与调用结果由 Actions Shell承担，见 [Actions 执行测试](../Actions/Execution/README.md)。
 
-Input：原生输入流与代际；Output：Channel/wait、容器端口、媒体和窗口路由。
+Input：原生输入流与代际；Output：容器端口、Signal 准入、媒体和窗口路由。
 
 ## 测试分层
 
@@ -11,7 +11,7 @@ Input：原生输入流与代际；Output：Channel/wait、容器端口、媒体
 | 能力目录 | 层级 | 文件或用例组 |
 | --- | --- | --- |
 | Input | Unit Tests / Integration Tests | [DeviceInputTests](Input/DeviceInputTests.swift) |
-| Output | Integration Tests | [ChannelSchedulerTests](Output/ChannelSchedulerTests.swift)、[GatewayContainerTests](Output/GatewayContainerTests.swift) |
+| Output | Integration Tests | [GatewayContainerTests](Output/GatewayContainerTests.swift) |
 | Output | Unit Tests / Integration Tests | [MediaTransportTests](Output/MediaTransportTests.swift)、[WindowGatewayTests](Output/WindowGatewayTests.swift) |
 | Output | Unit Tests | [NativeAttachmentTests](Output/NativeAttachmentTests.swift) |
 

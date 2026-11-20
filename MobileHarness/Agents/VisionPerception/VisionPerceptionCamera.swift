@@ -4,7 +4,7 @@ import PlatformKit
 
 extension VisionPerceptionAgent {
     /// The capture owner supplies one generation; inference never controls the camera.
-    func consumeCamera(_ frames: AsyncThrowingStream<CameraFrame, any Error>, generation: String) async throws {
+    func consumeCamera(_ frames: MediaSignalListener<CameraFrame>, generation: String) async throws {
         for try await frame in frames {
             try Task.checkCancellation()
             do { try await receive(frame, generation: generation) } catch CommunicationError.expired { continue }

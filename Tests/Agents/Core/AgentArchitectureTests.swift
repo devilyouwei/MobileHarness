@@ -159,14 +159,6 @@ private actor TaskFixtureChat: ChatCapability {
 func taskFixtureConfiguration(parent: Bool) throws -> AgentConfiguration {
     let id = parent ? "taskParent" : "taskPhotographer"
     let peer = parent ? "taskPhotographer" : "taskParent"
-    let accepted =
-        parent
-        ? ["agent.task.response", "runtime.message.receipt"]
-        : [
-            "task.request", "task.input", "task.cancel", "runtime.message.receipt", "runtime.action.result",
-            "runtime.round.result",
-        ]
-    let sends = parent ? ["task.request", "task.input", "task.cancel"] : ["agent.task.response"]
     let actions: [String: Any] =
         parent
         ? [:]
@@ -180,21 +172,15 @@ func taskFixtureConfiguration(parent: Bool) throws -> AgentConfiguration {
                 ]
             ]
         ]
-    let inputs: [[String: Any]] = accepted.map { contract in
-        let kind =
-            contract == "runtime.message.receipt"
-            ? "communicationReceipt"
-            : contract == "runtime.action.result"
-                ? "actionResult" : contract == "runtime.round.result" ? "roundResult" : "observation"
-        return ["contract": contract, "version": 1, "kind": kind]
-    }
     return try AgentConfiguration(
         contracts: AgentContracts.communication,
         data: JSONSerialization.data(withJSONObject: [
-            "version": 8, "category": "cognition", "id": id, "actions": actions, "tools": [],
-            "communication": [
-                "inputs": inputs, "subscriptions": [], "publications": [],
-                "sends": sends.map { ["contract": $0, "target": peer] },
+            "version": 9, "category": "cognition", "id": id, "actions": actions, "tools": [],
+            "signals": [
+                "requests": parent ? [] : ["agent.task.v1"],
+                "feedback": parent ? [] : ["action.result.v1", "agent.round.result.v1"],
+                "subscriptions": [],
+                "publications": [["channel": "agent.task", "protocol": "agent.task.events.v1"]],
             ],
         ]))
 }
@@ -213,11 +199,14 @@ private actor TaskFixtureAgent: Agent {
     private var budget: AgentTaskBudget
     private var sequence: UInt64 = 0
     private var requestCalls: [String: String] = [:]
+    private var messaging: AgentMessaging?
+    private var subscriptions: [String: AgentEventSubscription] = [:]
+    func bindMessaging(_ messaging: AgentMessaging) async { self.messaging = messaging }
     init(configuration: AgentConfiguration, model: TaskFixtureChat? = nil) throws {
         descriptor = AgentDescriptor(
             category: .cognition,
             id: configuration.agentID, name: configuration.agentID.rawValue,
-            inputs: Set(configuration.communication.inputs.map(\.kind)),
+            inputs: Set(configuration.communication.inputKinds),
             outputs: [.communication, .actionCall, .control],
             capabilities: configuration.capabilities)
         context = try AgentContextRepository(
@@ -234,6 +223,8 @@ private actor TaskFixtureAgent: Agent {
     func resume() { lifecycle = .running }
     func stop() async {
         lifecycle = .stopped
+        for subscription in subscriptions.values { await subscription.cancel() }
+        subscriptions.removeAll()
         worker?.cancel()
         await worker?.value
         do {
@@ -259,27 +250,24 @@ private actor TaskFixtureAgent: Agent {
         let action = try CommunicationAction(
             message: signal.message(), target: incoming ? signal.scope.executor : signal.scope.requester)
         if signal.kind == .request {
+            guard let messaging else { throw CommunicationError.unavailableTarget }
+            subscriptions[signal.scope.id] = try await messaging.subscribe(
+                .init(
+                    channel: "agent.task", protocolID: "agent.task.events.v1", sources: [signal.scope.executor],
+                    scope: signal.scope.id, sessionID: signal.scope.sessionID))
             try await context.update { try $0.tasks.register(signal.scope) }
             requestCalls[action.id] = signal.scope.id
         }
         try emit(.communication(action), input: parent)
         if model == nil { try emit(.control("agent.finished"), input: parent) }
     }
+    func receiveRequest(_ request: AgentProtocolRequest) async throws -> AgentRequestReply {
+        try await receive(request.input)
+        return .init(requestID: request.input.id, reference: request.input.taskScope?.id ?? request.input.id)
+    }
     func receive(_ input: AgentInput) async throws {
         guard lifecycle == .running else { throw HarnessError.notRunning }
         switch input.payload {
-        case .communicationReceipt(let receipt):
-            guard input.metadata.origin == .runtime, receipt.owner.agent == descriptor.id else {
-                throw CommunicationError.unauthorized
-            }
-            let taskID = requestCalls.removeValue(forKey: receipt.callID)
-            try await context.update { context in
-                context.state.receipts.append(receipt.callID)
-                if let taskID {
-                    try context.tasks.acknowledge(
-                        taskID, accepted: receipt.report.rejected.isEmpty && !receipt.report.delivered.isEmpty)
-                }
-            }
         case .observation(let message):
             guard let task = message.content(as: AgentTaskSignal.self) else { throw CommunicationError.invalidPayload }
             let agentID = descriptor.id
@@ -412,6 +400,7 @@ extension LiveRuntimeTests {
         let gateway = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(), actions: scheduler, policy: policy, sink: { _ in }
         )
+        await parent.bindMessaging(try await gateway.messaging(for: parent.descriptor.id))
         let parentPump = Task {
             try await IndependentOutputWorkflow.consumeSignals(parent.outputs) { _ = try await gateway.execute($0) }
         }
@@ -651,6 +640,7 @@ extension LiveRuntimeTests {
         let input = InputGateway(manager: manager, policy: policy)
         let gateway = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
+        await parent.bindMessaging(try await gateway.messaging(for: parent.descriptor.id))
         let root = AgentInput(
             id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("delegation"))
         let scope = AgentTaskScope(
@@ -664,41 +654,11 @@ extension LiveRuntimeTests {
         let consumer = try await gateway.consumer(for: parent)
         _ = try await consumer.execute(envelope)
         let snapshot = try await parent.context.snapshot()
-        #expect(snapshot.state.receipts.count == 1)
-        #expect(snapshot.tasks.task(scope.id)?.state == .failed)
+        #expect(snapshot.state.receipts.isEmpty)
+        #expect(snapshot.tasks.task(scope.id)?.state == .requested)
         #expect(!snapshot.state.reports.contains(.result))
         await gateway.shutdown()
         await manager.stopAll()
-    }
-}
-
-extension LiveRuntimeTests {
-    @Test(.actionCatalog) func communicationReceiptsAreBoundedDeduplicatedAndFailedWritesDoNotAcknowledge() async throws
-    {
-        let receipts = CommunicationReceipts()
-        let ids = (0..<16).map { _ in UUID().uuidString }
-        for id in ids { try await receipts.register(id) }
-        await #expect(throws: CommunicationError.capacityExceeded) {
-            try await receipts.register(UUID().uuidString)
-        }
-        let result = CommunicationReceipt(
-            callID: ids[0], report: .init(delivered: [.assistant]),
-            owner: ExecutionOwner(
-                agent: .assistant, incarnation: UUID().uuidString, sessionID: UUID().uuidString),
-            causality: .root())
-        await #expect(throws: CommunicationError.invalidPayload) {
-            try await receipts.accept(result) { throw CommunicationError.invalidPayload }
-        }
-        await #expect(throws: CommunicationError.unauthorized) { try await receipts.accept(result) }
-        await #expect(throws: CommunicationError.invalidPayload) { _ = try await receipts.wait(ids[0]) }
-        let next = UUID().uuidString
-        try await receipts.register(next)
-        let accepted = CommunicationReceipt(
-            callID: next, report: .init(delivered: [.assistant]), owner: result.owner, causality: result.causality)
-        try await receipts.accept(accepted)
-        #expect(try await receipts.wait(next).delivered == [.assistant])
-        await receipts.close()
-        await #expect(throws: CommunicationError.scopeClosed) { _ = try await receipts.wait(ids[1]) }
     }
 }
 
@@ -975,10 +935,7 @@ extension LiveRuntimeTests {
         #expect(!catalog.tools.contains { $0.alias == "Agent.send" || $0.path.hasPrefix("Agent.Communication.") })
         #expect(
             catalog.actions.contains { $0.alias == "send" }
-                == (role.capabilities.actions.contains { $0.path.description == "Agent.Communication.send" }
-                    && role.communication.sends.contains { send in
-                        AgentTaskSignal.Kind.allCases.contains { $0.contract == send.contract }
-                    }))
+                == (role.capabilities.actions.contains { $0.path.description == "Agent.Communication.send" }))
     }
     let catalog = try AgentCommunicationAdapter.catalog(
         fixtureCatalogWithCommunication(configuration.capabilities), policy: configuration.communication)

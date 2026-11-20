@@ -443,8 +443,8 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
     let channel = ContainerFailureChannel()
     let admission = PlatformAdmission(onFailure: channel.sink(module: "platform"))
     let broadcast = NativeInputBroadcast<Int> { error in admission.report("audio.capture", "subscriber", error) }
-    let slow = try broadcast.subscribe(.ordered)
-    let latest = try broadcast.subscribe(.latest)
+    let slow = try broadcast.listen(.ordered)
+    let latest = try broadcast.listen(.latest)
     for value in 0..<65 { broadcast.send(value) }
     var slowValues = slow.makeAsyncIterator()
     for value in 0..<64 { #expect(try await slowValues.next() == value) }

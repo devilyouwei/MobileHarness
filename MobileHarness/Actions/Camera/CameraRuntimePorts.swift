@@ -9,8 +9,8 @@
             -> ResourceLease
         func run(
             resources: Set<ResourceID>, owner: ExecutionOwner, lease: ResourceLease,
-            operation: @escaping @Sendable () async throws -> AsyncThrowingStream<CameraFrame, Error>
-        ) async throws -> AsyncThrowingStream<CameraFrame, Error>
+            operation: @escaping @Sendable () async throws -> MediaSignalListener<CameraFrame>
+        ) async throws -> MediaSignalListener<CameraFrame>
         func renew(_ lease: ResourceLease, owner: ExecutionOwner, duration: Duration) async throws -> ResourceLease
         func release(_ lease: ResourceLease, owner: ExecutionOwner) async throws
         func isSettled(_ resource: ResourceID) async -> Bool

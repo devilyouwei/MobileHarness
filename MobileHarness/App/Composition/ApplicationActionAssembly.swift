@@ -10,13 +10,11 @@ import UI
 
 @MainActor @available(iOS 27, *)
 final class ApplicationActionAssembly {
-    let gateway: GatewayContainer
     weak var agents: AgentContainer?
     private let actionSnapshots = AsyncStream<ActionExecutionSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
     private var actionLog: Task<Void, Never>?
     private let language: @Sendable () -> AppLanguage
-    init(gateway: GatewayContainer, language: @escaping @Sendable () -> AppLanguage) {
-        self.gateway = gateway
+    init(language: @escaping @Sendable () -> AppLanguage) {
         self.language = language
     }
 
@@ -49,12 +47,6 @@ final class ApplicationActionAssembly {
             presentationLanguage: language,
             workspaces: { try storage.database.workspaces },
             media: { try storage.database.media }, devices: { try storage.database.devices },
-            makeCameraRuntime: { [weak self] in
-                guard let self else { throw ActionsContainerError.stopped }
-                let ports = try self.gateway.capabilities
-                return CameraRuntimeDependencies(
-                    resources: CameraResourceBinding(resources: ports.resources, actions: ports.actions))
-            },
             connectVision: { [weak self] session, mirrored, endpoint in
                 guard let agents = self?.agents else { throw ActionsContainerError.unavailable }
                 try await agents.connectVision(
@@ -65,7 +57,7 @@ final class ApplicationActionAssembly {
     func prepare(_ request: AgentBusinessRequest, actions: ActionsContainer) throws -> AgentBusinessBindings {
         let ports = try actions.configureBusiness(request: request)
         return AgentBusinessBindings(
-            executor: ports.executor, catalog: ports.catalog, readWebScreenshot: ports.readWebScreenshot,
+            catalog: ports.catalog, readWebScreenshot: ports.readWebScreenshot,
             artifactStreaming: ports.artifactStreaming,
             writerArtifacts: ports.writerArtifacts,
             writerModel: ports.writerModel, decisionConfiguration: ports.decisionConfiguration,
@@ -76,11 +68,7 @@ final class ApplicationActionAssembly {
             trackingAvailable: ports.trackingAvailable,
             bindTracking: ports.bindTracking,
             bindDeferredFailure: ports.bindDeferredFailure,
-            bindResources: { resources, _ in
-                ports.bindResourceRun { requested, operation in
-                    try await resources.runInCurrentContext(resources: requested, operation: operation)
-                }
-            }, observeTranscript: ports.observeTranscript, output: ports.output,
+            observeTranscript: ports.observeTranscript, output: ports.output,
             speechEnhancementEnabled: ports.speechEnhancementEnabled, speechDetection: ports.speechDetection,
             decodeResources: ports.decodeResources,
             makeVoice: { host in

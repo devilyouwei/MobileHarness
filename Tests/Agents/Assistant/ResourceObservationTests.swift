@@ -3,6 +3,7 @@ import AgentCore
 import Foundation
 import FunctionContracts
 import Gateway
+import ModelKit
 import PlatformKit
 import StorageCore
 import Synchronization
@@ -52,7 +53,14 @@ func roleOwnedArtifactSubscriptionUsesObservationProvenanceAndPresentsEachRevisi
     try ui.start()
     let changes = AsyncStream<UInt64>.makeStream(bufferingPolicy: .bufferingNewest(1))
     let resumedChanges = AsyncStream<UInt64>.makeStream(bufferingPolicy: .bufferingNewest(1))
-    let sources = Mutex([changes.stream, resumedChanges.stream])
+    let sources = Mutex([
+        ModelKit.StateSignalListener(
+            producer: "fixture.resources", generation: UUID(), stream: changes.stream,
+            detach: { changes.continuation.finish() }),
+        ModelKit.StateSignalListener(
+            producer: "fixture.resources", generation: UUID(), stream: resumedChanges.stream,
+            detach: { resumedChanges.continuation.finish() }),
+    ])
     let failures = Mutex<[String]>([])
     let inventory = ObservationInventory()
     let presentation = ObservationPresentation()

@@ -2,7 +2,7 @@
 
 ## 职责与关系
 
-供根组合、公共组件和功能子容器复用的非视觉机制，仅依赖Foundation；不引用Camera、Settings、Conversation、Root或业务模块。UI仍为同一Swift target，目录不引入新编译模块。
+供根组合、公共组件和功能子容器复用的非视觉机制，仅依赖Foundation与Synchronization；不引用Camera、Settings、Conversation、Root或业务模块。UI仍为同一Swift target，目录不引入新编译模块。
 
 | 文件 | 职责 |
 | --- | --- |
@@ -46,3 +46,7 @@ The shared localization catalog includes Agent and execution-log status, complet
 模型选择、未下载提示与 Decision 的类型化失败文案覆盖英语和简体中文；原始诊断留日志，Toast 使用本地化用户消息。
 
 模型设置分区采用 Cloud Providers & Models／云端服务与模型、Agent Models／智能体模型、Local Models／本地模型；Chat／对话和 Decision／决策为独立用途标签。Gemma 4 E2B、D3 Edge 保留模型原名，中英文不添加用途后缀。
+
+## UI-owned SignalListener
+
+SignalListener.swift provides RequestSignalListener<Value,Reply> and StateSignalListener<Value>. UIRequests.listen/listenControls expose one typed request consumer with source-owned accept/complete/cancellation. Request capacity is 64 and control capacity is one. Camera facts use a generation-bound state listener. Iterators are single-consumer across copied handles. cancel/join close the matching source token and outstanding receipts; the business owner separately joins processing. Source producer labels are supplied by the owning UI subcontainer. The contract depends only on Foundation/Synchronization and imports no other project module.

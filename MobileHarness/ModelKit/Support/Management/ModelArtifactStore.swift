@@ -13,7 +13,7 @@ public actor ModelArtifactStore {
     }
     private let changes = ArtifactChanges()
     private let onFailure: @Sendable (String, any Error) -> Void
-    public func observeChanges() throws -> AsyncStream<UInt64> { try changes.observe() }
+    public func observeChanges() throws -> ModelKit.StateSignalListener<UInt64> { try changes.observe() }
     private var fixtureDownload: (@Sendable (URL, URL, Int64) async throws -> URL)?
     private let downloader: (any ModelArtifactDownloader)?
     private final class ProgressMeter: Sendable { let value = Mutex<Double>(0) }
@@ -576,7 +576,7 @@ private final class ArtifactChanges: Sendable {
         var observers: [UUID: AsyncStream<UInt64>.Continuation] = [:]
     }
     private let state = Mutex(State())
-    func observe() throws -> AsyncStream<UInt64> {
+    func observe() throws -> ModelKit.StateSignalListener<UInt64> {
         let id = UUID()
         let pair = AsyncStream<UInt64>.makeStream(bufferingPolicy: .bufferingNewest(1))
         pair.continuation.onTermination = { [weak self] _ in self?.state.withLock { $0.observers[id] = nil } }
@@ -587,7 +587,12 @@ private final class ArtifactChanges: Sendable {
             return value.revision
         }
         pair.continuation.yield(initial)
-        return pair.stream
+        return ModelKit.StateSignalListener(
+            producer: "model.artifacts.revision", generation: id, stream: pair.stream,
+            detach: { [weak self] in
+                self?.state.withLock { $0.observers[id] = nil }
+                pair.continuation.finish()
+            })
     }
     func changed() {
         let next = state.withLock { value -> (UInt64, [AsyncStream<UInt64>.Continuation]) in

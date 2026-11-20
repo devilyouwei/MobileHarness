@@ -224,7 +224,7 @@ actor WriterEvaluationChat: ChatCapability {
 actor WriterEvaluationSink: Agent {
     nonisolated let descriptor = AgentDescriptor(
         category: .cognition,
-        id: .assistant, name: "Evaluation requester", inputs: [.observation, .communicationReceipt],
+        id: .assistant, name: "Evaluation requester", inputs: [.observation],
         outputs: [.communication])
     nonisolated let outputs = AsyncStream<OutputEnvelope> { $0.finish() }
     var signals: [AgentTaskSignal] = []
@@ -426,7 +426,9 @@ func writerPromptCase(_ scenario: WriterPromptCase, env: [String: String], root:
     try await output.bindCommunications(records.agentMessages)
     await writer.bind(try await output.consumer(for: writer), messaging: try await output.messaging(for: .writer))
     try await manager.start(.writer)
-    let messaging = try await output.messaging(for: .assistant)
+    _ = try await output.consumer(for: sink)
+    let messaging = WriterTestRequester(
+        port: try await output.messaging(for: .assistant), receiver: sink, records: records)
     var issues: [String] = []
     var item: [String: Any] = ["id": scenario.id, "goal": scenario.goal]
     var seeds: [String: WriterWorkspaceRecord] = [:]
@@ -523,7 +525,7 @@ func writerPromptCase(_ scenario: WriterPromptCase, env: [String: String], root:
         }
         if let busyID = item["busyMessageID"] as? String {
             let rejected =
-                try await records.agentMessages.agentReply(to: busyID, contract: "agent.task.response")
+                try await records.agentMessages.agentReply(to: busyID, contract: "agent.task.events.v1")
                 != nil
             item["busyRejected"] = rejected
             if !rejected { issues.append("Busy assignment was accepted") }

@@ -231,3 +231,5 @@ localModelPreparationStep accepts a caller-owned asynchronous local-model select
 `speech.enhancement.enhance(_:)` exposes [bounded utterance noise suppression](Speech/Enhancement/README.md). DeepFilterNet3 is independently registered and provisioned. App optionally preloads installed artifacts; SpeechPerception uses the bounded window adapter when its denoising preference is enabled. Speech consumers own capture/resampling/segmentation; ModelKit owns DSP and model resources.
 
 Decision exposes independent choice, noul and multi-question decide interfaces through ModelDecisionContainer; [JEV](Language/JEV/README.md) owns their types and execution semantics. Consumers choose the interface; the SDK does not interpret interruption or queue state.
+
+Artifact revision observations use the SDK-owned [StateSignalListener](Support/Core/README.md#external-state-listeners). The management store produces bounded latest revisions; consumers own task lifetime. Observing never starts a download, model load or inference.

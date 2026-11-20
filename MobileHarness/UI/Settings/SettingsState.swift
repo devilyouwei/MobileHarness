@@ -464,7 +464,7 @@ public final class UISettingsContainer {
             ])
     }
 
-    public let requests = UIRequests<SettingsInput, SettingsReply>()
+    public let requests = UIRequests<SettingsInput, SettingsReply>(producer: "ui.settings")
 
     public let state: SettingsState
     public var presentation: any SettingsPresenting { state }

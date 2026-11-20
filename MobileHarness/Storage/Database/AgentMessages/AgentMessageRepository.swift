@@ -3,6 +3,11 @@ import StorageCore
 
 public protocol AgentMessageRepository: Sendable {
     var storageScope: UUID { get }
+    func observationRequests(sender: String, after: String?, limit: Int) async throws -> [AgentCommunicationRecord]
+    func archiveInvocationEvidence(_ id: String, ownerContext: String, data: Data) async throws
+    func invocationEvidence(_ id: String) async throws -> Data
+    func taskEvents(reference: String, receiver: String, after: Int64?, limit: Int) async throws -> AgentTaskEventPage
+    func consumeTaskEvents(reference: String, receiver: String, through: Int64) async throws
     func rejectAgentMessage(_ id: String, eventID: String, payload: Data) async throws
     func enqueueAgentMessage(_ value: AgentCommunicationRecord) async throws
     func nextAgentDelivery(sender: String, contract: String) async throws -> Date?
@@ -15,6 +20,21 @@ public protocol AgentMessageRepository: Sendable {
 }
 
 extension AgentMessageRepository {
+    public func observationRequests(sender: String, after: String?, limit: Int) async throws
+        -> [AgentCommunicationRecord]
+    { throw RecordStorageError.invalidRecord }
+    public func archiveInvocationEvidence(_ id: String, ownerContext: String, data: Data) async throws {
+        throw RecordStorageError.invalidRecord
+    }
+    public func invocationEvidence(_ id: String) async throws -> Data { throw RecordStorageError.invalidRecord }
+    public func taskEvents(reference: String, receiver: String, after: Int64? = nil, limit: Int = 32) async throws
+        -> AgentTaskEventPage
+    {
+        throw RecordStorageError.invalidRecord
+    }
+    public func consumeTaskEvents(reference: String, receiver: String, through: Int64) async throws {
+        throw RecordStorageError.invalidRecord
+    }
     public func rejectAgentMessage(_ id: String, eventID: String, payload: Data) async throws {
         throw RecordStorageError.invalidRecord
     }

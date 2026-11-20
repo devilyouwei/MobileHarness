@@ -29,4 +29,4 @@ Channel names are logical scheduling scopes. Device control requires App-defined
 
 Expiry, release, owner/session termination and shutdown invalidate admission, stop/join affected work and follow resource-specific safe cleanup. Uncertain cleanup leaves the domain gated for supervisor recovery. Unlock never replays old Actions or automatically resumes motion. Hardware safety cannot rely on iOS remaining active.
 
-The normative overview is [section 20.1](../../MobileHarness/Gateway/Output/Scheduling/README.md#channel-lock-design); full lifecycle, bounds, scenario and required tests are in [Scheduling](../../MobileHarness/Gateway/Output/Scheduling/README.md#channel-lock-design). Runtime APIs and enforcement must be delivered together before making the ownership state mutable.
+The normative overview is [section 20.1](../../MobileHarness/Actions/Support/Shell/README.md#scheduling); full lifecycle, bounds, scenario and required tests are in [Scheduling](../../MobileHarness/Actions/Support/Shell/README.md#scheduling). Runtime APIs and enforcement must be delivered together before making the ownership state mutable.

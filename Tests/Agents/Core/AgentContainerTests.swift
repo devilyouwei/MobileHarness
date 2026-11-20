@@ -309,7 +309,7 @@ private enum ContainerTestFailure: Error { case startup, cleanup }
                         makeRuntime: connections.makeRuntime, connectPerception: connections.connectPerception)
                 }, bluetooth: bluetooth, audio: platform.audio,
                 languageModels: model.language, speechModels: model.speech, visionModels: model.vision,
-                modelArtifacts: model.artifacts, memoryPressure: { await model.handleMemoryPressure() })
+                modelArtifacts: model.artifacts)
         }
     }
 

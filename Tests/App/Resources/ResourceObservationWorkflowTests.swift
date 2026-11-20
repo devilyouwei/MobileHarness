@@ -1,4 +1,5 @@
 import Foundation
+import ModelKit
 import Testing
 
 @testable import Agents
@@ -11,7 +12,9 @@ import Testing
     let observer = ResourceObservationSession(
         source: {
             connections += 1
-            return source.stream
+            return ModelKit.StateSignalListener(
+                producer: "fixture.resources", generation: UUID(), stream: source.stream,
+                detach: { source.continuation.finish() })
         },
         changed: { delivered.continuation.yield(true) }, failed: { _ in Issue.record("Unexpected observation failure") }
     )

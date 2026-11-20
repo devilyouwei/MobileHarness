@@ -22,8 +22,8 @@ public final class UIHomeContainer {
         ]
     }
 
-    public let requests = UIRequests<HomeInput, Void>()
-    public let listeningRequests = UIRequests<ListeningInput, Void>(controlOnly: true)
+    public let requests = UIRequests<HomeInput, Void>(producer: "ui.home.text")
+    public let listeningRequests = UIRequests<ListeningInput, Void>(producer: "ui.home.listening", controlOnly: true)
 
     public let conversation = ConversationState()
     public let notices = HomeNoticeState()

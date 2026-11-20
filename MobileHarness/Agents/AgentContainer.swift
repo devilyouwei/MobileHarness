@@ -36,7 +36,6 @@ import StorageFiles
         @ObservationIgnored private let speechModels: any ModelSpeechProviding
         @ObservationIgnored private let visionModels: any ModelVisionProviding
         @ObservationIgnored private let modelArtifacts: any ModelArtifactsManaging
-        @ObservationIgnored private let memoryPressure: @Sendable () async -> Void
         private func makeStateContext() throws -> AgentStateContext {
             let context = AgentStateContext()
             try AssistantStateBindings.register(in: context) { [weak self] path in
@@ -112,7 +111,6 @@ import StorageFiles
             audio: AudioContainer,
             languageModels: any ModelLanguageProviding, speechModels: any ModelSpeechProviding,
             visionModels: any ModelVisionProviding, modelArtifacts: any ModelArtifactsManaging,
-            memoryPressure: @escaping @Sendable () async -> Void,
             language: @escaping @Sendable () -> String = { "en" }
         ) {
             self.containerFailures = containerFailures
@@ -146,7 +144,6 @@ import StorageFiles
             self.speechModels = speechModels
             self.visionModels = visionModels
             self.modelArtifacts = modelArtifacts
-            self.memoryPressure = memoryPressure
             self.language = language
         }
         public let assistant: AssistantContainer
@@ -487,7 +484,7 @@ import StorageFiles
             try await applicationControl.settingsControls.restore()
             let prepared = try await VoiceInteractionSession(
                 home: homeUI, diagnostics: diagnosticsUI, language: languageModels, speech: speechModels,
-                memoryPressure: memoryPressure, audio: audio, runtime: runtime(),
+                audio: audio, runtime: runtime(),
                 perceptionContainer: speechPerception,
                 modelName: { [applicationControl] in await applicationControl.modelName },
                 progress: progress)

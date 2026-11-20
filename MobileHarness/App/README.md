@@ -47,7 +47,7 @@ flowchart TB
 
 Construction is inert. Startup orders diagnostics → storage → model → platform → ui → executionBindings → actions → gateway → agents → homePreparation. The foundation readiness edges do not create foundation compile dependencies. executionBindings prepares metadata/services, validates Skill coverage and installs host ports before business admission; it does not operate devices.
 
-Shutdown reverses that order. Agents closes requests and joins roles; Gateway joins scheduling, execution, transport and delivery while Actions remains available for cleanup; Actions joins native/business work; executionBindings finally unbinds. Startup failure rolls back the current node and completed stages while preserving original and cleanup failures. A failed cleanup prevents replacement.
+Shutdown reverses that order. Agents closes requests and joins roles; Gateway joins transport and Signal delivery; Actions joins scheduling, execution, result delivery and native/business work through its Shell; executionBindings finally unbinds. Startup failure rolls back the current node and completed stages while preserving original and cleanup failures. A failed cleanup prevents replacement.
 
 Initial inactive waits for active. Synchronous invalidation closes admission before asynchronous pause. Rapid reactivation completes necessary suspension first. One replacement task coalesces retries and rechecks foreground state; there is no replay queue. Durable records/media remain independent from runtime work.
 

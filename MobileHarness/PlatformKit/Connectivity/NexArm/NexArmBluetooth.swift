@@ -182,7 +182,7 @@ public enum NexArmBluetoothError: Error, Sendable, Equatable {
     case unavailable, unknownDevice, incompatibleService, packetTooLarge
 }
 public protocol NexArmBluetoothLink: NexArmObservableLink {
-    nonisolated var updates: AsyncStream<NexArmBluetoothSnapshot> { get }
+    nonisolated func listenUpdates() throws -> StateSignalListener<NexArmBluetoothSnapshot>
     nonisolated var reflectedState: NexArmBluetoothState? { get }
     func status() async -> NexArmBluetoothSnapshot
     func scan() async throws
@@ -202,17 +202,16 @@ extension NexArmBluetoothLink {
 
 /// Actor-facing transport; CoreBluetooth objects never leave their main-actor delegate owner.
 public actor NexArmBluetooth: NexArmBluetoothLink, NexArmObservableLink {
-    public nonisolated let updates: AsyncStream<NexArmBluetoothSnapshot>
+    private nonisolated let updates = NativeInputBroadcast<NexArmBluetoothSnapshot>()
     public nonisolated let reflectedState: NexArmBluetoothState?
     private var driver: Task<NexArmBLEDriver, Never>?
-    private let continuation: AsyncStream<NexArmBluetoothSnapshot>.Continuation
     private let admission: PlatformAdmission?
     private let initialSnapshot = NexArmBluetoothSnapshot()
     private func native() throws -> Task<NexArmBLEDriver, Never> {
         do {
             try admission?.check()
             if let driver { return driver }
-            let continuation = continuation
+            let continuation = updates
             let admission = admission
             let reflectedState = reflectedState
             let value = Task { @MainActor in
@@ -228,9 +227,9 @@ public actor NexArmBluetooth: NexArmBluetoothLink, NexArmObservableLink {
     public init(admission: PlatformAdmission? = nil) {
         self.admission = admission
         reflectedState = NexArmBluetoothState(initialSnapshot)
-        let pair = AsyncStream<NexArmBluetoothSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
-        updates = pair.stream
-        continuation = pair.continuation
+    }
+    public nonisolated func listenUpdates() throws -> StateSignalListener<NexArmBluetoothSnapshot> {
+        try updates.listen(.latest, producer: "platform.bluetooth.nexarm")
     }
     public func beginObservation() async throws -> String {
         do {
@@ -429,7 +428,7 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
     private static let service = CBUUID(string: "FFE0")
     private static let transmit = CBUUID(string: "FFE1")
     private static let receive = CBUUID(string: "FFE2")
-    private let updates: AsyncStream<NexArmBluetoothSnapshot>.Continuation
+    private let updates: NativeInputBroadcast<NexArmBluetoothSnapshot>
     private let reflectedState: NexArmBluetoothState?
     private var reportedPower: NexArmBluetoothPower?
     private var snapshot = NexArmBluetoothSnapshot()
@@ -460,7 +459,7 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
     private var disconnectTask: Task<Void, Never>?
 
     init(
-        updates: AsyncStream<NexArmBluetoothSnapshot>.Continuation, admission: PlatformAdmission?,
+        updates: NativeInputBroadcast<NexArmBluetoothSnapshot>, admission: PlatformAdmission?,
         reflectedState: NexArmBluetoothState?
     ) {
         self.admission = admission
@@ -484,7 +483,7 @@ private final class NexArmBLEDriver: NSObject, @preconcurrency CBCentralManagerD
             reportedPower = snapshot.power
             NotificationCenter.default.post(name: NativeStateCollection.permissionsDidChange, object: nil)
         }
-        updates.yield(snapshot)
+        updates.send(snapshot)
     }
     private func manager() -> CBCentralManager {
         if let central { return central }

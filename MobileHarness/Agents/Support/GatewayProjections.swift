@@ -8,7 +8,8 @@ extension OutputEnvelope {
         .init(
             source: source.rawValue, sessionID: sessionID, inputID: inputID, schedulingID: schedulingID,
             sequence: sequence, roundID: roundID, callID: callID, context: executionContext,
-            correlation: SignalCausality(envelope: self), orderingScope: source == .assistant ? "conversation" : nil)
+            correlation: SignalCausality(envelope: self), orderingScope: source == .assistant ? "conversation" : nil,
+            invocationSnapshot: invocation)
     }
     public var actionObservation: ActionOutputObservation {
         let kind: ActionOutputObservation.Kind
@@ -28,7 +29,8 @@ extension ExecutionResult {
             causality: (envelope.correlation as? SignalCausality)
                 ?? .init(inputID: envelope.inputID, rootID: envelope.inputID, hops: 0),
             status: status.agentValue, effect: effect.agentValue, completion: completion?.agentValue,
-            failure: failure?.agentValue, callID: envelope.callID, roundID: envelope.roundID)
+            failure: failure?.agentValue, callID: envelope.callID, roundID: envelope.roundID,
+            invocation: envelope.invocationSnapshot ?? invocation)
     }
 }
 extension ExecutionResult.Status {
@@ -71,7 +73,7 @@ extension ScheduledAction {
     }
 
 }
-extension ChannelScheduler {
+extension ActionExecutionEngine {
     public func finish(inputID: String, source: AgentID) async throws {
         try await finish(inputID: inputID, source: source.rawValue)
     }
@@ -81,16 +83,14 @@ extension ChannelScheduler {
     public func cancel(agent: AgentID, incarnation: String, sessionID: String? = nil) async {
         await cancel(endpoint: agent.rawValue, incarnation: incarnation, sessionID: sessionID)
     }
-    public func schedule(_ directive: SchedulingDirective, envelope: OutputEnvelope) throws {
-        try schedule(directive == .beginWait ? .beginWait : .endWait, envelope: envelope.schedulingEnvelope)
+    public func schedule(_ directive: SchedulingDirective, envelope: OutputEnvelope) async throws {
+        try await schedule(directive == .beginWait ? .beginWait : .endWait, envelope: envelope.schedulingEnvelope)
     }
-    public nonisolated func requiredResources(for call: ActionCall) async throws -> Set<ResourceID> {
+    public func requiredResources(for call: ActionCall) async throws -> Set<ResourceID> {
         try await requiredResources(for: call.executionRequest.functionRequest)
     }
-}
-extension ResourceCoordinator {
-    public func close(agent: AgentID, incarnation: String) async {
-        await close(endpoint: agent.rawValue, incarnation: incarnation)
+    public func closeResources(agent: AgentID, incarnation: String) async {
+        await closeResources(endpoint: agent.rawValue, incarnation: incarnation)
     }
 }
 extension ResourceDefinition {

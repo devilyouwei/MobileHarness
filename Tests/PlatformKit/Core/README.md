@@ -4,6 +4,8 @@
 
 PlatformStateTests covers deterministic local-time midnight/weekday/leap-day/DST/zone behavior, invalid dates, native observation replacement and unknown values, root admission/resume/stop, context JSON wrapping/re-read and malformed/oversized snapshots. BasicSkill's eight-source contract is asserted. Existing photography/ReACT acceptance inspects all eight sources in actual model requests and preserved request history. Shared and Qwen fixtures use explicitly synthetic FixedPlatformState rather than host device facts; model/device performance and native hardware acceptance are separate.
 
+Memory warnings are covered in PlatformContainerTests: coalescing latest delivery, survival across background invalidation, failure before start/after stop and listener termination on stop, using an injected NotificationCenter. The real iOS memory-warning effect on idle models needs separate device acceptance.
+
 ## 文件归属
 
 - [PlatformContainerTests.swift](PlatformContainerTests.swift)

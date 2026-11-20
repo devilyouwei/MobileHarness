@@ -33,7 +33,7 @@ public typealias AudioDetectionConnections = DetectionConnections<any AudioCaptu
             self.id = id
             self.observe = observe
             let configuration = try AgentConfigurations.load(named: "SpeechPerception").restrictingCommunication(
-                to: ["sound.source"], contracts: AgentContracts.communication)
+                to: ["perception.audio.source.v1"], contracts: AgentContracts.communication)
             policy = try CommunicationPolicy(contracts: AgentContracts.communication, configurations: [configuration])
             speech = try SpeechPerceptionAgent(
                 recognition: recognition, vad: vad, sessionID: id, configuration: configuration, mode: .soundSourceOnly,
@@ -69,7 +69,7 @@ public typealias AudioDetectionConnections = DetectionConnections<any AudioCaptu
         }
         private func start(fail: @escaping @MainActor (any Error) async -> Void) async throws {
             let session = try gateway.open(
-                policy: policy, observedContracts: ["sound.source"],
+                policy: policy, observedContracts: ["perception.audio.source.v1"],
                 observeEvent: { [weak self] in await self?.observe($0) })
             self.session = session
             let manager = session.capabilities.manager

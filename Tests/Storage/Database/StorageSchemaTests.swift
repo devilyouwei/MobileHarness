@@ -78,9 +78,11 @@ import UI
         ).compactMap(\.first)
         #expect(
             tables == [
-                "agent_messages", "assistant_conversations", "assistant_messages", "assistant_tasks", "devices",
+                "agent_messages", "assistant_conversations",
+                "assistant_messages", "assistant_tasks", "devices", "invocation_evidence",
                 "media_files",
-                "model_request_log", "workspace_files", "writer_executions", "writer_messages", "writer_workspaces",
+                "model_request_log", "task_observation_cursors", "workspace_files", "writer_executions",
+                "writer_messages", "writer_workspaces",
             ])
         #expect(try schemaRows(url, "SELECT COUNT(*) FROM assistant_messages") == [["2"]])
         #expect(try schemaRows(url, "SELECT COUNT(*) FROM assistant_messages") == [["2"]])

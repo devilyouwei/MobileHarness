@@ -695,12 +695,18 @@ func unifiedInterruptGatewayRequiresDeclaredSenderPermission() async throws {
         try AgentConfiguration(
             contracts: AgentContracts.communication,
             data: JSONSerialization.data(withJSONObject: [
-                "version": 8, "category": "cognition", "id": id, "actions": [String: [String]](), "tools": [],
-                "communication": [
-                    "inputs": id == "assistant"
-                        ? [["contract": AssistantInterrupt.contract, "version": 1, "kind": "observation"]] : [],
-                    "subscriptions": [], "publications": [],
-                    "sends": allowed ? [["contract": AssistantInterrupt.contract, "target": "assistant"]] : [],
+                "version": 9, "category": "cognition", "id": id, "actions": [String: [String]](), "tools": [],
+                "signals": [
+                    "requests": [], "feedback": [],
+                    "subscriptions": id == "assistant"
+                        ? [
+                            [
+                                "channel": "agent.interruption", "protocol": AssistantInterrupt.contract,
+                                "sources": ["producer"],
+                            ]
+                        ] : [],
+                    "publications": allowed
+                        ? [["channel": "agent.interruption", "protocol": AssistantInterrupt.contract]] : [],
                 ],
             ]))
     }
@@ -712,7 +718,8 @@ func unifiedInterruptGatewayRequiresDeclaredSenderPermission() async throws {
     let model = DecisionCloudFixture(events: [])
     let context = try AgentContextRepository(
         agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
-    let agent = try FixtureNativeAgent(fullDuplex: true, chat: model, context: context)
+    let agent = try FixtureNativeAgent(
+        fullDuplex: true, chat: model, configuration: configuration("assistant"), context: context)
     let manager = AgentManager()
     let source = ObservationRecorder(id: "producer")
     let untrusted = ObservationRecorder(id: "untrusted")
@@ -726,10 +733,10 @@ func unifiedInterruptGatewayRequiresDeclaredSenderPermission() async throws {
     let port = try await output.messaging(for: source.descriptor.id)
     let forbidden = try await output.messaging(for: untrusted.descriptor.id)
     let parent = AgentInput(id: "parent", sessionID: "s", payload: .text("event"))
-    let report = try await port.send(AssistantInterrupt().message(), parent: parent, to: .assistant)
-    #expect(report.delivered == [.assistant])
+    try await port.publish(AssistantInterrupt().message(), parent: parent)
+    await input.flushPublications()
     await #expect(throws: CommunicationError.unauthorized) {
-        try await forbidden.send(AssistantInterrupt().message(), parent: parent, to: .assistant)
+        try await forbidden.publish(AssistantInterrupt().message(), parent: parent)
     }
     #expect(await model.requests.isEmpty)
     await manager.stopAll()

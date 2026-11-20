@@ -1,6 +1,6 @@
 # Signal 核心架构重设计
 
-日期：2026-11-19。状态：需求与方案草案，SignalListener、Gateway 新通信/配置与反馈协议、IPC 均为拟议设计，尚未按本文实施。本文是 Signal 重设计的需求入口；当前实现仍以 [总体技术设计](../../../MobileHarness/README.md) 和各模块 README 为准。
+日期：2026-11-19。状态：非 IPC 代码迁移与工程门禁已完成；真实设备/性能专项待验收，IPC 按用户指定保留为独立待实施范围。实施与验证见第 13 节。本文是 Signal 重设计的需求入口；当前实现以 [总体技术设计](../../../MobileHarness/README.md) 和各模块 README 为准。
 
 ## 1. 目标与设计定位
 
@@ -757,11 +757,11 @@ flowchart LR
 
 | 阶段 | 计划产出 | 完成条件 | 状态 |
 | --- | --- | --- | --- |
-| A：逐源盘点与接口设计 | 列出实际源接口/文件、消费者、容量、执行域、所有权；确定监听协议族、编译归属及受影响文件清单 | 覆盖音视频、UI 请求、状态/故障及压力/温度等未来载荷契约；不破坏基础模块独立性 | 待实施 |
-| B：统一外部监听 | 先选一个已实现音视频源与一个请求源验证，并用标量传感器契约夹具验证可扩展性，再迁移其余批准范围；夹具不代表真实压力/温度硬件已接入 | 保留直接路径；取消、结束、失败、背压与请求完成回归通过；清理被替代接口 | 待实施 |
-| C：内部通信简化 | 分离事件频道与请求协议；await send 直接回复；迁移角色配置与持久任务观察，清理旧 receipt/response 路由 | 直接回复、真实接纳与长期任务完成分离；身份/容量/取消及终态恢复不退化 | 待实施 |
+| A：逐源盘点与接口设计 | 列出实际源接口/文件、消费者、容量、执行域、所有权；确定监听协议族、编译归属及受影响文件清单 | 覆盖音视频、UI 请求、状态/故障及压力/温度等未来载荷契约；不破坏基础模块独立性 | 已实施，工程门禁通过；专项证据见验证记录 |
+| B：统一外部监听 | 先选一个已实现音视频源与一个请求源验证，并用标量传感器契约夹具验证可扩展性，再迁移其余批准范围；夹具不代表真实压力/温度硬件已接入 | 保留直接路径；取消、结束、失败、背压与请求完成回归通过；清理被替代接口 | 已实施，工程门禁通过；专项证据见验证记录 |
+| C：内部通信简化 | 分离事件频道与请求协议；await send 直接回复；迁移角色配置与持久任务观察，清理旧 receipt/response 路由 | 直接回复、真实接纳与长期任务完成分离；身份/容量/取消及终态恢复不退化 | 已实施，工程门禁通过；专项证据见验证记录 |
 | D：IPC 协议与试验 | 确定平台、对端、承载和协议；最小跨进程闭环与故障验证 | 真实双进程通信与断连/取消证据；清楚区分 stub 与真实外部 App | 待设计、待实施 |
-| E：整体验收与文档对齐 | 多源并发及全双工回归、性能证据、当前设计与历史记录协调 | 原范围迁移/清理/必需验收完成，无旧新路径无理由并存 | 待实施 |
+| E：整体验收与文档对齐 | 多源并发及全双工回归、性能证据、当前设计与历史记录协调 | 原范围迁移/清理/必需验收完成，无旧新路径无理由并存 | 工程与文档已完成；真机多源与性能专项待执行 |
 
 每阶段代码修改前，在本需求或关联设计中补齐具体受影响文件、接口与行为；设计改变先修订文档。迁移如需兼容期，必须说明唯一权威状态、适配方向及删除条件，不能恢复旧的原始媒体 Gateway 入口。
 
@@ -792,4 +792,212 @@ flowchart LR
 | pub/sub | 源内顺序、分支独立容量与控制准入的具体实现；目标顺序契约不能当作当前已有的全局 FIFO 保证 |
 | IPC | 首个目标平台/合作程序、承载技术、身份与时钟、断连恢复及职责归属，见第 7 节 |
 
-本次交付为需求与设计文档，生产代码与资源 schema 在用户确认方案后另行迁移。不新增目录或依赖；文档核对不替代工程、性能、真实模型或跨进程验收。
+原文档阶段的待决策清单保留为需求背景；非 IPC 的接口、逐角色清单、容量与存储选择已在第 13 节定稿并实施。未新增目录或依赖。IPC 仍待设计；真机性能、真实模型与跨进程验收不由工程检查替代。
+
+## 12. 实现审计与首批修改（2026-11-19）
+
+开发分支：`feat/signal-redesign`。用户已授权依据本需求开展修改。以下为分阶段实施清单，不代表整份需求已经完成。
+
+| 优先级 | 当前证据及差距 | 修改归属与接口影响 |
+| --- | --- | --- |
+| P0 | Gateway/Input/SignalTransport.swift 的普通与 cleanup 递送共用全部 256 槽 / 8 MiB；普通负载可使停止清理拒绝 | 首批保留 16 槽 / 256 KiB 给现有可信 cleanup；普通准入限制为 240 槽 / 7936 KiB，总上限不变。不是未来 agent.interruption 的授权控制端口 |
+| P0 | register 更换 incarnation 只换 token；已进入 receiver 的旧代工作未取消，返回也未校验 | 首批取消涉及旧 token 的在途工作，接收返回后检查取消与端点身份；保留 receiver 原始异常，不将失败改成取消。同步注册不等待旧业务退出，transport 仍持有任务直到 join；不可撤销副作用仍由业务所有者负责 |
+| P1 | PCM 已有单消费者、64 包 FIFO 与溢出失败；CameraFrame 为 latest；各源生命周期接口仍不同 | PlatformKit Audio/Vision、Agents 感知、UI 请求逐源设计 listen/cancel/join；保留原生缓冲，不让基础模块依赖 AgentCore。具体共享编译归属尚需确定 |
+| P1 | AgentContracts、CommunicationPolicy、Resources/Agents 仍用 v10 inputs/sends/topic | 先确定类型化描述符与逐角色能力矩阵，再同时迁移加载器、资源、装配与所有消费者到 v11；不能只替换 JSON 名称 |
+| P1 | 当前 send 返回投递接纳，Writer 后续以 agent.task.response 反馈 | Gateway 中立 Request/Reply + Agents 语义授权，取消/deadline/循环调用释放等待容量；Writer/Storage 任务状态与游标事务迁移后删除旧回执路径 |
+| P1 | ActionResultLedger 与轮次屏障已有独立执行语义 | Agents 输出适配器与执行快照迁移到 feedback；保留函数参数快照、重投去重及屏障后结算，不再次执行业务 |
+| P2 | pub/sub 仍按旧 contract/source/topic 精确匹配 | 显式 EventChannel/Protocol 绑定、sources、事件变体策略、启动全量校验与回滚；打断需要独立授权和准入，不能借 cleanup 标记开放权限 |
+| 待决策 | IPC 无首个合作程序、承载或对端身份方案 | 在真实平台与对端明确后设计，当前不添加空壳 IPC 或虚构验收 |
+
+首批受影响文件：`MobileHarness/Gateway/Input/SignalTransport.swift`、同目录 README、Gateway README、`Tests/Gateway/Output/GatewayContainerTests.swift`。模块依赖与跨模块接口保持不变，不新增目录。后续范围在编码前补充逐源接口设计和逐角色迁移清单。
+
+首批验证：Swift 工程测试覆盖普通字节容量耗尽后清理仍可进入、总预算拒绝、源/目标更替取消及错误保真；运行 check.sh 和 build-ios.sh，证据记录于 docs/validation/Signal-Redesign-Validation.md。此批不声称统一监听、v11、任务游标、控制广播或 IPC 已完成。
+
+### 12.1 已核对的外部源基线
+
+| 源及当前接口 | 消费者/执行域 | 容量、生命周期与迁移约束 |
+| --- | --- | --- |
+| PlatformKit/Audio/MicrophoneFrame.swift：AudioCaptureObserving.subscribeCapture | SpeechPerception；原生采集回调生产，角色任务消费 | 每代单消费者、64 包 ordered；overflow 终止并抛错；保留 generation、PCM 连续性与原生缓冲，不增加转发 Task |
+| PlatformKit/Vision/CameraFrame.swift：CameraFrameReceiver.subscribe | VisionPerception / 获准媒体消费者；原生回调生产 | NativeInputBroadcast.latest、每订阅 1 帧；保留 sequence/capturedAt，重新 begin 关闭旧观察；订阅不激活设备 |
+| PlatformKit/Core/NativeInputBroadcast.swift：subscribe | 平台事实消费者；Mutex 管理注册 | 最多 16 订阅，latest=1 / ordered=64；ordered overflow 结束该分支并报告，latest 计替换；目前没有显式订阅句柄及 join |
+| UI/Shared/UIRequests.swift：listen / listenControls / submit | Agents/Support/AgentUIRequests.swift 接到负责角色；MainActor | 单消费者，普通 64 + 控制 1；独立 generation、request ID、accept/complete、取消回调；迁移不能将 accept 当作 Reply 或取消完成 |
+| UI/Camera/UICameraContainer.swift：CameraFactsObserving.observeFacts | Photographer；MainActor | 状态事实接口须单独核对初始快照、合并与关闭语义，不能从媒体队列策略推导 |
+| UI/Root/NavigationState.swift 与组件原生交互 | UI 自有状态；MainActor | 本地浅层交互保留原生同步路径；业务查询与设备操作继续请求负责角色 |
+
+后续精确接口设计应先覆盖订阅句柄取消/加入与请求完成，再迁移调用方；不能仅以重命名 subscribe 为 listen 宣称满足 SignalListener。压力/温度只纳入未来类型化测量夹具，不声称当前存在设备接入。
+
+首批实施结果：上述两项 Gateway P0 修正和 Swift 回归已实现，check.sh 通过；Simulator 编译通过但最终资源校验失败，详见 [验证记录](../../validation/Signal-Redesign-Validation.md)。A–E 阶段整体仍未完成，后续清单保持有效。
+
+## 13. 非 IPC 完整迁移实施契约
+
+用户确认范围：实施外部 SignalListener 及其分类、全部实际生产消费接线、Agent–Agent 与 Agent–Action 的新内部协议；IPC 不实施。第 12 节首批修正不是本轮交付终点。
+
+### 13.1 外部监听分类与所有权
+
+SignalListener 作为类型化监听契约，按交付语义细分 MediaSignalListener（PCM/帧）、StateSignalListener（快照、环境及故障事实）、RequestSignalListener（UI 业务请求及 Reply）。传感器标量/向量使用 SensorSignalListener，声明单位/时间/有效性，不假设等同媒体。UI 本地手势仍原生处理。请求接纳与完成分离，控制请求独立容量；监听本身不启动硬件。消费者持有唯一消费任务，取消先阻止接纳再加入任务及源解除订阅，不增加转发队列。
+
+用户已决定保留现有目录、采用模块自有监听契约，详见第 13.4 节。不创建 SignalKit。UI、PlatformKit、ModelKit 仅使用系统库实现自身协议族，App/Agents 通过公开端口装配生产者与消费者。
+
+### 13.2 中立 Request/Reply
+
+Gateway 拥有 `SignalRequestProtocol<Request, Reply>` 类型化描述符及端点注册 handler。描述符保存显式 protocol ID、Request/Reply 类型、请求字节计算、最大回复预算和默认 deadline。`request(source:target:using:request:) async throws -> Reply` 沿原调用返回，不进入源 inbox，不产生 response topic。完整启用检查属于 Agents 静态能力装配；Gateway 仅检查中立描述符与活跃身份。
+
+同一端点注册统一身份，事件接收与协议 handler 分开绑定；未知/未启用、类型不符、过期和循环调用显式拒绝。普通请求预留请求与最大回复的合计预算，控制请求不能由载荷自由声明身份。当前 task-local 调用链最多八跳并拒绝递归目标。端点更替取消旧 handler 工作，取消/deadline 后加入清理再释放所有权；无法合作停止的业务不能假装清理已完成。新文件放 Gateway/Input/ 现有目录，更新所属 README、Gateway 模块 README 与工程测试。
+
+### 13.3 执行与资源配置
+
+保持 Gateway 执行设施及 Channel/wait/资源许可，仅统一可信调用/结果协议和不可变输入快照。ActionResult 携带函数与参数，直接 Tool 保留唯一返回消费者；feedback 只允许可信 owner/context 进入。v11 资源与运行时编译配置联动迁移，静态能力目录与启用集合严格区分；固定任务角色的现有能力保留并逐操作建 handler。Writer 状态、终态 outbox 与消费游标在既有存储目录迁移，历史数据显式按旧版本读取，不重新解释或重放动作。
+
+### 13.4 已确定的模块自有监听接口
+
+用户选择保留目录，各模块自有契约，不新增 SignalKit。PlatformKit/Core 在 NativeInputBroadcast.swift 同目录实现 SignalListener 协议及 MediaSignalListener、StateSignalListener、SensorSignalListener；UI/Shared 在 UIRequests.swift 同目录实现 UI 自有 SignalListener/RequestSignalListener。两边均不导入对方或 Gateway。契约按语义一致，不以共享 Swift 继承树制造基础模块依赖。
+
+监听句柄为 AsyncSequence，保留唯一原生流；cancel 关闭源接纳，join 等待解除注册。消费者正在执行的工作仍由其所属 Agent 的消费任务加入，源 join 不冒充业务工作完成。普通源不新增缓存；PCM 64 包 ordered，图像 1 帧 latest，状态按原生 source 原有有界策略。Source 描述包含稳定生产者和交付政策；消费者为注册句柄的持有者，不在硬件 SDK 中硬编码业务角色。
+
+改动 MicrophoneCaptureInput.frames 为 MediaSignalListener，AudioCaptureObserving.listenCapture 取得带代际的句柄；CameraFrameObserving.listenFrames 返回 MediaSignalListener。Speech/VisionPerception 持有消费任务并在退出时 cancel/join 对应监听句柄。UIRequests.listen/listenControls 返回 RequestSignalListener，取消绑定 listening token；AgentUIInputs 在加入旧消费任务前关闭句柄。测试替身同步返回新契约，不保留旧 subscribe 接口。
+
+外部事实接线同时覆盖：UI CameraFacts → Photographer，以及 Actions NexArmControlService.connectionFacts → ApplicationControl（经 ActionsBusinessBindings、AgentHostBindings、App 注入）。两者迁为 StateSignalListener，保留初始快照、latest 和 16 订阅上限；消费任务退出 cancel/join。设备事实机制复用 PlatformKit 已有 NativeInputBroadcast 的公开句柄，不使 Actions 进入 PlatformKit 或 UI。改动所属根契约/组合文件、NexArm 根 README、ApplicationControl README 和 Camera/UI Shared README；编译依赖不变。
+
+### 13.5 内部配置与协议迁移细化
+
+新配置仍由 Core 的 CommunicationDeclaration 值拥有，字段整体替换为 requests/feedback/publications/subscriptions；不保留 inputs/sends/topic 的资源解码兼容。资源 v11、编译配置 v9 分别严格解码。CommunicationContract 显式区分请求协议和事件 channel，事件变体位于 AgentMessage.event；ASR 的 partial/final 共用 user.input.speech.v1，不能通过同名前缀匹配。
+
+角色 requests：Writer、Memory、Photographer、ApplicationControl 启用 agent.task.v1；Assistant、SpeechPerception、VisionPerception 为空。固定任务角色现有任务准入保留，不因示例空数组删除。feedback：所有经 Gateway 调用的角色启用 action.result.v1；Assistant 另启用 agent.round.result.v1。Tool 和 scheduled Action 在同一个 action.result.v1 下保持各自唯一接纳入口，Activity 保持可信内部绑定。
+
+静态 publications/subscriptions 按第 6.4 节；任务 events 由已接纳参与者的运行时作用域动态路由，不要求静态角色对权限；普通定向请求仅按目标的已启用协议和操作权限准入，不再检查发送方逐对 sends。生产切换同步更新 AgentContracts、AgentConfiguration/AgentConfigurations、CommunicationPolicy、OutputGateway/InputGateway、AgentCommunicationAdapter 与各角色资源；测试夹具同步迁移。
+
+普通通信调用直接使用已绑定身份的 AgentMessaging 异步返回链。OutputGateway.consumer 在绑定输出端点时给角色注入该端口，Assistant worker 和固定任务协调器直接等待返回，不再通过输出 mailbox + runtime.message.receipt 往返。Writer 的初次 Reply 表示持久消息接纳，后续 started/进度/终态仍为可恢复业务事实，不能把模型处理完成放在通信等待槽中。
+
+类型化任务请求使用 AgentProtocolRequest（可信 input + submit/update/answer/status/cancel）及 AgentRequestReply（requestID/reference/可选 state）。AgentMessage.operation 表明请求操作，不使用 topic 区分操作；AgentTaskQuery 保存已有 scope 的 status/cancel。固定任务查询核对 context task registry 的完整 scope；Writer 查询/取消核对原持久消息的 sender/receiver/session，取消加入真实清理。自然语言 submit 不预先强制分类，可信 update/answer 可显式表达意图。
+
+启动能力目录在 AgentContracts 中以代码注册角色实际 receiveRequest 方法和完整操作集；资源启用集合逐项校验 unknownProtocol、missingHandler、missingRequiredOperation、schemaMismatch 等，空 requests 合法。feedback 实现包含直接 Tool 的返回适配，不要求把返回值再投进 inbox；executeDirect 选择唯一直接接收链；executeReturning 为 UI 固定多步流程保留唯一配对 ToolResult 认知入口，直接值仅用于 UI 响应。
+
+相机执行入口 start/switchCamera 返回的预览流也统一为 MediaSignalListener；Actions/Camera 的 CameraRuntimePorts/CameraCoordinator、App/Composition/AgentResourceBindings 与测试替身同步改类型。receiver.begin 保留同一个原生 latest 缓冲，句柄取消只解除该代预览输出，不隐式停止硬件或关闭其他获准观察者；设备停止仍由 CameraCapturing.stopAndWait 完成。
+
+持久恢复沿现有 AgentMessageRepository 增加 taskEvents/consumeTaskEvents：基于不可变消息的 SQLite rowid 提供每个 taskRef + receiver 的有界页面和持久消费游标，提交游标与 consumed_at 在单一事务更新。新增表放既有 AgentMessages schema 文件，不新增目录。新 schema 版本在现有数据库上非破坏性加表；历史协议名和 payload 不重写。Writer 的终态/拒绝 outbox 改为写 agent.task.events.v1，查询明确读取新旧版本并在 Agent 解码边界识别历史版本。sourceSession 以新消息的显式持久字段保存，未知历史字段保留为空，不用当前会话补造旧身份。
+
+ModelKit 资源 revision 是既有外部状态源，也迁为该模块自有 StateSignalListener：Support/Core 放纯生命周期契约，Management 的 ArtifactChanges 仍持有唯一 latest(1) / 16 订阅注册。ModelManager/ModelArtifactsManaging、AgentRuntime 与 ApplicationControl 的 ResourceObservationSession 同步改类型并加入取消解除注册。不改变推理接口、不增加轮询，不让 ModelKit 依赖 UI、PlatformKit 或 Agents。
+
+持久迁移精确文件：Storage/Database/AgentMessages 的 Record/Row/Repository 增加 sourceSessionID 与任务事件页面、消费游标；SQLiteSchema 从 20261113 非破坏性迁至 20261119（加可空来源会话列与 task_observation_cursors 表）。原支持的 20261110–12 先完成既有迁移，再加 Signal 表/列。游标按 taskRef + receiver 唯一，单 receiver 最多 256 个，不回退；确认和对应事件 consumed_at 同事务提交。历史 sourceSessionID 为空保持未知，不能拿当前会话覆盖。WriterMessages SQL 新写 v1 事件，恢复读取显式包含历史 agent.task.response/writer.completion。
+
+Action 输入快照在 FunctionContracts/FunctionRequest.swift 定义 ActionInvocationSnapshot（action.invocation.v1、完整函数地址、原始参数字典），不包含附件/服务/凭据对象。字段沿原调用复用不可变 Swift 字典；原生凭据仍由现有受控引用接口提供，不展开。新 ActionResult/ToolResult 的 invocation 为可选，仅旧记录或尚未成功解析函数地址时为空；空参数字典与缺失快照区分。scheduled ledger 从实际 ScheduledAction 捕获；直接 Tool 从同一 FunctionInvocation 捕获；执行前拒绝也保留已解析的输入。结果重投复用原快照。单次输入快照最大 4 MiB，ledger 活跃输入合计 32 MiB、历史输入合计 32 MiB，准入前拒绝超限；历史按原有最旧淘汰策略并增加字节淘汰约束。现有返回值与 ActionReport 的业务限制继续由所属函数拥有，不新增执行后截断或丢弃结果规则。
+
+打断控制准入采用可信适配器设置的中立 control lane，与 cleanup 区分：control 仍受根可用性检查，cleanup 可在排空期进入。普通发布/分支/transport 不能占用预留的 16 槽和 256 KiB；获授权 agent.interruption.v1 发布才由 Agents 设置 control 标记，接收端继续验证 sources 与会话目标。全局发布预算拒绝必须抛错，不再仅记录 dropped 后伪装发布成功；不可丢弃 final/控制分支拒绝必须通知负责者。
+
+agent.task.v1 的 Request 是明确的联合载荷：自然语言 AgentTaskRequest、既有固定任务 AgentTaskSignal、已有引用的 AgentTaskQuery；AgentProtocolRequest 保存这个类型化 body、操作和可信上下文。自然语言请求值移入现有 AgentCore/Communication，避免 Gateway 以任意 AgentInput 类型冒充协议 schema。描述符注册的 Request/Reply 泛型为 AgentProtocolRequest/AgentRequestReply；各角色按自身业务接纳或明确拒绝载荷变体，保持原固定任务与 Writer 的解释职责。
+
+大参数采用执行前归档：大于 128 KiB 的 ActionInvocationSnapshot 由 OutputGateway 经现有 AgentMessageRepository 的中立 Data 接口写入 invocation_evidence；单条原始编码上限 4 MiB（JSON 实际字节计量）。归档失败或未注入持久端口时在执行前拒绝。内存中保留原参数，持久反馈仅编码 function/reference/原始字节计量，不把大字典复制进 512 KiB Context.Record；读取归档可恢复完整参数。小快照完整内联。Storage 不理解函数参数，只校验 ID、字节预算和不可变冲突。新表与任务游标同属 20261119 非破坏性迁移，sourceSession/历史记录保持上述规则。
+
+任务事件复用内部订阅分支而不是开放为普通 send 请求。任务运行时在提交接纳后建立 reference/source/observer/session 的动态观察（最多 256），并可依据已认证的持久请求恢复。普通 publish 只等待分支准入；持久 outbox 使用任务运行时私有的消费确认屏障，以实际 handler 接纳更新投递事实，不能把发布接纳当作通知已消费。两者共用同一任务观察表和递送设施，不双发。普通 AgentMessaging.send 在进入 Gateway 前要求请求 operation，事件不得先产生效果再因缺少 Reply 报错。
+
+事件分支采用源 incarnation + channel + consumer 的独立有序链，每分支最多 16 个在途/待递送事件，满载仅拒绝该分支；不同消费者互不等待。总分支预算仍有界，跨源不承诺总序。直接请求保持并发，不进入事件有序链。媒体 latest 及姿态发布替换继续由既有原生/角色源拥有，本次不凭配置制造隐藏丢弃策略。额外展示观察者最多 8 个活跃回调，满载独立报告拒绝，不能耗尽所有事件槽；回调错误必须由负责者收到，不再静默吞掉。
+
+Gateway 内部事件设施进一步收敛：新增现有 Input/ 目录下的 SignalEvents.swift，由 SignalTransport 唯一持有 SignalEventTransport；中立 EventChannel、类型化 EventProtocol、绑定生产者端口及静态/动态订阅归 Gateway。Agents InputGateway 保留语义授权、活跃角色绑定、任务参与者认证和诊断投影，删除其重复的 publication Task/队列/字节预算。事件顺序、独立分支容量、观察者上限、取消/端点退役/根停止加入均由 Gateway 设施拥有；Root 向隔离 scope 传递同一份中立容量配置。静态订阅绑定可在来源暂未活跃时存在；不启动来源。动态任务订阅通过 scope 独立字段匹配，不写入 JSON。普通 publish 返回中立接纳引用；只有任务持久投递与测试屏障会等待实际分支处理。
+
+监听句柄本身也执行单消费者限制：同一个句柄及其值拷贝只能建立一个迭代器，第二个迭代器显式抛出 duplicateConsumer，不能让两个消费者分走同一 FIFO。多个订阅仍由生产者的独立注册提供。State/UI/ModelKit 消费循环同步接纳显式迭代失败；join 终结并等待源解除注册，业务处理任务仍由消费者所有者加入。SensorMeasurement 声明可选量程、采样频率和校准身份，valid 不接受缺失值，unavailable 不伪造零值。
+
+Signal 的稳定身份同步贯通：AgentMessage 可携带生产者已分配的 id；新 AgentTaskSignal 在构造时保存 id（request 固定为 scope.id），Writer 事件使用业务 eventID，重投不重新生成 ID。旧持久 Signal 缺少该字段时保持 nil，Writer 历史事件通过已验证的原业务 eventID 恢复递送身份；不改写原 payload。Writer 终态重投的 parent/root 固定为原消息/任务引用，不再每次生成随机因果根。
+
+端点替换同时关闭旧代际的事件生产／订阅绑定并加入其事件分支；端点注册在清理期间可挂起，返回前再次核对新 token。任务消费确认在 Storage 事务内推进连续已消费事件的游标，不越过前面的未消费事件。公开文本委派目录由真实代码适配能力与已启用协议生成，不硬编码发送者/目标配对。
+
+构建验证同时核对 Agents 的资源边界：Package.swift 显式排除 Resources/Models，避免 Xcode 为 Agents 自动编译不属于该 target 的原生模型。模型仍由 ModelKit 的声明与资源装配路径拥有；本次不移动或删除模型源资产。
+
+启动校验还将静态订阅与角色代码的事件处理能力匹配（频道、协议、可消费变体），发布声明与实际生产能力匹配，反馈与角色处理能力匹配。只在 JSON 中添加订阅或发布不能产生处理器；实例绑定复用同一代码注册。
+
+原生 Bluetooth 状态同样迁移：NexArmBluetoothLink.listenUpdates 返回 PlatformKit.StateSignalListener，原生 driver 直接写 NativeInputBroadcast，不经过中转 Task。Actions 的运行所有者先注册监听再读取已有 reflectedState 缓存；无缓存保持未知，不调用会懒建驱动的 status()；暂停/恢复重新注册独立代际，退出关闭并加入监听。各测试替身实现同一端口。
+
+返回路径明确分开：既有 UI 固定多步工作流使用 executeReturning，其唯一认知消费仍为配对 ToolResult，直接返回仅用于 UI 响应/失败投影；Writer 等直接消费原生结果的流程使用 executeDirect，禁止再回投 inbox。executeInternal 仅用于已声明内部呈现。三者不共用一个模糊的“returning”开关。
+
+Writer 的任务入口与存储所有权校验使用认证 requester 和原始记录的 sender，不保留 Assistant→Writer 的隐式配对限制；进度、拒绝与持久终态按原 requester 返回。补充/取消必须与原任务同一发送者且同一 session，不能让放开协议访问变成跨任务修改权限。
+
+动态任务观察不依赖静态 subscriptions 是否为空：每个角色保留统一 observation 接收入口，真正的接纳仍受入站协议、静态订阅或经过授权的任务绑定限制。纯请求调用方也能接收可信终止事实；不能通过清空静态列表移除这个运行时入口。
+
+### 13.9 实施结果与验收边界
+
+非 IPC 源码及资源迁移已完成，保留模块自有监听契约，无新增目录/模块/第三方依赖。完整 check.sh 与五个 iOS Simulator scheme 通过，最后的原生缓存读取调整经独立 NexArm/Bluetooth 回归通过。生产者/消费者、容量、取消加入、直接 Reply、任务观察与历史快照的当前契约已同步到所属 README。详细计数、失败修复记录和日志见 [Signal 验证记录](../../validation/Signal-Redesign-Validation.md)。
+
+本需求仍保留真实设备多源全双工与同设备性能基线的专项验收；本次工程替身与构建不替代这些证据。IPC 按用户指定不实施，原范围在第 7 节继续保留，不把尚无真实双进程证据的设计归档为完成。
+
+## 14. 消费者拥有订阅，生产者独立发布
+
+用户复核要求替换第 13 节的自动观察方案：发布方不知道订阅者，不检查其 ready 或接收能力，发布不能创建、恢复或取消任何消费者订阅。Writer 无需 JSON publication 或初始化注册；任务事件描述符提供代码拥有的按需发布能力。静态 publication 继续用于常驻语义源，所有 publication 都只等待 Gateway 接纳。
+
+Agents/Support/InputGateway 删除 TaskObservation 表、observeTask/forgetTaskObservation 和 dynamicTask 分支；OutputGateway 删除 Reply/上报触发的订阅、终态自动退订及发布路径的接收者初始化/状态查询，也不为发布诊断预先扫描静态订阅名单；被动诊断只从 broker 已结算分支生成最多 16 个目标证据。共享层仅提供通用频道、协议、来源、scope、session 过滤及显式句柄；入站 Agent 事件由中立频道契约和 broker 已绑定分支准入，不保留任务协议专用的隐式观察通行分支。宿主 runtime 直接控制反馈仍由认证 ExecutionOwner 通道准入，与 Agent 发布订阅分离；保留停止时可信终止事实的交付。事件受众表示任务隐私所有权，不表示订阅者身份或状态；Gateway 只执行中立过滤。订阅者实例认证与历史事件 session 过滤分别校验，允许当前消费者恢复自己的旧任务。
+
+AssistantChatWorker 在发送请求之前自行订阅，按生产者、任务引用和 session 匹配，持有最多 256 个句柄。补充/取消复用原订阅，发送失败回收新句柄，终态成功应用并确认后退订，停止时取消并加入。恢复从自身持久请求重建订阅；兼容 AgentTaskRequest 的已支持历史协议名，未知旧 session 不伪造。订阅建立与停止通过所有者代际围栏隔离；最后订阅退出后若新订阅在旧 worker 收尾期间进入，收尾重新检查并启动唯一 worker。发送前取消同样释放新句柄。单个有所有者的补读 worker 每次每任务读取最多 32 条，失败保留有界诊断并重试，消费方自己应用、去重及确认游标，不能要求 Writer 因拒收重发。
+
+WriterNotifications 只根据本地 publication 准入推进 outbox，拒收、未监听、消费者暂停都不影响生产者。移除消费确认型发布 API；Gateway wait/flush 仅供测试和框架诊断。取消自身订阅时保留当前消费回调的完成确认，关闭后续分支。
+
+Storage schema 递增为逻辑修订号 20261120：published_at 独立记录源端发布接纳；received_at/consumed_at/任务游标独立记录消费。20261119 非破坏增加 published_at 并回填旧事件的实际已递送证据；更早受支持版本串行迁移。消费者确认不改变任务事件的发布 outbox 状态。WriterDelegationNotification 的 published 字段替换 delivered，retired 仍独立表示执行权限清理。
+
+受影响代码为 Core/Communication 通用契约、InputGateway/OutputGateway 中立适配、AgentContracts 生产契约、AssistantChatWorker 消费所有权、Writer 与固定任务发布、Gateway/Input/SignalEvents 泛型过滤和取消、Storage 的恢复查询及发布标记。同步更新总体设计与各目录 README、验证记录；不新增目录或依赖。回归覆盖无订阅发布、暂停/取消、任务/session 隔离、消费回调退订、无人监听期间的持久终态恢复及 schema 非破坏迁移。
+
+## 15. 实时 Pub/Sub 与 Assistant 常驻 Writer 订阅
+
+按用户最新确认：Pub/Sub 是相互独立的尽力实时事件，无订阅、迟订阅、分支溢出或消费拒绝均不向发布方提供接收确认，不要求源端因消费失败重发。publish 的成功仅表示本地准入；指定目标的 send 返回直接 Reply，失败/超时/取消显式传播。既有持久任务结果和消费方业务对账独立于 broker，不把其恢复称为 Signal 重放或可靠 Pub/Sub。
+
+Assistant 的 Agent.json 从启动装配开始静态订阅 agent.task / agent.task.events.v1，来源 writer；AgentContracts 注册对应真实处理器。Writer 保持 publications/subscriptions 为空，代码按需 pub。CommunicationPolicy 不再要求订阅源在当前配置集出现或声明 publication；只校验订阅自身的协议、频道、来源格式与容量，生产者自己的发布权限仍独立校验。
+
+AssistantChatWorker 将任务观察集合重命名为任务跟踪集合（最多 256 项），任务开始前登记生产者/任务 ID/session，不为 Writer 创建 per-task broker 句柄；任务结束/失败只移除跟踪，不关闭常驻频道。其他角色的既有动态订阅仍由发起角色持有。按本角色声明判断静态覆盖，避免 Writer 特判进入 Support。无匹配跟踪或 session 的静态事件忽略，不能污染当前任务；格式、来源和不可变事实仍验证。已有单 worker 的任务结果对账保留，与订阅生命周期分离。公开状态使用 trackedTasks，不能把业务任务计数命名为订阅数。
+
+修改文件：Assistant/Agent.json、AgentContracts.swift、Core/Communication/CommunicationPolicy.swift、AssistantChatWorker.swift、AssistantContainer.swift；更新任务/通信/配置回归。同步总体流程、Agents/Assistant、Agents/Support/Core/Communication、Resources/Agents、Gateway/Input 的 README 及当前概念/架构说明。回归验证启动无任务即有 Writer 订阅、任务前后数量不变、多任务/session 隔离、停止/重建端点清理、发布前无消费者及迟订阅不补发、send 的真实 Reply/错误边界。无新目录或依赖。
+
+常驻订阅在没有执行过任何任务时也必须随 Agent 停止而清理。OutputGateway.consumer 装配消费者端点时即安装既有通用生命周期观察器，不再等首次执行才安装；角色停止/实例替换关闭旧端点及其订阅。该机制不包含 Writer/Assistant 分支，也不由 publication 触发。
+
+频道级静态监听省略 scope 时匹配该频道所有事件 scope；显式 scope 仍做精确过滤。Gateway/Input/SignalEvents 将空 scope 明确定义为通配，并拒绝同一端点、来源交集且 scope/session 交叠的重复绑定，防止常驻监听和任务监听造成双重交付。Gateway 工程回归覆盖多个 scope 的常驻交付及交叠拒绝。
+
+Writer 的工程请求方夹具也采用相同所有权：装配时显式绑定 Assistant 静态消费端点，WriterTestRequester 只保存有界任务/session 跟踪及独立持久结果对账，不再为每个委托创建动态订阅。对应修改位于 Tests/Agents/Writer/WriterAgentTests.swift 和 WriterCommunicationFixture.swift，不修改实验运行器。
+
+## 16. Publication 声明与静态配对校验
+
+按用户进一步确认，保留 publications 作为每个 Agent 的实际生产协议声明，并恢复启动时 pub/sub 双方配对校验。本节替代第 14/15 节关于 Writer 无 publication 声明、允许订阅源缺失配置的决定；运行时发布仍不感知消费者存在、ready 或接收结果，静态校验不探测在线实例。
+
+Writer、Memory、Photographer、ApplicationControl 及拥有固定任务报告代码的 Assistant 声明 agent.task / agent.task.events.v1；保留语音、姿态、中断的原有发布声明。AgentContracts 的生产实现目录验证这些声明与真实代码能力一致，消费声明验证实际 handler/variants。CommunicationPolicy 校验每个静态订阅源存在配置并声明匹配频道/协议；允许声明的 publication 没有任何订阅，来源不必启动或在线。配置自身的版本、频道、协议、来源及容量校验保留。
+
+移除 onDemandPublication 的隐式授权绕过，实际 publish 要求本角色声明的 publication；通用端点绑定按声明注册源，不创建或启动消费者。Assistant 的 Writer 频道仍为启动起常驻订阅，业务任务跟踪与频道生命周期继续分离。无接收确认或 broker 补发，send 仍等待指定目标的 Reply。
+
+受影响文件为四个生产者 Agent.json、AgentContracts.swift、CommunicationPolicy.swift、InputGateway/OutputGateway、配置/通信/任务工程夹具；同步 owning README、总体设计、当前术语和验证记录。回归覆盖缺失发布声明/缺失来源配置/频道协议不符/伪造代码能力时启动拒绝，合法声明但无消费者时成功发布、订阅源未运行时独立建立常驻监听，以及任务期间订阅数保持不变。无新目录、模块或依赖。
+
+## 17. Action feedback 重投上限
+
+复核结论：Action 结果必须被接纳或明确终结（功能已产生副作用，整轮结算依赖结果），但重投只应用于接收端暂时拥塞，不应无限进行。第 6.7 节的“只重投不可变结果、不重新执行功能”保持不变。
+
+变更：ActionResultLedger 为每条已完成结果记录完成时间，重投总时长上限默认 60 秒（ChannelScheduler 可注入，用于测试）。超限后该记录以 `expired` 终结，保留结果与入参快照作为诊断证据，计入 `expiredResults`；`finishRoundDelivery` 将 `expired` 与 `closed` 同样视为结果未送达，抛出 resultDeliveryFailed，整轮结算为失败，不能报告 settled。作用域关闭、停机仍按 `closed` 处理。`accepted` 仍只表示接收端准入，不表示业务已处理。
+
+受影响文件：ActionResultLedger.swift、ChannelScheduler.swift（第 19 节后位于 Actions/Support/Shell）、对应 README、Tests/Actions/Execution/ActionLifecycleTests.swift。无新目录、模块或依赖；60 秒是待验证的设计值，不是性能结论。
+
+## 18. 消息传递的命名与分类标注
+
+决定：不为统一术语重命名目录或类型，现有名称按职责保留（Gateway/Input 为 Agent–Agent 传输，Gateway/Output 为 Agent–Action 执行调度）。`InternalAction`、`InternalTool` 指不经注册、由角色直接发起的展示调用（灵动岛、字幕、错误 Toast），与 Signal 分类无关，不改名。
+
+变更：在消息传递相关的类型定义处用一行注释标明所属类别。外部 Signal：各模块自有 SignalListener。内部 Signal：Gateway 的 SignalTransport / SignalEnvelope / SignalRequestProtocol / SignalEventTransport、Agents 的 AgentMessaging / InputGateway / OutputGateway，以及 Agent–Action 的 ExecutionEnvelope / ScheduledAction / ExecutionResult。Gateway README 同步写明该分类。仅改注释与文档，无行为、接口、目录或依赖变化。
+
+## 19. Gateway 回归 Signal 通信，执行 Shell 归 ActionsContainer
+
+目标：Gateway 只拥有内部 Signal 的端点身份、准入、路由与有界递送，统一承载四类内部 Signal——Agent→Agent 请求（send）、Agent↔Agent 事件（pub/sub）、Agent→Action 调用 Signal、Action→Agent 反馈 Signal。Agent 产生的 function token（XML 调用、Tool 调用、角色内部 Action）继续经 Gateway 送达 Action，Agents 不直接依赖 Actions。Channel 排序与并行/串行算法、Tool 直接调用、资源锁与交接、执行账本、结果重投由 ActionsContainer 拥有，因其离资源与真实执行更近。
+
+边界与接口：
+- FunctionContracts（中立）接收原属 Gateway/Output 的契约：ExecutionEnvelope、ScheduledAction、ExecutionSchedulingDirective、ExecutionResult、ActionSchedulingError，并新增 `ActionExecutionEngine` 协议，描述调用、调度指令、结束/取消、直接调用、资源租约、整轮结果送达与 Signal 绑定。Gateway 与 Agents 只依赖该协议，Actions 不 import Gateway。
+- Actions 新增 `ActionExecutionCoordinator`（实现该协议，持有 ChannelScheduler、DirectExecutionDispatcher、ResourceCoordinator、ActionResultLedger、ActionExecutionLedger 与自有准入），由 ActionsContainer 在业务配置时构造；引擎直接使用容器自身的 prepare/execute，不再经 App 注入 `ActionsExecutionPort`。资源定义、停止回调与 NexArm、Camera 的资源访问在 Actions 内部绑定，App 的 CameraResourceBinding 与 Agents 的 bindResources 删除。
+- Gateway：`GatewayConfiguration` 改为携带引擎与反馈出口；`GatewayExecution` 在 Gateway 准入通过后转发到引擎；绑定时把 `signals.validateExecution`（端点代际校验）与反馈出口交给引擎。`GatewayCapabilities` 去掉 actions/direct/resources，增加 execution。观察作用域使用 Gateway 提供的 DetachedExecution，不执行 Action。
+- Agents：OutputGateway、ToolDispatcher、ActionDispatcher 与 AgentGatewayCapabilities 改用 `ActionExecutionEngine`；Agent→Action 的 Invocation 构造、授权、反馈接纳语义不变。
+- App：先配置 Actions 执行引擎，再配置 Gateway；启停顺序保持 Actions 启动 → Gateway → Agents，停止相反。
+
+生命周期：ActionsContainer 的 start/invalidate/setForeground/stop 驱动引擎的准入、暂停与 join；Gateway 不再加入调度、直接调用与资源清理，只关闭 Signal 准入与传输。关闭 Gateway 准入后新调用被拒绝，已转发的工作由 Actions 取消并加入。State 节点由 gateway.scheduler/direct/resources 迁为 actions.scheduler/direct/resources。
+
+文件迁移：Gateway/Output 下 ChannelScheduler、Channel（现 ExecutionChannel）、ActionDiagnostics、ActionExecutionLedger、ActionResultLedger、DirectExecutionDispatcher、ResourceCoordinator 迁入 Actions/Support/Shell（Scheduling、Resources、Results 子目录，随 ExecutionRuntime 目标编译）；ScheduledAction、ExecutionResult、ActionSchedulingError 迁入 Actions/Support/Contracts。经用户批准按职责整理 Actions/Support 为 Contracts、Function、Call、Shell 四个子目录，Gateway/Output 的三份 README 合并为 Shell/README.md 与 Gateway/README.md；ChannelSchedulerTests 迁入 Tests/Actions/Execution，GatewayContainerTests 中的执行用例迁入 Actions 测试。
+
+文档同步：Gateway、Gateway/Input、Actions、Actions/Support、Actions/Support/Contracts、Agents、Agents/Support、App/Composition、总体设计、Concepts/Architecture、Container-Reflexivity 验证记录、Tests README、Xcode 工程导航。验收：`./scripts/check.sh`、`./scripts/build-ios.sh`；设备专项不受本次影响，也不由工程检查替代。
+
+## 20. 内存警告：PlatformKit 外部 Signal，App 组合层消费
+
+审计发现系统内存警告绕开了 SignalListener：SpeechPerception 的 VoiceInteractionSession 直接用 NotificationCenter 监听 UIApplication 内存警告，经 AgentContainer 的 memoryPressure 闭包调用 ModelContainer.handleMemoryPressure。该事件不需要 Agent 理解或业务决策，却依赖语音会话是否已创建，会话未启动或已停止时姿态、本地 ASR 等 releaseWhenIdle 模型得不到释放机会；它还让 Agents 持有无关的原生通知和模型回调。
+
+决定：内存警告是 PlatformKit 拥有的原生状态事实，由 App 组合层把它连接到 ModelKit 的释放入口，不进入 Agents 或 Gateway。
+
+- PlatformKit/Core 新增原生内存警告源（NativeMemoryWarnings），仅在 iOS 注册 UIApplication.didReceiveMemoryWarningNotification，复用 NativeInputBroadcast 的 latest 策略，警告合并为每个订阅者最多一个待处理值。PlatformContainer 增加 `listenMemoryWarnings()`，返回 `StateSignalListener<MemoryWarning>`（producer 为 platform.system.memory）。观察随根 start 注册、随根 stop 结束，不随前后台 invalidate 关闭，因为后台同样会收到警告；根未启动或已停止时订阅显式失败。
+- App/Composition 新增 MemoryPressureRelay：拥有唯一订阅及其处理任务，每次警告调用 ModelContainer.handleMemoryPressure；订阅失败通过 ContainerFailureChannel 上报；stop 取消订阅并加入任务。ModuleRegistration 注册 `memoryPressure` 托管服务，依赖 platform 与 model，continuesInBackground，先于二者停止。relay 随 ServiceFactories.Services 按作用域重建。
+- Agents 删除 AgentContainer 的 memoryPressure 参数及 VoiceInteractionSession 的内存警告任务、通知监听和 UIKit 依赖；Agents 不再接触该信号。
+- ModelKit 行为不变：handleMemoryPressure 仍只尽力卸载声明 releaseWhenIdle 的空闲模型，不等待也不取消推理。
+
+受影响文件：PlatformKit/Core（新文件、README）、PlatformKit/PlatformContainer.swift、App/Composition（MemoryPressureRelay、ModuleRegistration、ServiceFactories、README）、Agents/AgentContainer.swift、Agents/SpeechPerception/VoiceInteractionSession.swift、Tests/Agents/Core/AgentContainerTests.swift，并同步 PlatformKit、Agents、App 的 README 和总体设计。无新目录、模块或依赖。回归覆盖：警告被订阅者收到并合并、根未启动/停止后订阅失败、relay 每次警告调用一次释放且 stop 后不再调用。真实设备的内存警告释放效果仍需独立验收，本次工程测试不能代替。

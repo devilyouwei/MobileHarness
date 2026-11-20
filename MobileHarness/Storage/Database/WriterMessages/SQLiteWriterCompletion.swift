@@ -20,7 +20,7 @@ extension SQLiteWriterExecutionRepository {
         else {
             guard let message = try AgentMessageRow.fetchOne(db, key: id),
                 message.receiverAgentID == "writer",
-                ["task.request", "agent.taskMessage", "agent.task.request"].contains(message.contract),
+                ["agent.task.v1", "task.request", "agent.taskMessage", "agent.task.request"].contains(message.contract),
                 message.consumedAt == nil
             else { return nil }
             return "requested"
@@ -134,9 +134,11 @@ extension SQLiteWriterExecutionRepository {
             let existing = try AgentMessageRow.fetchOne(db, key: notification.eventID)
             let value = AgentCommunicationRecord(
                 id: notification.eventID, sender: "writer", receiver: incoming.senderAgentID,
-                contract: existing?.contract == "writer.completion" ? "writer.completion" : "agent.task.response",
+                contract: existing?.contract == "writer.completion"
+                    ? "writer.completion" : (existing?.contract ?? "agent.task.events.v1"),
                 payload: notification.data, correlationID: incoming.correlationID,
-                replyTo: incoming.id, senderContext: incoming.senderContext, dedupeKey: incoming.id + ":completion")
+                replyTo: incoming.id, senderContext: incoming.senderContext, sourceSessionID: incoming.sourceSessionID,
+                dedupeKey: incoming.id + ":completion")
             if existing != nil {
                 try SQLiteAgentMessageRepository.enqueue(value, db: db)
                 return
@@ -174,7 +176,7 @@ extension SQLiteWriterExecutionRepository {
             arguments: [request])
         return WriterDelegationNotification(
             delegateID: request, agent: "writer", eventID: row["id"], data: Data((row["payload_json"] as String).utf8),
-            delivered: row["delivery_state"] as String == "received",
+            published: row["published_at"] as Double? != nil,
             retired: state == nil || !["closing", "cleanup_failed"].contains(state ?? ""), position: row["position"],
             claimToken: row["claim_token"])
     }
@@ -186,7 +188,7 @@ extension SQLiteWriterExecutionRepository {
             try Row.fetchOne(
                 db,
                 sql:
-                    "SELECT rowid AS position,* FROM agent_messages WHERE correlation_id=? AND sender_agent_id='writer' AND contract IN ('agent.task.response','writer.completion') AND dedupe_key=correlation_id||':completion'",
+                    "SELECT rowid AS position,* FROM agent_messages WHERE correlation_id=? AND sender_agent_id='writer' AND contract IN ('agent.task.events.v1','agent.task.response','writer.completion') AND dedupe_key=correlation_id||':completion'",
                 arguments: [delegateID]
             ).map { try Self.notification($0, db: db) }
         }
@@ -211,7 +213,7 @@ extension SQLiteWriterExecutionRepository {
             let rows = try Row.fetchAll(
                 db,
                 sql:
-                    "SELECT m.rowid AS position,m.* FROM agent_messages m WHERE m.sender_agent_id='writer' AND m.contract IN ('agent.task.response','writer.completion') AND m.rowid>? AND \(filter) ORDER BY m.rowid LIMIT ?",
+                    "SELECT m.rowid AS position,m.* FROM agent_messages m WHERE m.sender_agent_id='writer' AND m.contract IN ('agent.task.events.v1','agent.task.response','writer.completion') AND m.rowid>? AND \(filter) ORDER BY m.rowid LIMIT ?",
                 arguments: args)
             var results: [WriterDelegationNotification] = []
             for row in rows {
@@ -255,7 +257,7 @@ extension SQLiteWriterExecutionRepository {
                 let row = try AgentMessageRow.fetchOne(
                     db,
                     sql:
-                        "SELECT * FROM agent_messages WHERE reply_to_id=? AND sender_agent_id='writer' AND contract IN ('agent.task.response','writer.completion') AND claim_token=? AND delivery_state IN ('in_flight','received')",
+                        "SELECT * FROM agent_messages WHERE reply_to_id=? AND sender_agent_id='writer' AND contract IN ('agent.task.events.v1','agent.task.response','writer.completion') AND claim_token=? AND delivery_state IN ('in_flight','received')",
                     arguments: [delegateID, claimToken])
             else { throw RecordStorageError.conflict }
             let now = Date().timeIntervalSince1970
@@ -263,7 +265,7 @@ extension SQLiteWriterExecutionRepository {
             let state = completed ? "received" : row.attemptCount >= 8 ? "dead_letter" : "pending"
             try db.execute(
                 sql:
-                    "UPDATE agent_messages SET delivery_state=?,received_at=CASE WHEN ? THEN ? ELSE received_at END,next_attempt_at=?,last_error=?,claim_token=NULL,claim_expires_at=NULL WHERE id=? AND claim_token=?",
+                    "UPDATE agent_messages SET delivery_state=?,published_at=CASE WHEN ? THEN COALESCE(published_at,?) ELSE published_at END,next_attempt_at=?,last_error=?,claim_token=NULL,claim_expires_at=NULL WHERE id=? AND claim_token=?",
                 arguments: [
                     state, completed, now, completed ? nil : now + delays[max(0, Int(row.attemptCount) - 1)], failure,
                     row.id, claimToken,

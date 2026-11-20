@@ -4,7 +4,7 @@ import FunctionContracts
 import Gateway
 import StorageTasks
 
-private enum GatewayOutputMode: Sendable { case protocolFeedback, returningFeedback, internalCompletion }
+private enum GatewayOutputMode: Sendable { case protocolFeedback, returningFeedback, directReturn, internalCompletion }
 
 /// A producer-bound port; the source cannot select or replace its registration identity.
 public struct GatewayOutputConsumer: Sendable {
@@ -39,6 +39,10 @@ public struct GatewayOutputConsumer: Sendable {
     @discardableResult public func executeReturning(_ envelope: OutputEnvelope) async throws -> OutputExecutionResult {
         try await consume(envelope, .returningFeedback)
     }
+    /// The caller consumes the native result; no ToolResult enters the Agent inbox.
+    @discardableResult public func executeDirect(_ envelope: OutputEnvelope) async throws -> OutputExecutionResult {
+        try await consume(envelope, .directReturn)
+    }
     /// Gateway-authorized runtime presentation. Completion belongs to the caller, not the Agent inbox.
     @discardableResult public func executeInternal(_ envelope: OutputEnvelope) async throws -> OutputExecutionResult {
         try await consume(envelope, .internalCompletion)
@@ -56,7 +60,7 @@ private enum OutputDispatchOwnership {
     @TaskLocal static var current: String?
 }
 
-/// Validates, routes and dispatches output while preserving the existing execution contract.
+/// Agents-side adapter for outgoing internal Signals: Agent–Action invocations and Agent–Agent messages. Validates, routes and dispatches output while preserving the existing execution contract.
 public actor OutputGateway {
     private var communications: (any AgentMessageRepository)?
     public func bindCommunications(_ repository: any AgentMessageRepository) throws {
@@ -201,14 +205,14 @@ public actor OutputGateway {
     private let actions: ActionDispatcher
     private let tools: ToolDispatcher
     private let sink: Sink
-    private let resources: ResourceCoordinator?
+    private let execution: any ActionExecutionEngine
     private let actionFeedback: ActionFeedback
     private let lifecycleObserverID = UUID().uuidString
     private var lifecycleBound = false
 
     public init(
         manager: AgentManager, requests: InputGateway, catalog: ActionCatalogSnapshot,
-        actions: ChannelScheduler, direct: DirectExecutionDispatcher,
+        execution: any ActionExecutionEngine,
         policy: CommunicationPolicy? = nil,
         actionFeedback: ActionFeedback = .failuresOnly,
         observedContracts: Set<String> = [],
@@ -217,16 +221,14 @@ public actor OutputGateway {
     ) {
         self.admission = admission
         self.requests = requests
-        self.resources = actions.resourceCoordinator
+        self.execution = execution
         self.actionFeedback = actionFeedback
         self.policy = policy
         self.observedContracts = observedContracts
         self.observeEvent = observeEvent
         self.manager = manager
-        self.tools = ToolDispatcher(
-            catalog: catalog, executor: direct, input: requests, resources: actions.resourceCoordinator,
-            admission: admission)
-        self.actions = ActionDispatcher(executor: actions)
+        self.tools = ToolDispatcher(catalog: catalog, executor: execution, input: requests, admission: admission)
+        self.actions = ActionDispatcher(executor: execution)
         self.sink = sink
     }
 
@@ -234,11 +236,13 @@ public actor OutputGateway {
         let id = producer.descriptor.id
         let internalTools = Set(producer.descriptor.capabilities.internalTools.map(\.path))
         let incarnation = try await manager.outputIdentity(for: producer)
+        try await bindLifecycle()
         try await requests.bindEndpoint(producer, incarnation: incarnation)
+        if policy?.agents[id] != nil { try await producer.bindMessaging(try await messaging(for: id)) }
         return GatewayOutputConsumer { [self] envelope, mode in
             guard envelope.source == id else { throw CommunicationError.unauthorized }
             try await manager.validate(id, incarnation: incarnation, sessionID: envelope.sessionID)
-            if mode == .returningFeedback {
+            if mode == .returningFeedback || mode == .directReturn {
                 guard case .toolCall(let call) = envelope.output, await returnsToolResult(for: call) else {
                     throw GatewayOutputConsumer.AdmissionError.returningFeedbackRequired
                 }
@@ -248,7 +252,9 @@ public actor OutputGateway {
                     internalTools.contains(call.toolPath)
                 else { throw GatewayOutputConsumer.AdmissionError.internalCallRequired }
             }
-            return try await AgentToolFeedbackDelivery.$internalCompletion.withValue(mode == .internalCompletion) {
+            return try await AgentToolFeedbackDelivery.$internalCompletion.withValue(
+                mode == .internalCompletion || mode == .directReturn
+            ) {
                 try await OutputProducerBinding.$identity.withValue(.init(agent: id, incarnation: incarnation)) {
                     try await execute(envelope)
                 }
@@ -280,12 +286,18 @@ public actor OutputGateway {
     public func messaging(for source: AgentID) async throws -> AgentMessaging {
         let incarnation = try await manager.identity(source)
         guard policy?.agents[source] != nil else { throw CommunicationError.unauthorized }
-        return AgentMessaging { [weak self] observation, parent, target in
-            guard let self else { throw CommunicationError.scopeClosed }
-            return try await self.emit(
-                observation, parent: parent, source: source, incarnation: incarnation, target: target)
-        }
+        return AgentMessaging(
+            subscribe: { [weak self] filter in
+                guard let self else { throw CommunicationError.scopeClosed }
+                return try await self.requests.subscribe(filter, consumer: source, incarnation: incarnation)
+            },
+            operation: { [weak self] observation, parent, target in
+                guard let self else { throw CommunicationError.scopeClosed }
+                return try await self.emit(
+                    observation, parent: parent, source: source, incarnation: incarnation, target: target)
+            })
     }
+
     private func emit(
         _ observation: AgentMessage, parent: AgentInput, source: AgentID,
         incarnation: String, target: AgentID?, messageID: String? = nil
@@ -301,6 +313,13 @@ public actor OutputGateway {
         metadata: InputMetadata, turn: AgentTurn?, source: AgentID, incarnation: String, target: AgentID?,
         messageID: String? = nil
     ) async throws -> DeliveryReport {
+        var target = target ?? observation.eventOwner
+        if target == nil, let reference = observation.eventScope,
+            let record = try await communications?.agentMessage(reference)
+        {
+            guard record.receiver == source.rawValue else { throw CommunicationError.unauthorized }
+            target = AgentID(rawValue: record.sender)
+        }
         if let task = observation.content(as: AgentTaskSignal.self), task.kind == .cancel || task.kind == .result {
             guard !closed else { throw CommunicationError.scopeClosed }
         } else {
@@ -321,21 +340,22 @@ public actor OutputGateway {
             guard let contract = policy.contracts[observation.contract] else {
                 throw CommunicationError.unsupportedContract
             }
-            if let target {
+            if contract.channel != nil {
                 guard
-                    declaration.sends.contains(where: {
-                        $0.contract == observation.contract && $0.target == target.rawValue
+                    declaration.publications.contains(where: {
+                        $0.protocol == observation.contract && $0.channel == contract.channel
                     })
-                else {
-                    throw CommunicationError.unauthorized
+                else { throw CommunicationError.unauthorized }
+            } else if let target {
+                guard policy.agents[target] != nil else { throw CommunicationError.unknownTarget }
+                guard policy.agents[target]?.requests.contains(observation.contract) == true else {
+                    throw CommunicationError.unsupportedContract
                 }
             } else {
-                guard declaration.publications.contains(observation.contract) else {
-                    throw CommunicationError.unauthorized
-                }
+                throw CommunicationError.unknownTarget
             }
             if let response = observation.content(as: AgentTaskResponse.self) {
-                guard source == .writer, target == .assistant else { throw CommunicationError.unauthorized }
+                guard target != nil else { throw CommunicationError.unauthorized }
                 if let signal = response.signal {
                     guard source == signal.scope.executor, target == signal.scope.requester,
                         sessionID == signal.scope.sessionID
@@ -376,10 +396,26 @@ public actor OutputGateway {
             guard generatedCommand || !metadata.expired else { throw CommunicationError.expired }
             sequences[source, default: 0] += 1
             let payload = InputPayload.observation(observation)
-            let communicationID =
-                task?.kind == .request
-                ? task?.scope.id : observation.content(as: AgentTaskRequest.self)?.id ?? messageID
+            var eventID = observation.id
+            if eventID == nil, let legacy = observation.content(as: AgentTaskResponse.self)?.signal {
+                eventID = try AgentTaskContent.decode(legacy).writerEvent?.eventID
+                guard eventID != nil else { throw CommunicationError.invalidPayload }
+            }
+            let communicationID = task?.kind == .request ? task?.scope.id : eventID ?? messageID
             let durableID = communicationID ?? UUID().uuidString
+            if let communications, let target,
+                observation.content(as: AgentTaskRequest.self) != nil
+                    || observation.content(as: AgentTaskQuery.self)?.operation == .cancel,
+                try await communications.agentMessage(durableID) == nil
+            {
+                try await communications.enqueueAgentMessage(
+                    .init(
+                        id: durableID, sender: source.rawValue, receiver: target.rawValue,
+                        contract: observation.contract, payload: observation.encodedContent(),
+                        correlationID: observation.content(as: AgentTaskQuery.self)?.scope.id ?? durableID,
+                        replyTo: observation.content(as: AgentTaskQuery.self)?.scope.id, sourceSessionID: sessionID,
+                        dedupeKey: durableID))
+            }
             if let communications, let target, let task, task.scope.execution == .background,
                 try await communications.agentMessage(durableID) == nil
             {
@@ -397,59 +433,51 @@ public actor OutputGateway {
                     payload: payload, source: source.rawValue, incarnation: incarnation, origin: .agent,
                     capturedAt: metadata.capturedAt, sequence: sequences[source]!, rootID: metadata.rootID,
                     parentID: inputID, hops: metadata.hops + 1,
-                    deadline: generatedCommand ? nil : metadata.deadline, topic: contract.topic),
+                    deadline: generatedCommand ? nil : metadata.deadline, topic: contract.channel),
                 turn: turn,
                 taskScope: task.flatMap {
                     ($0.kind == .request || $0.kind == .input || $0.kind == .cancel) ? $0.scope : nil
                 })
-            if target == nil {
-                let observe: (@Sendable (AgentInput) async -> Void)?
-                if observedContracts.contains(observation.contract), let observeEvent {
-                    observe = { input in
-                        do { try await observeEvent(input) } catch {
-                            // Presentation endpoint failure belongs to the observer, never the publisher.
-                        }
+            var report: DeliveryReport
+            if contract.channel != nil {
+                if let response = observation.content(as: AgentTaskResponse.self),
+                    let reference = observation.eventScope,
+                    let record = try await communications?.agentMessage(reference)
+                {
+                    guard record.sender == target?.rawValue, record.receiver == source.rawValue,
+                        record.sourceSessionID == nil || record.sourceSessionID == sessionID
+                    else { throw CommunicationError.unauthorized }
+                    if response.signal?.kind == .result || response.rejection != nil {
+                        guard let persisted = try await communications?.agentMessage(durableID),
+                            try JSONDecoder().decode(AgentTaskResponse.self, from: persisted.payload) == response
+                        else { throw CommunicationError.unauthorized }
                     }
-                } else {
-                    observe = nil
                 }
-                try await requests.publishInternal(
-                    input, targets: policy.destinations(for: input).map { ($0, nil) }, observe: observe)
-                return DeliveryReport()
+                let observe: (@Sendable (AgentInput) async throws -> Void)? =
+                    observedContracts.contains(observation.contract) ? observeEvent : nil
+                report = try await requests.publishInternal(
+                    input, observe: observe, scope: observation.eventScope,
+                    audience: target.map { [$0] })
+            } else {
+                guard let target else { throw CommunicationError.unknownTarget }
+                report = try await requests.sendInternal(input, targets: [(target, try await manager.identity(target))])
             }
-            let destinations = target.map { [$0] } ?? []
-            guard !destinations.isEmpty else { throw CommunicationError.noRecipients }
-            var targets: [(AgentID, String)] = []
-            var unavailable: [AgentID: String] = [:]
-            for id in destinations {
-                do { targets.append((id, try await manager.identity(id))) } catch {
-                    unavailable[id] = String(describing: error)
-                }
-            }
-            // The observer is a runtime/UI endpoint, never a direct business-Agent callback.
-            try Task.checkCancellation()
-            try await manager.validate(source, incarnation: incarnation, sessionID: input.sessionID)
-            guard !input.metadata.expired else { throw CommunicationError.expired }
-            let report = targets.isEmpty ? DeliveryReport() : try await requests.sendInternal(input, targets: targets)
+            let unavailable: [AgentID: String] = [:]
             if let communications, let target, task?.scope.execution == .background,
                 report.delivered.contains(target)
             {
                 try await communications.receiveAgentMessage(durableID, receiver: target.rawValue, consumed: false)
             }
             if let task {
-                if task.kind == .result, report.delivered.isEmpty || !report.rejected.isEmpty {
-                    await failTaskCompletion(
-                        task.scope,
-                        owner: ExecutionOwner(agent: source, incarnation: incarnation, sessionID: sessionID),
-                        reason: "Final task report rejected")
-                } else if task.kind == .result
+                if task.kind == .result
                     || (task.kind == .request && (report.delivered.isEmpty || !report.rejected.isEmpty))
                 {
                     await manager.retireTask(task.scope.id)
                 }
             }
             return DeliveryReport(
-                delivered: report.delivered, rejected: unavailable.merging(report.rejected) { _, new in new })
+                delivered: report.delivered, rejected: unavailable.merging(report.rejected) { _, new in new },
+                reply: report.reply, publicationAccepted: report.publicationAccepted)
         } catch {
             if let issuedGrant { await manager.retireTask(issuedGrant.0, admissionID: issuedGrant.1) }
             throw error
@@ -459,7 +487,7 @@ public actor OutputGateway {
     private func bindLifecycle() async throws {
         guard !lifecycleBound else { return }
         let scheduler = actions.executor
-        let resources = self.resources
+        let execution = self.execution
         let requests = self.requests
         try await manager.observeStops(id: lifecycleObserverID) { [weak self] agent, incarnation, terminations in
             for event in terminations {
@@ -473,7 +501,7 @@ public actor OutputGateway {
             await requests.retireEndpoint(agent, incarnation: incarnation)
             async let jobs: Void = scheduler.cancel(agent: agent, incarnation: incarnation)
             async let direct: Void? = self?.cancelDirectProducer(agent)
-            await resources?.close(agent: agent, incarnation: incarnation)
+            await execution.closeResources(agent: agent, incarnation: incarnation)
             await direct
             await jobs
         }
@@ -599,31 +627,28 @@ public actor OutputGateway {
 
     public func resourceControl(for source: AgentID, sessionID: String) async throws -> ResourceControl {
         try await bindLifecycle()
-        guard let resources else { throw ResourceError.unknownResource }
         let owner = ExecutionOwner(agent: source, incarnation: try await manager.identity(source), sessionID: sessionID)
         try await manager.validate(source, incarnation: owner.incarnation, sessionID: sessionID)
         let manager = self.manager
-        let scheduler = actions.executor
+        let execution = self.execution
         return ResourceControl(
             acquire: { ids, duration in
                 try await manager.validate(source, incarnation: owner.incarnation, sessionID: sessionID)
-                let lease = try await resources.acquire(resources: ids, owner: owner, duration: duration) {
-                    await scheduler.cancel(resources: $0)
-                }
+                let lease = try await execution.acquireLease(resources: ids, owner: owner, duration: duration)
                 do {
                     try Task.checkCancellation()
                     try await manager.validate(source, incarnation: owner.incarnation, sessionID: sessionID)
                     return lease
                 } catch {
-                    do { try await resources.release(lease, owner: owner) } catch {}
+                    do { try await execution.releaseLease(lease, owner: owner) } catch {}
                     throw error
                 }
             },
             renew: { lease, duration in
                 try await manager.validate(source, incarnation: owner.incarnation, sessionID: sessionID)
-                return try await resources.renew(lease, owner: owner, duration: duration)
+                return try await execution.renewLease(lease, owner: owner, duration: duration)
             },
-            release: { lease in try await resources.release(lease, owner: owner) })
+            release: { lease in try await execution.releaseLease(lease, owner: owner) })
     }
 
     /// Trusted host interruption can preempt a round seal waiting for playback completion.
@@ -650,7 +675,7 @@ public actor OutputGateway {
         let direct = directExecutions.values.filter { $0.scope.session == sessionID }
         for execution in direct { execution.task.cancel() }
         async let cancelled: Void = actions.cancel(sessionID: sessionID)
-        await resources?.close(sessionID: sessionID)
+        await execution.closeResources(sessionID: sessionID)
         for execution in direct { _ = await execution.task.result }
         await cancelled
     }
@@ -683,7 +708,7 @@ public actor OutputGateway {
         for descriptor in await manager.descriptors() {
             if let identity = try? await manager.identity(descriptor.id) {
                 await actions.executor.cancel(agent: descriptor.id, incarnation: identity)
-                await resources?.close(agent: descriptor.id, incarnation: identity)
+                await execution.closeResources(agent: descriptor.id, incarnation: identity)
             }
         }
         await requests.shutdown()
@@ -702,6 +727,25 @@ public actor OutputGateway {
         return descriptor.directResultPolicy == .returning
     }
 
+    private func captureInvocation(_ envelope: OutputEnvelope) async throws -> ActionInvocationSnapshot? {
+        let request: FunctionRequest
+        switch envelope.output {
+        case .actionCall(let call): request = call.executionRequest.functionRequest
+        case .toolCall(let call):
+            request = FunctionInvocation(tool: call.executionRequest, context: envelope.executionContext).call
+        default: return nil
+        }
+        guard request.actionPath.isValid else { return nil }
+        let snapshot = try ActionInvocationSnapshot(request)
+        if snapshot.encodedBytes <= ActionInvocationSnapshot.inlineBytes { return snapshot }
+        guard let communications else { throw ActionInvocationSnapshot.InvalidSnapshot.missingArchive }
+        _ = try await sourceIdentity(envelope)
+        let reference = UUID().uuidString
+        try await communications.archiveInvocationEvidence(
+            reference, ownerContext: envelope.inputID, data: JSONEncoder().encode(snapshot))
+        return try snapshot.archived(at: reference)
+    }
+
     /// Production consumers isolate ordinary output failures; explicit cancellation still joins cleanup.
     private func checkAdmission(_ output: AgentOutput) throws {
         guard !closed else { throw CommunicationError.scopeClosed }
@@ -717,7 +761,8 @@ public actor OutputGateway {
     }
 
     @discardableResult
-    public func execute(_ envelope: OutputEnvelope) async throws -> OutputExecutionResult {
+    public func execute(_ submitted: OutputEnvelope) async throws -> OutputExecutionResult {
+        var envelope = submitted
         try checkAdmission(envelope.output)
         let failure: String?
         var code: ActionExecutionFailureCode?
@@ -739,6 +784,7 @@ public actor OutputGateway {
                     outputScopes.insert(scope)
                 }
             }
+            envelope.invocation = try await captureInvocation(envelope)
             tool = try await dispatchOwned(envelope)
             failure = tool?.deliveryFailure
             code = failure == nil ? nil : .deliveryFailed
@@ -787,7 +833,7 @@ public actor OutputGateway {
                             status: cancelled ? .cancelled : .failed, effect: .notStarted,
                             completion: .report(report.agentValue), failure: cancelled ? .cancelled : .handlerFailed,
                             callID: callID,
-                            roundID: roundID)
+                            roundID: roundID, invocation: envelope.invocation)
                         guard await requests.deliverActionResult(receipt) == .accepted else {
                             throw CommunicationError.scopeClosed
                         }
@@ -795,7 +841,8 @@ public actor OutputGateway {
                         _ = try await requests.deliverToolResult(
                             .init(
                                 callID: callID, value: failure, isError: true,
-                                failureCode: code?.rawValue ?? "handlerFailed", roundID: roundID), owner: owner,
+                                failureCode: code?.rawValue ?? "handlerFailed", roundID: roundID,
+                                invocation: envelope.invocation), owner: owner,
                             envelope: envelope)
                     default: break
                     }
@@ -812,8 +859,13 @@ public actor OutputGateway {
         }
         let result = OutputExecutionResult(
             source: envelope.source, inputID: envelope.inputID,
-            sequence: envelope.sequence, tool: tool, failure: failure, failureCode: code)
-        if outputResults.count == 256 {
+            sequence: envelope.sequence, tool: tool, failure: failure, failureCode: code,
+            invocation: envelope.invocation)
+        let retained = result.invocation?.retainedBytes ?? 0
+        while !outputResults.isEmpty
+            && (outputResults.count >= 256
+                || outputResults.reduce(0, { $0 + ($1.invocation?.retainedBytes ?? 0) }) + retained > 32 * 1024 * 1024)
+        {
             outputResults.removeFirst()
             evictedOutputs += 1
         }
@@ -911,12 +963,8 @@ public actor OutputGateway {
                     rejected: call.target.map { [$0: String(describing: error)] } ?? [:],
                     failure: String(describing: error))
             }
-            if call.target != nil {
-                try await requests.deliverCommunicationReceipt(
-                    CommunicationReceipt(
-                        callID: call.id,
-                        report: report, owner: owner, causality: SignalCausality(envelope: envelope)))
-            }
+            guard report.failure == nil, report.rejected.isEmpty else { throw CommunicationError.unavailableTarget }
+
         case .action(let token):
             do {
                 try Task.checkCancellation()
@@ -925,7 +973,7 @@ public actor OutputGateway {
                     try await manager.registerExecution(envelope.schedulingID, scope: scope, agent: envelope.source)
                 }
                 let required = try await actions.executor.requiredResources(for: token)
-                let lease = await resources?.lease(for: owner, resources: required)
+                let lease = await execution.lease(for: owner, resources: required)
                 try await actions.dispatch(
                     token, envelope: envelope, owner: owner,
                     feedback: descriptor.inputs.contains(.actionResult)

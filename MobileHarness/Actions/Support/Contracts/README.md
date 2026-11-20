@@ -13,6 +13,7 @@ This existing target imports Foundation and Synchronization only, with no projec
 | FunctionInput / FunctionInvocation / ActionExecutionContext | Invocation identity, source/session/input and opaque correlation, reporting and optional Sendable attachment. Cognitive Task/decision strings are opaque correlation, never permission. |
 | ActionExecutionDescriptor / ActionCatalogSnapshot | Immutable descriptions, call protocols and execution/return policies; no handler or mutation API. |
 | PreparedAction / ActionsExecutionPort | Effect-free prepare, one-use revision-bound credential, resources/budget, execute and discard. Root instances retain actual invocations privately. |
+| ActionExecutionEngine / ActionSignalBinding / ScheduledAction / ExecutionResult / ActionSchedulingError | Neutral Agent → Action invocation and Action → Agent feedback boundary: Gateway forwards through the Shell contract and binds endpoint validation and the feedback exit once; the Actions Shell implements it. |
 | ActionExecutionRecord / ActionExecutionSnapshot | Read-only scheduling observation with canonical path, bounded parameter previews and actual completion evidence. |
 | ActionCompletion / ActionReport / ActionFailure | Real completion/value/activity/report, per-leaf partial effects and independent failure. |
 | ExecutionOwner / ResourceDefinition / ResourceLease / ResourceExecutionPermit | Opaque endpoint owner, configured resource mechanisms and live revocable authority. No Agent identity or role lookup. |
@@ -87,3 +88,5 @@ ProviderSettings 的 decisionUsesLocal、decisionProviderID 和 decisionModel �
 CameraControlCapability 不承担网页图片读取；Actions.Web 通过同一 MultimodalContextSnapshot 契约提供当前截图，不暴露历史媒体加载接口。
 
 ProviderSettings 的 writerUsesLocal 显式区分 Writer 本地选择与未配置；Decision 模式及本地 ID 与云端 Provider/Model 在使用时互斥。字段只描述私有配置，安装验证及运行策略归 Provider 服务与 Agent。
+
+ActionInvocationSnapshot in FunctionRequest.swift captures the canonical function and original arguments before effects. It validates at most 128 arguments and 4 MiB encoded input. Snapshots above 128 KiB are archived through an injected Storage port before dispatch; encoding stores the immutable reference while live execution retains raw arguments. Archived replay verifies function and encoded byte count. No attachment bytes, credentials objects or service handles are added. Legacy missing snapshots remain nil.

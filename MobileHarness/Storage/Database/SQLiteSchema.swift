@@ -2,9 +2,10 @@ import Foundation
 internal import GRDB
 
 enum SQLiteSchema {
-    static let currentVersion = 20_261_113
+    static let currentVersion = 20_261_120
     static let statements = [
-        AgentMessageRow.schemaSQL, AssistantConversationRow.schemaSQL, AssistantTaskRow.schemaSQL,
+        AgentMessageRow.schemaSQL, AgentMessageRow.cursorSchemaSQL, AssistantConversationRow.schemaSQL,
+        AssistantTaskRow.schemaSQL,
         WriterWorkspaceRow.schemaSQL, AssistantMessageRow.schemaSQL, SQLiteWriterExecutionRepository.schemaSQL,
         WriterMessageRow.schemaSQL,
         ModelRequestLogRow.schemaSQL, WorkspaceFileRow.schemaSQL, MediaFileRow.schemaSQL, DeviceRow.schemaSQL,
@@ -13,12 +14,31 @@ enum SQLiteSchema {
         let installed = try pool.read { try Int.fetchOne($0, sql: "PRAGMA user_version") ?? 0 }
         guard installed <= currentVersion else { throw SQLiteSchemaError.unsupportedVersion(installed) }
         if installed == currentVersion { return }
+        if installed == 20_261_119 {
+            try pool.write { db in
+                try db.execute(sql: "ALTER TABLE agent_messages ADD COLUMN published_at REAL")
+                try db.execute(
+                    sql:
+                        "UPDATE agent_messages SET published_at=received_at WHERE contract IN ('agent.task.events.v1','agent.task.response','writer.completion') AND delivery_state='received'"
+                )
+                try db.execute(sql: "PRAGMA user_version=\(currentVersion)")
+            }
+            return
+        }
+        if installed == 20_261_113 {
+            try pool.write { try migrateSignals($0) }
+            return
+        }
         if installed == 20_261_112 {
-            try pool.write { db in try migrateTaskContracts(db) }
+            try pool.write { db in
+                try migrateTaskContracts(db)
+                try migrateSignals(db)
+            }
             return
         }
         if [20_261_110, 20_261_111].contains(installed) {
             try migrateRequestMessages(pool)
+            try pool.write { try migrateSignals($0) }
             return
         }
         // Explicitly approved clean format replacement. No legacy data or compatibility schema remains.
@@ -103,6 +123,17 @@ enum SQLiteSchema {
         }
     }
 
+    private static func migrateSignals(_ db: Database) throws {
+        try db.execute(sql: "ALTER TABLE agent_messages ADD COLUMN source_session_id TEXT")
+        try db.execute(sql: "ALTER TABLE agent_messages ADD COLUMN published_at REAL")
+        try db.execute(
+            sql:
+                "UPDATE agent_messages SET published_at=received_at WHERE contract IN ('agent.task.events.v1','agent.task.response','writer.completion') AND delivery_state='received'"
+        )
+        try db.execute(sql: AgentMessageRow.cursorSchemaSQL)
+        try db.execute(sql: "PRAGMA user_version=\(currentVersion)")
+    }
+
     private static func migrateTaskContracts(_ db: Database) throws {
         try db.execute(
             sql: """
@@ -111,7 +142,7 @@ enum SQLiteSchema {
                 UPDATE agent_messages SET contract='agent.task.response'
                 WHERE (contract='agent.task.report' AND sender_agent_id='writer' AND receiver_agent_id='assistant')
                     OR contract IN ('task.progress','task.result');
-                PRAGMA user_version=\(currentVersion);
+                PRAGMA user_version=20261113;
                 """)
     }
 

@@ -40,13 +40,19 @@ extension Agent {
         handle: @escaping @Sendable (isolated Self, Value, ProcessingContext) async throws -> Reply
     ) async throws -> AgentUISubscription {
         let stream = try await requests.listen()
-        let controls: AsyncThrowingStream<UIRequest<Value, Reply>, any Error>
+        let controls: RequestSignalListener<Value, Reply>
         do { controls = try await requests.listenControls() } catch {
             await requests.stopListening()
             throw error
         }
         let token = try await requests.listeningToken()
-        let close: @Sendable () async -> Void = { await requests.stopListening(token: token) }
+        let close: @Sendable () async -> Void = {
+            await requests.stopListening(token: token)
+            await stream.cancel()
+            await controls.cancel()
+            await stream.join()
+            await controls.join()
+        }
         let task = Task { [self] in
             await AgentUIInputs.$owner.withValue(descriptor.id) {
                 await withTaskGroup(of: Void.self) { group in
@@ -66,7 +72,7 @@ extension Agent {
         return AgentUISubscription(task: task, close: close)
     }
     private func consumeUIStream<Value: Sendable, Reply: Sendable>(
-        _ stream: AsyncThrowingStream<UIRequest<Value, Reply>, any Error>, sessionID: String, maximumConcurrent: Int,
+        _ stream: RequestSignalListener<Value, Reply>, sessionID: String, maximumConcurrent: Int,
         handle: @escaping @Sendable (isolated Self, Value, ProcessingContext) async throws -> Reply
     ) async {
         await withTaskGroup(of: Void.self) { group in

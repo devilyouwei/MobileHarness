@@ -68,7 +68,7 @@ struct AudioPCMContinuity: Sendable {
 
 /// Read-only current capture. Subscription never requests permission or starts hardware.
 public protocol AudioCaptureObserving: Sendable {
-    func subscribeCapture() async throws -> MicrophoneCaptureInput
+    func listenCapture() async throws -> MicrophoneCaptureInput
 }
 
 /// Explicit capture execution. Read-only observers receive AudioCaptureObserving instead.
@@ -76,7 +76,7 @@ public protocol AudioCaptureObserving: Sendable {
     var captureContext: AudioCaptureContext { get }
     var cleanupFailure: (any Error)? { get }
     func requestPermissions() async throws
-    func subscribeEvents() throws -> AsyncThrowingStream<NativeAudioEvent, any Error>
+    func listenEvents() throws -> StateSignalListener<NativeAudioEvent>
     func startCapture(preferSpatial: Bool) async throws
     func stopCapture() async
     func stop() async
@@ -90,13 +90,17 @@ public enum AudioIOError: Error, Equatable {
 public struct MicrophoneCaptureInput: Sendable {
     public let generation: String
     public let supportsFullDuplex: Bool
-    public let frames: AsyncThrowingStream<MicrophoneFrame, any Error>
+    public let frames: MediaSignalListener<MicrophoneFrame>
     public init(
-        generation: String, frames: AsyncThrowingStream<MicrophoneFrame, any Error>, supportsFullDuplex: Bool = false
+        generation: String, frames: AsyncThrowingStream<MicrophoneFrame, any Error>, supportsFullDuplex: Bool = false,
+        detach: @escaping @Sendable () async -> Void
     ) {
         self.generation = generation
         self.supportsFullDuplex = supportsFullDuplex
-        self.frames = frames
+        self.frames = MediaSignalListener(
+            source: .init(
+                producer: "platform.audio.microphone", generation: generation, delivery: .ordered(capacity: 64)),
+            stream: frames, detach: detach)
     }
 }
 
@@ -123,7 +127,8 @@ final class MicrophoneCapture: Sendable {
             guard !$0.subscribed else { throw AudioIOError.busy }
             $0.subscribed = true
             return MicrophoneCaptureInput(
-                generation: generation, frames: frames, supportsFullDuplex: supportsFullDuplex)
+                generation: generation, frames: frames, supportsFullDuplex: supportsFullDuplex,
+                detach: { [weak self] in self?.finish() })
         }
     }
     @discardableResult func send(_ frame: MicrophoneFrame) throws -> Bool {

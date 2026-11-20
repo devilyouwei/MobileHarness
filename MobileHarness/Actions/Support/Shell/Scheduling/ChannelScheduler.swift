@@ -84,7 +84,7 @@ public actor ChannelScheduler {
             return nil
         }
     }
-    private let admission: GatewayAdmission?
+    private let admission: ActionsAdmission?
     private let validateScope: @Sendable (FunctionInvocation, ExecutionOwner?) async throws -> Void
     private var preparingChannels: [String: Int] = [:]
     private var preparationCount = 0
@@ -151,7 +151,7 @@ public actor ChannelScheduler {
         while true {
             try Task.checkCancellation()
             let records = resultLedger.snapshot().filter { $0.result?.roundID == roundID }
-            if let failed = records.first(where: { $0.state == .closed }) {
+            if let failed = records.first(where: { $0.state == .closed || $0.state == .expired }) {
                 throw ActionSchedulingError.resultDeliveryFailed(
                     executionID: failed.executionID,
                     path: failed.result?.path.description ?? "unknown", state: failed.state.rawValue)
@@ -178,13 +178,14 @@ public actor ChannelScheduler {
         return ticket.resources
     }
 
-    public func stateSnapshot() async throws -> GatewayStateSnapshot {
+    public func stateSnapshot() async throws -> ExecutionRuntimeFacts {
         try Task.checkCancellation()
-        return GatewayStateSnapshot(
-            path: "gateway.scheduler",
+        return ExecutionRuntimeFacts(
+            path: "actions.scheduler",
             runtime: [
                 "inputs": .count(inputs.count), "channels": .count(channelCounts.count),
                 "preparing": .count(preparationCount), "trackedResults": .count(resultLedger.snapshot().count),
+                "expiredResults": .count(Int(clamping: resultLedger.expiredResults)),
                 "closed": .flag(isShutdown),
             ])
     }
@@ -194,7 +195,7 @@ public actor ChannelScheduler {
         executor: ActionsExecutionPort, capacityPerChannel: Int = 32, maximumTrackedInputs: Int = 64,
         maximumChannels: Int = 16, diagnosticCapacity: Int = 256,
         resources: ResourceCoordinator? = nil, resultCapacity: Int = 512,
-        admission: GatewayAdmission? = nil,
+        resultDeliveryTimeout: Duration = .seconds(60), admission: ActionsAdmission? = nil,
         validateScope: @escaping @Sendable (FunctionInvocation, ExecutionOwner?) async throws -> Void = { _, _ in },
         deliverResult: @escaping @Sendable (ExecutionResult) async -> ActionResultDelivery = { _ in .closed },
         onExecutionSnapshot: (@Sendable (ActionExecutionSnapshot) -> Void)? = nil
@@ -204,7 +205,7 @@ public actor ChannelScheduler {
         self.validateScope = validateScope
         self.executor = executor
         self.resources = resources
-        self.resultLedger = ActionResultLedger(capacity: resultCapacity)
+        self.resultLedger = ActionResultLedger(capacity: resultCapacity, deliveryTimeout: resultDeliveryTimeout)
         self.deliverResult = deliverResult
         self.onExecutionSnapshot = onExecutionSnapshot
         self.diagnostics = ActionDiagnostics(capacity: diagnosticCapacity)
@@ -307,7 +308,7 @@ public actor ChannelScheduler {
                 }
                 state.producerIncarnation = incarnation
             }
-            resultLedger.reserve(invocation)
+            try resultLedger.reserve(invocation)
             state.acceptedActions += 1
             state.pending += 1
             channelCounts[channel, default: 0] += 1

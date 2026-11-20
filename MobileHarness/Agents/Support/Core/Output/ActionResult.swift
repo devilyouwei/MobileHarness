@@ -1,4 +1,5 @@
 import Foundation
+import FunctionContracts
 
 public enum AgentActionCompletion: Codable, Equatable, Sendable {
     case completed
@@ -52,6 +53,7 @@ public struct ActionResult: Codable, Sendable, Equatable {
     public enum Effect: String, Codable, Sendable { case notStarted, contractCompleted, unknown }
     public enum Failure: String, Codable, Sendable { case handlerFailed, cancelled, resourceUnavailable }
 
+    public let invocation: ActionInvocationSnapshot?
     public let callID: String?
     public let roundID: String?
     public let executionID: String
@@ -72,8 +74,9 @@ public struct ActionResult: Codable, Sendable, Equatable {
     public init(
         executionID: String, owner: ExecutionOwner, path: ActionPath, causality: SignalCausality,
         status: Status, effect: Effect, completion: AgentActionCompletion? = nil, failure: Failure? = nil,
-        callID: String? = nil, roundID: String? = nil
+        callID: String? = nil, roundID: String? = nil, invocation: ActionInvocationSnapshot? = nil
     ) {
+        self.invocation = invocation
         self.callID = callID
         self.roundID = roundID
         self.executionID = executionID

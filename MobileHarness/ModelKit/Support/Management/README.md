@@ -172,3 +172,5 @@ Sources support Hugging Face repositories, HTTPS `urlArchive` ZIPs, and HTTPS `u
 `ModelDownloadBackgroundService` owns up to ten OS completion handoffs. The App forwards identifiers/completions and provides preparation of the same model root; it does not manage files or downloads. Native transport delegates own reattachment and event completion. App's short OS execution allowance is independent of the long-lived background URLSession transfer.
 
 Catalog retirement cancels and joins orphaned native sessions before discarding their staging, reports the retired ID through the module failure callback, and persists the remaining transfer index. Existing installed weights are not automatically deleted. This prevents removed declarations from blocking unrelated restoration.
+
+ArtifactStore.observeChanges returns ModelKit.StateSignalListener<UInt64>. Its producer is model.artifacts.revision with a new generation per source binding. It uses the existing latest-one stream and 16-observer limit; cancellation removes the exact observer token, and consumers join their own processing tasks.

@@ -95,13 +95,13 @@ extension CameraPresenting {
 }
 
 @MainActor public protocol CameraFactsObserving: AnyObject, Sendable {
-    func observeFacts() throws -> AsyncStream<CameraPresentationSnapshot>
+    func listenFacts() throws -> StateSignalListener<CameraPresentationSnapshot>
 }
 
 /// One camera display state per UI root. Metal surfaces continue to own GPU completion.
 @MainActor
 public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
-    public let requests = UIRequests<CameraInput, String?>()
+    public let requests = UIRequests<CameraInput, String?>(producer: "ui.camera")
 
     public func stateSnapshot() async throws -> UIStateSnapshot {
         try Task.checkCancellation()
@@ -231,7 +231,7 @@ public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
     }
     public func clearFrame() { state.clearFrame() }
     public func clearPose() { state.clearPose() }
-    public func observeFacts() throws -> AsyncStream<CameraPresentationSnapshot> {
+    public func listenFacts() throws -> StateSignalListener<CameraPresentationSnapshot> {
         guard !stopped else { throw UIContainerError.stopped }
         guard factObservers.count < 16 else { throw UIRequestError.capacityExceeded }
         let id = UUID()
@@ -239,8 +239,14 @@ public final class UICameraContainer: CameraPresenting, CameraFactsObserving {
         factObservers[id] = pair.continuation
         pair.continuation.yield(snapshot)
         pair.continuation.onTermination = { [weak self] _ in Task { @MainActor in self?.factObservers[id] = nil } }
-        return pair.stream
+        return StateSignalListener(
+            producer: "ui.camera.facts", generation: id, stream: pair.stream,
+            detach: { [weak self] in
+                await self?.detachFacts(id)
+                pair.continuation.finish()
+            })
     }
+    private func detachFacts(_ id: UUID) { factObservers[id] = nil }
     private func checkAdmission() throws {
         guard !stopped else { throw UIContainerError.stopped }
         guard isAvailable else { throw UIContainerError.unavailable }

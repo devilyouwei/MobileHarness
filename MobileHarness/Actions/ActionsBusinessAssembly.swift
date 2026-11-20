@@ -31,7 +31,6 @@
         private let presentationLanguage: @Sendable () -> AppLanguage
         lazy var facades = makeUIFacades()
         var stopInteractions: @MainActor () async -> Void = {}
-        private let makeCameraRuntime: @MainActor () throws -> CameraRuntimeDependencies
         private let connectVision: @MainActor (String, Bool, any CameraOutputHandling) async throws -> Void
         private var endpoints: ActionEndpoints?
         init(
@@ -39,7 +38,6 @@
             workspaces: @escaping @Sendable () throws -> any WorkspaceRepository, model: ModelContainer,
             platform: PlatformContainer, ui: UIContainer, photos: MediaStore, bluetooth: BluetoothWorkflow,
             presentationLanguage: @escaping @Sendable () -> AppLanguage,
-            makeCameraRuntime: @escaping @MainActor () throws -> CameraRuntimeDependencies,
             connectVision: @escaping @MainActor (String, Bool, any CameraOutputHandling) async throws -> Void
         ) {
             self.actions = actions
@@ -53,7 +51,6 @@
             self.bluetooth = bluetooth
             self.device = NexArmDeviceAdapter(bluetooth: bluetooth)
             self.presentationLanguage = presentationLanguage
-            self.makeCameraRuntime = makeCameraRuntime
             self.connectVision = connectVision
         }
         private var observedWeb: WebExecutionService?
@@ -63,8 +60,10 @@
                 camera: platform.vision.camera, presentation: ui.camera, photos: photos, cache: cache,
                 photoCues: platform.audio.cue(.camera), windows: ui.windows,
                 makeRuntime: { [weak self] in
-                    guard let self else { throw ActionsContainerError.stopped }
-                    return try self.makeCameraRuntime()
+                    guard let self, let engine = self.actions.executionEngine else {
+                        throw ActionsContainerError.unavailable
+                    }
+                    return CameraRuntimeDependencies(resources: CameraResourceBinding(engine: engine))
                 },
                 connectPerception: { [weak self] session, mirrored, endpoint in
                     guard let self, let endpoints = self.endpoints else { throw ActionsContainerError.unavailable }
@@ -272,8 +271,14 @@
                         if let failure { throw failure }
                     }
                 })
+            try actions.addExecutionBinding { [bluetooth] engine in
+                bluetooth.withMotorResources = { motors, operation in
+                    let requested = Set(motors.map { ResourceID(rawValue: "nexarm.motor.\($0)") })
+                    try await engine.resources.runInCurrentContext(resources: requested, operation: operation)
+                }
+            }
             return ActionsBusinessBindings(
-                executor: actions.execution, catalog: try actions.catalog(),
+                catalog: try actions.catalog(),
                 readWebScreenshot: { scope in try await web.screenshotSnapshot(scope: scope) },
                 artifactStreaming: artifacts, writerArtifacts: exports,
                 writerModel: { [model] in
@@ -311,12 +316,7 @@
                 trackingAvailable: { [bluetooth] in await bluetooth.trackingAvailable },
                 bindTracking: { [bluetooth] in bluetooth.trackingInputAvailable = $0 },
                 bindDeferredFailure: { [device] in device.deliverActionResult = $0 },
-                bindResourceRun: { [bluetooth] run in
-                    bluetooth.withMotorResources = { motors, operation in
-                        let requested = Set(motors.map { ResourceID(rawValue: "nexarm.motor.\($0)") })
-                        try await run(requested, operation)
-                    }
-                }, observeTranscript: { text, session in try presentation.observeTranscript(text, sessionID: session) },
+                observeTranscript: { text, session in try presentation.observeTranscript(text, sessionID: session) },
                 output: { await presentation.output($0) },
                 speechEnhancementEnabled: { try await preferences.restoreSource().useSpeechEnhancement },
                 speechDetection: {

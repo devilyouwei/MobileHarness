@@ -42,12 +42,13 @@ public struct AgentTaskSignal: Codable, Sendable, Equatable {
         public var contract: String {
             switch self {
             case .progress, .result: AgentTaskSignal.responseContract
-            case .request, .input, .cancel: "task." + rawValue
+            case .request, .input, .cancel: "agent.task.v1"
             }
         }
     }
     public enum Status: String, Codable, Sendable { case succeeded, failed, cancelled }
-    public static let responseContract = "agent.task.response"
+    public static let responseContract = "agent.task.events.v1"
+    public let id: String?
     public let kind: Kind
     public let scope: AgentTaskScope
     public let businessContract: String?
@@ -58,8 +59,9 @@ public struct AgentTaskSignal: Codable, Sendable, Equatable {
     public var contract: String { kind.contract }
     public init(
         kind: Kind, scope: AgentTaskScope, businessContract: String? = nil, data: Data, status: Status? = nil,
-        goal: String? = nil, requestedSkills: [String]? = nil
+        goal: String? = nil, requestedSkills: [String]? = nil, id: String? = nil
     ) throws {
+        self.id = id ?? (kind == .request ? scope.id : UUID().uuidString)
         self.goal = goal
         self.requestedSkills = requestedSkills
         self.kind = kind
@@ -70,7 +72,8 @@ public struct AgentTaskSignal: Codable, Sendable, Equatable {
         try validate()
     }
     public func validate() throws {
-        guard goal == nil || (!(goal?.isEmpty ?? true) && (goal?.utf8.count ?? 0) <= 4096),
+        guard id.map({ !$0.isEmpty && $0.utf8.count <= 128 && (kind != .request || $0 == scope.id) }) ?? true,
+            goal == nil || (!(goal?.isEmpty ?? true) && (goal?.utf8.count ?? 0) <= 4096),
             (requestedSkills?.count ?? 0) <= 16,
             Set(requestedSkills ?? []).count == (requestedSkills?.count ?? 0),
             (requestedSkills ?? []).allSatisfy({ CapabilityRegistry.validName($0) }),
@@ -81,23 +84,24 @@ public struct AgentTaskSignal: Codable, Sendable, Equatable {
             CapabilityRegistry.validName(scope.executor.rawValue)
         else { throw CommunicationError.invalidPayload }
     }
-    public func message() throws -> AgentMessage {
+    public func message(operation: AgentRequestOperation? = nil) throws -> AgentMessage {
         try validate()
-        return AgentMessage(contract: contract, content: self, maximumBytes: 131_072, validate: { try $0.validate() })
-    }
-    public static var contracts: [CommunicationContract] {
-        [Kind.request, .input, .cancel].map { kind in
-            CommunicationContract(
-                name: kind.contract, kind: .observation, maximumBytes: 131_072,
-                startsNewWork: true,
-                validateMessage: { message in
-                    guard let signal = message.content(as: AgentTaskSignal.self), signal.kind == kind else {
-                        throw CommunicationError.invalidPayload
-                    }
-                    try signal.validate()
-                })
+        let selected: AgentRequestOperation? =
+            switch kind {
+            case .request: .submit
+            case .input: operation ?? .update
+            case .cancel: .cancel
+            case .progress, .result: nil
+            }
+        guard kind != .input || selected == .update || selected == .answer else {
+            throw CommunicationError.invalidPayload
         }
+        return AgentMessage(
+            contract: contract, content: self, maximumBytes: 131_072, operation: selected, task: self, id: id,
+            eventScope: selected == nil ? scope.id : nil, eventOwner: selected == nil ? scope.requester : nil,
+            validate: { try $0.validate() })
     }
+
 }
 
 /// Owned by the processing Agent. Remote task completion is never a delivery receipt.

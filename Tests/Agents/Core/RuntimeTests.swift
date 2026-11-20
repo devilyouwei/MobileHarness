@@ -590,9 +590,9 @@ private actor SignalFeedbackRecorder: Agent {
     let configuration = try AgentConfiguration(
         data: Data(
             #"""
-            {"version":8,"category":"cognition","id":"assistant","actions":{},"tools":[],"communication":{
-            "inputs":[{"contract":"runtime.tool.result","version":1,"kind":"toolResult"}],
-            "subscriptions":[],"publications":[],"sends":[]}}
+            {"version":9,"category":"cognition","id":"assistant","actions":{},"tools":[],"signals":{
+            "requests":[],"feedback":["action.result.v1"],
+            "subscriptions":[],"publications":[]}}
             """#.utf8))
     let policy = try CommunicationPolicy(configurations: [configuration])
     let gateway = await OutputGateway(

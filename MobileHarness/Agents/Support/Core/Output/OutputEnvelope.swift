@@ -3,6 +3,7 @@ import Foundation
 
 /// Source identity is attached by the runtime, never accepted from model output.
 public struct OutputEnvelope: Sendable {
+    public var invocation: ActionInvocationSnapshot?
     public let resourceBindings: [String: String]
     public let context: ProcessingContext
     public let source: AgentID
@@ -22,13 +23,15 @@ public struct OutputEnvelope: Sendable {
     public init(
         source: AgentID, context: ProcessingContext, output: AgentOutput, sequence: UInt64 = 0, roundID: String? = nil,
         callID: String? = nil, taskScope: AgentTaskScope? = nil, failure: AgentFailureDiagnostic? = nil,
-        media: ImageInput? = nil, executionAttachment: (any Sendable)? = nil, resourceBindings: [String: String] = [:]
+        media: ImageInput? = nil, executionAttachment: (any Sendable)? = nil, resourceBindings: [String: String] = [:],
+        invocation: ActionInvocationSnapshot? = nil
     ) {
         if failure != nil {
             guard case .control(let value) = output, value.hasPrefix("agent.error:") else {
                 preconditionFailure("Failure diagnostics require an Agent error control")
             }
         }
+        self.invocation = invocation
         self.resourceBindings = resourceBindings
         self.context = context
         self.media = media
@@ -57,7 +60,7 @@ extension OutputEnvelope {
         .init(
             source: source, context: context, output: output, sequence: sequence, roundID: roundID, callID: callID,
             taskScope: taskScope, failure: failure, media: media, executionAttachment: executionAttachment,
-            resourceBindings: bindings)
+            resourceBindings: bindings, invocation: invocation)
     }
 }
 

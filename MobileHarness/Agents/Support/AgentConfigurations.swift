@@ -116,22 +116,22 @@ public enum AgentConfigurations {
             init?(intValue: Int) { return nil }
         }
         private enum CodingKeys: String, CodingKey {
-            case version, id, category, description, communication, baseSkills
+            case version, id, category, description, signals, baseSkills
         }
         init(from decoder: any Decoder) throws {
             let all = try decoder.container(keyedBy: Key.self)
             guard
                 Set(all.allKeys.map(\.stringValue)) == [
-                    "version", "id", "category", "description", "communication", "baseSkills",
+                    "version", "id", "category", "description", "signals", "baseSkills",
                 ]
             else { throw AgentConfigurationError.invalidFormat }
             let fields = try decoder.container(keyedBy: CodingKeys.self)
             version = try fields.decode(Int.self, forKey: .version)
-            guard version == 10 else { throw AgentConfigurationError.unsupportedVersion(version) }
+            guard version == 11 else { throw AgentConfigurationError.unsupportedVersion(version) }
             id = try fields.decode(String.self, forKey: .id)
             category = try fields.decode(AgentCategory.self, forKey: .category)
             description = try fields.decode(String.self, forKey: .description)
-            communication = try fields.decode(CommunicationDeclaration.self, forKey: .communication)
+            communication = try fields.decode(CommunicationDeclaration.self, forKey: .signals)
             baseSkills = try fields.decode([String].self, forKey: .baseSkills)
             guard ActionIdentifier.validName(id),
                 !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -139,7 +139,7 @@ public enum AgentConfigurations {
                 baseSkills.count <= 16, Set(baseSkills).count == baseSkills.count,
                 baseSkills.allSatisfy({ ActionIdentifier.validName($0) })
             else { throw AgentConfigurationError.invalidFormat }
-            try communication.validate(contracts: AgentContracts.communication)
+            try communication.validate(contracts: AgentContracts.communication, agentID: .init(rawValue: id))
         }
     }
     static func decodeResource(_ data: Data, expectedID: AgentID) throws -> Resource {
@@ -170,7 +170,7 @@ public enum AgentConfigurations {
                     target: AgentID(rawValue: value.id), requester: requester, communication: communication)
             else { continue }
             let target = try load(named: name)
-            guard target.communication.inputs.contains(where: { $0.contract == AgentTaskRequest.contract }) else {
+            guard target.communication.requests.contains(AgentTaskRequest.contract) else {
                 throw CommunicationError.unsupportedContract
             }
             entries.append(
@@ -227,7 +227,9 @@ public enum AgentConfigurations {
         return data
     }
     public static func all() throws -> [AgentConfiguration] {
-        try catalog().agents.keys.sorted().map { try load(named: $0) }
+        let configurations = try catalog().agents.keys.sorted().map { try load(named: $0) }
+        for configuration in configurations { try AgentContracts.validateProtocols(configuration) }
+        return configurations
     }
     public static func skill(_ id: String) throws -> Skill {
         if let cached = cache.lock.withLock({ cache.skills[id] }) { return cached }
@@ -305,7 +307,7 @@ public enum AgentConfigurations {
         let generated = try declaration(AgentSkillLoader.bindings(expanded, owner: owner), owner: owner)
         root.removeValue(forKey: "baseSkills")
         root.removeValue(forKey: "description")
-        root["version"] = 8
+        root["version"] = 9
         root["actions"] = generated.actions
         root["tools"] = generated.tools
         let configuration = try AgentConfiguration(
@@ -317,8 +319,8 @@ public enum AgentConfigurations {
     public static func registry(_ bindings: [Binding], owner: AgentID? = nil) throws -> CapabilityRegistry {
         let d = try declaration(bindings, owner: owner, localize: AgentPrompts.language == "zh-Hans")
         let root: [String: Any] = [
-            "version": 8, "id": "catalog", "category": "perception", "actions": d.actions, "tools": d.tools,
-            "communication": ["inputs": [], "subscriptions": [], "publications": [], "sends": []],
+            "version": 9, "id": "catalog", "category": "perception", "actions": d.actions, "tools": d.tools,
+            "signals": ["requests": [], "feedback": [], "publications": [], "subscriptions": []],
         ]
         let configuration = try AgentConfiguration(data: JSONSerialization.data(withJSONObject: root))
         return configuration.capabilities

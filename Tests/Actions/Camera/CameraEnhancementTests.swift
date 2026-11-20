@@ -177,9 +177,15 @@ private actor RecordingCameraFixture: CameraCapturing {
     var waiter: CheckedContinuation<CameraMovie, any Error>?
     init(file: URL) { self.file = file }
     func requestPermission() -> Bool { true }
-    func subscribeFrames() -> AsyncThrowingStream<CameraFrame, Error> { .init { $0.finish() } }
-    func start(facing: CameraFacing) -> AsyncThrowingStream<CameraFrame, Error> { subscribeFrames() }
-    func switchCamera(facing: CameraFacing) -> AsyncThrowingStream<CameraFrame, Error> { subscribeFrames() }
+    func listenFrames() -> MediaSignalListener<CameraFrame> {
+        let pair = AsyncThrowingStream<CameraFrame, any Error>.makeStream()
+        pair.continuation.finish()
+        return .init(
+            source: .init(producer: "fixture.camera", generation: "one", delivery: .latest),
+            stream: pair.stream, detach: { pair.continuation.finish() })
+    }
+    func start(facing: CameraFacing) -> MediaSignalListener<CameraFrame> { listenFrames() }
+    func switchCamera(facing: CameraFacing) -> MediaSignalListener<CameraFrame> { listenFrames() }
     func capturePhoto(rotation: CGFloat) throws -> Data { throw CameraError.unavailable }
     func isRunning() -> Bool { true }
     func stop() { complete("interrupted") }
@@ -385,8 +391,14 @@ private actor RecordingCameraFixture: CameraCapturing {
     let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     var stopWaiter: CheckedContinuation<Void, Never>?
     func requestPermissions() async throws {}
-    func subscribeEvents() throws -> AsyncThrowingStream<NativeAudioEvent, any Error> { .init { $0.finish() } }
-    func subscribeCapture() async throws -> MicrophoneCaptureInput { throw AudioIOError.busy }
+    func listenEvents() throws -> PlatformKit.StateSignalListener<NativeAudioEvent> {
+        let pair = AsyncThrowingStream<NativeAudioEvent, any Error>.makeStream()
+        pair.continuation.finish()
+        return .init(
+            source: .init(producer: "fixture.audio", generation: "one", delivery: .latest),
+            stream: pair.stream, detach: { pair.continuation.finish() })
+    }
+    func listenCapture() async throws -> MicrophoneCaptureInput { throw AudioIOError.busy }
     func startCapture(preferSpatial: Bool) async throws { owned = true }
     func stopCapture() async { trace.append("samplesStopped") }
     func stop() async {

@@ -34,7 +34,7 @@
                 String, Bool, any CameraOutputHandling
             ) async throws -> Void
         private struct PreviewIntent: Sendable {
-            let frames: AsyncThrowingStream<CameraFrame, Error>
+            let frames: MediaSignalListener<CameraFrame>
             let revision: Int
         }
         private lazy var previewRestart = CameraVisionRestartWorkflow<PreviewIntent> { [weak self] intent in
@@ -569,7 +569,7 @@
             poseTask = Task { [weak self] in await self?.runPose(sessionID: id, mirrored: mirrored) }
         }
         private func runPreview(
-            _ frames: AsyncThrowingStream<CameraFrame, Error>, sessionID: String,
+            _ frames: MediaSignalListener<CameraFrame>, sessionID: String,
             token displayToken: UIPresentationToken
         ) async {
             do {
@@ -685,7 +685,7 @@
                 activityID: id, owner: captureOwner, state: state, sequence: eventSequence, context: context)
         }
 
-        private func startCapture(facing: CameraFacing) async throws -> AsyncThrowingStream<CameraFrame, Error> {
+        private func startCapture(facing: CameraFacing) async throws -> MediaSignalListener<CameraFrame> {
             let runtime = try makeRuntime()
             resourceRuntime = runtime
             let lease = try await runtime.resources.acquire(

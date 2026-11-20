@@ -89,7 +89,7 @@ ActionsBusinessAssembly only includes an already-created camera owner; the absen
 
 Preview frame adaptation forwards the native optional portrait sensor reference into CameraVideoFrame without changing gravity-upright capture dimensions, pose coordinates or JPEG orientation. UI owns scene orientation and final preview/skeleton/gaze projection; Actions does not query interface geometry or reorient inference input.
 
-CameraResourceAccess.isSettled asks whether resource handoff has reached a stable holding; a new stable lease can satisfy it. It does not imply that the resource is unowned. Gateway owns the holding interpretation through the App protocol adapter.
+CameraResourceAccess.isSettled asks whether resource handoff has reached a stable holding; a new stable lease can satisfy it. It does not imply that the resource is unowned. The Actions Shell owns the holding interpretation through the App protocol adapter.
 
 ## Camera window lifecycle
 
@@ -160,3 +160,5 @@ The gallery receives typed metadata and scoped read access through CameraInterac
 CameraPreviewStore owns a cancellable image-preparation task. Closing cancels it and joins completion before clearing bytes; non-cooperative callbacks remain generation-fenced. Window transitions reject new preview operations. Batch disposition and analysis preparation share the same single operation slot.
 
 历史 Prompts 图片由日志独占；本目录不提供相册或预览缓存的历史图片回退接口。实时相机和独立相册的读取不受日志清理影响。
+
+Camera runtime ports carry PlatformKit.MediaSignalListener<CameraFrame> from native capture. Camera execution retains hardware authority; perception consumers own listener iteration, detachment and joined processing. Returning a preview handle confirms native capture admission, while photo/video calls retain their existing terminal completion semantics.

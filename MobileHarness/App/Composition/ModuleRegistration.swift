@@ -30,6 +30,9 @@ import Gateway
                 foreground: { if $0 { try await services.platform.setForeground(true) } },
                 stop: { try await services.platform.stop() }),
             ManagedService(
+                id: "memoryPressure", dependencies: ["model", "platform"], continuesInBackground: true,
+                start: { try services.memoryPressure.start() }, stop: { await services.memoryPressure.stop() }),
+            ManagedService(
                 id: "ui", dependencies: ["diagnostics"], continuesInBackground: true,
                 start: { try services.uiContainer.start() },
                 invalidate: services.uiContainer.invalidate,
@@ -42,12 +45,13 @@ import Gateway
                         declarations: CapabilityModules.declarations)
                     let business = try services.actionAssembly.prepare(preparation.request, actions: services.actions)
                     let binding = try preparation.validate(business)
+                    let log = services.actionAssembly.connectActionLog(to: services.uiContainer.runtimeLog)
+                    let engine = try services.actions.configureExecution(
+                        resources: business.resources, onExecutionSnapshot: log)
                     let communication = AgentGatewayAssembly(
                         signals: services.gateway.signals,
-                        admission: services.gateway.admissionPort, configuration: binding.configuration)
-                    let log = services.actionAssembly.connectActionLog(to: services.uiContainer.runtimeLog)
-                    let ports = try services.gateway.configureExecution(
-                        communication.configuration, onExecutionSnapshot: log)
+                        admission: services.gateway.admissionPort, engine: engine, configuration: binding.configuration)
+                    let ports = try services.gateway.configureExecution(communication.configuration)
                     let facilities = communication.bind(ports: ports, observations: services.gateway.observations)
                     try services.agents.bindExecution(binding, facilities: facilities)
                 },

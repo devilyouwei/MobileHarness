@@ -337,7 +337,7 @@ public final class UIDeviceSettingsContainer {
             ])
     }
 
-    public let requests = UIRequests<DeviceInput, Void>()
+    public let requests = UIRequests<DeviceInput, Void>(producer: "ui.settings.device")
 
     public let state = BluetoothSettingsState()
     public var presentation: any DeviceSettingsPresenting { state }

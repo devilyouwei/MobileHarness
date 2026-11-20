@@ -47,7 +47,194 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
 
     private var resultInbox = ActionResultInbox()
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
-    private let communicationReceipts = CommunicationReceipts()
+    private var messaging: AgentMessaging?
+    private struct TrackedTask {
+        let token: UUID
+        let producer: AgentID
+        let sessionID: String
+        var durable: Bool
+        var dynamicSubscription: AgentEventSubscription?
+    }
+    private var trackedTasks: [String: TrackedTask] = [:]
+    private var taskRecovery: Task<Void, Never>?
+    public private(set) var taskObservationFailure: String?
+    public var trackedTaskCount: Int { trackedTasks.count }
+    public func bindMessaging(_ messaging: AgentMessaging) async throws {
+        self.messaging = messaging
+        if lifecycle == .running || lifecycle == .paused { try await restoreTrackedTasks() }
+    }
+    @discardableResult private func trackTask(reference: String, producer: AgentID, sessionID: String) async throws
+        -> Bool
+    {
+        if let existing = trackedTasks[reference] {
+            guard existing.producer == producer, existing.sessionID == sessionID else {
+                throw CommunicationError.unauthorized
+            }
+            return false
+        }
+        guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
+        guard let messaging, trackedTasks.count < 256 else { throw CommunicationError.capacityExceeded }
+        let token = UUID()
+        trackedTasks[reference] = .init(token: token, producer: producer, sessionID: sessionID, durable: false)
+        do {
+            let record = try await communications?.agentMessage(reference)
+            guard trackedTasks[reference]?.token == token else { throw CancellationError() }
+            if let record {
+                guard record.sender == descriptor.id.rawValue, record.receiver == producer.rawValue,
+                    record.sourceSessionID == nil || record.sourceSessionID == sessionID
+                else { throw CommunicationError.unauthorized }
+            }
+            trackedTasks[reference]?.durable = record != nil
+            if !hasStaticTaskSubscription(from: producer) {
+                let subscription = try await messaging.subscribe(
+                    .init(
+                        channel: "agent.task", protocolID: "agent.task.events.v1", sources: [producer],
+                        scope: reference,
+                        sessionID: sessionID))
+                guard trackedTasks[reference]?.token == token else {
+                    await subscription.cancel()
+                    throw CancellationError()
+                }
+                trackedTasks[reference]?.dynamicSubscription = subscription
+            }
+            try Task.checkCancellation()
+            startTaskRecovery()
+            return true
+        } catch {
+            if trackedTasks[reference]?.token == token { await stopTrackingTask(reference) }
+            throw error
+        }
+    }
+    private func hasStaticTaskSubscription(from producer: AgentID) -> Bool {
+        communicationPolicy.subscriptions.contains {
+            $0.channel == "agent.task" && $0.protocol == "agent.task.events.v1"
+                && $0.sources.contains(producer.rawValue)
+        }
+    }
+    private func stopTrackingTask(_ reference: String) async {
+        if let owned = trackedTasks.removeValue(forKey: reference) { await owned.dynamicSubscription?.cancel() }
+        if trackedTasks.isEmpty { taskRecovery?.cancel() }
+    }
+    private func startTaskRecovery() {
+        guard State.agentID == .assistant, communications != nil, taskRecovery == nil,
+            trackedTasks.values.contains(where: { $0.durable })
+        else { return }
+        taskRecovery = Task { [weak self] in
+            guard let self else { return }
+            await self.runTaskRecovery()
+        }
+    }
+    private func runTaskRecovery() async {
+        defer {
+            self.taskRecovery = nil
+            if lifecycle == .running || lifecycle == .paused { startTaskRecovery() }
+        }
+        while !Task.isCancelled, self.trackedTasks.values.contains(where: { $0.durable }),
+            self.lifecycle != .stopped
+        {
+            var failure: String?
+            for (reference, owned) in self.trackedTasks where owned.durable {
+                do {
+                    try Task.checkCancellation()
+                    try await self.replayTaskEvents(
+                        reference: reference, producer: owned.producer, sessionID: owned.sessionID)
+                } catch {
+                    if !Task.isCancelled { failure = String(String(describing: error).prefix(1024)) }
+                }
+            }
+            if !Task.isCancelled { self.taskObservationFailure = failure }
+            do { try await Task.sleep(for: .milliseconds(500)) } catch { break }
+        }
+    }
+
+    private func replayTaskEvents(reference: String, producer: AgentID, sessionID: String) async throws {
+        guard let communications, trackedTasks[reference] != nil else { return }
+        let page = try await communications.taskEvents(
+            reference: reference, receiver: descriptor.id.rawValue, after: nil, limit: 32)
+        for event in page.events {
+            guard trackedTasks[reference] != nil else { return }
+            var finished = false
+            let record = event.message
+            guard record.sender == producer.rawValue, record.receiver == descriptor.id.rawValue,
+                record.correlationID == reference
+            else { throw CommunicationError.unauthorized }
+            guard try await !communications.isAgentMessageConsumed(record.id) else { continue }
+            // A stored fact is applied locally; no live endpoint/incarnation is fabricated.
+            if producer == .writer {
+                let report = try JSONDecoder().decode(AgentTaskResponse.self, from: record.payload)
+                try report.validate()
+                let message = report.publication(scope: reference)
+                let input = AgentInput(
+                    id: record.id, sessionID: sessionID, payload: .observation(message),
+                    metadata: .init(
+                        payload: .observation(message), source: record.sender, origin: .local, rootID: reference))
+                if let rejection = report.rejection {
+                    guard rejection.sessionID == sessionID else { throw CommunicationError.unauthorized }
+                    try await receiveTaskMessageRejection(rejection, report: report, input: input)
+                    if let request = try await communications.agentMessage(rejection.messageID), request.replyTo == nil
+                    {
+                        finished = true
+                    }
+                } else if let signal = report.signal {
+                    guard signal.scope.id == reference, signal.scope.sessionID == sessionID,
+                        signal.scope.requester == descriptor.id
+                    else { throw CommunicationError.unauthorized }
+                    let content = try AgentTaskContent.decode(signal)
+                    guard let fact = content.writerEvent else { throw CommunicationError.invalidPayload }
+                    if signal.kind == .result {
+                        try await receiveWriterCompletion(
+                            report, signal: signal, content: content, event: fact, input: input)
+                        finished = true
+                    } else {
+                        try await receiveWriterEvent(signal, content: content, event: fact, input: input)
+                    }
+                }
+            } else {
+                let signal = try JSONDecoder().decode(AgentTaskSignal.self, from: record.payload)
+                guard signal.scope.id == reference, signal.scope.requester == descriptor.id,
+                    signal.scope.executor == producer,
+                    signal.scope.sessionID == sessionID
+                else { throw CommunicationError.unauthorized }
+                let content = try AgentTaskContent.decode(signal)
+                try await contextRepository.update { context in
+                    if let state = context.tasks.task(reference)?.state,
+                        ![.succeeded, .failed, .cancelled, .interrupted].contains(state)
+                    {
+                        try context.tasks.report(signal, agent: producer)
+                    }
+                    if context.state.taskViews == nil { context.state.taskViews = [:] }
+                    context.state.taskViews?[reference] = AgentTaskView(
+                        scope: signal.scope, content: content, terminal: signal.kind == .result)
+                }
+                if signal.kind == .result { finished = true }
+            }
+            try await communications.receiveAgentMessage(record.id, receiver: descriptor.id.rawValue, consumed: true)
+            if finished { await stopTrackingTask(reference) }
+        }
+    }
+    private func restoreTrackedTasks() async throws {
+        guard State.agentID == .assistant, let communications, messaging != nil else { return }
+        var cursor: String?
+        while true {
+            let page = try await communications.observationRequests(
+                sender: descriptor.id.rawValue, after: cursor, limit: 64)
+            for record in page {
+                var session = record.sourceSessionID
+                if session == nil,
+                    let event = try await communications.agentReply(to: record.id, contract: "agent.task.events.v1"),
+                    let report = try? JSONDecoder().decode(AgentTaskResponse.self, from: event.payload)
+                {
+                    session = report.signal?.scope.sessionID ?? report.rejection?.sessionID
+                }
+                if let session {
+                    try await trackTask(
+                        reference: record.id, producer: AgentID(rawValue: record.receiver), sessionID: session)
+                }
+            }
+            guard page.count == 64, let last = page.last else { return }
+            cursor = last.id
+        }
+    }
     private var containerFailures: [ContainerFailureEvent] = []
     public private(set) var containerFailureEvictions: UInt64 = 0
     public func receivedContainerFailures() -> [ContainerFailureEvent] { containerFailures }
@@ -483,6 +670,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         }
         if let skills = try await contextRepository.snapshot().state.skillState { skillContinuation.yield(skills) }
         lifecycle = .running
+        try await restoreTrackedTasks()
         try await startUIInputs()
     }
     private func startUIInputs() async throws {
@@ -594,6 +782,10 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     }
     public func stop() async {
         lifecycle = .stopped
+        taskRecovery?.cancel()
+        await taskRecovery?.value
+        taskRecovery = nil
+        for reference in Array(trackedTasks.keys) { await stopTrackingTask(reference) }
         await decisionQueue.cancelAndWait()
         await inputDecision?.stop()
         decisionTurn = nil
@@ -634,7 +826,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         roundCoordinator?.cancel()
         worker?.cancel()
         for task in routingWorkers.values { task.cancel() }
-        await communicationReceipts.close()
+        messaging = nil
         for task in routingWorkers.values { await task.value }
         routingWorkers.removeAll()
         await speechOutput?.stop()
@@ -701,7 +893,12 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             guard State.agentID == .assistant,
                 input.metadata.origin == .agent
                     || (input.metadata.origin == .local && input.metadata.source == "runtime"),
-                communicationPolicy.inputs.contains(where: { $0.contract == AssistantInterrupt.contract }),
+                input.metadata.origin == .local
+                    || communicationPolicy.subscriptions.contains(where: {
+                        $0.channel == "agent.interruption" && $0.protocol == AssistantInterrupt.contract
+                            && $0.sources.contains(input.metadata.source)
+                            && input.metadata.incarnation != nil && input.metadata.topic == $0.channel
+                    }),
                 let signal = message.content(as: AssistantInterrupt.self)
             else { throw CommunicationError.unauthorized }
             guard !input.metadata.expired else { throw CommunicationError.expired }
@@ -721,13 +918,6 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         if case .observation(let message) = input.payload, message.contract == ContainerFailureEvent.contract {
             throw CommunicationError.unauthorized
         }
-        if case .communicationReceipt(let receipt) = input.payload {
-            guard input.metadata.origin == .runtime, receipt.owner.agent == descriptor.id,
-                receipt.owner.sessionID == input.sessionID
-            else { throw CommunicationError.unauthorized }
-            try await communicationReceipts.accept(receipt) { [self] in try await prepareSignal(input) }
-            return
-        }
 
         if State.isContextObservation(input) {
             guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
@@ -737,7 +927,14 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         if case .observation(let message) = input.payload,
             let report = message.content(as: AgentTaskResponse.self)
         {
-            try await receiveTaskReport(report, input: input)
+            guard try await receiveTaskReport(report, input: input) else { return }
+            if let signal = report.signal, signal.kind == .result {
+                await stopTrackingTask(signal.scope.id)
+            } else if let rejection = report.rejection,
+                let record = try await communications?.agentMessage(rejection.messageID), record.replyTo == nil
+            {
+                await stopTrackingTask(record.id)
+            }
             return
         }
         if case .observation(let message) = input.payload,
@@ -748,6 +945,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
                     || (signal.kind != .progress && signal.kind != .result)
             else { throw CommunicationError.unauthorized }
             try await receiveTask(signal, input: input)
+            if signal.kind == .result { await stopTrackingTask(signal.scope.id) }
             return
         }
         if State.acceptsDirectedUserInput, case .observation(let message) = input.payload,
@@ -1338,7 +1536,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
                 default: break
                 }
             // Unsupported input is rejected by the descriptor; receipts are handled before this switch.
-            case .communicationReceipt, .image, .audio, .actionResult, .roundResult, .activityEvent, .event: break
+            case .image, .audio, .actionResult, .roundResult, .activityEvent, .event: break
             case .toolResult(let result):
                 activeInput = input
                 beginDecisionTurn(input)
@@ -2794,18 +2992,39 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
                     id: action.id, taskID: parent.taskScope?.id ?? parent.id,
                     kind: "communication.output", data: evidence))
         }
-        try await communicationReceipts.register(action.id)
-        guard emit(.communication(action), for: parent) else {
-            await communicationReceipts.cancel(action.id)
-            throw CommunicationError.capacityExceeded
+        guard let messaging else { throw CommunicationError.unavailableTarget }
+        let report: DeliveryReport
+        if let target {
+            let reference =
+                message.content(as: AgentTaskRequest.self).map { $0.replyTo ?? $0.id }
+                ?? signal.flatMap { [.request, .input, .cancel].contains($0.kind) ? $0.scope.id : nil }
+            let created: Bool
+            if let reference {
+                created = try await trackTask(reference: reference, producer: target, sessionID: parent.sessionID)
+            } else {
+                created = false
+            }
+            do {
+                if let reference {
+                    guard let tracked = trackedTasks[reference],
+                        hasStaticTaskSubscription(from: tracked.producer) || tracked.dynamicSubscription != nil
+                    else { throw CancellationError() }
+                }
+                try Task.checkCancellation()
+                report = try await messaging.sendResult(message, parent: parent, to: target)
+            } catch {
+                if created, let reference { await stopTrackingTask(reference) }
+                throw error
+            }
+            if created, let reference, report.failure != nil || !report.rejected.isEmpty {
+                await stopTrackingTask(reference)
+            }
+        } else {
+            try await messaging.publish(message, parent: parent)
+            report = DeliveryReport()
         }
-        if target == nil {
-            await communicationReceipts.cancel(action.id)
-            return DeliveryReport()
-        }
-        let report = try await communicationReceipts.wait(action.id)
         if let messageRecords, let target {
-            if report.delivered.contains(target) {
+            if report.delivered.contains(target) || report.publicationAccepted == true {
                 try await messageRecords.receiveAgentMessage(
                     action.id, receiver: target.rawValue, consumed: false)
             } else {
@@ -2820,7 +3039,6 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
 
     public func ownsFeedback(_ input: AgentInput) -> Bool {
         switch input.payload {
-        case .communicationReceipt: return true
         case .roundResult(let value): return value.roundID == roundID || pendingRounds[value.roundID] != nil
         case .actionResult(let value):
             return value.roundID != nil
@@ -2852,7 +3070,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             $0.state.taskViews?[scope.id]?.text = content.text
         }
         let report = try await communicate(signal.message(), parent: input, to: scope.requester)
-        guard report.delivered.contains(scope.requester), report.rejected.isEmpty else {
+        guard report.publicationAccepted == true, report.failure == nil else {
             throw CommunicationError.unavailableTarget
         }
     }
@@ -2907,7 +3125,9 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
                 }
             }
             let report = try await communicate(action.message, parent: input, to: action.target)
-            let accepted = report.failure == nil && report.rejected.isEmpty && !report.delivered.isEmpty
+            let accepted =
+                report.failure == nil && report.rejected.isEmpty
+                && (!report.delivered.isEmpty || report.publicationAccepted == true)
             if stableSignal.kind == .input || stableSignal.kind == .cancel {
                 try await contextRepository.update {
                     try $0.tasks.delivered(stableSignal.scope.id, kind: stableSignal.kind, accepted: accepted)
@@ -3047,16 +3267,29 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         }
     }
 
-    private func receiveTaskReport(_ report: AgentTaskResponse, input: AgentInput) async throws {
+    private func messageScopeForReport(_ report: AgentTaskResponse, input: AgentInput) -> String? {
+        guard case .observation(let message) = input.payload else { return nil }
+        if let signal = report.signal { return message.eventScope == signal.scope.id ? signal.scope.id : nil }
+        return message.eventScope
+    }
+
+    @discardableResult
+    private func receiveTaskReport(_ report: AgentTaskResponse, input: AgentInput) async throws -> Bool {
         guard lifecycle == .running || lifecycle == .paused, State.agentID == .assistant,
             input.metadata.origin == .agent, input.metadata.source == AgentID.writer.rawValue,
             input.metadata.incarnation != nil
         else { throw CommunicationError.unauthorized }
         try report.validate()
+        guard let reference = messageScopeForReport(report, input: input) else {
+            throw CommunicationError.invalidPayload
+        }
+        guard let tracked = trackedTasks[reference], tracked.producer == .writer,
+            tracked.sessionID == input.sessionID
+        else { return false }
         if let rejection = report.rejection {
             guard rejection.sessionID == input.sessionID else { throw CommunicationError.unauthorized }
             try await receiveTaskMessageRejection(rejection, report: report, input: input)
-            return
+            return true
         }
         guard let signal = report.signal, signal.scope.requester == descriptor.id, signal.scope.executor == .writer,
             signal.scope.sessionID == input.sessionID
@@ -3068,6 +3301,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         } else {
             try await receiveWriterEvent(signal, content: content, event: event, input: input)
         }
+        return true
     }
 
     private func receiveWriterEvent(
@@ -3125,7 +3359,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     private func writerMessageOrigin(_ id: String) async throws -> String? {
         guard let record = try await requireCommunications().agentMessage(id), record.sender == descriptor.id.rawValue,
             record.receiver == AgentID.writer.rawValue, record.replyTo == nil, record.correlationID == id,
-            [AgentTaskRequest.contract, "agent.taskMessage", "task.request"].contains(record.contract)
+            AgentTaskRequest.persistedContracts.contains(record.contract)
         else { throw CommunicationError.unauthorized }
         return record.senderContext
     }
@@ -3136,7 +3370,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     ) async throws {
         guard let stored = try await requireCommunications().agentMessage(event.eventID),
             stored.sender == "writer", stored.receiver == descriptor.id.rawValue,
-            [AgentTaskResponse.contract, "writer.completion"].contains(stored.contract),
+            AgentTaskResponse.persistedContracts.contains(stored.contract),
             stored.correlationID == signal.scope.id, stored.replyTo == signal.scope.id,
             try JSONDecoder().decode(AgentTaskResponse.self, from: stored.payload) == report
         else { throw CommunicationError.invalidPayload }
@@ -3635,7 +3869,8 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             .init(
                 id: content.id, sender: descriptor.id.rawValue, receiver: target.rawValue,
                 contract: AgentTaskRequest.contract, payload: payload, correlationID: content.replyTo ?? content.id,
-                replyTo: content.replyTo, senderContext: dialog, dedupeKey: content.id))
+                replyTo: content.replyTo, senderContext: dialog, sourceSessionID: parent.sessionID,
+                dedupeKey: content.id))
         do {
             let report = try await communicate(content.message, parent: parent, to: target)
             guard report.failure == nil, report.rejected.isEmpty, report.delivered.contains(target)
@@ -3659,9 +3894,9 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     ) async throws {
         let records = try requireCommunications()
         guard let sent = try await records.agentMessage(rejection.messageID), sent.sender == descriptor.id.rawValue,
-            sent.receiver == input.metadata.source, sent.contract == AgentTaskRequest.contract,
+            sent.receiver == input.metadata.source, AgentTaskRequest.persistedContracts.contains(sent.contract),
             let stored = try await records.agentMessage(rejection.eventID),
-            stored.contract == AgentTaskResponse.contract,
+            AgentTaskResponse.persistedContracts.contains(stored.contract),
             stored.sender == sent.receiver, stored.receiver == sent.sender, stored.replyTo == sent.id,
             stored.correlationID == sent.correlationID,
             try JSONDecoder().decode(AgentTaskResponse.self, from: stored.payload) == report

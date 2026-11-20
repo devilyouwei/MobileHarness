@@ -1,26 +1,24 @@
 {
-  "version": 10,
+  "version": 11,
   "category": "cognition",
   "id": "writer",
   "description": "I create and revise drawings, diagrams, HTML/CSS/JS pages, Markdown and text files, and find, open or delete saved works. Send me the user's goal, updates, answers or stop requests via task.send. Include any known work title or returned workspace_N reference. I decide whether to start work, update an assignment or ask a question. I handle one assignment at a time and report acceptance, questions, progress and outcomes. Request deletion only when the user explicitly asks. Accepted work survives the requesting conversation or listening session ending. My private tools and execution instructions remain private.",
-  "communication": {
-    "inputs": [
-      {
-        "contract": "agent.task.request",
-        "version": 1,
-        "kind": "observation"
-      }
-    ],
-    "subscriptions": [],
-    "publications": [],
-    "sends": [
-      {
-        "contract": "agent.task.response",
-        "target": "assistant"
-      }
-    ]
-  },
   "baseSkills": [
     "writer-workspace"
-  ]
+  ],
+  "signals": {
+    "requests": [
+      "agent.task.v1"
+    ],
+    "feedback": [
+      "action.result.v1"
+    ],
+    "publications": [
+      {
+        "channel": "agent.task",
+        "protocol": "agent.task.events.v1"
+      }
+    ],
+    "subscriptions": []
+  }
 }

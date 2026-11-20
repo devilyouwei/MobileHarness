@@ -76,7 +76,7 @@ public actor ModelManager {
         artifactRelease = task
         try await task.value
     }
-    public func observeArtifactChanges() async throws -> AsyncStream<UInt64> {
+    public func observeArtifactChanges() async throws -> ModelKit.StateSignalListener<UInt64> {
         guard !closed, let artifacts else { throw ModelArtifactError.missingArtifact }
         return try await artifacts.observeChanges()
     }

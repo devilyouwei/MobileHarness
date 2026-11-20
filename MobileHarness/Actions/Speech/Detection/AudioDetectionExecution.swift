@@ -155,19 +155,21 @@ private func diagnosticError(_ error: any Error) -> any Error {
     }
     func watchAudioChanges() {
         do {
-            let events = try audio.subscribeEvents()
+            let events = try audio.listenEvents()
             routeTask = Task {
                 do {
                     for try await event in events {
-                        guard !Task.isCancelled else { return }
+                        guard !Task.isCancelled else { break }
                         switch event {
                         case .interrupted: await fail(AudioDetectionError.interrupted)
                         case .routeChanged: await fail(AudioDetectionError.routeChanged)
                         case .mediaServicesReset: await fail(AudioIOError.runtimeFailed)
                         }
-                        return
+                        break
                     }
-                } catch { await fail(error) }
+                } catch { if !Task.isCancelled { await fail(error) } }
+                await events.cancel()
+                await events.join()
             }
         } catch { failure = error }
     }

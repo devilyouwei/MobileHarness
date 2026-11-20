@@ -20,8 +20,10 @@ extension SpeechPerceptionAgent {
         _ = try admitsMicrophone(sessionID: sessionID)
         let epoch = UUID()
         nativeInputEpoch = epoch
+        var opened: MicrophoneCaptureInput?
         do {
-            let capture = try await microphoneInput.subscribeCapture()
+            let capture = try await microphoneInput.listenCapture()
+            opened = capture
             setCaptureDuplex(capture.supportsFullDuplex)
             try Task.checkCancellation()
             guard nativeInputEpoch == epoch else { throw CancellationError() }
@@ -30,8 +32,18 @@ extension SpeechPerceptionAgent {
             try Task.checkCancellation()
             guard nativeInputEpoch == epoch else { throw CancellationError() }
             bindMicrophoneGeneration(capture.generation)
-            nativeInput = Task { try await self.consumeMicrophone(capture, sessionID: sessionID, epoch: epoch) }
+            nativeInput = Task {
+                do { try await self.consumeMicrophone(capture, sessionID: sessionID, epoch: epoch) } catch {
+                    await capture.frames.cancel()
+                    await capture.frames.join()
+                    throw error
+                }
+                await capture.frames.cancel()
+                await capture.frames.join()
+            }
         } catch {
+            await opened?.frames.cancel()
+            await opened?.frames.join()
             if nativeInputEpoch == epoch { nativeInputEpoch = nil }
             throw error
         }

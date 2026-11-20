@@ -1,51 +1,28 @@
 {
-  "version": 10,
+  "version": 11,
   "category": "perception",
   "id": "applicationControl",
   "description": "I own application settings, provider and model-resource configuration, device administration and diagnostic presentation through supported application interfaces.",
-  "communication": {
-    "inputs": [
-      {
-        "contract": "runtime.tool.result",
-        "version": 1,
-        "kind": "toolResult"
-      },
-      {
-        "contract": "task.request",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
-        "contract": "task.input",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
-        "contract": "agent.task.response",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
-        "contract": "task.cancel",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
-        "contract": "runtime.message.receipt",
-        "version": 1,
-        "kind": "communicationReceipt"
-      }
-    ],
-    "subscriptions": [],
-    "publications": [],
-    "sends": [
-      {
-        "contract": "agent.task.response",
-        "target": "assistant"
-      }
-    ]
-  },
   "baseSkills": [
     "application-control"
-  ]
+  ],
+  "signals": {
+    "requests": [
+      "agent.task.v1"
+    ],
+    "feedback": [
+      "action.result.v1"
+    ],
+    "publications": [
+      {
+        "channel": "agent.interruption",
+        "protocol": "agent.interruption.v1"
+      },
+      {
+        "channel": "agent.task",
+        "protocol": "agent.task.events.v1"
+      }
+    ],
+    "subscriptions": []
+  }
 }

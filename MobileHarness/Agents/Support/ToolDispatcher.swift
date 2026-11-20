@@ -8,9 +8,8 @@ enum AgentToolFeedbackDelivery { @TaskLocal static var internalCompletion = fals
 /// Native call adapter: native calls execute directly without Channel/wait; feedback crosses InputGateway.
 struct ToolDispatcher: Sendable {
     let catalog: ActionCatalogSnapshot
-    let executor: DirectExecutionDispatcher
+    let executor: any ActionExecutionEngine
     let input: InputGateway
-    let resources: ResourceCoordinator?
     var admission: GatewayAdmission? = nil
 
     private static func executionAttachment(_ image: ImageInput?, sequence: UInt64) throws -> (any Sendable)? {
@@ -33,6 +32,10 @@ struct ToolDispatcher: Sendable {
         let descriptor = catalog.entries.first(where: {
             $0.path.description == call.toolPath && $0.protocols.contains(.tool)
         })
+        let invocation = FunctionInvocation(tool: call.executionRequest, context: envelope.executionContext)
+        let snapshot =
+            try envelope.invocation
+            ?? (invocation.call.actionPath.isValid ? ActionInvocationSnapshot(invocation.call) : nil)
         let result: ToolResponse?
         if let descriptor {
             do {
@@ -68,7 +71,7 @@ struct ToolDispatcher: Sendable {
                 ToolResult(
                     callID: result.callID, value: result.value, isError: result.isError,
                     failureCode: result.failureCode?.rawValue, completion: result.completion?.agentValue,
-                    roundID: envelope.roundID),
+                    roundID: envelope.roundID, invocation: snapshot),
                 owner: owner, envelope: envelope)
             failure = report.flatMap { $0.rejected.isEmpty ? nil : "Result delivery rejected: \($0.rejected)" }
         } catch {

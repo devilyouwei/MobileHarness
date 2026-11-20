@@ -12,7 +12,7 @@ import UI
 extension AgentManager {
     func receiveLocally(_ input: AgentInput, to target: AgentID) async throws -> DeliveryReport {
         switch input.payload {
-        case .actionResult, .toolResult, .roundResult, .activityEvent, .communicationReceipt:
+        case .actionResult, .toolResult, .roundResult, .activityEvent:
             throw CommunicationError.unauthorized
         default: break
         }
@@ -256,7 +256,7 @@ func processCameraFixture(_ input: AgentInput, using agent: VisionPerceptionAgen
 
 actor NativeMicrophoneFixture: AudioCaptureObserving {
     nonisolated let capture = MicrophoneCapture()
-    func subscribeCapture() throws -> MicrophoneCaptureInput { try capture.subscribe() }
+    func listenCapture() throws -> MicrophoneCaptureInput { try capture.subscribe() }
 }
 
 func syntheticAudioInput(

@@ -141,3 +141,20 @@ import Testing
     withExtendedLifetime(ordinaryListening) {}
     await ui.stop()
 }
+
+@MainActor @Test func requestSignalListenerCopiesCannotSplitRequestsBetweenConsumers() async throws {
+    let source = UIRequests<String, Int>(producer: "fixture.ui.request")
+    source.setAvailable(true)
+    let listener = try source.listen()
+    var first = listener.makeAsyncIterator()
+    var duplicate = listener.makeAsyncIterator()
+    await #expect(throws: UIRequestError.duplicateConsumer) { try await duplicate.next() }
+    let result = Task { try await source.submit("request") }
+    let request = try #require(try await first.next())
+    #expect(listener.producer == "fixture.ui.request" && listener.capacity == 64)
+    #expect(request.accept())
+    await listener.cancel()
+    await listener.join()
+    await #expect(throws: UIRequestError.consumerEnded) { try await result.value }
+    #expect(!request.complete(.success(99)))
+}

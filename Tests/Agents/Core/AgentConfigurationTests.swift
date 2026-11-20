@@ -52,11 +52,9 @@ func writerSkillsAreScopedToTheirOwner(id: String) throws {
 
 private func document() -> [String: Any] {
     [
-        "version": 8, "category": "cognition",
-        "communication": [
-            "inputs": [
-                ["contract": "runtime.tool.result", "version": 1, "kind": "toolResult"]
-            ], "subscriptions": [], "publications": [], "sends": [],
+        "version": 9, "category": "cognition",
+        "signals": [
+            "requests": [], "feedback": ["action.result.v1"], "subscriptions": [], "publications": [],
         ],
         "id": "assistant",
         "actions": [
@@ -157,7 +155,7 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
 
 @Test(.actionCatalog) func bundledConfigurationsSeparateFixedAndSkillFunctions() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
-    #expect(config.version == 8 && config.agentID == .assistant)
+    #expect(config.version == 9 && config.agentID == .assistant)
     #expect(config.capabilities.actions.contains { $0.alias == "express" })
     #expect(config.capabilities.actions.contains { $0.alias == "task.start" })
     #expect(config.capabilities.tools.isEmpty)
@@ -496,7 +494,7 @@ func threeLevelConfigurationRejectsAmbiguousBindings(_ mutation: String) throws 
     ]
     for contract in owners.keys {
         let subscribers = configurations.filter {
-            $0.communication.subscriptions.contains { $0.source == "user" && $0.contract == contract }
+            $0.communication.subscriptions.contains { $0.sources.contains("user") && $0.protocol == contract }
         }.map(\.agentID)
         #expect(subscribers.isEmpty)
     }
@@ -627,7 +625,7 @@ func skillUseStateRejectsInvalidDeclarations(_ mutation: String) throws {
         let configuration = try AgentConfigurations.load(named: name)
         let data = try AgentConfigurations.data("Agents/" + name + "/Agent.json")
         let resource = try AgentConfigurations.decodeResource(data, expectedID: configuration.agentID)
-        #expect(resource.version == 10 && configuration.version == 8)
+        #expect(resource.version == 11 && configuration.version == 9)
         #expect(!resource.description.isEmpty && resource.description.utf8.count <= 2048)
         #expect(try AgentConfigurations.publicDescription(named: name) == resource.description)
     }
@@ -635,12 +633,10 @@ func skillUseStateRejectsInvalidDeclarations(_ mutation: String) throws {
 
 @Test(.actionCatalog) func writerDeclaresOnlyConsumedInputsAndPeerReports() throws {
     let communication = try AgentConfigurations.load(named: "Writer").communication
-    #expect(
-        Set(communication.inputs.map(\.contract)) == [
-            "agent.task.request"
-        ])
-    #expect(Set(communication.sends.map(\.contract)) == ["agent.task.response"])
-    #expect(communication.sends.allSatisfy { $0.target == "assistant" })
+    #expect(communication.requests == ["agent.task.v1"])
+    #expect(communication.feedback == ["action.result.v1"])
+    #expect(communication.publications == [.init(channel: "agent.task", protocol: "agent.task.events.v1")])
+    #expect(communication.subscriptions.isEmpty)
 }
 
 @Test(
@@ -722,4 +718,39 @@ func agentCategoryRejectsInvalidResourceAndCompiledConfiguration(mutation: Strin
         try AgentConfigurations.decodeResource(JSONSerialization.data(withJSONObject: resource), expectedID: .assistant)
     }
     #expect(throws: AgentConfigurationError.self) { try decode(compiled) }
+}
+
+@Test(.actionCatalog) func requestProtocolEnablementRequiresOneCompleteCodeImplementation() throws {
+    let writer = try AgentConfigurations.load(named: "Writer")
+    #expect(throws: AgentProtocolStartupError.self) {
+        try AgentContracts.validateProtocols(writer, implementations: [])
+    }
+    let incomplete = AgentRequestImplementation(
+        protocolID: "agent.task.v1", role: WriterAgent.self, operations: [.submit],
+        handler: { try await $0.receiveRequest($1) })
+    #expect(throws: AgentProtocolStartupError.self) {
+        try AgentContracts.validateProtocols(writer, implementations: [incomplete])
+    }
+    let complete = try #require(AgentContracts.requestImplementations[.writer]?.first)
+    #expect(throws: AgentProtocolStartupError.self) {
+        try AgentContracts.validateProtocols(writer, implementations: [complete, complete])
+    }
+    try AgentContracts.validateProtocols(writer)
+    #expect(complete.acceptsTextSubmission)
+}
+
+@Test(.actionCatalog) func taskReportPublicationDeclarationsMatchTheirCodeOwners() throws {
+    for name in ["Assistant", "Writer", "Memory", "Photographer", "ApplicationControl"] {
+        let configuration = try AgentConfigurations.load(named: name)
+        #expect(
+            configuration.communication.publications.contains {
+                $0.channel == "agent.task" && $0.protocol == "agent.task.events.v1"
+            })
+        try AgentContracts.validateEventImplementations(configuration)
+    }
+    // A syntactically valid declaration cannot invent a producer implementation.
+    let unsupported = try communicationConfiguration("assistant", publishes: true)
+    #expect(throws: AgentProtocolStartupError.self) {
+        try AgentContracts.validateEventImplementations(unsupported)
+    }
 }

@@ -320,12 +320,12 @@
     public final class AppleAudioIO: AudioInputOutput {
         private let deviceEvents: NativeInputBroadcast<NativeAudioEvent>
         private var eventTasks: [Task<Void, Never>] = []
-        public func subscribeEvents() throws -> AsyncThrowingStream<NativeAudioEvent, Error> {
+        public func listenEvents() throws -> StateSignalListener<NativeAudioEvent> {
             do {
                 try admitAvailability()
-                return try deviceEvents.subscribe(.latest)
+                return try deviceEvents.listen(.latest, producer: "platform.audio.events")
             } catch {
-                platformAdmission?.report("audio", "subscribeEvents", error)
+                platformAdmission?.report("audio", "listenEvents", error)
                 throw error
             }
         }
@@ -397,13 +397,13 @@
                 outputs: route.outputs.map { "\($0.portType.rawValue):\($0.uid)" })
         }
         private var captureSource: MicrophoneCapture?
-        public func subscribeCapture() async throws -> MicrophoneCaptureInput {
+        public func listenCapture() async throws -> MicrophoneCaptureInput {
             do {
                 try admitAvailability()
                 guard captureToken != nil, let captureSource else { throw PlatformError.unavailable }
                 return try captureSource.subscribe()
             } catch {
-                platformAdmission?.report("audio", "subscribeCapture", error)
+                platformAdmission?.report("audio", "listenCapture", error)
                 throw error
             }
         }

@@ -6,12 +6,12 @@
 
 | 术语 | 含义 |
 | --- | --- |
-| Local/native input | A typed UI request, native sensor stream or container observation consumed directly by its responsible role; it has local processing identity but no inter-role transport authority. |
+| External Signal | UI 交互/请求、原生媒体/传感器和能力状态，通过所属模块 SignalListener 由明确消费者直接消费；不自动取得角色间通信权限。 |
 | Perception | Agent-owned interpretation of native observations, such as VAD/ASR or pose processing; may produce semantic messages or authorized reactive calls. |
 | Cognition | Agent-owned interpretation, context, decisions and authorization; may be deterministic or model-assisted. Perception and cognition are responsibilities within Agents. |
-| Signal | Bound Agent communication or execution feedback. UI requests, native frames and container facts are local inputs and do not enter Signal transport. |
+| Signal | 外部输入、App 内部 Agent–Agent/Agent–Action 交互及独立 IPC 边界的交互契约；外部输入走监听器，内部交互走 Gateway，IPC 不在当前运行时范围内。 |
 | Agent | 拥有独立角色、输入准入、业务状态和允许输出的处理者。 |
-| Gateway | Agent communication and authorized execution coordination; local input observation belongs to the owning Agent. |
+| Gateway | Internal Signal channel (Agent messages, events, Agent → Action invocation, Action → Agent feedback); scheduling and resources belong to the Actions Shell; local input observation belongs to the owning Agent. |
 | Capability | 注入的类型化模型、设备、存储或展示能力。 |
 | Action | 协议中立的业务函数，定义参数、效果、完成和失败语义。 |
 | ActionCall | 使用任务内 Channel/wait 的文本行为调用协议。 |
@@ -25,9 +25,9 @@
 
 ## 接纳、执行与完成
 
-publish 选择已声明订阅者，send 选择明确收件人；通信接纳表示消息被接受处理，不代表业务完成。TaskResult 是任务显式报告，Action/Tool 结果表示实际调用结果，通信回执不能代替二者。
+publish 选择已声明订阅者，send 选择明确收件人；通信接纳表示消息被接受处理，不代表业务完成。TaskResult 是任务显式报告，Action/Tool 结果表示实际调用结果，直接 Request Reply 不能代替二者。
 
-Channel 只组织所属任务内的 Action 顺序，wait 加入声明范围内的工作；原生 Tool 不使用该队列。不同任务可并发，资源冲突按明确契约拒绝或交接，不能从名称推断互斥或授权。
+Event Channel 显式绑定事件协议、生产者和消费者，不是执行队列。执行 Channel 只组织所属任务内的 Action 顺序，wait 加入声明范围内的工作；原生 Tool 不使用该队列。不同任务可并发，资源冲突按明确契约拒绝或交接，不能从名称推断互斥或授权。
 
 模型生成结束、函数处理结束、音频排空、界面渲染完成和物理到位是不同事实。取消请求也不等于立即停止或自动回滚，所有者仍需完成清理。
 
@@ -47,4 +47,8 @@ ProcessingContext records local request/session/generation/turn and causal ident
 
 ## Native input and semantic Signal flow
 
-The main sensory path is raw data → perception → semantic Signal through Gateway → cognitive role → authorized Gateway execution → Actions and foundation capabilities, with real outcomes and subsequent observations forming feedback. Typed local requests may enter the owning cognitive role directly; role messages may originate without sensory input; perception can issue its own authorized reactive calls. The [overall input/Signal figure](../MobileHarness/README.md#native-input-and-internal-signals) defines the complete current graph. “External signal” is an informal stimulus description, not a runtime external-Signal input API.
+The main sensory path is raw data → perception → semantic Signal through Gateway → cognitive role → authorized invocation Signal through Gateway → Actions Shell and foundation capabilities, with real outcomes and subsequent observations forming feedback. Typed local requests may enter the owning cognitive role directly; role messages may originate without sensory input; perception can issue its own authorized reactive calls. The [overall input/Signal figure](../MobileHarness/README.md#native-input-and-internal-signals) defines the complete current graph. “External signal” is an informal stimulus description, not a runtime external-Signal input API.
+
+Signal publication confirms local admission only. Producers do not know subscribers or wait for readiness/consumption. Consumers explicitly own subscriptions and task/session correlation. Assistant listens to Writer throughout its role lifetime and tracks each task separately. Broker pub/sub is best-effort with no late-subscriber replay; direct send requires a Reply. Durable task recovery and local acknowledgment belong to the business consumer.
+
+Agent publications declare owned production protocols, as requests declare accepted direct protocols. Startup validates producer/consumer declarations and actual code capabilities. A configured pair is a static contract, not an online handshake or delivery guarantee; publication may have zero listeners.

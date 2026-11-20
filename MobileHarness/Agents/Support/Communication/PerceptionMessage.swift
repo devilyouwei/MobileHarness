@@ -5,16 +5,14 @@ public enum PerceptionMessage: Codable, Sendable, Equatable {
     case transcript(String, final: Bool)
     case soundSource(SoundSourceObservation)
     case pose(PoseObservation)
-    public static let userInputTopic = "user.input"
-    public static let asrPartialContract = "user.input.asr.partial"
-    public static let asrFinalContract = "user.input.asr.final"
+    public static let userInputTopic = "user.input.speech"
+    public static let speechProtocol = "user.input.speech.v1"
 
     public var contract: String {
         switch self {
-        case .transcript(_, true): Self.asrFinalContract
-        case .transcript(_, false): Self.asrPartialContract
-        case .soundSource: "sound.source"
-        case .pose: "vision.pose"
+        case .transcript: Self.speechProtocol
+        case .soundSource: "perception.audio.source.v1"
+        case .pose: "perception.vision.pose.v1"
         }
     }
     public func validate() throws {
@@ -40,7 +38,11 @@ extension AgentMessage {
     private static func wrap(_ value: PerceptionMessage) -> AgentMessage {
         AgentMessage(
             contract: value.contract, content: value,
-            maximumBytes: value.contract == "vision.pose" ? 262_144 : 16_384,
+            maximumBytes: value.contract == "perception.vision.pose.v1" ? 262_144 : 16_384,
+            event: {
+                if case .transcript(_, let final) = value { return final ? "final" : "partial" }
+                return nil
+            }(),
             validate: { try $0.validate() })
     }
 }

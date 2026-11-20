@@ -1,58 +1,49 @@
 {
-  "version": 10,
+  "version": 11,
   "category": "cognition",
   "id": "assistant",
   "description": "I handle user conversation, understand goals, coordinate available capabilities and report actual results clearly. I own my foreground goals and respect other Agents' private contexts.",
-  "communication": {
-    "inputs": [
+  "baseSkills": [
+    "basic-skill",
+    "expression-interaction"
+  ],
+  "signals": {
+    "requests": [],
+    "feedback": [
+      "action.result.v1",
+      "agent.round.result.v1"
+    ],
+    "publications": [
       {
-        "contract": "agent.task.response",
-        "version": 1,
-        "kind": "observation"
-      },
-      {
-        "contract": "runtime.action.result",
-        "version": 1,
-        "kind": "actionResult"
-      },
-      {
-        "contract": "runtime.tool.result",
-        "version": 1,
-        "kind": "toolResult"
-      },
-      {
-        "contract": "runtime.round.result",
-        "version": 1,
-        "kind": "roundResult"
-      },
-      {
-        "contract": "runtime.message.receipt",
-        "version": 1,
-        "kind": "communicationReceipt"
-      },
-      {
-        "contract": "assistant.interrupt",
-        "version": 1,
-        "kind": "observation"
+        "channel": "agent.task",
+        "protocol": "agent.task.events.v1"
       }
     ],
     "subscriptions": [
       {
-        "contract": "user.input.asr.final",
-        "source": "speechPerception",
-        "topic": "user.input"
-      }
-    ],
-    "publications": [],
-    "sends": [
+        "channel": "user.input.speech",
+        "protocol": "user.input.speech.v1",
+        "sources": [
+          "speechPerception"
+        ],
+        "events": [
+          "final"
+        ]
+      },
       {
-        "contract": "agent.task.request",
-        "target": "writer"
+        "channel": "agent.interruption",
+        "protocol": "agent.interruption.v1",
+        "sources": [
+          "applicationControl"
+        ]
+      },
+      {
+        "channel": "agent.task",
+        "protocol": "agent.task.events.v1",
+        "sources": [
+          "writer"
+        ]
       }
     ]
-  },
-  "baseSkills": [
-    "basic-skill",
-    "expression-interaction"
-  ]
+  }
 }

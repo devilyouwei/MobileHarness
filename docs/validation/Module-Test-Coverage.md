@@ -24,7 +24,7 @@ Tests 一级目录与 App、Agents、Gateway、Actions、ModelKit、PlatformKit�
 | 链路 | 直接证据 | 判断 |
 | --- | --- | --- |
 | 语音转写 → Assistant → 输出调度 → 合成/播放与字幕 | [VoiceTests](../../Tests/Agents/SpeechPerception/VoiceTests.swift) 的 voiceGatewaysRoundTripThroughSayAndPrint | 真实业务组件连接，ASR/LLM/TTS/native 播放注入替身；最近执行通过 |
-| Assistant → Gateway → Actions → 结果回流/继续请求 | [AssistantChatTests](../../Tests/Agents/Assistant/AssistantChatTests.swift)、[ActionExecutionTests](../../Tests/Gateway/Output/ChannelSchedulerTests.swift) | 已覆盖关联结果、拒绝、取消和 Channel/wait；不是整个 App 装配启动 |
+| Assistant → Gateway → Actions → 结果回流/继续请求 | [AssistantChatTests](../../Tests/Agents/Assistant/AssistantChatTests.swift)、[ActionExecutionTests](../../Tests/Actions/Execution/ChannelSchedulerTests.swift) | 已覆盖关联结果、拒绝、取消和 Channel/wait；不是整个 App 装配启动 |
 | Writer 委派 → 文件发布 → 记录持久化 → 历史回读 | [WriterAgentTests](../../Tests/Agents/Writer/WriterAgentTests.swift) 的 writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact、writerDelegationAndWorkspaceMessagesHaveImmutableScopes | 脚本模型结合实际工作流/存储，最近两组执行通过；单模型真实 delegate smoke 另有显式入口 |
 | 摄像头帧 → 视觉推理 → 展示/摄影/跟踪 | [PhotographyPipelineTests](../../Tests/Agents/Photographer/PhotographyPipelineTests.swift)、EyeTrackingTests、PhotographerCameraTests | 最新帧、慢消费者、取消与控制准入有覆盖；visionKeepsOnlyLatestAndNeverOverlapsOrReplays 最近通过，真实摄像头/电机效果不能由此确认 |
 | 设置 → Provider/模型选择 → 保存恢复/资源管理 | [SettingsInteractionTests](../../Tests/App/Settings/SettingsInteractionTests.swift)、[ProviderSettingsTests](../../Tests/Actions/System/ProviderSettingsTests.swift)、ModelResourceInteractionWorkflowTests | 有确定性链路回归，但当前识别模型清单断言失败；完整真实下载部署需独立验收 |

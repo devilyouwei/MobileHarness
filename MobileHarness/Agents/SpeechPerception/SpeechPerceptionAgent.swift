@@ -894,7 +894,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
 
     private func communicate(_ message: AgentMessage, parent: AgentInput) async throws {
         var parent = parent
-        if let interactionSessionID, message.contract == PerceptionMessage.asrFinalContract {
+        if let interactionSessionID, message.event == "final" {
             parent = AgentInput(
                 id: parent.id, sessionID: interactionSessionID, payload: parent.payload,
                 metadata: parent.metadata, turn: parent.turn, taskScope: parent.taskScope)

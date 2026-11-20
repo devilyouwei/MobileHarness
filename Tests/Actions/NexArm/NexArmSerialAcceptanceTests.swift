@@ -32,8 +32,10 @@ import Testing
         nonisolated var businessID: String {
             get throws { "device_1" }
         }
-        nonisolated let updates: AsyncStream<NexArmBluetoothSnapshot>
-        private let continuation: AsyncStream<NexArmBluetoothSnapshot>.Continuation
+        nonisolated func listenUpdates() throws -> PlatformKit.StateSignalListener<NexArmBluetoothSnapshot> {
+            try continuation.listen(.latest, producer: "fixture.bluetooth")
+        }
+        private nonisolated let continuation = NativeInputBroadcast<NexArmBluetoothSnapshot>()
         private let path: String
         private var serial: NexArmSerial?
         private var wireSession: String?
@@ -52,15 +54,13 @@ import Testing
 
         init(path: String) {
             self.path = path
-            let pair = AsyncStream<NexArmBluetoothSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
-            updates = pair.stream
-            continuation = pair.continuation
+
             snapshot.power = .poweredOn
         }
         private var device: NexArmBluetoothDevice { .init(id: id, name: "Nex_Arm (USB acceptance)", rssi: 0) }
         private func publish() {
             snapshot.revision &+= 1
-            continuation.yield(snapshot)
+            continuation.send(snapshot)
         }
         func status() -> NexArmBluetoothSnapshot { snapshot }
         func scan() {

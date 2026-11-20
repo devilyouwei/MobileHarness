@@ -378,3 +378,159 @@ func sceneBackgroundPreservesRunningActionsAndPreparedTickets() async throws {
     }
     try await root.stop()
 }
+
+private enum EngineTestError: Error { case cleanup }
+private let engineResource = ResourceID(rawValue: "fixture.writer")
+
+@MainActor private struct EngineHarness {
+    let root: ActionsContainer
+    let engine: ActionExecutionCoordinator
+    init(resources: [ResourceDefinition] = [], handler: @escaping ActionHandler = { _ in }) throws {
+        let root = ActionsContainer()
+        try root.configure(
+            BehaviorAssembly(capabilityModules: [
+                ContainerModule(definitions: [
+                    .init(
+                        path: containerPath, displayName: "Fixture", kind: .finite, completion: "Joined.",
+                        handler: handler)
+                ])
+            ]))
+        self.engine = try root.configureExecution(resources: resources)
+        try root.start()
+        self.root = root
+    }
+}
+private func engineJob(id: String = UUID().uuidString) throws -> ScheduledAction {
+    let context = ActionExecutionContext(source: "producer", sessionID: "session", inputID: id)
+    return try ScheduledAction(
+        envelope: .init(
+            source: context.source, sessionID: context.sessionID,
+            inputID: id, schedulingID: id, context: context), call: .init(actionPath: containerPath),
+        channel: "main", owner: .init(endpoint: "producer", incarnation: "generation", sessionID: "session"))
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func actionsPauseJoinsResourceCleanupBeforeResume() async throws {
+    let started = ContainerGate()
+    let stopping = ContainerGate()
+    let release = ContainerGate()
+    let harness = try EngineHarness(resources: [
+        ResourceDefinition(id: engineResource, allowedOwners: Set<String>()) {
+            await stopping.release()
+            await release.wait()
+        }
+    ])
+    let worker = Task {
+        try await harness.engine.resources.run(resources: [engineResource], owner: nil, lease: nil) {
+            await started.release()
+            try await Task.sleep(for: .seconds(30))
+        }
+    }
+    await started.wait()
+    harness.root.invalidate()
+    await stopping.wait()
+    let resume = Task { try await harness.root.setForeground(true) }
+    #expect(harness.root.state == .suspended)
+    await release.release()
+    try await resume.value
+    _ = await worker.result
+    #expect(harness.root.state == .running)
+    #expect(await harness.engine.resources.snapshot()[engineResource] == .unlocked)
+    try await harness.root.stop()
+}
+
+@Test(.actionCatalog) @MainActor func actionsRetainResourceCleanupFailureAcrossRepeatedStop() async throws {
+    let started = ContainerGate()
+    let harness = try EngineHarness(resources: [
+        ResourceDefinition(id: engineResource, allowedOwners: Set<String>()) { throw EngineTestError.cleanup }
+    ])
+    let worker = Task {
+        try await harness.engine.resources.run(resources: [engineResource], owner: nil, lease: nil) {
+            await started.release()
+            try await Task.sleep(for: .seconds(30))
+        }
+    }
+    await started.wait()
+    harness.root.invalidate()
+    await #expect(throws: (any Error).self) { try await harness.root.setForeground(true) }
+    await #expect(throws: ActionsFailure.self) { try await harness.root.stop() }
+    await #expect(throws: ActionsFailure.self) { try await harness.root.stop() }
+    _ = await worker.result
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func actionsPauseJoinsAcceptedActionCleanup() async throws {
+    let started = ContainerGate()
+    let cleaning = ContainerGate()
+    let release = ContainerGate()
+    let harness = try EngineHarness { _ in
+        await started.release()
+        do { try await Task.sleep(for: .seconds(30)) } catch {
+            await cleaning.release()
+            await release.wait()
+            throw error
+        }
+    }
+    _ = try await harness.engine.enqueue(invocation: engineJob())
+    await started.wait()
+    harness.root.invalidate()
+    await cleaning.wait()
+    let resume = Task { try await harness.root.setForeground(true) }
+    #expect(harness.root.state == .suspended)
+    await release.release()
+    try await resume.value
+    try await harness.root.stop()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func actionsEngineShutdownJoinsInProgressPreparation() async throws {
+    let harness = try EngineHarness()
+    let live = harness.root.execution
+    let started = ContainerGate()
+    let release = ContainerGate()
+    let prepared = ActionsExecutionPort(
+        catalog: live.catalog,
+        prepare: { input, syntax in
+            await started.release()
+            await release.wait()
+            return try await live.prepare(input, syntax)
+        }, execute: live.execute, discard: live.discard)
+    let engine = try ActionExecutionCoordinator(executor: prepared, resources: [])
+    engine.open()
+    let admission = Task { try await engine.enqueue(invocation: engineJob()) }
+    await started.wait()
+    let stopping = Task { try await engine.shutdown() }
+    await release.release()
+    try await stopping.value
+    await #expect(throws: (any Error).self) { try await admission.value }
+    try await harness.root.stop()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func actionsEngineReservesChannelCapacityBeforePreparation() async throws {
+    let harness = try EngineHarness()
+    let live = harness.root.execution
+    let started = ContainerGate()
+    let release = ContainerGate()
+    let calls = ContainerCounter()
+    let port = ActionsExecutionPort(
+        catalog: live.catalog,
+        prepare: { input, syntax in
+            await calls.record(1)
+            await started.release()
+            await release.wait()
+            return try await live.prepare(input, syntax)
+        }, execute: live.execute, discard: live.discard)
+    let scheduler = ChannelScheduler(executor: port, capacityPerChannel: 1)
+    let first = Task { try await scheduler.enqueue(invocation: engineJob()) }
+    await started.wait()
+    await #expect(throws: ActionSchedulingError.channelCapacityExceeded("main")) {
+        try await scheduler.enqueue(invocation: engineJob())
+    }
+    #expect(await calls.values.count == 1)
+    first.cancel()
+    await release.release()
+    _ = await first.result
+    await scheduler.shutdown()
+    try await harness.root.stop()
+}

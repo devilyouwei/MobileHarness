@@ -1,8 +1,8 @@
 import Foundation
-import FunctionContracts
 
-/// Scheduling correlation is independent of the producer's business protocol.
+/// Agent–Action invocation envelope (internal Signal). Scheduling correlation is independent of the producer's business protocol.
 public struct ExecutionEnvelope: Sendable {
+    public let invocationSnapshot: ActionInvocationSnapshot?
     public let source: String
     public let sessionID: String
     public let inputID: String
@@ -16,8 +16,10 @@ public struct ExecutionEnvelope: Sendable {
     public init(
         source: String, sessionID: String, inputID: String, schedulingID: String,
         sequence: UInt64 = 0, roundID: String? = nil, callID: String? = nil,
-        context: ActionExecutionContext, correlation: (any Sendable)? = nil, orderingScope: String? = nil
+        context: ActionExecutionContext, correlation: (any Sendable)? = nil, orderingScope: String? = nil,
+        invocationSnapshot: ActionInvocationSnapshot? = nil
     ) {
+        self.invocationSnapshot = invocationSnapshot
         self.orderingScope = orderingScope
         self.source = source
         self.sessionID = sessionID
@@ -32,6 +34,7 @@ public struct ExecutionEnvelope: Sendable {
 }
 public enum ExecutionSchedulingDirective: Sendable { case beginWait, endWait }
 
+/// Agent → Action invocation (internal Signal) admitted through the Actions execution engine.
 public struct ScheduledAction: Sendable {
     public let channel: String
     public let execution: FunctionInvocation
@@ -64,7 +67,7 @@ public struct ScheduledAction: Sendable {
         self.execution = FunctionInvocation(
             call: call, context: envelope.context, executionID: executionID, results: results ?? ActionReportStore())
     }
-    func preparing(_ ticket: PreparedAction) throws -> Self {
+    public func preparing(_ ticket: PreparedAction) throws -> Self {
         try Self(
             envelope: envelope, call: call, channel: channel, executionID: executionID,
             owner: owner, feedback: feedback, lease: lease, prepared: ticket, results: execution.results)

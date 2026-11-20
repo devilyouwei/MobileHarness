@@ -171,3 +171,5 @@ The shared Chat projection combines snapshot images with the current input's use
 Multimodal snapshots retain source-owned private resourceScope bindings and image scopes outside facts JSON. Camera withholds facts/attachments when its window is not visible, but retains its cache until actual closure. Registry aggregation preserves private bindings without interpreting them.
 
 actions.web.screenshot 通过同一多模态注册表读取 Actions.Web 的单槽当前图片；WebBrowsing 显式选择它。来源按调用会话隔离、检查窗口/页面有效性，不提供历史选择；dialog reset 无显式图片选择可清理，来源自行处理窗口和根生命周期。
+
+Feedback evidence retains optional immutable invocation snapshots. Small original function/argument values are encoded inline; large values encode a verified archive reference and byte count. Legacy feedback without a snapshot remains unknown. Context does not infer arguments from a current registry, truncate them after effects, or replay an Action during restoration.

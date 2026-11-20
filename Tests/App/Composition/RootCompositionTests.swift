@@ -6,6 +6,7 @@ import Foundation
 import Gateway
 import ModelKitDefaults
 import PlatformKit
+import Synchronization
 import Testing
 
 @testable import UI
@@ -141,7 +142,7 @@ private enum RootCompositionFailure: Error { case startup }
             id: "bindings",
             start: {
                 try root.configure(BehaviorAssembly(capabilityModules: []))
-                _ = try gateway.configureExecution(.init(executor: root.execution))
+                _ = try gateway.configureExecution(.init(engine: root.configureExecution(resources: [])))
                 order.append("bindings")
             },
             stop: {
@@ -196,7 +197,7 @@ private enum RootCompositionFailure: Error { case startup }
             id: "bindings",
             start: {
                 try actions.configure(BehaviorAssembly(capabilityModules: []))
-                _ = try gateway.configureExecution(.init(executor: actions.execution))
+                _ = try gateway.configureExecution(.init(engine: actions.configureExecution(resources: [])))
             },
             stop: {
                 #expect(actions.state == .stopped && gateway.state == .stopped)
@@ -219,4 +220,51 @@ private enum RootCompositionFailure: Error { case startup }
     #expect(registry.actions() === root)
     try await root.stop()
     #expect(registry.actions().state == .stopped)
+}
+
+@Test @MainActor func memoryPressureRelayReleasesOncePerWarningAndJoinsOnStop() async throws {
+    let pair = AsyncThrowingStream<MemoryWarning, any Error>.makeStream(bufferingPolicy: .bufferingNewest(1))
+    let released = AsyncStream<Void>.makeStream()
+    let detached = Mutex(false)
+    let relay = MemoryPressureRelay(
+        listen: {
+            StateSignalListener(
+                source: .init(producer: "test.memory", generation: "g", delivery: .latest), stream: pair.stream,
+                detach: {
+                    detached.withLock { $0 = true }
+                    pair.continuation.finish()
+                })
+        },
+        release: { released.continuation.yield(()) }, failed: { Issue.record("unexpected failure: \($0)") })
+    try relay.start()
+    try relay.start()
+    pair.continuation.yield(MemoryWarning(observedAt: .now))
+    var events = released.stream.makeAsyncIterator()
+    #expect(await events.next() != nil)
+    await relay.stop()
+    await relay.stop()
+    #expect(detached.withLock { $0 })
+    released.continuation.finish()
+    #expect(await events.next() == nil)
+}
+
+@Test @MainActor func memoryPressureRelayReportsSubscriptionFailures() async throws {
+    let unavailable = MemoryPressureRelay(
+        listen: { throw PlatformError.unavailable }, release: {}, failed: { _ in })
+    #expect(throws: PlatformError.self) { try unavailable.start() }
+
+    let pair = AsyncThrowingStream<MemoryWarning, any Error>.makeStream()
+    let failures = AsyncStream<String>.makeStream()
+    let relay = MemoryPressureRelay(
+        listen: {
+            StateSignalListener(
+                source: .init(producer: "test.memory", generation: "g", delivery: .latest), stream: pair.stream,
+                detach: {})
+        },
+        release: {}, failed: { failures.continuation.yield(String(describing: $0)) })
+    try relay.start()
+    pair.continuation.finish(throwing: NativeSubscriptionError.overflow)
+    var iterator = failures.stream.makeAsyncIterator()
+    #expect(await iterator.next() != nil)
+    await relay.stop()
 }
