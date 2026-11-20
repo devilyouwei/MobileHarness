@@ -468,6 +468,9 @@
 		866DCD98ECA7475C2199AD8A /* Macros */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Macros; sourceTree = SOURCE_ROOT; };
 		8685A7F09AF045225D58E368 /* MobileHarness/Actions/Artifacts/ArtifactExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Artifacts/ArtifactExport.swift; sourceTree = SOURCE_ROOT; };
 		86F114B1295DEDD4EB228D12 /* MobileHarness/Agents/SpeechPerception/SpeechRecognitionTurn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/SpeechPerception/SpeechRecognitionTurn.swift; sourceTree = SOURCE_ROOT; };
+		6B9144EC31543FF4D19A5EA6 /* MobileHarness/Agents/SpeechPerception/AudioFrameFloat32.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/SpeechPerception/AudioFrameFloat32.swift; sourceTree = SOURCE_ROOT; };
+		9828CAEE71C42FD2D20B585E /* MobileHarness/Agents/SpeechPerception/SpeechPerceptionSoundSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/SpeechPerception/SpeechPerceptionSoundSource.swift; sourceTree = SOURCE_ROOT; };
+		22CDB864D619ADDDFFE06C62 /* MobileHarness/Agents/SpeechPerception/SpeechPlaybackHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/SpeechPerception/SpeechPlaybackHistory.swift; sourceTree = SOURCE_ROOT; };
 		87AEE7003AA91B22E442EDE4 /* MobileHarness/ModelKit/Language/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/ModelKit/Language/README.md; sourceTree = SOURCE_ROOT; };
 		88606DF7D3512232C3C8F6D2 /* MobileHarness/Actions/Support/Shell/Resources/ResourceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Shell/Resources/ResourceCoordinator.swift; sourceTree = SOURCE_ROOT; };
 		889534E8875244241ED837CF /* MobileHarness/PlatformKit/Audio/MicrophoneFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/PlatformKit/Audio/MicrophoneFrame.swift; sourceTree = SOURCE_ROOT; };
@@ -1864,6 +1867,7 @@
 			isa = PBXGroup;
 			children = (
 				4832129A7E807EF9F35F23C1 /* MobileHarness/Agents/SpeechPerception/AudioDetectionAgentSession.swift */,
+				6B9144EC31543FF4D19A5EA6 /* MobileHarness/Agents/SpeechPerception/AudioFrameFloat32.swift */,
 				3F6F19D4F985B91404A046B0 /* MobileHarness/Agents/SpeechPerception/README.md */,
 				53048DAC66CA602C5A3A9176 /* MobileHarness/Agents/SpeechPerception/SoundSourceEstimator.swift */,
 				EE484E9843764CCC18751214 /* MobileHarness/Agents/SpeechPerception/SpeechBoundaryPolicy.swift */,
@@ -1872,7 +1876,9 @@
 				2C2BA7F554CF2F1E5E47AE26 /* MobileHarness/Agents/SpeechPerception/SpeechPerceptionContainer.swift */,
 				592EDF456734BF83F8E72F9E /* MobileHarness/Agents/SpeechPerception/SpeechPerceptionMicrophone.swift */,
 				05E38A05DABF93A2C4D2B2DD /* MobileHarness/Agents/SpeechPerception/SpeechPerceptionProcessing.swift */,
+				9828CAEE71C42FD2D20B585E /* MobileHarness/Agents/SpeechPerception/SpeechPerceptionSoundSource.swift */,
 				3360FA94DD42A8849F63FCCB /* MobileHarness/Agents/SpeechPerception/SpeechPCMPreparation.swift */,
+				22CDB864D619ADDDFFE06C62 /* MobileHarness/Agents/SpeechPerception/SpeechPlaybackHistory.swift */,
 				86F114B1295DEDD4EB228D12 /* MobileHarness/Agents/SpeechPerception/SpeechRecognitionTurn.swift */,
 				A7B982A9DDA4AD2100A76400 /* MobileHarness/Agents/SpeechPerception/VoiceActivitySegmenter.swift */,
 				F521FD37F8958540CCB40CAB /* MobileHarness/Agents/SpeechPerception/VoiceAgentSession.swift */,

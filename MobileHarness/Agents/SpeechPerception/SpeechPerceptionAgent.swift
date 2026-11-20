@@ -91,7 +91,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         required: ["enabled", "paused", "revision"])
     private var segmenter: VoiceActivitySegmenter?
     private var recognitionTurn: SpeechRecognitionTurn?
-    private var lifecycle: AgentLifecycle = .registered
+    var lifecycle: AgentLifecycle = .registered
     private var lastSequence: UInt64?
     private var lastTimestamp: TimeInterval?
     private var processed = 0
@@ -105,10 +105,10 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     private var soundEstimator = SoundSourceEstimator()
     private var soundLayout: AudioChannelLayout?
     private var soundRate: Int?
-    private var pendingSound: (value: SoundSourceObservation, parent: AgentInput, capturedAt: ContinuousClock.Instant)?
-    private var soundPublisher: Task<Void, Never>?
-    public private(set) var soundPublicationRejections = 0
-    public private(set) var soundPublicationReplacements = 0
+    var pendingSound: (value: SoundSourceObservation, parent: AgentInput, capturedAt: ContinuousClock.Instant)?
+    var soundPublisher: Task<Void, Never>?
+    public internal(set) var soundPublicationRejections = 0
+    public internal(set) var soundPublicationReplacements = 0
 
     // MARK: - Registration
 
@@ -237,6 +237,12 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         let value =
             "perception.\(point) enabled=\(listeningPolicy.enabled) capture=\(captureOpen) awaiting=\(recognitionSuspended) nativeProcessing=\(nativeProcessing) phase=\(phase.rawValue)"
         Logger(subsystem: "dev.mobileharness", category: "SpeechListening").notice("\(value, privacy: .public)")
+    }
+    /// Onset evidence for false-trigger analysis: gates and levels only, never audio or text.
+    private func traceOnset(_ onset: SpeechOnsetPolicy, playing: Bool, probability: Float, level: Float) {
+        let value =
+            "onset playing=\(playing) probability=\(probability) onsetThreshold=\(onset.onsetThreshold) windows=\(onset.onsetWindows) level=\(level)dBFS fullDuplex=\(listeningPolicy.fullDuplex)"
+        Logger(subsystem: "dev.mobileharness", category: "SpeechOnset").notice("\(value, privacy: .public)")
     }
     public func resumeListening() async throws {
         traceListening("resume.begin")
@@ -706,18 +712,15 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         _ frame: AudioFrame, input acceptedInput: AgentInput, segmenter: VoiceActivitySegmenter,
         recognitionTurn: SpeechRecognitionTurn, playing: Bool
     ) async throws {
-        var input = acceptedInput
-        activeInput = AgentInput(
-            id: input.id, sessionID: input.sessionID, payload: input.payload,
-            metadata: input.metadata, turn: currentTurn)
+        activeInput = acceptedInput.assigning(turn: currentTurn)
         let activity = await speechEndpointActivity(nil)
         try Task.checkCancellation()
+        let onset = SpeechOnsetPolicy(
+            windows: detectionSettings.windows, threshold: detectionSettings.threshold, playing: playing)
         let result = try await segmenter.process(
-            frame, threshold: Float(detectionSettings.threshold),
-            onsetWindows: playing && (1...16).contains(detectionSettings.windows)
-                ? min(16, detectionSettings.windows + 2) : detectionSettings.windows,
+            frame, threshold: onset.threshold, onsetWindows: onset.onsetWindows,
             useShortEndpoint: activity.replyActive && activity.interruptionID == nil,
-            onsetThreshold: min(0.95, Float(detectionSettings.threshold) + (playing ? 0.15 : 0)))
+            onsetThreshold: onset.onsetThreshold)
         try Task.checkCancellation()
         let beganTurn =
             currentTurn == nil
@@ -729,10 +732,9 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         if beganTurn {
             turnOrdinal += 1
             currentTurn = AgentTurn(id: UUID().uuidString, ordinal: turnOrdinal)
+            traceOnset(onset, playing: playing, probability: result.probability, level: frame.rmsDecibels)
         }
-        input = AgentInput(
-            id: input.id, sessionID: input.sessionID, payload: input.payload,
-            metadata: input.metadata, turn: currentTurn)
+        let input = acceptedInput.assigning(turn: currentTurn)
         activeInput = input
         if beganTurn { try presentTranscript("", input: input) }
         if beganTurn && !result.isSpeaking {
@@ -786,7 +788,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         try await resetListening(after: input)
         try await transition(to: text.isEmpty ? .empty : .listening, input: input, present: !recognitionSuspended)
     }
-    private func reportError(_ error: any Error, input: AgentInput) {
+    func reportError(_ error: any Error, input: AgentInput) {
         outputSequence += 1
         continuation.yield(
             OutputEnvelope(
@@ -830,51 +832,6 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         } catch { reportError(error, input: failedInput) }
     }
 
-    private func enqueueSound(
-        _ value: SoundSourceObservation, parent: AgentInput, capturedAt: ContinuousClock.Instant
-    ) {
-        guard lifecycle == .running else { return }
-        if pendingSound != nil { soundPublicationReplacements += 1 }
-        let metadata = parent.metadata
-        let scopedParent = AgentInput(
-            id: parent.id, sessionID: parent.sessionID, payload: parent.payload,
-            metadata: InputMetadata(
-                payload: parent.payload, source: metadata.source, incarnation: metadata.incarnation,
-                origin: metadata.origin,
-                capturedAt: metadata.capturedAt, sequence: metadata.sequence, rootID: metadata.rootID,
-                parentID: metadata.parentID, hops: metadata.hops,
-                deadline: min(
-                    metadata.deadline ?? capturedAt.advanced(by: .milliseconds(500)),
-                    capturedAt.advanced(by: .milliseconds(500))), generation: metadata.generation),
-            turn: parent.turn)
-        pendingSound = (value, scopedParent, capturedAt)
-        if soundPublisher == nil { soundPublisher = Task { await self.publishSound() } }
-    }
-    private func publishSound() async {
-        defer {
-            soundPublisher = nil
-            if lifecycle == .running, pendingSound != nil {
-                soundPublisher = Task { await self.publishSound() }
-            }
-        }
-        while lifecycle == .running, let publication = pendingSound {
-            pendingSound = nil
-            guard !publication.parent.metadata.expired,
-                publication.capturedAt.duration(to: .now) <= .milliseconds(500)
-            else { continue }
-            do {
-                try Task.checkCancellation()
-                try await communicate(.soundSource(publication.value), parent: publication.parent)
-                try Task.checkCancellation()
-            } catch is CancellationError {
-                return
-            } catch {
-                soundPublicationRejections += 1
-                reportError(error, input: publication.parent)
-            }
-        }
-    }
-
     // MARK: - Output
 
     private func emit(_ output: AgentOutput, input: AgentInput) throws {
@@ -892,7 +849,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
 
     // MARK: - Communication output
 
-    private func communicate(_ message: AgentMessage, parent: AgentInput) async throws {
+    func communicate(_ message: AgentMessage, parent: AgentInput) async throws {
         var parent = parent
         if let interactionSessionID, message.event == "final" {
             parent = AgentInput(
@@ -940,4 +897,11 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         try await contextRepository.snapshot()
     }
     public func actionResults() -> [ActionResult] { resultInbox.results }
+}
+
+extension AgentInput {
+    /// Same signal identity bound to the current recognition turn.
+    fileprivate func assigning(turn: AgentTurn?) -> AgentInput {
+        AgentInput(id: id, sessionID: sessionID, payload: payload, metadata: metadata, turn: turn)
+    }
 }

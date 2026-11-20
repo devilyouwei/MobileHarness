@@ -44,3 +44,12 @@
 ### 删除窗口后的真机安装（2026-11-16）
 
 按用户要求，当前工作区以现有开发团队签名构建 MobileHarness Debug iPhoneOS，通过构建、深层严格签名及 Agent/Skill、Live Activity、中英文资源校验。已原位安装到 Youwei’s iPhone 17 Pro，安装回执序号 7212；未卸载或清除数据。首次启动因 CoreDevice 连接中断失败，重试成功，系统返回 Launched application。日志为 `/tmp/speech-no-windows-device-build.log`、`/tmp/speech-no-windows-device-install.log`、`/tmp/speech-no-windows-device-launch.log` 和 `/tmp/speech-no-windows-device-launch-retry.log`。安装包含删除两个 250ms 硬屏蔽窗口的修改；启动回执不代表真机声学验收通过。
+
+## 语音链路整理与诊断（2026-11-20）
+
+范围见[需求与方案](../requirements/technical/Full-Duplex-Playback-Admission.md#语音链路复查与整理2026-11-20)。本次不改变接纳语义，不包含任何声学效果结论。
+
+- 代码阅读：采播图在输入/输出节点同时确认 Voice Processing 启用且未旁路，未发现遗漏的节点配置；降噪失败仍按契约显式失败。自身播报或环境声被识别的实际原因需真机基线，本次仅新增 `SpeechOnset` 诊断日志（播放状态、起声门槛、窗口数、窗口 dBFS）。
+- 自动化：新增 `speechOnsetPolicyRaisesOnlyTheOnsetGateDuringPlayback`、`audioFrameFloatSamplesRoundTripWithLevel`。带 speech/voice/enhancement/sound/Silero 过滤的专项运行（`/tmp/mh_speech_tests.log`）退出 0，含 123 个测试的主批次、4 个 speechWorkflow／增强用例全部通过。
+- `./scripts/check.sh` 的边界脚本、Python 测试、`swift format lint --strict`、plist 校验通过；Swift 测试 1212 项中仅 `assistantInstructionBudgetsKeepCatalogAndSafetyRules` 失败（`photography.utf8.count < 38_000`）。该失败来自工作区内他处对 BasicSkill 指令的未提交修改，不在本次改动范围，未处理。整体退出码因此为 1，不记为通过。
+- `./scripts/build-ios.sh` 退出 0（`/tmp/mh_ios.log`）：五个 iOS Simulator 目标均 BUILD SUCCEEDED，资源校验通过。真机验收（手机外放、AirPods、旁人/电视、起播窗口打断等）仍按上文矩阵待执行。

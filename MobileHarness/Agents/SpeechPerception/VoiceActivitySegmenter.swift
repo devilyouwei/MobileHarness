@@ -32,9 +32,7 @@ public actor VoiceActivitySegmenter {
         busy = true
         defer { busy = false }
         do {
-            let samples = frame.data.withUnsafeBytes { bytes in
-                (0..<frame.sampleCount).map { bytes.loadUnaligned(fromByteOffset: $0 * 4, as: Float.self) }
-            }
+            let samples = frame.floatSamples
             guard samples.allSatisfy(\.isFinite) else { throw CapabilityError.invalidRequest("Non-finite PCM") }
             pending.append(contentsOf: samples)
             let scores = try await session.process(frame)
@@ -49,7 +47,7 @@ public actor VoiceActivitySegmenter {
                 }
                 let slice = Array(pending[consumed..<consumed + score.sampleCount])
                 let window = try AudioFrame(
-                    data: slice.withUnsafeBytes { Data($0) }, format: frame.format,
+                    floatSamples: slice, format: frame.format,
                     sequence: UInt64(position), timestamp: Double(position) / 16000)
                 _ = policy.consume(
                     window, probability: score.probability, threshold: threshold, onsetWindows: onsetWindows,
@@ -78,8 +76,7 @@ public actor VoiceActivitySegmenter {
         if policy.isSpeaking, !pending.isEmpty {
             tail.append(
                 try AudioFrame(
-                    data: pending.withUnsafeBytes { Data($0) },
-                    format: AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32),
+                    floatSamples: pending, format: AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32),
                     sequence: UInt64(position), timestamp: Double(position) / 16000))
         }
         await cancel()

@@ -1531,6 +1531,29 @@ func configurableSpeechOnsetRetainsCandidate(windows: Int) throws {
     #expect(policy.isSpeaking)
 }
 
+@Test func speechOnsetPolicyRaisesOnlyTheOnsetGateDuringPlayback() {
+    let idle = SpeechOnsetPolicy(windows: 8, threshold: 0.65, playing: false)
+    #expect(idle.threshold == 0.65 && idle.onsetThreshold == 0.65 && idle.onsetWindows == 8)
+    let playing = SpeechOnsetPolicy(windows: 8, threshold: 0.65, playing: true)
+    #expect(playing.threshold == 0.65)
+    #expect(abs(playing.onsetThreshold - 0.8) < 0.0001)
+    #expect(playing.onsetWindows == 10)
+    let capped = SpeechOnsetPolicy(windows: 16, threshold: 0.9, playing: true)
+    #expect(capped.onsetThreshold == 0.95 && capped.onsetWindows == 16)
+    // Invalid window counts reach the segmenter unchanged, where they are rejected explicitly.
+    #expect(SpeechOnsetPolicy(windows: 0, threshold: 0.65, playing: true).onsetWindows == 0)
+}
+
+@Test func audioFrameFloatSamplesRoundTripWithLevel() throws {
+    let format = try ModelKit.AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32)
+    let frame = try ModelKit.AudioFrame(
+        floatSamples: [0.5, -0.5, 0.5, -0.5], format: format, sequence: 3, timestamp: 1)
+    #expect(frame.floatSamples == [0.5, -0.5, 0.5, -0.5])
+    #expect(abs(frame.rmsDecibels + 6.0206) < 0.001)
+    let silence = try ModelKit.AudioFrame(floatSamples: [0, 0], format: format, sequence: 4, timestamp: 1)
+    #expect(silence.rmsDecibels == -120)
+}
+
 @Test func speechPlaybackFactsSurviveAudioRetirementAndClearWithSession() async throws {
     let session = UUID().uuidString
     let input = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("reply"))

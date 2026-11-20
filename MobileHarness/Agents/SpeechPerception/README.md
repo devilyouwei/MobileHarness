@@ -20,10 +20,13 @@ UI.home.listeningRequests 是本角色单独订阅的控制源，提供 enabled/
 | --- | --- |
 | [AudioDetectionAgentSession.swift](AudioDetectionAgentSession.swift) | Isolated diagnostic role, result pump and neutral detection connection type specializations; no native capture ownership |
 | [SoundSourceEstimator.swift](SoundSourceEstimator.swift) | 声道测量到有限方向估计的算法 |
-| [SpeechBoundaryPolicy.swift](SpeechBoundaryPolicy.swift) | 边界、结束与恢复的纯策略 |
+| [SpeechBoundaryPolicy.swift](SpeechBoundaryPolicy.swift) | 边界、结束与恢复的纯策略；`SpeechOnsetPolicy` 由基础设置和播放事实得出单个窗口的起声概率、起声窗口数与维持概率 |
+| [SpeechPlaybackHistory.swift](SpeechPlaybackHistory.swift) | 播放事实快照与最多 32 区间的历史，由 Assistant 写入、感知角色按采集时刻读取 |
+| [AudioFrameFloat32.swift](AudioFrameFloat32.swift) | 本目录共享的 Float32 PCM 读写与帧电平（dBFS）扩展，不改变 ModelKit 契约 |
 | [SpeechListeningInputs.swift](SpeechListeningInputs.swift) | 聆听手势／策略输入和采集结束事实 |
 | [SpeechPerceptionAgent.swift](SpeechPerceptionAgent.swift) | 聆听策略、输入代际、VAD／ASR 协调与角色消息 |
 | [SpeechPerceptionMicrophone.swift](SpeechPerceptionMicrophone.swift) | 只读 PCM 的唯一角色订阅、布局校验与模型输入转换 |
+| [SpeechPerceptionSoundSource.swift](SpeechPerceptionSoundSource.swift) | 声源观测的最新值发布：单发布任务、500 ms 新鲜度、替换与拒绝计数；与识别链路无共享队列 |
 | [SpeechPerceptionProcessing.swift](SpeechPerceptionProcessing.swift) | 感知角色私有 Context、预处理和聆听策略 |
 | [SpeechPCMPreparation.swift](SpeechPCMPreparation.swift) | Capture-scoped optional enhancement and 48/16 kHz resampling; clears history at full-utterance boundaries |
 | [SpeechRecognitionTurn.swift](SpeechRecognitionTurn.swift) | 已提交片段、冷启动前缀和转写聚合的有界工作 |
@@ -196,7 +199,7 @@ SpeechPerception 在采集、聆听许可、识别阶段和播放准入变化时
 
 半双工恢复完成 ASR/VAD 重置后记录单调接纳时刻；原生帧以 capturedAt 判断，播放期间录到但在恢复后才出队的旧包仍被拒绝。新采集代清除门限。手机与蓝牙耳机的 Voice Processing 路线均返回全双工；播放期间保持底层采播；半双工恢复围栏独立于下述全双工短时语音接纳策略。
 
-Speech detection preferences are injected through a throwing read-only closure and snapshotted before VAD session creation. The capture keeps the same base settings; playback adds 0.15 to the onset probability and two onset windows, capped at 0.95/16. Confirmed speech retains the base probability for continuation/endpoint detection. No per-packet persistence reads occur.
+Speech detection preferences are injected through a throwing read-only closure and snapshotted before VAD session creation. The capture keeps the same base settings; `SpeechOnsetPolicy` derives each window's gates: playback adds 0.15 to the onset probability and two onset windows, capped at 0.95/16, while confirmed speech retains the base probability for continuation/endpoint detection. No per-packet persistence reads occur. When a new utterance begins, the `SpeechOnset` log category records playback state, onset probability/threshold/window count, the window level in dBFS and the duplex route — numbers only, no audio or text — as the evidence needed to analyze false triggers on device. Hardware echo and noise suppression come only from the Voice Processing graph and the optional denoiser; the onset gates add no energy- or noise-floor rule, and a failed denoiser never falls back to original PCM.
 
 ## Optional speech enhancement
 
@@ -218,7 +221,7 @@ Each native input is processed inline; there is no second native FIFO. The windo
 
 ## 播放状态与连续接纳
 
-SpeechBoundaryPolicy.swift拥有SpeechPlaybackSnapshot及最多32区间的SpeechPlaybackHistory。Assistant发布带原生schedule时刻的播放事实；播放及结束后200ms使用较严格起声门槛。历史淘汰保留known信息，不以历史缺失拒绝音频。没有起播保护窗口或ASR结束后的冷却窗口。
+SpeechPlaybackHistory.swift拥有SpeechPlaybackSnapshot及最多32区间的SpeechPlaybackHistory。Assistant发布带原生schedule时刻的播放事实；播放及结束后200ms使用较严格起声门槛。历史淘汰保留known信息，不以历史缺失拒绝音频。没有起播保护窗口或ASR结束后的冷却窗口。
 
 ASR完整语句结束后重置识别和预处理历史，允许下一片音频立即进入VAD。ASR收尾中的现有识别状态机、半双工播放暂停、会话与采集代隔离仍由原有生命周期控制。
 

@@ -109,3 +109,21 @@ SpeechPerception 自有的播放感知接纳状态放在现有目录内。播放
 修改SpeechPerceptionAgent/SpeechBoundaryPolicy，更新VoiceTests及SpeechEnhancementWorkflowTests：起播后的首批PCM立即进入VAD；ASR完成后下一个音频片段立即进入VAD；保留增强边界重置、连续语句、播放期间阈值和半双工恢复围栏验证。同步SpeechPerception、Assistant播放事实、Agents、Actions/Listening、总体流程文档；执行相关回归与check.sh/build-ios.sh，实机验收另记。
 
 上述删除已实施，当前技术契约已同步。验证结果见[删除窗口回归记录](../../validation/Full-Duplex-Playback-Admission.md#删除起播与-asr-后硬屏蔽2026-11-16)；本轮不包含真机安装或声学验收。
+
+## 语音链路复查与整理（2026-11-20）
+
+触发：真机仍出现自身播报被识别、环境声被识别。复查 PlatformKit/Audio 与 Agents/SpeechPerception 后确认：
+
+- 原生采播图已在输入/输出节点同时确认 Voice Processing 启用且未旁路（`AppleAudioIO.prepareCapture`、`voiceProcessingEnabled`），启动后、首包后、配置变化和播放提交前复核；未发现遗漏的节点配置。系统回声处理的实际残留量只能由真机基线给出，代码阅读不能把误触发归因到某个未设置项。
+- 降噪失败按既有契约显式失败并走识别恢复，不回退为原始 PCM；该契约保持，不新增静默回退。
+- 起声/能级自适应（第二阶段）仍需先取得真机 A/B 基线，本次不加入未验证的固定能量门限或噪声底规则。
+
+本次范围限于不改变接纳语义、可由自动化验证的整理，并补足后续基线所需的诊断：
+
+1. `SpeechBoundaryPolicy.swift` 同时承载分段策略与播放事实。把 `SpeechPlaybackSnapshot`／`SpeechPlaybackHistory` 移入同目录 `SpeechPlaybackHistory.swift`，Assistant 与感知角色的引用不变。
+2. 播放期间的起声参数（概率 +0.15、窗口 +2、上限 0.95/16）原在 `processFrame` 内联计算。收敛为 `SpeechBoundaryPolicy.swift` 中的纯值类型 `SpeechOnsetPolicy`，行为不变，直接单测。
+3. `SpeechPCMPreparation` 的三层嵌套增强流程拆为私有步骤；`AudioFrame` 的 Float32 读写在 SpeechPerception 内重复，收敛为同目录 `AudioFrame+Float32.swift` 的扩展，不改变 ModelKit。
+4. `SpeechPerceptionAgent.swift`（943 行）混合聆听策略、识别链路和声源发布。把声源发布状态机移入 `SpeechPerceptionSoundSource.swift`（扩展），放宽的成员仅为同模块内部可见。`processFrame` 去除每帧重复构造 `AgentInput`。
+5. 诊断：确认新一句起声时用 `SpeechOnset` 日志类别记录是否处于播放、实际概率阈值与窗口数、窗口 RMS（dBFS）。只含状态与数值，不含音频或文本，供第二阶段基线统计误触发时的能量分布。
+
+不新增目录或模块，不改通信契约、Gateway、ModelKit、PlatformKit 行为。实现后同步 `Agents/SpeechPerception/README.md`（文件表、起声参数、诊断）；PlatformKit/Audio 无行为变化，不改其 README。验证：SpeechPerception/ModelKit 增强相关专项测试，`./scripts/check.sh`（已知范围外失败按 [验证记录](../../validation/Full-Duplex-Playback-Admission.md) 另列）；真机声学验收仍未执行。
