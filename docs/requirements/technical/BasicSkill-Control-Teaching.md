@@ -21,3 +21,12 @@
 ## 状态
 
 revision 50 教学重组、JSON 描述与测试已实现；完整 check.sh、最终 36 项定向测试和四目标 iOS 构建通过。终轮实模 7/9，仍有单次拍摄就绪/重试及点头能力选择失败，旧摄影评估夹具也需对齐当前 previewID 契约，保留未归档。完整范围和证据见[验证记录](../../validation/BasicSkill-Control-Teaching.md)。此前发现教学的结果继续保存在[发现计划](Skill-Discovery-Before-Denial.md)及其验证资料中，不覆盖历史证据。
+
+## 后续优化（2026-11-20）
+
+针对模型容易随便开启 `task.start` 以及在委托给其他 Agent 前先开启前台 Task 的问题，补充两条通用约束（保持无业务 Skill ID / Agent ID 的通用教学原则）：
+
+- 明确 `task.start` 仅用于当前 Agent 自己负责、需要跨多轮用户交互维持状态与完成条件的**长程前台目标**（long-horizon task）；一次性操作、简单查询或单次请求内的多轮调用仅使用 `loadSkills` 或直接执行并回复，不随便建 Task。
+- 明确委托给其他 Agent 的工作归属对方生命周期，直接使用 `task.send(agent_id,text)`；禁止为委托目标开启前台 `task.start` 或加载 Skill，禁止先 `task.start` 再 `task.send` 同一目标。
+
+同步更新 `Resources/Skills/BasicSkill/Instructions.md`、`Instructions.zh-Hans.md` 与 `Skill.json`（递增 `revision`），并运行 `./scripts/check.sh` 与 `./scripts/build-ios.sh` 验证。
