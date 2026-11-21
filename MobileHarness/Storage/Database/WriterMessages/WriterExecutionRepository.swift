@@ -26,7 +26,6 @@ public protocol WriterExecutionRepository: Sendable {
     func retireRequest(_ delegateID: String, failure: String?) async throws
     func prepareWorkspace(workspaceID: String, delegateID: String, agent: String, ready: Bool)
         async throws
-    func updateRequestPhase(requestID: String, phase: String) async throws
     func saveInteraction(delegateID: String, interactionID: String?, data: Data?) async throws
     func acceptWriterInput(_ id: String, requestID: String, questionID: String?) async throws -> Bool
     func acceptWriterCancellation(_ id: String, requestID: String, reason: String) async throws -> Bool
@@ -91,9 +90,6 @@ extension WriterExecutionRepository {
     public func prepareWorkspace(workspaceID: String, delegateID: String, agent: String, ready: Bool)
         async throws
     {
-        throw RecordStorageError.invalidRecord
-    }
-    public func updateRequestPhase(requestID: String, phase: String) async throws {
         throw RecordStorageError.invalidRecord
     }
     public func acceptWriterInput(_ id: String, requestID: String, questionID: String?) async throws

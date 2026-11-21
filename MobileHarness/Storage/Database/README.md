@@ -120,8 +120,9 @@ erDiagram
         INTEGER selected_workspace_id FK
         TEXT user_input_json
         TEXT request_goal
-        TEXT run_state
-        TEXT terminal_state
+        TEXT task_state
+        INTEGER completion_recorded
+        TEXT retirement
         INTEGER request_revision
         TEXT pending_question_id FK
         TEXT pending_question_json

@@ -84,7 +84,13 @@ extension ActionExecutionEngine {
         await cancel(endpoint: agent.rawValue, incarnation: incarnation, sessionID: sessionID)
     }
     public func schedule(_ directive: SchedulingDirective, envelope: OutputEnvelope) async throws {
-        try await schedule(directive == .beginWait ? .beginWait : .endWait, envelope: envelope.schedulingEnvelope)
+        let projected: ExecutionSchedulingDirective =
+            switch directive {
+            case .beginWait: .beginWait
+            case .endWait: .endWait
+            case .pause(let milliseconds): .pause(milliseconds: milliseconds)
+            }
+        try await schedule(projected, envelope: envelope.schedulingEnvelope)
     }
     public func requiredResources(for call: ActionCall) async throws -> Set<ResourceID> {
         try await requiredResources(for: call.executionRequest.functionRequest)

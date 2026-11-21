@@ -5,8 +5,8 @@
 明确 Action 输出在主轨道与 Channel 子轨道之间的分发、执行和同步语义，并扩展全局 `wait` 的表示能力：
 
 - 成对作用域：`<wait>...</wait>`，作用域内的 Actions 分发到各自 Channel，闭标签构成完成屏障。
-- 自闭操作：`<wait/>` 或 `<wait .../>`，用于不带作用域的等待操作；未提供参数时的默认行为需定稿。
-- 自闭 `wait` 可携带 `time` 参数，单位为秒，允许小数。通常按整秒表达；只有确有必要等待不足一秒时才使用小数。它表示主轨道暂停分发的时长，计时期间子轨道继续运行；不隐含等待先前分发的 Actions 完成，也不用于成对作用域。允许范围、精度和超界行为仍需定义。
+- 自闭操作：`<wait time="秒"/>`，用于不带作用域的等待；不带有效 `time` 的 `<wait/>`、多余属性均无效，按 `invalidParameters` 调用拒绝，不终止整个生成。
+- 自闭 `wait` 可携带 `time` 参数，单位为秒，允许小数。通常按整秒表达；只有确有必要等待不足一秒时才使用小数。它表示主轨道暂停分发的时长，计时期间子轨道继续运行；不隐含等待先前分发的 Actions 完成，也不用于成对作用域。取值为十进制秒，大于 0 且不超过 60 秒，按毫秒精度；单次生成累计不超过 120 秒，Shell 对每个任务同样累计 120 秒；超界、非法或超出累计的值明确失败。
 
 `wait` 是 Assistant 的系统调度 Action，始终作用于主轨道，不占用业务 Channel，也不作为普通子轨道 Action 执行。它通过 Assistant 必然加载的 `basic-interaction` Skill 注册和教学；不需要再增加独立 Skill 或按业务角色重复声明。实现可以在协议层将其编码为调度事件，并由 Actions Shell 执行其调度语义。
 
@@ -114,7 +114,9 @@ UI.B
 - `time` 单位为秒，允许小数；一般用整秒，仅在确有必要时使用小于一秒的小数。
 - wait 在 Assistant 的必加载 `basic-interaction` Skill 中注册；用法教学只归该 Skill，不由 Actions 模块提供。
 
-## 当前实现与需求差异
+## 实施前现状与需求差异
+
+本节的“当前实现”列记录实施前的基线，实现后的设计见各目录 README。
 
 | 领域 | 当前实现 | 本需求需明确/扩展 |
 | --- | --- | --- |
@@ -165,7 +167,7 @@ UI.B
 5. **守住生命周期与容量**：沿用有界输入、Channel、Action 和 wait 深度策略；为定时等待定义明确的时长边界与失败结果。finish 对未闭合作用域显式失败；取消须加入实际运行与清理；队列溢出不得静默丢弃或伪装成功。
 6. **更新技术契约与验证**：实现后更新 Agents、Resources/Skills 与 Actions/Shell README；补充解析器和调度器回归，覆盖自闭/成对语法、秒/小数参数校验、并行/串行、嵌套、屏障、取消及无效输入。
 
-以上描述的是需求契约，不表示代码已经支持自闭 wait 或 `time`。
+以上为需求契约；实施结果与验证见下方“实施状态”。
 
 ## 验收条件
 
@@ -178,7 +180,15 @@ UI.B
 - malformed/unclosed scope、finish、取消、资源清理和容量超限均有确定且可观测结果，不提前放行后续轨道工作。
 - 工程回归覆盖上述外部可观察行为；真实模型是否正确生成标签与真机表现属于独立验收，不以 parser/scheduler 单测代替。
 
-## 尚待定稿
+## 已定稿的协议决定
 
-- 不带参数的 `<wait/>` 的默认语义，以及 `time` 的最小/最大秒数、精度和非法/超界参数的具体错误契约。
-- `Skill.json` 对系统调度 Action 的注册表达：如何声明无业务 Channel，并与现有普通 Action path/callType 元数据保持一致。
+- `<wait/>`（无 `time`）无效；`time` 十进制秒、大于 0 至 60 秒、毫秒精度，单次生成与每任务累计各 120 秒。
+- Skill 注册表达：`useActions` 条目 `callType: "scheduling"`、path `Scheduling.Wait.wait`、alias `wait`、无 channel；仅 Basic Interaction 使用。注册使 `CapabilityRegistry.supportsWait` 为真；未注册的 Agent 发出 wait 标签得到 `unknownCapability` 调用拒绝。
+- 共享 ActionCatalog 不再含 wait 条目；Actions 目录未发现自有提示词或教学资源，无需删除，已在 Actions README 记录其不拥有提示词的边界。
+- 语音退出规则放宽：`stopListening` 可附带一句简短告别，不强制“只输出 stopListening”；Basic Interaction 的 Listening 段在示例中给出最佳生成（简短告别加 `<stopListening/>`，不重启聆听），中英文同步，不增加其他约束。真实模型评估对应放宽 `voice-exit` 评分。
+
+## 实施状态
+
+已实施：`pause(milliseconds:)` 调度指令（Agents → Gateway → Shell）、生成器解析/校验/注册门控、ChannelScheduler 主轨道定时暂停（取消即结束、累计上限）、Basic Interaction 的 Skill.json 注册与中英文教学（revision 2）、ActionCatalog 删除 wait 教程、OutputProtocol 语法说明、校验脚本及相关 README。回归：解析器/生成器（秒与小数、非法形式、累计、未注册）、调度器（暂停不等待已启动 Action、取消、预算）、Skill 教学示例可解析、目录不再暴露 wait。
+
+验证记录与限制见 [Action wait 验证](../../validation/Action-Multi-Channel-Wait.md)。真实模型是否按教学生成标签、真机体验属于独立验收，尚未执行，因此本需求保留在 requirements。

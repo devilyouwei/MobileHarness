@@ -9,6 +9,7 @@ public struct AgentGenerator: Sendable {
     private var sentences: SentenceFunctionBuffer
     private var calls = 0
     private var waitDepth = 0
+    private var pausedMilliseconds = 0
     private var closed = false
 
     public init(
@@ -62,12 +63,26 @@ public struct AgentGenerator: Sendable {
                 result += try mapText(sentences.append(text))
             case .scheduling(let directive):
                 result += try flush()
+                guard capabilities.supportsWait else {
+                    result.append(.rejected(CallRejection(kind: .action, alias: "wait", reason: .unknownCapability)))
+                    continue
+                }
                 waitDepth += directive == .beginWait ? 1 : -1
                 result.append(.scheduling(directive))
             case .action(let alias, let parameters):
                 result += try flush()
                 try reserve(1)
                 do {
+                    if alias == "wait" {
+                        guard case .pause(let milliseconds) = try capabilities.resolvePause(parameters) else {
+                            throw GenerationError.invalidParameters
+                        }
+                        guard pausedMilliseconds + milliseconds <= CapabilityRegistry.maximumTotalPauseMilliseconds
+                        else { throw GenerationError.limitExceeded }
+                        pausedMilliseconds += milliseconds
+                        result.append(.scheduling(.pause(milliseconds: milliseconds)))
+                        continue
+                    }
                     if capabilities.isControl(alias) {
                         guard waitDepth == 0 else { throw GenerationError.controlInsideWait }
                         result.append(.control(try capabilities.resolveControl(alias, parameters: parameters)))
@@ -76,6 +91,7 @@ public struct AgentGenerator: Sendable {
                     }
                 } catch let error as GenerationError
                     where error == .unknownCapability || error == .invalidParameters || error == .controlInsideWait
+                    || (alias == "wait" && error == .limitExceeded)
                 {
                     result.append(
                         .rejected(

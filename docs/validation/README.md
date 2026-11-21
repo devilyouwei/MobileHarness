@@ -1,5 +1,8 @@
 # 验证与验收资料
 
+[Action 多轨道调度与 wait](Action-Multi-Channel-Wait.md)：自闭 `time` 延时、Skill 注册、教学迁移的自动化证据及未执行的真实模型/真机验收。
+[wait 提示词真实模型评估](Wait-Prompt-Evaluation.md)：qwen3.8-max/flash 与 gpt-4.1 对 wait 作用域与延时 function token 的单轮语义评估、失败分析与局限。
+
 [Xcode 工程配置清理](Xcode-Project-Cleanup.md)：工程结构、五个模拟器构建目标、资源验证及 SwiftPM 锁等待限制。
 
 本目录保存验证方法和可追溯证据。报告必须区分替身测试、真实模型、构建、原生 UI 和物理设备，并保留日期、环境、版本、失败与未执行范围。历史报告中的“当前”“默认”“尚未接入”只对应当时版本，不是今天的配置或待办。

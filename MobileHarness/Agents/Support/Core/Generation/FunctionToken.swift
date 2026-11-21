@@ -19,6 +19,8 @@ public enum GenerationError: Error, Equatable, Sendable {
 /// Structured execution boundaries, scoped to the trusted envelope's Agent/session/input.
 public enum SchedulingDirective: Equatable, Sendable {
     case beginWait, endWait
+    /// Self-closing `<wait time="seconds"/>`: pauses main-track dispatch; already dispatched Actions keep running.
+    case pause(milliseconds: Int)
 }
 
 /// A rejected model invocation carries no executable path or arguments.

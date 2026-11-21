@@ -66,7 +66,7 @@ flowchart TD
     Recovery -->|"内容请求可恢复，abort 后新建流"| Begin
     Recovery -->|"终止 / 提交不确定 / 清理失败"| Cleanup
     Cancel["显式 cancel / 根停止"] --> Cleanup
-    Cleanup --> Terminal["completeRequest：保存终态（closing）<br/>创作占用不等待回报"]
+    Cleanup --> Terminal["completeRequest：保存终态（task_state）<br/>创作占用不等待回报"]
     Terminal --> Notification["agent.task.events.v1<br/>发布一次，失败记入 deliveryFailure"]
     Notification --> Retirement["retireTask 一次<br/>retireRequest 记录退休结果"]
 ```
@@ -113,7 +113,7 @@ AgentTaskContent.event 携带通用 AgentTaskEvent（版本 1）：UUID eventID�
 
 Database 根目录拥有连接、schema 装配与生命周期；Shared 只保存编码、ID 与分页机制。Assistant 和 Writer 分别拥有消息/任务接口、历史 DTO、窗口及 SQL 实现。日志和 Agent 通信通过独立共享端口注入，不经统一 Chat/Task 门面。详见 [Database](../../Storage/Database/README.md)。
 
-暂停/关闭加入创作和投递 worker。终态先经 completeRequest 写入 writer_executions（run_state 为 closing），随后发布一次完成回报，再调用一次 consumer.retireTask，并由 retireRequest 将 closing 转为终态，退休失败记为 cleanup_failed。执行授权不跨进程保留，重启恢复把遗留 closing 行直接转为其终态，不重发回报、不重跑创作，也不重建旧执行权限。对用户的通知不是任务释放条件。
+暂停/关闭加入创作和投递 worker。终态先经 completeRequest 写入 writer_executions 的 task_state（Agent state 与 task state 是两层：暂停只属于 Agent，委托只会取消或自然结束），随后发布一次完成回报，再调用一次 consumer.retireTask，并由 retireRequest 记录 retirement；退休失败记为 failed 并作为交付失败记录，不再触发第二次完成。执行授权不跨进程保留，重启恢复把遗留 running/cancelling 委托记为 interrupted 并把未完成的退役转为 done，不重发回报、不重跑创作，也不重建旧执行权限。对用户的通知不是任务释放条件。
 
 Writer 私有控制提示只教本角色的选择、文件操作、追问与完成；ask/finish 由宿主发送回报，Writer 不生成 XML 调度或自行拼接跨 Agent 消息。独立内容请求只处理格式与文件编写，不承担角色协调。
 

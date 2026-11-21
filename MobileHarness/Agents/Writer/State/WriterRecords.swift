@@ -43,8 +43,11 @@ import UI
         var item = WriterDelegationItem(
             id: row.id, position: row.messageID, goal: row.goal, input: row.input, sourceAgent: row.sourceAgent,
             sourceContext: row.sourceContext, date: row.createdAt,
-            state: ["closing", "cleanup_failed", "waiting_input", "paused"].contains(row.executionState)
-                ? row.executionState : row.status, result: result,
+            state: row.retirement == "failed"
+                ? "cleanup_failed"
+                : row.taskState == "cancelling"
+                    ? "cancelling" : row.status == "running" && row.waiting != nil ? "waiting_input" : row.status,
+            result: result,
             failure: failure, workspace: linkedWorkspace)
         if let raw = row.waiting {
             item.waiting = try JSONDecoder().decode(AgentTaskContent.self, from: Data(raw.utf8)).text

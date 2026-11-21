@@ -190,8 +190,7 @@ public struct WriterDelegationItem: Identifiable, Sendable {
     public var stateTitle: String {
         switch state {
         case "waiting_input": return "Waiting for input"
-        case "paused": return "Paused"
-        case "closing": return "Finishing"
+        case "cancelling": return "Finishing"
         case "cleanup_failed": return "Cleanup failed"
         default: return WriterRequestItem.statusTitle(state)
         }

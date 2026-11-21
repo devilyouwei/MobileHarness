@@ -40,6 +40,9 @@ public enum AgentConfigurations {
         public let callType: String
         public let alias: String
         public let channel: String?
+        /// The only scheduling binding: Basic Interaction registers the Shell's main-track `wait`.
+        public static let schedulingWaitPath = "Scheduling.Wait.wait"
+        public var isSchedulingWait: Bool { callType == "scheduling" }
     }
     public struct Skill: Codable, Sendable {
         public let version: Int
@@ -236,7 +239,12 @@ public enum AgentConfigurations {
         let value = try JSONDecoder().decode(Skill.self, from: data(path))
         guard value.id == id else { throw AgentConfigurationError.invalidFormat }
         let functions = try installedCatalog()
-        for binding in value.useActions {
+        for binding in value.useActions where binding.isSchedulingWait {
+            guard binding.path == Binding.schedulingWaitPath, binding.alias == "wait", binding.channel == nil else {
+                throw AgentConfigurationError.invalidField("scheduling binding: " + binding.path)
+            }
+        }
+        for binding in value.useActions where !binding.isSchedulingWait {
             try functions.validateLocalTool(
                 path: binding.path, callType: binding.callType, owner: value.owner.map(AgentID.init(rawValue:)))
         }
@@ -309,6 +317,7 @@ public enum AgentConfigurations {
         root["version"] = 9
         root["actions"] = generated.actions
         root["tools"] = generated.tools
+        root["scheduling"] = generated.scheduling
         let configuration = try AgentConfiguration(
             contracts: AgentContracts.communication,
             data: JSONSerialization.data(withJSONObject: root, options: [.sortedKeys]))
@@ -319,6 +328,7 @@ public enum AgentConfigurations {
         let d = try declaration(bindings, owner: owner, localize: AgentPrompts.language == "zh-Hans")
         var root: [String: Any] = [
             "version": 9, "id": "catalog", "category": "perception", "actions": d.actions, "tools": d.tools,
+            "scheduling": d.scheduling,
             "signals": ["requests": [], "feedback": [], "publications": [], "subscriptions": []],
         ]
         let configuration = try AgentConfiguration(data: JSONSerialization.data(withJSONObject: root))
@@ -327,7 +337,7 @@ public enum AgentConfigurations {
     private static func declaration(
         _ bindings: [Binding], owner: AgentID? = nil, localize: Bool = false
     ) throws -> (
-        actions: [String: [[String: Any]]], tools: [[String: Any]]
+        actions: [String: [[String: Any]]], tools: [[String: Any]], scheduling: [String]
     ) {
         guard bindings.count <= 128, Set(bindings.map(\.path)).count == bindings.count else {
             throw GenerationError.duplicateAlias
@@ -335,8 +345,15 @@ public enum AgentConfigurations {
         let functions = try installedCatalog()
         var actions: [String: [[String: Any]]] = ["Speech": [], "Display": []]
         var tools: [[String: Any]] = []
+        var scheduling: [String] = []
         let copy = localize ? try functionCopy() : nil
         for binding in bindings {
+            if binding.isSchedulingWait {
+                guard binding.path == Binding.schedulingWaitPath, binding.alias == "wait", binding.channel == nil
+                else { throw AgentConfigurationError.invalidField("scheduling binding: " + binding.path) }
+                scheduling.append("wait")
+                continue
+            }
             let selected = try functions.declaration(
                 path: binding.path, callType: binding.callType, owner: owner)
             guard let canonical = selected, ["action", "tool"].contains(binding.callType)
@@ -361,7 +378,7 @@ public enum AgentConfigurations {
                 ])
             }
         }
-        return (actions, tools)
+        return (actions, tools, scheduling)
     }
 
     static func functionCopy() throws -> AgentFunctionCopy? {

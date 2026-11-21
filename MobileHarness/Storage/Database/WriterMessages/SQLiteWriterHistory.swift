@@ -23,7 +23,7 @@ extension SQLiteWriterMessageRepository {
                 let key = try Int64.fetchOne(
                     db,
                     sql:
-                        "SELECT id FROM writer_executions WHERE run_state!='rejected' ORDER BY CASE WHEN run_state IN ('running','waiting_input','paused','closing','cleanup_failed') THEN 0 ELSE 1 END,id DESC LIMIT 1"
+                        "SELECT id FROM writer_executions WHERE retirement!='none' ORDER BY CASE WHEN task_state IN ('running','cancelling') THEN 0 ELSE 1 END,id DESC LIMIT 1"
                 )
             else { throw RecordStorageError.missingRecord }
             return try Self.history(Owner(key: key, request: true), db: db)

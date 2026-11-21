@@ -53,7 +53,8 @@ public enum AgentSkillLoader {
             actions: selected.actions, tools: selected.tools,
             channels: selected.channels, internalActions: fixed.internalActions,
             internalTools: fixed.internalTools, controls: localizedControls(fixed.controls),
-            controlGuidance: localizedGuidance(fixed.controlGuidance))
+            controlGuidance: localizedGuidance(fixed.controlGuidance),
+            supportsWait: selected.supportsWait)
     }
     /// Fixed controls are re-presented in the current prompt language from their owner's resources.
     private static func localizedControls(_ controls: [ControlRegistration]) throws -> [ControlRegistration] {

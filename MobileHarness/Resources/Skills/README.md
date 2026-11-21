@@ -37,8 +37,8 @@ Skill 是可复用的流程与能力集合，Task 是运行时目标、状态和
 | 字段 | 作用与规范 |
 | --- | --- |
 | `path` | `Domain.Module.function` 三段 canonical 路径，必须有所属实现维护的中立声明和真实执行路由；通信函数声明由 Agents/Support/Communication 维护。 |
-| `callType` | 共享 Skill 使用 `action`，包括查询、设备操作、展示和 Task/Skill 控制。Writer 专属 Skill 使用原生 `tool`。 |
-| `alias` | 组合目录内唯一的模型调用标识，作为 Action 的 XML 别名或原生 Tool 名称。保留名为 `wait`。 |
+| `callType` | 共享 Skill 使用 `action`，包括查询、设备操作、展示和 Task/Skill 控制。Writer 专属 Skill 使用原生 `tool`。`scheduling` 只用于 Basic Interaction 注册系统调度 `wait`：path 固定为 `Scheduling.Wait.wait`、alias 为 `wait`、无 channel，不对应 Action 声明。 |
+| `alias` | 组合目录内唯一的模型调用标识，作为 Action 的 XML 别名或原生 Tool 名称。保留名为 `wait`，仅可由 `scheduling` 绑定使用。 |
 | `channel` | Action 必填，用于调度。原生 Tool 省略此字段。 |
 
 加载了 Skill 即可使用其全部合法 Action，不再维护 Agent 权限上限或重复登记函数。不同 Skill 引用同一 path 时，绑定完全相同才合并；类型、别名或 Channel 冲突时整个加载失败。不同 path 也不能共享 alias；同一函数不能同时作为 Action 和 Tool。send 只能是 Action，不能作为原生 Tool。Task 与 Skill 控制是 Assistant 的固定 control（见 [Agent controls](../../Agents/Support/Core/Capability/README.md#agent-controls)），Skill 不登记、不释放、不教学 control，control 声明与用法指南由拥有者 Agent 目录的 `Controls.json` 与 `Controls.md` 提供；Skill.json 出现 `useControls` 时解码拒绝。组合器没有固定 Task 函数注入特例。
@@ -47,7 +47,7 @@ Skill 是可复用的流程与能力集合，Task 是运行时目标、状态和
 
 [WriterWorkspace](WriterWorkspace/Skill.json) 是 Writer 的基础作品库 Skill，[WriterFileEditing](WriterFileEditing/Skill.json) 随编辑域自动激活。作品库 Skill 声明 Gateway 工具与 Writer 本地工具，区分已知 ID 的直接打开或进入与按名称搜索。文件编辑 Skill 依赖作品库 Skill，编辑阶段同时提供两者的工具与教学。详见 [Writer 工作区分域](../../Agents/Writer/README.md#作品库与工作区分域)。
 
-BasicInteraction 的表情部分教学连续表情演出，提供指定子集的纯串行及“每项语音与表情并行、各项串行”的全量 XML 示例；“所有表情”按当前 express 参数枚举逐项展开，不包括仅用于清除状态的 clear。演出使用完成时等待过渡与恢复的 express，保持默认 Speech/Display Channel；不为有限演出创建需后续用户决策的 Task。资源 revision 随教学递增，`wait` 排序规则由 Actions Shell 的 wait 目录条目（`Shared/ActionCatalog.json`）拥有。
+BasicInteraction 的表情部分教学连续表情演出，提供指定子集的纯串行及“每项语音与表情并行、各项串行”的全量 XML 示例；“所有表情”按当前 express 参数枚举逐项展开，不包括仅用于清除状态的 clear。演出使用完成时等待过渡与恢复的 express，保持默认 Speech/Display Channel；不为有限演出创建需后续用户决策的 Task。资源 revision 随教学递增。`wait` 的注册和全部用法教学（成对作用域、嵌套、自闭 `time` 延时）由 BasicInteraction 的 Skill.json 与 Instructions 拥有；`time` 以秒为单位，教学要求优先整秒，仅在确需不足一秒时用小数。Actions 与共享目录不再提供 wait 条目。
 
 ### useStates 与当前事实
 
@@ -236,6 +236,6 @@ Photography describes the20-image FIFO window session, stable local preview_N la
 
 BasicInteraction 的 Lifetime and completion 独占通用窗口生命周期教学：窗口独立于 Task/Skill，操作一个窗口不隐式关闭其他窗口，关闭/丢弃需要明确意图。Assistant 身份不承载窗口流程；Photography、ApplicationControl、WebBrowsing 只说明各自操作与完成语义，不复制通用规则或嵌入跨业务场景。资源 revision 随教学更新。
 
-Assistant 的 Controls.md 教授前台 Task、委派、补充输入、取消、Skill 生命周期和执行反馈；BasicInteraction 教授表情、聆听控制、窗口独立性和基础 State 的读法。`wait` 排序规则见目录中的 wait 条目，通用 XML 与 Channel 规则见 [共享输出协议](../Agents/Shared/OutputProtocol.md)，语音与字幕呈现见 [Assistant 角色指令](../Agents/Assistant/Instructions.md)。
+Assistant 的 Controls.md 教授前台 Task、委派、补充输入、取消、Skill 生命周期和执行反馈；BasicInteraction 教授 `wait` 排序与延时、表情、聆听控制、窗口独立性和基础 State 的读法。`wait` 的排序规则见 BasicInteraction 的 Instructions，通用 XML 与 Channel 规则见 [共享输出协议](../Agents/Shared/OutputProtocol.md)，语音与字幕呈现见 [Assistant 角色指令](../Agents/Assistant/Instructions.md)。
 
 WebBrowsing 的 useStates 同时选择 actions.web.screenshot、ui.web 与 ui.windows。图片是单张当前视口 State；Instructions 说明替换/失效及无历史选择，Action 回执 screenshotID 只作当次证据，不用于历史图片加载。

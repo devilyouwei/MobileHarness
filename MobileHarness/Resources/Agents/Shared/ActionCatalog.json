@@ -7,7 +7,6 @@
     "controls": "Agent controls (run by this Agent, not Actions; self: own state, peer: another Agent; no Channel; never inside <wait>)",
     "control": "Control {{alias}} ({{destination}}):",
     "parameter": "  {{name}}: {{type}}, {{presence}}. {{description}} {{constraints}}",
-    "wait": "Action wait (scheduling; paired tags `<wait>...</wait>`, no Channel; ordered by the Actions Shell):\nWaits for earlier parent work, and blocks later parent work until the group and its contents complete; ordering inside it still follows Channels. Nested groups never wait on themselves, ancestors or other tasks. Empty `<wait></wait>` is valid. Waits are paired, nested and attribute-free (no `<wait/>`); use at most 32 waits and 8 nested scopes. Wait adds no timeout or rollback, and a control never belongs inside one.\nFor a known sequence, emit ALL requested steps in ONE response; result-dependent choices await feedback. Strict order A to D, even across Channels: `<wait>A</wait><wait>B</wait><wait>C</wait><wait>D</wait>`. Two parallel pairs in sequence: `<wait>A B</wait><wait>C D</wait>` (A/B may overlap on different Channels; both finish before C/D start). Output order alone does not synchronize Channels. A to D stand for declared Actions or role-mapped text.",
     "guidance": "Control guide:\n{{text}}"
   }
 }

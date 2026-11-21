@@ -14,4 +14,5 @@ public enum ActionSchedulingError: Error, Equatable, Sendable {
     case invalidSchedule
     case taskActionLimitExceeded
     case waitGroupLimitExceeded
+    case pauseLimitExceeded
 }

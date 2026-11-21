@@ -166,7 +166,7 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
     #expect(output.names == ["body"])
     #expect(
         catalog.names == [
-            "section", "channel", "action", "wait", "controls", "control", "guidance", "parameter",
+            "section", "channel", "action", "controls", "control", "guidance", "parameter",
         ])
     let skills = try AgentPrompts.skillCatalog()
     #expect(prompt.contains(try skills.render("availableHeading") + "\n" + AgentConfigurations.skillOverview()))
@@ -251,9 +251,24 @@ private func controlGuide() throws -> String { try AssistantControls.guidance.te
     let catalog = try skills.registry(fixed: config.assistantFixed)
     let prompt = try AssistantContextState.systemPrompt(catalog, skills: skills)
     #expect(prompt.contains(try AgentConfigurations.skillInstructions("basic-interaction")))
-    #expect(prompt.contains("emit ALL requested steps in ONE response"))
-    let examples = try skillResponseExamples("basic-interaction")
-    #expect(examples.count == 2)
+    #expect(prompt.contains("Emit every known step in ONE response"))
+    let allExamples = try skillResponseExamples("basic-interaction")
+    #expect(allExamples.count == 5)
+    // The leading three teach nesting and pauses; the trailing two are the continuous performances.
+    let orderingEvents = try allExamples.prefix(3).map { example -> [GenerationEvent] in
+        var trace = GenerationTrace(
+            capabilities: catalog, textMapping: AssistantAgent.mapText,
+            segmentation: try AssistantAgent.textSegmentation)
+        for character in example { try trace.append(String(character)) }
+        trace.finish()
+        #expect(trace.parserError == nil && !trace.events.contains { if case .rejected = $0 { true } else { false } })
+        return trace.events
+    }
+    #expect(orderingEvents[0].filter { $0 == .scheduling(.beginWait) }.count == 2)
+    #expect(orderingEvents[1].contains(.scheduling(.pause(milliseconds: 1000))))
+    #expect(orderingEvents[2].contains(.scheduling(.pause(milliseconds: 2000))))
+    #expect(orderingEvents[2].first == .scheduling(.beginWait))
+    let examples = Array(allExamples.suffix(2))
     let emotions = UIActions.Emotion.allCases.filter { $0 != .clear }.map(\.rawValue)
     let labels = [
         "Eyes closed", "Smiling", "Happy", "Laughing", "Thinking", "Surprised", "Sad", "Love", "Angry", "Scared",
@@ -631,7 +646,7 @@ func businessSkillTeachingCannotFinishAnAbsentOrUnrelatedTask(skill: String) thr
     #expect(base.contains("web-browsing") && !base.contains("Artifact_library"))
     _ = try skills.control("loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: "budget", fixed: fixed)
     let photography = try AssistantContextState.systemPrompt(skills.registry(fixed: fixed), skills: skills)
-    #expect(photography.utf8.count < 38_500)
+    #expect(photography.utf8.count < 39_000)
     #expect(photography.contains("Action closeCamera:"))
     #expect(photography.contains("Task is not device authorization"))
     #expect(!photography.contains("skillOwnership/loadedSkills"))
@@ -981,24 +996,28 @@ extension AgentConfiguration {
     }
 }
 
-@Test(.actionCatalog) func waitIsACatalogActionWhileControlGuidanceFollowsTheOwnerControls() throws {
+@Test(.actionCatalog) func waitIsTaughtBySkillInsteadOfTheActionCatalog() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     let fixed = try AssistantAgent.runtimeCapabilities(config.capabilities)
     let registry = try AgentSkillLoader.registry(["basic-interaction"], fixed: fixed)
+    #expect(registry.supportsWait)
     let catalog = try AgentPrompts.capabilityContext().catalog(registry)
-    let wait = try #require(catalog.range(of: "Action wait (scheduling;"))
+    // Actions expose declarations only; ordering instructions belong to the registering Skill.
+    #expect(!catalog.contains("Action wait") && !catalog.contains("paired tags"))
     let controls = try #require(catalog.range(of: "Agent controls (run by this Agent"))
     let guide = try #require(catalog.range(of: try controlGuide()))
-    #expect(wait.lowerBound < controls.lowerBound && controls.lowerBound < guide.lowerBound)
-    #expect(catalog.contains("at most 32 waits and 8 nested scopes"))
-    #expect(!(try AgentConfigurations.skillInstructions("basic-interaction")).contains("32 waits"))
-    // Without Actions or controls there is nothing to order or to teach.
+    #expect(controls.lowerBound < guide.lowerBound)
+    let teaching = try AgentConfigurations.skillInstructions("basic-interaction")
+    #expect(teaching.contains("32 waits") && teaching.contains("<wait time=\"2\"/>"))
+    #expect(teaching.contains("Prefer whole seconds"))
     let empty = try AgentPrompts.capabilityContext().catalog(CapabilityRegistry())
     #expect(!empty.contains("Action wait") && !empty.contains("Agent controls"))
     #expect(throws: GenerationError.self) { try CapabilityRegistry(controlGuidance: fixed.controlGuidance) }
     try AgentPrompts.$language.withValue("zh-Hans") {
         let localized = try AgentSkillLoader.registry(["basic-interaction"], fixed: fixed)
         #expect(try #require(localized.controlGuidance).text.hasPrefix("## Agent 控制"))
-        #expect(try AgentPrompts.capabilityContext().catalog(localized).contains("操作 wait（调度；"))
+        #expect(!(try AgentPrompts.capabilityContext().catalog(localized)).contains("操作 wait"))
+        let zh = try AgentConfigurations.skillInstructions("basic-interaction")
+        #expect(zh.contains("32 个") && zh.contains("优先写整秒"))
     }
 }

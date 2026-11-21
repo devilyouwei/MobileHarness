@@ -48,8 +48,10 @@ public struct AgentConfiguration: Sendable {
         do { raw = try JSONSerialization.jsonObject(with: data) } catch {
             throw AgentConfigurationError.invalidFormat
         }
+        // Scheduling registration is optional: absent means no scheduling Action is registered.
+        let hasScheduling = (raw as? [String: Any])?.keys.contains("scheduling") == true
         let root = try Self.dictionary(
-            raw, keys: Self.rootKeys, field: "root")
+            raw, keys: hasScheduling ? Self.rootKeys : Self.rootKeys.subtracting(["scheduling"]), field: "root")
         let decoded: Document
         do { decoded = try JSONDecoder().decode(Document.self, from: data) } catch {
             throw AgentConfigurationError.invalidFormat
@@ -61,6 +63,9 @@ public struct AgentConfiguration: Sendable {
         category = decoded.category
         try decoded.signals.validate(contracts: contracts, agentID: .init(rawValue: decoded.id))
         communication = decoded.signals
+        guard let scheduling = (root["scheduling"] ?? [String]()) as? [String], Set(scheduling).isSubset(of: ["wait"]),
+            scheduling.count <= 1
+        else { throw AgentConfigurationError.invalidField("scheduling") }
         guard let groups = root["actions"] as? [String: [Any]], let tools = root["tools"] as? [Any],
             groups.values.reduce(0, { $0 + $1.count }) + tools.count <= 128
         else { throw AgentConfigurationError.invalidField("actions/tools") }
@@ -106,11 +111,13 @@ public struct AgentConfiguration: Sendable {
                     requiredParameters: Set(tool.function.parameters.required),
                     optionalParameters: Set(tool.function.parameters.properties.keys)
                         .subtracting(tool.function.parameters.required), definition: tool)
-            }, channels: Set(decoded.actions.keys))
+            }, channels: Set(decoded.actions.keys), supportsWait: decoded.scheduling?.contains("wait") == true)
         agentID = AgentID(rawValue: decoded.id)
     }
 
-    private static let rootKeys: Set<String> = ["version", "id", "category", "actions", "tools", "signals"]
+    private static let rootKeys: Set<String> = [
+        "version", "id", "category", "actions", "tools", "scheduling", "signals",
+    ]
 
     private static func dictionary(_ raw: Any, keys: Set<String>, field: String) throws -> [String: Any] {
         guard let value = raw as? [String: Any], Set(value.keys) == keys else {
@@ -192,6 +199,7 @@ public struct AgentConfiguration: Sendable {
         let id: String
         let category: AgentCategory
         let actions: [String: [Action]]
+        let scheduling: [String]?
         struct Action: Decodable {
             let alias: String
             let path: Path

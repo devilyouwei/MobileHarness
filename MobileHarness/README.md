@@ -464,14 +464,14 @@ sequenceDiagram
     end
     opt Accepted delegation reaches a terminal outcome
         W->>W: Join model and file cleanup
-        W->>S: Commit terminal outcome in writer_executions (closing)
+        W->>S: Commit terminal outcome in writer_executions (task_state)
         W->>G: Publish agent.task.events.v1 once
         G-->>W: Local publication admitted
         G-->>A: Async report if subscribed
         A->>S: Write trace record
         A->>A: Apply report; remove terminal task tracking; retain static subscription
         W->>G: Retire the execution grant once
-        W->>S: Record retirement result (terminal or cleanup_failed)
+        W->>S: Record retirement result (done or failed)
     end
 ```
 
@@ -886,7 +886,7 @@ The model-output path is **ModelKit stream → Agents parsing and catalog resolu
 
 | Boundary              | Contract                                                                                                                                                                                                                                                       |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Function Token syntax | Natural text mixed with restricted XML, without a document root. Self-closing tags name catalog aliases, which resolve to an Action or to an Agent control; the paired `wait` scope is a scheduling Action of the Shell and emits scheduling boundaries.                |
+| Function Token syntax | Natural text mixed with restricted XML, without a document root. Self-closing tags name catalog aliases, which resolve to an Action or to an Agent control; the paired `wait` scope and the self-closing `<wait time="seconds"/>` pause are scheduling events registered by a Skill (Basic Interaction) and executed by the Shell.                |
 | Agent control         | A self-closing tag that is a fixed capability of its owning Agent, not granted by Skills; the owner's `Controls.json` declares it and `Controls.md` teaches it (Assistant: `task.start`, `task.end`, `loadSkills`, `releaseSkills` with destination `self`; `task.send` with destination `peer`). It resolves to a ControlCall with no Channel, never reaches Actions, runs in the owning Agent in emission order without waiting for Actions on other Channels, and is rejected inside `<wait>`. Actions (scheduled or direct tool calls) are the only functions that enter Actions through Gateway. |
 | FunctionToken         | An Agent-local parsed text, action, boundary or scheduling event. Its boundary is independent of provider tokenizer tokens and network fragments. Incremental parsing handles incomplete UTF-8 and markup across fragments.                                    |
 | ActionCall            | A resolved actionPath, channel and string parameter map. Agents resolves aliases and parameters against its effective catalog; text mapping, when configured, produces ordered calls through the same generation pipeline.                                     |
@@ -904,7 +904,7 @@ Hello! How can I help you today?
 
 The XML requests a happy expression, and the following sentence is ordinary natural text. The parser emits beginWait, an action token for `express` with `emotion="happy"`, endWait, and text events. Catalog resolution turns the action token into an ActionCall with its canonical path, string parameters and registered Channel. The role's text mapping converts sentence chunks into its configured calls, such as speech or caption presentation; text is not an Action alias and does not execute by itself.
 
-Gateway forwards the resolved calls together with the ordered wait events to the Actions Shell. The Shell's wait group joins the scheduled expression before the following mapped calls proceed; parsing `</wait>` itself does not mean the expression has finished. Wait is a protocol scope, not a business function. Channel routing is fixed by registration. Exact aliases, parameters, permitted Channels and natural-text behavior come from the current decision catalog and role configuration.
+Gateway forwards the resolved calls together with the ordered wait events to the Actions Shell. The Shell's wait group joins the scheduled expression before the following mapped calls proceed; parsing `</wait>` itself does not mean the expression has finished. Wait is a protocol scope, not a business function; its `<wait time="seconds"/>` form only holds later dispatch of the same task for the timer, without joining started Actions. Channel routing is fixed by registration. Exact aliases, parameters, permitted Channels and natural-text behavior come from the current decision catalog and role configuration.
 
 A complete Action tag can emit a call before its enclosing scope closes. Parsing completion does not establish execution completion. Unknown aliases and invalid/missing required arguments produce ordered non-executable CallRejection events. Malformed syntax, capacity violations or cancellation terminate interpretation; failed generations do not flush incomplete syntax or replay already emitted effects. A later parse failure cannot undo an effect already executed.
 
@@ -1576,7 +1576,7 @@ Writer uses its own WriterExecutionRepository and WriterMessageRepository, with 
 
 Writer source lives in the current `writer/workspace_N` filesystem directory; SQLite indexes current files without retaining source bodies or workspace versions. StorageDatabase coordinates sandbox primitives and SQL leases, Actions owns validation/rendering/export, and Agents owns creative decisions. See [workspace storage](Storage/Database/WriterWorkspaces/README.md) and [Artifacts](Actions/Artifacts/README.md).
 
-On restart, Writer turns any leftover `closing` execution into its terminal state, without republishing reports, replaying creative work or reopening old execution permissions. The report publication policy belongs to [Writer](Agents/Writer/README.md#委托与主动事件), not generic Gateway transport. Before publishing repositories, Storage prepares the current schema. Any database whose version differs from the current one is erased and recreated, including the associated Writer files; stored data is never migrated. Settings, credentials and models are outside that reset. Database root owns connection/lifecycle/schema assembly; Shared owns neutral encoding, identity and paging mechanisms, while table directories own SQL and recovery. Agent consumers use role-specific task and communication ports. See [SQLite lifecycle](Storage/Database/README.md).
+On restart, Writer marks any leftover `running`/`cancelling` execution `interrupted` and releases unfinished retirements, without republishing reports, replaying creative work or reopening old execution permissions. The report publication policy belongs to [Writer](Agents/Writer/README.md#委托与主动事件), not generic Gateway transport. Before publishing repositories, Storage prepares the current schema. Any database whose version differs from the current one is erased and recreated, including the associated Writer files; stored data is never migrated. Settings, credentials and models are outside that reset. Database root owns connection/lifecycle/schema assembly; Shared owns neutral encoding, identity and paging mechanisms, while table directories own SQL and recovery. Agent consumers use role-specific task and communication ports. See [SQLite lifecycle](Storage/Database/README.md).
 
 ### 19. Model lifecycle and inference boundaries
 

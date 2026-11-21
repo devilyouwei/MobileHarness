@@ -63,7 +63,7 @@ flowchart LR
 
 ## Syntax and ordering
 
-Function Token protocol is natural text plus restricted XML without a document root. FunctionToken is a parsed event, not a model token/network fragment/character. Self-closing Action tags resolve aliases; paired `<wait>` scopes emit begin/end scheduling. Paired Actions, self-closing waits, attributes on scopes and crossing lexical scopes reject.
+Function Token protocol is natural text plus restricted XML without a document root. FunctionToken is a parsed event, not a model token/network fragment/character. Self-closing Action tags resolve aliases; paired `<wait>` scopes emit begin/end scheduling, and the self-closing `<wait time="…"/>` is parsed as an Action tag named `wait` that AgentGenerator resolves into a pause (the parser does not validate `time`). Paired Actions, attributes on scopes and crossing lexical scopes reject; `<wait/>` without a valid `time` becomes an `invalidParameters` call rejection.
 
 ```xml
 <express emotion="happy"/>
@@ -121,4 +121,4 @@ SentenceFunctionBuffer 支持首段软长度与后续长度，首段状态跨 XM
 
 GenerationEvent.runtimeAction保留代码展开来源；AgentGenerator把TextMapping输出的Action标为runtimeAction，XML显式调用保持action。actionCall统一读取两类执行值，GenerationTrace与历史预览显示两者；共享Chat按来源决定结果是否能进入模型观察，不能按函数路径推断。
 
-AgentGenerator resolves a self-closing tag against the registry's controls and actions. A control alias yields `GenerationEvent.control(ControlCall)`, never an ActionCall. The generator tracks wait depth and rejects a control written inside `<wait>` with `GenerationError.controlInsideWait`; unknown aliases and invalid parameters are rejected as for Actions. Controls count toward the 120-call response limit and keep emission order; execution belongs to the owning Agent.
+AgentGenerator resolves a self-closing tag against the registry's controls and actions. A control alias yields `GenerationEvent.control(ControlCall)`, never an ActionCall. The generator tracks wait depth and rejects a control written inside `<wait>` with `GenerationError.controlInsideWait`; scheduling events (`<wait>`, `</wait>`, `<wait time/>`) are emitted only when the registry `supportsWait`, otherwise each is a `wait` call rejection. Unknown aliases and invalid parameters are rejected as for Actions. Controls count toward the 120-call response limit and keep emission order; execution belongs to the owning Agent.

@@ -1,0 +1,1211 @@
+{
+  "version": 1,
+  "scope": "Python model-case evaluation; no App execution",
+  "provenance": {
+    "model": "qwen3.8-flash",
+    "repeats": 3,
+    "options": {
+      "temperature": 0
+    },
+    "inputSHA256": "2d16747c75adc192eac0ba5a29211b5796093ee8ed577c37b8d426d3948ea516",
+    "promptSHA256": "3c7d1759d39f13260229cc4277ef0d4112506a43340fc4e81f87f9b31db2fea7",
+    "runnerSHA256": "20ec92c3826eef50a6698a98aaa8f1abed061bff07a3688756797a35710026b2"
+  },
+  "rows": [
+    {
+      "id": "single-expression#r1",
+      "case": "single-expression",
+      "category": "no-wait",
+      "repeat": 1,
+      "user": "Smile.",
+      "response": "<express emotion=\"happy\"/>",
+      "usage": {
+        "prompt_tokens": 1734,
+        "total_tokens": 1801,
+        "completion_tokens": 67,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1734
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 58,
+          "text_tokens": 67
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 2202.9587919823825
+    },
+    {
+      "id": "chat-only#r1",
+      "case": "chat-only",
+      "category": "no-wait",
+      "repeat": 1,
+      "user": "你好呀，今天天气真好。",
+      "response": "<express emotion=\"happy\"/>你好呀！今天天气确实很棒，适合出去走走。",
+      "usage": {
+        "prompt_tokens": 1738,
+        "total_tokens": 1979,
+        "completion_tokens": 241,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1738
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 220,
+          "text_tokens": 241
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 5677.943291026168
+    },
+    {
+      "id": "voice-exit#r1",
+      "case": "voice-exit",
+      "category": "no-wait",
+      "repeat": 1,
+      "user": "Goodbye, stop listening now.",
+      "response": "<stopListening/>",
+      "usage": {
+        "prompt_tokens": 1738,
+        "total_tokens": 1796,
+        "completion_tokens": 58,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1738
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 51,
+          "text_tokens": 58
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 1429.4953749049455
+    },
+    {
+      "id": "speech-then-expression#r1",
+      "case": "speech-then-expression",
+      "category": "serial",
+      "repeat": 1,
+      "user": "Say hello, then smile.",
+      "response": "<wait>Hello.</wait><express emotion=\"happy\"/>",
+      "usage": {
+        "prompt_tokens": 1737,
+        "total_tokens": 1865,
+        "completion_tokens": 128,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1737
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 114,
+          "text_tokens": 128
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 3059.039209038019
+    },
+    {
+      "id": "expression-then-speech#r1",
+      "case": "expression-then-speech",
+      "category": "serial",
+      "repeat": 1,
+      "user": "先开心地笑一下，等表情做完再说“谢谢你”。",
+      "response": "<wait><express emotion=\"happy\"/></wait>谢谢你。",
+      "usage": {
+        "prompt_tokens": 1743,
+        "total_tokens": 2407,
+        "completion_tokens": 664,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1743
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 649,
+          "text_tokens": 664
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 12701.34545804467
+    },
+    {
+      "id": "parallel-expression-speech#r1",
+      "case": "parallel-expression-speech",
+      "category": "parallel",
+      "repeat": 1,
+      "user": "Smile while you say good morning.",
+      "response": "<express emotion=\"happy\"/>Good morning.",
+      "usage": {
+        "prompt_tokens": 1739,
+        "total_tokens": 2134,
+        "completion_tokens": 395,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1739
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 383,
+          "text_tokens": 395
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 8380.455959006213
+    },
+    {
+      "id": "nested-three-steps#r1",
+      "case": "nested-three-steps",
+      "category": "nested",
+      "repeat": 1,
+      "user": "Think for a moment, then smile while saying yes, and finally close your eyes.",
+      "response": "<wait><express emotion=\"thinking\"/><wait><express emotion=\"happy\"/>Yes.</wait></wait>\n<setExpression emotion=\"closed\"/>",
+      "usage": {
+        "prompt_tokens": 1748,
+        "total_tokens": 2260,
+        "completion_tokens": 512,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1748
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 480,
+          "text_tokens": 512
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 10656.184458057396
+    },
+    {
+      "id": "serial-expressions-silent#r1",
+      "case": "serial-expressions-silent",
+      "category": "serial",
+      "repeat": 1,
+      "user": "Show smile, thinking and surprised one by one, without speaking.",
+      "response": "<wait><express emotion=\"smile\"/></wait>\n<wait><express emotion=\"thinking\"/></wait>\n<wait><express emotion=\"surprised\"/></wait>",
+      "usage": {
+        "prompt_tokens": 1744,
+        "total_tokens": 1908,
+        "completion_tokens": 164,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1744
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 126,
+          "text_tokens": 164
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 2639.679125044495
+    },
+    {
+      "id": "serial-expressions-named#r1",
+      "case": "serial-expressions-named",
+      "category": "nested",
+      "repeat": 1,
+      "user": "Show happy, sad and angry one after another and say each name as you go.",
+      "response": "<wait><express emotion=\"happy\"/>Happy.</wait>\n<wait><express emotion=\"sad\"/>Sad.</wait>\n<wait><express emotion=\"angry\"/>Angry.</wait>",
+      "usage": {
+        "prompt_tokens": 1748,
+        "total_tokens": 1975,
+        "completion_tokens": 227,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1748
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 184,
+          "text_tokens": 227
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 4019.3587080575526
+    },
+    {
+      "id": "delay-after-speech#r1",
+      "case": "delay-after-speech",
+      "category": "delay",
+      "repeat": 1,
+      "user": "Say ready, wait two seconds, then smile.",
+      "response": "<wait>Ready.</wait><wait time=\"2\"/><express emotion=\"happy\"/>",
+      "usage": {
+        "prompt_tokens": 1741,
+        "total_tokens": 1992,
+        "completion_tokens": 251,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1741
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 231,
+          "text_tokens": 251
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 4119.413417065516
+    },
+    {
+      "id": "delay-between-speech#r1",
+      "case": "delay-between-speech",
+      "category": "delay",
+      "repeat": 1,
+      "user": "说“一”，停两秒，再说“二”。",
+      "response": "<wait>一。</wait><wait time=\"2\"/>二。",
+      "usage": {
+        "prompt_tokens": 1743,
+        "total_tokens": 2045,
+        "completion_tokens": 302,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1743
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 285,
+          "text_tokens": 302
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 5099.719375022687
+    },
+    {
+      "id": "hold-eyes-closed#r1",
+      "case": "hold-eyes-closed",
+      "category": "delay",
+      "repeat": 1,
+      "user": "Close your eyes for three seconds, then open them again.",
+      "response": "<setExpression emotion=\"closed\"/><wait time=\"3\"/><setExpression emotion=\"clear\"/>",
+      "usage": {
+        "prompt_tokens": 1743,
+        "total_tokens": 1896,
+        "completion_tokens": 153,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1743
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 132,
+          "text_tokens": 153
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 2799.4761660229415
+    },
+    {
+      "id": "subsecond-delay#r1",
+      "case": "subsecond-delay",
+      "category": "delay",
+      "repeat": 1,
+      "user": "Close your eyes, and half a second later open them.",
+      "response": "<setExpression emotion=\"closed\"/><wait time=\"0.5\"/><setExpression emotion=\"clear\"/>",
+      "usage": {
+        "prompt_tokens": 1743,
+        "total_tokens": 2008,
+        "completion_tokens": 265,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1743
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 242,
+          "text_tokens": 265
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 5249.464167049155
+    },
+    {
+      "id": "two-delays#r1",
+      "case": "two-delays",
+      "category": "delay",
+      "repeat": 1,
+      "user": "表情先笑一下，两秒后做思考的表情，再过三秒闭上眼睛。",
+      "response": "<wait><express emotion=\"smile\"/></wait><wait time=\"2\"/><setExpression emotion=\"thinking\"/><wait time=\"3\"/><setExpression emotion=\"closed\"/>",
+      "usage": {
+        "prompt_tokens": 1748,
+        "total_tokens": 3684,
+        "completion_tokens": 1936,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1748
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1900,
+          "text_tokens": 1936
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 25373.434209031984
+    },
+    {
+      "id": "speech-wait-then-expression-silent-delay#r1",
+      "case": "speech-wait-then-expression-silent-delay",
+      "category": "mixed",
+      "repeat": 1,
+      "user": "Say ready, wait two seconds, smile, wait one second, then close your eyes.",
+      "response": "<wait>Ready.</wait>\n<wait time=\"2\"/>\n<express emotion=\"happy\"/>\n<wait time=\"1\"/>\n<setExpression emotion=\"closed\"/>",
+      "usage": {
+        "prompt_tokens": 1749,
+        "total_tokens": 2153,
+        "completion_tokens": 404,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1749
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 365,
+          "text_tokens": 404
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 7245.657458086498
+    },
+    {
+      "id": "limit-request#r1",
+      "case": "limit-request",
+      "category": "limits",
+      "repeat": 1,
+      "user": "Smile, then wait five minutes before closing your eyes.",
+      "response": "<express emotion=\"happy\"/><wait time=\"60\"/><wait time=\"60\"/><wait time=\"60\"/><wait time=\"60\"/><wait time=\"60\"/><setExpression emotion=\"closed\"/>",
+      "usage": {
+        "prompt_tokens": 1743,
+        "total_tokens": 3086,
+        "completion_tokens": 1343,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1743
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1298,
+          "text_tokens": 1343
+        }
+      },
+      "finishReason": "stop",
+      "issues": [
+        "delayBudgetExceeded"
+      ],
+      "passed": false,
+      "milliseconds": 25620.997832971625
+    },
+    {
+      "id": "single-expression#r2",
+      "case": "single-expression",
+      "category": "no-wait",
+      "repeat": 2,
+      "user": "Smile.",
+      "response": "<express emotion=\"happy\"/>",
+      "usage": {
+        "prompt_tokens": 1734,
+        "total_tokens": 1914,
+        "completion_tokens": 180,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1734
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 171,
+          "text_tokens": 180
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 3528.3075829502195
+    },
+    {
+      "id": "chat-only#r2",
+      "case": "chat-only",
+      "category": "no-wait",
+      "repeat": 2,
+      "user": "你好呀，今天天气真好。",
+      "response": "<express emotion=\"happy\"/>你好呀，今天天气真好，心情也跟着明亮起来了。",
+      "usage": {
+        "prompt_tokens": 1738,
+        "total_tokens": 2124,
+        "completion_tokens": 386,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1738
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 365,
+          "text_tokens": 386
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 8098.609832930379
+    },
+    {
+      "id": "voice-exit#r2",
+      "case": "voice-exit",
+      "category": "no-wait",
+      "repeat": 2,
+      "user": "Goodbye, stop listening now.",
+      "response": "<stopListening/>",
+      "usage": {
+        "prompt_tokens": 1738,
+        "total_tokens": 1802,
+        "completion_tokens": 64,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1738
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 57,
+          "text_tokens": 64
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 1849.0899170283228
+    },
+    {
+      "id": "speech-then-expression#r2",
+      "case": "speech-then-expression",
+      "category": "serial",
+      "repeat": 2,
+      "user": "Say hello, then smile.",
+      "response": "<wait>Hello.</wait><express emotion=\"happy\"/>",
+      "usage": {
+        "prompt_tokens": 1737,
+        "total_tokens": 1885,
+        "completion_tokens": 148,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1737
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 134,
+          "text_tokens": 148
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 3508.1381250638515
+    },
+    {
+      "id": "expression-then-speech#r2",
+      "case": "expression-then-speech",
+      "category": "serial",
+      "repeat": 2,
+      "user": "先开心地笑一下，等表情做完再说“谢谢你”。",
+      "response": "<wait><express emotion=\"happy\"/></wait>谢谢你",
+      "usage": {
+        "prompt_tokens": 1743,
+        "total_tokens": 2121,
+        "completion_tokens": 378,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1743
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 364,
+          "text_tokens": 378
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 7770.560374949127
+    },
+    {
+      "id": "parallel-expression-speech#r2",
+      "case": "parallel-expression-speech",
+      "category": "parallel",
+      "repeat": 2,
+      "user": "Smile while you say good morning.",
+      "response": "<express emotion=\"happy\"/>Good morning.",
+      "usage": {
+        "prompt_tokens": 1739,
+        "total_tokens": 1926,
+        "completion_tokens": 187,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1739
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 175,
+          "text_tokens": 187
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 4077.6782920584083
+    },
+    {
+      "id": "nested-three-steps#r2",
+      "case": "nested-three-steps",
+      "category": "nested",
+      "repeat": 2,
+      "user": "Think for a moment, then smile while saying yes, and finally close your eyes.",
+      "response": "<wait><express emotion=\"thinking\"/><wait><express emotion=\"happy\"/>Yes.</wait></wait>\n<setExpression emotion=\"closed\"/>",
+      "usage": {
+        "prompt_tokens": 1748,
+        "total_tokens": 2042,
+        "completion_tokens": 294,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1748
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 262,
+          "text_tokens": 294
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 5026.003832928836
+    },
+    {
+      "id": "serial-expressions-silent#r2",
+      "case": "serial-expressions-silent",
+      "category": "serial",
+      "repeat": 2,
+      "user": "Show smile, thinking and surprised one by one, without speaking.",
+      "response": "<wait><express emotion=\"smile\"/></wait>\n<wait><express emotion=\"thinking\"/></wait>\n<wait><express emotion=\"surprised\"/></wait>",
+      "usage": {
+        "prompt_tokens": 1744,
+        "total_tokens": 1948,
+        "completion_tokens": 204,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1744
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 166,
+          "text_tokens": 204
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 3113.2031249580905
+    },
+    {
+      "id": "serial-expressions-named#r2",
+      "case": "serial-expressions-named",
+      "category": "nested",
+      "repeat": 2,
+      "user": "Show happy, sad and angry one after another and say each name as you go.",
+      "response": "<wait><express emotion=\"happy\"/>Happy.</wait>\n<wait><express emotion=\"sad\"/>Sad.</wait>\n<wait><express emotion=\"angry\"/>Angry.</wait>",
+      "usage": {
+        "prompt_tokens": 1748,
+        "total_tokens": 2050,
+        "completion_tokens": 302,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1748
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 259,
+          "text_tokens": 302
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 4339.280000072904
+    },
+    {
+      "id": "delay-after-speech#r2",
+      "case": "delay-after-speech",
+      "category": "delay",
+      "repeat": 2,
+      "user": "Say ready, wait two seconds, then smile.",
+      "response": "<wait>Ready.</wait><wait time=\"2\"/><express emotion=\"happy\"/>",
+      "usage": {
+        "prompt_tokens": 1741,
+        "total_tokens": 1853,
+        "completion_tokens": 112,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1741
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 92,
+          "text_tokens": 112
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 2979.1613329434767
+    },
+    {
+      "id": "delay-between-speech#r2",
+      "case": "delay-between-speech",
+      "category": "delay",
+      "repeat": 2,
+      "user": "说“一”，停两秒，再说“二”。",
+      "response": "<wait>一</wait><wait time=\"2\"/><wait>二</wait>",
+      "usage": {
+        "prompt_tokens": 1743,
+        "total_tokens": 2185,
+        "completion_tokens": 442,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1743
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 421,
+          "text_tokens": 442
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 6248.824291978963
+    },
+    {
+      "id": "hold-eyes-closed#r2",
+      "case": "hold-eyes-closed",
+      "category": "delay",
+      "repeat": 2,
+      "user": "Close your eyes for three seconds, then open them again.",
+      "response": "<setExpression emotion=\"closed\"/><wait time=\"3\"/><setExpression emotion=\"clear\"/>",
+      "usage": {
+        "prompt_tokens": 1743,
+        "total_tokens": 1912,
+        "completion_tokens": 169,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1743
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 148,
+          "text_tokens": 169
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 3889.1356660751626
+    },
+    {
+      "id": "subsecond-delay#r2",
+      "case": "subsecond-delay",
+      "category": "delay",
+      "repeat": 2,
+      "user": "Close your eyes, and half a second later open them.",
+      "response": "<setExpression emotion=\"closed\"/><wait time=\"0.5\"/><setExpression emotion=\"clear\"/>",
+      "usage": {
+        "prompt_tokens": 1743,
+        "total_tokens": 2010,
+        "completion_tokens": 267,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1743
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 244,
+          "text_tokens": 267
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 6399.267958011478
+    },
+    {
+      "id": "two-delays#r2",
+      "case": "two-delays",
+      "category": "delay",
+      "repeat": 2,
+      "user": "表情先笑一下，两秒后做思考的表情，再过三秒闭上眼睛。",
+      "response": "<express emotion=\"smile\"/><wait time=\"2\"/><setExpression emotion=\"thinking\"/><wait time=\"3\"/><setExpression emotion=\"closed\"/>",
+      "usage": {
+        "prompt_tokens": 1748,
+        "total_tokens": 3121,
+        "completion_tokens": 1373,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1748
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1341,
+          "text_tokens": 1373
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 17656.13791695796
+    },
+    {
+      "id": "speech-wait-then-expression-silent-delay#r2",
+      "case": "speech-wait-then-expression-silent-delay",
+      "category": "mixed",
+      "repeat": 2,
+      "user": "Say ready, wait two seconds, smile, wait one second, then close your eyes.",
+      "response": "<wait>Ready.</wait><wait time=\"2\"/><express emotion=\"happy\"/><wait time=\"1\"/><setExpression emotion=\"closed\"/>",
+      "usage": {
+        "prompt_tokens": 1749,
+        "total_tokens": 3979,
+        "completion_tokens": 2230,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1749
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2199,
+          "text_tokens": 2230
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 39353.55524998158
+    },
+    {
+      "id": "limit-request#r2",
+      "passed": false,
+      "error": "TimeoutError",
+      "milliseconds": 120002.64133303426
+    },
+    {
+      "id": "single-expression#r3",
+      "case": "single-expression",
+      "category": "no-wait",
+      "repeat": 3,
+      "user": "Smile.",
+      "response": "<express emotion=\"smile\"/>",
+      "usage": {
+        "prompt_tokens": 1734,
+        "total_tokens": 2010,
+        "completion_tokens": 276,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1734
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 266,
+          "text_tokens": 276
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 5182.8437090152875
+    },
+    {
+      "id": "chat-only#r3",
+      "case": "chat-only",
+      "category": "no-wait",
+      "repeat": 3,
+      "user": "你好呀，今天天气真好。",
+      "response": "<express emotion=\"happy\"/>你好呀！今天天气确实很好，适合出去走走。",
+      "usage": {
+        "prompt_tokens": 1738,
+        "total_tokens": 1940,
+        "completion_tokens": 202,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1738
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 181,
+          "text_tokens": 202
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 4729.015875025652
+    },
+    {
+      "id": "voice-exit#r3",
+      "case": "voice-exit",
+      "category": "no-wait",
+      "repeat": 3,
+      "user": "Goodbye, stop listening now.",
+      "response": "<stopListening/>",
+      "usage": {
+        "prompt_tokens": 1738,
+        "total_tokens": 1804,
+        "completion_tokens": 66,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1738
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 59,
+          "text_tokens": 66
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 1608.736167079769
+    },
+    {
+      "id": "speech-then-expression#r3",
+      "case": "speech-then-expression",
+      "category": "serial",
+      "repeat": 3,
+      "user": "Say hello, then smile.",
+      "response": "<wait>Hello.</wait><express emotion=\"happy\"/>",
+      "usage": {
+        "prompt_tokens": 1737,
+        "total_tokens": 1943,
+        "completion_tokens": 206,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1737
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 192,
+          "text_tokens": 206
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 4428.872082964517
+    },
+    {
+      "id": "expression-then-speech#r3",
+      "case": "expression-then-speech",
+      "category": "serial",
+      "repeat": 3,
+      "user": "先开心地笑一下，等表情做完再说“谢谢你”。",
+      "response": "<wait><express emotion=\"happy\"/></wait>谢谢你。",
+      "usage": {
+        "prompt_tokens": 1743,
+        "total_tokens": 2254,
+        "completion_tokens": 511,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1743
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 496,
+          "text_tokens": 511
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 10550.395542057231
+    },
+    {
+      "id": "parallel-expression-speech#r3",
+      "case": "parallel-expression-speech",
+      "category": "parallel",
+      "repeat": 3,
+      "user": "Smile while you say good morning.",
+      "response": "<express emotion=\"smile\"/>Good morning.",
+      "usage": {
+        "prompt_tokens": 1739,
+        "total_tokens": 1947,
+        "completion_tokens": 208,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1739
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 195,
+          "text_tokens": 208
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 4707.081666914746
+    },
+    {
+      "id": "nested-three-steps#r3",
+      "case": "nested-three-steps",
+      "category": "nested",
+      "repeat": 3,
+      "user": "Think for a moment, then smile while saying yes, and finally close your eyes.",
+      "response": "<wait><express emotion=\"thinking\"/><wait><express emotion=\"happy\"/>Yes.</wait></wait>\n<setExpression emotion=\"closed\"/>",
+      "usage": {
+        "prompt_tokens": 1748,
+        "total_tokens": 1991,
+        "completion_tokens": 243,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1748
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 211,
+          "text_tokens": 243
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 4209.224457968958
+    },
+    {
+      "id": "serial-expressions-silent#r3",
+      "case": "serial-expressions-silent",
+      "category": "serial",
+      "repeat": 3,
+      "user": "Show smile, thinking and surprised one by one, without speaking.",
+      "response": "<wait><express emotion=\"smile\"/></wait>\n<wait><express emotion=\"thinking\"/></wait>\n<wait><express emotion=\"surprised\"/></wait>",
+      "usage": {
+        "prompt_tokens": 1744,
+        "total_tokens": 1930,
+        "completion_tokens": 186,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1744
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 148,
+          "text_tokens": 186
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 3279.1708749718964
+    },
+    {
+      "id": "serial-expressions-named#r3",
+      "case": "serial-expressions-named",
+      "category": "nested",
+      "repeat": 3,
+      "user": "Show happy, sad and angry one after another and say each name as you go.",
+      "response": "<wait><express emotion=\"happy\"/>Happy.</wait>\n<wait><express emotion=\"sad\"/>Sad.</wait>\n<wait><express emotion=\"angry\"/>Angry.</wait>",
+      "usage": {
+        "prompt_tokens": 1748,
+        "total_tokens": 1934,
+        "completion_tokens": 186,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1748
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 143,
+          "text_tokens": 186
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 3049.6751660248265
+    },
+    {
+      "id": "delay-after-speech#r3",
+      "case": "delay-after-speech",
+      "category": "delay",
+      "repeat": 3,
+      "user": "Say ready, wait two seconds, then smile.",
+      "response": "<wait>Ready.</wait><wait time=\"2\"/><express emotion=\"happy\"/>",
+      "usage": {
+        "prompt_tokens": 1741,
+        "total_tokens": 1899,
+        "completion_tokens": 158,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1741
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 138,
+          "text_tokens": 158
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 2818.922417005524
+    },
+    {
+      "id": "delay-between-speech#r3",
+      "case": "delay-between-speech",
+      "category": "delay",
+      "repeat": 3,
+      "user": "说“一”，停两秒，再说“二”。",
+      "response": "<wait>一</wait><wait time=\"2\"/>二",
+      "usage": {
+        "prompt_tokens": 1743,
+        "total_tokens": 1871,
+        "completion_tokens": 128,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1743
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 112,
+          "text_tokens": 128
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 2819.1067499574274
+    },
+    {
+      "id": "hold-eyes-closed#r3",
+      "case": "hold-eyes-closed",
+      "category": "delay",
+      "repeat": 3,
+      "user": "Close your eyes for three seconds, then open them again.",
+      "response": "<setExpression emotion=\"closed\"/><wait time=\"3\"/><setExpression emotion=\"clear\"/>",
+      "usage": {
+        "prompt_tokens": 1743,
+        "total_tokens": 1998,
+        "completion_tokens": 255,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1743
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 234,
+          "text_tokens": 255
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 5289.007582934573
+    },
+    {
+      "id": "subsecond-delay#r3",
+      "case": "subsecond-delay",
+      "category": "delay",
+      "repeat": 3,
+      "user": "Close your eyes, and half a second later open them.",
+      "response": "<setExpression emotion=\"closed\"/><wait time=\"0.5\"/><setExpression emotion=\"clear\"/>",
+      "usage": {
+        "prompt_tokens": 1743,
+        "total_tokens": 1977,
+        "completion_tokens": 234,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1743
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 211,
+          "text_tokens": 234
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 4390.51170903258
+    },
+    {
+      "id": "two-delays#r3",
+      "case": "two-delays",
+      "category": "delay",
+      "repeat": 3,
+      "user": "表情先笑一下，两秒后做思考的表情，再过三秒闭上眼睛。",
+      "response": "<express emotion=\"smile\"/><wait time=\"2\"/><express emotion=\"thinking\"/><wait time=\"3\"/><setExpression emotion=\"closed\"/>",
+      "usage": {
+        "prompt_tokens": 1748,
+        "total_tokens": 2896,
+        "completion_tokens": 1148,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1748
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1117,
+          "text_tokens": 1148
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 15068.562792032026
+    },
+    {
+      "id": "speech-wait-then-expression-silent-delay#r3",
+      "case": "speech-wait-then-expression-silent-delay",
+      "category": "mixed",
+      "repeat": 3,
+      "user": "Say ready, wait two seconds, smile, wait one second, then close your eyes.",
+      "response": "<wait>Ready.</wait><wait time=\"2\"/><express emotion=\"happy\"/><wait time=\"1\"/><setExpression emotion=\"closed\"/>",
+      "usage": {
+        "prompt_tokens": 1749,
+        "total_tokens": 4248,
+        "completion_tokens": 2499,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1749
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2468,
+          "text_tokens": 2499
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 45628.714958089404
+    },
+    {
+      "id": "limit-request#r3",
+      "case": "limit-request",
+      "category": "limits",
+      "repeat": 3,
+      "user": "Smile, then wait five minutes before closing your eyes.",
+      "response": "<wait><express emotion=\"happy\"/></wait>\n<wait time=\"60\"/>\n<wait time=\"60\"/>\n<wait time=\"60\"/>\n<wait time=\"60\"/>\n<wait time=\"60\"/>\n<setExpression emotion=\"closed\"/>",
+      "usage": {
+        "prompt_tokens": 1743,
+        "total_tokens": 5879,
+        "completion_tokens": 4136,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1743
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4075,
+          "text_tokens": 4136
+        }
+      },
+      "finishReason": "stop",
+      "issues": [
+        "delayBudgetExceeded"
+      ],
+      "passed": false,
+      "milliseconds": 73639.76162509061
+    }
+  ],
+  "complete": true,
+  "summary": {
+    "count": 48,
+    "scored": 48,
+    "excluded": 0,
+    "passed": 45,
+    "errors": 1,
+    "p50MS": 4707.081666914746,
+    "p95MS": 39353.55524998158
+  }
+}

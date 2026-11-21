@@ -78,6 +78,8 @@ for path in catalog['skills'].values():
     if not descriptions.get(f'skill.{key}'):
         raise SystemExit(f'Missing Chinese Skill description: {path}')
     for binding in metadata['useActions']:
+        if binding['callType'] == 'scheduling':
+            continue
         if not functions.get(binding['path'], {}).get('description'):
             raise SystemExit(f"Missing Chinese function description: {binding['path']}")
 for name in ('Input/InputProtocol.json', 'Input/InputDecision.json', 'Controls/Controls.json', 'Controls/Controls.md', 'Prompts.json', 'Instructions.md'):

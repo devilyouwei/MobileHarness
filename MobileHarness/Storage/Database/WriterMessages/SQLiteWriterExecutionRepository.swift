@@ -11,8 +11,9 @@ public final class SQLiteWriterExecutionRepository: WriterExecutionRepository {
         selected_workspace_id INTEGER REFERENCES writer_workspaces(id) ON DELETE RESTRICT,
         user_input_json TEXT NOT NULL CHECK(json_valid(user_input_json)),
         request_goal TEXT NOT NULL,
-        run_state TEXT NOT NULL,
-        terminal_state TEXT,
+        task_state TEXT NOT NULL,
+        completion_recorded INTEGER NOT NULL DEFAULT 0,
+        retirement TEXT NOT NULL DEFAULT 'pending',
         request_revision INTEGER NOT NULL DEFAULT 0,
         pending_question_id TEXT REFERENCES agent_messages(id) ON DELETE RESTRICT,
         pending_question_json TEXT CHECK(pending_question_json IS NULL OR json_valid(pending_question_json)),
@@ -23,7 +24,7 @@ public final class SQLiteWriterExecutionRepository: WriterExecutionRepository {
         updated_at REAL NOT NULL,
         completed_at REAL);
         CREATE UNIQUE INDEX single_writer_execution ON writer_executions((1))
-        WHERE run_state IN ('running','waiting_input','paused','closing','cleanup_failed');
+        WHERE retirement IN ('pending','failed');
         """
 
     public var storageScope: UUID { database.storageScope }

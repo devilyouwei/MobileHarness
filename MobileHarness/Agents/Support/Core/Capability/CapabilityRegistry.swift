@@ -10,11 +10,13 @@ public struct CapabilityRegistry: Sendable {
     /// Usage guide of the owner's controls; present only together with controls.
     public let controlGuidance: ControlGuidance?
     public let channels: Set<String>
+    /// True when a loaded Skill registers the scheduling `wait` (paired scopes and self-closing `time`).
+    public let supportsWait: Bool
 
     public init(
         actions: [ActionRegistration] = [], tools: [ToolRegistration] = [], channels: Set<String> = [],
         internalActions: [InternalAction] = [], internalTools: [InternalTool] = [],
-        controls: [ControlRegistration] = [], controlGuidance: ControlGuidance? = nil
+        controls: [ControlRegistration] = [], controlGuidance: ControlGuidance? = nil, supportsWait: Bool = false
     )
         throws
     {
@@ -61,6 +63,7 @@ public struct CapabilityRegistry: Sendable {
         self.tools = tools
         self.controls = controls
         self.controlGuidance = controlGuidance
+        self.supportsWait = supportsWait
         self.channels = channels.union(actions.map(\.defaultChannel)).union(internalActions.map(\.channel))
         guard self.channels.count <= 16 else { throw GenerationError.limitExceeded }
     }
@@ -76,6 +79,30 @@ public struct CapabilityRegistry: Sendable {
         return ActionCall(
             actionPath: action.path, channel: action.defaultChannel,
             parameters: parameters.filter { allowed.contains($0.key) })
+    }
+
+    /// Longest single `<wait time/>` pause and the cumulative pause budget of one generation.
+    public static let maximumPauseMilliseconds = 60_000
+    public static let maximumTotalPauseMilliseconds = 120_000
+
+    /// Validates the registered `wait` self-closing form. `time` is decimal seconds, resolved to milliseconds.
+    public func resolvePause(_ parameters: [String: String]) throws -> SchedulingDirective {
+        guard supportsWait else { throw GenerationError.unknownCapability }
+        guard Set(parameters.keys) == ["time"], let text = parameters["time"], text.utf8.count <= 16,
+            let seconds = Self.decimal(text)
+        else { throw GenerationError.invalidParameters }
+        let milliseconds = (seconds * 1000).rounded()
+        guard milliseconds >= 1, milliseconds <= Double(Self.maximumPauseMilliseconds) else {
+            throw GenerationError.invalidParameters
+        }
+        return .pause(milliseconds: Int(milliseconds))
+    }
+
+    private static func decimal(_ text: String) -> Double? {
+        let parts = text.split(separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
+        guard parts.count <= 2, parts.allSatisfy({ !$0.isEmpty && $0.utf8.allSatisfy { (48...57).contains($0) } })
+        else { return nil }
+        return Double(text)
     }
 
     public func isControl(_ alias: String) -> Bool { controls.contains { $0.alias == alias } }
@@ -110,7 +137,8 @@ public struct CapabilityRegistry: Sendable {
         try Self(
             actions: actions, tools: tools, channels: channels,
             internalActions: self.internalActions + internalActions, internalTools: self.internalTools + internalTools,
-            controls: self.controls + controls, controlGuidance: controlGuidance ?? self.controlGuidance)
+            controls: self.controls + controls, controlGuidance: controlGuidance ?? self.controlGuidance,
+            supportsWait: supportsWait)
     }
 
     public func permits(_ call: ActionCall) -> Bool {

@@ -1219,6 +1219,10 @@ for group, version in [('agents', 11), ('skills', 3)]:
         if len(paths) != len(set(paths)) or len(aliases) != len(set(aliases)):
             errors.append(f'Duplicate function registration: {relative}')
         for function in functions:
+            if function['callType'] == 'scheduling':
+                if (function['path'], function['alias'], function.get('channel')) != ('Scheduling.Wait.wait', 'wait', None):
+                    errors.append(f'Invalid scheduling binding: {relative}')
+                continue
             if len(function['path'].split('.')) != 3 or function['callType'] not in ('action', 'tool'):
                 errors.append(f'Invalid function binding: {relative}')
             if function['callType'] == 'action' and not function.get('channel'):

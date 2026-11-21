@@ -6,7 +6,8 @@ public struct WriterRequestRecord: Codable, Sendable, Identifiable {
     public var sourceAgent: String = ""
     public var sourceContext: String? = nil
     public var result: String? = nil
-    public var executionState: String = ""
+    public var taskState: String = ""
+    public var retirement: String = ""
     public var waiting: String? = nil
     public let workspaceID: String
     public let delegateID: String

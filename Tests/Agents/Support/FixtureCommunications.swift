@@ -103,7 +103,8 @@ struct FixtureNativeChatState: AssistantChatState {
         let native = try CapabilityRegistry(
             actions: fixture.actions, tools: fixture.tools + [fixtureRuntimeTool()],
             channels: fixture.channels,
-            internalActions: fixture.internalActions, internalTools: fixture.internalTools)
+            internalActions: fixture.internalActions, internalTools: fixture.internalTools,
+            supportsWait: fixture.supportsWait)
         return try AssistantAgent.runtimeCapabilities(native)
     }
     static func preprocess(_ input: AgentInput, state: Self) throws -> SignalDisposition {

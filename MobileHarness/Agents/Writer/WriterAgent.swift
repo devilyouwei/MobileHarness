@@ -146,9 +146,6 @@ public actor WriterAgent: Agent {
         await reportWorker?.value
         for (id, _) in requests {
             await island.update(delegateID: id, phase: .paused)
-            if requests[id] != nil {
-                try await executions.updateRequestPhase(requestID: id, phase: "paused")
-            }
         }
     }
     public func resume() async throws {
@@ -156,10 +153,6 @@ public actor WriterAgent: Agent {
         lifecycle = .running
         for (id, _) in requests {
             await island.update(delegateID: id, phase: waiting[id] == nil ? .running : .waitingUser)
-            if requests[id] != nil {
-                try await executions.updateRequestPhase(
-                    requestID: id, phase: waiting[id] == nil ? "running" : "waitingUser")
-            }
         }
         for (id, input) in inputs where workers[id] == nil {
             guard let scope = input.taskScope else { continue }
@@ -467,7 +460,6 @@ public actor WriterAgent: Agent {
         await island.begin(delegateID: id, goal: goal)
         if lifecycle == .paused {
             phases[id] = "paused"
-            try await executions.updateRequestPhase(requestID: id, phase: "paused")
             await island.update(delegateID: id, phase: .paused)
             return
         }
@@ -1218,10 +1210,6 @@ public actor WriterAgent: Agent {
         eventSequences[scope.id] = eventSequence
         phases[scope.id] = status == .cancelled ? "cancelling" : interactionID == nil ? "running" : "waitingUser"
         lastSteps[scope.id] = String(summary.prefix(1000))
-        if status == nil, requests[scope.id] != nil {
-            try await executions.updateRequestPhase(
-                requestID: scope.id, phase: interactionID == nil ? "running" : "waitingUser")
-        }
         let event = AgentTaskEvent(
             sequence: eventSequence, kind: eventKind,
             goal: requests[scope.id].map { String($0.request.prefix(240)) },
@@ -1264,7 +1252,10 @@ public actor WriterAgent: Agent {
             } catch {
                 retirement = String(String(describing: error).prefix(1024))
             }
-            try await executions.retireRequest(scope.id, failure: retirement)
+            // Completion is persisted; a failed retirement is recorded, never retried as another completion.
+            do { try await executions.retireRequest(scope.id, failure: retirement) } catch {
+                failures[scope.id] = "Writer retirement not recorded: " + String(String(describing: error).prefix(256))
+            }
             return
         }
         if let interactionID {

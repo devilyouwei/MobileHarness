@@ -72,7 +72,7 @@ Skill.json 声明 path、callType、alias，以及 Action 的 channel。具体�
 
 `Instructions.md` 是 UTF-8 的可信静态指令，说明自身身份、职责与交互约束。其他角色用途读取各自的 Agent.json.description。用户目标、历史任务、设备状态和执行结果由 Context Builder 作为数据组装。共用协议和业务流程分别引用 Shared 与 Skill 的指令。
 
-`Shared/OutputProtocol.md` 固定描述 XML Action、Channel 调度和 Skill 加载后的目录更新时机。`Shared/ActionCatalog.json` 定义有效目录中的 Channel 标题、Action 别名、参数行排版、由 Actions Shell 调度的 `wait` 条目，以及拥有者控制指南的标题。`Assistant/InputProtocol.json` 将模型读取规则与时间线的标签、排版及历史格式识别放在同一资源中。共享提示词随 Agents Bundle 分发。Agents 加载资源，AgentCore 读取输出协议并渲染当前 Action 目录。`Assistant/Instructions.md` 维护角色职责、回应风格与语音、字幕、表情呈现。Task、Skill 控制和执行反馈由 Assistant 目录的 `Controls.md`（与 `Controls.json` 同级，可有 `Controls.<language>.md`）维护；表情、聆听与窗口规则由 BasicInteraction 维护。每个 Agent 可自配 control 声明与指南，目前只有 Assistant。Photography 维护自己的业务流程与分轮示例。
+`Shared/OutputProtocol.md` 固定描述 XML Action、Channel 调度和 Skill 加载后的目录更新时机。`Shared/ActionCatalog.json` 定义有效目录中的 Channel 标题、Action 别名、参数行排版，以及拥有者控制指南的标题。`Assistant/InputProtocol.json` 将模型读取规则与时间线的标签、排版及历史格式识别放在同一资源中。共享提示词随 Agents Bundle 分发。Agents 加载资源，AgentCore 读取输出协议并渲染当前 Action 目录。`Assistant/Instructions.md` 维护角色职责、回应风格与语音、字幕、表情呈现。Task、Skill 控制和执行反馈由 Assistant 目录的 `Controls.md`（与 `Controls.json` 同级，可有 `Controls.<language>.md`）维护；表情、聆听与窗口规则由 BasicInteraction 维护。每个 Agent 可自配 control 声明与指南，目前只有 Assistant。Photography 维护自己的业务流程与分轮示例。
 
 单段提示词使用 UTF-8 Markdown 或 TXT，加载为 `body`。多个具名模板共用一个 JSON 文件，包含 `version` 和 `templates`，版本为 1，最多 64 项，每项最多 16 KiB。三种格式都使用 `{{name}}` 插入变量，变量集合须与该模板完全一致。插入值按字面输出。资源、单段正文、单次渲染和 Assistant system 输出均最多 64 KiB。加载与卸载见 [AgentPrompts](../../Agents/Support/Chat/README.md#templates-and-localization)。
 
@@ -113,7 +113,7 @@ Task/Skill 控制是 Assistant 的固定 control（task.send 为 `peer`，其余
 
 ## Agent → Skill → Function registration
 
-Agent.json references baseSkills; Skill.json alone registers model Actions/Tools. Controls belong to the owning Agent (`Controls.json` declarations and `Controls.md` guide), never to Skills. BasicInteraction owns expression and listening Actions, window rules and automatic State selection. Role instructions retain identity/responsibility/style. Business roles reuse existing Skills; internal trusted bindings remain separate. Historical snapshots are preserved.
+Agent.json references baseSkills; Skill.json alone registers model Actions/Tools. Controls belong to the owning Agent (`Controls.json` declarations and `Controls.md` guide), never to Skills. BasicInteraction owns the scheduling `wait` registration and teaching, expression and listening Actions, window rules and automatic State selection. Role instructions retain identity/responsibility/style. Business roles reuse existing Skills; internal trusted bindings remain separate. Historical snapshots are preserved.
 
 ```mermaid
 flowchart LR

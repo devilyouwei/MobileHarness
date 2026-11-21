@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "scope": "Python model-case evaluation; no App execution",
+  "provenance": {
+    "model": "qwen3.8-max",
+    "repeats": 3,
+    "options": {
+      "temperature": 0
+    },
+    "inputSHA256": "11058003774bb39172081c4f05b79a3a8917d9212e875364c0fee5b248071469",
+    "promptSHA256": "f9a0bcf3b51755f369c9fc8cd660da4d565ff135bb03da8fef281228617aa747",
+    "runnerSHA256": "20ec92c3826eef50a6698a98aaa8f1abed061bff07a3688756797a35710026b2"
+  },
+  "rows": [
+    {
+      "id": "voice-exit#r1",
+      "case": "voice-exit",
+      "category": "no-wait",
+      "repeat": 1,
+      "user": "Goodbye, stop listening now.",
+      "response": "Goodbye.\n<stopListening/>",
+      "usage": {
+        "prompt_tokens": 1756,
+        "total_tokens": 1905,
+        "completion_tokens": 149,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1756
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 138,
+          "text_tokens": 149
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 4712.864041910507
+    },
+    {
+      "id": "voice-exit#r2",
+      "case": "voice-exit",
+      "category": "no-wait",
+      "repeat": 2,
+      "user": "Goodbye, stop listening now.",
+      "response": "Goodbye.\n<stopListening/>",
+      "usage": {
+        "prompt_tokens": 1756,
+        "total_tokens": 1844,
+        "completion_tokens": 88,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1756
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 77,
+          "text_tokens": 88
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 10908.908208017237
+    },
+    {
+      "id": "voice-exit#r3",
+      "case": "voice-exit",
+      "category": "no-wait",
+      "repeat": 3,
+      "user": "Goodbye, stop listening now.",
+      "response": "Goodbye.<stopListening/>",
+      "usage": {
+        "prompt_tokens": 1756,
+        "total_tokens": 1915,
+        "completion_tokens": 159,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024,
+          "text_tokens": 1756
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 150,
+          "text_tokens": 159
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 5988.551541930065
+    }
+  ],
+  "complete": true,
+  "summary": {
+    "count": 3,
+    "scored": 3,
+    "excluded": 0,
+    "passed": 3,
+    "errors": 0,
+    "p50MS": 5988.551541930065,
+    "p95MS": 10908.908208017237
+  }
+}

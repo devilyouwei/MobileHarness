@@ -791,3 +791,58 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     #expect(await log.values == ["assistant:start", "photographer:start", "photographer:end", "assistant:end"])
     await scheduler.shutdown()
 }
+
+@Test(.actionCatalog) func timedPauseStallsOnlyLaterDispatchAndNeverWaitsForStartedActions() async throws {
+    let started = ActionTestGate()
+    let release = ActionTestGate()
+    let log = ActionTestLog()
+    let scheduler = ChannelScheduler(
+        registry: try testActionRegistry(handlers: [
+            sayPath: { invocation in
+                let value = invocation.call.parameters["text"]!
+                await log.append(value + ":start")
+                if value == "before" {
+                    await started.open()
+                    await release.wait()
+                }
+                await log.append(value + ":end")
+            }
+        ]))
+    let input = AgentInput(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("pause"))
+    try await scheduler.enqueue(invocation: actionInvocation("before", input: input))
+    await started.wait()
+    let elapsed = try await ContinuousClock().measure {
+        try await scheduler.schedule(
+            .pause(milliseconds: 200), envelope: boundary(.pause(milliseconds: 200), input))
+    }
+    #expect(elapsed >= .milliseconds(190))
+    // The pause returned while the earlier Action was still running.
+    #expect(await log.values == ["before:start"])
+    try await scheduler.enqueue(invocation: actionInvocation("after", input: input))
+    await release.open()
+    try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
+    #expect(await log.values.contains("after:end"))
+    await scheduler.shutdown()
+}
+
+@Test(.actionCatalog) func pauseEndsWithTaskCancellationAndEnforcesItsBudget() async throws {
+    let scheduler = ChannelScheduler(registry: try testActionRegistry(handlers: [:]))
+    let input = AgentInput(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("cancel"))
+    let pausing = Task {
+        try await scheduler.schedule(
+            .pause(milliseconds: 60_000), envelope: boundary(.pause(milliseconds: 60_000), input))
+    }
+    try await Task.sleep(for: .milliseconds(50))
+    await scheduler.cancel(inputID: input.id, source: AgentID(rawValue: "assistant"))
+    await #expect(throws: CancellationError.self) { try await pausing.value }
+    let other = AgentInput(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("budget"))
+    await #expect(throws: ActionSchedulingError.pauseLimitExceeded) {
+        try await scheduler.schedule(
+            .pause(milliseconds: ChannelScheduler.maximumPauseMilliseconds + 1),
+            envelope: boundary(.pause(milliseconds: 1), other))
+    }
+    await #expect(throws: ActionSchedulingError.pauseLimitExceeded) {
+        try await scheduler.schedule(.pause(milliseconds: 0), envelope: boundary(.pause(milliseconds: 1), other))
+    }
+    await scheduler.shutdown()
+}

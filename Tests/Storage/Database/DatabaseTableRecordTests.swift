@@ -174,11 +174,70 @@ import Testing
     }
     try await repository.writerExecutions.retireRequest(request.delegateID, failure: "grant busy")
     #expect(
-        try await repository.writerExecutions.request(request.delegateID, agent: "writer").executionState
-            == "cleanup_failed")
+        try await repository.writerExecutions.request(request.delegateID, agent: "writer").retirement
+            == "failed")
     try await repository.writerExecutions.retireRequest(request.delegateID, failure: nil)
     #expect(try await repository.writerExecutions.request(request.delegateID, agent: "writer").status == "completed")
+    #expect(
+        try await repository.writerExecutions.request(request.delegateID, agent: "writer").retirement == "done")
+    await #expect(throws: RecordStorageError.conflict) {
+        try await repository.writerExecutions.completeRequest(
+            request.delegateID, eventID: UUID().uuidString, result: Data("{}".utf8), status: "failed",
+            failure: "after end", cancellationReason: nil)
+    }
     try await repository.shutdown()
+}
+
+private func beginNext(_ records: SQLiteRepositories) async throws -> WriterRequestRecord {
+    let id = UUID().uuidString
+    try await records.agentMessages.seedAgentRequest(
+        id: id, requester: "assistant", executor: "writer", goal: "next", input: "next", sourceDialog: nil)
+    return try await records.writerExecutions.beginRequest(
+        delegateID: id, workspaceID: nil, goal: "next", input: "next", sourceDialog: nil, agent: "writer")
+}
+
+@Test func recoveryReleasesFailedRetirement() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".sqlite")
+    defer { try? FileManager.default.removeItem(at: url) }
+    let records = try SQLiteRepositories(url: url)
+    let request = try await records.seedDelegation(
+        workspaceID: nil, goal: "work", input: "work", sourceDialog: nil, agent: "writer")
+    try await records.writerExecutions.completeRequest(
+        request.delegateID, eventID: UUID().uuidString, result: Data("{}".utf8), status: "completed", failure: nil,
+        cancellationReason: nil)
+    try await records.writerExecutions.retireRequest(request.delegateID, failure: "grant busy")
+    let blocked = try await beginNext(records)
+    #expect(blocked.status == "failed")
+    try await records.shutdown()
+    let reopened = try SQLiteRepositories(url: url)
+    try reopened.recoverInFlight()
+    let recovered = try await reopened.writerExecutions.request(request.delegateID, agent: "writer")
+    #expect(recovered.retirement == "done" && recovered.status == "completed")
+    #expect(try await beginNext(reopened).status == "running")
+    try await reopened.shutdown()
+}
+
+@Test func restartInterruptedDelegationAcceptsExactlyOneCompletion() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".sqlite")
+    defer { try? FileManager.default.removeItem(at: url) }
+    let records = try SQLiteRepositories(url: url)
+    let request = try await records.seedDelegation(
+        workspaceID: nil, goal: "work", input: "work", sourceDialog: nil, agent: "writer")
+    try await records.shutdown()
+    let reopened = try SQLiteRepositories(url: url)
+    try reopened.recoverInFlight()
+    let interrupted = try await reopened.writerExecutions.request(request.delegateID, agent: "writer")
+    #expect(interrupted.status == "interrupted" && interrupted.taskState == "interrupted")
+    #expect(interrupted.retirement == "done")
+    try await reopened.writerExecutions.completeRequest(
+        request.delegateID, eventID: UUID().uuidString, result: Data("{}".utf8), status: "interrupted",
+        failure: "restart", cancellationReason: nil)
+    await #expect(throws: RecordStorageError.conflict) {
+        try await reopened.writerExecutions.completeRequest(
+            request.delegateID, eventID: UUID().uuidString, result: Data("{}".utf8), status: "failed",
+            failure: "again", cancellationReason: nil)
+    }
+    try await reopened.shutdown()
 }
 
 @Test func narrowTaskAndCommunicationPortsPreserveTheirIndependentState() async throws {
@@ -326,7 +385,7 @@ import Testing
         delegateID: id, interactionID: question,
         data: Data("{\"text\":\"Which color?\",\"stage\":\"waitingUser\"}".utf8))
     let waiting = try await records.writerExecutions.request(id, agent: "writer")
-    #expect(waiting.executionState == "waiting_input" && waiting.waiting?.contains("Which color?") == true)
+    #expect(waiting.status == "running" && waiting.waiting?.contains("Which color?") == true)
     let supplement = UUID().uuidString
     try await records.agentMessages.enqueueAgentMessage(
         .init(

@@ -32,7 +32,12 @@ public struct ExecutionEnvelope: Sendable {
         self.correlation = correlation
     }
 }
-public enum ExecutionSchedulingDirective: Sendable { case beginWait, endWait }
+/// Main-track scheduling events. pause stalls dispatch of later events for the owning input without waiting
+/// for already dispatched Actions.
+public enum ExecutionSchedulingDirective: Sendable, Equatable {
+    case beginWait, endWait
+    case pause(milliseconds: Int)
+}
 
 /// Agent → Action invocation (internal Signal) admitted through the Actions execution engine.
 public struct ScheduledAction: Sendable {

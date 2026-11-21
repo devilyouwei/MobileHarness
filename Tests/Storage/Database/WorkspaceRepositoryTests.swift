@@ -232,9 +232,6 @@ extension SQLiteRepositories {
     #expect(second.messageID > first.messageID && second.workspaceID.isEmpty)
     _ = try await records.writerExecutions.selectWorkspace(requestID: next, workspaceID: workspace.id)
     #expect(try await records.writerExecutions.request(next, agent: "writer").workspaceID == workspace.id)
-    await #expect(throws: RecordStorageError.conflict) {
-        try await records.writerExecutions.updateRequestPhase(requestID: id, phase: "running")
-    }
     try await records.endSeedDelegation(next, status: "completed")
     #expect(try await records.writerExecutions.delegationCount() == 2)
     try await records.shutdown()

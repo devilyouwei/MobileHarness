@@ -57,6 +57,9 @@ public actor ChannelScheduler {
         var finishing = false
         var cancelling = false
         var retainCancelledBoundary = false
+        // Main-track pauses are cancelled with the task tree; the budget bounds cumulative stalling per task.
+        var pauses: [UUID: Task<Void, any Error>] = [:]
+        var pausedMilliseconds = 0
         var producerIncarnation: String?
         // Failed tasks remain fenced until their producer finishes or explicit cancellation joins them.
         var settled = false
@@ -329,7 +332,9 @@ public actor ChannelScheduler {
         }
     }
 
-    public func schedule(_ directive: ExecutionSchedulingDirective, envelope: ExecutionEnvelope) throws {
+    public static let maximumPauseMilliseconds = 120_000
+
+    public func schedule(_ directive: ExecutionSchedulingDirective, envelope: ExecutionEnvelope) async throws {
         try admission?.check()
         let key = InputKey(source: envelope.source, inputID: envelope.schedulingID)
         if directive == .endWait, inputs[key] == nil { throw ActionSchedulingError.invalidSchedule }
@@ -348,6 +353,24 @@ public actor ChannelScheduler {
             state.phases.append(Phase())
             state.stack.append(child)
             state.writePhase = phase
+        case .pause(let milliseconds):
+            guard milliseconds > 0, state.pausedMilliseconds + milliseconds <= Self.maximumPauseMilliseconds else {
+                throw ActionSchedulingError.pauseLimitExceeded
+            }
+            state.pausedMilliseconds += milliseconds
+            // Already dispatched Actions keep running; only later main-track events wait for the timer.
+            let id = UUID()
+            let timer = Task { try await Task.sleep(for: .milliseconds(milliseconds)) }
+            state.pauses[id] = timer
+            defer { state.pauses[id] = nil }
+            try await withTaskCancellationHandler {
+                try await timer.value
+            } onCancel: {
+                timer.cancel()
+            }
+            if let failure = state.failure { throw failure }
+            try admission?.check()
+            return
         case .endWait:
             guard state.stack.count > 1 else { throw ActionSchedulingError.invalidSchedule }
             state.phases[state.writePhase].closed = true
@@ -608,6 +631,7 @@ public actor ChannelScheduler {
     }
     private func cancelJobs(key: InputKey) {
         guard let state = inputs[key] else { return }
+        for timer in state.pauses.values { timer.cancel() }
         for phase in state.phases.indices {
             for name in Array(state.phases[phase].lanes.keys) {
                 let queued = state.phases[phase].lanes[name]?.queued ?? []

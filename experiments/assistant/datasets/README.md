@@ -4,3 +4,4 @@
 
 - [assistant-prompt-cases.json](assistant-prompt-cases.json)
 - [qwen-workflows.json](qwen-workflows.json)
+- [wait-prompt-cases.json](wait-prompt-cases.json)：wait 提示词 case；refs 选择器与 before/overlap/startGap/endGap 断言只用于评分，durations 为模拟时长假设

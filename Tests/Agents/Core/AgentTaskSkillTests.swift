@@ -1489,8 +1489,8 @@ func assistantCapturesWithoutTaskWhenNoFollowUpIsRequested(supportsImages: Bool)
     let expression = try AgentConfigurations.skill("basic-interaction")
     #expect(
         Set(expression.useActions.map(\.path)) == [
-            "UI.Expression.express", "UI.Expression.setExpression", "Speech.Listening.startListening",
-            "Speech.Listening.stopListening",
+            "Scheduling.Wait.wait", "UI.Expression.express", "UI.Expression.setExpression",
+            "Speech.Listening.startListening", "Speech.Listening.stopListening",
         ])
     let application = try AgentConfigurations.skill("application-control")
     #expect(application.useActions.count == 18 && !application.useActions.contains { $0.path.hasPrefix("NexArm.") })

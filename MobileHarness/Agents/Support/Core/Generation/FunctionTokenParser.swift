@@ -140,9 +140,7 @@ public struct FunctionTokenParser: Sendable {
         }
         func skip() { while index < chars.count, whitespace(chars[index]) { index += 1 } }
         let alias = name()
-        guard CapabilityRegistry.validName(alias), alias != "wait" else {
-            throw GenerationError.malformedMarkup
-        }
+        guard CapabilityRegistry.validName(alias) else { throw GenerationError.malformedMarkup }
         var params: [String: String] = [:]
         while index < chars.count {
             guard whitespace(chars[index]) else { throw GenerationError.malformedMarkup }

@@ -432,8 +432,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
                 #expect(await sink.rejectionAttempts[wrong.id]?.count == 1)
                 #expect(try await records.agentMessages.isAgentMessageConsumed(wrong.id))
             }
-            #expect(
-                try await records.writerExecutions.request(scope.id, agent: "writer").executionState == "waiting_input")
+            #expect(try await records.writerExecutions.request(scope.id, agent: "writer").waiting != nil)
             let answerText = mode == 16 ? "我们改天再写这份稿子" : (cancels ? "取消当前创作" : "中文")
             let answer = AgentTaskRequest(text: answerText, replyTo: scope.id, interactionID: content.interactionID)
             #expect(
@@ -447,7 +446,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
         try await Task.sleep(for: .milliseconds(10))
     }
     let retiredDeadline = ContinuousClock.now + .seconds(5)
-    while try await records.writerExecutions.request(scope.id, agent: "writer").executionState == "closing" {
+    while try await records.writerExecutions.request(scope.id, agent: "writer").retirement == "pending" {
         guard ContinuousClock.now < retiredDeadline else { throw WriterFailure.incomplete }
         try await Task.sleep(for: .milliseconds(10))
     }
@@ -1633,7 +1632,7 @@ func writerCompletesTwentyTasksWhileProgressReportsAreDropped() async throws {
         let deadline = ContinuousClock.now.advanced(by: .seconds(10))
         while true {
             let run = try? await records.writerExecutions.request(message.id, agent: "writer")
-            if run?.status == "completed", run?.executionState == "completed" { break }
+            if run?.status == "completed", run?.retirement == "done" { break }
             guard ContinuousClock.now < deadline else { throw WriterFailure.incomplete }
             try await Task.sleep(for: .milliseconds(10))
         }
@@ -2696,7 +2695,7 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
             #expect(current.workspaceID.isEmpty)
             #expect(try await workspace.project(workspaceID).files["document.md"] == "# Draft\nKEEP")
             let deadline = ContinuousClock.now + .seconds(5)
-            while try await records.writerExecutions.request(requestID, agent: "writer").executionState == "closing" {
+            while try await records.writerExecutions.request(requestID, agent: "writer").retirement == "pending" {
                 guard ContinuousClock.now < deadline else { throw WriterFailure.incomplete }
                 try await Task.sleep(for: .milliseconds(10))
             }

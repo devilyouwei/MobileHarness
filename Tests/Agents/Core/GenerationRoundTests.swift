@@ -252,7 +252,8 @@ private func roundHarness(
     if photo || photoCommand != nil || deviceStatus {
         let declared = try AgentConfigurations.registry(
             AgentConfigurations.skill(deviceStatus ? "application-control" : "photography").useActions)
-        let capabilities = try CapabilityRegistry(actions: declared.actions, channels: declared.channels)
+        let capabilities = try CapabilityRegistry(
+            actions: declared.actions, channels: declared.channels, supportsWait: true)
         agent = try FixtureNativeAgent(
             inputDecision: decision, fullDuplex: fullDuplex, chat: model, conversations: store,
             observations: { values, input, chat in
@@ -902,7 +903,7 @@ private struct OpenMalformedProtocolModel: ChatCapability {
         let pair = InferenceSession<ChatEvent>.make(
             limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes },
             onTermination: { termination.yield($0) })
-        try pair.emitter.yield(.text("<wait/>"))
+        try pair.emitter.yield(.text("<wait x='1'>"))
         // Deliberately keep the model stream open after a malformed Action token.
         return pair.session
     }

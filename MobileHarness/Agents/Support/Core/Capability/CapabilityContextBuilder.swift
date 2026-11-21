@@ -31,10 +31,6 @@ public struct CapabilityContextBuilder: Sendable {
                     required: action.requiredParameters, optional: action.optionalParameters)
             }
         }
-        if !registry.actions.isEmpty || !registry.internalActions.isEmpty {
-            lines += try actionCatalog.render("wait").split(separator: "\n", omittingEmptySubsequences: false).map(
-                String.init)
-        }
         if !registry.controls.isEmpty {
             lines.append(try actionCatalog.render("controls"))
             for control in registry.controls {

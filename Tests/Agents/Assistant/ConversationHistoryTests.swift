@@ -219,7 +219,7 @@ private actor HistoryModel: ChatCapability {
 
 @Test(.actionCatalog) func assistantRecordsMalformedOutputBeforeParsingAndContextSurvivesNewInstance() async throws {
     let store = AssistantHistoryStore()
-    let model = HistoryModel("<wait/>")
+    let model = HistoryModel("<wait x='1'>")
     let agent = try AssistantAgent(
         stateContext: try publicStateFixture(),
         chat: model, conversations: store,
@@ -239,9 +239,9 @@ private actor HistoryModel: ChatCapability {
     #expect(message.hasPrefix("agent.error:"))
     let turn = try #require(try await store.snapshot().current.turns.first)
     #expect(turn.user == "请串行" && turn.state == .failed)
-    #expect(turn.raw == "<wait/>")
+    #expect(turn.raw == "<wait x='1'>")
     #expect(await model.requests.count == 1)
-    #expect(turn.modelRequests?.allSatisfy { $0.state == .failed && $0.response == "<wait/>" } == true)
+    #expect(turn.modelRequests?.allSatisfy { $0.state == .failed && $0.response == "<wait x='1'>" } == true)
     #expect(turn.error != nil)
     await agent.stop()
 }
@@ -283,7 +283,7 @@ private actor HistoryModel: ChatCapability {
     #expect(request.maximumOutputTokens == nil)
     #expect(!request.messages[0].content.contains("CALLABLE ACTIONS"))
     await #expect(throws: (any Error).self) {
-        try await ConversationTitleGenerator.summarize(archived, using: HistoryModel("<wait/>"))
+        try await ConversationTitleGenerator.summarize(archived, using: HistoryModel("<wait x='1'>"))
     }
 }
 

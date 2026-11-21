@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "scope": "Python model-case evaluation; no App execution",
+  "provenance": {
+    "model": "gpt-4.1",
+    "repeats": 3,
+    "options": {
+      "temperature": 0
+    },
+    "inputSHA256": "11058003774bb39172081c4f05b79a3a8917d9212e875364c0fee5b248071469",
+    "promptSHA256": "f9a0bcf3b51755f369c9fc8cd660da4d565ff135bb03da8fef281228617aa747",
+    "runnerSHA256": "20ec92c3826eef50a6698a98aaa8f1abed061bff07a3688756797a35710026b2"
+  },
+  "rows": [
+    {
+      "id": "voice-exit#r1",
+      "case": "voice-exit",
+      "category": "no-wait",
+      "repeat": 1,
+      "user": "Goodbye, stop listening now.",
+      "response": "Goodbye.<stopListening/>",
+      "usage": {
+        "prompt_tokens": 1651,
+        "completion_tokens": 6,
+        "total_tokens": 1657,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 3593.7344159465283
+    },
+    {
+      "id": "voice-exit#r2",
+      "case": "voice-exit",
+      "category": "no-wait",
+      "repeat": 2,
+      "user": "Goodbye, stop listening now.",
+      "response": "Goodbye.<stopListening/>",
+      "usage": {
+        "prompt_tokens": 1651,
+        "completion_tokens": 6,
+        "total_tokens": 1657,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 2829.830582952127
+    },
+    {
+      "id": "voice-exit#r3",
+      "case": "voice-exit",
+      "category": "no-wait",
+      "repeat": 3,
+      "user": "Goodbye, stop listening now.",
+      "response": "Goodbye.<stopListening/>",
+      "usage": {
+        "prompt_tokens": 1651,
+        "completion_tokens": 6,
+        "total_tokens": 1657,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0
+        }
+      },
+      "finishReason": "stop",
+      "issues": [],
+      "passed": true,
+      "milliseconds": 2537.874292000197
+    }
+  ],
+  "complete": true,
+  "summary": {
+    "count": 3,
+    "scored": 3,
+    "excluded": 0,
+    "passed": 3,
+    "errors": 0,
+    "p50MS": 2829.830582952127,
+    "p95MS": 3593.7344159465283
+  }
+}

@@ -2,7 +2,7 @@ import Foundation
 internal import GRDB
 
 enum SQLiteSchema {
-    static let currentVersion = 20_261_121
+    static let currentVersion = 20_261_122
     static let statements = [
         AgentMessageRow.schemaSQL, AgentMessageRow.evidenceSchemaSQL, AssistantConversationRow.schemaSQL,
         AssistantTaskRow.schemaSQL,

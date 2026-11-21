@@ -4,18 +4,12 @@ import StorageCore
 import StorageTasks
 
 extension SQLiteWriterExecutionRepository {
-    static func completionState(_ id: String, db: Database) throws -> String? {
-        try String.fetchOne(
-            db,
-            sql: "SELECT terminal_state FROM writer_executions WHERE request_message_id=?",
-            arguments: [id])
-    }
     static func requestStatus(_ id: String, db: Database) throws -> String? {
         guard
             let row = try Row.fetchOne(
                 db,
                 sql:
-                    "SELECT run_state,terminal_state FROM writer_executions WHERE request_message_id=?",
+                    "SELECT task_state FROM writer_executions WHERE request_message_id=?",
                 arguments: [id])
         else {
             guard let message = try AgentMessageRow.fetchOne(db, key: id),
@@ -25,9 +19,8 @@ extension SQLiteWriterExecutionRepository {
             else { return nil }
             return "requested"
         }
-        if let terminal: String = row["terminal_state"] { return terminal }
-        let state: String = row["run_state"]
-        return ["waiting_input", "paused"].contains(state) ? "running" : state
+        let state: String = row["task_state"]
+        return state == "cancelling" ? "running" : state
     }
 
     public func requestStatus(_ delegateID: String, agent: String) async throws -> String? {
@@ -67,7 +60,8 @@ extension SQLiteWriterExecutionRepository {
         value.sourceAgent = sourceAgent
         value.sourceContext = original["source_context"] as? String
         value.result = entry["result_json"]
-        value.executionState = entry["run_state"]
+        value.taskState = entry["task_state"]
+        value.retirement = entry["retirement"]
         value.waiting = entry["pending_question_json"]
         return value
     }
@@ -114,41 +108,35 @@ extension SQLiteWriterExecutionRepository {
         try database.write { db in
             let entry = try Self.entry(delegateID, db: db)
             let key: Int64 = entry["id"]
+            // A delegation completes once; a restart-interrupted delegation has not yet recorded its completion.
+            let state: String = entry["task_state"]
             guard
-                ["running", "waiting_input", "paused", "closing", "interrupted"].contains(entry["run_state"] as String)
-            else {
-                throw RecordStorageError.conflict
-            }
+                ["running", "cancelling"].contains(state)
+                    || (state == "interrupted" && (entry["completion_recorded"] as Int64) == 0)
+            else { throw RecordStorageError.conflict }
             var completion = [
                 "kind": "completion", "state": status, "eventID": eventID, "failure": failure ?? "",
             ]
             completion["cancellationReason"] = cancellationReason
             let marker = try SQLiteRecordCoding.json(completion)
+            let now = Date().timeIntervalSince1970
             try db.execute(
                 sql:
-                    "UPDATE writer_executions SET runtime_results_json=json_insert(runtime_results_json,'$[#]',json(?)),completed_at=?,updated_at=? WHERE id=?",
-                arguments: [marker, Date().timeIntervalSince1970, Date().timeIntervalSince1970, key])
-            try db.execute(
-                sql:
-                    "UPDATE writer_executions SET run_state='closing',terminal_state=?,result_json=?,pending_question_id=NULL,pending_question_json=NULL,failure_json=?,updated_at=?,request_revision=request_revision+1 WHERE id=?",
+                    "UPDATE writer_executions SET runtime_results_json=json_insert(runtime_results_json,'$[#]',json(?)),task_state=?,completion_recorded=1,result_json=?,pending_question_id=NULL,pending_question_json=NULL,failure_json=?,completed_at=?,updated_at=?,request_revision=request_revision+1 WHERE id=?",
                 arguments: [
-                    status, String(decoding: result, as: UTF8.self),
-                    try failure.map { try SQLiteRecordCoding.json(["message": $0]) },
-                    Date().timeIntervalSince1970,
-                    key,
+                    marker, status, String(decoding: result, as: UTF8.self),
+                    try failure.map { try SQLiteRecordCoding.json(["message": $0]) }, now, now, key,
                 ])
         }
     }
     public func retireRequest(_ delegateID: String, failure: String?) async throws {
         try database.write { db in
-            guard let state = try Self.completionState(delegateID, db: db) else {
-                throw RecordStorageError.missingRecord
-            }
+            _ = try Self.entry(delegateID, db: db)
             try db.execute(
                 sql:
-                    "UPDATE writer_executions SET run_state=?,failure_json=CASE WHEN ? THEN failure_json ELSE ? END,updated_at=?,request_revision=request_revision+1 WHERE request_message_id=? AND run_state IN ('closing','cleanup_failed')",
+                    "UPDATE writer_executions SET retirement=?,failure_json=CASE WHEN ? THEN failure_json ELSE ? END,updated_at=?,request_revision=request_revision+1 WHERE request_message_id=? AND completion_recorded=1 AND retirement!='done'",
                 arguments: [
-                    failure == nil ? state : "cleanup_failed", failure == nil,
+                    failure == nil ? "done" : "failed", failure == nil,
                     try failure.map { try SQLiteRecordCoding.json(["message": $0, "stage": "cleanup"]) },
                     Date().timeIntervalSince1970, delegateID,
                 ])

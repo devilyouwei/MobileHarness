@@ -387,12 +387,60 @@ private func generationTrace() throws -> GenerationTrace {
 @Test(
     .actionCatalog,
     arguments: [
-        "<wait/>", "<wait x='1'>", "</wait>", "<wait><channel.Speech></wait></channel.Speech>",
+        "<wait x='1'>", "</wait>", "<wait><channel.Speech></wait></channel.Speech>",
         "<channel.Speech><wait></channel.Speech></wait>",
     ])
 func invalidWaitSyntaxIsRejected(_ source: String) throws {
     var parser = FunctionTokenParser()
     #expect(throws: GenerationError.malformedMarkup) { try parser.append(source) }
+}
+
+@Test(.actionCatalog) func timedWaitResolvesDecimalSecondsAndRejectsInvalidForms() throws {
+    var timed = try generator()
+    let events =
+        try timed.append("<express emotion='happy'/><wait time='1.5'/><wait time='2'/><wait time='0.001'/>")
+        + timed.finish()
+    #expect(
+        events.filter { if case .scheduling = $0 { true } else { false } } == [
+            .scheduling(.pause(milliseconds: 1500)), .scheduling(.pause(milliseconds: 2000)),
+            .scheduling(.pause(milliseconds: 1)),
+        ])
+    // A pause is not a scope: it neither nests nor requires a closing tag.
+    var parser = FunctionTokenParser()
+    _ = try parser.append("<wait time='1'/>")
+    #expect(try parser.finish().isEmpty)
+    for source in [
+        "<wait/>", "<wait time='0'/>", "<wait time='-1'/>", "<wait time='60.001'/>", "<wait time='abc'/>",
+        "<wait time='1e1'/>", "<wait time='.5'/>", "<wait time=''/>", "<wait time='1' x='2'/>", "<wait x='1'/>",
+    ] {
+        var invalid = try generator()
+        #expect(
+            try invalid.append(source) + invalid.finish() == [
+                .rejected(CallRejection(kind: .action, alias: "wait", reason: .invalidParameters))
+            ], "\(source)")
+    }
+    var budget = try generator()
+    #expect(
+        try budget.append("<wait time='60'/><wait time='60'/><wait time='1'/>") + budget.finish() == [
+            .scheduling(.pause(milliseconds: 60_000)), .scheduling(.pause(milliseconds: 60_000)),
+            .rejected(CallRejection(kind: .action, alias: "wait", reason: .limitExceeded)),
+        ])
+}
+
+@Test(.actionCatalog) func waitRequiresSkillRegistration() throws {
+    var plain = AgentGenerator(capabilities: try CapabilityRegistry())
+    #expect(
+        try plain.append("<wait></wait><wait time='1'/>") + plain.finish() == [
+            .rejected(CallRejection(kind: .action, alias: "wait", reason: .unknownCapability)),
+            .rejected(CallRejection(kind: .action, alias: "wait", reason: .unknownCapability)),
+            .rejected(CallRejection(kind: .action, alias: "wait", reason: .unknownCapability)),
+        ])
+    let registered = try AgentSkillLoader.registry(
+        ["basic-interaction"], fixed: AgentConfigurations.load(named: "Assistant").capabilities)
+    #expect(registered.supportsWait && !registered.actions.contains { $0.alias == "wait" })
+    let application = try AgentSkillLoader.registry(
+        ["application-control"], fixed: AgentConfigurations.load(named: "Assistant").capabilities)
+    #expect(!application.supportsWait)
 }
 
 @Test(.actionCatalog) func waitLimitsEmptyScopesAndReservedAlias() throws {

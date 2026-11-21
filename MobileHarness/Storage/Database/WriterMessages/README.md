@@ -1,14 +1,14 @@
 # Writer messages
 
-writer_messages 仅保存实际发起的模型请求；writer_executions 独立保存委托生命周期，入口保存原始输入、request_goal、run_state、terminal_state、request_revision、pending_question_id、pending_question_json、result_json 和 failure_json；user_input_json 同时保存原始输入、来源 Agent/会话及原始通信包；关联不可变 agent_messages 来源。每个通信请求只能有一个入口，单活跃索引覆盖运行、等待、暂停及清理。
+writer_messages 仅保存实际发起的模型请求；writer_executions 独立保存委托生命周期，入口保存原始输入、request_goal、task_state、completion_recorded、retirement、request_revision、pending_question_id、pending_question_json、result_json 和 failure_json；user_input_json 同时保存原始输入、来源 Agent/会话及原始通信包；关联不可变 agent_messages 来源。每个通信请求只能有一个入口，单 Writer 唯一索引覆盖 retirement 为 pending 或 failed 的入口，即委托在执行权限退役前持续占位。
 
-模型请求用 delegation_id 指向 writer_executions 入口，workspace_id 为创建当时的 workspace 或空值。入口的 selected_workspace_id 记录执行目标，对外投影为 workspace_N；选择不修改旧消息，前序和进入后的消息都属于同一委托。position 固定为事务分配的全局消息主键；revision 只作状态版本。模型调用状态与入口 run_state 独立。
+模型请求用 delegation_id 指向 writer_executions 入口，workspace_id 为创建当时的 workspace 或空值。入口的 selected_workspace_id 记录执行目标，对外投影为 workspace_N；选择不修改旧消息，前序和进入后的消息都属于同一委托。position 固定为事务分配的全局消息主键；revision 只作状态版本。模型调用状态与入口 task_state 独立。
 
 tool_catalog_json 只保存本轮 decisionMetadata.catalogJSON.tools 的目录条目数组，包含工具别名、路径、参数名和 definitionJSON。输入 checkpoint 不写工具目录；查询通过同一请求的 decisionMetadata 还原，不转换为字符串数组，也不借用输入根或其他轮次目录。工具定义不存在第二份 WriterRecord 字段或保存接口，清理日志保留目录。
 
 WriterInputMessage 保存当前轮 user/tool 文本及工具名/关联 ID，存入 user_input_json.messages，不携带图片或完整历史上下文。查询独立于日志恢复 inputMessages；checkpoint 更新输入摘要时保留已有 messages。输入快照计入 WriterHistoryStore 的窗口容量，清日志后不变。
 
-WriterExecutionRepository/SQLiteWriterExecutionRepository 同属本目录，负责入口接纳、目标绑定、补充输入、请求状态和终态。completeRequest(_ delegateID:, eventID:, result:, status:, failure:, cancellationReason:) 把终态写入执行入口并将 run_state 置为 closing，不插入虚构模型消息；retireRequest(_ delegateID:, failure:) 记录权限退休结果，成功时 closing 转为终态，失败时记为 cleanup_failed。执行授权不跨进程保留，重启恢复把遗留 closing 行转为其终态。补充输入仅消费已有 agent_messages，不复制为 writer_messages。重复通信幂等；恢复标记 interrupted，不重放工具。
+WriterExecutionRepository/SQLiteWriterExecutionRepository 同属本目录，负责入口接纳、目标绑定、补充输入、请求状态和终态。completeRequest(_ delegateID:, eventID:, result:, status:, failure:, cancellationReason:) 把终态写入 task_state 并置 completion_recorded，不插入虚构模型消息。task_state 取 running / cancelling / completed / failed / cancelled / interrupted，只表达委托自身；Agent 暂停不改变它，等待用户输入由 pending_question_id 表达。每个委托（agent message）只接受一次完成：仅 running、cancelling，或重启恢复得到且尚未记录完成的 interrupted 可接受，其余状态再次提交抛 conflict；同一 workspace 的多次委托各自独立完成。retireRequest(_ delegateID:, failure:) 只更新 retirement（done 或 failed），失败原因记入 failure_json 的 cleanup 阶段，不改变 task_state。入口忙被拒绝的委托 task_state 为 failed、retirement 为 none，不占位也不进入历史。执行授权不跨进程保留，重启恢复把 running/cancelling 标记为 interrupted，并把所有未完成退役的 retirement 转为 done，不再占用单 Writer 槽位。补充输入仅消费已有 agent_messages，不复制为 writer_messages。重复通信幂等；恢复标记 interrupted，不重放工具。
 
 WriterMessageRepository/SQLiteWriterMessageRepository、WriterRecordStore、WriterHistoryStore 与 WriterRecords 构成消息链。运行窗口按委托读取；workspace 查询是另一过滤范围，前序查询额外限制 workspace_id IS NULL。HistoryStore 的 bindingWorkspace 在串行写门内 checkpoint 后执行绑定，不切换窗口或移动消息。新委托切换前必须没有未提交/生成中的输入，写入等待最多 16，满时 busy。
 
@@ -20,7 +20,7 @@ WriterContainer 将本侧历史映射到 UI 详情/导出展示模型；展示�
 
 WriterHistoryStore.requestPreviews 透传有界 limit（默认 20，仓库上限 50），供调用方做轻量记录前瞻。工作区消息页按 position 降序，使用排他的 before 游标读取更早一页，轮次编号仍按正序计数。按 after 查询用于近期消息更新、前序历史及导出。Storage 返回查询事实，不决定 UI 页大小或末页显示；WriterContainer 拥有公开分页结果。
 
-Writer 从普通消息正文识别明确停止请求后，在同一事务确认来源及执行身份、标记原消息已消费、进入 closing 并保存原因。清理结果由 Writer 经 completeRequest 提交。私有模型选择取消时，终态事务保存它的事实摘要。既有取消记录可按历史消息读取。
+Writer 从普通消息正文识别明确停止请求后，在同一事务确认来源及执行身份、标记原消息已消费、将 task_state 置为 cancelling 并保存原因。清理结果由 Writer 经 completeRequest 提交。私有模型选择取消时，终态事务保存它的事实摘要。既有取消记录可按历史消息读取。
 
 新入口接纳 agent.task.v1，消息身份成为执行入口的来源。Writer 判定为补充或停止后将消息关联到原入口，存储核对来源、关联身份和当前执行状态后消费。消息级拒绝只把 Writer 收到的请求记录标记为已消费，拒绝回报经 agent.task.events.v1 发布一次，不写入本目录的表。前序（未进入工作区）请求的所有者由 WriterPreflightOwner.id(requestMessageID) 生成，读取统一走 WriterHistoryStore.preflightPreviews。
 
