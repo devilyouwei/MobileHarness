@@ -1,0 +1,181 @@
+{
+  "entries": {
+    "delete": {
+      "description": "仅按明确授权删除作品，使用本次搜索返回的准确 ID。",
+      "parameters": {
+        "workspaceID": {
+          "description": "真实工作区 ID。"
+        }
+      }
+    },
+    "diff": {
+      "description": "检查当前工作区的变更。",
+      "parameters": {
+        "offset": {
+          "description": "从零起算的变更文件偏移。"
+        },
+        "path": {
+          "description": "可选的确切相对路径。"
+        },
+        "savepoint": {
+          "description": "由 savepoint 返回的实际 ID。"
+        }
+      }
+    },
+    "edit": {
+      "description": "生成新文件或用实际读取引用编辑现有文件的指定范围。",
+      "parameters": {
+        "contextReferences": {
+          "description": "相关文件的新鲜读取引用，以逗号分隔。"
+        },
+        "end": {
+          "description": "读区中的绝对结束字符偏移，不含此位置。"
+        },
+        "instruction": {
+          "description": "简短、具体的编辑要求。"
+        },
+        "path": {
+          "description": "工作区相对文件路径。"
+        },
+        "reference": {
+          "description": "新鲜的 read_N 引用。新文件或空入口可省略。"
+        },
+        "start": {
+          "description": "读区中的绝对起始字符偏移。"
+        },
+        "title": {
+          "description": "新显示标题。省略保留原标题。"
+        }
+      }
+    },
+    "list": {
+      "description": "列出当前工作区的文件。",
+      "parameters": {
+        "path": {
+          "description": "相对目录或文件前缀。省略时列出所有路径。"
+        }
+      }
+    },
+    "move": {
+      "description": "移动当前工作区的文件。",
+      "parameters": {
+        "destination": {
+          "description": "未使用的工作区相对目标路径。"
+        },
+        "path": {
+          "description": "确切的工作区相对文件或目录路径。"
+        }
+      }
+    },
+    "open": {
+      "description": "打开已保存作品供查看，不切换编辑目标。",
+      "parameters": {
+        "workspaceID": {
+          "description": "真实工作区 ID。"
+        }
+      }
+    },
+    "read": {
+      "description": "读取当前工作区文件或指定范围，生成可用于编辑的真实引用。",
+      "parameters": {
+        "limit": {
+          "description": "正整数，限制字符数或行数。默认 2500 字符或 60 行。"
+        },
+        "line": {
+          "description": "从一开始的读取行号。省略时按字符读取。"
+        },
+        "offset": {
+          "description": "从零起算的字符偏移。给出 line 时忽略。"
+        },
+        "path": {
+          "description": "工作区相对文件路径。"
+        }
+      }
+    },
+    "remove": {
+      "description": "移除当前工作区指定文件。",
+      "parameters": {
+        "path": {
+          "description": "工作区相对文件路径。"
+        },
+        "reference": {
+          "description": "本文件新鲜的 read_N 引用。"
+        }
+      }
+    },
+    "removeTree": {
+      "description": "移除当前工作区指定子目录及其内容。",
+      "parameters": {
+        "path": {
+          "description": "工作区下确切的目录路径。"
+        }
+      }
+    },
+    "rename": {
+      "description": "更新当前工作区的显示标题。",
+      "parameters": {
+        "title": {
+          "description": "使用用户语言的非空显示标题。"
+        }
+      }
+    },
+    "render": {
+      "description": "渲染当前草稿并返回实际呈现或诊断结果。",
+      "parameters": {}
+    },
+    "replace": {
+      "description": "使用实际读引用执行明确的精确替换。",
+      "parameters": {
+        "newText": {
+          "description": "准确替换文本。空字符串删除匹配内容。"
+        },
+        "oldText": {
+          "description": "必须准确匹配一次的非空文本。"
+        },
+        "path": {
+          "description": "工作区相对文件路径。"
+        },
+        "reference": {
+          "description": "本文件新鲜的 read_N 引用。"
+        }
+      }
+    },
+    "restore": {
+      "description": "用实际保存点恢复草稿。",
+      "parameters": {
+        "savepoint": {
+          "description": "由 savepoint 返回的实际 ID。"
+        }
+      }
+    },
+    "savepoint": {
+      "description": "为当前工作区建立保存点。",
+      "parameters": {}
+    },
+    "search": {
+      "description": "搜索当前工作区的文件内容。",
+      "parameters": {
+        "offset": {
+          "description": "从零起算，用先前的 nextOffset 继续。"
+        },
+        "path": {
+          "description": "工作区相对路径前缀。"
+        },
+        "query": {
+          "description": "非空且区分大小写的字面搜索。"
+        }
+      }
+    },
+    "searchWorkspaces": {
+      "description": "按标题或关键词分页搜索已保存作品。空查询用于浏览。",
+      "parameters": {
+        "before": {
+          "description": "上页返回的 nextBefore。首页省略。"
+        },
+        "query": {
+          "description": "标题、说明关键词或确切 workspace_N。空查询用于浏览。"
+        }
+      }
+    }
+  }
+}

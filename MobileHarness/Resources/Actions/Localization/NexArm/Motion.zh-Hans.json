@@ -1,0 +1,63 @@
+{
+  "entries": {
+    "moveMotor": {
+      "description": "移动指定电机。绝对编码器计数和相对角度只能选一个。执行方检查真实位置和行程。",
+      "parameters": {
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        },
+        "deltaDegrees": {
+          "description": "相对于当前位置的角度变化，单位为度。"
+        },
+        "motor": {
+          "description": "实际电机编号。"
+        },
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        },
+        "target": {
+          "description": "绝对编码器目标计数。"
+        }
+      }
+    },
+    "reset": {
+      "description": "将机械臂所有支持的轴归位，夹爪除外。",
+      "parameters": {
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        },
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        }
+      }
+    },
+    "resetMotor": {
+      "description": "将指定电机归位。",
+      "parameters": {
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        },
+        "motor": {
+          "description": "实际电机编号。"
+        },
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        }
+      }
+    },
+    "shakeBase": {
+      "description": "按指定次数摆动底座并返回归位位置。",
+      "parameters": {
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        },
+        "cycles": {
+          "description": "重复次数。"
+        },
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        }
+      }
+    }
+  }
+}

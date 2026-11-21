@@ -10,7 +10,7 @@ Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注�
 
 | 文件 | 当前职责 |
 | --- | --- |
-| [RuntimePresentation.swift](RuntimePresentation.swift) | 仅拥有 UI 呈现接入，弱绑定角色端点并保留身份／代际检查 |
+| [RuntimePresentation.swift](Runtime/RuntimePresentation.swift) | 仅拥有 UI 呈现接入，弱绑定角色端点并保留身份／代际检查 |
 | [ActionNamespaces.swift](../Support/Contracts/ActionNamespaces.swift) | Shared UIActions namespace only; callable implementations remain in the domain files below |
 | [UIModule.swift](UIModule.swift) | 显式绑定通用呈现能力及可选诊断、蓝牙和加载状态端口 |
 

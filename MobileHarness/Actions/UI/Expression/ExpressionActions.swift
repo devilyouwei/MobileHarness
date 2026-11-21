@@ -5,7 +5,9 @@ import FunctionContracts
 extension UIActions {
     /// Trusted request progress; not a model-selected expression or animation receipt.
     @Action(
-        domain: "UI", module: "Expression", title: "Request wait", kind: .state,
+        domain: "UI", module: "Expression", title: "Request wait",
+        doc: "Show or clear the waiting expression for one request while its reply is pending (enabled and requestID).",
+        kind: .state,
         completion: "Request waiting state is accepted; the animation loop is not joined.", timeout: .seconds(5))
     public static func setReplyWaiting(
         invocation: any FunctionInput,
@@ -85,7 +87,10 @@ extension UIActions {
     }
 
     @Action(
-        domain: "UI", module: "Expression", title: "Load eyes", kind: .state,
+        domain: "UI", module: "Expression", title: "Load eyes",
+        doc:
+            "Show or clear the loading expression on the eyes while resources are being prepared (enabled and a positive revision).",
+        kind: .state,
         completion: "Loading expression state is accepted; does not wait for model preparation or animation loops.",
         timeout: .seconds(5))
     public static func setLoading(

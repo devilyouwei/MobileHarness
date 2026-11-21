@@ -239,14 +239,15 @@ import StorageFiles
         private var executionPreparationStarted = false
         /// Called by App's executionBindings node after foundational repositories are ready.
         public func prepareExecutionBindings(
-            declarations: [ActionDeclaration]
+            declarations: [ActionDeclaration], translations: [String: [String: ActionTranslation]] = [:]
         ) throws -> AgentExecutionPreparation {
             guard !lifecycle.isStopped else { throw AgentContainerError.stopped }
             guard !executionPreparationStarted else { throw GatewayContainerError.alreadyConfigured }
             executionPreparationStarted = true
             try Task.checkCancellation()
             _ = try repositories()
-            try AgentConfigurations.installDeclarations(declarations, localTools: AgentContracts.localTools)
+            try AgentConfigurations.installDeclarations(
+                declarations, localTools: AgentContracts.localTools, translations: translations)
             let maintenance = AgentMaintenancePorts(
                 artifacts: { [weak self] in
                     guard let self else { throw CancellationError() }

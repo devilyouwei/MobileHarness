@@ -5,7 +5,8 @@ extension NexArmActions {
     /// Publishes a latest target to the host-owned, resource-guarded worker.
     /// The publication itself holds no motor fence; it must remain available during tracking.
     @Action(
-        domain: "NexArm", module: "Tracking", title: "aim")
+        domain: "NexArm", module: "Tracking", title: "aim",
+        doc: "Aim the arm by sending finite base and pitch angles in radians as one tracking command.")
     public static func aim(
         invocation: any FunctionInput,
         using send: @escaping @Sendable (Double, Double, any FunctionInput) async throws -> Void

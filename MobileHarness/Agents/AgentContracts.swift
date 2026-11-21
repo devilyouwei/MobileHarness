@@ -113,7 +113,12 @@ public struct AgentLocalTool: Equatable, Sendable {
 public struct AgentFunctionCatalog: Equatable, Sendable {
     public let declarations: [ActionDeclaration]
     public let localTools: [AgentLocalTool]
-    public init(declarations: [ActionDeclaration], localTools: [AgentLocalTool] = []) throws {
+    /// Translations by language and function path; absent entries keep the declaration's default-language text.
+    public let translations: [String: [String: ActionTranslation]]
+    public init(
+        declarations: [ActionDeclaration], localTools: [AgentLocalTool] = [],
+        translations: [String: [String: ActionTranslation]] = [:]
+    ) throws {
         let controls = Set(try AssistantControls.all.map(\.declaration.path))
         guard !declarations.isEmpty, declarations.count <= 256, localTools.count <= 128,
             Set(declarations.map(\.path)).count == declarations.count,
@@ -127,6 +132,11 @@ public struct AgentFunctionCatalog: Equatable, Sendable {
         for tool in localTools { try tool.declaration.validate() }
         self.declarations = declarations.sorted { $0.path.description < $1.path.description }
         self.localTools = localTools.sorted { $0.declaration.path.description < $1.declaration.path.description }
+        self.translations = translations
+    }
+
+    func localized(_ declaration: ActionDeclaration, language: String) -> ActionDeclaration {
+        translations[language]?[declaration.path.description].map(declaration.localized) ?? declaration
     }
 
     func validateLocalTool(path: String, callType: String, owner: AgentID?) throws {

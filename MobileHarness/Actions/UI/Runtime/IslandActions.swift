@@ -26,7 +26,7 @@ public enum IslandActions {
     }
     @Action(
         domain: "UI", module: "Island", title: "end",
-        doc: "Submit shared local and system content; the component owns presentation and animations.",
+        doc: "End the shared local and system activity identified by activityID and release its presentation.",
         parameters: [
             .init(
                 "activityID", type: .string, required: true,

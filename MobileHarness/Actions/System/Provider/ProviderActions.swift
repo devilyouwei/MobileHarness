@@ -3,7 +3,10 @@ import FunctionContracts
 import StorageCore
 
 extension SystemActions {
-    @Action(domain: "System", module: "Provider", title: "discoverModels", timeout: .seconds(60))
+    @Action(
+        domain: "System", module: "Provider", title: "discoverModels",
+        doc: "Discover the models offered by the configured cloud provider for one settings request.",
+        timeout: .seconds(60))
     public static func discoverModels(invocation: any FunctionInput, using provider: any ProviderDiscoveryCapability)
         async throws -> String
     {
@@ -21,7 +24,9 @@ extension SystemActions {
 }
 
 extension SystemActions {
-    @Action(domain: "System", module: "Provider", title: "restoreSettings", timeout: .seconds(60))
+    @Action(
+        domain: "System", module: "Provider", title: "restoreSettings",
+        doc: "Restore the persisted provider settings into the settings UI.", timeout: .seconds(60))
     public static func restoreSettings(invocation: any FunctionInput, using settings: any ProviderSettingsCapability)
         async throws
     {
@@ -29,7 +34,9 @@ extension SystemActions {
         try Task.checkCancellation()
         try await settings.restoreSettings(requestID: id, sessionID: invocation.context.sessionID)
     }
-    @Action(domain: "System", module: "Provider", title: "saveSettings", timeout: .seconds(60))
+    @Action(
+        domain: "System", module: "Provider", title: "saveSettings",
+        doc: "Persist the provider settings staged in the settings UI.", timeout: .seconds(60))
     public static func saveSettings(invocation: any FunctionInput, using settings: any ProviderSettingsCapability)
         async throws
     {

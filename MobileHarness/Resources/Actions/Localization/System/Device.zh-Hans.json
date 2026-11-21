@@ -1,0 +1,28 @@
+{
+  "entries": {
+    "control": {
+      "description": "按所选操作控制蓝牙扫描、连接或断开等设备行为。执行结果以回执为准。",
+      "parameters": {
+        "action": {
+          "description": "请求的既有操作名称。"
+        },
+        "fence": {
+          "description": "当前设备会话的实际围栏值。"
+        },
+        "id": {
+          "description": "对应业务的准确标识，使用 State 或实际返回值。"
+        },
+        "operation": {
+          "description": "当前设备能力支持的操作。"
+        },
+        "value": {
+          "description": "与该操作对应的值。"
+        }
+      }
+    },
+    "readStatus": {
+      "description": "只读查询当前蓝牙和设备连接事实。",
+      "parameters": {}
+    }
+  }
+}

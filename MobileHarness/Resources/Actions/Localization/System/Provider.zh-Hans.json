@@ -1,0 +1,8 @@
+{
+  "entries": {
+    "readSettings": {
+      "description": "只读查询已确认的云端服务开关和当前模型。结果不包含密钥及 URL。",
+      "parameters": {}
+    }
+  }
+}

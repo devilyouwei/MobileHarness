@@ -10,7 +10,7 @@ Assistant 是唯一面向用户的对话 Agent；摄影、历史查询、应用�
 
 ## 文件组织
 
-Use the unsuffixed resource for English and a `.zh-Hans` sibling for Simplified Chinese. Localized prose uses the same template keys, variables and protocol identifiers. `Descriptions.zh-Hans.json` and `FunctionCopy.zh-Hans.json` supplement the canonical Agent, Skill and Action declarations with translated model-facing descriptions.
+Use the unsuffixed resource for English and a `.zh-Hans` sibling for Simplified Chinese. Localized prose uses the same template keys, variables and protocol identifiers. `Descriptions.zh-Hans.json` supplements the canonical Agent and Skill declarations, and `Writer/Tools.zh-Hans.json` the Writer-owned native tools, with translated model-facing descriptions. Action translations belong to [Resources/Actions](../Actions/README.md).
 
 | 文件 | 作用与要求 |
 | --- | --- |

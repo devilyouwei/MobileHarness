@@ -9,7 +9,9 @@ extension UIActions {
         else { throw PresentationError.invalidCall }
         return (phase, revision)
     }
-    @Action(domain: "UI", module: "BluetoothStatus", title: "showHome", timeout: .seconds(5))
+    @Action(
+        domain: "UI", module: "BluetoothStatus", title: "showHome",
+        doc: "Show the Bluetooth connection status on the home screen.", timeout: .seconds(5))
     public static func showBluetoothHome(
         invocation: any FunctionInput, using presentation: any BluetoothStatusPresentationCapability
     ) async throws {
@@ -17,7 +19,9 @@ extension UIActions {
         let (phase, revision) = try bluetoothStatus(invocation)
         try await presentation.presentBluetoothHome(phase, revision: revision, invocation: invocation)
     }
-    @Action(domain: "UI", module: "BluetoothStatus", title: "showSettings", timeout: .seconds(5))
+    @Action(
+        domain: "UI", module: "BluetoothStatus", title: "showSettings",
+        doc: "Show the Bluetooth connection status in the settings screen.", timeout: .seconds(5))
     public static func showBluetoothSettings(
         invocation: any FunctionInput, using presentation: any BluetoothStatusPresentationCapability
     ) async throws {

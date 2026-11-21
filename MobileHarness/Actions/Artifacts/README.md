@@ -4,6 +4,10 @@
 
 ArtifactsModule 从 WorkspaceActions 的声明表注册独立的 Artifacts.Workspace 函数。Writer 通过 Gateway direct 调用作品库检索、打开、删除、文件读写和渲染。start/resume/describe/preview/publish 由 Writer 运行时授权并调用。函数地址选择实际操作，各操作有独立的参数声明。Assistant 只能委派，不暴露作品库 Action，服务拒绝其直接调用。Writer 的可信 delegateID 绑定编辑会话，workspaceID 定位持久工作区，模型参数不能更改所有者。ArtifactService 拥有单项会话准入及项目单写锁；ArtifactEditing 拥有单流、按文件版本失效的读取引用和范围修改。remove 要求有效读取引用且禁止入口删除。完整文件内容通过中立 ArtifactStreaming 端口背压追加，不通过 Tool 参数。发布要求最新草稿已进行显式渲染，存在已报告的运行错误时拒绝发布；窗口不可见时显式返回不能进行视觉验证，不能把保存等同视觉验收。
 
+## 目录
+
+根目录保留 ArtifactsModule、ArtifactsActions 与 ArtifactService。[Workspace](Workspace/) 拥有 WorkspaceActions、ArtifactWorkspace 与导出；[Editing](Editing/) 拥有流式编辑事务、内容解析与文本渲染。
+
 ## 执行与续写生命周期
 
 Gateway 的 edit 工具完成表示已创建编辑流，不表示文件已写完或委托已完成。工具入口同时校验原始 sessionID 与 delegateID，续写校验 delegateID/streamID；恢复经 start/resume 创建新会话和新的流身份。Writer 拥有模型与委托生命周期，Actions 拥有实际效果和编辑资源，内容分片无需重复提交 Gateway。

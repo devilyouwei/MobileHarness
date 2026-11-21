@@ -17,6 +17,7 @@ extension SystemActions {
 
     @Action(
         domain: "System", module: "ModelResources", title: "restoreSource",
+        doc: "Restore the persisted model download source selection into the resource settings UI.",
         timeout: .seconds(60))
     public static func restoreSource(
         invocation: any FunctionInput, using preferences: any ModelResourcePreferencesCapability
@@ -27,6 +28,7 @@ extension SystemActions {
     }
     @Action(
         domain: "System", module: "ModelResources", title: "saveSource",
+        doc: "Persist the selected model download source and its endpoint settings.",
         timeout: .seconds(60))
     public static func saveSource(
         invocation: any FunctionInput, using preferences: any ModelResourcePreferencesCapability
@@ -68,6 +70,7 @@ extension SystemActions {
 
     @Action(
         domain: "System", module: "ModelResources", title: "configureSpeech",
+        doc: "Select the speech recognition and speech synthesis resources used by the app.",
         timeout: .seconds(60))
     public static func configureSpeech(invocation: any FunctionInput, using resources: any ModelResourceCapability)
         async throws
@@ -129,6 +132,7 @@ extension SystemActions {
 
     @Action(
         domain: "System", module: "ModelResources", title: "remove",
+        doc: "Remove a downloaded model resource by its resource id.",
         timeout: .seconds(60))
     public static func remove(invocation: any FunctionInput, using resources: any ModelResourceCapability) async throws
     {

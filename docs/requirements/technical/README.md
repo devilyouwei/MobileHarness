@@ -1,5 +1,8 @@
 # 技术需求
 
+- [Action 多语言说明内聚](Action-Localization.md)：默认文案留在 `@Action`，翻译放入 `Resources/Actions` 镜像目录并由 Actions 暴露本地化接口，替换 Agents 的 FunctionCopy。
+- [Actions 目录整理](Actions-Directory-Cleanup.md)：模块根只保留入口与契约，装配文件归入 Composition，平铺域按能力分子目录，合并微型文件，补齐内部 Action 英文说明与 Skill 绑定翻译覆盖测试。
+
 - [Action 多轨道调度与 Wait](Action-Multi-Channel-Wait.md)：主轨道有序分发、Channel 子轨道并行/串行、嵌套屏障及全局 wait 的自闭定时形式。
 - [Assistant 内部函数标记](Assistant-Internal-Function-Tokens.md)：非 Action 函数标记的定义、解析、调度与执行链路，函数库内聚于 Assistant；`task.send` 归属待定。
 - [Writer 内聚与 Assistant 解耦重构](Writer-Cohesion-Refactor.md)：通用任务事件协议、删除旧契约与停止短语、Writer 内部文件拆分；WriterAgent 状态聚合待完成。
@@ -12,6 +15,8 @@
 - [拍照倒计时与显式打开相机](Photo-Countdown-And-Explicit-Open.md)：单次倒计时、独立打开、同轮多 Action 与验证。
 
 已完成：[删除 Channel 覆盖与照片忽略](../../completed/Remove-Channel-Override-And-Photo-Ignore.md)，包括配置、教学、UI和专用音效清理，以及固定路由、重拍保留与完整检查。
+
+- [状态机泛化与 Task 的去处](State-Generalization-Task-Removal.md)：以 `state.set/clear` 取代 `task.start/end`，状态每轮注入模型；`task.send` 独立为 `send`，同伴委托重命名为 Delegation。
 
 - [BasicSkill 控制教学](BasicSkill-Control-Teaching.md)：Task / Skill 概念、上下文、动作效果、生效时机和失败语义的通用教学重组。
 

@@ -6,21 +6,25 @@
 
 Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注入唯一基础能力和根生命周期。本域消费 FunctionContracts 及需要的基础能力，不导入 Agents、Gateway 实现或 App。全部域内源码由 Actions 单一目标编译。
 
+## 子目录
+
+根目录保留 HistoryModule、HistoryActions 与 HistoryCapabilities；[Conversation](Conversation/) 拥有会话历史的函数、查询、完整读取、修改与读取请求，[Presentation](Presentation/) 拥有历史呈现函数与适配器。
+
 ## 目录与文件
 
 | 文件 | 当前职责 |
 | --- | --- |
-| [ConversationActions.swift](ConversationActions.swift) | 业务函数的参数校验、能力调用与完成值 |
-| [ConversationHistoryWorkflow.swift](ConversationHistoryWorkflow.swift) | 历史浏览请求、取消加入与有界图片读取 |
+| [ConversationActions.swift](Conversation/ConversationActions.swift) | 业务函数的参数校验、能力调用与完成值 |
+| [ConversationHistoryWorkflow.swift](Conversation/ConversationHistoryWorkflow.swift) | 历史浏览请求、取消加入与有界图片读取 |
 | [HistoryActions.swift](HistoryActions.swift) | 业务函数的参数校验、能力调用与完成值 |
 | [HistoryCapabilities.swift](HistoryCapabilities.swift) | 历史引用、查询／修改／呈现端口 |
-| [HistoryFullReadService.swift](HistoryFullReadService.swift) | 共享仓库的完整消息与日志查询 |
+| [HistoryFullReadService.swift](Conversation/HistoryFullReadService.swift) | 共享仓库的完整消息与日志查询 |
 | [HistoryModule.swift](HistoryModule.swift) | 绑定预览、修改与完整读取函数 |
-| [HistoryMutationService.swift](HistoryMutationService.swift) | 归档、删除及单槽标题工作 |
-| [HistoryPresentationActions.swift](HistoryPresentationActions.swift) | 业务函数的参数校验、能力调用与完成值 |
-| [HistoryPresentationAdapter.swift](HistoryPresentationAdapter.swift) | 仓库事实到 UI 值的版本化呈现 |
-| [HistoryQueryService.swift](HistoryQueryService.swift) | 有界预览、分页与编码 |
-| [HistoryReadRequest.swift](HistoryReadRequest.swift) | 完整读取查询／结果约束与单次请求结果槽 |
+| [HistoryMutationService.swift](Conversation/HistoryMutationService.swift) | 归档、删除及单槽标题工作 |
+| [HistoryPresentationActions.swift](Presentation/HistoryPresentationActions.swift) | 业务函数的参数校验、能力调用与完成值 |
+| [HistoryPresentationAdapter.swift](Presentation/HistoryPresentationAdapter.swift) | 仓库事实到 UI 值的版本化呈现 |
+| [HistoryQueryService.swift](Conversation/HistoryQueryService.swift) | 有界预览、分页与编码 |
+| [HistoryReadRequest.swift](Conversation/HistoryReadRequest.swift) | 完整读取查询／结果约束与单次请求结果槽 |
 
 ## 查询、修改与完成
 

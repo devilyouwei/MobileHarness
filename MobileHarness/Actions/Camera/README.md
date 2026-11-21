@@ -12,19 +12,31 @@ Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注�
 | --- | --- |
 | [ActionNamespaces.swift](../Support/Contracts/ActionNamespaces.swift) | Shared CameraActions namespace only; callable implementations remain in the domain files below |
 | [CameraCapabilities.swift](../Support/Contracts/CameraCapabilities.swift) | 相机端口、镜头类型、照片回执及失败分类 |
-| [PerceptionActions.swift](PerceptionActions.swift) | 背景视觉／跟随的 openVision、closeVision、retryVision、flipVision，模型别名 Vision.* |
+| [PerceptionActions.swift](Perception/PerceptionActions.swift) | 背景视觉／跟随的 openVision、closeVision、retryVision、flipVision，模型别名 Vision.* |
 | [CameraCoordinator.swift](CameraCoordinator.swift) | 采集、资源租约、预览、姿态与公开事实的根协调者 |
 | [CameraExecutionEndpoint.swift](CameraExecutionEndpoint.swift) | 相机调用身份与会话准入，直接转发类型化回执 |
-| [CameraInteractionWorkflow.swift](CameraInteractionWorkflow.swift) | 单槽操作提交、忙态与实际错误反馈 |
+| [CameraInteractionWorkflow.swift](Runtime/CameraInteractionWorkflow.swift) | 单槽操作提交、忙态与实际错误反馈 |
 | [CameraModule.swift](CameraModule.swift) | 绑定相机与相册函数，不定义业务参数或调用协议 |
-| [CameraRecordingSession.swift](CameraRecordingSession.swift) | 录像启动/终态/素材处置；与显式设置共享原生配置及回滚事务 |
-| [CameraPhotoSession.swift](CameraPhotoSession.swift) | 拍照／处置任务、预览身份、呈现确认和反馈作用域 |
-| [CameraPreviewStore.swift](CameraPreviewStore.swift) | 原图缓存目录、最新图与显式选择、分析图准备和批量保存 |
-| [CameraRuntimePorts.swift](CameraRuntimePorts.swift) | Injected resource arbitration interface and runtime dependencies; perception connections are supplied by App composition |
-| [CameraStorageFactory.swift](CameraStorageFactory.swift) | 注入仓库并选择照片保留策略 |
-| [CameraCaptureWorkflow.swift](CameraCaptureWorkflow.swift) | 录像入口复用 canonical open 子 Action；前置失败停止组合，成功返回真实录像回执 |
-| [CaptureActions.swift](CaptureActions.swift) | 业务函数的参数校验、能力调用与完成值 |
-| [PhotoDispositionWorkflow.swift](PhotoDispositionWorkflow.swift) | 已提交保存结果与提示音失败分离 |
+| [CameraRecordingSession.swift](Video/CameraRecordingSession.swift) | 录像启动/终态/素材处置；与显式设置共享原生配置及回滚事务 |
+| [CameraPhotoSession.swift](Capture/CameraPhotoSession.swift) | 拍照／处置任务、预览身份、呈现确认和反馈作用域 |
+| [CameraPreviewStore.swift](Preview/CameraPreviewStore.swift) | 原图缓存目录、最新图与显式选择、分析图准备和批量保存 |
+| [CameraRuntimePorts.swift](Runtime/CameraRuntimePorts.swift) | Injected resource arbitration interface and runtime dependencies; perception connections are supplied by App composition |
+| [CameraStorageFactory.swift](Preview/CameraStorageFactory.swift) | 注入仓库并选择照片保留策略 |
+| [CameraCaptureWorkflow.swift](Capture/CameraCaptureWorkflow.swift) | PhotoDispositionWorkflow 将已提交保存结果与提示音失败分离；录像入口复用 canonical open 子 Action，前置失败停止组合，成功返回真实录像回执 |
+| [CaptureActions.swift](Capture/CaptureActions.swift) | 业务函数的参数校验、能力调用与完成值 |
+
+## 子目录
+
+根目录只保留 CameraModule、CameraCoordinator 与 CameraExecutionEndpoint；能力文件按职责分目录：
+
+| 目录 | 职责 |
+| --- | --- |
+| [Capture](Capture/) | 拍照／采集业务函数、单次采集组合、拍照会话与采集活动事件 |
+| [Video](Video/) | 录像业务函数与录像会话 |
+| [Perception](Perception/) | 背景视觉／跟随函数 |
+| [Album](Album/) | 私有相册服务 |
+| [Preview](Preview/) | 预览缓存与照片保留策略 |
+| [Runtime](Runtime/) | 注入的资源仲裁端口、基于执行引擎的绑定与单槽交互工作流 |
 
 ## 状态、完成与清理
 

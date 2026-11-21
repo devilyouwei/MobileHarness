@@ -110,7 +110,9 @@ import Testing
 @Test(.actionCatalog) func localCatalogInstallationIsImmutableAndOrderIndependent() throws {
     let before = try AgentConfigurations.load(named: "Writer").capabilities.tools.map(\.path)
     try AgentConfigurations.installDeclarations(
-        CapabilityModules.declarations.reversed(), localTools: AgentContracts.localTools.reversed())
+        CapabilityModules.declarations.reversed(), localTools: AgentContracts.localTools.reversed(),
+        translations: ActionLocalization.translations(
+            for: CapabilityModules.declarations, resourceRoot: AgentConfigurations.actionResourceRoot()))
     #expect(try AgentConfigurations.load(named: "Writer").capabilities.tools.map(\.path) == before)
     #expect(throws: AgentConfigurationError.self) {
         try AgentConfigurations.installDeclarations(CapabilityModules.declarations)
@@ -134,4 +136,48 @@ import Testing
     }
     try CapabilityCoverage.validate(catalog: catalog, capabilities: [capabilities], locallyExecutedTools: [path])
     #expect(!capabilities.permits(ToolCall(id: "model", toolPath: path)))
+}
+
+@Test func actionTranslationsOverlayDeclarationsAndKeepDefaultsForMissingEntries() throws {
+    let declarations = CapabilityModules.declarations
+    let translations = try ActionLocalization.translations(
+        for: declarations, resourceRoot: AgentConfigurations.actionResourceRoot())
+    let chinese = try #require(translations["zh-Hans"])
+    #expect(translations.keys.sorted() == ["zh-Hans"])
+    let declaration = try #require(declarations.first { $0.path.description == "UI.Island.setPresentation" })
+    let translated = declaration.localized(try #require(chinese[declaration.path.description]))
+    #expect(translated.doc != declaration.doc)
+    #expect(translated.parameters.map(\.name) == declaration.parameters.map(\.name))
+    #expect(translated.parameters.map(\.valueType) == declaration.parameters.map(\.valueType))
+    let untranslated = try #require(declarations.first { chinese[$0.path.description] == nil })
+    #expect(untranslated.localized(.init(description: "x")).parameters == untranslated.parameters)
+}
+
+@Test func actionTranslationsRejectUnknownFunctionsAndParameters() throws {
+    let declarations = CapabilityModules.declarations
+    #expect(throws: ActionLocalizationError.self) {
+        try ActionLocalization.translations(
+            for: declarations.filter { $0.path.description != "UI.Island.setPresentation" },
+            resourceRoot: AgentConfigurations.actionResourceRoot())
+    }
+}
+
+@Test func everySkillBoundActionHasChineseTranslation() throws {
+    let declarations = CapabilityModules.declarations
+    let chinese = try #require(
+        try ActionLocalization.translations(
+            for: declarations, resourceRoot: AgentConfigurations.actionResourceRoot())["zh-Hans"])
+    let skills = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent(
+            "MobileHarness/Resources/Skills")
+    let known = Set(declarations.map { $0.path.description })
+    var bound: Set<String> = []
+    for case let url as URL in try #require(FileManager.default.enumerator(at: skills, includingPropertiesForKeys: nil))
+    where url.lastPathComponent == "Skill.json" {
+        let object = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        let actions = try #require(object["useActions"] as? [[String: Any]])
+        bound.formUnion(actions.compactMap { $0["path"] as? String }.filter(known.contains))
+    }
+    #expect(!bound.isEmpty)
+    #expect(bound.filter { chinese[$0] == nil }.sorted().isEmpty)
 }

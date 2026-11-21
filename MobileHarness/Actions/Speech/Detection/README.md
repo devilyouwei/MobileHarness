@@ -12,10 +12,9 @@
 
 | 文件 | 当前职责 |
 | --- | --- |
-| [AudioDetectionCapabilities.swift](AudioDetectionCapabilities.swift) | 检测执行端口 |
+| [AudioDetectionCapabilities.swift](AudioDetectionCapabilities.swift) | 检测执行端口及角色产生的检测测量值类型 |
 | [AudioDetectionPresentation.swift](AudioDetectionPresentation.swift) | 检测就绪信号、UI 代际与操作完成 |
 | [AudioDetectionExecution.swift](AudioDetectionExecution.swift) | 原生检测准备、采集事实和清理 |
-| [AudioDetectionTypes.swift](AudioDetectionTypes.swift) | 角色产生的检测测量值 |
 | [DetectionActions.swift](DetectionActions.swift) | 业务函数的参数校验、能力调用与完成值 |
 
 [所属域设计](../README.md) · [Actions 模块](../../README.md)

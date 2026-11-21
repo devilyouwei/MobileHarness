@@ -16,7 +16,7 @@ The three visible lanes generally exist, but the implementation does not uniform
 
 ### 1. Bluetooth page visibility performs business work outside the request path
 
-[ActionsUIFacades](../../MobileHarness/Actions/ActionsUIFacades.swift) injects direct pageVisibility callbacks into BluetoothInteractionWorkflow. UI page appearance calls openPage, which reaches [NexArmControlService.openPage](../../MobileHarness/Actions/NexArm/NexArmControlService.swift): it starts scanning when disconnected. Page disappearance stops scanning through the same direct service path. Explicit scan/stop buttons instead submit DeviceInput through Agent/Gateway execution.
+[ActionsUIFacades](../../MobileHarness/Actions/Composition/ActionsUIFacades.swift) injects direct pageVisibility callbacks into BluetoothInteractionWorkflow. UI page appearance calls openPage, which reaches [NexArmControlService.openPage](../../MobileHarness/Actions/NexArm/NexArmControlService.swift): it starts scanning when disconnected. Page disappearance stops scanning through the same direct service path. Explicit scan/stop buttons instead submit DeviceInput through Agent/Gateway execution.
 
 This makes equivalent discovery operations follow different admission, correlation and result paths. Separate presentation visibility from discovery intent and route discovery business requests through the owning Agent. Keep the existing immediate motor stop/fence mechanism explicit: it is a physical-control safety/cancellation path, not ordinary presentation, and must not be delayed merely to standardize request routing.
 

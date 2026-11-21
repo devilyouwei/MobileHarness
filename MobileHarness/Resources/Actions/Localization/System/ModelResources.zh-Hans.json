@@ -1,0 +1,30 @@
+{
+  "entries": {
+    "cancel": {
+      "description": "取消真实 ID 对应的当前下载。",
+      "parameters": {
+        "id": {
+          "description": "对应业务的准确标识，使用 State 或实际返回值。"
+        }
+      }
+    },
+    "download": {
+      "description": "用确认的来源及蜂窝网络选择启动指定模型下载。",
+      "parameters": {
+        "allowsCellular": {
+          "description": "是否允许使用蜂窝网络。"
+        },
+        "endpoint": {
+          "description": "确认的下载服务来源。"
+        },
+        "id": {
+          "description": "对应业务的准确标识，使用 State 或实际返回值。"
+        }
+      }
+    },
+    "snapshotResources": {
+      "description": "查询模型制品、安装状态和当前传输进度。",
+      "parameters": {}
+    }
+  }
+}

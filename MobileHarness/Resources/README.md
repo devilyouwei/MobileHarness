@@ -34,7 +34,7 @@ flowchart TB
 
 ## Packaging contract
 
-Agent prompt translations use `.zh-Hans` siblings in the existing role and Skill directories. Unsuffixed prompt resources are English and provide runtime fallback. The packaged-resource check compares both versions’ template keys and interpolation variables. Role and Skill descriptions and localizable function prose are projected by stable identifiers while their declarations remain canonical.
+Action resources live in [Actions/](Actions/README.md), packaged into the Agents resource bundle as `Localization/` and read only by `ActionLocalization`, which receives the directory from `AgentConfigurations.actionResourceRoot()`. Agent prompt translations use `.zh-Hans` siblings in the existing role and Skill directories. Unsuffixed prompt resources are English and provide runtime fallback. The packaged-resource check compares both versions’ template keys and interpolation variables. Role and Skill descriptions and localizable function prose are projected by stable identifiers while their declarations remain canonical.
 
 The bundle contains source declarations/license notices, not model weights. Catalog declarations identify acquirable artifacts; installed receipts record actual sandbox installation. Neither proves capability readiness or selects an active provider. ModelKit owns paths; ModelKit Defaults combines installation state, compatibility and preferences.
 

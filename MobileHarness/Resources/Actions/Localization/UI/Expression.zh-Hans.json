@@ -1,0 +1,20 @@
+{
+  "entries": {
+    "express": {
+      "description": "执行一次表情演出并等待完成后恢复基础表情。",
+      "parameters": {
+        "emotion": {
+          "description": "当前目录支持的表情。"
+        }
+      }
+    },
+    "setExpression": {
+      "description": "设置持续表情或清除为当前中性姿态。",
+      "parameters": {
+        "emotion": {
+          "description": "当前目录支持的表情。"
+        }
+      }
+    }
+  }
+}

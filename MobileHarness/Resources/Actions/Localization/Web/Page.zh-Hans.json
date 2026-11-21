@@ -1,0 +1,42 @@
+{
+  "entries": {
+    "browse": {
+      "description": "在新窗口或指定窗口浏览 HTTP(S) 页面，返回真实页面信息。",
+      "parameters": {
+        "url": {
+          "description": "要浏览的完整 HTTP 或 HTTPS 地址。"
+        },
+        "windowID": {
+          "description": "State 或回执返回的实际窗口 ID。"
+        }
+      }
+    },
+    "inspect": {
+      "description": "读取现有网页窗口当前页面的标题和文本。",
+      "parameters": {
+        "windowID": {
+          "description": "State 或回执返回的实际窗口 ID。"
+        }
+      }
+    },
+    "navigate": {
+      "description": "在现有网页窗口执行历史导航、刷新或滚动。",
+      "parameters": {
+        "command": {
+          "description": "导航或滚动指令，使用当前目录中的取值。"
+        },
+        "windowID": {
+          "description": "State 或回执返回的实际窗口 ID。"
+        }
+      }
+    },
+    "snapshot": {
+      "description": "捕获现有网页窗口的当前可见区域。",
+      "parameters": {
+        "windowID": {
+          "description": "State 或回执返回的实际窗口 ID。"
+        }
+      }
+    }
+  }
+}

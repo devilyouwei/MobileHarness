@@ -10,15 +10,17 @@ public enum AgentConfigurations {
         var functions: AgentFunctionCatalog?
         var agents: [String: AgentConfiguration] = [:]
         var skills: [String: Skill] = [:]
-        var functionCopy: AgentFunctionCopy?
+        var toolTranslations: [String: [String: ActionTranslation]] = [:]
     }
     private static let cache = Cache()
     /// Install the production projection before loading any Agent or Skill registry.
     /// Identical reinstallation is harmless; replacement cannot mutate cached/in-flight catalogs.
     public static func installDeclarations(
-        _ declarations: [ActionDeclaration], localTools: [AgentLocalTool] = []
+        _ declarations: [ActionDeclaration], localTools: [AgentLocalTool] = [],
+        translations: [String: [String: ActionTranslation]] = [:]
     ) throws {
-        let catalog = try AgentFunctionCatalog(declarations: declarations, localTools: localTools)
+        let catalog = try AgentFunctionCatalog(
+            declarations: declarations, localTools: localTools, translations: translations)
         try cache.lock.withLock {
             if let installed = cache.functions {
                 guard installed == catalog else {
@@ -200,6 +202,10 @@ public enum AgentConfigurations {
         }
         return value
     }
+    /// Resource bundle root; it holds the packaged `Resources/Actions/Localization` that Actions localization reads.
+    public static func actionResourceRoot() throws -> URL {
+        try resourceRoot(in: Bundle.module)
+    }
     static func resourceRoot(in bundle: Bundle) throws -> URL {
         guard let catalog = bundle.url(forResource: "Catalog", withExtension: "json") else {
             throw AgentConfigurationError.resourceMissing("Catalog.json")
@@ -325,7 +331,7 @@ public enum AgentConfigurations {
         return configuration
     }
     public static func registry(_ bindings: [Binding], owner: AgentID? = nil) throws -> CapabilityRegistry {
-        let d = try declaration(bindings, owner: owner, localize: AgentPrompts.language == "zh-Hans")
+        let d = try declaration(bindings, owner: owner, localize: true)
         var root: [String: Any] = [
             "version": 9, "id": "catalog", "category": "perception", "actions": d.actions, "tools": d.tools,
             "scheduling": d.scheduling,
@@ -346,7 +352,7 @@ public enum AgentConfigurations {
         var actions: [String: [[String: Any]]] = ["Speech": [], "Display": []]
         var tools: [[String: Any]] = []
         var scheduling: [String] = []
-        let copy = localize ? try functionCopy() : nil
+        let language = localize ? AgentPrompts.language : "en"
         for binding in bindings {
             if binding.isSchedulingWait {
                 guard binding.path == Binding.schedulingWaitPath, binding.alias == "wait", binding.channel == nil
@@ -360,7 +366,7 @@ public enum AgentConfigurations {
             else {
                 throw AgentConfigurationError.invalidField(binding.path)
             }
-            let declaration = copy.map { localized(canonical, copy: $0) } ?? canonical
+            let declaration = try localized(canonical, language: language, in: functions)
             let definition = try declaration.actionObject(alias: binding.alias)
             if binding.callType == "action" {
                 guard let channel = binding.channel else { throw AgentConfigurationError.invalidField("channel") }
@@ -381,39 +387,30 @@ public enum AgentConfigurations {
         return (actions, tools, scheduling)
     }
 
-    static func functionCopy() throws -> AgentFunctionCopy? {
-        if let value = cache.lock.withLock({ cache.functionCopy }) { return value }
+    /// Action text comes from the injected catalog; Agent-owned local tools carry their translations as resources.
+    static func localized(_ declaration: ActionDeclaration, language: String, in catalog: AgentFunctionCatalog) throws
+        -> ActionDeclaration
+    {
+        guard language != "en" else { return declaration }
+        if let translated = catalog.translations[language]?[declaration.path.description] {
+            return declaration.localized(translated)
+        }
+        let tools = try toolTranslations(language: language)
+        return tools[declaration.path.description].map(declaration.localized) ?? declaration
+    }
+
+    private static func toolTranslations(language: String) throws -> [String: ActionTranslation] {
+        if let value = cache.lock.withLock({ cache.toolTranslations[language] }) { return value }
+        struct File: Decodable { let entries: [String: ActionTranslation] }
+        var result: [String: ActionTranslation] = [:]
         do {
-            let copy = try JSONDecoder().decode(
-                AgentFunctionCopy.self, from: data("Agents/Shared/FunctionCopy.zh-Hans.json"))
-            cache.lock.withLock { cache.functionCopy = copy }
-            return copy
-        } catch let error as CocoaError where error.code == .fileReadNoSuchFile { return nil }
+            for owner in ["Writer"] {
+                let file = try JSONDecoder().decode(
+                    File.self, from: data("Agents/\(owner)/Tools.\(language).json"))
+                for (title, translation) in file.entries { result["Agent.\(owner).\(title)"] = translation }
+            }
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile { result = [:] }
+        cache.lock.withLock { cache.toolTranslations[language] = result }
+        return result
     }
-
-    static func localized(_ declaration: ActionDeclaration, copy: AgentFunctionCopy) -> ActionDeclaration {
-        guard let text = copy.entries[declaration.path.description] else { return declaration }
-        let parameters = declaration.parameters.map { parameter in
-            let translation = text.parameters[parameter.name]
-            return ActionParameter(
-                parameter.name, type: parameter.valueType, required: parameter.required,
-                description: translation?.description ?? parameter.description,
-                constraints: translation?.constraints ?? parameter.constraints, values: parameter.values)
-        }
-        return ActionDeclaration(path: declaration.path, doc: text.description, parameters: parameters)
-    }
-}
-
-struct AgentFunctionCopy: Decodable {
-    struct Entry: Decodable {
-        struct Parameter: Decodable {
-            let description: String
-            let constraints: String?
-        }
-
-        let description: String
-        let parameters: [String: Parameter]
-    }
-
-    let entries: [String: Entry]
 }

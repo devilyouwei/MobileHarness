@@ -1,0 +1,102 @@
+{
+  "entries": {
+    "celebrate": {
+      "description": "执行庆祝动作后归位。",
+      "parameters": {
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        },
+        "cycles": {
+          "description": "重复次数。"
+        },
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        }
+      }
+    },
+    "dance": {
+      "description": "执行舞蹈动作后归位。",
+      "parameters": {
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        },
+        "cycles": {
+          "description": "重复次数。"
+        },
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        }
+      }
+    },
+    "lookAround": {
+      "description": "左右张望后归位。",
+      "parameters": {
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        },
+        "cycles": {
+          "description": "重复次数。"
+        },
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        }
+      }
+    },
+    "nodHead": {
+      "description": "执行点头后归位。",
+      "parameters": {
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        },
+        "cycles": {
+          "description": "重复次数。"
+        },
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        }
+      }
+    },
+    "shakeHead": {
+      "description": "执行摇头后归位。",
+      "parameters": {
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        },
+        "cycles": {
+          "description": "重复次数。"
+        },
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        }
+      }
+    },
+    "tiltWrist": {
+      "description": "向指定方向歪头后归位。",
+      "parameters": {
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        },
+        "direction": {
+          "description": "动作方向，以当前目录获准值为准。"
+        },
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        }
+      }
+    },
+    "waveWrist": {
+      "description": "执行挥手后归位。",
+      "parameters": {
+        "acceleration": {
+          "description": "电机原生位置模式加速度。"
+        },
+        "count": {
+          "description": "执行次数。"
+        },
+        "speed": {
+          "description": "电机原生位置模式速度。"
+        }
+      }
+    }
+  }
+}

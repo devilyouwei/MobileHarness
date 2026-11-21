@@ -1,0 +1,42 @@
+{
+  "entries": {
+    "ask": {
+      "description": "向用户询问继续工作所需的必要信息。",
+      "parameters": {
+        "question": {
+          "description": "用户需回答的具体问题。"
+        }
+      }
+    },
+    "create": {
+      "description": "创建工作区、初始化空入口并进入编辑。独立回合调用。",
+      "parameters": {
+        "entry": {
+          "description": "工作区相对入口文件路径，例如 flowchart.html。"
+        },
+        "title": {
+          "description": "使用用户语言的非空显示标题。"
+        }
+      }
+    },
+    "enter": {
+      "description": "进入已经确认的工作区。切换时保留旧草稿，独立回合调用。",
+      "parameters": {
+        "workspaceID": {
+          "description": "真实工作区 ID。"
+        }
+      }
+    },
+    "finish": {
+      "description": "独立回合结束当前委托并报告真实结果。",
+      "parameters": {
+        "outcome": {
+          "description": "委托结果类型。使用当前声明的值。"
+        },
+        "summary": {
+          "description": "简短且真实的结果摘要。"
+        }
+      }
+    }
+  }
+}

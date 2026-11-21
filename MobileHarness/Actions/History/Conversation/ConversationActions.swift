@@ -5,7 +5,9 @@ import UI
 
 /// History.Conversation function ownership.
 extension HistoryActions {
-    @Action(domain: "History", module: "Conversation", title: "clearLogs")
+    @Action(
+        domain: "History", module: "Conversation", title: "clearLogs",
+        doc: "Clear the stored request logs, optionally limited to one request by its canonical requestID.")
     public static func clearLogs(invocation: any FunctionInput, using history: any HistoryMutationCapability)
         async throws
     {
@@ -17,7 +19,11 @@ extension HistoryActions {
         try await history.clearRequestLogs(requestID: input)
     }
 
-    @Action(domain: "History", module: "Conversation", title: "startNew")
+    @Action(
+        domain: "History", module: "Conversation", title: "startNew",
+        doc:
+            "Archive the current conversation and start a new one. Returns the archived conversation identifier, or null when nothing was archived."
+    )
     public static func startNew(invocation: any FunctionInput, using history: any HistoryMutationCapability)
         async throws -> String
     {
@@ -30,6 +36,7 @@ extension HistoryActions {
 
     @Action(
         domain: "History", module: "Conversation", title: "summarize",
+        doc: "Generate a title for an archived conversation identified by its canonical dialog id.",
         timeout: .seconds(60))
     public static func summarize(invocation: any FunctionInput, using history: any HistoryMutationCapability)
         async throws
@@ -46,7 +53,8 @@ extension HistoryActions {
     }
 
     @Action(
-        domain: "History", module: "Conversation", title: "delete")
+        domain: "History", module: "Conversation", title: "delete",
+        doc: "Delete an archived conversation identified by its canonical dialog id.")
     public static func delete(invocation: any FunctionInput, using history: any HistoryMutationCapability) async throws
     {
         try Task.checkCancellation()

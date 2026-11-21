@@ -71,3 +71,36 @@ public struct ActionDeclaration: Codable, Sendable, Equatable {
         ]
     }
 }
+
+/// Translated model-facing prose for one function. Names, types, requirements and enum values are never translated.
+public struct ActionTranslation: Codable, Sendable, Equatable {
+    public struct Parameter: Codable, Sendable, Equatable {
+        public let description: String
+        public let constraints: String?
+        public init(description: String, constraints: String? = nil) {
+            self.description = description
+            self.constraints = constraints
+        }
+    }
+    public let description: String
+    public let parameters: [String: Parameter]
+    public init(description: String, parameters: [String: Parameter] = [:]) {
+        self.description = description
+        self.parameters = parameters
+    }
+}
+
+extension ActionDeclaration {
+    /// Overlay a translation; absent parameter entries keep the declaration's default-language text.
+    public func localized(_ translation: ActionTranslation) -> ActionDeclaration {
+        ActionDeclaration(
+            path: path, doc: translation.description,
+            parameters: parameters.map { parameter in
+                let text = translation.parameters[parameter.name]
+                return ActionParameter(
+                    parameter.name, type: parameter.valueType, required: parameter.required,
+                    description: text?.description ?? parameter.description,
+                    constraints: text?.constraints ?? parameter.constraints, values: parameter.values)
+            })
+    }
+}

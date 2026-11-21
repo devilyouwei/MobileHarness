@@ -28,6 +28,8 @@ if pathlib.Path(lookup).resolve() != (bundle / 'Catalog.json').resolve():
 expected = {pathlib.Path('Catalog.json'): source / 'Catalog.json'}
 for group in ('Agents', 'Skills'):
     expected.update({p.relative_to(source): p for p in (source / group).rglob('*') if p.is_file()})
+# Action translations are copied to the bundle root as Localization/.
+expected.update({p.relative_to(source / 'Actions'): p for p in (source / 'Actions/Localization').rglob('*') if p.is_file()})
 for name in ('OutputProtocol.md', 'ActionCatalog.json', 'SkillCatalog.json', 'AgentCatalog.json', 'RequestContext.json'):
     path = pathlib.Path('Agents/Shared') / name
     if path not in expected:
@@ -67,7 +69,6 @@ for path, original in expected.items():
             raise SystemExit(f'Template placeholder mismatch: {path}:{key}')
 catalog = json.loads((bundle / 'Catalog.json').read_text())
 descriptions = json.loads((bundle / 'Agents/Shared/Descriptions.zh-Hans.json').read_text())['templates']
-functions = json.loads((bundle / 'Agents/Shared/FunctionCopy.zh-Hans.json').read_text())['entries']
 for path in catalog['agents'].values():
     metadata = json.loads((bundle / path).read_text())
     if not descriptions.get(f"agent.{metadata['id']}"):
@@ -77,11 +78,6 @@ for path in catalog['skills'].values():
     key = metadata['id'].replace('-', '_')
     if not descriptions.get(f'skill.{key}'):
         raise SystemExit(f'Missing Chinese Skill description: {path}')
-    for binding in metadata['useActions']:
-        if binding['callType'] == 'scheduling':
-            continue
-        if not functions.get(binding['path'], {}).get('description'):
-            raise SystemExit(f"Missing Chinese function description: {binding['path']}")
 for name in ('Input/InputProtocol.json', 'Input/InputDecision.json', 'Controls/Controls.json', 'Controls/Controls.md', 'Prompts.json', 'Instructions.md'):
     if not (bundle / 'Agents/Assistant' / name).is_file():
         raise SystemExit(f'Missing Assistant prompt resource: {name}')

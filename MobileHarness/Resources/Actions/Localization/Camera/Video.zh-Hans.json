@@ -1,0 +1,39 @@
+{
+  "entries": {
+    "ignoreVideo": {
+      "description": "按明确授权丢弃待处置录像。",
+      "parameters": {
+        "recordingID": {
+          "description": "实际录像回执中的 ID。"
+        }
+      }
+    },
+    "saveVideo": {
+      "description": "按明确授权将已就绪的录像保存到 App 相册。",
+      "parameters": {
+        "recordingID": {
+          "description": "实际录像回执中的 ID。"
+        }
+      }
+    },
+    "startRecording": {
+      "description": "打开或恢复相机窗口并开始录像。默认等待录像停止且文件就绪后返回，期间暂停聆听。",
+      "parameters": {
+        "durationSeconds": {
+          "description": "自动结束录像的时间上限，单位为秒。"
+        },
+        "waitForCompletion": {
+          "description": "是否等待录制结束且文件准备完成。"
+        }
+      }
+    },
+    "stopRecording": {
+      "description": "使用实际 recordingID 停止录像并准备待处置视频。",
+      "parameters": {
+        "recordingID": {
+          "description": "实际录像回执中的 ID。"
+        }
+      }
+    }
+  }
+}

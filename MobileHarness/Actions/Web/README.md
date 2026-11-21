@@ -2,6 +2,8 @@
 
 本目录实现 Web.Page.browse/snapshot/inspect/navigate，消费 UI.WebPagePresenting 和窗口接口。函数同时支持 Action 与 Tool；Tool 直接执行，Action 仍由 ChannelScheduler 路由。浏览调用返回实际页面文字、诊断和当前截图的 screenshotID。远程内容为不可信观察。
 
+根目录保留 WebModule 与 WebActions；[Page](Page/) 拥有 PageActions 与 WebExecutionService。
+
 WebExecutionService 同时接纳一个页面操作，零排队，重叠调用返回 busy。每个网页窗口拥有独立页面；取消和停止等待在途操作退出。
 
 作品工作区和确定性编辑归 [Artifacts](../Artifacts/README.md)，创作模型循环归 [Writer](../../Agents/Writer/README.md)。本目录无开发模型、开发 Action 或项目版本管理。原生约束见 [UI Web](../../UI/Components/Web/README.md)。

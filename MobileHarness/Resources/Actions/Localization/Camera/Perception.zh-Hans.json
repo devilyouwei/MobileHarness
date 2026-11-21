@@ -1,0 +1,24 @@
+{
+  "entries": {
+    "closeVision": {
+      "description": "关闭后台视觉识别并释放其控制。",
+      "parameters": {}
+    },
+    "flipVision": {
+      "description": "切换后台视觉使用的镜头。",
+      "parameters": {
+        "facing": {
+          "description": "目标镜头方向。"
+        }
+      }
+    },
+    "openVision": {
+      "description": "打开后台视觉识别和可用的姿态观察。不会打开拍摄窗口。",
+      "parameters": {}
+    },
+    "retryVision": {
+      "description": "重试失败的后台视觉识别。",
+      "parameters": {}
+    }
+  }
+}

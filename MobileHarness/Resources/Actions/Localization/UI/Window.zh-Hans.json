@@ -1,0 +1,58 @@
+{
+  "entries": {
+    "close": {
+      "description": "关闭指定窗口，依当前窗口的关闭规则处理未完成内容。",
+      "parameters": {
+        "windowID": {
+          "description": "State 或回执返回的实际窗口 ID。"
+        }
+      }
+    },
+    "focus": {
+      "description": "将现有窗口置于前台。",
+      "parameters": {
+        "windowID": {
+          "description": "State 或回执返回的实际窗口 ID。"
+        }
+      }
+    },
+    "maximize": {
+      "description": "最大化指定窗口。",
+      "parameters": {
+        "windowID": {
+          "description": "State 或回执返回的实际窗口 ID。"
+        }
+      }
+    },
+    "minimize": {
+      "description": "最小化指定窗口并保留其内容。",
+      "parameters": {
+        "windowID": {
+          "description": "State 或回执返回的实际窗口 ID。"
+        }
+      }
+    },
+    "move": {
+      "description": "在允许范围内移动指定窗口。",
+      "parameters": {
+        "windowID": {
+          "description": "State 或回执返回的实际窗口 ID。"
+        },
+        "x": {
+          "description": "横向位置的归一化比例。"
+        },
+        "y": {
+          "description": "纵向位置的归一化比例。"
+        }
+      }
+    },
+    "restore": {
+      "description": "恢复指定窗口。",
+      "parameters": {
+        "windowID": {
+          "description": "State 或回执返回的实际窗口 ID。"
+        }
+      }
+    }
+  }
+}

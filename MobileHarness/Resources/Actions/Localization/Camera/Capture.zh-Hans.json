@@ -1,0 +1,87 @@
+{
+  "entries": {
+    "cancelCapture": {
+      "description": "停止并等待当前拍照倒计时取消。保留已拍照片和正在录制的视频。",
+      "parameters": {}
+    },
+    "close": {
+      "description": "关闭拍摄窗口。存在待处置录像时先明确保存或忽略。",
+      "parameters": {}
+    },
+    "configure": {
+      "description": "仅更新提供的拍摄参数。待处理媒体会阻止切换模式，录像时闪光灯必须关闭。",
+      "parameters": {
+        "delaySeconds": {
+          "description": "本次拍摄倒计时秒数，零表示立即拍摄。"
+        },
+        "durationSeconds": {
+          "description": "自动结束录像的时间上限，单位为秒。"
+        },
+        "flash": {
+          "description": "闪光灯模式。"
+        },
+        "mode": {
+          "description": "照片或视频模式。"
+        },
+        "zoom": {
+          "description": "相机变焦倍率。"
+        }
+      }
+    },
+    "flip": {
+      "description": "按请求切换当前拍摄窗口所用镜头。",
+      "parameters": {
+        "facing": {
+          "description": "目标镜头方向。"
+        }
+      }
+    },
+    "loadPreviewImage": {
+      "description": "从当前相机会话加载指定的缓存图像供模型查看。",
+      "parameters": {
+        "previewID": {
+          "description": "实际拍摄或预览 State 返回的预览 ID。"
+        },
+        "previewIDs": {
+          "description": "包含一到五个互不相同的实际预览 ID 的 JSON 数组。"
+        }
+      }
+    },
+    "open": {
+      "description": "打开或恢复相机预览，不拍照。",
+      "parameters": {}
+    },
+    "retry": {
+      "description": "按用户明确意图重试当前失败的拍摄预览。",
+      "parameters": {}
+    },
+    "saveAllPhotos": {
+      "description": "保存当前相机会话中所有尚未保存的照片，并返回逐项实际结果。",
+      "parameters": {}
+    },
+    "savePhoto": {
+      "description": "将当前会话准确的照片原件保存到 App 相册，并从模型 State 卸载。缓存原件仍可查看；失败保留原状态，重复保存幂等。",
+      "parameters": {
+        "previewID": {
+          "description": "实际拍摄或预览 State 返回的预览 ID。"
+        }
+      }
+    },
+    "takePhoto": {
+      "description": "在已打开可见的相机窗口拍一张照片，返回实际 previewID 和图像证据。此调用不打开相机，也不保存相册。已知需要打开相机时在同一响应先发 openCamera。",
+      "parameters": {
+        "delaySeconds": {
+          "description": "本次拍摄倒计时秒数，零表示立即拍摄。"
+        }
+      }
+    },
+    "unloadPreviewImage": {
+      "description": "从模型 State 卸载指定预览，保留缓存中的原件。",
+      "parameters": {
+        "previewID": {
+          "description": "实际拍摄或预览 State 返回的预览 ID。"
+        }
+      }
+    }
+  }
+}

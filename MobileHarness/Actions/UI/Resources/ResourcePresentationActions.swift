@@ -5,6 +5,7 @@ import StorageCore
 extension UIActions {
     @Action(
         domain: "UI", module: "ResourcePresentation", title: "showResources",
+        doc: "Present the model resource inventory for one presentation generation.",
         timeout: .seconds(60))
     public static func showResources(
         invocation: any FunctionInput, inventory: any ModelResourceInventoryCapability,
@@ -21,7 +22,9 @@ extension UIActions {
         return encoded
     }
 
-    @Action(domain: "UI", module: "ResourcePresentation", title: "showResourceFailure", timeout: .seconds(5))
+    @Action(
+        domain: "UI", module: "ResourcePresentation", title: "showResourceFailure",
+        doc: "Present a resource inventory failure message for one presentation generation.", timeout: .seconds(5))
     public static func showResourceFailure(
         invocation: any FunctionInput, using presentation: any ResourcePresentationCapability
     ) async throws {
@@ -34,7 +37,10 @@ extension UIActions {
         try Task.checkCancellation()
     }
 
-    @Action(domain: "UI", module: "ResourcePresentation", title: "showResourceOperationFailure", timeout: .seconds(5))
+    @Action(
+        domain: "UI", module: "ResourcePresentation", title: "showResourceOperationFailure",
+        doc: "Present the failure message of a model resource operation such as download or removal.",
+        timeout: .seconds(5))
     public static func showResourceOperationFailure(
         invocation: any FunctionInput, using presentation: any ResourcePresentationCapability
     ) async throws {
@@ -47,7 +53,8 @@ extension UIActions {
     }
 
     @Action(
-        domain: "UI", module: "ResourcePresentation", title: "showResourcePreferenceFailure", timeout: .seconds(5))
+        domain: "UI", module: "ResourcePresentation", title: "showResourcePreferenceFailure",
+        doc: "Present why saving a model resource preference failed.", timeout: .seconds(5))
     public static func showResourcePreferenceFailure(
         invocation: any FunctionInput, using presentation: any ResourcePresentationCapability
     ) async throws {
@@ -65,7 +72,9 @@ extension UIActions {
         try Task.checkCancellation()
     }
 
-    @Action(domain: "UI", module: "ResourcePresentation", title: "showProviderResult", timeout: .seconds(5))
+    @Action(
+        domain: "UI", module: "ResourcePresentation", title: "showProviderResult",
+        doc: "Present the result of a provider settings or model discovery request.", timeout: .seconds(5))
     public static func showProviderResult(
         invocation: any FunctionInput, using presentation: any ResourcePresentationCapability
     ) async throws {

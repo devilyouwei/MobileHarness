@@ -1,0 +1,15 @@
+{
+  "entries": {
+    "setPresentation": {
+      "description": "调整指定灵动岛活动的展开状态。详情可展开，状态条保持独立。",
+      "parameters": {
+        "activityID": {
+          "description": "实际灵动岛活动 ID。"
+        },
+        "size": {
+          "description": "呈现尺寸，取自已声明值。"
+        }
+      }
+    }
+  }
+}

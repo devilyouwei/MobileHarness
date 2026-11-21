@@ -553,7 +553,8 @@ let package = Package(
         .target(
             name: "Actions",
             dependencies: [
-                "BehaviorDefinitions", "CallRuntime", "ExecutionRuntime", "FunctionContracts", "ModelKit",
+                "BehaviorDefinitions", "CallRuntime", "ExecutionRuntime", "FunctionContracts",
+                "ModelKit",
                 "ModelKitDefaults", "ModelKitOpenAI", "ModelKitRuntime", "PlatformKit", "StorageCache",
                 "StorageChat", "StorageCore", "StorageDevices", "StorageFiles", "StorageDatabase", "StorageMedia", "UI",
             ],
@@ -614,11 +615,15 @@ let package = Package(
                 "Agents/Support/Core/Output/README.md", "Agents/Support/Core/README.md",
                 "Agents/Support/Core/Runtime/README.md", "Agents/Support/README.md",
                 "Agents/VisionPerception/README.md", "App", "Gateway", "ModelKit", "PlatformKit", "README.md",
-                "Resources/Agents/README.md", "Resources/AppIconVariants", "Resources/Assets.xcassets",
+                "Resources/Actions/README.md", "Resources/Agents/README.md", "Resources/AppIconVariants",
+                "Resources/Assets.xcassets",
                 "Resources/Models",
                 "Resources/PrivacyInfo.xcprivacy", "Resources/README.md", "Storage", "UI",
             ], sources: ["Agents"],
-            resources: [.copy("Resources/Agents"), .copy("Resources/Skills"), .copy("Resources/Catalog.json")]),
+            resources: [
+                .copy("Resources/Actions/Localization"), .copy("Resources/Agents"), .copy("Resources/Skills"),
+                .copy("Resources/Catalog.json"),
+            ]),
         .target(
             name: "StorageCore", dependencies: [], path: "MobileHarness/Storage",
             exclude: [

@@ -564,7 +564,7 @@ if 'ToolHandler' in macro_implementation or 'ToolCompletionHandler' in macro_imp
 if (actions_root / 'ToolMacro.swift').exists():
     errors.append('Retired @Tool macro must not be recreated')
 expected_domains = {'UI', 'Speech', 'Camera', 'History', 'System', 'NexArm', 'Web', 'Artifacts'}
-domains = {p.name for p in actions_root.iterdir() if p.is_dir()} - {'Support'}
+domains = {p.name for p in actions_root.iterdir() if p.is_dir()} - {'Support', 'Composition'}
 if domains != expected_domains:
     errors.append(f'Executable business domains must be classified explicitly: {domains}')
 # Layout follows capability ownership, independently of call protocol or directory depth.
@@ -615,20 +615,20 @@ for name in sorted(expected_domains):
 for retired in ('ActionModules.swift', 'ToolModules.swift'):
     if (actions_root / retired).exists():
         errors.append(f'Production catalogs must use CapabilityModules instead of {retired}')
-assembly = (actions_root / 'BehaviorAssembly.swift').read_text()
+assembly = (actions_root / 'Composition/BehaviorAssembly.swift').read_text()
 if 'CapabilityModules.builtIn' not in assembly or 'CapabilityCatalog(modules:' not in assembly or 'bindings.actions' not in assembly or 'bindings.tools' not in assembly or 'BehaviorProtocolBindings.bind' not in assembly:
     errors.append('BehaviorAssembly must project both registries from one business-domain catalog')
 # Generic Support cannot depend on concrete production catalogs or own native services.
 for source in (actions_root / 'Support').rglob('*.swift'):
     if 'Contracts' in source.relative_to(actions_root / 'Support').parts:
         continue
-    if source.name != 'ActionMacro.swift' and source.resolve() not in target_sources(targets['ExecutionRuntime']) | target_sources(targets['CallRuntime']):
+    if source.name not in ('ActionMacro.swift', 'ActionLocalization.swift') and source.resolve() not in target_sources(targets['ExecutionRuntime']) | target_sources(targets['CallRuntime']):
         errors.append(f'Business implementation in shared Action Support: {source.relative_to(ROOT)}')
 for relative in ('CapabilityModules.swift', 'Speech/SpeechModule.swift', 'UI/UIModule.swift'):
     if re.search(r'as\? any \w+Capability', (actions_root / relative).read_text()):
         errors.append(f'Catalog must inject capabilities explicitly: {relative}')
 for relative, forbidden in {
-    'UI/RuntimePresentation.swift': ('CameraControlCapability', 'SpeechPlaybackCapability', 'AudioDetectionCapability'),
+    'UI/Runtime/RuntimePresentation.swift': ('CameraControlCapability', 'SpeechPlaybackCapability', 'AudioDetectionCapability'),
     'Camera/CameraExecutionEndpoint.swift': ('JSONEncoder', 'JSONDecoder'),
 }.items():
     if any(marker in (actions_root / relative).read_text() for marker in forbidden):
@@ -706,7 +706,7 @@ for relative in (
     'Actions/System/Diagnostics/SpeechDiagnosticWorkflow.swift',
     'Actions/System/Provider/SettingsProviderAdapter.swift',
     'Actions/System/ModelResources/SettingsModelResourcesAdapter.swift',
-    'Actions/History/HistoryPresentationAdapter.swift',
+    'Actions/History/Presentation/HistoryPresentationAdapter.swift',
 ):
     source = ROOT / 'MobileHarness' / relative
     if re.search(r'\bstate\.\w+\s*(?:=(?!=)|\+=)', source.read_text()):
@@ -810,7 +810,7 @@ for path in (ROOT / 'Tests').rglob('*'):
 if list((ROOT / 'Tests/UI').rglob('ModelResourcesStateTests.swift')):
     errors.append('Resource operation tests belong to AppWorkflowTests')
 # History deletion must be selected by Agents/Tools, never the legacy host workflow.
-legacy_history = (ROOT / 'MobileHarness/Actions/History/ConversationHistoryWorkflow.swift').read_text()
+legacy_history = (ROOT / 'MobileHarness/Actions/History/Conversation/ConversationHistoryWorkflow.swift').read_text()
 if 'store.deleteArchived(' in legacy_history:
     errors.append('History mutation/inference bypasses the Agent capability path')
 # Discovery/connection presentation must not consume device Action diagnostics.
@@ -850,10 +850,10 @@ if 'preempts:' not in runtime or 'AgentID.assistant.rawValue' not in runtime or 
 if 'bindTracking' not in runtime or '[weak photographerAgent]' not in runtime or 'hasFreshPose()' not in runtime:
     errors.append('Tracking freshness must be bound to the current Photographer without retaining its lifetime')
 assembly = (ROOT / 'MobileHarness/Agents/AgentContainer.swift').read_text()
-history_binding = (ROOT / 'MobileHarness/Actions/History/ConversationHistoryWorkflow.swift').read_text()
+history_binding = (ROOT / 'MobileHarness/Actions/History/Conversation/ConversationHistoryWorkflow.swift').read_text()
 if re.search(r'\b(?:stopVoice|beginSettingsChange|endSettingsChange)\b', history_binding):
     errors.append('Read-only Assistant history preparation must not stop the root listening session')
-camera_admission = (ROOT / 'MobileHarness/Actions/ActionsBusinessAssembly.swift').read_text()
+camera_admission = (ROOT / 'MobileHarness/Actions/Composition/ActionsBusinessAssembly.swift').read_text()
 if 'windows: ui.windows' not in camera_admission or 'camera.setForeground(sceneActive && visible)' in camera_admission:
     errors.append('Camera window lifecycle must be independent of home navigation visibility')
 if 'camera.shutdown()' in assembly or 'bluetooth.setForeground(' in assembly:
@@ -873,7 +873,7 @@ if not all(marker in camera_ownership for marker in ('any CameraCapturing', 'any
     errors.append('Camera execution must receive native and presentation interfaces')
 if re.search(r'\b(?:AppleCamera|CameraCaptureOrientation|CameraState)\b', camera_ownership):
     errors.append('Camera execution acquired a concrete device or UI state dependency')
-if 'CameraCoordinator(' not in (ROOT / 'MobileHarness/Actions/ActionsBusinessAssembly.swift').read_text() or 'ActionsBusinessAssembly(' not in (ROOT / 'MobileHarness/Actions/ActionsContainer.swift').read_text():
+if 'CameraCoordinator(' not in (ROOT / 'MobileHarness/Actions/Composition/ActionsBusinessAssembly.swift').read_text() or 'ActionsBusinessAssembly(' not in (ROOT / 'MobileHarness/Actions/ActionsContainer.swift').read_text():
     errors.append('ActionsContainer must construct its own business assembly')
 for source in (ROOT / 'MobileHarness/App').rglob('*.swift'):
     if re.search(r'\b(?:ActionsBusinessAssembly|BluetoothWorkflow|CameraStorageFactory)\b', source.read_text()):
@@ -1363,7 +1363,7 @@ if re.search(r'\b(?:import Actions|NexArmActionError|NexArmExecutionError|case r
     raise SystemExit('Bluetooth recovery must not depend on Action failures/resources.')
 if 'BluetoothSettingsState' in (ROOT / 'MobileHarness/UI/Conversation/ConversationView.swift').read_text():
     raise SystemExit('Home conversation must not observe Bluetooth state.')
-for filename in ('Actions/UI/RuntimePresentation.swift', 'Actions/Camera/CameraCoordinator.swift', 'UI/Camera/CameraState.swift'):
+for filename in ('Actions/UI/Runtime/RuntimePresentation.swift', 'Actions/Camera/CameraCoordinator.swift', 'UI/Camera/CameraState.swift'):
     source = (ROOT / 'MobileHarness' / filename).read_text()
     if 'trackingMessage' in source or 'trackingStatus' in source:
         raise SystemExit('Tracking execution failures belong only in home scheduling issues.')
@@ -1461,7 +1461,7 @@ if 'publishIssue(issue, showsToast)' not in application_control:
 for source in (ROOT / 'MobileHarness').rglob('*.swift'):
     if 'UI.RuntimeDiagnostics.recordFailure' in source.read_text():
         raise SystemExit(f'Retired runtime diagnostics call remains: {source.relative_to(ROOT)}')
-runtime_presentation = (ROOT / 'MobileHarness/Actions/UI/RuntimePresentation.swift').read_text()
+runtime_presentation = (ROOT / 'MobileHarness/Actions/UI/Runtime/RuntimePresentation.swift').read_text()
 if 'invocation.context.source == "applicationControl"' in runtime_presentation:
     raise SystemExit('Actions must not duplicate Agent role authorization.')
 print('ApplicationControl owns diagnostic policy and directly publishes runtime issues.')

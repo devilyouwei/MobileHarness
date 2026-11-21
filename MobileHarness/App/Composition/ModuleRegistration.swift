@@ -39,7 +39,10 @@ import Gateway
                 id: "executionBindings", dependencies: ["storage", "platform", "ui", "model"],
                 start: {
                     let preparation = try services.agents.prepareExecutionBindings(
-                        declarations: CapabilityModules.declarations)
+                        declarations: CapabilityModules.declarations,
+                        translations: try ActionLocalization.translations(
+                            for: CapabilityModules.declarations, resourceRoot: AgentConfigurations.actionResourceRoot())
+                    )
                     let business = try services.actionAssembly.prepare(preparation.request, actions: services.actions)
                     let binding = try preparation.validate(business)
                     let log = services.actionAssembly.connectActionLog(to: services.uiContainer.runtimeLog)

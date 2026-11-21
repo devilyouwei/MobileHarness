@@ -1,0 +1,12 @@
+{
+  "entries": {
+    "open": {
+      "description": "打开用户请求的 App 页面。",
+      "parameters": {
+        "destination": {
+          "description": "当前目录声明的页面目的地。"
+        }
+      }
+    }
+  }
+}

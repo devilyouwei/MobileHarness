@@ -357,7 +357,8 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     var pausedDelivery = false
     var verifiedIndependent = false
     var sceneHidden = false
-    while !(await sink.signals.contains { $0.kind == .result }) {
+    // Mode 7 keeps polling after the result so the independent-delivery checks cannot be skipped by a fast finish.
+    while !(await sink.signals.contains { $0.kind == .result }) || (mode == 7 && !verifiedIndependent) {
         if mode == 15, !answered, await model.requests == 1 {
             let followUp = AgentTaskRequest(text: "把语气改得轻松一些")
             let independent = AgentTaskRequest(text: "另写一封邮件")

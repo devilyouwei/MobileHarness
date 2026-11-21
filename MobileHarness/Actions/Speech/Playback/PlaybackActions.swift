@@ -6,7 +6,8 @@ import StorageCore
 extension SpeechActions {
     /// Play an existing single-use audio handle; never synthesize text here.
     @Action(
-        domain: "Speech", module: "Playback", title: "Read reply aloud", kind: .finite,
+        domain: "Speech", module: "Playback", title: "Read reply aloud",
+        doc: "Play the synthesized reply audio identified by audioID until playback drains.", kind: .finite,
         completion: "Playback drained and audio lease released.", timeout: .seconds(300))
     public static func speak(
         invocation: any FunctionInput,
