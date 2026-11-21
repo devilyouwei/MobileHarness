@@ -41,17 +41,17 @@ Skill 是可复用的流程与能力集合，Task 是运行时目标、状态和
 | `alias` | 组合目录内唯一的模型调用标识，作为 Action 的 XML 别名或原生 Tool 名称。保留名为 `wait`。 |
 | `channel` | Action 必填，用于调度。原生 Tool 省略此字段。 |
 
-加载了 Skill 即可使用其全部合法 Action，不再维护 Agent 权限上限或重复登记函数。不同 Skill 引用同一 path 时，绑定完全相同才合并；类型、别名或 Channel 冲突时整个加载失败。不同 path 也不能共享 alias；同一函数不能同时作为 Action 和 Tool。send 只能是 Action，不能作为原生 Tool。Task 与 Skill 控制是 Assistant 的固定 control（见 [Agent controls](../../Agents/Support/Core/Capability/README.md#agent-controls)），Skill 不登记、不释放 control；Skill.json 出现 `useControls` 时解码拒绝。组合器没有固定 Task 函数注入特例。
+加载了 Skill 即可使用其全部合法 Action，不再维护 Agent 权限上限或重复登记函数。不同 Skill 引用同一 path 时，绑定完全相同才合并；类型、别名或 Channel 冲突时整个加载失败。不同 path 也不能共享 alias；同一函数不能同时作为 Action 和 Tool。send 只能是 Action，不能作为原生 Tool。Task 与 Skill 控制是 Assistant 的固定 control（见 [Agent controls](../../Agents/Support/Core/Capability/README.md#agent-controls)），Skill 不登记、不释放、不教学 control，control 声明与用法指南由拥有者 Agent 目录的 `Controls.json` 与 `Controls.md` 提供；Skill.json 出现 `useControls` 时解码拒绝。组合器没有固定 Task 函数注入特例。
 
 `doc`、参数 Schema、必填项、约束和完成语义来自函数自己的 `@Action`，不放在 Skill.json。函数不注册 examples；全部业务示例放在 Instructions.md，并遵循真实函数参数与当前 Skill 别名。
 
 [WriterWorkspace](WriterWorkspace/Skill.json) 是 Writer 的基础作品库 Skill，[WriterFileEditing](WriterFileEditing/Skill.json) 随编辑域自动激活。作品库 Skill 声明 Gateway 工具与 Writer 本地工具，区分已知 ID 的直接打开或进入与按名称搜索。文件编辑 Skill 依赖作品库 Skill，编辑阶段同时提供两者的工具与教学。详见 [Writer 工作区分域](../../Agents/Writer/README.md#作品库与工作区分域)。
 
-ExpressionInteraction 教学连续表情演出，提供指定子集的纯串行及“每项语音与表情并行、各项串行”的全量 XML 示例；“所有表情”按当前 express 参数枚举逐项展开，不包括仅用于清除状态的 clear。演出使用完成时等待过渡与恢复的 express，保持默认 Speech/Display Channel；不为有限演出创建需后续用户决策的 Task。资源 revision 随教学递增，通用编排规则由 Core scheduling 模板拥有。
+BasicInteraction 的表情部分教学连续表情演出，提供指定子集的纯串行及“每项语音与表情并行、各项串行”的全量 XML 示例；“所有表情”按当前 express 参数枚举逐项展开，不包括仅用于清除状态的 clear。演出使用完成时等待过渡与恢复的 express，保持默认 Speech/Display Channel；不为有限演出创建需后续用户决策的 Task。资源 revision 随教学递增，`wait` 排序规则由 Actions Shell 的 wait 目录条目（`Shared/ActionCatalog.json`）拥有。
 
 ### useStates 与当前事实
 
-BasicSkill读取agents.applicationcontrol、agents.writer、ui.navigation、全局ui.windows及八个platform.*来源；Photography读取actions.camera、ui.camera、ui.album；RobotInteraction读取actions.robot。加载与依赖合并后去重排序，每次实际模型请求重新读取。CURRENT STATE是数据，不是指令；availability和value表达来源事实。Task／Skill从Agent私有决策快照生成AGENT CONTEXT，不注册公共task。
+BasicInteraction读取ui.home.expression、agents.applicationcontrol、agents.writer、ui.navigation、全局ui.windows及八个platform.*来源；Photography读取actions.camera、ui.camera、ui.album；RobotInteraction读取actions.robot。加载与依赖合并后去重排序，每次实际模型请求重新读取。CURRENT STATE是数据，不是指令；availability和value表达来源事实。Task／Skill从Agent私有决策快照生成AGENT CONTEXT，不注册公共task。
 
 声明不启动设备；释放Skill不销毁Container。来源由上层装配提供，Container显式维护快照schema，不使用运行时反射。容量、生命周期和采集失败见[Context](../../Agents/Support/Context/README.md)。
 
@@ -101,15 +101,15 @@ BasicSkill读取agents.applicationcontrol、agents.writer、ui.navigation、全�
 
 ## 加载、释放与 Task 生命周期
 
-BasicSkill Instructions 按概念、上下文、决策、控制动作效果、生命周期、反馈/失败组织。Skill 明确提供教学、函数、State 选择及依赖；Task 保留持续目标和完成条件，单次工作的多次模型请求不构成创建 Task 的充分理由。五项 Agent 控制与两项聆听 Action 分别负责加载／释放 Skill、开始／结束前台 Task、向同伴发送委托正文，以及开始／停止聆听。加载和释放影响后续请求，task.start 可携带初始能力，task.end 提交终态及摘要。task.send 的送达回执独立于同伴接纳与完成。参数和协议由 canonical 声明与 Core 拥有，JSON 只注册现有绑定、状态及指令来源。
+Assistant 的 [Controls.md](../Agents/Assistant/Controls.md) 按概念、上下文、决策、控制动作效果、生命周期、反馈/失败组织。Skill 明确提供教学、函数、State 选择及依赖；Task 保留持续目标和完成条件，单次工作的多次模型请求不构成创建 Task 的充分理由。五项 Agent 控制 由 Controls.md 教学，分别负责加载／释放 Skill、开始／结束前台 Task、向同伴发送委托正文，以及开始／停止聆听。加载和释放影响后续请求，task.start 可携带初始能力，task.end 提交终态及摘要。task.send 的送达回执独立于同伴接纳与完成。参数和协议由 canonical 声明与 Core 拥有，JSON 只注册现有绑定、状态及指令来源。
 
 显式 releaseSkills 可移除确认不再需要且允许释放的近期或任务非基础根，Task 本身继续存在；基础项、非根依赖和仍被其他根依赖的指定 Skill 拒绝释放。通常保留目标需要的能力并在终态清理，不能把使用建议写成运行时禁止。加载/释放失败原子保留先前能力状态；Task 替换预校验、旧目标收尾、新目标创建是分阶段流程，不能承诺收尾后的创建失败会自动恢复旧目标。
 
-BasicSkill 在加载前按用户目标匹配 AVAILABLE SKILLS / DELEGATABLE AGENTS 的公开 description。当前函数目录只是已加载子集；函数缺失不能直接作为不支持该能力的依据。事实已足够时直接回答，已声明函数直接按教学使用，缺失且匹配的单次能力通过 loadSkills 获取；新持续目标通过 task.start(skills) 获取。加载成功后的下一请求才读取新增私有教学并执行，不把加载与业务动作拼在一轮。拒绝能力前检查公开目录；实际未提供的操作或加载/执行失败仍如实报告，不重复加载。BasicSkill 只描述通用能力发现流程，不包含具体业务场景或业务 Skill ID 示例；业务教学由对应 Skill 拥有。只有公开目录没有相关 Skill 或可委托 Agent 时，才能说明能力未提供；加载或执行失败须报告具体阻塞，不能等同于能力不存在。
+Assistant 的 [Controls.md](../Agents/Assistant/Controls.md) 在加载前按用户目标匹配 AVAILABLE SKILLS / DELEGATABLE AGENTS 的公开 description。当前函数目录只是已加载子集；函数缺失不能直接作为不支持该能力的依据。事实已足够时直接回答，已声明函数直接按教学使用，缺失且匹配的单次能力通过 loadSkills 获取；新持续目标通过 task.start(skills) 获取。加载成功后的下一请求才读取新增私有教学并执行，不把加载与业务动作拼在一轮。拒绝能力前检查公开目录；实际未提供的操作或加载/执行失败仍如实报告，不重复加载。Assistant 的 [Controls.md](../Agents/Assistant/Controls.md) 只描述通用能力发现流程，不包含具体业务场景或业务 Skill ID 示例；业务教学由对应 Skill 拥有。只有公开目录没有相关 Skill 或可委托 Agent 时，才能说明能力未提供；加载或执行失败须报告具体阻塞，不能等同于能力不存在。
 
-默认基础能力由 Agent 的 baseSkills 初始化。`loadSkills` / `releaseSkills` 是 Assistant 的 `self` control，不经 Channel 调度；`task.start(description, skills?)` 在创建本 Agent 的前台目标任务时同时加载所需 Skill 组；BasicSkill 教学要求携带已知必要的初始 Skill 数组，成功反馈后下一轮使用提交后的函数，无需再 loadSkills。已有 Skill 可随启动转为任务持有；后续出现新的缺失能力才额外加载。输入参数及数组编码以 Agent.Task canonical 元数据为准。
+默认基础能力由 Agent 的 baseSkills 初始化。`loadSkills` / `releaseSkills` 是 Assistant 的 `self` control，不经 Channel 调度；`task.start(description, skills?)` 在创建本 Agent 的前台目标任务时同时加载所需 Skill 组；Assistant 的 [Controls.md](../Agents/Assistant/Controls.md) 教学要求携带已知必要的初始 Skill 数组，成功反馈后下一轮使用提交后的函数，无需再 loadSkills。已有 Skill 可随启动转为任务持有；后续出现新的缺失能力才额外加载。输入参数及数组编码以 Agent.Task canonical 元数据为准。
 
-BasicSkill Instructions.md先检查CURRENT STATE：已有足够事实直接回答，不加载Skill或重复查询；确需执行单步控制/查询/拍摄且函数缺失时才使用loadSkills，多轮持续目标使用startTask。一次拍照且无后续操作不强制创建Task。直接加载只扩展能力，不建立任务目标；默认决策链可包含多次模型请求；无 Task 的 Skill 跨链保留，加载/合法调用重置为 5，未使用的完整用户决策扣 1。Task 先设定目标及可判断的完成条件，等待用户时持续保留；模型根据真实结果判断目标达成或用户明确替换目标后使用 task.end，并如实记录结果；用户取消使用 task.end 并记录未完成结果。可恢复动作失败不等于任务结束；运行时决策异常进入 failed，重启进入 interrupted。在已有 Task 中 loadSkills 仅补充任务能力，不创建或替换目标。一次性历史查询仅在所需函数缺失时直接加载，多轮筛选与确认示例使用 Task。
+Assistant 的 [Controls.md](../Agents/Assistant/Controls.md)先检查CURRENT STATE：已有足够事实直接回答，不加载Skill或重复查询；确需执行单步控制/查询/拍摄且函数缺失时才使用loadSkills，多轮持续目标使用startTask。一次拍照且无后续操作不强制创建Task。直接加载只扩展能力，不建立任务目标；默认决策链可包含多次模型请求；无 Task 的 Skill 跨链保留，加载/合法调用重置为 5，未使用的完整用户决策扣 1。Task 先设定目标及可判断的完成条件，等待用户时持续保留；模型根据真实结果判断目标达成或用户明确替换目标后使用 task.end，并如实记录结果；用户取消使用 task.end 并记录未完成结果。可恢复动作失败不等于任务结束；运行时决策异常进入 failed，重启进入 interrupted。在已有 Task 中 loadSkills 仅补充任务能力，不创建或替换目标。一次性历史查询仅在所需函数缺失时直接加载，多轮筛选与确认示例使用 Task。
 
 加载先展开依赖，再验证资源、canonical 函数、别名和 Channel，全部成功后提交；任一失败保持原状态。依赖链最多 8 层，展开后最多 16 个 Skill，有效函数含内部能力最多 128 项，Channel 最多 16 个。
 
@@ -130,8 +130,7 @@ BasicSkill Instructions.md先检查CURRENT STATE：已有足够事实直接回�
 
 | ID / 目录 | 职责 |
 | --- | --- |
-| basic-skill / BasicSkill | 常驻任务/Skill 编排、自动 State 选择及交互执行规则。 |
-| expression-interaction / ExpressionInteraction | 表情互动，仅注册双眼表情 Actions。 |
+| basic-interaction / BasicInteraction | 常驻基础交互：表情与聆听 Action、窗口独立性规则及基础 State 选择。Task／Skill 控制不在 Skill 内，见 Assistant 的 Controls.md。 |
 | robot-interaction / RobotInteraction | 按需加载的机械臂交互动作及其状态观察。 |
 | photography / Photography | Assistant 内的摄影任务流程和相机 Actions。 |
 | history-query / HistoryQuery | 历史只读查询 Actions。 |
@@ -148,7 +147,7 @@ BasicSkill Instructions.md先检查CURRENT STATE：已有足够事实直接回�
 
 Photography 的匹配摄影 Task 在保存或视频处置结果确认后可以结束，Camera 窗口独立保留。只有用户明确关闭或丢弃照片时才执行 closeCamera，收到 operation=close、enabled=false 后确认关闭并完成匹配目标。Task 取消/替换、打开新窗口不授权关窗。关闭直接清空未保存照片；待处置视频需先明确保存或忽略。关闭失败或取消时保留 Task 和已提交的保存结果。Capture 关闭不关闭背景视觉。独立拍照／保存操作不创建 Task；重拍保留原 Task、窗口及先前缓存照片。
 
-BasicSkill 要求以 AGENT CONTEXT task 和匹配目标判断关闭：无 Task 单步完成只回复。明确目标切换可释放无关非基础近期 Skill；不确定是否放弃旧目标时先问是否继续实际 Task，保持等待状态。明确替换或正常目标完成不重复询问。continueDecision 只继续同一输入剩余新目标；释放 Skill 不代表相机/照片清理。Photography 与 HistoryQuery 的完成示例遵循同一规则。
+Assistant 的 [Controls.md](../Agents/Assistant/Controls.md) 要求以 AGENT CONTEXT task 和匹配目标判断关闭：无 Task 单步完成只回复。明确目标切换可释放无关非基础近期 Skill；不确定是否放弃旧目标时先问是否继续实际 Task，保持等待状态。明确替换或正常目标完成不重复询问。continueDecision 只继续同一输入剩余新目标；释放 Skill 不代表相机/照片清理。Photography 与 HistoryQuery 的完成示例遵循同一规则。
 
 Assistant 全双工中，`task.end` 成功即提交前台终态和历史摘要。开始或结束被打断时，根据当前任务及回执决定是否再发起控制。短暂岔题保留任务，去向不明时询问，明显转向且旧目标无需继续时可主动结束。Control 与语音、显示等 channel 各自调度。
 
@@ -160,9 +159,9 @@ Assistant 全双工中，`task.end` 成功即提交前台终态和历史摘要�
 
 [容器上下文契约](../../Agents/Support/Context/README.md)
 
-BasicSkill 统一承载 Skill 选择/Task/表达/失败规则，Photography 专注就绪/镜头/捕获/照片处理；少量示例验证主要分支，不重述通用协议。公开 State 位于独立的每轮系统数据消息。
+Assistant Controls.md 统一承载 Skill 选择/Task/失败规则，BasicInteraction 承载表情、聆听与窗口规则，Photography 专注就绪/镜头/捕获/照片处理；少量示例验证主要分支，不重述通用协议。公开 State 位于独立的每轮系统数据消息。
 
-BasicSkill 教学明确五种控制都是 XML、加载/替换关闭的独占响应与后续请求边界，查询旁支保留 Task，最近 Skill 不因短暂旁支而主动释放。Photography 明确 busy/needsSettings 门、真实 preview ID、已保存事实与未执行保存的区别；普通忽略成功经窗口收尾后结束匹配 Task，明确重拍则保留。RobotInteraction 以 connected/controlAvailable 同时为 true 作为动作前提，不以环境查询覆盖明确阻断。ApplicationControl/HistoryQuery 使用各自子系统 Channel 的精确 XML 查询别名与跨请求结果示例。教学保持简洁，增加有针对性的正向分支示例，不扩展新能力。
+Assistant 的 [Controls.md](../Agents/Assistant/Controls.md) 教学明确五种控制都是 XML、加载/替换关闭的独占响应与后续请求边界，查询旁支保留 Task，最近 Skill 不因短暂旁支而主动释放。Photography 明确 busy/needsSettings 门、真实 preview ID、已保存事实与未执行保存的区别；普通忽略成功经窗口收尾后结束匹配 Task，明确重拍则保留。RobotInteraction 以 connected/controlAvailable 同时为 true 作为动作前提，不以环境查询覆盖明确阻断。ApplicationControl/HistoryQuery 使用各自子系统 Channel 的精确 XML 查询别名与跨请求结果示例。教学保持简洁，增加有针对性的正向分支示例，不扩展新能力。
 
 当前 Action 目录中的查询可直接使用，不重复加载 Skill；摄影示例区分“用户请求但尚未拍摄”和“收到成功反馈”，缺失 displayedMediaID 字段也不能传空 ID。沿用相同能力、用例和执行错误，不通过放宽校验兼容错误输出。
 
@@ -186,11 +185,11 @@ schema v3统一声明useActions/useStates/useInstructions；Action绑定保持�
 
 ## Basic native State selection
 
-BasicSkill selects agents.applicationcontrol, agents.writer, ui.navigation and ui.windows plus platform.system.time/power/thermal/network/permissions/audio/locale/accessibility. PlatformKit owns the native facts; AssistantStateBindings projects the complete producer-owned Business dictionary and wraps bounded JSON for CURRENT STATE on each actual request. BasicSkill teaches sampled time, unknown data, path-versus-endpoint and permission-versus-execution boundaries without adding functions or authority. There is no location/motion/depth/proximity/magnetic-attachment collection in this selection. [Source contracts](../../Agents/Support/Context/README.md#container-context-read-path) own details.
+BasicInteraction selects agents.applicationcontrol, agents.writer, ui.navigation and ui.windows plus platform.system.time/power/thermal/network/permissions/audio/locale/accessibility. PlatformKit owns the native facts; AssistantStateBindings projects the complete producer-owned Business dictionary and wraps bounded JSON for CURRENT STATE on each actual request. BasicInteraction teaches sampled time, unknown data, path-versus-endpoint and permission-versus-execution boundaries without adding functions or authority. There is no location/motion/depth/proximity/magnetic-attachment collection in this selection. [Source contracts](../../Agents/Support/Context/README.md#container-context-read-path) own details.
 
 ## Prefer current facts before query selection
 
-BasicSkill answers questions directly from sufficient CURRENT STATE facts before selecting functions or loading Skills. It does not reload facts through a query merely because the user asks a state question. Only missing or stale facts justify a query that actually provides them; unknown/unavailable values are not readiness. Requested effects still require registered execution and real feedback. agents.applicationcontrol provides the role-owned application summary; specific status/resource/history queries supply details under their own contracts. No generic environment query is registered.
+BasicInteraction answers questions directly from sufficient CURRENT STATE facts before selecting functions or loading Skills. It does not reload facts through a query merely because the user asks a state question. Only missing or stale facts justify a query that actually provides them; unknown/unavailable values are not readiness. Requested effects still require registered execution and real feedback. agents.applicationcontrol provides the role-owned application summary; specific status/resource/history queries supply details under their own contracts. No generic environment query is registered.
 
 RobotInteraction teaches six-axis anatomy, absolute counts versus relative degrees, base-left/right viewpoint, native speed/acceleration units, per-axis limits and ordered compound examples. Relative motor requests use fresh executor feedback; undefined absolute angle origins require clarification. Its revision identifies this teaching contract.
 
@@ -198,8 +197,7 @@ RobotInteraction teaches six-axis anatomy, absolute counts versus relative degre
 
 useStates declares exact canonical paths. | Skill | `useStates` |
 | --- | --- |
-| BasicSkill | agents.applicationcontrol、agents.writer、ui.navigation、ui.windows，以及上节八个 platform.system.* |
-| ExpressionInteraction | ui.home.expression |
+| BasicInteraction | agents.applicationcontrol、agents.writer、ui.navigation、ui.windows、ui.home.expression，以及上节八个 platform.system.* |
 | RobotInteraction | actions.robot、actions.robot.motion |
 | Photography | actions.camera、actions.camera.preview、ui.camera、ui.album、ui.windows、platform.vision.camera、ui.island |
 | ApplicationControl | ui.windows、ui.camera、platform.vision.camera、ui.island |
@@ -208,13 +206,13 @@ useStates declares exact canonical paths. | Skill | `useStates` |
 
 Each actual request samples only those nodes and uses the producer-owned complete Business dictionary. Child indices are not recursively expanded or injected. Runtime, health/issues and diagnostic history stay outside Assistant State. Internal engineering callers can explicitly inspect a tree independently of Skills. Loading/release changes future disclosure only; no loadState, automatic wakeup, device action or changed execution authority is introduced.
 
-BasicSkill 常驻提供 `Speech.Listening.startListening` / `stopListening`，别名同函数名，使用独立 ListeningControl Channel。退出语音意图仅输出 stopListening，不在关闭后追加语音或自动重开，不隐式改变业务 Task；启动只响应明确用户意图。参数和真实完成语义由 [Listening Actions](../../Actions/Speech/Listening/README.md) 拥有。
+BasicInteraction 常驻提供 `Speech.Listening.startListening` / `stopListening`，别名同函数名，使用独立 ListeningControl Channel。退出语音意图仅输出 stopListening，不在关闭后追加语音或自动重开，不隐式改变业务 Task；启动只响应明确用户意图。参数和真实完成语义由 [Listening Actions](../../Actions/Speech/Listening/README.md) 拥有。
 
-Photography and ApplicationControl share six Window.* aliases and select ui.windows. BasicSkill selects the window summary and leaves window controls to the owning Skills. Camera.Capture.open remains the only photo-window creation entry. Photography instructions emit known open/settings/capture steps in one response; result-dependent disposition remains a later request within the existing prompt budget.
+Photography and ApplicationControl share six Window.* aliases and select ui.windows. BasicInteraction selects the window summary and leaves window controls to the owning Skills. Camera.Capture.open remains the only photo-window creation entry. Photography instructions emit known open/settings/capture steps in one response; result-dependent disposition remains a later request within the existing prompt budget.
 
 ApplicationControl exposes background Vision.open/close/flip/retry aliases for Camera.Perception.*Vision. Photography retains Capture aliases and window controls. Both select platform.vision.camera for actual native facts. Only the visible lensOwner may flip; minimizing photo retains capture and hands lens authority to visible enabled background vision.
 
-BasicSkill routes 打开视觉／跟踪／人物或姿态跟随 to application-control and Vision.open; 拍照／拍摄照片 to photography and its capture Actions. The unloaded Skill descriptions carry this distinction, and both Skill instruction sets repeat the boundary after loading. openPage vision is model settings navigation, not vision activation. No new Camera Actions are resident in BasicSkill.
+打开视觉／跟踪／人物或姿态跟随由 application-control 的 Vision.open 承担；拍照／拍摄照片由 photography 及其 Capture Actions 承担。未加载 Skill 的 description 携带这一区分，两个 Skill 的指令在加载后重复该边界；Controls.md 不含具体业务 Skill。openPage vision 是模型设置导航，不是视觉启动。BasicInteraction 不常驻任何新增相机 Action。
 
 ## Photo/video workflow
 
@@ -224,11 +222,11 @@ Photography与ApplicationControl增加Island.setPresentation以及ui.island事�
 
 ## Web skills
 
-BasicSkill 公开 Assistant 前台 task.start/end 和后台消息 task.send(agent_id,text)。后台目标、补充和停止都使用正文。接收 Agent 自行决定如何处理，公开目录提供角色职责。Writer 私有工具与作品业务由 Writer 拥有。
+Assistant 的 [Controls.md](../Agents/Assistant/Controls.md) 公开 Assistant 前台 task.start/end 和后台消息 task.send(agent_id,text)。后台目标、补充和停止都使用正文。接收 Agent 自行决定如何处理，公开目录提供角色职责。Writer 私有工具与作品业务由 Writer 拥有。
 
-BasicSkill 要求将同伴报告视为证据，不由通知重委托；运行时拥有播放排空后的启听衔接，不靠模型生成startListening。
+Assistant 的 [Controls.md](../Agents/Assistant/Controls.md) 要求将同伴报告视为证据，不由通知重委托；运行时拥有播放排空后的启听衔接，不靠模型生成startListening。
 
-Skill description是未加载时的能力发现索引，说明触发场景与职责边界。BasicSkill默认观察全窗口摘要；web-browsing提供远程页面观察、定向截图和导航；application-control 提供通用窗口控制；跨边界目标根据拥有者公开 description 路由，不在其他 Skill 重复角色用途。没有加载Skill不等于不存在可加载能力；指令要求根据可用目录加载后再判断可见性，State摘要与实际正文/截图证据明确区分。
+Skill description是未加载时的能力发现索引，说明触发场景与职责边界。BasicInteraction默认观察全窗口摘要；web-browsing提供远程页面观察、定向截图和导航；application-control 提供通用窗口控制；跨边界目标根据拥有者公开 description 路由，不在其他 Skill 重复角色用途。没有加载Skill不等于不存在可加载能力；指令要求根据可用目录加载后再判断可见性，State摘要与实际正文/截图证据明确区分。
 
 Photography selects actions.camera.preview and exposes loadPreviewImage/unloadPreviewImage. Teaching distinguishes temporary previewID from persistent mediaID, default latest from explicit selections, and actual image attachments from metadata. Skill absence stops transmission without disposing of cached photos.
 
@@ -236,8 +234,8 @@ Photography teaches actual numeric preview_N references and system-State attachm
 
 Photography describes the20-image FIFO window session, stable local preview_N labels, retained pending/saved entries, reload and close expiry. A single load appends a selection. A batch load sets up to five explicit photos, with the latest photo filling a free slot. saveAllPhotos saves all pending photos, and closing clears temporary previews without a photo prompt.
 
-BasicSkill 的 Lifetime and completion 独占通用窗口生命周期教学：窗口独立于 Task/Skill，操作一个窗口不隐式关闭其他窗口，关闭/丢弃需要明确意图。Assistant 身份不承载窗口流程；Photography、ApplicationControl、WebBrowsing 只说明各自操作与完成语义，不复制通用规则或嵌入跨业务场景。资源 revision 随教学更新。
+BasicInteraction 的 Lifetime and completion 独占通用窗口生命周期教学：窗口独立于 Task/Skill，操作一个窗口不隐式关闭其他窗口，关闭/丢弃需要明确意图。Assistant 身份不承载窗口流程；Photography、ApplicationControl、WebBrowsing 只说明各自操作与完成语义，不复制通用规则或嵌入跨业务场景。资源 revision 随教学更新。
 
-BasicSkill 教授前台 Task、委派、补充输入、取消、Skill 生命周期、聆听控制和执行反馈。通用 XML、Channel 和 wait 规则见 [共享输出协议](../Agents/Shared/OutputProtocol.md)，语音与字幕呈现见 [Assistant 角色指令](../Agents/Assistant/Instructions.md)。
+Assistant 的 Controls.md 教授前台 Task、委派、补充输入、取消、Skill 生命周期和执行反馈；BasicInteraction 教授表情、聆听控制、窗口独立性和基础 State 的读法。`wait` 排序规则见目录中的 wait 条目，通用 XML 与 Channel 规则见 [共享输出协议](../Agents/Shared/OutputProtocol.md)，语音与字幕呈现见 [Assistant 角色指令](../Agents/Assistant/Instructions.md)。
 
 WebBrowsing 的 useStates 同时选择 actions.web.screenshot、ui.web 与 ui.windows。图片是单张当前视口 State；Instructions 说明替换/失效及无历史选择，Action 回执 screenshotID 只作当次证据，不用于历史图片加载。

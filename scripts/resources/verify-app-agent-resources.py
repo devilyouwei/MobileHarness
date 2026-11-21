@@ -55,7 +55,9 @@ for path, original in expected.items():
         raise SystemExit(f'Missing Simplified Chinese prompt: {path}')
     if path.suffix == '.md':
         continue
-    source_templates = json.loads(original.read_text())['templates']
+    source_templates = json.loads(original.read_text()).get('templates')
+    if source_templates is None:  # Structured libraries such as Controls.json have no prompt templates.
+        continue
     translated_templates = json.loads(expected[translated].read_text())['templates']
     if source_templates.keys() != translated_templates.keys():
         raise SystemExit(f'Template key mismatch: {path}')
@@ -78,7 +80,7 @@ for path in catalog['skills'].values():
     for binding in metadata['useActions']:
         if not functions.get(binding['path'], {}).get('description'):
             raise SystemExit(f"Missing Chinese function description: {binding['path']}")
-for name in ('InputProtocol.json', 'InputDecision.json', 'Prompts.json', 'Instructions.md'):
+for name in ('Input/InputProtocol.json', 'Input/InputDecision.json', 'Controls/Controls.json', 'Controls/Controls.md', 'Prompts.json', 'Instructions.md'):
     if not (bundle / 'Agents/Assistant' / name).is_file():
         raise SystemExit(f'Missing Assistant prompt resource: {name}')
 writer = bundle / 'Agents/Writer'

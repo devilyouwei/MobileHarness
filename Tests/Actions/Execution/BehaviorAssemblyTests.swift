@@ -470,8 +470,8 @@ private func endpointInvocation(source: String, session: String, decision: Strin
     }
 }
 
-@Test(.actionCatalog) func listeningCatalogUsesBasicSkillBindingsAndFailsWithoutCapability() async throws {
-    let registry = try AgentSkillLoader.registry(["basic-skill"], fixed: CapabilityRegistry())
+@Test(.actionCatalog) func listeningCatalogUsesBasicInteractionBindingsAndFailsWithoutCapability() async throws {
+    let registry = try AgentSkillLoader.registry(["basic-interaction"], fixed: CapabilityRegistry())
     let module = SpeechModule(playback: BehaviorEndpoint())
     for name in ["startListening", "stopListening"] {
         let path = ActionIdentifier(domain: "Speech", module: "Listening", function: name)

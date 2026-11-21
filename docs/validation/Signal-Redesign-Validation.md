@@ -194,3 +194,17 @@ NexArm/Bluetooth 最终定向回归退出 0：一个目标 11 tests / 0.006 秒�
 | `./scripts/check.sh`、`./scripts/build-ios.sh`、`swift test` | 未执行（按用户要求先只验证编译）。 |
 
 未验证：测试运行、真实模型与实机行为。
+
+## control 提示词归属与 wait 归入 Action 的验证（2026-11-21）
+
+范围见 [Assistant 内部函数标记](../requirements/technical/Assistant-Internal-Function-Tokens.md)。
+
+| 检查 | 结果 |
+| --- | --- |
+| `python3 scripts/checks/check-modelkit-boundaries.py`（新增：Skill 不得绑定 `Agent.Task.*`、指令不得含 control 标签） | 通过 |
+| `swift format lint --strict` | 本次改动文件通过；`AssistantChatWorker.swift` 与 `WriterAgentTests.swift` 的既有告警未改动 |
+| `swift test --skip 'LiveRuntimeTests\|NativePresentationTests'` | 1197 项，仅剩 4 个 Writer/数据库测试共 56 个问题；这 4 项在未修改的 HEAD 工作树上同样失败（56 个问题），与本次无关 |
+| `swift test --filter 'LiveRuntimeTests\|NativePresentationTests'` | 231 项通过（首轮的 NexArm 夹具缺聆听处理器已修正，相机 Metal 用例首轮偶发失败，重跑通过） |
+| `./scripts/build-ios.sh` | BUILD SUCCEEDED（验证脚本改为跳过无 `templates` 的 Controls.json） |
+
+新增测试：`waitIsACatalogActionWhileControlGuidanceFollowsTheOwnerControls`（wait 条目、指南顺序、中文回退、无 Action 与 control 时不渲染）。未执行：真实模型对新提示词选择的评估（属 experiments）与实机验收；`./scripts/check.sh` 未整体运行，其各步骤已分别执行，其中测试因上述既有失败退出非 0。

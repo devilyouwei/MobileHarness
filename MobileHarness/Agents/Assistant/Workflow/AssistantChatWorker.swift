@@ -103,7 +103,8 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     /// The receiver records each received peer message for tracing; the record never drives processing.
     func recordReceived(_ report: AgentTaskResponse, reference: String, input: AgentInput) async {
         do {
-            let id = report.signal.flatMap { try? AgentTaskContent.decode($0).event?.eventID }
+            let id =
+                report.signal.flatMap { try? AgentTaskContent.decode($0).event?.eventID }
                 ?? report.rejection?.eventID ?? input.id
             let records = try requireCommunications()
             try await records.enqueueAgentMessage(

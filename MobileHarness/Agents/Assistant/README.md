@@ -32,33 +32,35 @@ Native observations and UI requests have role-owned consumers. Final SpeechPerce
 
 ## Files
 
+The root keeps the Agent entry, container, execution session and processing assembly. Responsibilities live in [Controls](Controls/README.md), [Input](Input/README.md), [Output](Output/README.md), [Workflow](Workflow/README.md) and [State](State/README.md). `Resources/Agents/Assistant` mirrors this for controls (`Controls/`) and input prompts (`Input/`).
+
 | File | Responsibility |
 | --- | --- |
 | [AssistantAgent.swift](AssistantAgent.swift) | Concrete public worker/state binding. |
-| [AssistantChatWorker.swift](AssistantChatWorker.swift) | Actor declaration: stored state and dependencies, registration and shared helpers. The other `AssistantChat*` files are extensions of this actor, split by responsibility. |
-| [AssistantChatLifecycle.swift](AssistantChatLifecycle.swift) | Start, recovery, pause/resume, stop and cleanup. |
-| [AssistantChatInput.swift](AssistantChatInput.swift) | Input admission, text handling, prepared batches, queue drain and reply-turn start. |
-| [AssistantChatGeneration.swift](AssistantChatGeneration.swift) | Generation per input: language selection, rounds, execution, completion and batch finish. |
-| [AssistantChatFeedback.swift](AssistantChatFeedback.swift) | Round Action results, pending feedback acceptance and publication, observation text. |
-| [AssistantChatEmission.swift](AssistantChatEmission.swift) | Output collection, Action and native Tool emission, playback, failures and runtime events. |
-| [AssistantChatTaskCommunication.swift](AssistantChatTaskCommunication.swift) | Directed task communication: receiving tasks and reports, delegation, `task.send` delivery and rejection. |
+| [AssistantChatWorker.swift](Workflow/AssistantChatWorker.swift) | Actor declaration: stored state and dependencies, registration and shared helpers. The other `AssistantChat*` files are extensions of this actor, split by responsibility. |
+| [AssistantChatLifecycle.swift](Workflow/AssistantChatLifecycle.swift) | Start, recovery, pause/resume, stop and cleanup. |
+| [AssistantChatInput.swift](Input/AssistantChatInput.swift) | Input admission, text handling, prepared batches, queue drain and reply-turn start. |
+| [AssistantChatGeneration.swift](Workflow/AssistantChatGeneration.swift) | Generation per input: language selection, rounds, execution, completion and batch finish. |
+| [AssistantChatFeedback.swift](Output/AssistantChatFeedback.swift) | Round Action results, pending feedback acceptance and publication, observation text. |
+| [AssistantChatEmission.swift](Output/AssistantChatEmission.swift) | Output collection, Action and native Tool emission, playback, failures and runtime events. |
+| [AssistantChatTaskCommunication.swift](Workflow/AssistantChatTaskCommunication.swift) | Directed task communication: receiving tasks and reports, delegation, `task.send` delivery and rejection. |
 | [AssistantChatWriterEvents.swift](AssistantChatWriterEvents.swift) | Writer events, completion facts and the Writer notice queue and playback. |
-| [AssistantChatStatus.swift](AssistantChatStatus.swift) | Signal preparation, status, resident context, effective capabilities, local history decisions and decision metadata. |
-| [AssistantControls.swift](AssistantControls.swift) | Control library: aliases, declarations, `destination` (task.send is `peer`; the rest are `self`), `AgentControlOperation` and fixed registrations. |
-| [AssistantControlExecution.swift](AssistantControlExecution.swift) | Control execution (`executeControl`, `controlTask` gating, Task/Skill transactions) and the late-bound `AssistantControlLink`. |
-| [AssistantChatContext.swift](AssistantChatContext.swift) | AssistantChatState, workflow control intent, transactional AssistantHistoryContext and recovery/compression. |
-| [AssistantHistoryProjection.swift](AssistantHistoryProjection.swift) | Durable history reconstruction and private request selection. |
+| [AssistantChatStatus.swift](State/AssistantChatStatus.swift) | Signal preparation, status, resident context, effective capabilities, local history decisions and decision metadata. |
+| [AssistantControls.swift](Controls/AssistantControls.swift) | Control library: aliases, declarations, `destination` (task.send is `peer`; the rest are `self`), `AgentControlOperation` and fixed registrations. |
+| [AssistantControlExecution.swift](Controls/AssistantControlExecution.swift) | Control execution (`executeControl`, `controlTask` gating, Task/Skill transactions) and the late-bound `AssistantControlLink`. |
+| [AssistantChatContext.swift](Workflow/AssistantChatContext.swift) | AssistantChatState, workflow control intent, transactional AssistantHistoryContext and recovery/compression. |
+| [AssistantHistoryProjection.swift](Workflow/AssistantHistoryProjection.swift) | Durable history reconstruction and private request selection. |
 | [AssistantContainer.swift](AssistantContainer.swift) | Stable role capability, UI-facing state/control and resident-state projection. |
 | [AssistantExecutionSession.swift](AssistantExecutionSession.swift) | Registration, output ownership, task/waiting/Decision presentation and joined session cleanup. |
-| [AssistantGenerationTransport.swift](AssistantGenerationTransport.swift) | Ordered output reader, bounded native execution slots and per-round seals. |
+| [AssistantGenerationTransport.swift](Workflow/AssistantGenerationTransport.swift) | Ordered output reader, bounded native execution slots and per-round seals. |
 | [AssistantProcessing.swift](AssistantProcessing.swift) | Concrete state, prompt/capability assembly, preprocessing and history binding. |
-| [AssistantSessionControl.swift](AssistantSessionControl.swift) | Runtime cleanup/close message and typed decoding. |
-| [AssistantInterrupt.swift](AssistantInterrupt.swift) | Public interruption target, signal and result contracts. |
-| [AssistantInputDecision.swift](AssistantInputDecision.swift) | Frozen current-turn context, localized interruption question, ModelKit noul invocation, independent bounded classification queue, targeted signal submission and log values. |
-| [AssistantInputBatch.swift](AssistantInputBatch.swift) | Trusted source timeline, batch text, source-line markers and input prompt access. |
-| [AssistantStateBindings.swift](AssistantStateBindings.swift) | Business-only exact-path State adaptation. |
-| [AssistantSpeechOutput.swift](AssistantSpeechOutput.swift) | AssistantSpeechProducing contract, audio-handle production and synthesis/playback presentation. |
-| [SpeechPlaybackFailure.swift](SpeechPlaybackFailure.swift) | Playback-boundary failure copy with preserved underlying synthesis/cache cause. |
+| [AssistantSessionControl.swift](Workflow/AssistantSessionControl.swift) | Runtime cleanup/close message and typed decoding. |
+| [AssistantInterrupt.swift](Input/AssistantInterrupt.swift) | Public interruption target, signal and result contracts. |
+| [AssistantInputDecision.swift](Input/AssistantInputDecision.swift) | Frozen current-turn context, localized interruption question, ModelKit noul invocation, independent bounded classification queue, targeted signal submission and log values. |
+| [AssistantInputBatch.swift](Input/AssistantInputBatch.swift) | Trusted source timeline, batch text, source-line markers and input prompt access. |
+| [AssistantStateBindings.swift](State/AssistantStateBindings.swift) | Business-only exact-path State adaptation. |
+| [AssistantSpeechOutput.swift](Output/AssistantSpeechOutput.swift) | AssistantSpeechProducing contract, audio-handle production and synthesis/playback presentation. |
+| [SpeechPlaybackFailure.swift](Output/SpeechPlaybackFailure.swift) | Playback-boundary failure copy with preserved underlying synthesis/cache cause. |
 
 ```mermaid
 flowchart TB
@@ -90,7 +92,7 @@ Each request records selected State paths in AssistantDecisionMetadata.states al
 
 AssistantContextState assembles the following order: shared OutputProtocol, Assistant InputProtocol, role Instructions and reply-language guidance, available shared Skills, permission-filtered public Agent descriptions, loaded Skill teaching and the effective Action catalog. AgentConfigurations locates assets through Catalog.json; AgentPrompts loads/renders immutable locale-selected templates. Canonical historical timeline markers remain English and retain recognized historical formats; missing templates/render failures propagate.
 
-Role Instructions explain that ASR input may contain recognition errors, noise or unintended background speech, and require a contextual check for meaningful intent before replying. Unintelligible or unrelated accidental input without clear user intent receives only a catalog-permitted expression or no response; recoverable errors, meaningful incomplete input and clear new topics remain actionable. Natural-language output is spoken and captioned, so the role requests plain conversational text without decorative formatting; expressions use declared Actions. ExpressionInteraction owns expression execution, while queue admission and Decision interruption remain independent.
+Role Instructions explain that ASR input may contain recognition errors, noise or unintended background speech, and require a contextual check for meaningful intent before replying. Unintelligible or unrelated accidental input without clear user intent receives only a catalog-permitted expression or no response; recoverable errors, meaningful incomplete input and clear new topics remain actionable. Natural-language output is spoken and captioned, so the role requests plain conversational text without decorative formatting; expressions use declared Actions. BasicInteraction owns expression execution, while queue admission and Decision interruption remain independent.
 
 Public Agent introductions are limited to 8,192 bytes and filtered by actual delegation adapters and current instance communication permissions. Shared Skill overview has a 4 KiB budget and retains IDs when descriptions are shortened. Owner-restricted Writer Skills are loaded by Writer's own workflow. Base/dependency teaching and Action metadata derive from the same effective Skill snapshot. Actual request assembly receives the instance's narrowed communication policy; the convenience default does not bypass it.
 
@@ -100,7 +102,9 @@ Assistant/Prompts.json owns execution evidence, Task-history prefixes, peer-task
 
 ## Task and Skill lifecycle
 
-Base Skills are basic-skill and expression-interaction. Optional capabilities such as robot-interaction are discovered/loaded on demand. Loading a Skill adds declarations/teaching/selected State, not runtime execution authority. Internal tools are not automatically exposed by registration. Camera operations do not inherently require a foreground Task.
+Base Skills are basic-interaction. Optional capabilities such as robot-interaction are discovered/loaded on demand. Loading a Skill adds declarations/teaching/selected State, not runtime execution authority. Internal tools are not automatically exposed by registration. Camera operations do not inherently require a foreground Task.
+
+The control library lives in `Resources/Agents/Assistant/Controls.json` and its usage guide in `Controls.md` / `Controls.<language>.md` (AssistantControls.guidance; a missing translation falls back to English). The guide covers when and why to call each control, Task and delegation policy, response exclusivity, failure retry and examples; parameters stay in the declarations. No Skill declares or teaches a control, and the boundary checker rejects `Agent.Task.*` bindings and control tags in Skill instructions.
 
 Task/Skill control and task.send are Assistant-owned controls (see [Agent controls](../Support/Core/Capability/README.md#agent-controls)); task.send has destination `peer` and the others `self`. The prompt shows the peer Agent catalog only when a `peer` control is registered. Controls are resolved and executed inside the Assistant in emission order without waiting for Actions on other Channels, never through Gateway or the Actions Shell. task.start rejects an existing foreground goal; loadSkills/releaseSkills commit state before rebuilding the catalog. task.end commits the actual outcome and ends the decision unless continueDecision=true explicitly permits a new objective. Full-duplex completion validates the originating request/Task binding, commits SQLite terminal state/summary/sources, then publishes private context and releases Task-held Skills. The ending Message remains part of the source set. Trusted host completion uses the same commit path; synchronous mode joins the ending call and execution barrier first.
 
@@ -184,7 +188,7 @@ Full-duplex Action and native Tool result inputs retain their originating conver
 
 AssistantStateBindings installs one App-backed exact-path resolver. Skill.useStates alone selects sources; parent paths do not imply child reads. It preserves the producer's complete Business dictionaries/arrays while excluding Runtime, health/issues, metadata and child indices. Missing/unreadable/malformed sources become unknown/null with bounded path/code diagnostics; cancellation, closed context and capacity failures propagate. There is no polling, tree discovery, loadState or duplicate path allowlist.
 
-BasicSkill includes passive native time, power, thermal, network, permissions, audio, locale and accessibility facts plus navigation/windows. Facts never override authorization or execution checks. Resident state inspection reads initialized committed memory only, without persistence restoration or a second mutable registry; unknown is reported before initialization. start owns restoration and its failures.
+BasicInteraction includes passive native time, power, thermal, network, permissions, audio, locale and accessibility facts plus navigation/windows. Facts never override authorization or execution checks. Resident state inspection reads initialized committed memory only, without persistence restoration or a second mutable registry; unknown is reported before initialization. start owns restoration and its failures.
 
 Camera owns preview bytes, latest/explicit selection and validity. Photography selects actions.camera settings/recording facts and actions.camera.preview; native platform.vision.camera independently reports actual capture facts. Reads neither start the camera nor grant capture permission. Capture/disposition use actual preview/video identity and joined window cleanup.
 

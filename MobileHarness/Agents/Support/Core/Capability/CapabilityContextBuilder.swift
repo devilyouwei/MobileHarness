@@ -31,6 +31,10 @@ public struct CapabilityContextBuilder: Sendable {
                     required: action.requiredParameters, optional: action.optionalParameters)
             }
         }
+        if !registry.actions.isEmpty || !registry.internalActions.isEmpty {
+            lines += try actionCatalog.render("wait").split(separator: "\n", omittingEmptySubsequences: false).map(
+                String.init)
+        }
         if !registry.controls.isEmpty {
             lines.append(try actionCatalog.render("controls"))
             for control in registry.controls {
@@ -38,6 +42,9 @@ public struct CapabilityContextBuilder: Sendable {
                     "control", alias: control.alias, documentation: control.documentation,
                     required: control.requiredParameters, optional: control.optionalParameters,
                     variables: ["destination": control.destination.rawValue])
+            }
+            if let guidance = registry.controlGuidance {
+                lines.append(try actionCatalog.render("guidance", variables: ["text": guidance.text]))
             }
         }
         let result = lines.joined(separator: "\n")

@@ -151,7 +151,7 @@ Private Task/Skill transitions, retained history and actual execution outcomes c
 
 ### Current facts before explicit queries
 
-BasicSkill uses sufficient CURRENT STATE facts directly before function/Skill selection. The role-owned application summary, passive platform.* facts and selected UI/business snapshots are read for each actual request; reading an observed value does not force its native producer to update. Query Actions provide missing/stale details only under their specific contracts. They may share an owner with State without creating duplicate state. No generic environment query is exposed or registered. Queries cannot override unknown/unavailable readiness, initiate undeclared probes or replace actual effect feedback. The context builder does not suppress model calls automatically; normal catalog/authorization validation rejects removed addresses.
+BasicInteraction uses sufficient CURRENT STATE facts directly before function/Skill selection. The role-owned application summary, passive platform.* facts and selected UI/business snapshots are read for each actual request; reading an observed value does not force its native producer to update. Query Actions provide missing/stale details only under their specific contracts. They may share an owner with State without creating duplicate state. No generic environment query is exposed or registered. Queries cannot override unknown/unavailable readiness, initiate undeclared probes or replace actual effect feedback. The context builder does not suppress model calls automatically; normal catalog/authorization validation rejects removed addresses.
 
 ## Reflexivity disclosure boundary
 
@@ -160,7 +160,7 @@ The producer classifies its own complete node data; Assistant chooses Business f
 
 residentSnapshot() returns the last initialized committed Context without acquiring the transaction slot, restoring persistence or mutating state. Before initialization it returns nil; an in-flight commit leaves the previous committed value readable. Role State reads use their owning Agent’s residentContext() accessor; Agent start() performs the existing initialization through snapshot(). Operational snapshot()/transaction semantics remain unchanged, including validation, recovery and explicit persistence failure.
 
-ui.windows reports windowID/title/content/mode/phase and focusedID from the UI owner. Photography and ApplicationControl select it explicitly; BasicSkill remains unchanged. It contains no capture, media or Task authority.
+ui.windows reports windowID/title/content/mode/phase and focusedID from the UI owner. Photography and ApplicationControl select it explicitly; BasicInteraction remains unchanged. It contains no capture, media or Task authority.
 
 WebBrowsing/WebDrawing选择ui.web与ui.windows；ui.web 由生产者提供按窗口组织的页面类型与 URL，本地路径保持 unknown。Skill加载改变下一轮读取集合，新增来源无需修改角色路径清单。
 

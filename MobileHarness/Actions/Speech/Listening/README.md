@@ -25,7 +25,7 @@ VoiceSessionCoordinator.start 在发布 isReady 前完成 wake/0.85 音效 PCM �
 
 VoiceSessionCoordinator is retained and cleaned by ActionsContainer. Voice output/presentation/perception protocols and typed values live in FunctionContracts. Business checks use current session/generation/native conditions, without role-name permission tests. Agent cancellation policy arrives through the injected narrow host interface.
 
-## BasicSkill 启停与关闭完成
+## BasicInteraction 启停与关闭完成
 
 startListening / stopListening 由 @Action 声明并在 SpeechModule 显式绑定；参数校验位于能力调用前，可用于纯 preflight。VoiceSessionCoordinator.setListening 验证根会话、已启动与设置状态，经 VoicePerceptionHandling.setListening 取得权威 enabled/paused/revision，复用内部策略应用。revision 拒绝迟到快照；启动保留权限、反馈、清理加入及半双工屏障。
 

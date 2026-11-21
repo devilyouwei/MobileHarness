@@ -2,11 +2,11 @@
 
 ## Summary
 
-Xcode asset catalog for the selected app icon.
+Xcode asset catalog for the app icon.
 
 ## Ownership and boundaries
 
-Owns catalog metadata and packaged visual assets, with no runtime logic. Alternate source artwork is preserved in AppIconVariants.
+Owns catalog metadata and packaged visual assets, with no runtime logic. The single app icon is the only icon; there is no icon selection or alternate artwork here.
 
 ## External relationships and data flow
 
@@ -33,4 +33,4 @@ flowchart LR
 
 [`AppIcon.appiconset/`](AppIcon.appiconset/)
 
-[Contents.json](AppIcon.appiconset/Contents.json) declares the universal iOS 1024×1024 [AppIcon.png](AppIcon.appiconset/AppIcon.png). [The icon selection script](../../../scripts/resources/select-app-icon.sh) copies the chosen artwork into the app icon set before asset compilation. The project banner is maintained as a separate asset.
+[Contents.json](AppIcon.appiconset/Contents.json) declares the universal iOS 1024×1024 [AppIcon.png](AppIcon.appiconset/AppIcon.png). The project banner is maintained as a separate asset.

@@ -104,7 +104,7 @@ Support 中的 `ControlRegistration`、`ControlCall`、`FunctionToken` 与 `Agen
 - `<wait>` 内的 peer control 继续拒绝。
 - 不按 Agent 写死：是否以 `agent.task.v1` 文本请求转交，由目标是否实现该协议（`AgentTaskMessaging.permits`）决定。
 
-实现见 [AssistantChatTaskCommunication](../../../MobileHarness/Agents/Assistant/AssistantChatTaskCommunication.swift) 的 `deliverTaskMessage` 与 Writer 的 `enqueue`。
+实现见 [AssistantChatTaskCommunication](../../../MobileHarness/Agents/Assistant/Workflow/AssistantChatTaskCommunication.swift) 的 `deliverTaskMessage` 与 Writer 的 `enqueue`。
 
 ## control 声明放入资源文件（已定）
 
@@ -151,3 +151,59 @@ pub/sub 发后即丢：不补发、不重试、不兜底，错过就是错过。
 - 实施后同步更新 `MobileHarness/Agents/Assistant/README.md` 与 `MobileHarness/Agents/Support/Core/Capability/README.md`，只描述已实现的设计。
 
 实施状态：命名、`destination`、提示词、文件拆分与 checker 调整已实施，验证见 [Signal 改造验证](../../validation/Signal-Redesign-Validation.md#第-23-节与-control-两类模型的验证)。对照复查后补充：拒绝记录新增 `control` 类别；Agent 目录是否显示改由是否注册 `peer` control 决定，不再匹配 `sendMessage` 路径；状态快照的 controls 输出 `destination`；技术 README 中残留的 `useControls` 描述已清除。`task.send` 投递、旧 `send` Action 删除与 Writer 原生工具拆分仍待定。
+
+## control 提示词归属与 wait 归入 Action（2026-11-21，已实施）
+
+问题：BasicSkill 的 `Instructions.md` 讲解 control（`loadSkills`、`task.*`），但 `Skill.json` 没有声明它们；Skill 可被任何 Agent 注册，control 教学却绑死 Assistant；声明（`Controls.json` 的 `doc`）与教程两处来源并存；`OutputProtocol.md` 写“control 由 base Skill 教学”；`<wait>` 规则散在 Skill 教程与解析器里。已确认的决定如下。
+
+### 归属原则
+
+与 Action 同构：声明与用法说明由所有者持有并随所有者固定存在，反射到提示词。Action 的所有者是 Skill（`useActions` 授予、`Instructions.md` 教学）；control 的所有者是 Agent（固定内置、`Controls.md` 教学）。Skill 下不再出现任何 control 声明或教学。
+
+### control：每个 Agent 自配函数库与提示词
+
+- 资源按 Agent 目录放置：`Resources/Agents/<Agent>/Controls.json`（函数库）与 `Controls.md`、`Controls.<language>.md`（用法提示词，缺语言时用英文）。不新增目录；目前只有 Assistant 配置。
+- `Controls.md` 统一承载：control 的何时用、顺序与独占整轮响应、失败与重试、示例，以及 Task 与委派的决策策略（原 BasicSkill 第 3、4、5、6 节中与 control 相关的部分）。声明参数仍以 `Controls.json` 为准，文档不重复参数表。
+- 反射：`ControlRegistration` 之外，拥有者经 `AgentConfigurations.data` 按语言读取 `Controls.md`，注册为 control 指南（与声明本地化闭包同构）。`ActionCatalog` 的 `controls` 段先渲染声明，再渲染指南。Support 只渲染，不解释内容；其他 Agent 新增 control 只加资源，不改 Support。
+- 没有 control 的 Agent 不渲染 `controls` 段。
+- `OutputProtocol.md` 中“由 base Skill 教学”改为“由拥有者的 control 段说明”。
+
+### wait：归入 Action，由 Shell 调度
+
+`<wait>` 是调度机制，不是 Agent 自身状态，因此归入 Action 一类，而不是 control。
+
+- 语法保持成对标签 `<wait>...</wait>`，无属性、可嵌套，沿用现有上限（32 个、8 层）。FunctionToken 仍需按词法产出 `scheduling` 事件，因为成对结构要在解析阶段确定；这属于语法，不属于分类。
+- 声明：`wait` 是 Shell 持有的内置调度 Action（不绑定 Channel、无执行器），对每个暴露 Action 的 Agent 固定可用，不由 Skill 授予。其用法提示词（排序语义、可嵌套、空 wait 合法、不能含 control、无超时与回滚）是共享资源 `Shared/ActionCatalog.json`（及 zh-Hans）的 `wait` 条目，由 `CapabilityContextBuilder` 在目录中渲染；`OutputProtocol.md` 与原 BasicSkill 的 wait 说明已删除。
+- 执行：`wait` 不是普通调用，由 Actions 的执行 Shell（[ChannelScheduler](../../../MobileHarness/Actions/Support/Shell/Scheduling/ChannelScheduler.swift)）作为调度结构特殊处理；Gateway 只承载，Support 不解释。
+- 注册表：`CapabilityRegistry` 保留别名 `wait`，Skill 与 control 都不得占用。
+- 约束不变：control 不得出现在 `<wait>` 内，拒绝类别为 `control`。
+
+### BasicSkill 与 ExpressionInteraction：合并为 BasicInteraction
+
+State 来源必须跟随 Skill 声明，不能由 Assistant 固定提供，因此 BasicSkill 的 `useStates` 不能迁出 Skill 体系；两个 Skill 合并，不保留旧名，也不保留空壳。
+
+- 新 Skill：`basic-interaction`，目录 `Resources/Skills/BasicInteraction/`。名称表示“与用户的基本交互与环境感知”：表情、聆听控制，以及基础环境 State。它不含任何 control 声明或教学，也不含 Task 或委派策略。
+- `useActions`：`express`、`setExpression`（Channel `Display`）与 `startListening`、`stopListening`（Channel `ListeningControl`）。
+- `useStates`：原 BasicSkill 的全部来源（`agents.applicationcontrol`、`ui.navigation`、`ui.windows`、`platform.system.*`、`agents.writer`）与原 ExpressionInteraction 的 `ui.home.expression`。
+- `Instructions.md`：只保留表情与聆听的用法、窗口独立于 Task 与 Skill 生命周期的规则，以及读取基础 State 的方法；control、Task、wait 内容分别归 `Controls.md` 与 wait 声明。上下文各段（AVAILABLE SKILLS、DELEGATABLE AGENTS、AGENT CONTEXT）只存在于 Assistant 的请求中，其读法归入 Assistant 的 `Controls.md`，不进入共享的 `RequestContext`。
+- 删除 `Resources/Skills/BasicSkill/` 与 `Resources/Skills/ExpressionInteraction/`；`Catalog.json` 以 `basic-interaction` 替换两个条目；Assistant 的 `baseSkills` 由 `basic-skill`、`expression-interaction` 改为 `basic-interaction`。
+- 同步清理 Skills README、Agents README、各测试夹具与断言中的旧 ID（`basic-skill`、`expression-interaction`）；`BasicSkill-Control-Teaching.md` 与 history 文档保留为历史记录。
+
+### 涉及文件（实施范围）
+
+资源：`Resources/Agents/Assistant/Controls*.md`（新）、`Resources/Agents/Shared/{OutputProtocol,RequestContext,ActionCatalog}*`、`Resources/Skills/BasicInteraction`（新）、`Resources/Catalog.json`、`Resources/Agents/Assistant/Agent.json`。代码：`AssistantControls.swift`、`ControlRegistration.swift`、`ActionCatalog` 渲染、`CapabilityRegistry`、`FunctionTokenParser`、`ChannelScheduler` 与 wait 声明。README：Assistant、Support/Core/Capability、Actions/Support/Shell、Resources/Skills、Resources/Agents。
+
+### 验收
+
+- 没有 Skill 资源含 control 别名；boundary checker 拒绝 Skill 声明或教学 `loadSkills`/`task.*`。
+- 各语言 `Controls.md` 与英文一致性校验；缺语言回退英文。
+- 提示词中 control 段含指南，Action 段含 `wait` 声明；`wait` 别名不可被 Skill 或 control 占用。
+- 现有 wait 排序、嵌套上限、`<wait>` 内 control 拒绝的测试继续通过。
+- `./scripts/check.sh` 与 `./scripts/build-ios.sh` 通过；模型选择效果属 experiments，不在此判定。
+
+### 实施结果（2026-11-21）
+
+- 代码：`ControlGuidance` 位于 `ControlRegistration.swift`；`CapabilityRegistry` 携带 `controlGuidance`（仅与 controls 同时存在）；`AgentSkillLoader.registry` 按当前语言重读指南；`CapabilityContextBuilder` 在声明后渲染指南，并在有 Action 时渲染 `wait` 条目；`AssistantControls.guidance` 读取 `Controls.md`（缺语言回退英文）。
+- 资源：新增 `Resources/Agents/Assistant/Controls.md` 与 `Controls.zh-Hans.md`；新增 `Skills/BasicInteraction/`，删除 `BasicSkill/` 与 `ExpressionInteraction/`；`Catalog.json`、Assistant `baseSkills`、`Descriptions.zh-Hans.json`、`OutputProtocol*.md`、`ActionCatalog*.json` 同步更新。Photography 示例去掉 `<task.end/>`，仅保留拍摄相关部分并指向 Agent controls。
+- 检查：boundary checker 拒绝 Skill 绑定 `Agent.Task.*` 以及 Skill 指令中的 control 标签。
+- `FunctionTokenParser` 仍按词法产出 `scheduling` 事件；`wait` 在 Shell 中的执行结构未改变。

@@ -30,3 +30,7 @@ revision 50 教学重组、JSON 描述与测试已实现；完整 check.sh、最
 - 明确委托给其他 Agent 的工作归属对方生命周期，直接使用 `task.send(agent_id,text)`；禁止为委托目标开启前台 `task.start` 或加载 Skill，禁止先 `task.start` 再 `task.send` 同一目标。
 
 同步更新 `Resources/Skills/BasicSkill/Instructions.md`、`Instructions.zh-Hans.md` 与 `Skill.json`（递增 `revision`），并运行 `./scripts/check.sh` 与 `./scripts/build-ios.sh` 验证。
+
+## 后续变更（2026-11-21）
+
+BasicSkill 已删除：control 的函数库与教学归拥有者 Agent 的 `Controls.json` / `Controls.md`，表情、聆听、窗口规则与基础 State 并入 `basic-interaction`，见 [Assistant 内部函数标记](Assistant-Internal-Function-Tokens.md#control-提示词归属与-wait-归入-action2026-11-21已实施)。本文保留为历史记录。

@@ -9,7 +9,7 @@ import Testing
 private func generator() throws -> AgentGenerator {
     try AgentGenerator(
         capabilities: AgentSkillLoader.registry(
-            ["expression-interaction", "robot-interaction", "photography"],
+            ["basic-interaction", "robot-interaction", "photography"],
             fixed: AgentConfigurations.load(named: "Assistant").capabilities), textMapping: AssistantAgent.mapText,
         segmentation: try AssistantAgent.textSegmentation)
 }
@@ -287,7 +287,7 @@ private func generationTrace() throws -> GenerationTrace {
     let configuration = try AgentConfigurations.load(named: "Assistant")
     return GenerationTrace(
         capabilities: try AgentSkillLoader.registry(
-            ["expression-interaction", "robot-interaction", "photography"], fixed: configuration.capabilities),
+            ["basic-interaction", "robot-interaction", "photography"], fixed: configuration.capabilities),
         textMapping: AssistantAgent.mapText,
         segmentation: try AssistantAgent.textSegmentation)
 }

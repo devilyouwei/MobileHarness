@@ -25,6 +25,8 @@ flowchart LR
 
 Bounded task-local FIFO/wait trees with separate resource arbitration. [ChannelScheduler](Scheduling/ChannelScheduler.swift) owns ordering, admission, finish, cancel and passive execution observation. Each task root contains phases and nested wait groups. A wait joins preceding parent work, executes ordinary per-Channel FIFO internally and releases its continuation only when closed and all children complete. Open active phases may execute received calls; dormant groups hold no resource locks. Native Tools are outside the tree.
 
+`wait` is the Shell's scheduling Action. It has no Channel, executor or Skill grant: the Agent catalog always lists it (the usage text is the `wait` entry of `Resources/Agents/Shared/ActionCatalog.json`) and the Shell realizes it only as the wait group structure above. Agent controls are never allowed inside a wait.
+
 | Boundary | Limit / policy |
 | --- | --- |
 | Tracked tasks | 64 until finish/cancel |

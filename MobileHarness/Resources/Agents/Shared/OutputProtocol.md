@@ -4,10 +4,10 @@ Emit XML Action calls as `<alias name="value"/>` using aliases and quoted attrib
 
 ## SCHEDULING: CHANNEL AND EXECUTION CONSTRAINTS
 
-A Channel is an execution queue. Each Action uses its registered Channel, shown in the current Action catalog. Within a task, Actions on the same Channel execute in output order. When tasks share an ordering scope, the same Channel also stays ordered across those tasks. Different Channels may overlap subject to resource constraints and wait scopes. A resource conflict fails unless host policy permits takeover after cleanup. Wait scopes and Agent controls are taught by the loaded base Skill.
+A Channel is an execution queue. Each Action uses its registered Channel, shown in the current Action catalog. Within a task, Actions on the same Channel execute in output order. When tasks share an ordering scope, the same Channel also stays ordered across those tasks. Different Channels may overlap subject to resource constraints and wait scopes. A resource conflict fails unless host policy permits takeover after cleanup. Wait scopes are described by the catalog's wait entry; Agent controls, when the Agent owns any, are described by its control section.
 
 ## Syntax
 
-Action and control tags are self-closing. No paired Actions, document root, comments, DOCTYPE, CDATA or parallel/serial tags. Escape literal `<` and `&` as `&lt;` and `&amp;`, and quotes inside double-quoted attributes as `&quot;`.
+Action and control tags are self-closing. No paired Actions other than the scheduling wait, document root, comments, DOCTYPE, CDATA or parallel/serial tags. Escape literal `<` and `&` as `&lt;` and `&amp;`, and quotes inside double-quoted attributes as `&quot;`.
 
 Use at most 120 generated calls. Agent policy defines natural-text interpretation.

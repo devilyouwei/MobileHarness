@@ -641,8 +641,8 @@ Agent 为该轮保留结果接纳状态，确认所需 Action/Tool 反馈已处�
 
 | 现行业务 / 证据 | 必须保留的要点 |
 | --- | --- |
-| [AssistantInterrupt.swift](../../../MobileHarness/Agents/Assistant/AssistantInterrupt.swift) 与 [Assistant 打断设计](../../../MobileHarness/Agents/Assistant/README.md) | 按第 6.3 节迁移；保留 interrupted/no_target/target_expired/duplicate 内部处理证据，完成模型、Action 与播放清理后才记录 interrupted。 |
-| [AssistantChatWorker.swift](../../../MobileHarness/Agents/Assistant/AssistantChatWorker.swift) | 按第 6.7 节迁移；feedback 接纳、执行事实持久化与整轮结算分别保留，删除 communicationReceipt 不得误删 roundResult。 |
+| [AssistantInterrupt.swift](../../../MobileHarness/Agents/Assistant/Input/AssistantInterrupt.swift) 与 [Assistant 打断设计](../../../MobileHarness/Agents/Assistant/README.md) | 按第 6.3 节迁移；保留 interrupted/no_target/target_expired/duplicate 内部处理证据，完成模型、Action 与播放清理后才记录 interrupted。 |
+| [AssistantChatWorker.swift](../../../MobileHarness/Agents/Assistant/Workflow/AssistantChatWorker.swift) | 按第 6.7 节迁移；feedback 接纳、执行事实持久化与整轮结算分别保留，删除 communicationReceipt 不得误删 roundResult。 |
 | [Assistant 多源输入](../../../MobileHarness/Agents/Assistant/README.md) | 仅用户文本/ASR 在到达时满足同会话忙碌条件才进入 Decision；角色任务报告和 Action 事实不进入 Decision。保留 turn/task 关联、真实来源与输入时间线；transport kind/protocol 变化不能把运行时结果冒充用户指令。 |
 | [Writer 工作流](../../../MobileHarness/Agents/Writer/README.md) | submit 仍可表达新目标、补充、回答或自然语言停止意图，Writer 保留解释职责；类型化 update/answer/cancel 只用于可信上下文已有明确语义的情况，不能强迫 Assistant 预先代替 Writer 分类。保留消息 ID、delegateID、可选 workspaceID、interactionID、事件序号和来源对话；workspace 不等于任务身份。 |
 | [AgentMessageRepository](../../../MobileHarness/Storage/Database/AgentMessages/README.md) | 当前消息有接收/消费事实、不可变正文、冲突去重、领取 token、有限重试与 dead_letter。新 Reply/事件恢复不能丢失消息级拒绝、未消费终态或把接收标记当作任务完成；终态与通知的原子提交、执行权限退休与通知消费仍是独立职责。 |
@@ -1103,7 +1103,7 @@ AssistantChatWorker（4051 行，按职责拆成 Assistant 目录内的同名 ex
 
 决定：Task、Skill 与消息管理的 control 是 Assistant 的内置函数库，不再由 Skill 声明 `useControls`。别名、声明和执行都在 Assistant 内，随 Assistant 状态高内聚；Skill 只配置 Action 与 Tool。
 
-库（Assistant/AssistantControls.swift）：`AssistantControl`（alias、`ActionDeclaration`、`AgentControlOperation`）、`AssistantControls.all`、按 path 查找，以及执行扩展（`executeControl`、`controlTask` 等）。解析器把标签别名解析为 `ControlCall`（path 与参数）后，由库的 path 查找直接得到 operation，不再经 `AgentControls`（Support）转手。
+库（Assistant/Controls/AssistantControls.swift）：`AssistantControl`（alias、`ActionDeclaration`、`AgentControlOperation`）、`AssistantControls.all`、按 path 查找，以及执行扩展（`executeControl`、`controlTask` 等）。解析器把标签别名解析为 `ControlCall`（path 与参数）后，由库的 path 查找直接得到 operation，不再经 `AgentControls`（Support）转手。
 
 注册与暴露：
 - `ControlRegistration` 保存规范 `ActionDeclaration`，可按当前语言重新本地化；JSON `controls` 配置通道删除。

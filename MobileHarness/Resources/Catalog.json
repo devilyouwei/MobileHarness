@@ -10,8 +10,7 @@
     "Writer": "Agents/Writer/Agent.json"
   },
   "skills": {
-    "basic-skill": "Skills/BasicSkill/Skill.json",
-    "expression-interaction": "Skills/ExpressionInteraction/Skill.json",
+    "basic-interaction": "Skills/BasicInteraction/Skill.json",
     "robot-interaction": "Skills/RobotInteraction/Skill.json",
     "photography": "Skills/Photography/Skill.json",
     "history-query": "Skills/HistoryQuery/Skill.json",

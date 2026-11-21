@@ -5,7 +5,7 @@ import Testing
 
 /// Opt-in real artifact acceptance. No downloads or substitute model are performed by this test.
 @Test(.enabled(if: ProcessInfo.processInfo.environment["D3_TEST_RESOURCES"] != nil))
-@MainActor func d3NativeDecisionMatchesPublishedFixtureAndRejectsOversizedInput() async throws {
+@MainActor func d3NativeDecisionMatchesPublishedFixtureAndTruncatesOversizedInput() async throws {
     guard #available(macOS 27, iOS 27, *) else {
         throw CapabilityError.unavailable("This native integration test requires macOS 27, iOS 27")
     }
@@ -38,20 +38,18 @@ import Testing
     await warm.waitForCompletion()
     print("D3 native warm duration: \(start.duration(to: .now))")
     let oversized = try DecisionRequest(text: String(repeating: "hello ", count: 1000), candidates: ["keep", "drop"])
-    await #expect(throws: CapabilityError.self) {
-        let session = try await decision.choice(oversized)
-        do { for try await _ in session.events {} } catch {
-            session.cancel()
-            await session.waitForCompletion()
-            throw error
-        }
-        await session.waitForCompletion()
+    let longSession = try await decision.choice(oversized)
+    let longValues = try await longSession.withCleanup {
+        var values: [DecisionResult] = []
+        for try await result in longSession.events { values.append(result) }
+        return values
     }
+    #expect(longValues.count == 1)
     try await root.stop()
 }
 
 @Test(.enabled(if: ProcessInfo.processInfo.environment["D3_EDGE_TEST_RESOURCES"] != nil))
-@MainActor func d3NativeDecisionRunsTextGraphAndRejectsOversizedInput() async throws {
+@MainActor func d3NativeDecisionRunsTextGraphAndTruncatesOversizedInput() async throws {
     guard #available(macOS 27, iOS 27, *) else {
         throw CapabilityError.unavailable("This native integration test requires macOS 27, iOS 27")
     }
@@ -87,12 +85,13 @@ import Testing
         #expect(score?.isFinite == true)
         let oversized = try DecisionRequest(
             text: String(repeating: "hello ", count: 1000), candidates: ["keep", "drop"])
-        await #expect(throws: CapabilityError.self) {
-            let rejected = try await model.choice(oversized)
-            try await rejected.withCleanup {
-                for try await _ in rejected.events {}
-            }
+        let longSession = try await model.choice(oversized)
+        let longValues = try await longSession.withCleanup {
+            var values: [DecisionResult] = []
+            for try await result in longSession.events { values.append(result) }
+            return values
         }
+        #expect(longValues.count == 1)
     } catch {
         try await root.stop()
         throw error

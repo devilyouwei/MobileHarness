@@ -99,7 +99,7 @@ struct FixtureNativeChatState: AssistantChatState {
     static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {
         let fixture =
             capabilities.actions.allSatisfy { $0.path.domain == "Agent" && $0.path.module == "Task" }
-            ? try AgentSkillLoader.registry(["expression-interaction"], fixed: capabilities) : capabilities
+            ? try AgentSkillLoader.registry(["basic-interaction"], fixed: capabilities) : capabilities
         let native = try CapabilityRegistry(
             actions: fixture.actions, tools: fixture.tools + [fixtureRuntimeTool()],
             channels: fixture.channels,

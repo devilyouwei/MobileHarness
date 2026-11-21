@@ -113,7 +113,7 @@ Role assets are described by [shared Chat](../../Chat/README.md#templates-and-lo
 
 ## 协议教学与分段
 
-调用方提供 XML Action、Channel 和 wait 的输出协议，以及独立的 Action 目录排版模板。原生 Tool 由实际模型请求携带结构化定义。Task 流程由 BasicSkill 教学，设备流程见对应 Skill，语音与字幕呈现由角色指令说明。
+调用方提供 XML Action、Channel 和 wait 的输出协议，以及独立的 Action 目录排版模板。原生 Tool 由实际模型请求携带结构化定义。Task 流程由拥有者 Agent 的 Controls.md 教学，设备流程见对应 Skill，语音与字幕呈现由角色指令说明。
 
 同一响应可为已确定的多步输出连续 wait，每组内不同 Channel 可并行；依赖结果才能选择的步骤必须等待真实反馈。同名 Channel 跨 Task 独立，资源约束另外校验；模板不授予执行权。
 

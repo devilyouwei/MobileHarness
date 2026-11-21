@@ -13,7 +13,7 @@ Preparation-step tests cover requested-order deduplication, registered-but-not-r
 
 ChatExecutionTests exercises root-owned local FIFO (one active/eight pending), overflow, immediate cancellation slot reuse, native cleanup joining, failure advancement and retained completed handles, using an explicit fake Chat provider. Immutable cloud selections/configuration reuse and root retirement are checked without HTTP. Provider HTTP concurrency is tested in OpenAIChatTests.
 
-D3NativeTests is explicitly opt-in via D3_TEST_RESOURCES. It performs real Swift tokenizer/Core AI inference against a locally supplied published fixture, compares selection/score and rejects oversized input. Ordinary default tests remain artifact-free; native results are recorded separately in docs/validation.
+D3NativeTests is explicitly opt-in via D3_TEST_RESOURCES or D3_EDGE_TEST_RESOURCES. It performs real Swift tokenizer/Core AI inference against a locally supplied published fixture, checks short-input selection and oversized-input completion. DecisionAdapterNativeTests checks D3 token truncation and graph input layout without weights. Ordinary default tests remain artifact-free; native results are recorded separately in docs/validation.
 
 
 Default local Gemma and cloud capabilities both advertise tools. Configuration isolation uses their distinct image support; a fixed local ChatModel retains local tool/image capabilities after the default selection changes. Queries remain artifact-free and do not issue HTTP requests.

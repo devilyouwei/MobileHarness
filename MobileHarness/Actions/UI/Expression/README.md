@@ -19,4 +19,4 @@
 
 ## State ownership
 
-Expression execution and restoration keep their existing Action completion contracts. The persistent base, temporary override and effective display target are owned by UI ConversationExpressionPresentation, whose explicit snapshot supplies ExpressionInteraction State. Actions keeps no mirrored expression state; loading a Skill or reading State never performs an expression.
+Expression execution and restoration keep their existing Action completion contracts. The persistent base, temporary override and effective display target are owned by UI ConversationExpressionPresentation, whose explicit snapshot supplies BasicInteraction State. Actions keeps no mirrored expression state; loading a Skill or reading State never performs an expression.

@@ -61,7 +61,7 @@ func realMossChineseEnglishAndLifecycle() async throws {
     }
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        .appendingPathComponent("MobileHarness/Resources/Models/MossTTSNano")
+        .appendingPathComponent("Models/MossTTSNano")
     let tokenizer = try MossTtsNanoTokenizer(modelURL: root.appendingPathComponent("tokenizer.model"))
     #expect(
         tokenizer.encode("欢迎关注模思智能、上海创智学院与复旦大学自然语言处理实验室。") == [

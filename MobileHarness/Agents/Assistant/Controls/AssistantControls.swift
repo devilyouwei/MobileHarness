@@ -20,7 +20,8 @@ public struct AssistantControl: Codable, Sendable, Equatable {
     public let declaration: ActionDeclaration
 }
 
-/// The Assistant's control library. Aliases, declarations and prompt text live in per-language resources.
+/// The Assistant's control library. Aliases, declarations, the usage guide and prompt text live in per-language
+/// resources.
 public enum AssistantControls {
     private struct Library: Decodable {
         let version: Int
@@ -33,7 +34,9 @@ public enum AssistantControls {
     }
 
     static func library(language: String) throws -> [AssistantControl] {
-        let path = language == "en" ? "Agents/Assistant/Controls.json" : "Agents/Assistant/Controls.\(language).json"
+        let path =
+            language == "en"
+            ? "Agents/Assistant/Controls/Controls.json" : "Agents/Assistant/Controls/Controls.\(language).json"
         let library = try JSONDecoder().decode(Library.self, from: AgentConfigurations.data(path))
         guard library.version == 1, !library.controls.isEmpty, library.controls.count <= 16,
             Set(library.controls.map(\.alias)).count == library.controls.count,
@@ -45,6 +48,27 @@ public enum AssistantControls {
 
     public static func control(path: String) throws -> AssistantControl? {
         try all.first { $0.declaration.path.description == path }
+    }
+
+    /// Usage guide (`Controls.md`), re-read for each prompt language; missing translations use the English guide.
+    static var guidance: ControlGuidance {
+        get throws {
+            ControlGuidance(text: try guidanceText(language: "en"), localized: { try guidanceText(language: $0) })
+        }
+    }
+
+    private static func guidanceText(language: String) throws -> String {
+        var data: Data?
+        if AgentPrompts.normalizedLanguage(language) == "zh-Hans" {
+            do { data = try AgentConfigurations.data("Agents/Assistant/Controls/Controls.zh-Hans.md") } catch let error
+                as CocoaError where error.code == .fileReadNoSuchFile
+            {}
+        }
+        if data == nil { data = try AgentConfigurations.data("Agents/Assistant/Controls/Controls.md") }
+        guard let data, let text = String(data: data, encoding: .utf8), !text.isEmpty else {
+            throw AgentConfigurationError.invalidFormat
+        }
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Registrations added to the Assistant's fixed capabilities, re-read for each prompt language.

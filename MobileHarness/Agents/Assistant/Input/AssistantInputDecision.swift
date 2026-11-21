@@ -71,7 +71,7 @@ public struct InputDecisionSnapshot: Sendable {
         let text = String(
             decoding: try encoder.encode(State(currentTurn: currentTurn, incomingUserInput: text)), as: UTF8.self)
         return try NoulRequest(
-            text: text, instructions: AgentPrompts.text("Assistant/InputDecision", "question"),
+            text: text, instructions: AgentPrompts.text("Assistant/Input/InputDecision", "question"),
             context: .init(requestID: input.id + ".decision", scopeID: input.sessionID))
     }
 }

@@ -49,3 +49,11 @@ Edge源图选择已实施；远端固定版本与Mac本地12文件内容匹配�
 首轮220条完成，minimal基线18/48，收窄discard为24/48但继续聆听仍0/16，补问候定义仅8/48。追加预先固定对照：历史utterance_status原样参考、仅将ASR marker短语替换为unintelligible text、仅保留无待答问题的hesitation定义、替换为无可识别话语定义；其余上下文和选项不变。历史ASR描述只作已存档控制，绝不恢复生产噪声词表或声称ASR提供该标签。
 
 自有repo与文件清单已恢复并安装真机；锁屏未启动。两轮440条提示评分完成，未发现可上线候选，生产提示保持原样。结果与验证限制见原Mac报告的discard边界对照及D3制品记录。
+
+## D3 超长输入裁剪
+
+- ModelKit 的 `Language/JEV/D3Decision.swift` 在完整聊天模板分词后保留末尾最多 512 个 token，再生成左填充的输入、注意力掩码及四组位置；不由 Assistant 或调用者裁剪。短输入保持原样，空 token 序列和无法表示的 token ID 仍明确失败。裁剪可能移除系统提示、上下文或极长问题及选项的前部，不保证模型效果。
+- 在现有 `DecisionAdapterNativeTests.swift` 使用无权重测试覆盖短、恰好 512、超长及无效 token，以及张量输入布局；`D3NativeTests.swift` 的可选真实模型用例验证超长请求完成，保留原短输入回归。
+- 实现后同步 JEV 和 Defaults 测试 README，执行定向测试与 `scripts/check.sh`；完整 Xcode 可用时执行 `scripts/build-ios.sh`。真实模型和物理设备结果单独报告。
+
+实现及 Mac 真实模型验证完成；全量检查未通过，真机验收未执行，见[验证记录](../../validation/D3-iOS-AOT.md#d3-input-truncation--2026-11-21)。

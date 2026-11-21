@@ -7,15 +7,18 @@ public struct CapabilityRegistry: Sendable {
     public let internalActions: [InternalAction]
     public let internalTools: [InternalTool]
     public let controls: [ControlRegistration]
+    /// Usage guide of the owner's controls; present only together with controls.
+    public let controlGuidance: ControlGuidance?
     public let channels: Set<String>
 
     public init(
         actions: [ActionRegistration] = [], tools: [ToolRegistration] = [], channels: Set<String> = [],
         internalActions: [InternalAction] = [], internalTools: [InternalTool] = [],
-        controls: [ControlRegistration] = []
+        controls: [ControlRegistration] = [], controlGuidance: ControlGuidance? = nil
     )
         throws
     {
+        guard controlGuidance == nil || !controls.isEmpty else { throw GenerationError.invalidParameters }
         guard
             actions.count + tools.count + controls.count + internalActions.count + internalTools.count <= 128,
             channels.count <= 16
@@ -57,6 +60,7 @@ public struct CapabilityRegistry: Sendable {
         self.actions = actions
         self.tools = tools
         self.controls = controls
+        self.controlGuidance = controlGuidance
         self.channels = channels.union(actions.map(\.defaultChannel)).union(internalActions.map(\.channel))
         guard self.channels.count <= 16 else { throw GenerationError.limitExceeded }
     }
@@ -99,12 +103,14 @@ public struct CapabilityRegistry: Sendable {
     }
 
     public func adding(
-        internalActions: [InternalAction] = [], internalTools: [InternalTool] = [], controls: [ControlRegistration] = []
+        internalActions: [InternalAction] = [], internalTools: [InternalTool] = [],
+        controls: [ControlRegistration] = [],
+        controlGuidance: ControlGuidance? = nil
     ) throws -> Self {
         try Self(
             actions: actions, tools: tools, channels: channels,
             internalActions: self.internalActions + internalActions, internalTools: self.internalTools + internalTools,
-            controls: self.controls + controls)
+            controls: self.controls + controls, controlGuidance: controlGuidance ?? self.controlGuidance)
     }
 
     public func permits(_ call: ActionCall) -> Bool {

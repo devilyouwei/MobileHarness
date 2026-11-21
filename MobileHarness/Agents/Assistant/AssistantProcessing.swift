@@ -28,7 +28,7 @@ public struct AssistantContextState: AssistantChatState {
             internalTools: [
                 .init(path: "UI.Island.present", required: ["activityID", "revision", "content"]),
                 .init(path: "UI.Island.end", required: ["activityID", "revision"]),
-            ], controls: try AssistantControls.registrations)
+            ], controls: try AssistantControls.registrations, controlGuidance: try AssistantControls.guidance)
     }
     public static func preprocess(_ input: AgentInput, state: Self) throws -> SignalDisposition {
         try AssistantSignalPreprocessor().classify(input, state: state)

@@ -59,12 +59,12 @@ private struct WindowToolsFixture: ToolModule { let definitions: [ActionBinding]
     await service.stop()
     await ui.stop()
 }
-@Test(.actionCatalog) func windowSkillsShareAliasesWithoutExpandingBasicSkill() throws {
+@Test(.actionCatalog) func windowSkillsShareAliasesWithoutExpandingBasicInteraction() throws {
     let configuration = try AgentConfigurations.load(named: "Assistant")
     let shared = try AgentSkillLoader.registry(
         ["photography", "application-control"], fixed: configuration.capabilities)
     #expect(shared.actions.filter { $0.path.description.hasPrefix("UI.Window.") }.count == 6)
-    let base = try AgentSkillLoader.registry(["basic-skill"], fixed: configuration.capabilities)
+    let base = try AgentSkillLoader.registry(["basic-interaction"], fixed: configuration.capabilities)
     #expect(!base.actions.contains { $0.path.description.hasPrefix("UI.Window.") })
 }
 
@@ -72,7 +72,7 @@ private struct WindowToolsFixture: ToolModule { let definitions: [ActionBinding]
     let fixed = try AgentConfigurations.load(named: "Assistant").capabilities
     let vision = try AgentSkillLoader.registry(["application-control"], fixed: fixed)
     let photo = try AgentSkillLoader.registry(["photography"], fixed: fixed)
-    let base = try AgentSkillLoader.registry(["basic-skill"], fixed: fixed)
+    let base = try AgentSkillLoader.registry(["basic-interaction"], fixed: fixed)
     for (alias, function) in [
         ("Vision.open", "openVision"), ("Vision.close", "closeVision"),
         ("Vision.flip", "flipVision"), ("Vision.retry", "retryVision"),

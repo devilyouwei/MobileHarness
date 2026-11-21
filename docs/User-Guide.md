@@ -21,7 +21,7 @@ Open **Settings → AI Models** in the app to manage **Speech Recognition**, **S
 ### Model Downloads and Development Provisioning
 
 - App model downloads use an explicit Hugging Face, HF-Mirror, or custom HTTPS source; YOLO retains its declared ZIP source. Production revisions remain pinned. Background transfer and resume depend on the OS and server; force-quit does not guarantee continued transfer. See [model resources](../MobileHarness/ModelKit/Support/Config/README.md) and the [Hub adapter](../MobileHarness/ModelKit/Support/Management/HuggingFace/README.md) for acquisition, compatibility, and recovery details.
-- For local Gemma development on macOS, run `python3 scripts/models/model_download.py gemma4-e2b --platform macos` to provision `Models/Gemma4` (`--endpoint` selects the download source). Other downloader profiles still use the legacy `MobileHarness/Resources/Models` destination, so check the [script inventory](../scripts/README.md) before provisioning.
+- For local model development, run `python3 scripts/models/model_download.py <profile>` (for example `gemma4-e2b --platform macos`) to provision `Models/<model>`; `--endpoint` selects the download source. All downloader profiles write to the root `Models/` directory; see the [script inventory](../scripts/README.md).
 - Research and engineering reuse verified artifacts in root [Models](../Models/README.md) through their explicit resource settings. App-managed downloads are separate from the development workspace. See [Voice](validation/Voice.md) and [MOSS validation](validation/Moss-Validation.md) for native acceptance procedures.
 
 ## Interaction Controls

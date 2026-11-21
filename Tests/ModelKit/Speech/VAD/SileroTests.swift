@@ -103,7 +103,7 @@ private struct BoundaryRecorder {
 func realSileroStreamingResetTailAndSilence() async throws {
     let repo = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-    let models = repo.appendingPathComponent("MobileHarness/Resources/Models")
+    let models = repo.appendingPathComponent("Models")
     let providerContext = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
     let provider = try SileroVAD(
         context: providerContext,

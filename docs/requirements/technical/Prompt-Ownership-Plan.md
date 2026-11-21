@@ -14,7 +14,7 @@ Assistant 角色指令只介绍自身；每个 Agent 维护自己的用途说明
 - `Resources/Agents/Assistant/Prompts.json` 的 delegation 模板再次手写六个同伴介绍，与身份指令维护的 Writer 介绍不同步。
 - `Resources/Skills/BasicSkill/Instructions.md` 既定义 Task/Skill 的使用规则，又维护 Writer 的用途、单任务限制、作品定位与业务示例。
 - `Actions/System/Task/TaskActions.swift` 的 startTask/delegateTask 文档包含 Writer 业务分工。
-- Writer 的私有控制/内容指令在 `Agents/Writer/WriterWorkflow.swift`，其原生工具说明在 `WriterAgent.swift`；所有者正确，但长正文和执行代码混在一起。
+- Writer 的私有控制/内容指令在 `Agents/Writer/Workflow/WriterWorkflow.swift`，其原生工具说明在 `WriterAgent.swift`；所有者正确，但长正文和执行代码混在一起。
 - Skill 的用途已有自己的 `Skill.json.description` 和按目录生成的 overview；Agent 没有对应的统一公开介绍读取接口。
 - 当前 `AgentChatWorker.controlTask` 的 delegate 适配实际只接受 writer。Agent 注册、通信输入声明或一段用途介绍均不能据此新增公开委派能力。
 

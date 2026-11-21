@@ -6,6 +6,8 @@
     "action": "操作 {{alias}}：",
     "controls": "Agent 控制（由本 Agent 执行，不是操作；self：本 Agent 状态，peer：另一个 Agent；无通道，不得写在 <wait> 内）",
     "control": "控制 {{alias}}（{{destination}}）：",
-    "parameter": "  {{name}}：{{type}}，{{presence}}。{{description}} {{constraints}}"
+    "parameter": "  {{name}}：{{type}}，{{presence}}。{{description}} {{constraints}}",
+    "wait": "操作 wait（调度；成对标签 `<wait>...</wait>`，无通道；由 Actions 的 Shell 排序）：\n<wait>...</wait> 等待父组在它之前的工作完成才开始，并在自身闭合及内部工作全部完成以前阻止父组后续工作。组内按 Channel 排序。嵌套组不等待自身、祖先或其他任务。空的 `<wait></wait>` 有效。wait 必须成对，可嵌套且无属性，禁止 `<wait/>`。上限是 32 个 wait 和 8 层嵌套作用域。wait 不增加超时或回滚，控制不能放进 wait。\n在一个响应中发送所有已知的请求步骤。依赖结果的选择等待反馈。严格串行 A 到 D 使用 `<wait>A</wait><wait>B</wait><wait>C</wait><wait>D</wait>`，即使跨 Channel，上一步也先完成。两对并行操作依次执行时使用 `<wait>A B</wait><wait>C D</wait>`，A/B 可在不同 Channel 重叠，两者完成后才开始 C/D。仅靠输出顺序不能同步不同 Channel。A 到 D 指已声明的 Action 或角色映射的文字。",
+    "guidance": "控制指南：\n{{text}}"
   }
 }

@@ -45,7 +45,7 @@ import Testing
     #expect(try encoder.encode(state) == encoded)
     #expect(throws: CommunicationError.unauthorized) {
         try state.control(
-            "releaseSkills", arguments: ["skills": "[\"expression-interaction\"]"], inputID: input,
+            "releaseSkills", arguments: ["skills": "[\"basic-interaction\"]"], inputID: input,
             fixed: fixedCapabilities)
     }
     try state.decisionCompleted()
@@ -1287,11 +1287,12 @@ func legacyBackgroundStartIsRejectedWithoutChangingForegroundOrInvokingChat()
         #expect(composed.tools.map(\.path) == configuration.capabilities.tools.map(\.path))
     }
     let assistant = try AgentConfigurations.load(named: "Assistant")
-    let expression = try AgentSkillLoader.registry(["expression-interaction"], fixed: assistant.capabilities)
+    let expression = try AgentSkillLoader.registry(["basic-interaction"], fixed: assistant.capabilities)
     #expect(expression.tools.isEmpty)
-    #expect(expression.actions.count == 2)
+    #expect(
+        expression.actions.map(\.alias).sorted() == ["express", "setExpression", "startListening", "stopListening"])
     #expect(!expression.actions.contains { $0.alias == "send" || $0.alias == "readEnvironment" })
-    let basic = try AgentSkillLoader.registry(["basic-skill"], fixed: assistant.assistantFixed)
+    let basic = try AgentSkillLoader.registry(["basic-interaction"], fixed: assistant.assistantFixed)
     #expect(basic.tools.isEmpty)
     #expect(basic.controls.contains { $0.alias == "task.start" })
     #expect(!basic.actions.contains { $0.alias == "send" })
@@ -1305,7 +1306,7 @@ func legacyBackgroundStartIsRejectedWithoutChangingForegroundOrInvokingChat()
     let configuration = try AgentConfigurations.load(named: "Assistant")
     let fixed = try AssistantAgent.runtimeCapabilities(configuration.capabilities)
     let base = try AgentConfigurations.baseSkills(named: "Assistant")
-    #expect(Set(base) == ["basic-skill", "expression-interaction"])
+    #expect(Set(base) == ["basic-interaction"])
     var state = AgentTaskSkillState()
     try state.initialize(fixed: fixed, baseSkills: base)
     let before = try state.registry(fixed: fixed)
@@ -1485,8 +1486,12 @@ func assistantCapturesWithoutTaskWhenNoFollowUpIsRequested(supportsImages: Bool)
 }
 
 @Test(.actionCatalog) func bundledSkillsKeepPresentationAndDeviceProceduresSeparate() throws {
-    let expression = try AgentConfigurations.skill("expression-interaction")
-    #expect(Set(expression.useActions.map(\.path)) == ["UI.Expression.express", "UI.Expression.setExpression"])
+    let expression = try AgentConfigurations.skill("basic-interaction")
+    #expect(
+        Set(expression.useActions.map(\.path)) == [
+            "UI.Expression.express", "UI.Expression.setExpression", "Speech.Listening.startListening",
+            "Speech.Listening.stopListening",
+        ])
     let application = try AgentConfigurations.skill("application-control")
     #expect(application.useActions.count == 18 && !application.useActions.contains { $0.path.hasPrefix("NexArm.") })
     let robot = try AgentConfigurations.skill("robot-interaction")
@@ -2151,7 +2156,8 @@ func unrelatedOrUnexposedCallsCannotRenewOrAdoptSkill(reason: String) throws {
     #expect(!state.loaded.contains("photography") && state.decisions.isEmpty)
 }
 
-@Test(.actionCatalog, arguments: ["[\"basic-skill\"]", "[\"missing\"]", "[\"photography\",\"basic-skill\"]"])
+@Test(
+    .actionCatalog, arguments: ["[\"basic-interaction\"]", "[\"missing\"]", "[\"photography\",\"basic-interaction\"]"])
 func invalidSkillReleaseCannotPartiallyRemoveRecentSkills(skills: String) throws {
     var (state, fixed) = try retentionFixture()
     try retainedLoad("photography", state: &state, fixed: fixed)
@@ -2673,6 +2679,10 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
     let port = try await output.messaging(for: .writer)
     let writerRuntime = try await output.consumer(for: child)
     _ = try await writerRuntime.authorizeReceivedTask(scope, received)
+    // The receiver, not the sending Gateway, records the admitted message.
+    try await database.agentMessages.seedAgentRequest(
+        id: scope.id, requester: "assistant", executor: "writer", goal: request.text, input: request.text,
+        sourceDialog: nil)
     _ = try await database.writerExecutions.beginRequest(
         delegateID: scope.id, workspaceID: nil, goal: request.text, input: request.text, sourceDialog: nil,
         agent: "writer")
@@ -2724,7 +2734,8 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         #expect(try await context.snapshot().state.taskViews?[scope.id]?.terminal != true)
         #expect(try await context.snapshot().state.skillState?.activeTaskID == nil)
         #expect(cancel.text == "User cancelled")
-        #expect(try await database.agentMessages.agentMessage(cancelledInput.id)?.contract == AgentTaskRequest.contract)
+        // Only the receiving Agent records a message; this fixture child does not.
+        #expect(try await database.agentMessages.agentMessage(cancelledInput.id) == nil)
         let ended = try await fixtureWriterCompletion(
             AgentTaskContent(
                 text: "Cleanup complete", stage: .completed,
@@ -2750,6 +2761,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         let old = try await fixtureWriterCompletion(
             content, scope: scope, status: .succeeded, executions: database.writerExecutions)
         try await writerRuntime.retireTask(#require(old.signal))
+        try await database.writerExecutions.retireRequest(scope.id, failure: nil)
         await model.delegateAgain()
         try await assistant.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("继续或开始下一项任务")))
         try await skillEventually { await child.inputs.count == 2 }
@@ -2760,6 +2772,9 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         let nextScope = AgentTaskScope(
             id: next.id, requester: .assistant, executor: .writer, sessionID: session, execution: .background)
         _ = try await writerRuntime.authorizeReceivedTask(nextScope, nextInput)
+        try await database.agentMessages.seedAgentRequest(
+            id: next.id, requester: "assistant", executor: "writer", goal: next.text, input: next.text,
+            sourceDialog: nil)
         _ = try await database.writerExecutions.beginRequest(
             delegateID: next.id, workspaceID: nil, goal: next.text, input: next.text, sourceDialog: nil, agent: "writer"
         )
@@ -3113,7 +3128,7 @@ private func fixtureEventPublication(
     let registry = try AgentSkillLoader.registry(
         [
             "application-control", "history-query", "photography", "robot-interaction", "web-browsing",
-            "expression-interaction",
+            "basic-interaction",
         ], fixed: CapabilityRegistry())
     func channel(_ alias: String) throws -> String {
         try #require(registry.actions.first { $0.alias == alias }).defaultChannel
@@ -3147,13 +3162,13 @@ private func fixtureEventPublication(
     }
     let registry = try AgentSkillLoader.registry(["photography"], fixed: fixed)
     #expect(registry.controls.count == 5)
-    #expect(try AgentSkillLoader.registry(["basic-skill"], fixed: CapabilityRegistry()).controls.isEmpty)
+    #expect(try AgentSkillLoader.registry(["basic-interaction"], fixed: CapabilityRegistry()).controls.isEmpty)
     let legacy = Data(
         #"{"version":3,"id":"legacy","revision":1,"description":"x","dependencies":[],"useActions":[],"useControls":[],"useStates":[],"useInstructions":[]}"#
             .utf8)
     #expect(throws: (any Error).self) { try JSONDecoder().decode(AgentConfigurations.Skill.self, from: legacy) }
     try AgentPrompts.$language.withValue("zh-Hans") {
-        let localized = try AgentSkillLoader.registry(["basic-skill"], fixed: fixed)
+        let localized = try AgentSkillLoader.registry(["basic-interaction"], fixed: fixed)
         let english = try #require(fixed.controls.first { $0.alias == "loadSkills" })
         let chinese = try #require(localized.controls.first { $0.alias == "loadSkills" })
         #expect(english.documentation?.doc != chinese.documentation?.doc)

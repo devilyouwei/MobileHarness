@@ -4,10 +4,10 @@
 
 ## 调度、Channel 和执行约束
 
-Channel 是执行队列。每项 Action 使用当前目录所列的已注册 Channel。同一任务内，同一 Channel 按输出顺序执行。共享排序作用域的任务也遵循同一 Channel 的顺序。不同 Channel 可受资源和 wait 约束而并行。资源冲突会失败，宿主明确允许清理后接管时才可接管。wait 作用域和 Agent 控制由已加载的基础 Skill 说明。
+Channel 是执行队列。每项 Action 使用当前目录所列的已注册 Channel。同一任务内，同一 Channel 按输出顺序执行。共享排序作用域的任务也遵循同一 Channel 的顺序。不同 Channel 可受资源和 wait 约束而并行。资源冲突会失败，宿主明确允许清理后接管时才可接管。wait 作用域见目录中的 wait 条目；Agent 若持有控制，由其控制段说明。
 
 ## 语法
 
-Action 和控制标签自闭合。禁止成对 Action、文档根标签、注释、DOCTYPE、CDATA 及 parallel 或 serial 标签。字面量 < 和 & 分别转义成 &lt; 和 &amp;；双引号属性内部的引号用 &quot;。
+Action 和控制标签自闭合。除调度 wait 外禁止成对 Action、文档根标签、注释、DOCTYPE、CDATA 及 parallel 或 serial 标签。字面量 < 和 & 分别转义成 &lt; 和 &amp;；双引号属性内部的引号用 &quot;。
 
 上限是 120 个生成的调用。自然语言由角色策略解释。

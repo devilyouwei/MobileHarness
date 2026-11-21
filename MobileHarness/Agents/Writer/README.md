@@ -16,16 +16,18 @@ Assistant 不参与创作循环或通过聆听/对话关闭终止 Writer；应�
 
 ## 文件职责
 
+根目录保留 Agent 入口与容器；职责目录为 [Input](Input/README.md)、[Output](Output/README.md)、[Workflow](Workflow/README.md) 与 [State](State/README.md)。
+
 | 文件 | 职责 |
 | --- | --- |
 | [WriterAgent.swift](WriterAgent.swift) | AgentCore 角色：收件、准入、执行 worker、工具端口绑定与 agent.task.response 回报队列。状态全部 private，同一编译目标内的 Assistant 不可访问。 |
-| [WriterWorkflow.swift](WriterWorkflow.swift) | 控制/内容模型循环、收件意图判定（inboxIntent）及 WriterBudget 字节预算。 |
-| [WriterTools.swift](WriterTools.swift) | 宿主绑定的 WriterTools 端口、工具结果、控制域和本地工具声明，以及共享的 WriterToolGroup 工具分组。 |
+| [WriterWorkflow.swift](Workflow/WriterWorkflow.swift) | 控制/内容模型循环、收件意图判定（inboxIntent）及 WriterBudget 字节预算。 |
+| [WriterTools.swift](Workflow/WriterTools.swift) | 宿主绑定的 WriterTools 端口、工具结果、控制域和本地工具声明，以及共享的 WriterToolGroup 工具分组。 |
 | [WriterContainer.swift](WriterContainer.swift) | 根拥有的注册、暂停、恢复、关闭与存储装配。 |
-| [WriterRecords.swift](WriterRecords.swift) | 设置页记录读模型：委托、工作区、请求详情与导出。 |
-| [WriterRequestNaming.swift](WriterRequestNaming.swift) | 请求行标题与状态推导。 |
-| [WriterHistory.swift](WriterHistory.swift) / [WriterRecovery.swift](WriterRecovery.swift) / [WriterDiagnostics.swift](WriterDiagnostics.swift) | 请求历史与恢复上下文、有界恢复、失败分类。 |
-| [WriterPreview.swift](WriterPreview.swift) / [WriterIslandPresentation.swift](WriterIslandPresentation.swift) / [WriterNotifications.swift](WriterNotifications.swift) | 预览刷新、自有灵动岛、终态持久投递。 |
+| [WriterRecords.swift](State/WriterRecords.swift) | 设置页记录读模型：委托、工作区、请求详情与导出。 |
+| [WriterRequestNaming.swift](Input/WriterRequestNaming.swift) | 请求行标题与状态推导。 |
+| [WriterHistory.swift](State/WriterHistory.swift) / [WriterRecovery.swift](Workflow/WriterRecovery.swift) / [WriterDiagnostics.swift](State/WriterDiagnostics.swift) | 请求历史与恢复上下文、有界恢复、失败分类。 |
+| [WriterPreview.swift](Output/WriterPreview.swift) / [WriterIslandPresentation.swift](Output/WriterIslandPresentation.swift) / [WriterNotifications.swift](WriterNotifications.swift) | 预览刷新、自有灵动岛、终态持久投递。 |
 
 对外只暴露 Agent 通信协议（agent.task.request / agent.task.response）及根装配接口。作品导出端口 WriterArtifactsControlling 由宿主经 AgentContainer.writerArtifacts 直接提供给设置页，Writer 不持有 UI 导出能力。
 
@@ -99,7 +101,7 @@ WriterWorkflow 为控制/内容的每次实际请求创建独立 ChatTiming，�
 
 生成指标使用所选调用的日志证据，缺少参数或耗时可独立呈现。新委托的完成结果归属显式 finish 工具调用。历史宿主收尾按模型调用 ID 读取。
 
-WriterRequestNaming（[WriterRequestNaming.swift](WriterRequestNaming.swift)）只识别规范英文阶段名，从工具与控制域派生请求行标题，包括作品查询、进入、创建、呈现、文件编辑与保存。文件内容阶段按目标路径命名，多工具按顺序去重合并，过长/含源码标记的instruction不作标题。没有操作事实时使用中性描述，不请求模型生成标题。请求失败/取消/中断优先保留，其后才判断工具失败、取消和在途状态；模型结束不等同工具操作成功。完整证据始终在请求详情。
+WriterRequestNaming（[WriterRequestNaming.swift](Input/WriterRequestNaming.swift)）只识别规范英文阶段名，从工具与控制域派生请求行标题，包括作品查询、进入、创建、呈现、文件编辑与保存。文件内容阶段按目标路径命名，多工具按顺序去重合并，过长/含源码标记的instruction不作标题。没有操作事实时使用中性描述，不请求模型生成标题。请求失败/取消/中断优先保留，其后才判断工具失败、取消和在途状态；模型结束不等同工具操作成功。完整证据始终在请求详情。
 
 ## 委托与主动事件
 

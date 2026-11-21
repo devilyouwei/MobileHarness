@@ -6,6 +6,23 @@ import Tokenizers
 
 @testable import ModelKitD3
 
+@Test(arguments: [3, 512, 700])
+func d3TextInputPreservesLastTokensAndBuildsGraphInputs(count: Int) throws {
+    let tokens = Array(1...count)
+    let input = try D3TextInput(tokens: tokens)
+    let retained = Array(tokens.suffix(512)).map(Int32.init)
+    let padding = 512 - retained.count
+    #expect(input.ids == Array(repeating: 0, count: padding) + retained)
+    #expect(input.attentionMask == Array(repeating: 0, count: padding) + Array(repeating: 1, count: retained.count))
+    let positions = Array(repeating: Int32(0), count: padding) + (0..<retained.count).map(Int32.init)
+    #expect(input.positions == Array(repeating: positions, count: 4).flatMap { $0 })
+}
+
+@Test func d3TextInputRejectsInvalidTokens() {
+    #expect(throws: CapabilityError.self) { try D3TextInput(tokens: []) }
+    #expect(throws: CapabilityError.self) { try D3TextInput(tokens: [Int(Int32.max) + 1]) }
+}
+
 private struct AdapterParityInput: Decodable {
     struct Row: Decodable {
         let model: String

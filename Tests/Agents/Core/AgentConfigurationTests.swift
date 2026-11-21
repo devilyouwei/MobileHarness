@@ -272,14 +272,14 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     #expect(prompt.contains("Each Action uses its registered Channel, shown in the current Action catalog."))
     #expect(!prompt.contains("Action dance:"))
     #expect(!prompt.contains("Action takePhoto:"))
-    #expect(prompt.contains("# BasicSkill"))
+    #expect(prompt.contains("## BasicInteraction"))
     #expect(prompt.contains("is converted to speech and displayed as captions"))
     for text in [
         "Action say:", "Action print:", "playAudio", "audioID", "beginReplyTurn", "runtimeInfo", "not callable",
     ] {
         #expect(!prompt.contains(text))
     }
-    #expect(prompt.contains("# Expression interaction"))
+    #expect(prompt.contains("express is transient"))
     var generator = AgentGenerator(
         capabilities: registry, textMapping: AssistantAgent.mapText, segmentation: try AssistantAgent.textSegmentation)
     let events = try generator.append("<wait>Hello.</wait><express emotion='smile'/>") + generator.finish()
@@ -362,7 +362,7 @@ func malformedNativeToolsFailExplicitly(_ mutation: String) throws {
 }
 
 @Test(.actionCatalog) func codeOwnedTextMappingIsBoundedAndOptional() throws {
-    let model = try AgentSkillLoader.registry(["expression-interaction"], fixed: CapabilityRegistry())
+    let model = try AgentSkillLoader.registry(["basic-interaction"], fixed: CapabilityRegistry())
     var actionOnly = AgentGenerator(capabilities: model)
     #expect(try actionOnly.append("<express emotion='smile'/>").count == 1)
     #expect(throws: GenerationError.unknownCapability) { try actionOnly.append("Hello") }
@@ -409,7 +409,7 @@ func malformedNativeToolsFailExplicitly(_ mutation: String) throws {
 
 @Test(.actionCatalog) func agentCoreContextContainsNoAutomaticSpeechPolicy() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
-    let effective = try AgentSkillLoader.registry(["expression-interaction"], fixed: config.capabilities)
+    let effective = try AgentSkillLoader.registry(["basic-interaction"], fixed: config.capabilities)
     let output = try AgentPrompts.capabilityContext()
     let generic = try output.build(effective)
     #expect(generic.contains("SCHEDULING: CHANNEL AND EXECUTION CONSTRAINTS"))
@@ -539,7 +539,7 @@ func threeLevelConfigurationRejectsAmbiguousBindings(_ mutation: String) throws 
 @Test(
     .actionCatalog, arguments: ["missing", "old", "duplicate", "unknown", "wildcard", "malformed", "tooMany", "schema"])
 func skillUseStateRejectsInvalidDeclarations(_ mutation: String) throws {
-    let skill = try AgentConfigurations.skill("basic-skill")
+    let skill = try AgentConfigurations.skill("basic-interaction")
     var json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(skill)) as? [String: Any])
     switch mutation {
     case "missing": json.removeValue(forKey: "useStates")

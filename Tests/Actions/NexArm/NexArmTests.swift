@@ -354,7 +354,7 @@ private func runNexArmAssistantMarkup(
     }
 ) async throws {
     let motionBindings =
-        try AgentConfigurations.skill("expression-interaction").useActions
+        try AgentConfigurations.skill("basic-interaction").useActions.filter { $0.path.hasPrefix("UI.Expression.") }
         + AgentConfigurations.skill("robot-interaction").useActions
     let assistant = try AssistantChatWorker<AssistantContextState>(
         stateContext: try publicStateFixture(),

@@ -75,7 +75,7 @@ func invalidHapticArgumentsNeverInvokeNativeEffect(_ arguments: [String: String]
 @Test(.actionCatalog) func feedbackFunctionsRemainCanonicalWithoutSkillExposure() throws {
     let feedback = UIModule.declarations.filter { $0.path.module == "Feedback" }
     #expect(Set(feedback.map(\.path.function)) == ["playCue", "vibrate"])
-    let skill = try AgentConfigurations.skill("expression-interaction")
+    let skill = try AgentConfigurations.skill("basic-interaction")
     #expect(!skill.useActions.contains { $0.path == "UI.Feedback.playCue" })
     #expect(!skill.useActions.contains { $0.path == "UI.Feedback.vibrate" })
     let cue = try #require(feedback.first { $0.path.function == "playCue" })

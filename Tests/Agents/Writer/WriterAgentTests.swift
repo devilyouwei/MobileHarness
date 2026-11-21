@@ -2696,8 +2696,7 @@ func writerOwnsTargetSelectionAndCompletion(mode: String) async throws {
             #expect(current.workspaceID.isEmpty)
             #expect(try await workspace.project(workspaceID).files["document.md"] == "# Draft\nKEEP")
             let deadline = ContinuousClock.now + .seconds(5)
-            while try await records.writerExecutions.request(requestID, agent: "writer").executionState == "closing"
-            {
+            while try await records.writerExecutions.request(requestID, agent: "writer").executionState == "closing" {
                 guard ContinuousClock.now < deadline else { throw WriterFailure.incomplete }
                 try await Task.sleep(for: .milliseconds(10))
             }

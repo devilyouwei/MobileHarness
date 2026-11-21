@@ -17,7 +17,7 @@ Recording handoff tests exercise the production VoiceRecordingAudioHandoff with 
 
 灵动岛双呈现回归覆盖通用详情阶段/收起/结束、普通状态拒绝展开、相机优先整活动切换、后台只保留当前活动摘要、真实渲染回执围栏、频谱不重发摘要及系统失败下前台独立。布局检查左右同边距、硬件保护和有界标准圆角矩形；不替代真机动画验收。
 
-Island集成校验新primary/secondary内容与Action解析、指定活动的展示偏好修改、任务自动详情以及系统权限失败与前台独立；图片端口只注册显示资源，不扩大BasicSkill。
+Island集成校验新primary/secondary内容与Action解析、指定活动的展示偏好修改、任务自动详情以及系统权限失败与前台独立；图片端口只注册显示资源，不扩大BasicInteraction。
 
 VoiceTests的ASR失败回归覆盖创建失败及结束输入后的SFSpeechErrorDomain拒识替身：错误保留、字幕封口、Context及显示回到listening、empty轮次终态、下一句成功发布。此替身验证控制流，不等于Apple ASR真机识别验收。
 
@@ -54,7 +54,7 @@ Writer 历史回归验证同一 SQLite 的角色隔离、重开后完整请求/�
 
 Writer 委托回归覆盖默认目录XML Action、保持已有前台 Task、主动事件触发模型、与用户输入 FIFO、重复消息去重、单任务竞争与错误 interactionID 拒收、完成证据满队列后同 ID 重送，以及模型获取前窗口呈现。呈现/模型仍为明确替身，真实 Gateway 与 SQLite 链路独立验证。
 
-Assistant 协议回归检查所有内置 Skill 仅暴露 XML Action、BasicSkill 包含前后台任务控制、身份提示说明协作角色与委托范围；真实 Scheduler 驱动 XML 委托，生产绑定检查 Action scheduled/Tool direct，Writer 独立工具执行保持覆盖。
+Assistant 协议回归检查所有内置 Skill 仅暴露 XML Action、Assistant 的 Controls 声明与指南包含前后台任务控制（Skill 不含 control）、身份提示说明协作角色与委托范围；真实 Scheduler 驱动 XML 委托，生产绑定检查 Action scheduled/Tool direct，Writer 独立工具执行保持覆盖。
 
 Writer 委托故障回归通过真实 Assistant XML、Gateway/Scheduler 和 SQLite 验证：模型在 failed 事件中尝试重委托被宿主拒绝；原用户输入内重复委托也不创建第二项任务，新用户输入仍可再次尝试。Writer 端点与模型使用替身，不代表真实模型或设备验收。
 

@@ -2,7 +2,7 @@
 ### 事实与准入
 拍照、摄影和录像使用相机窗口。打开视觉、跟踪和跟随属于 application-control 和 Vision.open，摄影不启用后台视觉。
 actions.camera 提供意图、忙闲、权限和预览。platform.vision.camera 提供实际启动状态、阶段和朝向。未知表示未就绪。只有用户要求且 lensOwner=capture 时才切换镜头。
-BasicSkill 决定 Task 的开始和结束。读取 AGENT CONTEXT 中的 task。独立保存、关闭或切换镜头不必新建 Task。只结束已实际创建的匹配任务。报告忙碌或权限阻碍；retryCamera 需要明确意图。
+Agent 控制决定 Task 的开始和结束。下面示例中，存在匹配的活动 Task 时，在确认结果的同一响应里用 task.end 结束它；示例只展示拍摄相关部分。读取 AGENT CONTEXT 中的 task。独立保存、关闭或切换镜头不必新建 Task。只结束已实际创建的匹配任务。报告忙碌或权限阻碍；retryCamera 需要明确意图。
 ### 拍照
 openCamera 打开或恢复就绪预览，不拍照。takePhoto 需要可见相机且会选择拍照模式，不能代替打开或恢复相机。将已知的打开、切换或设置、口语和拍摄步骤放在一个响应；依赖结果的决策才等反馈。
 新拍摄在打开与拍照之间用简短口语提示。用各自 wait 排序相机和语音 Channel。已打开时省略 openCamera，已说过提示时省略重复提示。
@@ -68,17 +68,13 @@ Island.setPresentation 使用实际 activityID，size 为 compact 或 expanded�
 ```xml
 <takePhoto/>
 ```
-确认保存且任务匹配，保留相机：
-```xml
-照片已保存到 App 相册。<task.end summary="照片已保存到 App 相册"/>
-```
 要求丢弃：
 ```xml
 <closeCamera/>
 ```
-关闭成功并清空会话：
+关闭成功并清空会话（存在匹配 Task 时在同一响应中结束）：
 ```xml
-相机已关闭。<task.end summary="相机已关闭，未保存照片已清空"/>
+相机已关闭。
 ```
 无 Task 的保存确认：
 ```xml
@@ -109,13 +105,13 @@ Island.setPresentation 使用实际 activityID，size 为 compact 或 expanded�
 ```xml
 <ignoreVideo recordingID="11111111-2222-4333-8444-555555555555"/>
 ```
-确认保存且任务匹配，保留相机：
+确认保存，保留相机：
 ```xml
-视频已保存到 App 相册。<task.end summary="视频已保存到 App 相册"/>
+视频已保存到 App 相册。
 ```
-忽略后结束匹配 Task，保留窗口：
+忽略后保留窗口：
 ```xml
-视频已忽略。<task.end summary="视频已忽略"/>
+视频已忽略。
 ```
 
 ### 跨轮预览图像

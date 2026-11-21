@@ -41,6 +41,18 @@ public struct ControlRegistration: Sendable {
     }
 }
 
+/// An owner-supplied usage guide for its controls, rendered after their declarations. Text lives in per-language
+/// owner resources, never in code.
+public struct ControlGuidance: Sendable {
+    public let text: String
+    public let localized: @Sendable (String) throws -> String
+
+    public init(text: String, localized: @escaping @Sendable (String) throws -> String) {
+        self.text = text
+        self.localized = localized
+    }
+}
+
 /// A validated model request for a control function; it carries no Channel and no execution authority.
 public struct ControlCall: Equatable, Sendable {
     public let path: ActionPath

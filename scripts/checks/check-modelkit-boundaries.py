@@ -1091,7 +1091,7 @@ for marker in ('id: "diagnostics"', 'dependencies: ["diagnostics"]', 'phase: .st
 local_schema_files = (
     'ApplicationControl/ApplicationControlInputs.swift', 'ApplicationControl/ProviderInputs.swift',
     'ApplicationControl/ModelResourceInputs.swift', 'Photographer/PhotographerCameraInputs.swift',
-    'Assistant/AssistantSessionControl.swift', 'Memory/MemoryHistoryIntent.swift',
+    'Assistant/Workflow/AssistantSessionControl.swift', 'Memory/MemoryHistoryIntent.swift',
     'SpeechPerception/SpeechListeningInputs.swift', 'AgentContracts.swift',
 )
 for name in local_schema_files:
@@ -1225,6 +1225,12 @@ for group, version in [('agents', 11), ('skills', 3)]:
                 errors.append(f'Action Skill bindings require an explicit Channel: {relative}')
             if function['path'].startswith('Agent.Communication.'):
                 errors.append(f'Retired send Action: {relative}')
+            if function['path'].startswith('Agent.Task.'):
+                errors.append(f'Controls belong to their owning Agent, not Skills: {relative}')
+        if group == 'skills':
+            for teaching in source.parent.glob('Instructions*.md'):
+                if re.search(r'<(?:loadSkills|releaseSkills|task\.(?:start|end|send))\b', teaching.read_text()):
+                    errors.append(f'Skill teaches Agent controls: {teaching.relative_to(ROOT)}')
 if any(p for group in ('Agents', 'Skills') for p in (asset_root / group).rglob('*.swift')):
     errors.append('Agent Resources must not contain compiled code')
 if any((ROOT / 'MobileHarness/Agents').rglob('*.agent.json')):
@@ -1432,7 +1438,7 @@ for source in (ROOT / 'MobileHarness').rglob('*.swift'):
 context_repository = (ROOT / 'MobileHarness/Agents/Support/Context/AgentContextRepository.swift').read_text()
 if 'installPublicProjection' in context_repository:
     raise SystemExit('Private AgentContext must not be registered in public State.')
-for source in [ROOT / 'MobileHarness/Agents/Assistant/AssistantProcessing.swift', *sorted((ROOT / 'MobileHarness/Agents/Assistant').glob('AssistantChat*.swift'))]:
+for source in [ROOT / 'MobileHarness/Agents/Assistant/AssistantProcessing.swift', *sorted((ROOT / 'MobileHarness/Agents/Assistant').rglob('AssistantChat*.swift'))]:
     relative = source.relative_to(ROOT / 'MobileHarness')
     text = source.read_text()
     if any(label in text for label in ('Task transition result (data)', 'Runtime camera facts (data', 'Current task and Skill state (data')):
@@ -1768,7 +1774,7 @@ for marker in ('environmentSequence', 'pendingEnvironment', 'recordEnvironmentFa
         raise SystemExit(f'AgentContainer must only wire environment policy: {marker}')
 for owner, names in {
     'ApplicationControl': ('ApplicationControlInputs.swift', 'ApplicationEnvironmentInputs.swift', 'ProviderInputs.swift', 'ModelResourceInputs.swift'),
-    'Assistant': ('AssistantSessionControl.swift',),
+    'Assistant/Workflow': ('AssistantSessionControl.swift',),
     'Memory': ('MemoryHistoryIntent.swift',),
     'Photographer': ('PhotographerCameraInputs.swift',),
     'SpeechPerception': ('SpeechListeningInputs.swift', 'VoiceInteractionSession.swift'),
@@ -1783,7 +1789,7 @@ for retired in ('AgentApplicationUI.swift', 'InteractionServices.swift', 'Applic
     if list((ROOT / 'MobileHarness/Agents').rglob(retired)):
         raise SystemExit(f'Retired Support implementation remains: {retired}')
 chat_worker = ''.join(
-    source.read_text() for source in sorted((ROOT / 'MobileHarness/Agents/Assistant').glob('AssistantChat*.swift'))
+    source.read_text() for source in sorted((ROOT / 'MobileHarness/Agents/Assistant').rglob('AssistantChat*.swift'))
 )
 assistant_state = (ROOT / 'MobileHarness/Agents/Assistant/AssistantProcessing.swift').read_text()
 memory_agent = (ROOT / 'MobileHarness/Agents/Memory/MemoryAgent.swift').read_text()

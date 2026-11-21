@@ -68,7 +68,7 @@ Agents/Writer 拥有控制循环、内容流、任务和上下文；Actions/Arti
 
 ### 文件范围与验收
 
-主要涉及 Agents/Writer/WriterWorkflow.swift 与域内工具定义/Instruction、Actions/Artifacts/ArtifactEditing.swift、ArtifactService.swift、ArtifactWorkspace.swift、ArtifactPresentation.swift、ArtifactContentParser.swift；UI/Components/Web 只在基础页面更新/诊断接口确有需要时扩展。Storage/Files 只在现有原生接口无法覆盖操作时补通用能力。实施后同步各拥有目录 README；不把本节待实现行为写成技术 README 的现有契约。
+主要涉及 Agents/Writer/Workflow/WriterWorkflow.swift 与域内工具定义/Instruction、Actions/Artifacts/ArtifactEditing.swift、ArtifactService.swift、ArtifactWorkspace.swift、ArtifactPresentation.swift、ArtifactContentParser.swift；UI/Components/Web 只在基础页面更新/诊断接口确有需要时扩展。Storage/Files 只在现有原生接口无法覆盖操作时补通用能力。实施后同步各拥有目录 README；不把本节待实现行为写成技术 README 的现有契约。
 
 验收重点：跨文件选择器/脚本引用一致，搜索超限可继续，Unicode 行范围与精确定位，单文件版本冲突隔离，目录操作沙盒与入口一致性；流末尾强制刷新、随机分片、不完整 HTML/CSS/JS、CSS/JS 单独变化、删除/重命名刷新、多文件一致快照；双窗口并行、关闭/恢复、取消与迟到帧隔离。自动化/模拟器渲染结果与真实模型、真机体验分别记录。
 

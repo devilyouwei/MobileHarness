@@ -23,7 +23,6 @@
 | [clean-app-models.sh](resources/clean-app-models.sh) | Scheme 预构建清理生成的 App 模型/旧资源 bundle；拒绝源目录 |
 | [stage-voice-models.sh](resources/stage-voice-models.sh) | Xcode 打包 model-catalog 与许可，不嵌入权重；保留既有构建阶段名称 |
 | [update-model-filelists.py](resources/update-model-filelists.py) | 重建 Config 的 sandbox 输入/输出清单 |
-| [select-app-icon.sh](resources/select-app-icon.sh) | 显式选择已保存图标：original / robot-camera / lamp-arm / eyes-wink |
 | [verify-app-agent-resources.py](resources/verify-app-agent-resources.py) | 最终 Bundle 的 Agent Catalog、资源集合与源字节一致性 |
 | [verify-app-island-resources.py](resources/verify-app-island-resources.py) | Live Activity 扩展、版本、返回 URL 与打包契约 |
 | [verify-app-localizations.py](resources/verify-app-localizations.py) | App、UI 包与扩展的已编译本地化资源 |

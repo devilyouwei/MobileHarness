@@ -1,3 +1,3 @@
 # Shared model download destination
 
-Root Models is the agreed shared artifact location. scripts/models/model_download.py currently writes only Gemma macOS there; other profiles still write MobileHarness/Resources/Models. Migrate development destinations and their engineering consumers together, preserving production App-managed storage, existing artifact reuse and verification. This remains pending; the root README documents the current behavior.
+Root Models is the shared artifact location for Tests and experiments. Completed: scripts/models/model_download.py writes every profile to Models/<model>, and Nemotron, Silero and MossTTSNano Swift tests read from there. MobileHarness/Resources/Models has been removed and must not be recreated. New model artifacts for Tests or experiments go only under root Models and stay Git-ignored (/Models/*/). Production App-managed storage and the catalog (MobileHarness/ModelKit/Support/Config/model-catalog.json) are unchanged.

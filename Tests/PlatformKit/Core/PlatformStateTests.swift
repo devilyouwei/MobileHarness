@@ -177,14 +177,14 @@ private func nativeObject(_ data: Data) throws -> [String: Any] {
     }
 }
 
-@Test func basicSkillAlwaysSelectsTheEightPassiveNativeSources() throws {
-    let basic = try AgentConfigurations.skill("basic-skill")
+@Test func basicInteractionAlwaysSelectsTheEightPassiveNativeSources() throws {
+    let basic = try AgentConfigurations.skill("basic-interaction")
     #expect(
         basic.useStates.sorted() == [
             "agents.applicationcontrol", "agents.writer", "platform.system.accessibility", "platform.system.audio",
             "platform.system.locale", "platform.system.network",
             "platform.system.permissions", "platform.system.power", "platform.system.thermal", "platform.system.time",
-            "ui.navigation", "ui.windows",
+            "ui.home.expression", "ui.navigation", "ui.windows",
         ])
     #expect(!basic.useStates.contains("platform.location") && !basic.useStates.contains("platform.magneticAttachment"))
 }

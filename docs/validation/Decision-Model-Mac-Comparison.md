@@ -55,7 +55,7 @@ Laya 的较低延迟伴随更差的分类结果。长中文组将 44/48 条判�
 
 ## D3 请求格式与句向量追加对照
 
-2026-11-11，沿用同一台 M5 Mac 和 D3 文本 Core AI 制品。核对 [Assistant 请求构造](../../MobileHarness/Agents/Assistant/AssistantInputDecision.swift)、[对话工作器](../../MobileHarness/Agents/Support/Chat/AgentChatWorker.swift)和 [D3 编码及读出](../../MobileHarness/ModelKit/Language/JEV/D3Decision.swift)。
+2026-11-11，沿用同一台 M5 Mac 和 D3 文本 Core AI 制品。核对 [Assistant 请求构造](../../MobileHarness/Agents/Assistant/Input/AssistantInputDecision.swift)、[对话工作器](../../MobileHarness/Agents/Support/Chat/AgentChatWorker.swift)和 [D3 编码及读出](../../MobileHarness/ModelKit/Language/JEV/D3Decision.swift)。
 
 - 应用把来源、采集时间、`occupied`、上下文和用户原话插入多行文本。原话和上下文能包含换行，字段边界在模型文本中没有转义。采集时间为相对时钟值，没有说明其对分类的含义。
 - `occupied` 表示生成任务、待完成轮次或回复输入有占用。它不能表达实际播放状态。最近回复片段由模型流式文本逐段累积，最多 160 字，代码没有在新回复开头清空这一缓冲。正在等待的交互文本拼在同一上下文字段，`protectsAnswer` 只在模型返回后参与应用判定。

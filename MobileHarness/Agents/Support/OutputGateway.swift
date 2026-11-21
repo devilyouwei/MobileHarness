@@ -403,29 +403,6 @@ public actor OutputGateway {
             }
             let communicationID = task?.kind == .request ? task?.scope.id : eventID ?? messageID
             let durableID = communicationID ?? UUID().uuidString
-            if let communications, let target,
-                observation.content(as: AgentTaskRequest.self) != nil
-                    || observation.content(as: AgentTaskQuery.self)?.operation == .cancel,
-                try await communications.agentMessage(durableID) == nil
-            {
-                try await communications.enqueueAgentMessage(
-                    .init(
-                        id: durableID, sender: source.rawValue, receiver: target.rawValue,
-                        contract: observation.contract, payload: observation.encodedContent(),
-                        correlationID: observation.content(as: AgentTaskQuery.self)?.scope.id ?? durableID,
-                        replyTo: observation.content(as: AgentTaskQuery.self)?.scope.id, sourceSessionID: sessionID,
-                        dedupeKey: durableID))
-            }
-            if let communications, let target, let task, task.scope.execution == .background,
-                try await communications.agentMessage(durableID) == nil
-            {
-                try await communications.enqueueAgentMessage(
-                    .init(
-                        id: durableID, sender: source.rawValue, receiver: target.rawValue,
-                        contract: observation.contract, payload: observation.encodedContent(),
-                        correlationID: task.scope.id,
-                        replyTo: task.kind == .request ? nil : task.scope.id, dedupeKey: durableID))
-            }
             let input = AgentInput(
                 id: durableID,
                 sessionID: sessionID, payload: payload,
@@ -440,18 +417,13 @@ public actor OutputGateway {
                 })
             var report: DeliveryReport
             if contract.channel != nil {
-                if let response = observation.content(as: AgentTaskResponse.self),
+                if observation.content(as: AgentTaskResponse.self) != nil,
                     let reference = observation.eventScope,
                     let record = try await communications?.agentMessage(reference)
                 {
                     guard record.sender == target?.rawValue, record.receiver == source.rawValue,
                         record.sourceSessionID == nil || record.sourceSessionID == sessionID
                     else { throw CommunicationError.unauthorized }
-                    if response.signal?.kind == .result || response.rejection != nil {
-                        guard let persisted = try await communications?.agentMessage(durableID),
-                            try JSONDecoder().decode(AgentTaskResponse.self, from: persisted.payload) == response
-                        else { throw CommunicationError.unauthorized }
-                    }
                 }
                 let observe: (@Sendable (AgentInput) async throws -> Void)? =
                     observedContracts.contains(observation.contract) ? observeEvent : nil
@@ -463,11 +435,6 @@ public actor OutputGateway {
                 report = try await requests.sendInternal(input, targets: [(target, try await manager.identity(target))])
             }
             let unavailable: [AgentID: String] = [:]
-            if let communications, let target, task?.scope.execution == .background,
-                report.delivered.contains(target)
-            {
-                try await communications.receiveAgentMessage(durableID, receiver: target.rawValue, consumed: false)
-            }
             if let task {
                 if task.kind == .result
                     || (task.kind == .request && (report.delivered.isEmpty || !report.rejected.isEmpty))

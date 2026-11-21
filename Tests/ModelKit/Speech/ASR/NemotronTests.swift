@@ -60,7 +60,7 @@ private func metadata(chunkFrames: Int = 224) throws -> Data {
 @Test(.enabled(if: ProcessInfo.processInfo.environment["HARNESS_TEST_NEMOTRON"] == "1"))
 @available(macOS 15, iOS 18, *)
 func realModelStreamingPacketParityAndCancellation() async throws {
-    let models = repository.appendingPathComponent("MobileHarness/Resources/Models")
+    let models = repository.appendingPathComponent("Models")
     let providerContext = try ModelContext(loadGate: ModelLoadGate(maximumConcurrentLoads: 4), maximumLoadWaiters: 32)
     let provider = try NemotronASR(
         context: providerContext,

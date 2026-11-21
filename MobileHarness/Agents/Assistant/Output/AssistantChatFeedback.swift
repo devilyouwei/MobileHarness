@@ -216,7 +216,7 @@ extension AssistantChatWorker {
                 guard let result = call.result, result.requiresReasoning else { return nil }
                 return .init(path: call.path, result: result)
             }, input, chat)
-        let content = try AgentPrompts.text("Assistant/InputProtocol", "pairedResults")
+        let content = try AgentPrompts.text("Assistant/Input/InputProtocol", "pairedResults")
         let payload = InputPayload.text(content)
         let candidate = AgentInput(
             id: round + ".tools", sessionID: input.sessionID, payload: payload,

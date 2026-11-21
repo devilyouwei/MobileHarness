@@ -1,6 +1,6 @@
 ## Web browsing
 ### Scope and current facts
-Open HTTP/HTTPS pages, read their text and inspect screenshots through Web.* XML Actions. For goals outside remote browsing, consult the public Skill and Agent descriptions and route to their owner. BasicSkill owns Skill loading and Task selection: one website visit needs no Task; an ongoing comparison/review may retain a matching Task. Loading a Skill never opens a page.
+Open HTTP/HTTPS pages, read their text and inspect screenshots through Web.* XML Actions. For goals outside remote browsing, consult the public Skill and Agent descriptions and route to their owner. The Agent controls own Skill loading and Task selection: one website visit needs no Task; an ongoing comparison/review may retain a matching Task. Loading a Skill never opens a page.
 ui.windows supplies actual window IDs, including Writer artifacts. ui.web.sessions lists per-window page summaries. A URL describes location, not page evidence. Use sufficient current evidence directly; do not reopen or query a page just to repeat an answer.
 actions.web.screenshot supplies at most one current viewport image, with its windowID and capture time. A new capture replaces it; closing/minimizing the window or a detected page/viewport change invalidates it. There is no screenshot history or load/unload operation. Reuse a valid current image; State reads do not capture or refresh pixels. Dynamic page updates require an explicit fresh snapshot when relevant.
 ### Browse and observe

@@ -2,7 +2,7 @@
 ### Facts and gates
 Taking photos and recording video uses the Camera window. Enabling vision or tracking uses application-control and Vision.open; photography never enables background vision.
 actions.camera supplies intent, busy, permission and preview facts. platform.vision.camera supplies actual running/phase/facing. Unknown is not ready. Flip only when asked and lensOwner=capture.
-BasicSkill owns Task selection/closure. use AGENT CONTEXT task. Standalone save/close/lens operations need no new Task. Only clean up if a matching Task was actually created. Explain busy or permission failures. retryCamera requires explicit user intent.
+The Agent controls own Task selection/closure. In the examples below, a matching active Task is ended with task.end in the same response as the confirmed-result reply; examples show only the Photography-specific part. use AGENT CONTEXT task. Standalone save/close/lens operations need no new Task. Only clean up if a matching Task was actually created. Explain busy or permission failures. retryCamera requires explicit user intent.
 ### Photo
 openCamera opens/restores a ready preview without taking a photo. takePhoto requires the visible camera and selects photo mode; it never opens/restores it. Emit known open, requested flip/settings, speech and capture steps in ONE response. Await feedback only for result-dependent choices.
 For a new photo, give one brief cue BETWEEN open and takePhoto. Separate wait groups order Camera and Speech Channels: `<wait><openCamera/></wait><wait>Look at the camera for the photo.</wait><takePhoto/>`. Omit open when already visible; if preparation was already spoken, omit the cue.
@@ -71,17 +71,13 @@ Requested reshoot; keep earlier photos:
 ```xml
 <takePhoto/>
 ```
-Saved, matching Task; keep Camera:
-```xml
-The photo is saved in the app album.<task.end summary="Photo saved in the app album"/>
-```
 Discard requested:
 ```xml
 <closeCamera/>
 ```
-Close succeeded and session cleared:
+Close succeeded and session cleared (a matching Task is ended in the same response):
 ```xml
-The camera is closed.<task.end summary="Camera closed and unsaved photos cleared"/>
+The camera is closed.
 ```
 Saved without a Task:
 ```xml
@@ -112,13 +108,13 @@ User authorizes ignore:
 ```xml
 <ignoreVideo recordingID="11111111-2222-4333-8444-555555555555"/>
 ```
-Saved, matching Task; keep Camera:
+Saved; keep Camera:
 ```xml
-The video is saved in the app album.<task.end summary="Video saved in the app album"/>
+The video is saved in the app album.
 ```
-Ignored, matching Task; keep Camera:
+Ignored; keep Camera:
 ```xml
-The video was discarded.<task.end summary="Video discarded"/>
+The video was discarded.
 ```
 
 ### Preview images across turns

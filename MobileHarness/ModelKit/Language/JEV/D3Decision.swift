@@ -3,6 +3,24 @@ import ModelKit
 import ModelKitCoreAI
 import Tokenizers
 
+struct D3TextInput {
+    let ids: [Int32]
+    let attentionMask: [Int32]
+    let positions: [Int32]
+
+    init(tokens: [Int]) throws {
+        let retained = tokens.suffix(512)
+        guard !retained.isEmpty, retained.allSatisfy({ Int32(exactly: $0) != nil }) else {
+            throw CapabilityError.invalidRequest("Invalid D3 input tokens")
+        }
+        let padding = 512 - retained.count
+        ids = Array(repeating: 0, count: padding) + retained.map(Int32.init)
+        attentionMask = Array(repeating: 0, count: padding) + Array(repeating: 1, count: retained.count)
+        let positions = Array(repeating: Int32(0), count: padding) + (0..<retained.count).map(Int32.init)
+        self.positions = Array(repeating: positions, count: 4).flatMap { $0 }
+    }
+}
+
 /// Text-only D3 readout. The caller supplies candidate meanings and owns routing policy.
 @available(iOS 27, macOS 27, *)
 public actor D3Decision: DecisionCapability {
@@ -155,20 +173,14 @@ public actor D3Decision: DecisionCapability {
             let options = zip(configuration.codes, request.candidates).map { "\($0): \($1)" }.joined(separator: "\n")
             let user =
                 "State:\n\(request.text)\n\nQuestion:\n\(request.instructions)\n\nOptions:\n\(options)\n\nReply with only the code of the best option."
-            let ids = try tokenizer.applyChatTemplate(
+            let tokens = try tokenizer.applyChatTemplate(
                 messages: [["role": "system", "content": system], ["role": "user", "content": user]],
                 tools: nil, additionalContext: ["enable_thinking": false])
-            guard !ids.isEmpty, ids.count <= 512, ids.allSatisfy({ Int32(exactly: $0) != nil }) else {
-                throw CapabilityError.invalidRequest("D3 input exceeds 512 tokens; input was not truncated")
-            }
-            let pad = 512 - ids.count
-            let positions = Array(repeating: Int32(0), count: pad) + (0..<ids.count).map(Int32.init)
+            let input = try D3TextInput(tokens: tokens)
             let inputs: [String: TensorValue] = [
-                "input_ids": .int32(Array(repeating: 0, count: pad) + ids.map(Int32.init), shape: [1, 512]),
-                "attention_mask": .int32(
-                    Array(repeating: 0, count: pad) + Array(repeating: 1, count: ids.count), shape: [1, 512]),
-                "position_ids": .int32(
-                    Array(repeating: positions, count: 4).flatMap { $0 }, shape: [4, 1, 512]),
+                "input_ids": .int32(input.ids, shape: [1, 512]),
+                "attention_mask": .int32(input.attentionMask, shape: [1, 512]),
+                "position_ids": .int32(input.positions, shape: [4, 1, 512]),
             ]
             let output = try await graph.run(inputs.merging(visualInputs) { text, _ in text })
             guard let values = output[manifest.output]?.floats(), values.count == 255, values.allSatisfy(\.isFinite)

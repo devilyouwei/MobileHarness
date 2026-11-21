@@ -26,8 +26,6 @@ Config/Local.xcconfig
 *.safetensors
 *.gguf
 
-# Flat local model directories; download JSON files remain tracked.
-MobileHarness/Resources/Models/*/
 *.aimodel/
 *.aimodelc/
 

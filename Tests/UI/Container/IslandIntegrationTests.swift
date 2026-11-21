@@ -57,7 +57,7 @@ private func islandInput(_ function: String, parameters: [String: String], sourc
             "Island.setPresentation"
         ])
     #expect(
-        try !AgentSkillLoader.registry(["basic-skill"], fixed: fixed).actions.contains {
+        try !AgentSkillLoader.registry(["basic-interaction"], fixed: fixed).actions.contains {
             $0.path.description.hasPrefix("UI.Island.")
         })
 }

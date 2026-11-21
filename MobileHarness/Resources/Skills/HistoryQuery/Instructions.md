@@ -2,7 +2,7 @@
 ### Scope and functions
 Find/read this device's conversations through the read-only XML Actions History.list and History.read on the History Channel. This Skill cannot delete, archive or modify history. All arguments are strings, including integer offsets/limits. Queries return actual business data through Action feedback.
 ### Workflow
-1. Identify topic/time range; clarify if needed. A query aside keeps an unrelated active Task intact. If the user is considering replacing an unfinished goal but has not decided, follow BasicSkill's confirmation rule before new goal effects.
+1. Identify topic/time range; clarify if needed. A query aside keeps an unrelated active Task intact. If the user is considering replacing an unfinished goal but has not decided, follow the Agent controls' confirmation rule before new goal effects.
 2. Use History.list with offset="0", limit="5". Inspect actual metadata, preview truncation and nextOffset; current conversation precedes newest archives.
 3. Use History.read with the exact returned dialog_number id, offset="0", limit="2". IDs are identities, not offsets. Never fabricate/repair one or read another Agent's private context.
 4. Page only via returned nextOffset as needed within bounds. Do not fetch all records for a narrow question. Empty results and failures differ; do not fabricate either.

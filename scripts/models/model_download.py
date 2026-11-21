@@ -13,7 +13,7 @@ from pathlib import Path
 import subprocess
 
 REPOSITORY = Path(__file__).resolve().parents[2]
-MODELS = REPOSITORY / "MobileHarness/Resources/Models"
+MODELS = REPOSITORY / "Models"
 GEMMA_TESTS = REPOSITORY / "Tests/ModelKit/Language/Gemma4"
 
 
@@ -107,8 +107,7 @@ def main():
     profile = args.profile
     try:
         config = load_config(profile, args.platform)
-        root = REPOSITORY / "Models" if (profile, args.platform) == ("gemma4-e2b", "macos") else MODELS
-        provision(config, root / config["directory"], args.endpoint, args.force)
+        provision(config, MODELS / config["directory"], args.endpoint, args.force)
     except ValueError as error:
         parser.error(str(error))
 

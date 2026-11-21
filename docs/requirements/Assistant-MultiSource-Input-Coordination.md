@@ -21,7 +21,7 @@
 证据入口：
 - [输入接纳与批次](../../MobileHarness/Agents/Support/Chat/AgentChatWorker.swift)：receiveSignal、classifyPendingInputs、drain、acceptPendingFeedback、admitPeerText。
 - [输入事实](../../MobileHarness/Agents/Support/Core/AgentInput.swift)、[现有有界邮箱](../../MobileHarness/Agents/Support/Core/Runtime/SignalProcessing.swift)。
-- [Decision 校验](../../MobileHarness/Agents/Assistant/AssistantInputDecision.swift)：手工 local text 当前仍把 discard 强制转为 enqueue；这是需要统一说明/调整的既有保护，而非没有调用分类。
+- [Decision 校验](../../MobileHarness/Agents/Assistant/Input/AssistantInputDecision.swift)：手工 local text 当前仍把 discard 强制转为 enqueue；这是需要统一说明/调整的既有保护，而非没有调用分类。
 - [Assistant 提示词](../../MobileHarness/Resources/Agents/Assistant/Instructions.md)、[请求发起回调](../../MobileHarness/ModelKit/Language/LLM/OpenAI/OpenAIChat.swift)、[历史写入门槛](../../MobileHarness/Storage/Database/AssistantMessages/AssistantHistoryStore.swift)。
 
 ### 输入来源与边界

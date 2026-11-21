@@ -26,10 +26,9 @@ flowchart TB
     Roles --> AgentBundle["SwiftPM Agents 资源包"]
     Skills --> AgentBundle
     Catalog --> AgentBundle
-    Variants["AppIconVariants · 原始图稿"] --> Assets["Assets.xcassets · 选定的 AppIcon"]
+    Assets["Assets.xcassets · AppIcon"]
     Assets --> AppBundle["App staging"]
     Privacy["PrivacyInfo.xcprivacy"] --> AppBundle
-    Models["Models · 忽略的本地测试制品"] -->|仅开发者显式使用| Tests
     linkStyle default stroke:#64748b,stroke-width:1.5px
 ```
 
@@ -43,11 +42,11 @@ Pure Agent/Skill assets live here as Agents/, Skills/ and Catalog.json. Agents o
 
 Runtime/server/device acceptance belongs in [validation history](../../docs/validation/Validation-History.md).
 
-Agents packages Agents/, Skills/ and Catalog.json, including the [Assistant input protocol, shared output protocol and Action catalog templates](Agents/README.md#提示词与模板字段). Models and app assets are independently packaged. The final app resource verifier checks exact source bytes and missing or stale resources in the Agents bundle.
+Agents packages Agents/, Skills/ and Catalog.json, including the [Assistant input protocol, shared output protocol and Action catalog templates](Agents/README.md#提示词与模板字段). App assets are independently packaged. The final app resource verifier checks exact source bytes and missing or stale resources in the Agents bundle.
 
 ## Related design
 
-[Parent design](../README.md) · [AppIconVariants](AppIconVariants/README.md) · [Assets.xcassets](Assets.xcassets/README.md) · [Models](../ModelKit/Support/Config/README.md)
+[Parent design](../README.md) · [Assets.xcassets](Assets.xcassets/README.md) · [Models](../ModelKit/Support/Config/README.md)
 
 ## 职责与组织
 
@@ -77,7 +76,7 @@ RobotInteraction instructions teach Channel/wait ordering and explicit resource 
 
 ## Agent → Skill → Function registration
 
-Agent.json references baseSkills; Skill.json alone registers model Actions/Tools. BasicSkill owns Task/Skill orchestration and automatic State selection; ExpressionInteraction owns expression Actions. Role instructions retain identity/responsibility/style. Business roles reuse existing Skills; internal trusted bindings remain separate. Historical snapshots are preserved.
+Agent.json references baseSkills; Skill.json alone registers model Actions/Tools. Controls belong to the owning Agent (`Controls.json` declarations and `Controls.md` guide), never to Skills. BasicInteraction owns expression and listening Actions, window rules and automatic State selection. Role instructions retain identity/responsibility/style. Business roles reuse existing Skills; internal trusted bindings remain separate. Historical snapshots are preserved.
 
 ```mermaid
 flowchart TB
@@ -96,7 +95,7 @@ flowchart TB
     linkStyle default stroke:#64748b,stroke-width:1.5px
 ```
 
-Actions 为可信业务调用和模型调用提供统一实现与元数据。Skill 仅暴露实际流程需要的函数：ExpressionInteraction 提供表情，ApplicationControl 提供导航/状态/资源/Bluetooth，RobotInteraction 提供机械臂操作。BasicSkill 提供 Task/Skill 控制与自动 State 选择。具体清单和当前教学契约见 [Skills](Skills/README.md)。
+Actions 为可信业务调用和模型调用提供统一实现与元数据。Skill 仅暴露实际流程需要的函数：BasicInteraction 提供表情与聆听，ApplicationControl 提供导航/状态/资源/Bluetooth，RobotInteraction 提供机械臂操作。Task/Skill 控制由拥有者 Agent 的 Controls 声明与指南提供，BasicInteraction 提供自动 State 选择。具体清单和当前教学契约见 [Skills](Skills/README.md)。
 
 ## 公开 State 边界
 
@@ -106,9 +105,9 @@ Skill schema v3 通过 useActions、useStates 和 useInstructions 声明函数�
 
 ApplicationControl 配置声明 container.failure/runtime.failure 的 runtime 来源订阅；Assistant 保留被动容器诊断。内部呈现函数由代码授权，不加入模型 Skill 或改变资源 schema 版本。
 
-BasicSkill selects eight passive native platform.* State sources alongside UI navigation. Source schemas and native lifetime remain owned by [PlatformKit](../PlatformKit/README.md#native-state-port); [Skill declarations](Skills/README.md#basic-native-state-selection) select reads without starting hardware or granting execution authority.
+BasicInteraction selects eight passive native platform.* State sources alongside UI navigation. Source schemas and native lifetime remain owned by [PlatformKit](../PlatformKit/README.md#native-state-port); [Skill declarations](Skills/README.md#basic-native-state-selection) select reads without starting hardware or granting execution authority.
 
-Assistant 身份只介绍自身。BasicSkill 说明如何区分自己的前台任务和发给其他 Agent 的后台消息。各 Agent.json.description 维护各自用途，加载器按实际路由与实例通信权限生成公开目录。作品查找、打开与创作由 Writer 原生工具拥有。详见 [Skill 契约](Skills/README.md) 与 [角色配置](Agents/README.md)。
+Assistant 身份只介绍自身。Assistant 的 Controls.md 说明如何区分自己的前台任务和发给其他 Agent 的后台消息。各 Agent.json.description 维护各自用途，加载器按实际路由与实例通信权限生成公开目录。作品查找、打开与创作由 Writer 原生工具拥有。详见 [Skill 契约](Skills/README.md) 与 [角色配置](Agents/README.md)。
 
 ## 提示词目录归属
 

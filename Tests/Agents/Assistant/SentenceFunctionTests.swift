@@ -240,7 +240,7 @@ private struct ExcessiveSentencesChat: ChatCapability {
 @Test(.actionCatalog) func speechXMLBoundariesFlushShortUnpunctuatedTextInOrder() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     var generator = AgentGenerator(
-        capabilities: try AgentSkillLoader.registry(["expression-interaction"], fixed: config.capabilities),
+        capabilities: try AgentSkillLoader.registry(["basic-interaction"], fixed: config.capabilities),
         textMapping: AssistantAgent.mapText,
         segmentation: try AssistantAgent.textSegmentation)
     #expect(try generator.append("你好，先想一下").isEmpty)

@@ -1,8 +1,11 @@
-## 表情互动
+## BasicInteraction
+
+### 表情
+本 Skill 涵盖眼部表情、聆听控制、窗口独立性和基础 State 事实。
 
 使用眼部表情配合对话或满足明确的表情请求。express 是暂时演出，结束后恢复基础表情。setExpression 提交持续表情。只用目录当前取值。closed 平滑闭上双眼，clear 恢复当前聆听中性表情。关闭聆听时自然闭眼，不执行其他有限演出。日常对话中表情可选，无需建 Task。
 
-若用户要求先说再做，用 wait 明确排序。避免重复，收到真实失败就报告。该 Skill 不控制相机和机械臂。
+若用户要求先说再做，用 wait Action 明确排序。避免重复，收到真实失败就报告。该 Skill 不控制相机和机械臂。
 
 「笑一下。」 <express emotion="happy"/>
 「先说你好，再笑一下。」 <wait>你好。</wait><express emotion="happy"/>
@@ -35,4 +38,11 @@
 <wait><express emotion="playful"/>这是调皮。</wait>
 ```
 
-本 Skill 只提供 express 和 setExpression。聆听启动、光环、震动、音效及拍照离开反馈由应用负责。自然回复由宿主朗读及呈现。ui.home.expression.value 记录基础及有效目标、覆盖、过渡和加载；过渡只在现有动画完成契约确认时完成。
+表情只用 express 和 setExpression。聆听启动、光环、震动、音效及拍照离开反馈由应用负责。自然回复由宿主朗读及呈现。ui.home.expression.value 记录基础及有效目标、覆盖、过渡和加载；过渡只在现有动画完成契约确认时完成。
+
+### 聆听
+仅按用户明确要求用 startListening、stopListening 启停聆听，二者不改变 Task 或 Skill。语音退出只发 <stopListening/>，不说话也不重启。startListening 需要明确意图。自动恢复聆听由运行时负责。
+
+### 窗口与基础 State
+窗口的生命周期独立于 Task 和 Skill。打开或聚焦一个窗口不会关闭或替换其他窗口。用户明确要求关闭或处置前，保留窗口及内容；切换目标或 Task/Skill 状态不授予这一权限。窗口操作只针对用户指定且已由 State 或反馈确认的窗口，并使用其已声明的操作。
+CURRENT STATE 是已加载 Skill 选择的已观测事实。事实充分就直接使用，只查询缺失或过时且受支持的事实。按字段描述的属性读取：结果缺失不代表其来源被禁用。未知代表未观测。State 不是像素，路径、权限或已加载 Skill 不能证明操作成功。用户语言优先于区域设置。

@@ -342,11 +342,11 @@ private actor ContextReadBarrier {
     try context.open(session: "one")
     let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
     var skills = AgentTaskSkillState()
-    try skills.initialize(fixed: fixed, baseSkills: ["basic-skill"])
+    try skills.initialize(fixed: fixed, baseSkills: ["basic-interaction"])
     #expect(
         try AgentSkillLoader.useStates(skills.loaded)
             == (FixedPlatformState.sourceNames + [
-                "agents.applicationcontrol", "agents.writer", "ui.navigation", "ui.windows",
+                "agents.applicationcontrol", "agents.writer", "ui.home.expression", "ui.navigation", "ui.windows",
             ]).sorted())
     _ = try skills.control("loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
     let names = try AgentSkillLoader.useStates(skills.loaded)
@@ -355,7 +355,7 @@ private actor ContextReadBarrier {
             == (FixedPlatformState.sourceNames + [
                 "actions.camera", "actions.camera.preview", "agents.applicationcontrol", "agents.writer",
                 "platform.vision.camera", "ui.album",
-                "ui.camera",
+                "ui.camera", "ui.home.expression",
                 "ui.navigation", "ui.windows", "ui.island",
             ]).sorted())
     _ = try skills.control("releaseSkills", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
@@ -363,7 +363,7 @@ private actor ContextReadBarrier {
     #expect(
         try AgentSkillLoader.useStates(skills.loaded)
             == (FixedPlatformState.sourceNames + [
-                "agents.applicationcontrol", "agents.writer", "ui.navigation", "ui.windows",
+                "agents.applicationcontrol", "agents.writer", "ui.home.expression", "ui.navigation", "ui.windows",
             ]).sorted())
     #expect(try await context.snapshot(session: "one", names: ["platform.vision.camera"]).contains("\"running\":true"))
 }
@@ -371,7 +371,7 @@ private actor ContextReadBarrier {
 @Test(.actionCatalog) func agentTaskContextIsSessionBoundAndHasNoPrivateRegistry() throws {
     var skills = AgentTaskSkillState()
     let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
-    try skills.initialize(fixed: fixed, baseSkills: ["basic-skill"])
+    try skills.initialize(fixed: fixed, baseSkills: ["basic-interaction"])
     _ = try skills.control(
         "task.start", arguments: ["description": "拍照"], inputID: "input", fixed: fixed,
         sessionID: "one", taskID: try fixtureTaskID())
@@ -383,7 +383,7 @@ private actor ContextReadBarrier {
 }
 
 @Test func skillInstructionsRequireExplicitCurrentPaths() throws {
-    let skill = try AgentConfigurations.skill("basic-skill")
+    let skill = try AgentConfigurations.skill("basic-interaction")
     var json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(skill)) as? [String: Any])
     json.removeValue(forKey: "useInstructions")
     func decode() throws -> AgentConfigurations.Skill {
@@ -509,18 +509,18 @@ private actor ContextReadBarrier {
 @Test(.actionCatalog) func reflexivityDisclosureFollowsEffectiveSkillsAndRelease() async throws {
     let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
     var skills = AgentTaskSkillState()
-    try skills.initialize(fixed: fixed, baseSkills: ["basic-skill"])
+    try skills.initialize(fixed: fixed, baseSkills: ["basic-interaction"])
     let basic = try AgentSkillLoader.useStates(skills.loaded)
     #expect(!basic.contains("system.health"))
     #expect(
-        !basic.contains("ui.home.expression") && !basic.contains("actions.robot")
+        basic.contains("ui.home.expression") && !basic.contains("actions.robot")
             && !basic.contains("system.diagnostics"))
     _ = try skills.control(
-        "loadSkills", arguments: ["skills": "[\"expression-interaction\"]"], inputID: "input", fixed: fixed)
-    #expect(try AgentSkillLoader.useStates(skills.loaded).contains("ui.home.expression"))
+        "loadSkills", arguments: ["skills": "[\"robot-interaction\"]"], inputID: "input", fixed: fixed)
+    #expect(try AgentSkillLoader.useStates(skills.loaded).contains("actions.robot"))
     _ = try skills.control(
-        "releaseSkills", arguments: ["skills": "[\"expression-interaction\"]"], inputID: "input", fixed: fixed)
-    #expect(!((try AgentSkillLoader.useStates(skills.loaded)).contains("ui.home.expression")))
+        "releaseSkills", arguments: ["skills": "[\"robot-interaction\"]"], inputID: "input", fixed: fixed)
+    #expect(!((try AgentSkillLoader.useStates(skills.loaded)).contains("actions.robot")))
 }
 
 @Test @MainActor func reflexivityAllModuleShapesComposeWithoutCreatingStorage() async throws {
@@ -561,7 +561,7 @@ private actor ContextReadBarrier {
 }
 
 @Test(.actionCatalog) func singleNodeSkillsDeclareCanonicalChildrenWithoutAncestorOrSummaryGrants() throws {
-    #expect(try AgentConfigurations.skill("expression-interaction").useStates == ["ui.home.expression"])
+    #expect(try AgentConfigurations.skill("basic-interaction").useStates.contains("ui.home.expression"))
     let robot = try AgentConfigurations.skill("robot-interaction").useStates
     #expect(robot == ["actions.robot", "actions.robot.motion"])
     let skillIDs = try bundledStateSkillIDs()

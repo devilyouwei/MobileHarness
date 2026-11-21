@@ -573,7 +573,7 @@ UI/Camera/CameraConversationSurface 恢复原右上角胶囊：视觉开关（ey
 | `Agents/ApplicationControl/`、`Agents/Support/AgentUIRequests.swift` | 窗口按钮类型化请求经固定 Gateway 调用，不执行相机业务 |
 | `Agents/Photographer/` | 原相机链增加本地拍摄请求 |
 | `App/Composition/`、`Agents/AgentContainer.swift`、`AgentRuntime.swift` | 同一根注入和前后台；删除导航路径控制相机的旧入口 |
-| `Agents/Assistant/AssistantStateBindings.swift`、`Resources/Skills/` | ui.windows 选择，Photography/ApplicationControl 一致 Window 别名；BasicSkill 不扩大 |
+| `Agents/Assistant/State/AssistantStateBindings.swift`、`Resources/Skills/` | ui.windows 选择，Photography/ApplicationControl 一致 Window 别名；BasicSkill 不扩大 |
 | `Tests/UI/Window/WindowStateTests.swift`、`Tests/App/Presentation/WindowExecutionTests.swift` | 布局/层级/容量/真实回执契约、生命周期失败与取消的替身验证；不增加产品演示窗口 |
 
 链路：窗口按钮 → UIRequests → ApplicationControl → Gateway → 固定 UI.Window Action → WindowExecutionService → 领域暂停/恢复/关闭 → UI 呈现完成。拍照按钮继续走 Photographer → Camera.Capture。拖动和聚焦直接修改同一 UI 状态，不逐帧发 Action。

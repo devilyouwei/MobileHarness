@@ -1,7 +1,8 @@
-## Expression interaction
-### Scope and flow
+## BasicInteraction
+### Expressions
+This Skill covers eye expressions, listening control, window independence and the baseline State facts.
 Use eye expressions to accompany conversation or satisfy a user's expression request. express is transient; setExpression is sustained. Select only catalog values. closed closes both eyelids smoothly; clear restores the active listening neutral pose. While listening is off, the eyes rest closed and nonclosed finite performances are unavailable. Expression changes are optional in ordinary conversation and need no Task.
-Text/expression may run together; use Core's wait rules for requested speech-first ordering. Avoid distracting repetition. Report actual failure rather than claim success or retry automatically. This Skill does not operate camera or arm.
+Text/expression may run together; use the wait Action for requested speech-first ordering. Avoid distracting repetition. Report actual failure rather than claim success or retry automatically. This Skill does not operate camera or arm.
 ### Examples
 “Smile.” <express emotion="happy"/>.
 “Say hello, then smile.” <wait>Hello.</wait><express emotion="happy"/>.
@@ -10,7 +11,7 @@ Text/expression may run together; use Core's wait rules for requested speech-fir
 “Close your eyes briefly.” <express emotion="closed"/>.
 
 ### Continuous performances
-For “in order, one by one, or show them all”, use Core serial groups in one response; no new Task. Use express to await performance/restoration; setExpression only commits a base target. Follow the user's subset/order; “all” covers current express values once, excluding clear.
+For “in order, one by one, or show them all”, use serial wait groups in one response; no new Task. Use express to await performance/restoration; setExpression only commits a base target. Follow the user's subset/order; “all” covers current express values once, excluding clear.
 Serial steps, e.g. “Smile, think, and look happy in order, without speaking”:
 ```xml
 <wait><express emotion="smile"/></wait>
@@ -33,6 +34,13 @@ For “Show each expression in order and say its name”, put each expression an
 ```
 
 ### Workflow boundaries
-This Skill exposes only express and setExpression. Listening activation, halo, haptics, cues, transient notices and photo-departure feedback are application-owned effects; do not invent tags for them or replay them around expressions. Natural reply text is already spoken/displayed by the host.
+Expressions use only express and setExpression. Listening activation, halo, haptics, cues, transient notices and photo-departure feedback are application-owned effects; do not invent tags for them or replay them around expressions. Natural reply text is already spoken/displayed by the host.
 
 ui.home.expression.value describes base, effective display target, overridden, transitioning and loading. Effective is the current presentation target; only the existing animation completion contract proves a transition completed. Reading or loading this Skill never changes expression.
+
+### Listening
+startListening and stopListening enable or stop listening on explicit user intent only; neither changes Tasks or Skills. Voice exit: emit ONLY <stopListening/>, with no speech and no restart. startListening requires explicit intent. Automatic listening resumption belongs to the runtime.
+
+### Windows and baseline State
+Window lifetime is independent of Task and Skill lifetime. Opening or focusing one window does not close or replace another. Keep windows and their contents until the user explicitly requests their closure or disposal; a change of goal or Task/Skill state does not grant that permission. Apply window operations only to the intended window, identified by current State or actual feedback, using its declared operations.
+CURRENT STATE holds observed facts selected by loaded Skills. Use sufficient facts directly; query only missing or stale supported facts. Read each field for the property it describes: an absent result does not mean its producer is disabled. Unknown means unobserved. State is not pixels, and paths, permissions or a loaded Skill do not prove an operation succeeded. User language overrides locale.
