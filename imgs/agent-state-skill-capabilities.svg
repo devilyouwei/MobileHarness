@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="840" height="410" viewBox="0 0 840 410" role="img" aria-labelledby="title description">
-  <title id="title">Agents, Tasks and Skill declarations</title>
-  <desc id="description">An Agent manages a Task and loads Skills. A Task preserves its goal and context and combines Skills. Each Skill declares Actions, read-only States, Instructions and dependencies on other Skills. Action invocations pass through Gateway and are scheduled and executed inside Actions; selected State facts are read on each model request. Skills reference capabilities rather than owning their implementation or live state.</desc>
+  <title id="title">Agents, State variables and Skill declarations</title>
+  <desc id="description">An Agent and its own State variables, such as a goal or mood, form one unit that loads Skills. Each Skill declares Actions, read-only States, Instructions and dependencies on other Skills. Action invocations pass through Gateway and are scheduled and executed inside Actions; selected State facts are read on each model request. Skills reference capabilities rather than owning their implementation or live state.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
@@ -8,13 +8,12 @@
   </defs>
   <rect width="840" height="410" rx="16" fill="#ffffff"/>
   <g fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)">
-    <path d="M 200 112 H 300"/>
-    <path d="M 114 162 V 250"/>
-    <path d="M 200 300 H 300"/>
+    <path d="M 208 112 H 300"/>
   </g>
   <g stroke-width="1.5">
-    <rect x="28" y="62" width="172" height="100" rx="20" fill="#ede9fe" stroke="#a397c6"/>
-    <rect x="28" y="250" width="172" height="100" rx="20" fill="#e0f2fe" stroke="#7ba6c4"/>
+    <rect x="20" y="24" width="188" height="336" rx="20" fill="#f8fafc" stroke="#94a3b8"/>
+    <rect x="34" y="62" width="160" height="116" rx="14" fill="#ede9fe" stroke="#a397c6"/>
+    <rect x="34" y="206" width="160" height="116" rx="14" fill="#e0f2fe" stroke="#7ba6c4"/>
     <rect x="300" y="24" width="512" height="336" rx="20" fill="#f1faf4" stroke="#80af94"/>
     <rect x="320" y="90" width="226" height="112" rx="14" fill="#ffedd5" stroke="#c7a17b"/>
     <rect x="566" y="90" width="226" height="112" rx="14" fill="#e0f2fe" stroke="#7ba6c4"/>
@@ -23,8 +22,8 @@
   </g>
   <g font-family="-apple-system, BlinkMacSystemFont, sans-serif" text-anchor="middle" dominant-baseline="middle">
     <g fill="#1e293b" font-size="21" font-weight="600">
-      <text x="114" y="99">Agent</text>
-      <text x="114" y="287">Task</text>
+      <text x="114" y="106">Agent</text>
+      <text x="114" y="250">Agent State</text>
       <text x="556" y="57">Skill</text>
     </g>
     <g fill="#1e293b" font-size="18" font-weight="600">
@@ -34,11 +33,9 @@
       <text x="679" y="253">Dependencies</text>
     </g>
     <g fill="#475569" font-size="14">
-      <text x="114" y="129">Reason + converse</text>
-      <text x="114" y="317">Goal + context</text>
-      <text x="250" y="94">loads</text>
-      <text x="126" y="206" text-anchor="start">manages</text>
-      <text x="250" y="282">combines</text>
+      <text x="114" y="136">Reason + converse</text>
+      <text x="114" y="280">Goal, mood, notes</text>
+      <text x="254" y="94">loads</text>
       <text x="433" y="151">Callable operations</text>
       <text x="433" y="176">Scheduled &amp; run in Actions</text>
       <text x="679" y="151">Read-only current facts</text>
