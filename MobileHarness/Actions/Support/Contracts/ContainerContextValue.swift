@@ -1,18 +1,12 @@
 import Foundation
 
-public enum ContextAvailability: String, Codable, Sendable { case unknown, available, unavailable }
+/// A State source's meaningful value. An absent value encodes as null and is omitted from the model context.
 public struct ContainerContextValue<Value: Encodable & Sendable>: Encodable, Sendable {
-    public let availability: ContextAvailability
     public let value: Value?
-    public init(_ value: Value? = nil, availability: ContextAvailability = .available) {
-        self.availability = availability
-        self.value = value
-    }
-    private enum CodingKeys: String, CodingKey { case availability, value }
+    public init(_ value: Value? = nil) { self.value = value }
     public func encode(to encoder: any Encoder) throws {
-        var fields = encoder.container(keyedBy: CodingKeys.self)
-        try fields.encode(availability, forKey: .availability)
-        try fields.encode(value, forKey: .value)
+        var container = encoder.singleValueContainer()
+        try container.encode(value)
     }
 }
 

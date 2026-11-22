@@ -7,6 +7,7 @@ import StorageCore
 /// Tests inspect the text-to-handle boundary without running a model or device.
 actor SpeechRequestProbe: AssistantSpeechProducing {
     var requests: [String: String] = [:]
+    var playing: Bool?
     var beforePrepare: (@Sendable () async throws -> Void)?
     var prepared: (@Sendable (String, String) async -> Void)?
     init(
@@ -26,6 +27,8 @@ actor SpeechRequestProbe: AssistantSpeechProducing {
     func cancel(audioID: String, input: AgentInput) {}
     func cancel(input: AgentInput) {}
     func stop() {}
+    func isPlaying(sessionID: String) -> Bool? { playing }
+    func setPlaying(_ value: Bool) { playing = value }
     func text(_ id: String) -> String? { requests[id] }
     func restored(_ output: AgentOutput) -> AgentOutput {
         guard case .actionCall(let call) = output, let id = call.parameters["audioID"], let text = requests[id] else {

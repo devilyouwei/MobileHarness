@@ -166,7 +166,7 @@ private actor SpecialistRobotModel: ChatCapability {
         let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
         let text =
             requests.count == 1
-            ? "<loadSkills skills='[\"robot-interaction\"]'/>" : "<dance cycles=\"1\"/>"
+            ? "<skill.load skills='[\"robot-interaction\"]'/>" : "<dance cycles=\"1\"/>"
         try pair.emitter.yield(.text(text))
         try pair.emitter.yield(.finished(.stop))
         pair.emitter.finish()

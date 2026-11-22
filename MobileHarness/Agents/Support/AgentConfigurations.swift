@@ -112,7 +112,9 @@ public enum AgentConfigurations {
         let category: AgentCategory
         let description: String
         let communication: CommunicationDeclaration
+        /// Skills loaded when the Agent starts (`skills` in Agent.json).
         let baseSkills: [String]
+        let states: [AgentStateDeclaration]
         private struct Key: CodingKey {
             let stringValue: String
             var intValue: Int? { nil }
@@ -120,23 +122,25 @@ public enum AgentConfigurations {
             init?(intValue: Int) { return nil }
         }
         private enum CodingKeys: String, CodingKey {
-            case version, id, category, description, signals, baseSkills
+            case version, id, category, description, signals, skills, states
         }
         init(from decoder: any Decoder) throws {
             let all = try decoder.container(keyedBy: Key.self)
             guard
                 Set(all.allKeys.map(\.stringValue)) == [
-                    "version", "id", "category", "description", "signals", "baseSkills",
+                    "version", "id", "category", "description", "signals", "skills", "states",
                 ]
             else { throw AgentConfigurationError.invalidFormat }
             let fields = try decoder.container(keyedBy: CodingKeys.self)
             version = try fields.decode(Int.self, forKey: .version)
-            guard version == 11 else { throw AgentConfigurationError.unsupportedVersion(version) }
+            guard version == 12 else { throw AgentConfigurationError.unsupportedVersion(version) }
             id = try fields.decode(String.self, forKey: .id)
             category = try fields.decode(AgentCategory.self, forKey: .category)
             description = try fields.decode(String.self, forKey: .description)
             communication = try fields.decode(CommunicationDeclaration.self, forKey: .signals)
-            baseSkills = try fields.decode([String].self, forKey: .baseSkills)
+            baseSkills = try fields.decode([String].self, forKey: .skills)
+            states = try fields.decode([AgentStateDeclaration].self, forKey: .states)
+            _ = try AgentStateSchema(states)
             guard ActionIdentifier.validName(id),
                 !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                 description.utf8.count <= 2048,
@@ -267,6 +271,10 @@ public enum AgentConfigurations {
     public static func baseSkills(named name: String) throws -> [String] {
         try resource(named: name).baseSkills
     }
+    /// Declared preset variables of an Agent, validated at load time.
+    public static func stateSchema(named name: String) throws -> AgentStateSchema {
+        try AgentStateSchema(resource(named: name).states)
+    }
     public static func skillInstructions(_ id: String) throws -> String {
         guard let path = try catalog().skills[id] else { throw AgentConfigurationError.resourceMissing(id) }
         let root = String(path.dropLast("Skill.json".count))
@@ -318,7 +326,8 @@ public enum AgentConfigurations {
         let owner = AgentID(rawValue: metadata.id)
         let expanded = try AgentSkillLoader.expand(metadata.baseSkills, owner: owner)
         let generated = try declaration(AgentSkillLoader.bindings(expanded, owner: owner), owner: owner)
-        root.removeValue(forKey: "baseSkills")
+        root.removeValue(forKey: "skills")
+        root.removeValue(forKey: "states")
         root.removeValue(forKey: "description")
         root["version"] = 9
         root["actions"] = generated.actions

@@ -506,7 +506,7 @@ public actor AssistantHistoryStore {
         else { throw AssistantHistoryError.invalidRecord }
         var admitted = request
         admitted.historyOrder = value.revision + 1
-        let observation = !requests.isEmpty
+        let observation = request.isObservation ?? !requests.isEmpty
         admitted.isObservation = observation
         admitted.inputMessageID = next.current.turns[index].messageID
         admitted.awaitingDispatch = awaitingDispatch
@@ -770,8 +770,10 @@ public actor AssistantHistoryStore {
             request.tokenUsage = turn.tokenUsage
             next.current.turns[index].modelRequests = [request]
         }
+        // A finished reply whose playback is cut off is rewritten; the turn state derives from its last request.
         if let request = next.current.turns[index].modelRequests?.indices.last,
             next.current.turns[index].modelRequests?[request].state == .generating
+                || (state == .interrupted && next.current.turns[index].modelRequests?[request].state == .completed)
         {
             next.current.turns[index].modelRequests?[request].modelRequestCompletedAt = Date()
             next.current.turns[index].modelRequests?[request].state = state

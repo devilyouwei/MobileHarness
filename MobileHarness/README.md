@@ -308,7 +308,7 @@ The App persists the application language and supplies the same resolved prefere
 | Workflow family | Entry points |
 | --- | --- |
 | Root scope and observation | [Startup and lifecycle](#1-containerization-dependencies-startup-and-lifecycle) · [State reads](#6-state-ownership-state-machines-and-model-observations) · [Diagnostics](#20-diagnostics-ui-presentation-and-native-rendering) · [Cancellation and completion](#21-cross-module-cancellation-pressure-and-completion) |
-| Input and cognition | [Signals and delegation](#2-signals-and-agent-communication) · [UI requests](#3-ui-requests-and-shared-business-execution) · [Navigation](#4-page-navigation-and-visible-page-context) · [Task, Skill and model context](#5-skill-composition-task-and-model-context) · [Assistant full duplex](#assistant-full-duplex-interaction) |
+| Input and cognition | [Signals and delegation](#2-signals-and-agent-communication) · [UI requests](#3-ui-requests-and-shared-business-execution) · [Navigation](#4-page-navigation-and-visible-page-context) · [Skill, own State and model context](#5-skill-composition-own-state-and-model-context) · [Assistant full duplex](#assistant-full-duplex-interaction) |
 | Execution and feedback | [Capability resolution](#7-capability-declaration-resolution-and-execution-routes) · [Function Tokens](#8-function-token-and-action-call-protocol) · [Channel and wait](#9-channel-ordering-wait-and-resource-ownership) · [ReACT feedback](#10-react-continuation-and-execution-feedback-causality) |
 | Native interactions | [Listening and ASR](#11-listening-asr-and-sound-source-observations) · [Speech playback](#12-reply-synthesis-playback-and-listening-restoration) · [Vision and tracking](#13-camera-preview-vision-and-tracking) · [Photo, video and album](#14-photovideo-capture-app-album-and-system-export) · [Robot motion](#15-robot-motion-hardware-facts-and-control-handoff) · [Bluetooth](#16-bluetooth-discovery-connection-and-recovery) |
 | Durable data and models | [Provider and model resources](#17-settings-provider-and-model-resource-workflows) · [History and restart](#18-history-business-records-and-restart-behavior) · [Inference](#19-model-lifecycle-and-inference-boundaries) |
@@ -430,7 +430,7 @@ Solid arrows carry the incoming Signal paths; dashed arrows carry outgoing execu
 
 <a id="assistant-agent-delegation"></a>
 
-Assistant uses `task.start` and `task.end` for its own foreground task. For a goal owned by another Agent, it uses the Agent control `task.send(agent_id,text)` directly. Writer is the current public destination. The same control carries new goals, follow-ups, answers and stop requests as text. An unrelated Assistant foreground task can continue concurrently.
+Assistant keeps its foreground goal in its own `task` variable (`state.set` / `state.clear`; see [Assistant controls](Agents/Assistant/Controls/README.md#state-writes)). For a goal owned by another Agent, it uses the Agent control `send(agent_id,text)` directly; the two are independent, so Assistant may set `task` to follow a goal while a peer works on it. Writer is the current public destination. The same control carries new goals, follow-ups, answers and stop requests as text.
 
 Assistant persists each addressed `agent.task.v1` with a message ID and originating dialog. For an answer, the runtime can attach the captured delegation and question IDs. Gateway delivers the authenticated message to Writer, which verifies it against the persisted record before admitting it to the bounded inbox. Assistant receives the direct admission Reply and records delivery. Writer then decides whether to start work, apply input, stop or reject the message. For new work, Writer uses the original message ID as the delegation ID and obtains an execution grant before starting. Writer admits one delegation at a time and chooses its workspace independently.
 
@@ -659,7 +659,7 @@ UI owns NavigationStack and path generations. A path change enters transitioning
 
 Face remains a persistent sibling of navigation. WindowHost overlays only the retained home surface, below NavigationStack and the local Island. Navigation pages cover the home windows: UIContainer synchronously projects home visibility into window visibility while retaining window identity. The root-owned local Island stays above all pages in one scene overlay, retaining live updates, status-bar presentation and interactive expansion preferences across navigation. Writer record queries return explicit next-page cursors through UI-owned DTOs; Writer determines pagination from bounded Storage lookahead. Workspace messages and delegations start newest first and load older records as the list reaches its bottom. UI retains loaded pages across child navigation. See [Writer records](UI/Settings/README.md#writer-记录与作品). Settings/history/album preserve Face rendering and listening; the Camera window lifecycle controls capture independently of navigation. Minimize hides window rendering while retaining capture/recording demand; restore confirms current readiness; background clears capture intent and foreground requires an explicit reopen. `useStates` supplies page facts to subsequent decisions; execution checks live conditions. See [UI](UI/README.md) and [navigation](Actions/UI/Navigation/README.md).
 
-### 5. Skill composition, Task and model context
+### 5. Skill composition, own State and model context
 
 <a id="model-context-composition"></a>
 
@@ -668,8 +668,8 @@ flowchart TB
     subgraph Private["AGENTS · PRIVATE STATE"]
         Repo["AgentContextRepository<br/>Role-owned committed memory"]:::agent
         Snap["One request's private snapshot"]:::agent
-        Skills["Effective loaded Skills<br/>Base + recent / Task roots + dependencies"]:::agent
-        Task["Matching active Task<br/>Goal + status only"]:::agent
+        Skills["Effective loaded Skills<br/>Base + recent roots + dependencies"]:::agent
+        Task["Own variables<br/>name, value, write time (incl. task)"]:::agent
         Repo --> Snap
         Snap --> Skills
         Snap --> Task
@@ -684,7 +684,7 @@ flowchart TB
     end
     subgraph Assembly["AGENTS · REQUEST"]
         Prefix["System prefix<br/>Role / protocol / Skill teaching / catalog"]:::agent
-        Dynamic["Fresh system data<br/>AGENT CONTEXT + CURRENT STATE"]:::agent
+        Dynamic["Fresh system data<br/>AGENT CONTEXT + CURRENT STATE + AGENT STATE"]:::agent
         History["Selected history / actual feedback<br/>Latest input / observation"]:::agent
         Request["Bounded ChatRequest<br/>Preserve native call / result groups"]:::agent
         Prefix --> Request
@@ -694,7 +694,7 @@ flowchart TB
     Facts["Owner snapshots<br/>Read per actual model request"]:::neutral
     Names -->|"select read capabilities"| Facts
     Facts -.->|"CURRENT STATE"| Dynamic
-    Task -->|"AGENT CONTEXT.task"| Dynamic
+    Task -->|"AGENT STATE"| Dynamic
     Skills -->|"AGENT CONTEXT.skills"| Dynamic
     Catalog --> Prefix
     Teaching --> Prefix
@@ -714,20 +714,21 @@ flowchart TB
 <a id="state-devices-resources-and-faults"></a>
 <a id="tasks-model-decisions-and-history"></a>
 
-Skill v3 selects function bindings with `useActions`, read capabilities with `useStates`, and static Markdown with `useInstructions`. The effective loaded set includes base Skills, retained recent/Task-held roots and dependency expansion. One private snapshot supplies the request's selected Skill IDs, catalog, teaching and minimal Task/Skill projection. A load/release transition changes subsequent requests; it cannot expand a request already sent to the model. The runtime also binds the frozen catalog to output authorization.
+Skill v3 selects function bindings with `useActions`, read capabilities with `useStates`, and static Markdown with `useInstructions`. The effective loaded set includes base Skills, retained recent roots and dependency expansion; same-named Skills, dependencies, `useStates` and function bindings merge once. One private snapshot supplies the request's selected Skill IDs, catalog, teaching and the Agent's own variables. A load/unload transition changes subsequent requests; it cannot expand a request already sent to the model. The runtime also binds the frozen catalog to output authorization.
 
 The request combines a system prefix, fresh system data and conversation evidence.
 
 | Request content                    | Source and meaning                                                                                                                                                                                                                                            |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Instruction/catalog prefix         | Role identity and protocol, available Skill overview, loaded Skill teaching and effective function metadata. Available Skills describe choices; only the effective catalog permits current calls. The prefix changes when its selected Skills/catalog change. |
-| AGENT CONTEXT                      | The same private snapshot's current loaded Skill IDs and matching active Task's goal/status. No matching Task produces `task: null`; this is not a dump of task records, grants, input bindings or retention counters.                                        |
+| AGENT CONTEXT                      | The same private snapshot's current loaded Skill IDs. It is not a dump of task records, grants, input bindings or retention counters.                                        |
+| AGENT STATE                        | The Agent's own variables from the same snapshot: name, natural-language write time and quoted value, earliest written first, rendered by one function. The current goal is the `task` variable; moods and styles are free variables. The values are data; they grant no authority. |
 | CURRENT STATE                      | Fresh owner-defined facts selected by the loaded Skills' `useStates`, sampled separately through read-only capabilities. These are data, not instructions or execution permits.                                                                               |
 | History, feedback and latest input | Bounded conversation evidence, real Action/Tool outcomes and current user input or continuation observation. Current Task evidence remains in the history window; terminal Task history can be projected as a summary.                                        |
 
-The ordinary request order is **instruction/catalog system → selected history → dynamic system data (AGENT CONTEXT, then CURRENT STATE) → latest user input/observation**. If the request ends in native Tool results, the dynamic system message follows the complete call/result group. Previous dynamic system messages are removed before fresh facts are inserted. Native Tool definitions are a separate ChatRequest field. ModelKit receives the finished request; it does not discover containers or assemble Agent Task/Skill state.
+The ordinary request order is **instruction/catalog system → selected history → dynamic system data (AGENT CONTEXT, then CURRENT STATE, then AGENT STATE) → latest user input/observation**. If the request ends in native Tool results, the dynamic system message follows the complete call/result group. Previous dynamic system messages are removed before fresh facts are inserted. Native Tool definitions are a separate ChatRequest field. ModelKit receives the finished request; it does not discover containers or assemble Agent Task/Skill state.
 
-Each actual model request, including an internal ReACT continuation, samples again. The private snapshot and the business reads are not a single atomic transaction. Model-visible Task/Skill data is private to the responsible Agent; the production conversational owner is Assistant with one foreground continuing goal. Generic task registries and delegated-role views support runtime correlation, but are not serialized wholesale into AGENT CONTEXT and do not imply an exposed background-work Skill. Detailed message selection, budgets and continuation rules belong in [Assistant](Agents/Assistant/README.md#request-state-assembly); private transitions belong in [Context](Agents/Support/Context/README.md#container-context-read-path).
+Each actual model request, including an internal ReACT continuation, samples again. The private snapshot and the business reads are not a single atomic transaction. Model-visible own State and Skill data is private to the responsible Agent; the production conversational owner is Assistant with one foreground continuing goal (the `task` variable). Generic task registries and delegated-role views support runtime correlation, but are not serialized wholesale into AGENT CONTEXT and do not imply an exposed background-work Skill. Detailed message selection, budgets and continuation rules belong in [Assistant](Agents/Assistant/README.md#request-state-assembly); private transitions belong in [Context](Agents/Support/Context/README.md#container-context-read-path).
 
 #### Prompt ownership and public discovery
 
@@ -887,7 +888,7 @@ The model-output path is **ModelKit stream → Agents parsing and catalog resolu
 | Boundary              | Contract                                                                                                                                                                                                                                                       |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Function Token syntax | Natural text mixed with restricted XML, without a document root. Self-closing tags name catalog aliases, which resolve to an Action or to an Agent control; the paired `wait` scope and the self-closing `<wait time="seconds"/>` pause are scheduling events registered by a Skill (Basic Interaction) and executed by the Shell.                |
-| Agent control         | A self-closing tag that is a fixed capability of its owning Agent, not granted by Skills; the owner's `Controls.json` declares it and `Controls.md` teaches it (Assistant: `task.start`, `task.end`, `loadSkills`, `releaseSkills` with destination `self`; `task.send` with destination `peer`). It resolves to a ControlCall with no Channel, never reaches Actions, runs in the owning Agent in emission order without waiting for Actions on other Channels, and is rejected inside `<wait>`. Actions (scheduled or direct tool calls) are the only functions that enter Actions through Gateway. |
+| Agent control         | A self-closing tag that is a fixed capability of its owning Agent, not granted by Skills; the owner's `Controls.json` declares it and `Controls.md` teaches it (Assistant: `state.set`, `state.clear`, `state.get`, `skill.load`, `skill.unload` with destination `self`; `send` with destination `peer`). It resolves to a ControlCall with no Channel, never reaches Actions, runs in the owning Agent in emission order without waiting for Actions on other Channels, and is rejected inside `<wait>`. Actions (scheduled or direct tool calls) are the only functions that enter Actions through Gateway. |
 | FunctionToken         | An Agent-local parsed text, action, boundary or scheduling event. Its boundary is independent of provider tokenizer tokens and network fragments. Incremental parsing handles incomplete UTF-8 and markup across fragments.                                    |
 | ActionCall            | A resolved actionPath, channel and string parameter map. Agents resolves aliases and parameters against its effective catalog; text mapping, when configured, produces ordered calls through the same generation pipeline.                                     |
 | Scheduling events     | beginWait/endWait travel in order with calls. Each call uses its registered Channel. Dropping wait events changes execution semantics.                                           |
@@ -1045,7 +1046,7 @@ sequenceDiagram
         M-->>S: enhanced PCM or explicit failure
     end
     S->>S: stateful 16 kHz conversion / capture-time slices
-    S->>A: read injected playback / reply activity / interruption snapshots
+    S->>A: read injected reply activity; report utterance lifecycle
     A-->>S: same-session facts bound by AgentRuntime
     S->>M: VAD / ASR with playback-aware onset
     M-->>S: VAD / recognition output
@@ -1066,7 +1067,7 @@ BasicInteraction also exposes explicit startListening/stopListening Actions thro
 
 Readiness depends on effective samples and native conditions. The role validates channel layout, rate, sequence and continuity before model adaptation; ordered PCM overflow fails explicitly. Partials do not independently start ordinary conversation. SpeechPerception submits the final caption and its seal before publishing a nonempty final through Gateway. Assistant subscribes to `user.input.speech.v1（final）` on the `user.input` topic. Sound-source estimation and low-rate measurements belong to perception, while Actions presents facts. A declared observation contract does not imply a current subscriber. See [SpeechPerception](Agents/SpeechPerception/README.md), [Listening](Actions/Speech/Listening/README.md) and [Platform Audio](PlatformKit/Audio/README.md).
 
-SpeechPerception starts recognition captions at confirmed VAD onset and publishes the speaking-phase control fact. For silence endpointing, AgentRuntime binds same-session Assistant reply activity and the pending interruption marker. SpeechPerception acknowledges that marker after forwarding the next nonempty final transcript. In the full-duplex Assistant, onset leaves the current reply caption in place. Final ASR enters the ordinary Assistant queue; interruption Decision runs only when same-session reply work or playback existed at arrival. The next actual reply replaces the Assistant caption. Actions fences stale request, turn and sequence updates. UI renders user and Assistant captions in fixed, separate regions. See [Assistant captions](Agents/Assistant/README.md#presentation-speech-and-cleanup), [caption execution](Actions/UI/Conversation/README.md) and [Conversation](UI/Conversation/README.md).
+SpeechPerception starts recognition captions at confirmed VAD onset and reports utterance lifecycle to Assistant. AgentRuntime binds same-session reply activity for endpointing and capture-scoped VAD observations for interruption. In the full-duplex Assistant, onset leaves the current reply caption in place. Final ASR enters the ordinary Assistant queue; interruption Decision runs only when same-session reply work or playback existed at arrival. After interruption Assistant joins cancellation before a one-shot speech observation; confirmed recognition blocks dispatch until final admission, without restarting the observation. The next actual reply replaces the Assistant caption. Actions fences stale request, turn and sequence updates. UI renders user and Assistant captions in fixed, separate regions. See [Assistant captions](Agents/Assistant/README.md#presentation-speech-and-cleanup), [caption execution](Actions/UI/Conversation/README.md) and [Conversation](UI/Conversation/README.md).
 
 #### Playback-aware speech admission
 
@@ -1141,6 +1142,7 @@ flowchart TB
     Presentation["UI<br/>Conversation presentation"]:::ui
     Records["Storage<br/>Message and Task records"]:::storage
     Capture -->|"PCM and duplex capability"| Speech
+    Speech -->|"Utterance lifecycle"| Assistant
     Speech -->|"user.input.speech.v1（final） · user.input"| Signals
     Peers -->|"Authorized messages"| Signals
     Signals -->|"Final speech and verified peer reports"| Assistant
@@ -1160,9 +1162,9 @@ flowchart TB
     classDef storage fill:#faf3e4,stroke:#a18a4c,color:#61512a
 ```
 
-PlatformKit reports capture capability; SpeechPerception publishes partial and final ASR. Assistant admits authenticated final ASR and typed user text to its bounded ordinary queue and independently asks ModelKit for a boolean interruption decision only if the same session had reply work or playback when the input arrived. Idle arrivals dispatch without invoking Decision, even if admission starts their own reply. The frozen context contains only the current user/assistant exchange and latest input. A target-bound true signal can cancel the original reply after identity validation; an idle or stale signal cannot cancel a new reply. Errors leave admitted messages queued. ModelKit owns choice/noul protocol encoding for D3, Vela and Laya and strict boolean adaptation for Chat providers. Peer reports and execution observations bypass user Decision. Full-duplex audio policy and round settlement remain unchanged. See [Assistant input handling](Agents/Assistant/README.md#full-duplex-input-and-decision).
+PlatformKit reports capture capability; SpeechPerception publishes partial and final ASR. Assistant admits authenticated final ASR and typed user text to its bounded ordinary queue and independently asks ModelKit for a boolean interruption decision only if the same session had reply work or playback when the input arrived. Idle arrivals dispatch without invoking Decision, even if admission starts their own reply. The frozen context contains only the current user/assistant exchange and latest input. A target-bound true signal can cancel the original reply after identity validation; an idle or stale signal cannot cancel a new reply. Errors leave admitted messages queued. ModelKit owns choice/noul protocol encoding for D3, Vela and Laya and strict boolean adaptation for Chat providers. Peer reports and execution observations bypass user Decision. See [Assistant input handling](Agents/Assistant/README.md#full-duplex-input-and-decision).
 
-Model generation closes the set of calls. The Actions Shell preserves ordering within each Channel and coordinates resource use across Channels. Assistant keeps accepting input while the round's Channels, native calls and result delivery settle. Once the admissions tracked at settlement finish, it freezes the ready items in that session into a time-ordered input batch. An interruption retains the new input and pending queue. When its generation still matches, Assistant cancels the old round and joins cleanup before dispatch. Independent Writer work continues, and an unfinished foreground task remains available until `task.end` commits. Storage records dispatched requests, replies, Action results and Task commits at their respective boundaries. See [Assistant multi-Channel output](Agents/Assistant/README.md#input-timeline-and-channels), [Actions Shell scheduling](Actions/Support/Shell/README.md#scheduling) and [history and restart](#18-history-business-records-and-restart-behavior).
+Model generation closes the set of calls. The Actions Shell preserves ordering within each Channel and coordinates resource use across Channels. Assistant keeps accepting input while the round's Channels, native calls and result delivery settle. Once the admissions tracked at settlement finish, it freezes the ready items in that session into a time-ordered input batch. An interruption retains the new input and pending queue. When its generation still matches, Assistant cancels the old round and joins cleanup; the full-duplex speech session observes for possible continuation and, if speech is confirmed, waits for its final admission. Final settlement does not restart the observation; lifecycle closure retires it. Independent Writer work continues, and an unfinished foreground task remains available until `task.end` commits. Storage records dispatched requests, replies, Action results and Task commits at their respective boundaries. See [Assistant multi-Channel output](Agents/Assistant/README.md#input-timeline-and-channels), [Actions Shell scheduling](Actions/Support/Shell/README.md#scheduling) and [history and restart](#18-history-business-records-and-restart-behavior).
 
 Assistant interruption has one role-owned entry for internal Decision, trusted host requests and authorized `assistant.interrupt` messages delivered by Gateway. Target matching and dispatch fencing precede joined cancellation; ordinary text admission remains independent. External world signals are adapted by their owning role or host, never constructed by foundation modules. Details: [Assistant unified interruption](Agents/Assistant/README.md#unified-interruption-control).
 

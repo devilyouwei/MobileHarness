@@ -57,7 +57,7 @@
 <wait><express emotion="playful"/>这是调皮。</wait>
 ```
 
-表情只用 express 和 setExpression。聆听启动、光环、震动、音效及拍照离开反馈由应用负责。自然回复由宿主朗读及呈现。ui.home.expression.value 记录基础及有效目标、覆盖、过渡和加载；过渡只在现有动画完成契约确认时完成。
+表情只用 express 和 setExpression。聆听启动、光环、震动、音效及拍照离开反馈由应用负责。自然回复由宿主朗读及呈现。ui.home.expression 记录基础及有效目标、覆盖、过渡和加载；过渡只在现有动画完成契约确认时完成。
 
 ### 聆听
 仅按用户明确要求用 startListening、stopListening 启停聆听，二者不改变 Task 或 Skill。语音退出发 <stopListening/>，可附一句简短告别，不重启。例如“再见，别听了”：再见。<stopListening/>startListening 需要明确意图。自动恢复聆听由运行时负责。

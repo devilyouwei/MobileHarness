@@ -64,15 +64,12 @@ public final class RuntimeLogState: RuntimeLogWriting {
 
     public internal(set) var showsExecutionHistory = false
     public internal(set) var selectedTab: ExecutionLogTab = .action
-    public internal(set) var selectedTaskID: String?
     public private(set) var agentEvents: [AgentRuntimeLogItem] = []
     public private(set) var agentEventEvictions: UInt64 = 0
     public internal(set) var selectedSource = "All"
     public internal(set) var selectedChannel: String?
     public internal(set) var selectedFilter: ExecutionLogFilter = .all
     public internal(set) var showsInternalActions = false
-    public private(set) var tasks: [TaskLogItem] = []
-    public private(set) var taskEvictions: UInt64 = 0
     public private(set) var items: [ActionActivityItem] = []
     public private(set) var revision: UInt64?
     public private(set) var evictedCount: UInt64 = 0
@@ -81,6 +78,10 @@ public final class RuntimeLogState: RuntimeLogWriting {
     public private(set) var issueEvictions: UInt64 = 0
     public private(set) var decisions: [DecisionLogItem] = []
     public private(set) var decisionEvictions: UInt64 = 0
+    public private(set) var stateVariables: [StateVariableItem] = []
+    @ObservationIgnored private var stateSource: (@MainActor @Sendable () async -> [StateVariableItem])?
+    @ObservationIgnored private var observedValues: [String: String?] = [:]
+    @ObservationIgnored private var observedChanges: [String: Date] = [:]
 
     private func recordIssue(_ issue: ExecutionIssue) {
         if let index = issues.firstIndex(where: { $0.id == issue.id }) {
@@ -104,12 +105,12 @@ public final class RuntimeLogState: RuntimeLogWriting {
     }
 
     public var hasRecords: Bool {
-        !items.isEmpty || !tasks.isEmpty || !agentEvents.isEmpty || !issues.isEmpty || !decisions.isEmpty
+        !items.isEmpty || !agentEvents.isEmpty || !issues.isEmpty || !decisions.isEmpty
     }
     public var sources: [String] {
         Array(
             Set(
-                items.map(\.source) + tasks.flatMap { [$0.requester, $0.executor] } + runtimeIssues.map(\.source)
+                items.map(\.source) + runtimeIssues.map(\.source)
                     + agentEvents.map(\.source) + decisions.map(\.source))
         ).filter { !$0.isEmpty }.sorted()
     }
@@ -126,27 +127,40 @@ public final class RuntimeLogState: RuntimeLogWriting {
 
     public var visibleActions: [ActionActivityItem] {
         items.filter { item in
-            (selectedTaskID == nil
-                || tasks.contains { task in task.id == selectedTaskID && task.events.contains { $0.id == item.inputID }
-                })
-                && (selectedChannel == nil || selectedChannel == item.channel)
+            (selectedChannel == nil || selectedChannel == item.channel)
                 && (showsInternalActions || !item.isInternal || item.isFailure) && matchesSource([item.source])
                 && matchesStatus(
                     active: item.isActive, success: item.execution.phase == .succeeded, failure: item.isFailure)
         }
     }
-    public var visibleTasks: [TaskLogItem] {
-        tasks.filter {
-            matchesSource([$0.requester, $0.executor])
-                && matchesStatus(active: !$0.isTerminal, success: $0.phase == .succeeded, failure: $0.phase == .failed)
+    public func provideStateVariables(_ source: @escaping @MainActor @Sendable () async -> [StateVariableItem]) {
+        stateSource = source
+    }
+
+    /// Reads the current variables. Values without a write time get the moment the display first saw them change.
+    public func refreshStateVariables(now: Date = .now) async {
+        guard let stateSource else { return }
+        let items = await stateSource()
+        for item in items {
+            if let previous = observedValues[item.path], previous != item.value { observedChanges[item.path] = now }
+            observedValues[item.path] = .some(item.value)
+        }
+        observedValues = observedValues.filter { key, _ in items.contains { $0.path == key } }
+        observedChanges = observedChanges.filter { key, _ in items.contains { $0.path == key } }
+        let changedAt: (StateVariableItem) -> Date = { $0.writtenAt ?? self.observedChanges[$0.path] ?? .distantPast }
+        stateVariables = items.sorted {
+            if ($0.value == nil) != ($1.value == nil) { return $0.value != nil }
+            if $0.value != nil, changedAt($0) != changedAt($1) { return changedAt($0) > changedAt($1) }
+            return $0.path < $1.path
         }
     }
+
     public var visibleDecisions: [DecisionLogItem] {
         decisions.reversed().filter {
             matchesSource([$0.source])
                 && matchesStatus(
                     active: false, success: $0.booleanResult != nil || $0.modelResult != nil,
-                    failure: $0.booleanResult == nil && $0.modelResult == nil)
+                    failure: $0.isFailure)
         }.sorted { $0.time > $1.time }
     }
 
@@ -170,35 +184,6 @@ public final class RuntimeLogState: RuntimeLogWriting {
         }
         agentEvents.append(event)
     }
-    func updateTask(_ incoming: TaskLogItem, event: TaskLogEvent) {
-        if let index = tasks.firstIndex(where: { $0.id == incoming.id }) {
-            if let existing = tasks[index].events.firstIndex(where: { $0.id == event.id }) {
-                tasks[index].events[existing] = event
-            } else {
-                if tasks[index].events.count == 32 {
-                    tasks[index].events.removeFirst()
-                    tasks[index].evictedEvents += 1
-                }
-                tasks[index].events.append(event)
-            }
-            tasks[index].execution = incoming.execution ?? tasks[index].execution
-            tasks[index].mode = incoming.mode
-            if !incoming.skills.isEmpty { tasks[index].skills = incoming.skills }
-            tasks[index].failure = incoming.failure
-            if !tasks[index].isTerminal { tasks[index].phase = incoming.phase }
-            if tasks[index].title.isEmpty { tasks[index].title = incoming.title }
-        } else {
-            if tasks.count == 100 {
-                let retired = tasks.firstIndex(where: { $0.isTerminal }) ?? 0
-                tasks.remove(at: retired)
-                taskEvictions &+= 1
-            }
-            var value = incoming
-            value.events = [event]
-            tasks.append(value)
-        }
-    }
-
     private var dismissed: Set<String> = []
 
     public init() {}
@@ -250,7 +235,6 @@ public final class RuntimeLogState: RuntimeLogWriting {
         guard presentationAdmission?.acceptsRetained() ?? true else { return false }
         switch event {
         case .agent(let event): recordAgentEvent(event)
-        case .task(let task, let event): updateTask(task, event: event)
         case .actions(let revision, let records, let evictedCount):
             replace(revision: revision, records: records, evictedCount: evictedCount)
         case .decision(let decision): recordDecision(decision)
@@ -265,11 +249,41 @@ public final class RuntimeLogState: RuntimeLogWriting {
 public protocol RuntimeLogWriting: Sendable {
     @discardableResult
     func record(_ event: RuntimeLogEvent) -> Bool
+    /// Supplies the read-only view of the variables an Agent currently loads into its prompt.
+    func provideStateVariables(_ source: @escaping @MainActor @Sendable () async -> [StateVariableItem])
+}
+
+extension RuntimeLogWriting {
+    public func provideStateVariables(_ source: @escaping @MainActor @Sendable () async -> [StateVariableItem]) {}
+}
+
+/// One variable an Agent currently loads into its prompt, as a read-only display value.
+public struct StateVariableItem: Identifiable, Sendable, Equatable {
+    public enum Category: String, Sendable {
+        case readOnly = "Read-only"
+        case readWrite = "Read-write"
+        case semantic = "Semantic"
+        case container = "Container"
+        case image = "Image"
+    }
+    public let path: String
+    public let category: Category
+    /// `nil` means the variable currently has no value.
+    public let value: String?
+    /// Only variables the Agent owns record a write time.
+    public let writtenAt: Date?
+    public var id: String { path }
+    public var isAgentOwned: Bool { [.readOnly, .readWrite, .semantic].contains(category) }
+    public init(path: String, category: Category, value: String?, writtenAt: Date? = nil) {
+        self.path = path
+        self.category = category
+        self.value = value.flatMap { $0.isEmpty ? nil : String($0.prefix(4096)) }
+        self.writtenAt = writtenAt
+    }
 }
 
 public enum RuntimeLogEvent: Sendable {
     case agent(AgentRuntimeLogItem)
-    case task(TaskLogItem, TaskLogEvent)
     case actions(revision: UInt64, records: [ActionActivityItem], evictedCount: UInt64)
     case decision(DecisionLogItem)
     case issue(ExecutionIssue)
@@ -282,6 +296,7 @@ public struct DecisionLogItem: Identifiable, Sendable, Equatable {
         case cloud = "Cloud Decision"
         case fallback = "Fallback"
         case failed = "Failed"
+        case superseded = "Superseded Decision"
     }
     public enum Disposition: String, Sendable {
         case enqueue, discard, interrupt
@@ -300,6 +315,9 @@ public struct DecisionLogItem: Identifiable, Sendable, Equatable {
     public let signalStatus: String?
     public let reason: String?
     public let requests: [String]
+    public var isFailure: Bool {
+        booleanResult == nil && modelResult == nil && route != .superseded
+    }
 
     public init(
         id: String, source: String, inputText: String, time: Date = .now, duration: Duration, route: Route,
@@ -326,65 +344,15 @@ public struct DecisionLogItem: Identifiable, Sendable, Equatable {
 /// Passive log projections. Neither observation nor filtering drives Agent execution.
 public enum ExecutionLogTab: String, CaseIterable, Sendable {
     case action = "Action"
-    case task = "Task"
     case agent = "Agent"
     case decision = "Decision"
+    case state = "State"
 }
 public enum ExecutionLogFilter: String, CaseIterable, Sendable {
     case all = "All"
     case active = "In progress"
     case succeeded = "Succeeded"
     case failed = "Failed"
-}
-public struct TaskLogEvent: Identifiable, Equatable, Sendable {
-    public let id: String
-    public let time: Date
-    public let title: String
-    public let detail: String
-    public init(id: String, time: Date, title: String, detail: String) {
-        self.id = id
-        self.time = time
-        self.title = title
-        self.detail = String(detail.prefix(256))
-    }
-}
-public struct TaskLogItem: Identifiable, Equatable, Sendable {
-    public enum Phase: String, Sendable {
-        case requested = "Delegating"
-        case accepted = "Accepted"
-        case running = "In progress"
-        case waitingUser = "Waiting for user"
-        case cancelling = "Cancellation accepted"
-        case succeeded = "Completed"
-        case failed = "Failed"
-        case cancelled = "Cancelled"
-    }
-    public let id: String
-    public let parentID: String?
-    public let requester: String
-    public let executor: String
-    public var title: String
-    public var phase: Phase
-    public var execution: String?
-    public var mode: String?
-    public var skills: [String] = []
-    public var failure: String?
-    public var events: [TaskLogEvent]
-    public var evictedEvents: Int
-    public var isTerminal: Bool { [.succeeded, .failed, .cancelled].contains(phase) }
-    public init(
-        id: String, parentID: String?, requester: String, executor: String, title: String, phase: Phase,
-        events: [TaskLogEvent] = [], evictedEvents: Int = 0
-    ) {
-        self.id = id
-        self.parentID = parentID
-        self.requester = requester
-        self.executor = executor
-        self.title = String(title.prefix(256))
-        self.phase = phase
-        self.events = events
-        self.evictedEvents = evictedEvents
-    }
 }
 public struct AgentRuntimeLogItem: Identifiable, Equatable, Sendable {
     public let id: String

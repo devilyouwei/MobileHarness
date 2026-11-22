@@ -166,8 +166,8 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     let active = try skills.registry(fixed: maximum)
     #expect(active.tools.isEmpty)
     #expect(!active.actions.contains { $0.path.domain == "Camera" })
-    #expect(active.controls.contains { $0.alias == "task.start" })
-    #expect(active.controls.filter { $0.path.domain == "Agent" && $0.path.module == "Task" }.count == 5)
+    #expect(active.controls.contains { $0.alias == "state.set" })
+    #expect(Set(active.controls.map(\.path.module)) == ["State", "Skill", "Message"] && active.controls.count == 6)
     let agent = try AssistantAgent(
         stateContext: try publicStateFixture(),
         chat: FixedTextChat(),
@@ -569,7 +569,7 @@ func skillUseStateRejectsInvalidDeclarations(_ mutation: String) throws {
         let configuration = try AgentConfigurations.load(named: name)
         let data = try AgentConfigurations.data("Agents/" + name + "/Agent.json")
         let resource = try AgentConfigurations.decodeResource(data, expectedID: configuration.agentID)
-        #expect(resource.version == 11 && configuration.version == 9)
+        #expect(resource.version == 12 && configuration.version == 9)
         #expect(!resource.description.isEmpty && resource.description.utf8.count <= 2048)
         #expect(try AgentConfigurations.publicDescription(named: name) == resource.description)
     }

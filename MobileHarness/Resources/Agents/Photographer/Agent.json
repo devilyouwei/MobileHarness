@@ -1,11 +1,12 @@
 {
-  "version": 11,
+  "version": 12,
   "category": "perception",
   "id": "photographer",
   "description": "I own camera and album intent, capture/tracking workflows, preview disposition and photo/video lifecycle. I consume supported camera, album and tracking inputs; my registration does not expose a general public delegation entry.",
-  "baseSkills": [
+  "skills": [
     "photography"
   ],
+  "states": [],
   "signals": {
     "requests": [
       "agent.task.v1"

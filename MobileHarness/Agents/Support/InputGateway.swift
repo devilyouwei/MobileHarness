@@ -19,6 +19,7 @@ public actor InputGateway {
     private var eventPublishers: [SignalEndpoint: [String: SignalEventPublisher<AgentInput>]] = [:]
     private var closed = false
     private let publicationFailure: @Sendable (AgentInput, AgentID?, String) async -> Void
+    private let publicationSettled: @Sendable (AgentInput, Set<AgentID>, [AgentID: String]) async -> Void
     private var activeAdmissions = 0
     private var activeBranches = 0
     private var observationBytes = 0
@@ -37,6 +38,9 @@ public actor InputGateway {
         },
         signalSummary: @escaping @Sendable (AgentInput) -> String = { _ in "" },
         publicationFailure: @escaping @Sendable (AgentInput, AgentID?, String) async -> Void = { _, _, _ in },
+        publicationSettled: @escaping @Sendable (AgentInput, Set<AgentID>, [AgentID: String]) async -> Void = {
+            _, _, _ in
+        },
         admission: GatewayAdmission? = nil
     ) {
         self.requestImplementations = requestImplementations
@@ -46,6 +50,7 @@ public actor InputGateway {
         self.signalAggregation = signalAggregation
         self.signalSummary = signalSummary
         self.publicationFailure = publicationFailure
+        self.publicationSettled = publicationSettled
         self.policy = policy
         self.manager = manager
     }
@@ -473,6 +478,7 @@ public actor InputGateway {
                 await publicationFailure(input, target, reason)
             }
         }
+        await publicationSettled(input, Set(delivered), rejected)
     }
 
     private func checkAdmission(_ input: AgentInput) throws {

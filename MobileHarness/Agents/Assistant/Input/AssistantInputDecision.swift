@@ -15,6 +15,7 @@ public struct InputDecisionOutcome: Sendable, Equatable {
         case apple = "local:apple-system"
         case cloud = "cloud:decision"
         case failed = "decision:failed"
+        case superseded = "decision:superseded"
     }
     public let route: Route
     public let modelResult: Bool?
@@ -96,8 +97,17 @@ public actor AssistantInputDecision {
     private enum Attempt: Sendable {
         case selected(Bool)
         case failed(String, InputDecisionOutcome.Failure = .model)
+        case superseded
     }
-    private var waiters: [String: CheckedContinuation<Attempt, Never>] = [:]
+    private struct PendingAttempt {
+        let id: UUID
+        let deadline: ContinuousClock.Instant
+        let model: String
+        let operation: @Sendable () async throws -> Bool
+        let continuation: CheckedContinuation<Attempt, Never>
+        var timeout: Attempt { .failed("\(model) timed out", .timedOut) }
+    }
+    private var attempts: [String: PendingAttempt] = [:]
     private var localFailure: String?
     private var preparation: Task<Void, Never>?
     private var stopped = false
@@ -195,8 +205,8 @@ public actor AssistantInputDecision {
     public func stop() async {
         stopped = true
         for timer in timers.values { timer.cancel() }
-        for waiter in waiters.values { waiter.resume(returning: .failed("Classification cancelled")) }
-        waiters.removeAll()
+        for attempt in attempts.values { attempt.continuation.resume(returning: .failed("Classification cancelled")) }
+        attempts.removeAll()
         let active = Array(workers.values)
         for task in active { task.cancel() }
         preparation?.cancel()
@@ -279,6 +289,8 @@ public actor AssistantInputDecision {
                 }
             }
             switch result {
+            case .superseded:
+                return Self.supersededOutcome(requests: requests.withLock { $0 }, modelName: modelName)
             case .selected(let action):
                 await report("Local \(modelName)")
                 return outcome(
@@ -323,6 +335,8 @@ public actor AssistantInputDecision {
                         }
                     }
                     switch result {
+                    case .superseded:
+                        return Self.supersededOutcome(requests: requests.withLock { $0 }, modelName: modelName)
                     case .selected(let action):
                         return outcome(
                             action, route: modelRoute, snapshot: snapshot, requests: requests.withLock { $0 },
@@ -372,6 +386,10 @@ public actor AssistantInputDecision {
                 requests.withLock { $0.append("Cloud Decision\n\n" + request) }
             }
         }
+        if case .superseded = result {
+            return Self.supersededOutcome(
+                requests: requests.withLock { $0 }, modelName: selectedModelName.withLock { $0 })
+        }
         if case .selected(let action) = result {
             return outcome(
                 action, route: .cloud, snapshot: snapshot, requests: requests.withLock { $0 },
@@ -412,48 +430,75 @@ public actor AssistantInputDecision {
         .init(route: route, modelResult: value, reason: nil, requests: requests, modelName: modelName)
     }
 
+    static func supersededOutcome(requests: [String] = [], modelName: String? = nil) -> InputDecisionOutcome {
+        .init(
+            route: .superseded, modelResult: nil, signalStatus: "superseded",
+            reason: "Decision superseded by newer input; input remains queued",
+            requests: requests, modelName: modelName)
+    }
+
     private func race(
         _ key: String, until deadline: ContinuousClock.Instant, name: String? = nil,
         operation: @escaping @Sendable () async throws -> Bool
     ) async -> Attempt {
         let model = name ?? (key == "local" ? "Local Decision" : "Cloud Decision")
         let timeout = Attempt.failed("\(model) timed out", .timedOut)
+        let id = UUID()
         guard !stopped, !Task.isCancelled else { return .failed("Classification cancelled") }
-        guard workers[key] == nil else { return .failed("\(model) is still cleaning up the previous request") }
         guard ContinuousClock.now < deadline else { return timeout }
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
-                waiters[key] = continuation
-                workers[key] = Task {
-                    let result: Attempt
-                    do {
-                        result = .selected(try await operation())
-                    } catch {
-                        let reason = "\(model) failed: \(error.localizedDescription)"
-                        result = .failed(reason)
-                    }
-                    if !Task.isCancelled {
-                        self.resolve(key, result: ContinuousClock.now < deadline ? result : timeout)
-                    }
-                    self.workers[key] = nil
+                guard !stopped, !Task.isCancelled else {
+                    continuation.resume(returning: .failed("Classification cancelled"))
+                    return
                 }
+                workers[key]?.cancel()
+                resolve(key, result: .superseded)
+                attempts[key] = PendingAttempt(
+                    id: id, deadline: deadline, model: model, operation: operation, continuation: continuation)
                 timers[key] = Task {
                     do { try await ContinuousClock().sleep(until: deadline) } catch { return }
+                    guard self.attempts[key]?.id == id else { return }
                     self.workers[key]?.cancel()
                     self.resolve(key, result: timeout)
                 }
+                startAttempt(key)
             }
         } onCancel: {
-            Task { await self.cancel(key) }
+            Task { await self.cancel(key, attemptID: id) }
         }
     }
-    private func cancel(_ key: String) {
+
+    private func startAttempt(_ key: String) {
+        guard !stopped, workers[key] == nil, let attempt = attempts[key] else { return }
+        guard ContinuousClock.now < attempt.deadline else {
+            resolve(key, result: attempt.timeout)
+            return
+        }
+        workers[key] = Task {
+            let result: Attempt
+            do {
+                try Task.checkCancellation()
+                result = .selected(try await attempt.operation())
+            } catch {
+                result = .failed("\(attempt.model) failed: \(error.localizedDescription)")
+            }
+            if self.attempts[key]?.id == attempt.id, !Task.isCancelled {
+                self.resolve(key, result: ContinuousClock.now < attempt.deadline ? result : attempt.timeout)
+            }
+            self.workers[key] = nil
+            self.startAttempt(key)
+        }
+    }
+
+    private func cancel(_ key: String, attemptID: UUID? = nil) {
+        if let attemptID, attempts[key]?.id != attemptID { return }
         workers[key]?.cancel()
         resolve(key, result: .failed("Classification cancelled"))
     }
     private func resolve(_ key: String, result: Attempt) {
         timers.removeValue(forKey: key)?.cancel()
-        waiters.removeValue(forKey: key)?.resume(returning: result)
+        attempts.removeValue(forKey: key)?.continuation.resume(returning: result)
     }
 }
 
@@ -473,6 +518,7 @@ extension InputDecisionOutcome {
             case .local, .vela, .vela31, .laya, .gemma, .apple: .local
             case .cloud: .cloud
             case .failed: .failed
+            case .superseded: .superseded
             }
         return .init(
             id: snapshot.input.id, source: AgentID.assistant.rawValue, inputText: snapshot.text, duration: duration,
@@ -494,6 +540,8 @@ actor AssistantDecisionQueue {
     }
     private var pending: [Job] = []
     private var worker: Task<Void, Never>?
+    private var classification: Task<InputDecisionOutcome, Never>?
+    private var classifyingInputID: String?
     private var cancelling = false
     var count: Int { pending.count }
 
@@ -501,15 +549,30 @@ actor AssistantDecisionQueue {
         guard !cancelling else { throw CancellationError() }
         guard pending.count < 32 else { throw CommunicationError.capacityExceeded }
         pending.append(job)
+        classification?.cancel()
         guard worker == nil else { return }
         worker = Task {
             defer { worker = nil }
             while let job = pending.first, !Task.isCancelled {
                 let started = ContinuousClock.now
-                var result = await model.classify(job.snapshot)
+                var result: InputDecisionOutcome
+                if pending.count > 1 {
+                    result = AssistantInputDecision.supersededOutcome()
+                } else {
+                    let task = Task { await model.classify(job.snapshot) }
+                    classification = task
+                    classifyingInputID = job.snapshot.input.id
+                    result = await task.value
+                    classification = nil
+                    classifyingInputID = nil
+                }
                 let duration = started.duration(to: .now)
                 guard !Task.isCancelled else { return }
                 guard pending.first?.snapshot.input.id == job.snapshot.input.id else { continue }
+                if pending.count > 1 {
+                    result = AssistantInputDecision.supersededOutcome(
+                        requests: result.requests, modelName: result.modelName)
+                }
                 if result.modelResult == true {
                     if let target = job.target {
                         do {
@@ -523,7 +586,7 @@ actor AssistantDecisionQueue {
                     } else {
                         result.signalStatus = "no_target"
                     }
-                } else if result.modelResult == nil {
+                } else if result.modelResult == nil, result.signalStatus != "superseded" {
                     result.signalStatus = "decision_failed"
                 }
                 await job.complete(job.snapshot, result, duration)
@@ -534,6 +597,11 @@ actor AssistantDecisionQueue {
     }
 
     func remove(sessionID: String) {
+        if pending.contains(where: {
+            $0.snapshot.input.sessionID == sessionID && $0.snapshot.input.id == classifyingInputID
+        }) {
+            classification?.cancel()
+        }
         pending.removeAll { $0.snapshot.input.sessionID == sessionID }
     }
 
@@ -542,6 +610,7 @@ actor AssistantDecisionQueue {
         pending.removeAll()
         let active = worker
         active?.cancel()
+        classification?.cancel()
         await active?.value
         cancelling = false
     }

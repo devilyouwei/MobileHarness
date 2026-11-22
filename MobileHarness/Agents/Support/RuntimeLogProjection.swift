@@ -132,31 +132,6 @@ extension ActionExecutionRecord.Phase {
     }
 }
 
-extension SignalTraceRecord.Phase {
-    func displayTitle(language: AppLanguage) -> String {
-        switch self {
-        case .delivering: language.text("Delivering")
-        case .accepted: language.text("Accepted")
-        case .partial: language.text("Partially accepted")
-        case .rejected: language.text("Rejected")
-        case .suppressed: language.text("Suppressed")
-        case .dropped: language.text("Dropped")
-        case .unobserved: language.text("No subscriber")
-        }
-    }
-}
-
-extension AgentTaskSignal.Kind {
-    func logTitle(language: AppLanguage) -> String {
-        switch self {
-        case .request: language.text("Task delegation")
-        case .input: language.text("Follow-up input")
-        case .progress: language.text("Task progress")
-        case .result: language.text("Task result")
-        case .cancel: language.text("Cancellation request")
-        }
-    }
-}
 extension AgentLifecycle {
     func logTitle(language: AppLanguage) -> String {
         switch self {

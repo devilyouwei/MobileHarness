@@ -97,15 +97,11 @@ extension CameraActions {
         doc:
             "Close the Camera window directly and clear temporary photos after joining capture cleanup. Save or discard pending video explicitly first.",
         parameters: [], timeout: .seconds(60))
-    public static func close(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws
-        -> String
-    {
+    public static func close(invocation: any FunctionInput, using camera: any CameraControlCapability) async throws {
         try Task.checkCancellation()
         try ActionArguments(invocation.call.parameters).validateAllowedKeys([])
         try await camera.setEnabled(false, invocation: invocation)
         try Task.checkCancellation()
-        return String(
-            decoding: try JSONEncoder().encode(CameraCommandReceipt(operation: "close", enabled: false)), as: UTF8.self)
     }
 
     @Action(

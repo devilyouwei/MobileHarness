@@ -2,9 +2,9 @@
 
 | 文件 | 职责 |
 | --- | --- |
-| [evaluate_qwen.py](evaluate_qwen.py) | 按多轮 case 直接调用模型，提供合成动作反馈；支持配置中的云端、Apple 或 Core AI 文本后端 |
+| [evaluate_qwen.py](evaluate_qwen.py) | 按多轮 case 直接调用模型，提供合成动作反馈（含与 App 一致的 state 控制规则：只读、note、无返回写入）；支持配置中的云端、Apple 或 Core AI 文本后端 |
 | [workflow_scoring.py](workflow_scoring.py) | XML动作解析、顺序/参数/Skill状态与表情等评分 |
-| [assistant-evaluation.json](assistant-evaluation.json) | 实验提示词与动作目录；不使用 App 的注册/执行链路 |
+| [assistant-evaluation.json](assistant-evaluation.json) | 实验提示词（含生产 Controls.md 冻结副本及其哈希）与动作目录；不使用 App 的注册/执行链路 |
 | [evaluate_prompts.py](evaluate_prompts.py) | 显式 system prompt 矩阵的原始回答与计时；语义质量需单独评审 |
 | [compare_qwen_protocols.py](compare_qwen_protocols.py) | 云端 XML/native/mixed 协议对照，使用合成函数反馈 |
 | [evaluate_wait.py](evaluate_wait.py) | wait 作用域/延时提示词评估：单轮请求，严格解析后在主轨道/Channel 时间线模拟上断言先后、并行与间隔 |

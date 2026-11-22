@@ -1,11 +1,12 @@
 {
-  "version": 11,
+  "version": 12,
   "category": "perception",
   "id": "applicationControl",
   "description": "I own application settings, provider and model-resource configuration, device administration and diagnostic presentation through supported application interfaces.",
-  "baseSkills": [
+  "skills": [
     "application-control"
   ],
+  "states": [],
   "signals": {
     "requests": [
       "agent.task.v1"

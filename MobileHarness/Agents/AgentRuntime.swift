@@ -198,7 +198,7 @@ import StorageFiles
                     sessionID: historySessionID, uiHistory: historyUI,
                     beforeNewConversation: {
                         if try await assistantContext.snapshot().state.skillState?.activeTaskID != nil {
-                            try await assistantControl.finishForegroundTask(
+                            try await assistantControl.clearForegroundTask(
                                 summary: "The user started a new conversation and ended the current goal.",
                                 sessionID: applicationControlSessionID)
                         }
@@ -246,6 +246,14 @@ import StorageFiles
                         if case .transcript(let text, true)? = input.payload.perception {
                             try await business.observeTranscript(text, input.sessionID)
                         }
+                    },
+                    publicationSettled: { input, delivered, rejected in
+                        guard input.metadata.source == AgentID.speechPerception.rawValue,
+                            case .transcript(_, final: true)? = input.payload.perception,
+                            !delivered.contains(.assistant)
+                        else { return }
+                        await assistantControl.speechPublicationFailed(
+                            input, reason: rejected[.assistant] ?? "Assistant did not receive the transcript")
                     }, sink: { await business.output($0.actionObservation) })
                 return AgentExecutionBinding(configuration: configuration) { facilities in
                     try AgentRuntime(
@@ -357,6 +365,7 @@ import StorageFiles
                 modelName: modelName,
                 context: assistantContext, language: language)
             assistantControl.bind(main)
+            log?.provideStateVariables { await main.stateVariables() }
             let interaction = AssistantExecutionSession(
                 agent: main, manager: manager, output: gateway, speech: speechOutput,
                 report: { message in
@@ -378,12 +387,6 @@ import StorageFiles
             let interaction = interaction
             let main = interaction.agent
             let gateway = output
-            activity.startTasks(
-                observe: { try await input.observeTasks() },
-                taskContent: { signal in
-                    guard let content = try? AgentTaskContent.decode(signal) else { return ("", false) }
-                    return (String(content.text.prefix(256)), content.stage == .waitingUser)
-                })
             activity.startAgents {
                 var values: [(String, AgentLifecycle)] = []
                 for descriptor in await manager.descriptors() {
@@ -393,38 +396,10 @@ import StorageFiles
                 }
                 return values
             }
-            skillObservation = Task { [activity] in
-                var previous: [String: String] = [:]
+            skillObservation = Task {
                 for await skills in main.skillUpdates {
                     guard !Task.isCancelled else { return }
                     await interaction.presentTaskState(skills)
-                    for task in skills.tasks {
-                        let marker = task.status + task.skills.joined(separator: ",") + (task.failure ?? "")
-                        guard previous[task.id] != marker else { continue }
-                        previous[task.id] = marker
-                        let phase: TaskLogItem.Phase
-                        switch task.status {
-                        case "waitingUser": phase = .waitingUser
-                        case "completed": phase = .succeeded
-                        case "cancelled": phase = .cancelled
-                        case "failed", "interrupted": phase = .failed
-                        default: phase = .running
-                        }
-                        var item = TaskLogItem(
-                            id: task.id, parentID: nil, requester: "", executor: "assistant", title: task.goal,
-                            phase: phase
-                        )
-                        item.execution = "foreground"
-                        item.mode = task.mode
-                        item.skills = task.skills
-                        item.failure = task.failure
-                        activity.updateTask(
-                            item,
-                            event: .init(
-                                id: UUID().uuidString, time: task.updatedAt ?? task.date, title: task.status,
-                                detail: "Foreground task · Skills: " + task.skills.joined(separator: ",")))
-                    }
-                    previous = previous.filter { id, _ in skills.tasks.contains { $0.id == id } }
                 }
             }
 
@@ -463,7 +438,22 @@ import StorageFiles
                         recognition: $0, vad: $1, enhancement: $5, speechEnhancementEnabled: enhancementEnabled,
                         sessionID: $2, interactionSessionID: interactionSessionID,
                         residentListening: true, uiHome: uiHome, microphoneInput: $3, microphoneSpectrum: $4,
-                        speechEndpointActivity: { await assistant.speechEndpointActivity(acknowledging: $0) },
+                        speechEndpointActivity: { await assistant.speechEndpointActivity() },
+                        speechStarted: { try await assistant.speechStarted($0) },
+                        speechEnded: { id in
+                            if let id {
+                                await assistant.speechEnded(id)
+                            } else {
+                                await assistant.clearSpeechUtterances()
+                            }
+                        },
+                        speechCaptureStarted: { await assistant.speechCaptureStarted($0) },
+                        speechCaptureStopped: { await assistant.speechCaptureStopped($0) },
+                        speechWindow: { generation, capturedAt, samples, candidate in
+                            await assistant.speechWindow(
+                                generation: generation, capturedAt: capturedAt, samples: samples,
+                                onsetCandidate: candidate)
+                        },
                         speechPlayback: {
                             await speechOutput?.playbackSnapshot(sessionID: interactionSessionID) ?? .init()
                         },

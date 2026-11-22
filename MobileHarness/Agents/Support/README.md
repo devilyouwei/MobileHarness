@@ -109,4 +109,6 @@ Signal requests are bound to the live role's registered typed handler. Gateway o
 
 AgentGatewayAssembly injects the validated production request/event implementation catalogs into InputGateway. Isolated observation sessions use role-supplied receive handlers and independently assembled contracts, so test/observation Agent IDs do not select unrelated production role types. executeDirect returns only to the native caller; executeReturning preserves paired ToolResult continuation for fixed UI workflows and uses the direct value for UI reply projection only.
 
+InputGateway reports completed publication branches through the assembly-provided settlement callback, including delivered and rejected recipients; publication itself still returns admission only. The runtime uses this fact to retire failed or unobserved speech finals, without forwarding text outside Gateway or changing recipient authorization.
+
 OutputExecutionResult exposes the captured invocation for direct native callers. Output diagnostic retention is bounded by both 256 results and 32 MiB original invocation bytes, evicting oldest evidence with a counter. Durable archive references and business records remain authoritative for replay.

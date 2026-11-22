@@ -52,6 +52,8 @@ extension AssistantChatWorker {
         await stopUIInputs()
         guard lifecycle == .running else { throw HarnessError.invalidTransition }
         lifecycle = .paused
+        cancelInterruptionWait()
+        clearSpeechUtterances()
         var cancellationFailure: (any Error)?
         if State.acceptsDirectedUserInput {
             do {
@@ -88,6 +90,7 @@ extension AssistantChatWorker {
         batchTexts.removeAll()
         mergedResults.removeAll()
         coordination.removeAll()
+        interruptedInputs.removeAll()
         semanticMessages.removeAll()
         semanticAttachments.removeAll()
         blockedSessions.removeAll()
@@ -135,6 +138,8 @@ extension AssistantChatWorker {
     }
     public func stop() async {
         lifecycle = .stopped
+        cancelInterruptionWait()
+        clearSpeechUtterances()
         for reference in Array(trackedTasks.keys) { await stopTrackingTask(reference) }
         await decisionQueue.cancelAndWait()
         await inputDecision?.stop()
@@ -154,6 +159,7 @@ extension AssistantChatWorker {
         batchTexts.removeAll()
         mergedResults.removeAll()
         coordination.removeAll()
+        interruptedInputs.removeAll()
         semanticMessages.removeAll()
         semanticAttachments.removeAll()
         blockedSessions.removeAll()

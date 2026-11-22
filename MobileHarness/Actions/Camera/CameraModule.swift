@@ -62,8 +62,8 @@ public struct CameraModule: CapabilityModule {
             CameraActions.openDefinition(handler: { [camera] invocation in
                 try await CameraActions.open(invocation: invocation, using: camera)
             }),
-            CameraActions.closeDefinition(completing: { [camera] invocation in
-                .value(try await CameraActions.close(invocation: invocation, using: camera))
+            CameraActions.closeDefinition(handler: { [camera] invocation in
+                try await CameraActions.close(invocation: invocation, using: camera)
             }),
             CameraActions.flipDefinition(completing: { [camera] invocation in
                 .value(try await CameraActions.flip(invocation: invocation, using: camera))

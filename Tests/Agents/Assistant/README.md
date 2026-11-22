@@ -27,3 +27,5 @@ AgentConfigurationTests cover v10 public role metadata projected to the v8 compi
 
 
 [AssistantCommunicationFixture.swift](AssistantCommunicationFixture.swift) 提供真实 Assistant/Gateway 单请求 smoke 与确定性协议回归的合成端点；没有多 case 真实模型评估入口。
+
+InputDecisionTests 的 latest-wins 回归用可控慢清理的 Decision 替身验证取消后不重入、只推理最新候选、过时结果不打断、等待截止后超时及退出后恢复；Agent 集成验证被替代输入仍进入下一批。替身结果不证明真实 Laya/CoreAI 在真机上能响应取消。

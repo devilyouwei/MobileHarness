@@ -53,3 +53,48 @@
 - 自动化：新增 `speechOnsetPolicyRaisesOnlyTheOnsetGateDuringPlayback`、`audioFrameFloatSamplesRoundTripWithLevel`。带 speech/voice/enhancement/sound/Silero 过滤的专项运行（`/tmp/mh_speech_tests.log`）退出 0，含 123 个测试的主批次、4 个 speechWorkflow／增强用例全部通过。
 - `./scripts/check.sh` 的边界脚本、Python 测试、`swift format lint --strict`、plist 校验通过；Swift 测试 1212 项中仅 `assistantInstructionBudgetsKeepCatalogAndSafetyRules` 失败（`photography.utf8.count < 38_000`）。该失败来自工作区内他处对 BasicSkill 指令的未提交修改，不在本次改动范围，未处理。整体退出码因此为 1，不记为通过。
 - `./scripts/build-ios.sh` 退出 0（`/tmp/mh_ios.log`）：五个 iOS Simulator 目标均 BUILD SUCCEEDED，资源校验通过。真机验收（手机外放、AirPods、旁人/电视、起播窗口打断等）仍按上文矩阵待执行。
+
+## 打断后等待续说（2026-11-22）
+
+范围见[方案](../requirements/technical/Assistant-Channel-Settlement.md#打断后等待续说2026-11-22)。测试使用替身，不代表真实语音或模型效果。
+
+- 定向 Swift 测试退出 0：4 项测试通过，包含 8 种打断等待场景、3 种发布终态、动态 VAD 端点和 Action 取消结算。第二次请求实际启动时间用于检查至少 800ms，避免依赖测试任务按时唤醒。
+- `./scripts/check.sh` 最终退出 0：边界、Python 工具回归、格式检查、普通 Swift 测试和 plist 校验完成；普通批次的 1203 项及串行 LiveRuntimeTests 的 231 项通过。但 NativePresentationTests 日志在 `cameraNativeMetalDrawStopAndLayerHandoff` 开始后没有结束记录，即使脚本退出 0，也不能视该阶段为通过。此前一次检查该测试报告窗口可见性失败；初次检查还有测试时间断言和另一原生测试失败，时间断言已修正。
+- `./scripts/build-ios.sh` 退出 0：五个 Simulator scheme 均构建成功，最终 App 的 Agent/Skill、Live Activity 和本地化资源校验通过。
+- 真机全双工语音体验与真实模型验收未执行。
+
+### 停播后计时与续说空档
+
+用户反馈停止播放的耗时消耗了续说窗口。本轮改为认领打断立即建立派发屏障，取消清理成功完成后才开始 800ms；最后一个在途语句的 final 入队、空结果或失败收尾后重新计时，再次起声继续阻止派发。VAD 参数不变。
+
+- `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path . --filter 'interruptedSpeechWaitsForWindowAndFinalAdmission|interruptedSpeechCleanupCannotRearmRetiredWait|publicationSettlementReportsActualRecipients|speechBoundaryUsesCurrentEndpointDuringSilence|fullDuplexInterruptSettlesOldActionAndRetainsQueuedInput'` 退出 0：5 项测试通过，覆盖 10 种等待场景及清理期间暂停/停止两种生命周期退役。使用下一次请求的实际单调时间验证慢清理完成、最后 final、空结果及失败之后至少 800ms；覆盖再次起声、旧语句 ID、合批文本与动态端点。
+- `./scripts/check.sh` 退出 0：边界、Python 工具回归、格式与 plist 校验通过；普通 IntegrationTests 的 1204 项和 LiveRuntimeTests 的 231 项通过。本次 NativePresentationTests 的 Camera 测试通过，但日志在 `webNativeLoadsLocalJavaScriptAndCapturesVisiblePixels` 开始后没有结束记录，随后运行另一 suite；不能将该原生界面阶段视为完整通过。日志 `/tmp/mobileharness-interrupt-gap-check.log`。
+- `./scripts/build-ios.sh` 退出 0：五个 Simulator scheme 构建及 Agent/Skill、Live Activity、本地化资源校验通过。日志 `/tmp/mobileharness-interrupt-gap-ios.log`。
+- `git diff --check` 通过。未执行真实模型或真机语音验收；800ms 之外的用户停顿仍可能触发回复，有限空档不保证任意长停顿都不抢答。
+
+### 续说窗口扩大至 1200ms
+
+在保留清理后计时、起声后的 ASR 等待及原有 VAD 规则的基础上，将打断后和最后语句收尾后的空档均从 800ms 改为 1200ms。
+
+- `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path . --filter 'interruptedSpeechWaitsForWindowAndFinalAdmission|interruptedSpeechCleanupCannotRearmRetiredWait|speechBoundaryUsesCurrentEndpointDuringSilence|fullDuplexInterruptSettlesOldActionAndRetainsQueuedInput'` 退出 0：4 项测试通过，参数化覆盖无语音、在途语音、续说 final 合批、失败、慢清理及生命周期退役，并以实际派发时间验证至少 1200ms。
+- `./scripts/check.sh` 退出 0：边界、格式、工具回归和 plist 检查完成；普通 IntegrationTests 的 1206 项、LiveRuntimeTests 的 231 项通过。但 NativePresentationTests 中 `cameraNativeMetalDrawStopAndLayerHandoff` 报窗口可见性失败，且日志在 Web 原生测试开始后没有该 suite 的结束记录，不能将原生阶段视为通过。日志 `/tmp/mobileharness-interrupt-1200-check.log`。
+- `./scripts/build-ios.sh` 退出 0：五个 Simulator scheme 构建成功，App 资源校验通过；`git diff --check` 通过。
+- 未执行真实模型或真机语音验收。窗口依赖 VAD 确认起声通知；窗口边界的音频处理延迟竞态未由单纯延长时长解决。
+
+### Decision 最新候选优先
+
+按[需求](../requirements/technical/Assistant-Channel-Settlement.md#decision-最新候选优先2026-11-22)实现 latest-wins：新候选取消旧分类，只推理最新待处理候选；旧候选以 superseded 结算，普通输入不丢弃。原生 worker 仍由 AssistantInputDecision 持有，后继在自己的截止时间内等真实清理结束，不重入；清理等待超时仍明确失败。日志将被替代与失败分开呈现。
+
+- `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path . --filter 'latestDecision|independentDecisionQueueBoundsAndJoinsCancellation|twoInterruptSignalsForOneReplyCancelOnlyOnceAndKeepBothInputs|supersededDecisionIsNeitherModelSuccessNorFailure|runtimeLogDecisionRetentionSortingAndFiltering'` 退出 0：7 项测试通过。覆盖非即时清理、原生取消、跳过中间候选、旧结果不发信号、输入保留、直接尝试替代/取消、会话关闭、32 条结算容量、等待超时和恢复，以及被替代记录不落入成功或失败筛选。日志 `/tmp/mobileharness-decision-latest-final-targeted.log`。此前本地化符号生成发现大小写键冲突，改为独立标题键后复测通过。
+- `./scripts/check.sh` 退出 0：边界、工具回归、格式与 plist 检查通过；普通 IntegrationTests 1209 项、LiveRuntimeTests 232 项通过。但 NativePresentationTests 在 `cameraNativeMetalDrawStopAndLayerHandoff` 开始后没有结束记录，随即开始其他测试运行；不记为原生界面阶段通过。日志 `/tmp/mobileharness-decision-latest-final-check.log`。
+- `./scripts/build-ios.sh` 退出 0：五个 Simulator scheme 构建成功，Agent/Skill、Live Activity 和中英本地化资源验证通过。日志 `/tmp/mobileharness-decision-latest-ios.log`。
+- `git diff --check` 通过。未执行真实 Laya 推理、真机安装或语音验收；可控替身不证明 CoreAI 原生调用会响应取消。本次不强制终止或卸载在途原生工作，不能声称已修复用户报告的持续 10–30 秒清理不退出。
+
+### 打断后 40 个语音窗口
+
+打断清理完成后，一次性观察 40 个 512 样本的 VAD 窗口；已确认或新确认人声后等待该语句正常端点和 final 实际入队，随后直接放行，不重新等待。第 40 窗存在起声候选时继续判定；清理前音频、旧采集代与旧语句不能释放屏障。采集不可用或 10 秒观察未推进明确报告失败。正常起声与端点参数不变。
+
+- `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path . --filter 'nativeSpeechReportsVADWindowsWithCaptureTimeAndGeneration|interruptedSpeechWaitsForWindowAndFinalAdmission|interruptedSpeechCleanupCannotRearmRetiredWait|speechVADReportsCandidateAndWindowOffsetAcrossPartialFrames|coldVADAndASRPreserveRecordedPrefixAndJoinLiveAudioInOrder'` 退出 0：5 项测试通过；覆盖 39/40 窗、边界候选确认/消退、提前和清理期间起声、多个语句、空值/投递失败、采集关闭、旧代/旧时间、暂停/停止、部分窗口偏移及原生采集替身到 VAD 的窗口元数据。断言最终放行在 1 秒内，不会额外等待 1200ms。日志 `/tmp/mobileharness-speech-window-targeted.log`。
+- `./scripts/check.sh` 退出 0：边界、格式、工具回归和 plist 通过；普通 IntegrationTests 1211 项、LiveRuntimeTests 232 项通过。NativePresentationTests 中 `cameraNativeMetalDrawStopAndLayerHandoff` 报窗口可见性失败，之后 Web 原生测试没有完整 suite 结束记录，不能视为完整通过。日志 `/tmp/mobileharness-speech-window-check.log`。完整检查发生在新增上述 1 秒断言之前，该断言由随后定向测试验证。
+- `./scripts/build-ios.sh` 退出 0：五个 Simulator scheme 构建成功，资源检查通过。日志 `/tmp/mobileharness-speech-window-ios.log`。
+- 未执行真实模型或真机语音体验验收。窗口按 PlatformKit 提供的 `capturedAt` 判别，原生 VPIO 路径目前使用音频回调时刻而非直接使用硬件帧起点；采集回调延迟及跨清理边界的缓冲区可能影响窗口边界，替身的精确时间戳测试不能证明物理设备上的采集时间精度。

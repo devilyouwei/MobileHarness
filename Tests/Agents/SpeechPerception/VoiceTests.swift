@@ -469,7 +469,52 @@ private actor EndpointVADSession: VoiceActivitySession {
     func cancel() {}
 }
 
-@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: ["idle", "active", "interrupted"])
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func nativeSpeechReportsVADWindowsWithCaptureTimeAndGeneration() async throws {
+    let root = UUID().uuidString
+    let captureSession = UUID().uuidString
+    let microphone = NativeMicrophoneFixture()
+    let generations = Mutex<[UUID]>([])
+    let windows = Mutex<[(UUID, ContinuousClock.Instant, Int, Bool)]>([])
+    let speech = try SpeechPerceptionAgent(
+        recognition: RecognitionFixture(text: "hello", includeFinal: true), vad: EndpointVAD(), sessionID: root,
+        interactionSessionID: root, residentListening: true, microphoneInput: microphone,
+        speechCaptureStarted: { generation in generations.withLock { $0.append(generation) } },
+        speechWindow: { generation, capturedAt, samples, candidate in
+            windows.withLock { $0.append((generation, capturedAt, samples, candidate)) }
+        },
+        speechDetection: { (16, 0.5) },
+        context: try AgentContextRepository(
+            agent: .speechPerception, scope: UUID().uuidString, state: SpeechPerceptionContextState()))
+    try await speech.start()
+    try await speech.receive(ListeningIntent(enabled: true).input(sessionID: root))
+    try await speech.openCapture(sessionID: captureSession)
+    try await speech.startInput(sessionID: captureSession)
+    let origin = ContinuousClock.now
+    for sequence: UInt64 in 0..<21 {
+        let timestamp = Double(sequence) * 0.064
+        try microphone.capture.send(
+            MicrophoneFrame(
+                samples: [Float](repeating: 0, count: 1024), sampleRate: 16000, sequence: sequence,
+                timestamp: timestamp, capturedAt: origin.advanced(by: .seconds(timestamp))))
+    }
+    for _ in 0..<1000 {
+        if windows.withLock({ $0.count }) >= 40 { break }
+        try await Task.sleep(for: .milliseconds(2))
+    }
+    let observed = windows.withLock { $0 }
+    let generation = try #require(generations.withLock { $0.first })
+    #expect(observed.count >= 40)
+    #expect(observed.prefix(40).allSatisfy { $0.0 == generation && $0.2 == 512 })
+    #expect(observed.first?.3 == true)
+    let first = try #require(observed.first?.1)
+    #expect(origin.duration(to: first) > .milliseconds(-2))
+    #expect(origin.duration(to: first) < .milliseconds(2))
+    await speech.closeCapture()
+    await speech.stop()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: ["idle", "active"])
 func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop(profile: String) async throws {
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
@@ -477,21 +522,15 @@ func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop(profile: String) async t
     let session = UUID().uuidString
     let manager = AgentManager()
     let assistant = ObservationRecorder(id: "assistant")
-    let interruptionID: UUID? = profile == "interrupted" ? UUID() : nil
-    let activity = Mutex((pending: interruptionID, acknowledgements: [UUID]()))
+    let speechStarts = Mutex<[String]>([])
+    let speechEnds = Mutex<[String?]>([])
     let context = try AgentContextRepository(
         agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString, state: SpeechPerceptionContextState())
     let speech = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "你好", includeFinal: true), vad: EndpointVAD(), sessionID: session,
-        speechEndpointActivity: { id in
-            activity.withLock { state in
-                if let id, id == state.pending {
-                    state.pending = nil
-                    state.acknowledgements.append(id)
-                }
-                return (profile != "idle", state.pending)
-            }
-        },
+        speechEndpointActivity: { profile == "active" },
+        speechStarted: { id in speechStarts.withLock { $0.append(id) } },
+        speechEnded: { id in speechEnds.withLock { $0.append(id) } },
         speechDetection: { (3, 0.5) },
         context: context)
     try await manager.register(assistant, sessionID: session)
@@ -552,7 +591,6 @@ func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop(profile: String) async t
         try await processMicrophoneFixture(
             .init(id: UUID().uuidString, sessionID: session, payload: .audio(remaining)), using: speech)
     }
-    #expect(activity.withLock { $0.acknowledgements } == [interruptionID].compactMap { $0 })
     for _ in 0..<10000 {
         if await assistant.inputs.contains(where: {
             if case .transcript(_, final: true)? = $0.payload.perception { return true }
@@ -577,11 +615,14 @@ func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop(profile: String) async t
         #expect(event.perception == .transcript("你好", final: true))
         #expect(value.metadata.topic == PerceptionMessage.userInputTopic)
         #expect(value.turn?.ordinal == 1)
+        #expect(speechStarts.withLock { $0 } == [value.turn?.id].compactMap { $0 })
+        #expect(speechEnds.withLock { $0 }.isEmpty)
     } else {
         Issue.record("Missing final observation")
     }
     try await speech.resumeListening()
     await speech.stop()
+    #expect(speechEnds.withLock { $0.count } == 1)
     try await outputTask.value
     let displayed = await captions.displayedText
     #expect(displayed.contains("partial"))
@@ -805,6 +846,28 @@ func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop(profile: String) async t
             if case .end(.silence) = $0 { return true }
             return false
         })
+}
+
+@Test func speechVADReportsCandidateAndWindowOffsetAcrossPartialFrames() async throws {
+    let segmenter = VoiceActivitySegmenter(session: EndpointVADSession())
+    let format = try ModelKit.AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32)
+    func frame(_ sequence: UInt64, _ count: Int) throws -> ModelKit.AudioFrame {
+        try .init(
+            data: Data(repeating: 0, count: count * 4), format: format,
+            sequence: sequence, timestamp: Double(sequence) / 16000)
+    }
+    let partial = try await segmenter.process(frame(0, 256), threshold: 0.5, onsetWindows: 3)
+    #expect(partial.windows.isEmpty)
+    let first = try await segmenter.process(frame(256, 256), threshold: 0.5, onsetWindows: 3)
+    #expect(first.windows.count == 1)
+    #expect(first.windows.first?.offset == -256)
+    #expect(first.windows.first?.sampleCount == 512)
+    #expect(first.windows.first?.onsetCandidate == true)
+    _ = try await segmenter.process(frame(512, 512), threshold: 0.5, onsetWindows: 3)
+    let onset = try await segmenter.process(frame(1024, 512), threshold: 0.5, onsetWindows: 3)
+    #expect(onset.isSpeaking)
+    #expect(onset.windows.first?.onsetCandidate == false)
+    await segmenter.cancel()
 }
 
 @Test(arguments: [false, true])

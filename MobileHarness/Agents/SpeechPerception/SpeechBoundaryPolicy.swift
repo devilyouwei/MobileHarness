@@ -15,6 +15,7 @@ struct SpeechBoundaryPolicy {
     private var preRoll: [AudioFrame] = []
     private var holdback: [AudioFrame] = []
     private var candidate = 0
+    var hasOnsetCandidate: Bool { !isSpeaking && candidate > 0 }
     private var silentWindows = 0
     private var duration = 0
     private var hasSpeech = false

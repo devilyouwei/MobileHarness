@@ -1,10 +1,27 @@
 {
-  "version": 11,
+  "version": 12,
   "category": "cognition",
   "id": "assistant",
   "description": "I handle user conversation, understand goals, coordinate available capabilities and report actual results clearly. I own my foreground goals and respect other Agents' private contexts.",
-  "baseSkills": [
+  "skills": [
     "basic-interaction"
+  ],
+  "states": [
+    {
+      "name": "task",
+      "kind": "semantic",
+      "access": "readWrite",
+      "type": "text",
+      "meaning": "The goal you are carrying across turns. Set it when a goal needs several turns; clear it with a summary when the goal is done or dropped. Set it only for an explicit, purposeful instruction from the user, never after an Action result; after finishing, only clear it.",
+      "trigger": "task"
+    },
+    {
+      "name": "quiet",
+      "kind": "typed",
+      "access": "readOnly",
+      "type": "bool",
+      "meaning": "When true the user asked you to stay silent: do not speak or announce on your own."
+    }
   ],
   "signals": {
     "requests": [],

@@ -246,7 +246,7 @@ private actor InteractionPresentation: ResourcePresentationCapability {
     }
     let first = try await context.snapshot(session: session, names: ["agents.applicationcontrol"])
     let json = try #require(JSONSerialization.jsonObject(with: Data(first.utf8)) as? [String: [String: Any]])
-    let value = try #require(json["agents.applicationcontrol"]?["value"] as? [String: Any])
+    let value = try #require(json["agents.applicationcontrol"])
     #expect(value["scene"] as? String == "active" && value["sceneSequence"] as? Int == 2)
     #expect(value["modelPreparation"] as? String == "idle")
     #expect(!first.contains("private-business-detail") && !first.contains(session) && first.utf8.count < 1024)

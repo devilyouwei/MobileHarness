@@ -50,7 +50,7 @@ Agents packages Agents/, Skills/ and Catalog.json, including the [Assistant inpu
 
 ## 职责与组织
 
-随 App 打包的 Agent 与 Skill 配置由 Catalog.json 显式索引。Agents 保存 v11 身份、静态类别、角色自有公开 description、私有角色指令、通信契约和 baseSkills。共享协议由 Agents 按固定资源路径读取。Skills 保存 v3 配置、revision、可选的角色归属、流程说明和函数引用。Task 目标作为运行时数据。
+随 App 打包的 Agent 与 Skill 配置由 Catalog.json 显式索引。Agents 保存 v12 身份、静态类别、角色自有公开 description、私有角色指令、通信契约、初始 skills 和预设变量 states。共享协议由 Agents 按固定资源路径读取。Skills 保存 v3 配置、revision、可选的角色归属、流程说明和函数引用。目标作为运行时变量 `task`。
 
 Actions 独立提供函数实现，FunctionContracts 提供中立元数据。Catalog 是 Agent 与 Skill 定义的唯一索引。
 
@@ -64,7 +64,7 @@ Assistant 配置声明基础交互 Skill，前台任务和交互链按需要加�
 
 ## 泛化 Task 与独立 Skill
 
-Agent resources declare baseSkills and communication permissions. Skill assets retain reusable instruction/function bindings. Delegation sends the runtime goal and original input to the receiving role.
+Agent resources declare skills, states and communication permissions. Skill assets retain reusable instruction/function bindings. Delegation sends the runtime goal and original input to the receiving role.
 
 资源叶目录说明收拢到 [Agents](Agents/README.md) 与 [Skills](Skills/README.md)，不再为每个 Agent/Skill 放置开发 README；Skill 注册与运行时教学保留在各自目录。
 
@@ -76,11 +76,11 @@ RobotInteraction instructions teach Channel/wait ordering and explicit resource 
 
 ## Agent → Skill → Function registration
 
-Agent.json references baseSkills; Skill.json alone registers model Actions/Tools. Controls belong to the owning Agent (`Controls.json` declarations and `Controls.md` guide), never to Skills. BasicInteraction owns expression and listening Actions, window rules and automatic State selection. Role instructions retain identity/responsibility/style. Business roles reuse existing Skills; internal trusted bindings remain separate. Historical snapshots are preserved.
+Agent.json references `skills` and declares `states`; Skill.json alone registers model Actions/Tools. Controls belong to the owning Agent (`Controls.json` declarations and `Controls.md` guide), never to Skills. BasicInteraction owns expression and listening Actions, window rules and automatic State selection. Role instructions retain identity/responsibility/style. Business roles reuse existing Skills; internal trusted bindings remain separate. Historical snapshots are preserved.
 
 ```mermaid
 flowchart TB
- A[Agent.json: identity and baseSkills] --> S[Skill.json: Action / Tool bindings]
+ A[Agent.json: identity, skills and states] --> S[Skill.json: Action / Tool bindings]
  S --> L[Skill loader: dependency / conflict validation]
  M[Action-owned function metadata] --> L
  C[Skill Instructions: procedures and examples] --> P[Request context builder]

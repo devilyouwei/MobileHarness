@@ -333,10 +333,38 @@ public struct HistoryToolCall: Codable, Sendable, Identifiable {
 public struct HistoryInputCoordination: Codable, Sendable {
     public let source: String
     public let capturedAt: String
-    public let decision: String?
+    /// Whether this input interrupted the reply in progress; nil when no valid decision was made.
+    public let interrupt: Bool?
     public let route: String?
     public let batchID: String?
     public let memberIDs: [String]?
+
+    private enum CodingKeys: String, CodingKey {
+        case source, capturedAt, interrupt, decision, route, batchID, memberIDs
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        source = try container.decode(String.self, forKey: .source)
+        capturedAt = try container.decode(String.self, forKey: .capturedAt)
+        // Earlier records stored the model result as the string `decision`.
+        interrupt =
+            try container.decodeIfPresent(Bool.self, forKey: .interrupt)
+            ?? container.decodeIfPresent(String.self, forKey: .decision).map { $0 == "true" || $0 == "interrupt" }
+        route = try container.decodeIfPresent(String.self, forKey: .route)
+        batchID = try container.decodeIfPresent(String.self, forKey: .batchID)
+        memberIDs = try container.decodeIfPresent([String].self, forKey: .memberIDs)
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(source, forKey: .source)
+        try container.encode(capturedAt, forKey: .capturedAt)
+        try container.encodeIfPresent(interrupt, forKey: .interrupt)
+        try container.encodeIfPresent(route, forKey: .route)
+        try container.encodeIfPresent(batchID, forKey: .batchID)
+        try container.encodeIfPresent(memberIDs, forKey: .memberIDs)
+    }
 }
 
 public struct HistoryTurn: Codable, Sendable, Identifiable {

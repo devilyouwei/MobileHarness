@@ -69,7 +69,7 @@ extension SQLiteAssistantMessageRepository {
         if previous == nil {
             guard
                 try String.fetchOne(db, sql: "SELECT end_reason FROM assistant_tasks WHERE id=?", arguments: [task])
-                    != "task.end"
+                    != "state.clear"
             else { throw RecordStorageError.conflict }
             try db.execute(sql: "UPDATE assistant_messages SET task_id=? WHERE id=?", arguments: [task, message])
             try SQLiteAssistantTaskRepository.invalidateAssistantSummary(task, db: db)

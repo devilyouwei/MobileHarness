@@ -9,7 +9,6 @@ import Foundation
         @Environment(\.locale) private var appCopyLocale
         private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         @Bindable private var state: RuntimeLogState
-        @State private var taskPath: [String] = []
         public init(state: RuntimeLogState) {
             self.state = state
         }
@@ -86,7 +85,7 @@ import Foundation
                 }
             }
             .sheet(isPresented: $state.showsExecutionHistory) {
-                NavigationStack(path: $taskPath) {
+                NavigationStack {
                     VStack(spacing: 0) {
                         Picker("Record type", selection: $state.selectedTab) {
                             ForEach(ExecutionLogTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
@@ -111,18 +110,15 @@ import Foundation
                         Picker("Status", selection: $state.selectedFilter) {
                             ForEach(ExecutionLogFilter.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                         }.pickerStyle(.segmented).padding(.horizontal).padding(.bottom, 8)
-                        if let taskID = state.selectedTaskID,
-                            state.selectedTab == .action
-                        {
-                            HStack {
-                                Text("Task: " + taskID).font(.caption)
-                                Spacer()
-                                Button("Show all") { state.selectedTaskID = nil }
-                            }.padding(.horizontal).padding(.bottom, 8)
-                        }
                         List { logRows }
+                            .task(id: state.selectedTab == .state && state.showsExecutionHistory) {
+                                guard state.selectedTab == .state else { return }
+                                while !Task.isCancelled {
+                                    await state.refreshStateVariables()
+                                    try? await Task.sleep(for: .seconds(2))
+                                }
+                            }
                     }
-                    .navigationDestination(for: String.self) { taskDetail($0) }
                     .navigationTitle(appCopy.text("Execution Log"))
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
@@ -144,29 +140,6 @@ import Foundation
                 if !finished.isEmpty { Section("Recent results") { ForEach(finished.reversed()) { historyRow($0) } } }
                 if state.visibleActions.isEmpty { emptyRow("No matching actions") }
                 retention(state.evictedCount)
-            case .task:
-                ForEach(state.visibleTasks.reversed()) { task in
-                    NavigationLink(value: task.id) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(task.title.isEmpty ? "Task " + task.id : task.title)
-                                .lineLimit(2)
-                            Text(
-                                task.execution == nil
-                                    ? task.requester + " → " + task.executor
-                                    : (task.execution == "background" ? "Background task" : "Foreground task") + " · "
-                                        + task.executor
-                            ).font(.caption).foregroundStyle(.secondary)
-                            Text(task.phase.rawValue).font(.subheadline).foregroundStyle(
-                                task.phase == .failed ? .orange : .secondary)
-                            if !task.skills.isEmpty {
-                                Text("Skills: " + task.skills.joined(separator: ", ")).font(.caption).foregroundStyle(
-                                    .secondary)
-                            }
-                        }.padding(.vertical, 4)
-                    }
-                }
-                if state.visibleTasks.isEmpty { emptyRow("No matching tasks") }
-                retention(state.taskEvictions)
             case .agent:
                 let issues = state.runtimeIssues.filter {
                     state.matchesSource([$0.source])
@@ -204,7 +177,7 @@ import Foundation
                                 + (decision.signalStatus.map { appCopy.text($0) } ?? decision.adoptedResult.rawValue)
                         )
                         .foregroundStyle(
-                            decision.modelResult == nil && decision.booleanResult == nil ? .orange : .primary)
+                            decision.isFailure ? .orange : .primary)
                         Text(
                             appCopy.text("Model result") + " · "
                                 + (decision.booleanResult.map { $0 ? "true" : "false" } ?? decision.modelResult?
@@ -240,73 +213,44 @@ import Foundation
                 }
                 if state.visibleDecisions.isEmpty { emptyRow("No matching Decision records") }
                 retention(state.decisionEvictions)
+            case .state:
+                Section("Agent state") {
+                    ForEach(state.stateVariables.filter(\.isAgentOwned)) { stateVariableRow($0) }
+                }
+                Section("Skill state") {
+                    ForEach(state.stateVariables.filter { !$0.isAgentOwned }) { stateVariableRow($0) }
+                    if !state.stateVariables.contains(where: { !$0.isAgentOwned }) { emptyRow("No Skill state loaded") }
+                }
+            }
+        }
+        @ViewBuilder private func stateVariableRow(_ variable: StateVariableItem) -> some View {
+            if let value = variable.value {
+                DisclosureGroup {
+                    Text(value).font(.callout.monospaced()).textSelection(.enabled)
+                    if let writtenAt = variable.writtenAt {
+                        Text(writtenAt, format: .dateTime.month().day().hour().minute().second())
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                } label: {
+                    stateVariableLabel(variable)
+                }
+                .accessibilityIdentifier("runtimeLog.variable." + variable.path)
+            } else {
+                stateVariableLabel(variable).foregroundStyle(.tertiary)
+                    .accessibilityIdentifier("runtimeLog.variable." + variable.path)
+            }
+        }
+        private func stateVariableLabel(_ variable: StateVariableItem) -> some View {
+            HStack {
+                Text(variable.path).font(.body.weight(.medium)).lineLimit(1).truncationMode(.middle)
+                Spacer()
+                Text(appCopy.text(variable.category.rawValue)).font(.caption).foregroundStyle(.secondary)
             }
         }
         private func emptyRow(_ title: String) -> some View { Text(title).foregroundStyle(.secondary) }
         @ViewBuilder private func retention(_ count: UInt64) -> some View {
             if count > 0 { Text("Removed \(count) older records").font(.footnote).foregroundStyle(.secondary) }
         }
-        @ViewBuilder private func taskDetail(_ id: String) -> some View {
-            if let task = state.tasks.first(where: { $0.id == id }) {
-                List {
-                    Section("Task") {
-                        Text(task.title)
-                        Text(
-                            task.execution == nil
-                                ? task.requester + " → " + task.executor
-                                : (task.execution == "background" ? "Background task" : "Foreground task") + " · "
-                                    + task.executor)
-                        Text(task.phase.rawValue)
-                        if !task.skills.isEmpty { Text("Skills: " + task.skills.joined(separator: ", ")) }
-                        if let parentID = task.parentID {
-                            Text("Parent task / input: " + parentID).font(.caption).textSelection(.enabled)
-                        }
-                    }
-                    if task.phase == .failed {
-                        Section("Failure reason") {
-                            Text(
-                                task.failure
-                                    ?? "This record has no retained cause. Check related Actions and the Agent records in Settings."
-                            )
-                            .textSelection(.enabled)
-                        }
-                    }
-                    Section("Timeline") {
-                        ForEach(task.events) { event in
-                            HStack(alignment: .top, spacing: 12) {
-                                Image(systemName: "circle.fill").font(.caption2).foregroundStyle(.blue).padding(.top, 5)
-                                VStack(alignment: .leading, spacing: 5) {
-                                    Text(event.title)
-                                    if !event.detail.isEmpty {
-                                        Text(event.detail).font(.subheadline).textSelection(.enabled)
-                                    }
-                                    Text(event.time, style: .time).font(.caption).foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                        if task.evictedEvents > 0 {
-                            Text("Removed \(task.evictedEvents) older events").font(.caption).foregroundStyle(
-                                .secondary)
-                        }
-                    }
-                    Section("Related records") {
-                        Button("View Actions") { showTaskActions(id) }
-
-                    }
-                }.navigationTitle("Task details")
-            } else {
-                Text("This task record is no longer retained")
-            }
-        }
-        private func showTaskActions(_ task: String) {
-            taskPath.removeAll()
-            state.selectedTaskID = task
-            state.selectedTab = .action
-            state.selectedFilter = .all
-            state.selectedSource = "All"
-            state.selectedChannel = nil
-        }
-
         private var channelFilter: some View {
             Menu {
                 Picker("Channel", selection: $state.selectedChannel) {

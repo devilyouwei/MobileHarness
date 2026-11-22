@@ -202,7 +202,10 @@ extension AssistantChatWorker {
                 if closesSession {
                     if decisionTurn?.sessionID == input.sessionID { decisionTurn = nil }
                     peerNotices.removeAll { $0.input.sessionID == input.sessionID }
-                    if input.sessionID == speechSessionID { speechInterruptionID = nil }
+                    if input.sessionID == speechSessionID {
+                        cancelInterruptionWait()
+                        clearSpeechUtterances()
+                    }
                 }
                 guard !hostCancellationInProgress else { throw HarnessError.invalidTransition }
                 hostCancellationInProgress = true
@@ -491,6 +494,11 @@ extension AssistantChatWorker {
             }
         }
         if fullDuplex { await publishInputQueue() }
+        if input.sessionID == speechSessionID, case .transcript(_, final: true)? = input.payload.perception,
+            let turn = input.turn
+        {
+            speechEnded(turn.id)
+        }
         if lifecycle == .running { drain() }
     }
 
@@ -644,7 +652,8 @@ extension AssistantChatWorker {
             let excluded = Set(
                 queue.inputs.filter { queued in
                     !settlements.contains(queued.id)
-                        && (waitingForSettlement || blockedSessions.contains(queued.sessionID))
+                        && (waitingForSettlement || blockedSessions.contains(queued.sessionID)
+                            || (queued.sessionID == speechSessionID && interruptionWait != nil))
                 }.map(\.id))
             guard let entry = queue.take(excluding: excluded) else { return }
             let input = entry.input
@@ -703,8 +712,12 @@ extension AssistantChatWorker {
                 return
             }
         }
-        if lifecycle == .running, !peerNotices.isEmpty {
-            let notice = peerNotices.removeFirst()
+        if lifecycle == .running,
+            let index = peerNotices.firstIndex(where: {
+                interruptionWait == nil || $0.input.sessionID != speechSessionID
+            })
+        {
+            let notice = peerNotices.remove(at: index)
             activePeerTaskNoticeID = notice.input.id
             activeInput = notice.input
             worker = Task { await playPeerTaskNotice(notice) }

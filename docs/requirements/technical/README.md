@@ -106,6 +106,7 @@ Completed scope: [可读预览编号与合并图片输入](../../completed/Reada
 - [Apple system LLM](Apple-System-LLM.md)：独立 FoundationModels ChatCapability 适配器与验证边界。
 
 - [Decision 执行日志修复](Decision-Log-Presentation.md)：模型身份、模型结果与最终采用结果的独立展示及验证。
+- [打断决策记录与对话历史本地化](Interrupt-Decision-Presentation.md)：以布尔 interrupt 取代字符串决策、被打断请求状态及历史页文案本地化。
 
 - [D3 iOS AOT delivery](D3-iOS-AOT-Delivery.md): compiled artifact publishing and architecture-aware acquisition.
 

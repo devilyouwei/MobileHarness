@@ -77,11 +77,36 @@
             outputTask = Task {
                 do {
                     try await IndependentOutputWorkflow.consumeSignals(value.outputs) { envelope in
-                        do { _ = try await consumer.execute(envelope) } catch is CancellationError {
+                        do {
+                            let result = try await consumer.execute(envelope)
+                            if result.failure != nil || result.tool?.deliveryFailure != nil || result.isError,
+                                case .communication(let action) = envelope.output,
+                                case .transcript(_, final: true)? = action.message.perception
+                            {
+                                await value.speechPublicationFailed(turn: envelope.turn)
+                            }
+                        } catch is CancellationError {
+                            if case .communication(let action) = envelope.output,
+                                case .transcript(_, final: true)? = action.message.perception
+                            {
+                                await value.speechPublicationFailed(turn: envelope.turn)
+                            }
                             throw CancellationError()
-                        } catch { runtime.reportFailure("speechPerception", "output", error) }
+                        } catch {
+                            if case .communication(let action) = envelope.output,
+                                case .transcript(_, final: true)? = action.message.perception
+                            {
+                                await value.speechPublicationFailed(turn: envelope.turn)
+                            }
+                            runtime.reportFailure("speechPerception", "output", error)
+                        }
                     }
-                } catch is CancellationError {} catch { runtime.reportFailure("speechPerception", "output", error) }
+                } catch is CancellationError {
+                    await value.speechPublicationFailed(turn: nil)
+                } catch {
+                    await value.speechPublicationFailed(turn: nil)
+                    runtime.reportFailure("speechPerception", "output", error)
+                }
             }
             return value
         }

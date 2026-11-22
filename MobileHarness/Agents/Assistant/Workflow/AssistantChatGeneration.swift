@@ -210,6 +210,7 @@ extension AssistantChatWorker {
             continuationRounds[input.id] = nil
             queue.remove(id: input.id)
             let cancelled = Task.isCancelled || error is CancellationError
+            let interrupted = cancelled && interruptedInputs.contains(input.id)
             var failure = Self.failureDescription(error)
             do {
                 try await contextRepository.update {
@@ -235,11 +236,12 @@ extension AssistantChatWorker {
             if recorded {
                 do {
                     try await conversations.finish(
-                        input.id, state: Task.isCancelled || error is CancellationError ? .cancelled : .failed,
+                        input.id, state: interrupted ? .interrupted : (cancelled ? .cancelled : .failed),
                         reason: generationFinishReason, error: failure)
                 } catch { failure += "; history persistence failed: \(error)" }
             }
-            do { try await finishBatch(input, cancelled: cancelled, failure: failure) } catch {
+            do { try await finishBatch(input, cancelled: cancelled, interrupted: interrupted, failure: failure) } catch
+            {
                 failure += "; batch terminal persistence failed: \(error)"
             }
             guard !Task.isCancelled, lifecycle == .running || lifecycle == .paused else { return }
@@ -251,7 +253,10 @@ extension AssistantChatWorker {
         }
     }
 
-    func finishBatch(_ input: AgentInput, cancelled: Bool = false, failure: String? = nil) async throws {
+    func finishBatch(
+        _ input: AgentInput, cancelled: Bool = false, interrupted: Bool = false, failure: String? = nil
+    ) async throws {
+        defer { interruptedInputs.remove(input.id) }
         let members = batchMembers.removeValue(forKey: input.id) ?? [input]
         batchTexts[input.id] = nil
         mergedResults[input.id] = nil
@@ -265,11 +270,14 @@ extension AssistantChatWorker {
             try await contextRepository.update { context in
                 if context.work[member.id]?.state.terminal == false {
                     try context.transitionWork(
-                        member.id, to: cancelled ? .cancelled : (failure == nil ? .completed : .failed))
+                        member.id,
+                        to: interrupted
+                            ? .interrupted : (cancelled ? .cancelled : (failure == nil ? .completed : .failed)))
                 }
             }
             try await conversations.finish(
-                member.id, state: cancelled ? .cancelled : (failure == nil ? .completed : .failed),
+                member.id,
+                state: interrupted ? .interrupted : (cancelled ? .cancelled : (failure == nil ? .completed : .failed)),
                 reason: "batch:" + input.id, error: failure)
         }
     }
@@ -305,8 +313,10 @@ extension AssistantChatWorker {
         guard lifecycle == .running || lifecycle == .paused else { return }
         try await finishLocalDecision(input: input)
         try await completeTaskDecision(input)
-        try await conversations.finish(input.id, state: .completed, reason: generationFinishReason)
-        try await finishBatch(input)
+        let interrupted = interruptedInputs.contains(input.id)
+        try await conversations.finish(
+            input.id, state: interrupted ? .interrupted : .completed, reason: generationFinishReason)
+        try await finishBatch(input, interrupted: interrupted)
         emit(.control("agent.finished"), for: input)
     }
 
@@ -387,6 +397,7 @@ extension AssistantChatWorker {
                     from: decisionContext.state.taskViews ?? [:], dialog: decisionContext.state.history.current.id,
                     budget: min(3_072, 16 * 1024 - block.utf8.count),
                     templates: AgentPrompts.load(named: State.configurationName))
+                block += try AgentStatePrompt.block(decisionContext.state.visibleVariables(session: input.sessionID))
                 let system = try State.systemPrompt(
                     catalog, skills: decisionContext.state.skillState, communication: communicationPolicy)
                 stateMessages.removeAll { $0.role == .system }
@@ -413,14 +424,15 @@ extension AssistantChatWorker {
                 maximumOutputTokens: request.maximumOutputTokens, temperature: request.temperature,
                 tools: usesSkills ? requestTools : request.tools
             )
-            try await conversations.beginModelRequest(
-                .init(
-                    id: requestID, input: inputText,
-                    requestJSON: try Self.historyRequest(providerRequest.messages, imageScopes: imageScopes),
-                    decisionMetadata: try decisionMetadata(
-                        skills: decisionContext.state.skillState, states: requestedStates),
-                    historyTaskID: decisionContext.state.skillState?.activeTaskID),
-                for: input.id, awaitingDispatch: true)
+            var historyRequest = AssistantModelRequest(
+                id: requestID, input: inputText,
+                requestJSON: try Self.historyRequest(providerRequest.messages, imageScopes: imageScopes),
+                decisionMetadata: try decisionMetadata(
+                    skills: decisionContext.state.skillState, states: requestedStates),
+                historyTaskID: decisionContext.state.skillState?.activeTaskID)
+            // A runtime-origin input that continues a prior input is a ReACT round, not a user turn.
+            if input.metadata.origin == .runtime, input.metadata.parentID != nil { historyRequest.isObservation = true }
+            try await conversations.beginModelRequest(historyRequest, for: input.id, awaitingDispatch: true)
             try beginReplyTurn(input)
             var generationError: (any Error)?
             let text: String
@@ -526,7 +538,7 @@ extension AssistantChatWorker {
                     "Task closure failed at \(failed.path): \(try Self.observationText(result))")
             }
             try await finishLocalDecision(input: input, taskBoundaryOnly: true)
-            if task.continueDecision != true { return nil }
+            return nil
         }
         guard roundCalls.contains(where: { !isInternalRuntimeCall($0) && $0.result?.requiresReasoning == true })
         else {

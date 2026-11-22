@@ -1,4 +1,17 @@
 import Foundation
+import SwiftUI
+
+extension HistoryTurn.State {
+    var color: Color {
+        switch self {
+        case .generating: .blue
+        case .completed: .green
+        case .failed: .red
+        case .cancelled: .gray
+        case .interrupted: .orange
+        }
+    }
+}
 
 public struct HistoryTaskReference: Equatable, Sendable, Identifiable {
     public let id: String
@@ -170,46 +183,46 @@ extension HistoryTurn {
     }
 
     public var dateReport: String { date.formatted() }
-    public var stateReport: String { state.rawValue }
-
-    public var decisionReport: String {
-        switch coordination?.decision {
-        case "enqueue": "Queued"
-        case "discard": "Discarded"
-        case "interrupt": "Interrupted"
-        case .some(let value): value
-        case nil: "No decision recorded"
-        }
-    }
-    public var responseStatus: String {
+    public func stateReport(_ copy: AppLanguage = .english) -> String {
         switch state {
-        case .generating: return "The request is running. A reply has yet to be recorded."
-        case .failed: return "The request failed before recording a reply."
-        case .cancelled: return "The request was cancelled before recording a reply."
-        case .interrupted: return "The request was interrupted before recording a reply."
-        case .completed: return "The request ended with no recorded text or tool calls."
+        case .generating: copy.text("Generating")
+        case .completed: copy.text("Completed")
+        case .failed: copy.text("Failed")
+        case .cancelled: copy.text("Cancelled")
+        case .interrupted: copy.text("Interrupted")
         }
     }
 
-    public var outputSummary: String {
+    public func responseStatus(_ copy: AppLanguage = .english) -> String {
+        switch state {
+        case .generating: copy.text("The request is running. A reply has yet to be recorded.")
+        case .failed: copy.text("The request failed before recording a reply.")
+        case .cancelled: copy.text("The request was cancelled before recording a reply.")
+        case .interrupted: copy.text("The request was interrupted before recording a reply.")
+        case .completed: copy.text("The request ended with no recorded text or tool calls.")
+        }
+    }
+
+    public func outputSummary(_ copy: AppLanguage = .english) -> String {
         if !raw.isEmpty { return raw }
         guard let calls = toolCalls, !calls.isEmpty else {
-            return responseStatus
+            return responseStatus(copy)
         }
-        return "Tool Call：" + calls.map(\.name).joined(separator: "、")
+        return copy.text("Tool Call: ") + calls.map(\.name).joined(separator: copy.text(", "))
     }
-    public var firstTokenReport: String {
+    public func firstTokenReport(_ copy: AppLanguage = .english) -> String {
         guard modelRequestStartedAt != nil, firstTokenAt != nil, let delay = firstTokenLatency else {
-            return "Time to first token: "
+            return copy.text("Time to first token: ")
         }
-        return "Time to first token: \(String(format: "%.3f", delay)) sec"
+        return copy.format("Time to first token: %@ sec", String(format: "%.3f", delay))
     }
-    public var tokenReport: String {
-        guard let usage = tokenUsage else { return "Token usage: " }
-        var report =
-            "Input: \(usage.input) tokens · Generated: \(usage.generated) tokens · Total: \(usage.total) tokens"
-        if let cached = usage.cachedInput { report += " · Cache read: \(cached) tokens" }
-        if let written = usage.cacheWriteInput { report += " · Cache write: \(written) tokens" }
+    public func tokenReport(_ copy: AppLanguage = .english) -> String {
+        guard let usage = tokenUsage else { return copy.text("Token usage: ") }
+        var report = copy.format(
+            "Input: %ld tokens · Generated: %ld tokens · Total: %ld tokens", usage.input, usage.generated,
+            usage.total)
+        if let cached = usage.cachedInput { report += copy.format(" · Cache read: %ld tokens", cached) }
+        if let written = usage.cacheWriteInput { report += copy.format(" · Cache write: %ld tokens", written) }
         return report
     }
 
@@ -225,10 +238,13 @@ extension HistoryMessage {
 }
 
 extension HistoryToolCall {
-    public var responseReport: String {
-        var sections = ["Tool Call · \(name) · \(state.rawValue)", "Arguments:\n\(argumentsJSON)"]
-        if let output { sections.append("Result:\n\(output)") }
-        if let error { sections.append("Error:\n\(error)") }
+    public func responseReport(_ copy: AppLanguage = .english) -> String {
+        var sections = [
+            copy.format("Tool Call · %@ · %@", name, state.rawValue),
+            copy.text("Arguments:") + "\n" + argumentsJSON,
+        ]
+        if let output { sections.append(copy.text("Result:") + "\n" + output) }
+        if let error { sections.append(copy.text("Error:") + "\n" + error) }
         return sections.joined(separator: "\n\n")
     }
 }

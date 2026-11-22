@@ -469,7 +469,7 @@ private func beginNext(_ records: SQLiteRepositories) async throws -> WriterRequ
     let current = try await store.readCurrent()
     _ = try await store.admitUserInput(id: "discard", user: "ack", model: "not started")
     var discarded = AssistantInputCoordination(source: "speech", capturedAt: "1")
-    discarded.decision = "discard"
+    discarded.interrupt = false
     try await store.recordCoordination(discarded, for: "discard")
     try await store.finish("discard", state: .completed, reason: "decision.discard")
     #expect(try db.database.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM assistant_messages") } == 0)
@@ -569,4 +569,21 @@ private func beginNext(_ records: SQLiteRepositories) async throws -> WriterRequ
             correlationID: root, replyTo: root, sourceSessionID: "session", dedupeKey: update))
     #expect(try await repository.writerExecutions.acceptWriterInput(update, requestID: root, questionID: nil))
     try await repository.shutdown()
+}
+
+@Test func inputCoordinationDecodesLegacyDecisionStrings() throws {
+    func decode(_ json: String) throws -> AssistantInputCoordination {
+        try JSONDecoder().decode(AssistantInputCoordination.self, from: Data(json.utf8))
+    }
+    let base = #""source":"speech","capturedAt":"1""#
+    #expect(try decode("{\(base),\"decision\":\"true\"}").interrupt == true)
+    #expect(try decode("{\(base),\"decision\":\"false\"}").interrupt == false)
+    #expect(try decode("{\(base)}").interrupt == nil)
+    let member = #"{"id":"a",\#(base),"decision":"true"}"#
+    #expect(try decode("{\(base),\"members\":[\(member)]}").members?.first?.interrupt == true)
+    var evidence = AssistantInputCoordination(source: "speech", capturedAt: "1")
+    evidence.interrupt = true
+    let encoded = String(decoding: try JSONEncoder().encode(evidence), as: UTF8.self)
+    #expect(encoded.contains(#""interrupt":true"#) && !encoded.contains("decision"))
+    #expect(try decode(encoded).interrupt == true)
 }

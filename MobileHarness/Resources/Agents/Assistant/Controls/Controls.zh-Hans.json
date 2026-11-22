@@ -2,11 +2,72 @@
   "version": 1,
   "controls": [
     {
-      "alias": "loadSkills",
-      "operation": "loadSkills",
+      "alias": "state.set",
+      "operation": "state.set",
       "destination": "self",
       "declaration": {
-        "path": { "domain": "Agent", "module": "Task", "function": "loadSkills" },
+        "path": { "domain": "Agent", "module": "State", "function": "set" },
+        "doc": "设置你自己的一个变量。值连同写入时间出现在你的 AGENT STATE 中。可使用任何简短的小写名称，部分名称有已声明的含义。",
+        "parameters": [
+          {
+            "name": "name", "valueType": "string", "required": true,
+            "description": "变量名称", "constraints": "小写字母、数字和下划线；以字母开头；最多 32 字节",
+            "values": []
+          },
+          {
+            "name": "value", "valueType": "string", "required": true,
+            "description": "自然语言的值，或变量声明的类型化取值", "constraints": "非空，最多 1 KiB",
+            "values": []
+          },
+          {
+            "name": "note", "valueType": "string", "required": false,
+            "description": "被替换旧值的摘要；仅在该变量驱动某个过程（如 task）且已有值时需要",
+            "constraints": "长度有限", "values": []
+          }
+        ]
+      }
+    },
+    {
+      "alias": "state.clear",
+      "operation": "state.clear",
+      "destination": "self",
+      "declaration": {
+        "path": { "domain": "Agent", "module": "State", "function": "clear" },
+        "doc": "清除你自己的一个变量。清除未设置的变量不产生任何变化。",
+        "parameters": [
+          {
+            "name": "name", "valueType": "string", "required": true,
+            "description": "变量名称", "constraints": "", "values": []
+          },
+          {
+            "name": "note", "valueType": "string", "required": false,
+            "description": "对该值存在期间实际发生之事的真实摘要；清除 task 时必填",
+            "constraints": "长度有限", "values": []
+          }
+        ]
+      }
+    },
+    {
+      "alias": "state.get",
+      "operation": "state.get",
+      "destination": "self",
+      "declaration": {
+        "path": { "domain": "Agent", "module": "State", "function": "get" },
+        "doc": "立即读取一个状态值并据此继续。读取自己的变量用简短名称，读取其他来源（如 ui.windows、platform.system.audio）用完整路径。",
+        "parameters": [
+          {
+            "name": "path", "valueType": "string", "required": true,
+            "description": "自己的变量名，或带点号的状态路径", "constraints": "", "values": []
+          }
+        ]
+      }
+    },
+    {
+      "alias": "skill.load",
+      "operation": "skill.load",
+      "destination": "self",
+      "declaration": {
+        "path": { "domain": "Agent", "module": "Skill", "function": "load" },
         "doc": "加载真实 Skill ID 及其依赖供后续请求使用，失败保留当前状态。",
         "parameters": [
           {
@@ -18,12 +79,12 @@
       }
     },
     {
-      "alias": "releaseSkills",
-      "operation": "releaseSkills",
+      "alias": "skill.unload",
+      "operation": "skill.unload",
       "destination": "self",
       "declaration": {
-        "path": { "domain": "Agent", "module": "Task", "function": "releaseSkills" },
-        "doc": "释放确认不再需要的非基础根 Skill，保留共享依赖和任务。",
+        "path": { "domain": "Agent", "module": "Skill", "function": "unload" },
+        "doc": "卸载确认不再需要的非基础根 Skill，保留共享依赖。",
         "parameters": [
           {
             "name": "skills", "valueType": "string", "required": true,
@@ -34,50 +95,11 @@
       }
     },
     {
-      "alias": "task.start",
-      "operation": "task.start",
-      "destination": "self",
-      "declaration": {
-        "path": { "domain": "Agent", "module": "Task", "function": "startTask" },
-        "doc": "建立可判定完成条件的前台目标，并持有必要的初始 Skill。",
-        "parameters": [
-          {
-            "name": "description", "valueType": "string", "required": true,
-            "description": "可判定完成条件的目标说明。", "constraints": "", "values": []
-          },
-          {
-            "name": "skills", "valueType": "string", "required": false,
-            "description": "由实际 Skill ID 组成的 JSON 数组。", "constraints": "", "values": []
-          }
-        ]
-      }
-    },
-    {
-      "alias": "task.end",
-      "operation": "task.end",
-      "destination": "self",
-      "declaration": {
-        "path": { "domain": "Agent", "module": "Task", "function": "finishTask" },
-        "doc": "根据实际结果结束当前前台任务并记录摘要。",
-        "parameters": [
-          {
-            "name": "summary", "valueType": "string", "required": true,
-            "description": "简短且真实的结果摘要。", "constraints": "非空且长度有限", "values": []
-          },
-          {
-            "name": "continueDecision", "valueType": "boolean", "required": false,
-            "description": "任务结束后是否继续处理本次输入中的新目标。",
-            "constraints": "true 或 false；默认 false", "values": ["true", "false"]
-          }
-        ]
-      }
-    },
-    {
-      "alias": "task.send",
-      "operation": "task.send",
+      "alias": "send",
+      "operation": "send",
       "destination": "peer",
       "declaration": {
-        "path": { "domain": "Agent", "module": "Task", "function": "sendMessage" },
+        "path": { "domain": "Agent", "module": "Message", "function": "send" },
         "doc": "将完整目标、补充、回答或停止请求发送给实际可委托的同伴。送达仅代表接收。",
         "parameters": [
           {

@@ -23,4 +23,4 @@ resetMotor 归位单轴，resetArm 不归位夹爪。演出手势收尾会归位
 「先右转 30 度，只有成功才点头；失败就停」→ 先只发 <moveMotor motor="1" deltaDegrees="30"/>，等真实结果。失败时报告并停止。wait 只排序，void 成功不自动继续。
 
 受理和到达不同。失败时不自动重试、归位、重连或补偿，取消不倒转物理动作。不要用动作测试连接。
-actions.robot.value 的连接、控制可用性、示教或跟踪、以及 positionsCounts 是独立事实。feedbackAgeSeconds 是单调时钟计算的回执年龄，连接且年龄不超过两秒方可标记 feedbackFresh。null 是未知，过时位置只代表历史。targetCounts 和 trackingTargetCounts 是目标位置。读取 State 不查询或移动机械臂。
+actions.robot 的连接、控制可用性、示教或跟踪、以及 positionsCounts 是独立事实。feedbackAgeSeconds 是单调时钟计算的回执年龄，连接且年龄不超过两秒方可标记 feedbackFresh。null 是未知，过时位置只代表历史。targetCounts 和 trackingTargetCounts 是目标位置。读取 State 不查询或移动机械臂。

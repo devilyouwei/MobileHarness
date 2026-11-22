@@ -32,7 +32,7 @@ AssistantRecordStore 注入本侧会话、消息、任务摘要和日志端口�
 
 ## Assistant 链路
 
-ReACT 是新消息行。task_id 标识前台摘要范围。前台任务经 task.end 保存终态及摘要后，才可启动下一个任务。已有 Message 保留原任务归属。
+ReACT 是新消息行。task_id 标识前台摘要范围。前台任务经 state.clear("task") 保存终态及摘要后，才可启动下一个任务。已有 Message 保留原任务归属。
 
 ```mermaid
 erDiagram
@@ -86,7 +86,7 @@ erDiagram
     }
 ```
 
-摘要来源由 assistant_messages.task_id 推导；只有终态、非空摘要且 summary_revision 等于 source_revision 才可折叠。全双工 task.end 固定来源成员，后续原行证据更新同步推进摘要版本。其他摘要随输入、回复或工具结果变化失效。原始消息始终保留。列表使用 JSON 的有限投影。
+摘要来源由 assistant_messages.task_id 推导；只有终态、非空摘要且 summary_revision 等于 source_revision 才可折叠。全双工 state.clear("task") 固定来源成员，后续原行证据更新同步推进摘要版本。其他摘要随输入、回复或工具结果变化失效。原始消息始终保留。列表使用 JSON 的有限投影。
 
 ## Writer 链路
 

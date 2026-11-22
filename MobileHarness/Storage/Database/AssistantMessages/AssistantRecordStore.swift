@@ -126,7 +126,7 @@ public actor AssistantRecordStore {
             }
             for request in dispatched {
                 // Observations are complete before the next invocation; assistant partials are not admitted here.
-                if request.id != dispatched.first?.id {
+                if request.id != dispatched.first?.id || request.isObservation == true {
                     let key = request.id + ":observation"
                     let data = try encoder.encode(request.input)
                     let fingerprint = ContentFingerprint.digest(data)

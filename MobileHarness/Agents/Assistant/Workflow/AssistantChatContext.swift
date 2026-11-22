@@ -28,6 +28,10 @@ public protocol AssistantChatState: AgentTaskContextState {
     ) throws -> String
     init()
     var skillState: AgentTaskSkillState? { get set }
+    /// The Agent's own variables; roles without State keep the empty default.
+    var variables: AgentStateVariables { get set }
+    /// The variables as the model sees them, including values another owner keeps (such as the active goal).
+    func visibleVariables(session: String?) -> AgentStateVariables
     var history: AssistantArchive { get set }
     var admissionSequence: UInt64 { get set }
 }
@@ -102,6 +106,11 @@ extension AssistantChatState {
         get { nil }
         set {}
     }
+    public var variables: AgentStateVariables {
+        get { AgentStateVariables() }
+        set {}
+    }
+    public func visibleVariables(session: String?) -> AgentStateVariables { variables }
     public static func isContextObservation(_ input: AgentInput) -> Bool { false }
     public mutating func applyContextObservation(_ input: AgentInput) throws { throw HarnessError.unsupportedInput }
     public static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {

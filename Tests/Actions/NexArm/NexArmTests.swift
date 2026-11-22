@@ -336,7 +336,7 @@ func loadedRobotAssistantContext() throws -> AssistantContextState {
     var skills = AgentTaskSkillState()
     try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
     _ = try skills.control(
-        "loadSkills", arguments: ["skills": "[\"robot-interaction\"]"],
+        "skill.load", arguments: ["skills": "[\"robot-interaction\"]"],
         inputID: "robot-fixture", fixed: fixed)
     var state = AssistantContextState()
     state.skillState = skills

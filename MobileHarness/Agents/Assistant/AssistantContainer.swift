@@ -14,13 +14,14 @@
             let speech = await session?.speech?.snapshot()
             let recordFailure = await session?.agent.messageRecordFailure
             let trackedCount = await session?.agent.trackedTaskCount
+            let schema = try AgentConfigurations.stateSchema(named: AssistantContextState.configurationName)
+            var variables: [String: AgentStateSnapshot.Value] = [:]
+            for item in context?.state.visibleVariables(session: nil).ordered ?? [] {
+                variables[item.name] = .text(item.entry.value)
+            }
             return AgentStateSnapshot(
                 path: "agents.assistant",
-                business: [
-                    "taskPhase": context?.state.skillState?.tasks.first(where: {
-                        $0.id == context?.state.skillState?.activeTaskID
-                    }).map { .text($0.status) } ?? .unknown
-                ],
+                business: variables,
                 runtime: [
                     "speechInstalled": speech.map { .flag($0.installed) } ?? .flag(false),
                     "speechQueued": speech.map { .count($0.queued) } ?? .unknown,
@@ -33,7 +34,7 @@
                     "trackedTasks": trackedCount.map { .count($0) } ?? .unknown,
                     "messageRecordFailure": recordFailure.map { .text($0) } ?? .unknown,
                     "closed": .flag(closed), "installed": .flag(session != nil),
-                ])
+                ], meanings: schema.declarations.mapValues(\.meaning))
         }
 
         @ObservationIgnored private var session: AssistantExecutionSession?

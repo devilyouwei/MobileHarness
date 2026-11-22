@@ -11,12 +11,10 @@ public struct AgentTaskSkillState: Codable, Sendable {
         public let date: Date
         public var status: String
         public var summary: String?
-        public var continueDecision: Bool?
         public var sessionID: String? = nil
         public var failure: String? = nil
         public var updatedAt: Date? = nil
         public var inputIDs: [String]
-        public var skills: [String]
     }
     public struct Event: Codable, Sendable {
         public let date: Date
@@ -34,7 +32,6 @@ public struct AgentTaskSkillState: Codable, Sendable {
     public struct DecisionUsage: Codable, Sendable {
         public let sessionID: String?
         public let countsIdle: Bool
-        public var observedTask: Bool
         public var roots: Set<String> = []
     }
     public struct Policy: Codable, Sendable {
@@ -43,10 +40,9 @@ public struct AgentTaskSkillState: Codable, Sendable {
         public var maximumNonBaseBytes = 24 * 1024
         public init() {}
     }
-    public var version = 4
+    public var version = 5
     public var policy = Policy()
     public private(set) var recentSkills: [String: Retention] = [:]
-    public private(set) var taskSkillRoots: Set<String> = []
     public private(set) var decisions: [String: DecisionUsage] = [:]
     private var useOrder: UInt64 = 0
     public var baseSkillIDs: [String]?
@@ -83,7 +79,7 @@ public struct AgentTaskSkillState: Codable, Sendable {
         tasks[index].updatedAt = Date()
     }
     public mutating func initialize(fixed fixedCapabilities: CapabilityRegistry, baseSkills: [String]) throws {
-        guard version == 4 else { throw CommunicationError.invalidPayload }
+        guard version == 5 else { throw CommunicationError.invalidPayload }
         baseSkillIDs = baseSkills
         if loaded.isEmpty { loaded = try base(fixed: fixedCapabilities) }
         _ = try registry(fixed: fixedCapabilities)
@@ -99,15 +95,13 @@ public struct AgentTaskSkillState: Codable, Sendable {
     }
     public func ownership(_ id: String) throws -> String {
         if try AgentSkillLoader.expand(baseSkillIDs ?? []).contains(id) { return "base" }
-        if try AgentSkillLoader.expand(taskSkillRoots.sorted()).contains(id) { return "task" }
         return "recent"
     }
     /// One original user input, shared by all its internal ReACT requests.
     public mutating func beginDecision(_ inputID: String, sessionID: String? = nil, countsIdle: Bool = true) throws {
         if decisions[inputID] != nil { return }
         guard decisions.count < 32 else { throw CommunicationError.capacityExceeded }
-        decisions[inputID] = DecisionUsage(
-            sessionID: sessionID, countsIdle: countsIdle, observedTask: activeTaskID != nil)
+        decisions[inputID] = DecisionUsage(sessionID: sessionID, countsIdle: countsIdle)
     }
 
     public mutating func discardDecision(_ inputID: String) {
@@ -119,19 +113,13 @@ public struct AgentTaskSkillState: Codable, Sendable {
         guard useOrder < UInt64.max else { throw CommunicationError.capacityExceeded }
         useOrder += 1
         for root in roots {
-            if activeTaskID != nil {
-                taskSkillRoots.insert(root)
-                recentSkills[root] = nil
-            } else {
-                recentSkills[root] = Retention(
-                    remainingDecisions: policy.idleDecisions, lastUsed: useOrder,
-                    sessionID: decisions[inputID]?.sessionID ?? recentSkills[root]?.sessionID)
-            }
+            recentSkills[root] = Retention(
+                remainingDecisions: policy.idleDecisions, lastUsed: useOrder,
+                sessionID: decisions[inputID]?.sessionID ?? recentSkills[root]?.sessionID)
         }
         // Trusted idle controls are not user Decisions and create no pending usage owner.
         if var usage = decisions[inputID] {
             usage.roots.formUnion(roots)
-            usage.observedTask = usage.observedTask || activeTaskID != nil
             decisions[inputID] = usage
         }
     }
@@ -139,7 +127,7 @@ public struct AgentTaskSkillState: Codable, Sendable {
     /// Called only for an admitted model function; parsing/parameter rejections never reach here.
     public mutating func recordUse(path: String, callType: String, inputID: String, snapshotSkills: [String]) throws {
         var next = self
-        let roots = Set(recentSkills.keys).union(taskSkillRoots)
+        let roots = Set(recentSkills.keys)
         let providers = try Set(
             roots.filter { root in
                 try AgentSkillLoader.expand([root]).contains { id in
@@ -152,13 +140,11 @@ public struct AgentTaskSkillState: Codable, Sendable {
         guard !providers.isEmpty else { return }
         try next.touch(providers, inputID: inputID)
         try next.refreshLoaded()
-        try next.updateTaskEvidence()
         self = next
     }
 
     private mutating func refreshLoaded() throws {
-        loaded = try AgentSkillLoader.expand(
-            (baseSkillIDs ?? []) + taskSkillRoots.sorted() + recentSkills.keys.sorted())
+        loaded = try AgentSkillLoader.expand((baseSkillIDs ?? []) + recentSkills.keys.sorted())
     }
 
     private mutating func fitBudget(fixed: CapabilityRegistry, requested: Set<String>) throws {
@@ -166,7 +152,7 @@ public struct AgentTaskSkillState: Codable, Sendable {
             throw CommunicationError.invalidPayload
         }
         let base = try base(fixed: fixed)
-        let protected = decisions.values.reduce(taskSkillRoots.union(requested)) { $0.union($1.roots) }
+        let protected = decisions.values.reduce(requested) { $0.union($1.roots) }
         try refreshLoaded()
         while try loaded.filter({ !base.contains($0) }).count > policy.maximumNonBaseSkills
             || AgentSkillLoader.nonBaseBytes(loaded, base: base) > policy.maximumNonBaseBytes
@@ -184,103 +170,69 @@ public struct AgentTaskSkillState: Codable, Sendable {
         _ = try registry(fixed: fixed)
     }
 
-    private mutating func updateTaskEvidence() throws {
-        guard let id = activeTaskID, let index = tasks.firstIndex(where: { $0.id == id }) else { return }
-        let owned = try AgentSkillLoader.expand((baseSkillIDs ?? []) + taskSkillRoots.sorted())
-        tasks[index].skills = Array(Set(tasks[index].skills).union(owned)).sorted()
-        tasks[index].updatedAt = Date()
-    }
-
+    /// `skill.load` / `skill.unload`: Skills follow their own retention rules and never belong to a goal.
     public mutating func control(
         _ operation: String, arguments: [String: String], inputID: String,
-        fixed fixedCapabilities: CapabilityRegistry,
-        sessionID: String? = nil, taskID: String? = nil
+        fixed fixedCapabilities: CapabilityRegistry
     ) throws -> String {
-        let allowed: Set<String>
-        let required: Set<String>
-        switch operation {
-        case "task.start":
-            allowed = ["description", "skills"]
-            required = ["description"]
-        case "loadSkills", "releaseSkills":
-            allowed = ["skills"]
-            required = allowed
-        case "task.end":
-            allowed = ["summary", "continueDecision"]
-            required = ["summary"]
-        default: throw HarnessError.forbiddenFunction
-        }
-        guard required.isSubset(of: Set(arguments.keys)), Set(arguments.keys).isSubset(of: allowed),
+        guard ["skill.load", "skill.unload"].contains(operation) else { throw HarnessError.forbiddenFunction }
+        guard Set(arguments.keys) == ["skills"],
             arguments.values.allSatisfy({
                 !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.utf8.count <= 4096
             })
         else { throw CommunicationError.invalidPayload }
-        if let value = arguments["continueDecision"], !["true", "false"].contains(value) {
-            throw CommunicationError.invalidPayload
-        }
         var next = self
         let requested = try AgentTaskSkillIDs.decode(arguments["skills"])
-        switch operation {
-        case "task.start":
-            guard activeTaskID == nil, let goal = arguments["description"]
-            else { throw CommunicationError.invalidPayload }
-            next.taskSkillRoots = Set(requested).subtracting(try base(fixed: fixedCapabilities))
-            for root in next.taskSkillRoots { next.recentSkills[root] = nil }
-            try next.fitBudget(fixed: fixedCapabilities, requested: next.taskSkillRoots)
-            if next.tasks.count == 256 { next.tasks.removeFirst() }
-            guard let taskID, BusinessRecordID(rawValue: taskID)?.kind == .task else {
-                throw CommunicationError.invalidPayload
-            }
-            let task = TaskRecord(
-                id: taskID, mode: "task", goal: goal, date: Date(), status: "running",
-                inputIDs: [], skills: try AgentSkillLoader.expand((baseSkillIDs ?? []) + next.taskSkillRoots.sorted())
-            )
-            next.tasks.append(task)
-            next.tasks[next.tasks.count - 1].sessionID = sessionID
-            next.activeTaskID = task.id
-            for key in next.decisions.keys { next.decisions[key]?.observedTask = true }
-            try next.bind(inputID, task: task.id)
-        case "loadSkills":
+        if operation == "skill.load" {
             let roots = Set(requested).subtracting(try base(fixed: fixedCapabilities))
             try next.touch(roots, inputID: inputID)
             try next.fitBudget(fixed: fixedCapabilities, requested: roots)
-        case "releaseSkills":
+        } else {
             let protected = try base(fixed: fixedCapabilities)
-            let roots = Set(next.recentSkills.keys).union(next.taskSkillRoots)
+            let roots = Set(next.recentSkills.keys)
             guard requested.allSatisfy({ roots.contains($0) && !protected.contains($0) }) else {
                 throw CommunicationError.unauthorized
             }
-            for root in requested {
-                next.recentSkills[root] = nil
-                next.taskSkillRoots.remove(root)
-            }
+            for root in requested { next.recentSkills[root] = nil }
             try next.refreshLoaded()
             // A requested dependency still needed by another root cannot be released.
             guard requested.allSatisfy({ !next.loaded.contains($0) }) else { throw CommunicationError.unauthorized }
-        case "task.end":
-            guard let id = activeTaskID, let index = next.tasks.firstIndex(where: { $0.id == id }),
-                ["running", "waitingUser"].contains(next.tasks[index].status)
-            else { throw CommunicationError.scopeClosed }
-            next.tasks[index].status = "finishing"
-            next.tasks[index].continueDecision = arguments["continueDecision"] == "true"
-            next.tasks[index].summary = arguments["summary"]
-        default: throw HarnessError.forbiddenFunction
         }
         try next.recordChanges(
-            previous: loaded, task: next.activeTaskID,
-            releaseReason: operation == "releaseSkills" ? "explicit" : "capacity")
-        try next.updateTaskEvidence()
+            previous: loaded, task: nil, releaseReason: operation == "skill.unload" ? "explicit" : "capacity")
         let beforeLoaded = Set(loaded)
         self = next
         let receipt: [String: Any] = [
-            "operation": operation, "status": "committed", "mode": mode,
-            "taskID": activeTaskID ?? "none", "skills": loaded,
+            "operation": operation, "status": "committed", "skills": loaded,
             "remainingDecisions": recentSkills.mapValues(\.remainingDecisions),
-            "taskSkills": taskSkillRoots.sorted(),
             "released": beforeLoaded.subtracting(loaded).sorted(),
         ]
         return String(
             decoding: try JSONSerialization.data(withJSONObject: receipt, options: [.sortedKeys]), as: UTF8.self)
+    }
+
+    /// Opens the interval record of a `task` variable change. A goal is only the text the Agent set.
+    public mutating func beginTask(goal: String, taskID: String, sessionID: String?, inputID: String) throws {
+        guard activeTaskID == nil else { throw CommunicationError.scopeClosed }
+        guard BusinessRecordID(rawValue: taskID)?.kind == .task else { throw CommunicationError.invalidPayload }
+        var next = self
+        if next.tasks.count == 256 { next.tasks.removeFirst() }
+        next.tasks.append(
+            TaskRecord(
+                id: taskID, mode: "task", goal: goal, date: Date(), status: "running", sessionID: sessionID,
+                inputIDs: []))
+        next.activeTaskID = taskID
+        try next.bind(inputID, task: taskID)
+        self = next
+    }
+
+    /// Marks the active interval as ending; `settleTask` completes it once its decision joins.
+    public mutating func requestFinish(summary: String) throws {
+        guard let id = activeTaskID, let index = tasks.firstIndex(where: { $0.id == id }),
+            ["running", "waitingUser"].contains(tasks[index].status)
+        else { throw CommunicationError.scopeClosed }
+        tasks[index].status = "finishing"
+        tasks[index].summary = summary
     }
 
     private mutating func recordChanges(previous: [String], task: String?, releaseReason: String? = nil) throws {
@@ -301,19 +253,10 @@ public struct AgentTaskSkillState: Codable, Sendable {
         let status = next.tasks[index].status
         if finishRequested && status == "finishing" {
             next.tasks[index].status = "completed"
-            for root in next.taskSkillRoots { next.recentSkills[root] = nil }
             next.activeTaskID = nil
-            let retired = next.taskSkillRoots
-            next.taskSkillRoots = []
-            for key in next.decisions.keys { next.decisions[key]?.roots.subtract(retired) }
-            try next.refreshLoaded()
-            try next.recordChanges(previous: loaded, task: id, releaseReason: "taskEnded")
         } else {
             next.tasks[index].status = "waitingUser"
-            if status == "finishing" {
-                next.tasks[index].summary = nil
-                next.tasks[index].continueDecision = nil
-            }
+            if status == "finishing" { next.tasks[index].summary = nil }
         }
         self = next
     }
@@ -324,9 +267,7 @@ public struct AgentTaskSkillState: Codable, Sendable {
         var next = self
         try next.settleTask(finishRequested: finishRequested)
         let beforeIdle = next.loaded
-        if let inputID, let usage = next.decisions.removeValue(forKey: inputID),
-            usage.countsIdle && !usage.observedTask && next.activeTaskID == nil
-        {
+        if let inputID, let usage = next.decisions.removeValue(forKey: inputID), usage.countsIdle {
             for root in Array(next.recentSkills.keys) {
                 if usage.roots.contains(root) || next.decisions.values.contains(where: { $0.roots.contains(root) }) {
                     continue
@@ -341,7 +282,6 @@ public struct AgentTaskSkillState: Codable, Sendable {
     }
 
     public mutating func resetConversation() throws {
-        guard activeTaskID == nil else { throw CommunicationError.scopeClosed }
         let previous = loaded
         recentSkills = [:]
         decisions = [:]
@@ -379,17 +319,14 @@ public struct AgentTaskSkillState: Codable, Sendable {
         activeTaskID = nil
         loaded = []
         recentSkills = [:]
-        taskSkillRoots = []
         decisions = [:]
     }
     public func validate() throws {
-        guard version == 4, (baseSkillIDs?.count ?? 0) <= 16, loaded.count <= 16,
+        guard version == 5, (baseSkillIDs?.count ?? 0) <= 16, loaded.count <= 16,
             Set(loaded).count == loaded.count, tasks.count <= 256,
-            events.count <= 256, decisions.count <= 32, recentSkills.count <= 16, taskSkillRoots.count <= 16,
+            events.count <= 256, decisions.count <= 32, recentSkills.count <= 16,
             policy.idleDecisions > 0, policy.maximumNonBaseSkills > 0, policy.maximumNonBaseBytes > 0,
             recentSkills.values.allSatisfy({ (1...policy.idleDecisions).contains($0.remainingDecisions) }),
-            Set(recentSkills.keys).isDisjoint(with: taskSkillRoots),
-            activeTaskID != nil || taskSkillRoots.isEmpty,
             decisions.values.allSatisfy({ $0.roots.count <= 16 }),
             inputBindings.count <= 256,
             Set(tasks.map(\.id)).count == tasks.count,
@@ -415,22 +352,11 @@ public struct AgentTaskSkillState: Codable, Sendable {
 }
 
 extension AgentTaskSkillState {
+    /// The model-visible AGENT CONTEXT: the loaded Skills. Goals and moods are variables, not part of this block.
     public struct ContextSnapshot: Encodable, Sendable, Equatable {
-        public struct Task: Encodable, Sendable, Equatable {
-            public let goal: String
-            public let status: String
-        }
-        public let task: Task?
         public let skills: [String]
-        private enum CodingKeys: String, CodingKey { case task, skills }
-        public func encode(to encoder: any Encoder) throws {
-            var fields = encoder.container(keyedBy: CodingKeys.self)
-            try fields.encode(task, forKey: .task)
-            try fields.encode(skills, forKey: .skills)
-        }
     }
     public func contextSnapshot(session: String) -> ContextSnapshot {
-        let active = tasks.first { $0.id == activeTaskID && $0.sessionID == session }
-        return ContextSnapshot(task: active.map { .init(goal: $0.goal, status: $0.status) }, skills: loaded)
+        ContextSnapshot(skills: loaded)
     }
 }

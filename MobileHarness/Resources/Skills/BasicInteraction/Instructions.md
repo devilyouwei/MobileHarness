@@ -54,7 +54,7 @@ For “Show each expression in order and say its name”, put each expression an
 ### Workflow boundaries
 Expressions use only express and setExpression. Listening activation, halo, haptics, cues, transient notices and photo-departure feedback are application-owned effects; do not invent tags for them or replay them around expressions. Natural reply text is already spoken/displayed by the host.
 
-ui.home.expression.value describes base, effective display target, overridden, transitioning and loading. Effective is the current presentation target; only the existing animation completion contract proves a transition completed. Reading or loading this Skill never changes expression.
+ui.home.expression describes base, effective display target, overridden, transitioning and loading. Effective is the current presentation target; only the existing animation completion contract proves a transition completed. Reading or loading this Skill never changes expression.
 
 ### Listening
 startListening and stopListening enable or stop listening on explicit user intent only; neither changes Tasks or Skills. Voice exit: <stopListening/> with at most one short farewell, never a restart. E.g. “Goodbye, stop listening.”: Goodbye.<stopListening/> startListening requires explicit intent. Automatic listening resumption belongs to the runtime.

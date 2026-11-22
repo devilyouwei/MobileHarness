@@ -10,11 +10,15 @@ public struct AgentGatewayConfiguration: Sendable {
     public let signalSummary: @Sendable (AgentInput) -> String
     public let observedContracts: Set<String>
     public let observeEvent: (@Sendable (AgentInput) async throws -> Void)?
+    public let publicationSettled: @Sendable (AgentInput, Set<AgentID>, [AgentID: String]) async -> Void
     public let sink: OutputGateway.Sink
     public init(
         catalog: ActionCatalogSnapshot, policy: CommunicationPolicy? = nil,
         signalSummary: @escaping @Sendable (AgentInput) -> String = { _ in "" },
         observedContracts: Set<String> = [], observeEvent: (@Sendable (AgentInput) async throws -> Void)? = nil,
+        publicationSettled: @escaping @Sendable (AgentInput, Set<AgentID>, [AgentID: String]) async -> Void = {
+            _, _, _ in
+        },
         sink: @escaping OutputGateway.Sink = { _ in }
     ) {
         self.catalog = catalog
@@ -22,6 +26,7 @@ public struct AgentGatewayConfiguration: Sendable {
         self.signalSummary = signalSummary
         self.observedContracts = observedContracts
         self.observeEvent = observeEvent
+        self.publicationSettled = publicationSettled
         self.sink = sink
     }
 }

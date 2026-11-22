@@ -155,6 +155,47 @@ extension LiveRuntimeTests {
     }
 }
 
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: ["delivered", "rejected", "unobserved"])
+func publicationSettlementReportsActualRecipients(scenario: String) async throws {
+    let session = UUID().uuidString
+    let manager = AgentManager()
+    let policy = try CommunicationPolicy(
+        contracts: communicationFixtureContracts(),
+        configurations: [
+            communicationConfiguration("producer", publishes: true),
+            communicationConfiguration("consumer", subscribes: true),
+        ])
+    let source = ObservationRecorder(id: "producer")
+    try await manager.register(source, sessionID: session)
+    await source.start()
+    let consumer = ObservationRecorder(id: "consumer", reject: scenario == "rejected")
+    if scenario != "unobserved" {
+        try await manager.register(consumer, sessionID: session)
+        await consumer.start()
+    }
+    let outcomes = AsyncStream<(Set<AgentID>, [AgentID: String])>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let input = InputGateway(
+        manager: manager, policy: policy, signals: SignalTransport(),
+        publicationSettled: { _, delivered, rejected in outcomes.continuation.yield((delivered, rejected)) })
+    let output = await OutputGateway(
+        manager: manager, requests: input, tools: ToolRegistry(), policy: policy, sink: { _ in })
+    for descriptor in await manager.descriptors() {
+        _ = try await output.consumer(for: manager.agent(descriptor.id))
+    }
+    let port = try await output.messaging(for: source.descriptor.id)
+    try await port.publish(
+        .transcript("hello", final: true),
+        parent: AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("parent")))
+    await input.flushPublications()
+    var iterator = outcomes.stream.makeAsyncIterator()
+    let (delivered, rejected) = try #require(await iterator.next())
+    let consumerID = AgentID(rawValue: "consumer")
+    #expect(delivered.contains(consumerID) == (scenario == "delivered"))
+    #expect((rejected[consumerID] != nil) == (scenario == "rejected"))
+    await output.shutdown()
+    await manager.stopAll()
+}
+
 private func directFixture(blockText: String? = nil, reject: Bool = false) async throws
     -> (AgentManager, InputGateway, OutputGateway, AgentMessaging, ObservationRecorder, String)
 {

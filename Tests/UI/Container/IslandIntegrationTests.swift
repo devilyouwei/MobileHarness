@@ -198,12 +198,8 @@ private func islandInput(_ function: String, parameters: [String: String], sourc
     #expect(ui.island.headerActivity?.owner == "test.voice")
     await writer.update(delegateID: "writer-run", phase: .running, step: "迟到进度")
     try await wait { ui.island.detailActivity == nil }
-    // Assistant Task logs are no longer a producer of Writer Island content.
-    ui.runtimeLog.record(
-        .task(
-            .init(
-                id: "stale", parentID: nil, requester: "assistant", executor: "writer", title: "旧日志", phase: .running),
-            .init(id: "late", time: Date(), title: "旧步骤", detail: "不能覆盖")))
+    // Runtime logs are not a producer of Writer Island content.
+    ui.runtimeLog.record(.agent(.init(source: "writer", status: "running", isFailure: false)))
     try await Task.sleep(for: .milliseconds(30))
     #expect(ui.island.detailActivity == nil)
     #expect(!ui.island.activities.contains { $0.owner == "domain.writer" })
@@ -355,12 +351,11 @@ private actor WriterIslandPublicationProbe {
     try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
     #expect(AssistantExecutionSession.taskContent(skills) == nil)
     let input = UUID().uuidString
-    _ = try skills.control(
-        "task.start", arguments: ["description": "测试前台目标"], inputID: input, fixed: fixed, taskID: "task_1")
+    try skills.beginTask(goal: "测试前台目标", taskID: "task_1", sessionID: nil, inputID: input)
     let content = try #require(AssistantExecutionSession.taskContent(skills))
     #expect(content.detail?.text == "测试前台目标")
     #expect(content.expansionID == skills.activeTaskID)
-    _ = try skills.control("task.end", arguments: ["summary": "完成"], inputID: input, fixed: fixed)
+    try skills.requestFinish(summary: "完成")
     try skills.decisionCompleted()
     #expect(AssistantExecutionSession.taskContent(skills) == nil)
 }
@@ -384,10 +379,7 @@ private actor WriterIslandPublicationProbe {
     var skills = AgentTaskSkillState()
     let fixed = agent.descriptor.capabilities
     try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
-    _ = try skills.control(
-        "task.start", arguments: ["description": "Assistant 独立前台目标"], inputID: UUID().uuidString, fixed: fixed,
-        taskID: "task_1"
-    )
+    try skills.beginTask(goal: "Assistant 独立前台目标", taskID: "task_1", sessionID: nil, inputID: UUID().uuidString)
     await session.presentTaskState(skills)
     let deadline = ContinuousClock.now + .seconds(5)
     while state.detailActivity == nil, ContinuousClock.now < deadline { await Task.yield() }

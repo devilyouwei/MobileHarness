@@ -32,16 +32,22 @@ extension SpeechPerceptionAgent {
             try Task.checkCancellation()
             guard nativeInputEpoch == epoch else { throw CancellationError() }
             bindMicrophoneGeneration(capture.generation)
+            await speechCaptureStarted(epoch)
+            try Task.checkCancellation()
+            guard nativeInputEpoch == epoch else { throw CancellationError() }
             nativeInput = Task {
                 do { try await self.consumeMicrophone(capture, sessionID: sessionID, epoch: epoch) } catch {
                     await capture.frames.cancel()
                     await capture.frames.join()
+                    await self.speechCaptureStopped(epoch)
                     throw error
                 }
                 await capture.frames.cancel()
                 await capture.frames.join()
+                await self.speechCaptureStopped(epoch)
             }
         } catch {
+            await speechCaptureStopped(epoch)
             await opened?.frames.cancel()
             await opened?.frames.join()
             if nativeInputEpoch == epoch { nativeInputEpoch = nil }

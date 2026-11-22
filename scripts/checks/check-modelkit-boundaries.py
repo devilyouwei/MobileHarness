@@ -1179,7 +1179,7 @@ if targets['Agents'].get('path') != 'MobileHarness' or targets['Agents'].get('so
     errors.append('Agents must compile only Agents sources while packaging shared assets')
 asset_root = ROOT / 'MobileHarness/Resources'
 asset_catalog = json.loads((asset_root / 'Catalog.json').read_text())
-for group, version in [('agents', 11), ('skills', 3)]:
+for group, version in [('agents', 12), ('skills', 3)]:
     for name, relative in asset_catalog[group].items():
         source = asset_root / relative
         parts = Path(relative).parts
@@ -1203,9 +1203,11 @@ for group, version in [('agents', 11), ('skills', 3)]:
                 errors.append(f'Retired per-Agent Permissions remain: {relative}')
             if any(key in configuration for key in ('functions', 'actions', 'tools')):
                 errors.append(f'Agent function registration must belong to Skills: {relative}')
-            base = configuration.get('baseSkills', [])
+            base = configuration.get('skills', [])
             if not isinstance(base, list) or any(skill not in asset_catalog['skills'] for skill in base):
                 errors.append(f'Unknown Agent base Skill: {relative}')
+            if 'baseSkills' in configuration or not isinstance(configuration.get('states'), list):
+                errors.append(f'Agent.json requires skills and states (no baseSkills): {relative}')
             functions = []
         elif group == 'skills':
             functions = configuration['useActions']
@@ -1229,11 +1231,11 @@ for group, version in [('agents', 11), ('skills', 3)]:
                 errors.append(f'Action Skill bindings require an explicit Channel: {relative}')
             if function['path'].startswith('Agent.Communication.'):
                 errors.append(f'Retired send Action: {relative}')
-            if function['path'].startswith('Agent.Task.'):
+            if function['path'].startswith(('Agent.Task.', 'Agent.State.', 'Agent.Skill.', 'Agent.Message.')):
                 errors.append(f'Controls belong to their owning Agent, not Skills: {relative}')
         if group == 'skills':
             for teaching in source.parent.glob('Instructions*.md'):
-                if re.search(r'<(?:loadSkills|releaseSkills|task\.(?:start|end|send))\b', teaching.read_text()):
+                if re.search(r'<(?:loadSkills|releaseSkills|task\.(?:start|end|send)|skill\.(?:load|unload)|state\.(?:set|clear|get)|send)\b', teaching.read_text()):
                     errors.append(f'Skill teaches Agent controls: {teaching.relative_to(ROOT)}')
 if any(p for group in ('Agents', 'Skills') for p in (asset_root / group).rglob('*.swift')):
     errors.append('Agent Resources must not contain compiled code')

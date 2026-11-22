@@ -54,7 +54,8 @@ extension AgentObservationAccess {
             manager: manager, policy: configuration.policy, signals: signals,
             requestImplementations: AgentContracts.requestImplementations,
             eventImplementations: AgentContracts.eventImplementations,
-            signalSummary: configuration.signalSummary, admission: admission)
+            signalSummary: configuration.signalSummary, publicationSettled: configuration.publicationSettled,
+            admission: admission)
         self.manager = manager
         self.input = input
         self.cognitive = configuration

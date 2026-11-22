@@ -33,7 +33,7 @@ PlatformSystemStatus测试验证驻留电量未知/充电/低电量字段、网�
 
 Bundled Skill catalog validation includes web-browsing/web-drawing and their dependency expansion. The full behavior fixture explicitly supplies WebCapability alongside other optional host capabilities; it does not perform native browsing or generation.
 
-状态覆盖回归从打包Catalog动态枚举全部Skill，逐个执行loadSkills→收集有效useStates→releaseSkills→再次收集。UI/Platform使用真实被动状态读取，iOS专属Actions业务节点与Agent应用摘要为明确替身；验证Web技能依赖、ui.web注册与释放，不调用模型或网络。
+状态覆盖回归从打包Catalog动态枚举全部Skill，逐个执行skill.load→收集有效useStates→skill.unload→再次收集。UI/Platform使用真实被动状态读取，iOS专属Actions业务节点与Agent应用摘要为明确替身；验证Web技能依赖、ui.web注册与释放，不调用模型或网络。
 
 Web Skill教学回归逐字符解析实际Instructions.md中的XML示例，使用各Skill及依赖展开后的真实目录，验证别名/参数可接受、依赖调用分轮、创建与修改身份，以及完整已加载提示词的大小预算。它验证教学制品和执行协议一致，不代替真实模型遵循度测试。
 

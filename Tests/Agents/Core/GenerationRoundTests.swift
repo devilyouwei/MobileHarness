@@ -1187,9 +1187,7 @@ private func agentRequestFailuresTerminateWithoutRetryOrEffectReplay(_ failure: 
         var initial = AssistantContextState()
         var skills = AgentTaskSkillState()
         try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
-        _ = try skills.control(
-            "task.start", arguments: ["description": "保留跨轮目标"], inputID: input.id, fixed: fixed,
-            taskID: try fixtureTaskID())
+        try skills.beginTask(goal: "保留跨轮目标", taskID: try fixtureTaskID(), sessionID: nil, inputID: input.id)
         initial.skillState = skills
         context = try AgentContextRepository(
             agent: .assistant, scope: UUID().uuidString, state: initial
@@ -2017,15 +2015,11 @@ func fullDuplexInterruptSettlesOldActionAndRetainsQueuedInput() async throws {
         try await Task.sleep(for: .milliseconds(10))
     }
     let turns = try await harness.store.snapshot().current.turns
-    #expect(turns.first(where: { $0.id == first.id })?.state == .cancelled)
+    #expect(turns.first(where: { $0.id == first.id })?.state == .interrupted)
     #expect(turns.first(where: { $0.id == next.id })?.state == .completed)
     #expect(await harness.model.requests.count == 2)
     #expect(await !gate.released)
     #expect(await feedback.values == [next.id])
-    let pending = await agent.speechEndpointActivity(acknowledging: nil)
-    let interruptionID = try #require(pending.interruptionID)
-    #expect(await agent.speechEndpointActivity(acknowledging: UUID()).interruptionID == interruptionID)
-    #expect(await agent.speechEndpointActivity(acknowledging: interruptionID).interruptionID == nil)
     await harness.close()
     pump.cancel()
     _ = await pump.result

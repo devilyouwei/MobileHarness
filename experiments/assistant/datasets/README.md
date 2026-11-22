@@ -3,5 +3,5 @@
 本目录拥有本任务的原始 case、冻结请求及配置快照。标签和判定用于评估，不注入模型请求。历史输入保留字节与来源哈希；实际输出、性能测量和汇总归 [results](../results/README.md)。
 
 - [assistant-prompt-cases.json](assistant-prompt-cases.json)
-- [qwen-workflows.json](qwen-workflows.json)
+- [qwen-workflows.json](qwen-workflows.json)：多轮工作流 case（v2 使用 `state.set/clear/get`、`skill.load/unload`、`send`；turn 的 `variables` 断言变量值，`freeVariable`、`allowRejections` 控制状态评分，case 级 `variables` 是初始变量）
 - [wait-prompt-cases.json](wait-prompt-cases.json)：wait 提示词 case；refs 选择器与 before/overlap/startGap/endGap 断言只用于评分，durations 为模拟时长假设

@@ -629,17 +629,6 @@
         }
       }
     },
-    "An interrupt decision can precede execution stopping.": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "打断是决策结果，不代表所有执行都已停止。"
-          }
-        }
-      }
-    },
     "Another album operation is in progress.": {
       "extractionState": "extracted",
       "localizations": {
@@ -2242,17 +2231,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "决策路径："
-          }
-        }
-      }
-    },
-    "Decision: ": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "决策："
           }
         }
       }
@@ -3914,17 +3892,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "输入 / 输出 / 总 Token"
-          }
-        }
-      }
-    },
-    "Input decision": {
-      "extractionState": "extracted",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "输入决策"
           }
         }
       }
@@ -9891,6 +9858,34 @@
         }
       }
     },
+    "Superseded Decision": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已被新输入替代"
+          }
+        }
+      }
+    },
+    "superseded": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Superseded by newer input"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已被新输入替代"
+          }
+        }
+      }
+    },
     "target_expired": {
       "localizations": {
         "en": {
@@ -9999,6 +9994,748 @@
           "stringUnit": {
             "state": "translated",
             "value": "仅供 Mac 打断实验参考。推荐优先考虑少误打断；中文可靠性和真机表现仍待验证。"
+          }
+        }
+      }
+    },
+    " · Cache read: %ld tokens": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · 缓存读取 %ld Token"
+          }
+        }
+      }
+    },
+    " · Cache write: %ld tokens": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · 缓存写入 %ld Token"
+          }
+        }
+      }
+    },
+    "%ld Actions · %ld Tools": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%ld 个动作 · %ld 个工具"
+          }
+        }
+      }
+    },
+    "%ld turns": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%ld 轮"
+          }
+        }
+      }
+    },
+    ", ": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "、"
+          }
+        }
+      }
+    },
+    "Actions and Tools": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "动作与工具"
+          }
+        }
+      }
+    },
+    "Active task ID at request": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请求时进行中的任务 ID"
+          }
+        }
+      }
+    },
+    "Agent state": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent 状态"
+          }
+        }
+      }
+    },
+    "Arguments:": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参数："
+          }
+        }
+      }
+    },
+    "Assistant Response": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "助手回复"
+          }
+        }
+      }
+    },
+    "Channel: ": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通道："
+          }
+        }
+      }
+    },
+    "Container": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "容器"
+          }
+        }
+      }
+    },
+    "Default conversation at request": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请求时为默认对话"
+          }
+        }
+      }
+    },
+    "Definition": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "定义"
+          }
+        }
+      }
+    },
+    "Error:": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "错误："
+          }
+        }
+      }
+    },
+    "Function Catalog": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "函数目录"
+          }
+        }
+      }
+    },
+    "Functions": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "函数"
+          }
+        }
+      }
+    },
+    "Generation Error: ": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成错误："
+          }
+        }
+      }
+    },
+    "Generation Meta": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成信息"
+          }
+        }
+      }
+    },
+    "Image": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "图像"
+          }
+        }
+      }
+    },
+    "Input ID: %@": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "输入 ID：%@"
+          }
+        }
+      }
+    },
+    "Input: %ld tokens · Generated: %ld tokens · Total: %ld tokens": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "输入 %ld Token · 生成 %ld Token · 共 %ld Token"
+          }
+        }
+      }
+    },
+    "Interrupt decision": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打断决策"
+          }
+        }
+      }
+    },
+    "Interrupt: %@": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "是否打断：%@"
+          }
+        }
+      }
+    },
+    "Loading conversations…": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在加载对话…"
+          }
+        }
+      }
+    },
+    "Logs cleared": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日志已清空"
+          }
+        }
+      }
+    },
+    "Model: %@": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型：%@"
+          }
+        }
+      }
+    },
+    "No": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "否"
+          }
+        }
+      }
+    },
+    "No Skill state loaded": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未加载 Skill 状态"
+          }
+        }
+      }
+    },
+    "No conversations yet.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂无对话。"
+          }
+        }
+      }
+    },
+    "No parameters": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无参数"
+          }
+        }
+      }
+    },
+    "No past conversations.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂无历史对话。"
+          }
+        }
+      }
+    },
+    "Input source": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "输入来源"
+          }
+        }
+      }
+    },
+    "Not recorded": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未记录"
+          }
+        }
+      }
+    },
+    "Optional: ": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可选："
+          }
+        }
+      }
+    },
+    "Prompt messages unavailable": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提示词消息不可用"
+          }
+        }
+      }
+    },
+    "Prompts": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提示词"
+          }
+        }
+      }
+    },
+    "Raw JSON": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原始 JSON"
+          }
+        }
+      }
+    },
+    "ReACT · Execution observations": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReACT · 执行观察"
+          }
+        }
+      }
+    },
+    "Read-only": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只读"
+          }
+        }
+      }
+    },
+    "Read-write": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可读写"
+          }
+        }
+      }
+    },
+    "Regenerate Title": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新生成标题"
+          }
+        }
+      }
+    },
+    "Request ID: %@": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请求 ID：%@"
+          }
+        }
+      }
+    },
+    "Required: ": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "必填："
+          }
+        }
+      }
+    },
+    "Result:": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "结果："
+          }
+        }
+      }
+    },
+    "Semantic": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语义"
+          }
+        }
+      }
+    },
+    "Skill state": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skill 状态"
+          }
+        }
+      }
+    },
+    "Skills": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "技能"
+          }
+        }
+      }
+    },
+    "Starting a new conversation archives the current one.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开始新对话会归档当前对话。"
+          }
+        }
+      }
+    },
+    "State": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "State"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状态"
+          }
+        }
+      }
+    },
+    "State: %@; Finish Reason: %@": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状态：%@；结束原因：%@"
+          }
+        }
+      }
+    },
+    "States": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状态"
+          }
+        }
+      }
+    },
+    "Task ID": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "任务 ID"
+          }
+        }
+      }
+    },
+    "Task ID · Active at request": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "任务 ID · 请求时进行中"
+          }
+        }
+      }
+    },
+    "Tasks": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "任务"
+          }
+        }
+      }
+    },
+    "Temperature: %@": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "温度：%@"
+          }
+        }
+      }
+    },
+    "This cannot be undone.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此操作无法撤销。"
+          }
+        }
+      }
+    },
+    "This input interrupted the reply in progress.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本条输入打断了正在进行的回复。"
+          }
+        }
+      }
+    },
+    "Title generation failed: %@": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标题生成失败：%@"
+          }
+        }
+      }
+    },
+    "Tool %ld": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工具 %ld"
+          }
+        }
+      }
+    },
+    "Tool Call ID: ": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工具调用 ID："
+          }
+        }
+      }
+    },
+    "Tool Call · %@ · %@": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工具调用 · %@ · %@"
+          }
+        }
+      }
+    },
+    "Tool Call: ": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工具调用："
+          }
+        }
+      }
+    },
+    "Tool Call: %@ · %@": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工具调用：%@ · %@"
+          }
+        }
+      }
+    },
+    "Unable to read Function Catalog": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取函数目录"
+          }
+        }
+      }
+    },
+    "User Request": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用户请求"
+          }
+        }
+      }
+    },
+    "Yes": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "是"
           }
         }
       }

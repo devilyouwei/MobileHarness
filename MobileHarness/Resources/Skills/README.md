@@ -65,7 +65,7 @@ BasicInteraction读取ui.home.expression、agents.applicationcontrol、agents.wr
 2. **前置检查**：依赖哪些事实、权限、设备或产物；未知状态先读取，不由模型猜测。
 3. **执行流程**：分步骤说明使用哪些已注册函数、依赖关系、需要等待结果的节点。涉及先后顺序遵守 Core wait / Channel 规则。
 4. **反馈与 ReACT**：以真实 Action / Tool 结果决定下一步；失败保留真实效果，不自动重复有副作用动作。
-5. **用户交互**：明确何时询问、等待什么答案。等待用户保留 Task，不因模型回复结束而 task.end。
+5. **用户交互**：明确何时询问、等待什么答案。等待用户保留 `task`，不因模型回复结束而清除。
 6. **完成、取消与异常**：明确可确认的完成条件、需要的清理和摘要。Skill 释放不等于设备清理；清理通过已实现的 Action 和任务屏障完成。
 7. **例子（必要时）**：以“当前条件/用户输入 → 本轮精确输出 → 真实反馈后的下一轮”组织。可执行回复单独放在 `xml` 代码块中，不把条件、步骤编号、引号或解释拼进模型输出；参数来自 canonical 元数据。示例反馈须标明为假设数据，mediaID 等标识仅用于该示例，运行时使用真实返回值。
 
@@ -101,21 +101,21 @@ BasicInteraction读取ui.home.expression、agents.applicationcontrol、agents.wr
 
 ## 加载、释放与 Task 生命周期
 
-Assistant 的 [Controls.md](../Agents/Assistant/Controls.md) 按概念、上下文、决策、控制动作效果、生命周期、反馈/失败组织。Skill 明确提供教学、函数、State 选择及依赖；Task 保留持续目标和完成条件，单次工作的多次模型请求不构成创建 Task 的充分理由。五项 Agent 控制 由 Controls.md 教学，分别负责加载／释放 Skill、开始／结束前台 Task、向同伴发送委托正文，以及开始／停止聆听。加载和释放影响后续请求，task.start 可携带初始能力，task.end 提交终态及摘要。task.send 的送达回执独立于同伴接纳与完成。参数和协议由 canonical 声明与 Core 拥有，JSON 只注册现有绑定、状态及指令来源。
+Assistant 的 [Controls.md](../Agents/Assistant/Controls/Controls.md) 按概念、上下文、决策、控制动作效果、生命周期、反馈/失败组织。Skill 明确提供教学、函数、State 选择及依赖；自身变量 `task` 保留持续目标，单次工作的多次模型请求不构成设置它的充分理由。六项 Agent 控制由 Controls.md 教学，分别负责读写自身变量（`state.set` / `state.clear` / `state.get`）、加载／卸载 Skill（`skill.load` / `skill.unload`）和向同伴发送委托正文（`send`）。加载和卸载影响后续请求，清除 `task` 提交终态及摘要。`send` 的送达回执独立于同伴接纳与完成。参数和协议由 canonical 声明与 Core 拥有，JSON 只注册现有绑定、状态及指令来源。
 
-显式 releaseSkills 可移除确认不再需要且允许释放的近期或任务非基础根，Task 本身继续存在；基础项、非根依赖和仍被其他根依赖的指定 Skill 拒绝释放。通常保留目标需要的能力并在终态清理，不能把使用建议写成运行时禁止。加载/释放失败原子保留先前能力状态；Task 替换预校验、旧目标收尾、新目标创建是分阶段流程，不能承诺收尾后的创建失败会自动恢复旧目标。
+显式 `skill.unload` 可移除确认不再需要且允许释放的近期非基础根；基础项、非根依赖和仍被其他根依赖的指定 Skill 拒绝卸载。Skill 与 `task` 无关：目标既不持有 Skill，也不回收 Skill。加载/卸载失败原子保留先前能力状态；`state.set` 替换已有目标时旧目标收尾与新目标创建是分阶段流程，不能承诺收尾后的创建失败会自动恢复旧目标。
 
 Assistant 的 [Controls.md](../Agents/Assistant/Controls.md) 在加载前按用户目标匹配 AVAILABLE SKILLS / DELEGATABLE AGENTS 的公开 description。当前函数目录只是已加载子集；函数缺失不能直接作为不支持该能力的依据。事实已足够时直接回答，已声明函数直接按教学使用，缺失且匹配的单次能力通过 loadSkills 获取；新持续目标通过 task.start(skills) 获取。加载成功后的下一请求才读取新增私有教学并执行，不把加载与业务动作拼在一轮。拒绝能力前检查公开目录；实际未提供的操作或加载/执行失败仍如实报告，不重复加载。Assistant 的 [Controls.md](../Agents/Assistant/Controls.md) 只描述通用能力发现流程，不包含具体业务场景或业务 Skill ID 示例；业务教学由对应 Skill 拥有。只有公开目录没有相关 Skill 或可委托 Agent 时，才能说明能力未提供；加载或执行失败须报告具体阻塞，不能等同于能力不存在。
 
-默认基础能力由 Agent 的 baseSkills 初始化。`loadSkills` / `releaseSkills` 是 Assistant 的 `self` control，不经 Channel 调度；`task.start(description, skills?)` 在创建本 Agent 的前台目标任务时同时加载所需 Skill 组；Assistant 的 [Controls.md](../Agents/Assistant/Controls.md) 教学要求携带已知必要的初始 Skill 数组，成功反馈后下一轮使用提交后的函数，无需再 loadSkills。已有 Skill 可随启动转为任务持有；后续出现新的缺失能力才额外加载。输入参数及数组编码以 Agent.Task canonical 元数据为准。
+默认基础能力由 Agent 的 `skills` 初始化。`skill.load` / `skill.unload` 是 Assistant 的 `self` control，不经 Channel 调度；加载后下一轮使用提交后的函数，无需再次加载。输入参数及数组编码以 Agent.Skill canonical 元数据为准。
 
-Assistant 的 [Controls.md](../Agents/Assistant/Controls.md)先检查CURRENT STATE：已有足够事实直接回答，不加载Skill或重复查询；确需执行单步控制/查询/拍摄且函数缺失时才使用loadSkills，多轮持续目标使用startTask。一次拍照且无后续操作不强制创建Task。直接加载只扩展能力，不建立任务目标；默认决策链可包含多次模型请求；无 Task 的 Skill 跨链保留，加载/合法调用重置为 5，未使用的完整用户决策扣 1。Task 先设定目标及可判断的完成条件，等待用户时持续保留；模型根据真实结果判断目标达成或用户明确替换目标后使用 task.end，并如实记录结果；用户取消使用 task.end 并记录未完成结果。可恢复动作失败不等于任务结束；运行时决策异常进入 failed，重启进入 interrupted。在已有 Task 中 loadSkills 仅补充任务能力，不创建或替换目标。一次性历史查询仅在所需函数缺失时直接加载，多轮筛选与确认示例使用 Task。
+Assistant 的 [Controls.md](../Agents/Assistant/Controls/Controls.md)先检查CURRENT STATE：已有足够事实直接回答，不加载Skill或重复查询；确需执行单步控制/查询/拍摄且函数缺失时才使用 skill.load，多轮持续目标设置 `task`。一次拍照且无后续操作不强制设置。直接加载只扩展能力，不建立目标；默认决策链可包含多次模型请求；Skill 跨链保留，加载/合法调用重置为 5，未使用的完整用户决策扣 1。`task` 先设定目标及可判断的完成条件，等待用户时持续保留；模型根据真实结果判断目标达成或用户明确替换目标后用 state.clear（或带 note 的 state.set）并如实记录结果；用户取消时清除并记录未完成结果。可恢复动作失败不等于目标结束；运行时决策异常进入 failed，重启进入 interrupted。一次性历史查询仅在所需函数缺失时直接加载，多轮筛选与确认示例使用 `task`。
 
 加载先展开依赖，再验证资源、canonical 函数、别名和 Channel，全部成功后提交；任一失败保持原状态。依赖链最多 8 层，展开后最多 16 个 Skill，有效函数含内部能力最多 128 项，Channel 最多 16 个。
 
 每次模型请求持有不可变的 Skill / 函数快照。切换只影响后续请求，本轮不能立即调用刚加载的函数；成功结果通过现有屏障进入 ReACT。无 Task 的近期 Skill 在五次闲置用户决策后回收，内部 ReACT 不扣次数；任务所属 Skill 在 waitingUser 保留，任务终态清理后释放，基础 Skill 继续有效。Skill 不保存运行时业务状态，不能通过修改文件恢复旧任务或重放动作。
 
-后台工作使用 task.send(agent_id,text) 转述用户要求。接收角色拥有自己的能力、Context 和工作流，决定如何接纳与回报。
+后台工作使用 send(agent_id,text) 转述用户要求。接收角色拥有自己的能力、Context 和工作流，决定如何接纳与回报。
 
 ## 开发与 Review 标准
 
@@ -145,11 +145,11 @@ Assistant 的 [Controls.md](../Agents/Assistant/Controls.md)先检查CURRENT STA
 
 ## 当前流程规则
 
-Photography 的匹配摄影 Task 在保存或视频处置结果确认后可以结束，Camera 窗口独立保留。只有用户明确关闭或丢弃照片时才执行 closeCamera，收到 operation=close、enabled=false 后确认关闭并完成匹配目标。Task 取消/替换、打开新窗口不授权关窗。关闭直接清空未保存照片；待处置视频需先明确保存或忽略。关闭失败或取消时保留 Task 和已提交的保存结果。Capture 关闭不关闭背景视觉。独立拍照／保存操作不创建 Task；重拍保留原 Task、窗口及先前缓存照片。
+Photography 的匹配摄影 Task 在保存或视频处置结果确认后可以结束，Camera 窗口独立保留。只有用户明确关闭或丢弃照片时才执行 closeCamera，closeCamera 成功无返回值（仅失败回传），直接确认关闭并清除匹配目标。Task 取消/替换、打开新窗口不授权关窗。关闭直接清空未保存照片；待处置视频需先明确保存或忽略。关闭失败或取消时保留 Task 和已提交的保存结果。Capture 关闭不关闭背景视觉。独立拍照／保存操作不创建 Task；重拍保留原 Task、窗口及先前缓存照片。
 
 Assistant 的 [Controls.md](../Agents/Assistant/Controls.md) 要求以 AGENT CONTEXT task 和匹配目标判断关闭：无 Task 单步完成只回复。明确目标切换可释放无关非基础近期 Skill；不确定是否放弃旧目标时先问是否继续实际 Task，保持等待状态。明确替换或正常目标完成不重复询问。continueDecision 只继续同一输入剩余新目标；释放 Skill 不代表相机/照片清理。Photography 与 HistoryQuery 的完成示例遵循同一规则。
 
-Assistant 全双工中，`task.end` 成功即提交前台终态和历史摘要。开始或结束被打断时，根据当前任务及回执决定是否再发起控制。短暂岔题保留任务，去向不明时询问，明显转向且旧目标无需继续时可主动结束。Control 与语音、显示等 channel 各自调度。
+Assistant 全双工中，清除 `task`（附 note）成功即提交前台终态和历史摘要。被打断时，根据 AGENT STATE 中的当前目标及回执决定是否再发起控制。短暂岔题保留目标，去向不明时询问，明显转向且旧目标无需继续时可主动清除。Control 与语音、显示等 channel 各自调度。
 
 历史查询只复制 list 返回的完整 dialog_number；notFound 允许一次重新 list 和一次基于实际 ID 的修正 read，不猜测 ID 或无限重试。业务参数与 media_N 等引用来自真实反馈。语法、Channel/wait 和资源冲突由 Core/Gateway 契约决定，Skill 不重复定义。
 
@@ -222,7 +222,7 @@ Photography与ApplicationControl增加Island.setPresentation以及ui.island事�
 
 ## Web skills
 
-Assistant 的 [Controls.md](../Agents/Assistant/Controls.md) 公开 Assistant 前台 task.start/end 和后台消息 task.send(agent_id,text)。后台目标、补充和停止都使用正文。接收 Agent 自行决定如何处理，公开目录提供角色职责。Writer 私有工具与作品业务由 Writer 拥有。
+Assistant 的 [Controls.md](../Agents/Assistant/Controls/Controls.md) 公开 Assistant 自身变量 state.set/clear/get、Skill 加载 skill.load/unload 和后台消息 send(agent_id,text)。后台目标、补充和停止都使用正文。接收 Agent 自行决定如何处理，公开目录提供角色职责。Writer 私有工具与作品业务由 Writer 拥有。
 
 Assistant 的 [Controls.md](../Agents/Assistant/Controls.md) 要求将同伴报告视为证据，不由通知重委托；运行时拥有播放排空后的启听衔接，不靠模型生成startListening。
 

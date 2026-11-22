@@ -171,6 +171,8 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         drain()
     }
     var coordination: [String: AssistantInputCoordination] = [:]
+    /// Replies cut off by an interrupt decision while still generating; consumed when their generation settles.
+    var interruptedInputs: Set<String> = []
     var mergedResults: [String: [ChatMessage]] = [:]
     var semanticMessages: [String: AssistantInputMessage] = [:]
     var semanticAttachments: [String: [ChatMessage]] = [:]
@@ -205,7 +207,120 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             user: batchTexts[input.id] ?? Self.inputText(input) ?? "")
     }
     let speechSessionID: String?
-    var speechInterruptionID: UUID?
+    var speechUtterances: Set<String> = []
+    var interruptionWait: UUID?
+    private var interruptionSpeechObserved = false
+    private var interruptionProbeStart: ContinuousClock.Instant?
+    private var interruptionProbeSamples = 0
+    private var speechCaptureGeneration: UUID?
+    var interruptionWaitTask: Task<Void, Never>?
+
+    func speechStarted(_ id: String) throws {
+        guard lifecycle == .running else { return }
+        guard speechUtterances.count < 32 || speechUtterances.contains(id) else {
+            throw CommunicationError.capacityExceeded
+        }
+        speechUtterances.insert(id)
+        if interruptionWait != nil {
+            interruptionSpeechObserved = true
+            interruptionWaitTask?.cancel()
+            interruptionWaitTask = nil
+        }
+    }
+
+    func speechEnded(_ id: String) {
+        guard speechUtterances.remove(id) != nil else { return }
+        finishInterruptionWaitIfReady()
+    }
+
+    func speechPublicationFailed(_ input: AgentInput, reason: String) {
+        guard input.sessionID == speechSessionID, let turn = input.turn,
+            speechUtterances.contains(turn.id)
+        else { return }
+        emit(.control("agent.error: speech delivery failed: \(reason)"), for: input)
+        speechEnded(turn.id)
+    }
+
+    func clearSpeechUtterances() {
+        speechUtterances.removeAll()
+        finishInterruptionWaitIfReady()
+    }
+
+    func cancelInterruptionWait() {
+        interruptionWaitTask?.cancel()
+        interruptionWaitTask = nil
+        interruptionWait = nil
+        interruptionSpeechObserved = false
+        interruptionProbeStart = nil
+        interruptionProbeSamples = 0
+    }
+
+    func finishInterruptionWaitIfReady() {
+        guard interruptionWait != nil, !executionCancellationBarrier, interruptionSpeechObserved,
+            speechUtterances.isEmpty
+        else { return }
+        cancelInterruptionWait()
+        drain()
+    }
+
+    func speechCaptureStarted(_ generation: UUID) {
+        if let prior = speechCaptureGeneration, prior != generation, interruptionWait != nil {
+            failInterruptionProbe("Speech capture changed during interruption wait")
+        }
+        speechCaptureGeneration = generation
+    }
+
+    func speechCaptureStopped(_ generation: UUID) {
+        guard speechCaptureGeneration == generation else { return }
+        speechCaptureGeneration = nil
+        if interruptionWait != nil {
+            failInterruptionProbe("Speech capture stopped during interruption wait")
+        }
+    }
+
+    func speechWindow(
+        generation: UUID, capturedAt: ContinuousClock.Instant, samples: Int, onsetCandidate: Bool
+    ) {
+        guard speechCaptureGeneration == generation, interruptionWait != nil, !executionCancellationBarrier,
+            !interruptionSpeechObserved, let start = interruptionProbeStart, capturedAt >= start
+        else { return }
+        interruptionProbeSamples += samples
+        if interruptionProbeSamples >= 40 * 512, !onsetCandidate {
+            cancelInterruptionWait()
+            drain()
+        }
+    }
+
+    private func failInterruptionProbe(_ reason: String) {
+        Logger(subsystem: "dev.mobileharness", category: "AssistantSpeech").error("\(reason, privacy: .public)")
+        if let input = queue.inputs.first(where: { $0.sessionID == speechSessionID }) {
+            emit(.control("agent.error: \(reason)"), for: input)
+        }
+        cancelInterruptionWait()
+        drain()
+    }
+
+    private func beginInterruptionWait(_ id: UUID) {
+        guard interruptionWait == id else { return }
+        if interruptionSpeechObserved {
+            finishInterruptionWaitIfReady()
+            return
+        }
+        guard speechCaptureGeneration != nil else {
+            failInterruptionProbe("Speech capture unavailable for interruption wait")
+            return
+        }
+        interruptionProbeStart = .now
+        interruptionWaitTask = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(10)) } catch { return }
+            await self?.interruptionProbeTimedOut(id)
+        }
+    }
+
+    private func interruptionProbeTimedOut(_ id: UUID) {
+        guard interruptionWait == id else { return }
+        failInterruptionProbe("Speech interruption observation stalled")
+    }
     var inputInterruption: (@Sendable (String) async throws -> Void)?
     func bindInputInterruption(_ callback: @escaping @Sendable (String) async throws -> Void) {
         inputInterruption = callback
@@ -233,15 +348,41 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         guard let inputInterruption else { throw CommunicationError.unavailableTarget }
         // Claim synchronously after the final target check, before crossing the cleanup boundary.
         executionCancellationBarrier = true
+        let victim = decisionTurn?.inputID
         decisionTurn = nil
         worker?.cancel()
+        let speechWait = fullDuplex && sessionID == speechSessionID ? UUID() : nil
+        if let speechWait {
+            cancelInterruptionWait()
+            interruptionWait = speechWait
+            interruptionSpeechObserved = !speechUtterances.isEmpty
+        }
         defer {
             executionCancellationBarrier = false
+            finishInterruptionWaitIfReady()
             drain()
         }
-        try await inputInterruption(sessionID)
-        if sessionID == speechSessionID { speechInterruptionID = UUID() }
+        if let victim { interruptedInputs.insert(victim) }
+        do {
+            try await inputInterruption(sessionID)
+            if let speechWait, interruptionWait == speechWait, lifecycle == .running {
+                beginInterruptionWait(speechWait)
+            }
+        } catch {
+            cancelInterruptionWait()
+            throw error
+        }
+        if let victim { try await markInterruptedAfterCleanup(victim) }
         return .interrupted
+    }
+
+    /// Generation may have finished before the interrupt, leaving only playback to cut off; the reply then
+    /// already holds a terminal state that must still read as interrupted.
+    private func markInterruptedAfterCleanup(_ id: String) async throws {
+        let state = try await conversations.readCurrent().current.turns.first { $0.id == id }?.state
+        guard state == .completed else { return }
+        interruptedInputs.remove(id)
+        try await conversations.finish(id, state: .interrupted, reason: "interrupted")
     }
 
     public func currentReplyID(sessionID: String) async -> UUID? {
@@ -260,7 +401,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             emit(.control("decision.error: \(result.reason ?? "Interruption failed")"), for: input)
         }
         if var evidence = coordination[input.id] {
-            evidence.decision = result.modelResult.map { $0 ? "true" : "false" }
+            evidence.interrupt = result.modelResult
             evidence.route = result.route.rawValue
             coordination[input.id] = evidence
             do { try await conversations.recordCoordination(evidence, for: input.id) } catch {
@@ -483,6 +624,11 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             throw AgentConfigurationError.invalidField("State context required")
         }
         usesSkills = supportsSkills
+        if supportsSkills {
+            // The `task` variable's trigger needs its declaration; a missing one is a configuration error.
+            guard try AgentConfigurations.stateSchema(named: State.configurationName).declaration(boundTo: .task) != nil
+            else { throw AgentConfigurationError.invalidField("task state declaration") }
+        }
         if supportsSkills, let communications {
             guard conversations.tasks.storageScope == communications.storageScope else {
                 throw RecordStorageError.invalidRecord

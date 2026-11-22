@@ -2,11 +2,72 @@
   "version": 1,
   "controls": [
     {
-      "alias": "loadSkills",
-      "operation": "loadSkills",
+      "alias": "state.set",
+      "operation": "state.set",
       "destination": "self",
       "declaration": {
-        "path": { "domain": "Agent", "module": "Task", "function": "loadSkills" },
+        "path": { "domain": "Agent", "module": "State", "function": "set" },
+        "doc": "Set one of your own variables. The value appears in your AGENT STATE with its write time. Any short lowercase name is allowed; some names have declared meaning.",
+        "parameters": [
+          {
+            "name": "name", "valueType": "string", "required": true,
+            "description": "Variable name", "constraints": "Lowercase letters, digits and underscore; starts with a letter; at most 32 bytes",
+            "values": []
+          },
+          {
+            "name": "value", "valueType": "string", "required": true,
+            "description": "Natural-language value, or the typed value the variable declares", "constraints": "Nonempty, at most 1 KiB",
+            "values": []
+          },
+          {
+            "name": "note", "valueType": "string", "required": false,
+            "description": "Summary of the value being replaced, when that variable drives a process (such as task) and already holds a value",
+            "constraints": "Bounded text", "values": []
+          }
+        ]
+      }
+    },
+    {
+      "alias": "state.clear",
+      "operation": "state.clear",
+      "destination": "self",
+      "declaration": {
+        "path": { "domain": "Agent", "module": "State", "function": "clear" },
+        "doc": "Clear one of your own variables. Clearing a variable that is not set changes nothing.",
+        "parameters": [
+          {
+            "name": "name", "valueType": "string", "required": true,
+            "description": "Variable name", "constraints": "", "values": []
+          },
+          {
+            "name": "note", "valueType": "string", "required": false,
+            "description": "Truthful summary of what happened while the value was set; required when clearing task",
+            "constraints": "Bounded text", "values": []
+          }
+        ]
+      }
+    },
+    {
+      "alias": "state.get",
+      "operation": "state.get",
+      "destination": "self",
+      "declaration": {
+        "path": { "domain": "Agent", "module": "State", "function": "get" },
+        "doc": "Read a state value now and continue with it. Use a short name for your own variable, or a full path for another source such as ui.windows or platform.system.audio.",
+        "parameters": [
+          {
+            "name": "path", "valueType": "string", "required": true,
+            "description": "Own variable name, or dotted state path", "constraints": "", "values": []
+          }
+        ]
+      }
+    },
+    {
+      "alias": "skill.load",
+      "operation": "skill.load",
+      "destination": "self",
+      "declaration": {
+        "path": { "domain": "Agent", "module": "Skill", "function": "load" },
         "doc": "Atomically load Skills; returns committed state for the following request.",
         "parameters": [
           {
@@ -18,12 +79,12 @@
       }
     },
     {
-      "alias": "releaseSkills",
-      "operation": "releaseSkills",
+      "alias": "skill.unload",
+      "operation": "skill.unload",
       "destination": "self",
       "declaration": {
-        "path": { "domain": "Agent", "module": "Task", "function": "releaseSkills" },
-        "doc": "Atomically release non-base Skills; returns committed state for the following request.",
+        "path": { "domain": "Agent", "module": "Skill", "function": "unload" },
+        "doc": "Atomically unload non-base Skills; returns committed state for the following request.",
         "parameters": [
           {
             "name": "skills", "valueType": "string", "required": true,
@@ -34,50 +95,11 @@
       }
     },
     {
-      "alias": "task.start",
-      "operation": "task.start",
-      "destination": "self",
-      "declaration": {
-        "path": { "domain": "Agent", "module": "Task", "function": "startTask" },
-        "doc": "Start a foreground goal when none is active. End an existing foreground goal before starting another.",
-        "parameters": [
-          {
-            "name": "description", "valueType": "string", "required": true,
-            "description": "Foreground task description", "constraints": "", "values": []
-          },
-          {
-            "name": "skills", "valueType": "string", "required": false,
-            "description": "Optional JSON array of initial foreground Skill IDs", "constraints": "", "values": []
-          }
-        ]
-      }
-    },
-    {
-      "alias": "task.end",
-      "operation": "task.end",
-      "destination": "self",
-      "declaration": {
-        "path": { "domain": "Agent", "module": "Task", "function": "finishTask" },
-        "doc": "Finish foreground only; background completion belongs to its executor. continueDecision requires a remaining new goal.",
-        "parameters": [
-          {
-            "name": "summary", "valueType": "string", "required": true,
-            "description": "summary", "constraints": "Nonempty bounded text", "values": []
-          },
-          {
-            "name": "continueDecision", "valueType": "boolean", "required": false,
-            "description": "Continue only to a different goal still requested by this user input; omit after ordinary completion",
-            "constraints": "true or false; default false", "values": ["true", "false"]
-          }
-        ]
-      }
-    },
-    {
-      "alias": "task.send",
-      "operation": "task.send",
+      "alias": "send",
+      "operation": "send",
       "destination": "peer",
       "declaration": {
-        "path": { "domain": "Agent", "module": "Task", "function": "sendMessage" },
+        "path": { "domain": "Agent", "module": "Message", "function": "send" },
         "doc": "Relay the user's request, reply or correction to a peer Agent. The receiver decides how to handle it.",
         "parameters": [
           {

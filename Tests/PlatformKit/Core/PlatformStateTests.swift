@@ -151,7 +151,7 @@ private func nativeObject(_ data: Data) throws -> [String: Any] {
     #expect(after.contains("2026-10-25T16:00:00Z") && !after.contains("15:59:59"))
     root.invalidate()
     let unavailable = try await context.snapshot(session: "state-session", names: ["platform.system.time"])
-    #expect(unavailable.contains("\"availability\":\"unknown\""))
+    #expect(unavailable == "{}")
     try await root.stop()
     context.close()
 }
@@ -165,8 +165,7 @@ private func nativeObject(_ data: Data) throws -> [String: Any] {
     }
     try context.open(session: "state-session")
     #expect(
-        try await context.snapshot(session: "state-session", names: ["platform.system.time"]).contains(
-            "stateUnavailable"))
+        try await context.snapshot(session: "state-session", names: ["platform.system.time"]) == "{}")
     mode.update { $0 = 1 }
     await #expect(throws: ContainerContextError.capacityExceeded) {
         try await context.snapshot(session: "state-session", names: ["platform.system.network"])

@@ -198,7 +198,7 @@ func multiSourceBatchQueuesIdleUsersWithoutDecisionAndPersistsAttribution() asyn
     let userIDs: Set<String> = ["asr-old", "asr-new", "typed"]
     let userMembers = members.filter { userIDs.contains($0.id) }
     #expect(Set(userMembers.map(\.id)) == userIDs)
-    #expect(userMembers.allSatisfy { $0.route == nil && $0.decision == nil })
+    #expect(userMembers.allSatisfy { $0.route == nil && $0.interrupt == nil })
     let invocation = try #require(try await store.readCurrent().current.turns.flatMap { $0.modelRequests ?? [] }.first)
     #expect(invocation.input == body)
     await agent.stop()
@@ -482,6 +482,7 @@ private actor DeferredBooleanChat: ChatCapability {
     }
     var availability: CapabilityAvailability { .available }
     var requests: [ChatRequest] = []
+    var requestInstants: [ContinuousClock.Instant] = []
     private var released = false
     private var waiter: CheckedContinuation<Void, Never>?
     func release() {
@@ -491,6 +492,7 @@ private actor DeferredBooleanChat: ChatCapability {
     }
     func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
         requests.append(request)
+        requestInstants.append(.now)
         let subsequent = requests.count > 1
         let value = replyValue ?? subsequent
         if (blocksFirst ? requests.count == 1 : subsequent) && !released {
@@ -519,10 +521,15 @@ func twoInterruptSignalsForOneReplyCancelOnlyOnceAndKeepBothInputs() async throw
     let context = try AgentContextRepository(
         agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
     let logs = BinaryLogProbe()
+    let database = try SQLiteRepositories.temporary()
+    let store = AssistantHistoryStore(
+        records: try AssistantRecordStore(
+            repository: database.assistantMessages, tasks: database.assistantTasks,
+            conversations: database.assistantConversations, logs: database.logs))
     let agent = try FixtureNativeAgent(
         inputDecision: service, fullDuplex: true,
         decisionLog: { snapshot, outcome, _ in logs.statuses[snapshot.input.id] = outcome.signalStatus },
-        chat: main, context: context)
+        chat: main, conversations: store, context: context)
     _ = try await bindSpeechRequests(agent)
     let pump = Task { for try await _ in FixtureGenerationOutputs(agent: agent) {} }
     let probe = InterruptProbe()
@@ -545,11 +552,107 @@ func twoInterruptSignalsForOneReplyCancelOnlyOnceAndKeepBothInputs() async throw
         try await Task.sleep(for: .milliseconds(2))
     }
     #expect(await probe.count == 1)
-    #expect(logs.statuses["interrupt-one"] == "interrupted")
-    #expect(logs.statuses["interrupt-two"] == "target_expired")
+    #expect(logs.statuses["interrupt-one"] == "superseded")
+    #expect(logs.statuses["interrupt-two"] == "interrupted")
+    let history = try await store.readCurrent().current.turns
+    #expect(history.first { $0.id == "interrupt-one" }?.coordination?.interrupt == nil)
+    #expect(history.first { $0.id == "interrupt-two" }?.coordination?.interrupt == true)
     let request = try #require(await main.requests.last)
     let text = request.messages.map(\.content).joined(separator: "\n")
     #expect(text.contains("Stop and explain B") && text.contains("Stop and explain C"))
+    await agent.stop()
+    pump.cancel()
+    _ = await pump.result
+}
+
+private actor PartialReplyChat: ChatCapability {
+    var availability: CapabilityAvailability { .available }
+    var requests = 0
+    func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
+        requests += 1
+        let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
+        try pair.emitter.yield(.text("Part of a long reply"))
+        guard requests == 1 else {
+            try pair.emitter.yield(.finished(.stop))
+            pair.emitter.finish()
+            return pair.session
+        }
+        // The first reply keeps streaming until the interrupt cancels it.
+        Task {
+            try? await Task.sleep(for: .seconds(30))
+            pair.emitter.finish()
+        }
+        return pair.session
+    }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func interruptedReplyIsRecordedAsInterruptedAndTheInterruptingInputKeepsItsDecision() async throws {
+    let decision = DeferredBooleanChat(blocksFirst: false, replyValue: true)
+    let service = AssistantInputDecision(
+        local: UnavailableDecision(), configuration: { (false, { decision }) },
+        timeout: .seconds(30), localTimeout: .seconds(5))
+    let main = PartialReplyChat()
+    let context = try AgentContextRepository(
+        agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
+    let database = try SQLiteRepositories.temporary()
+    let store = AssistantHistoryStore(
+        records: try AssistantRecordStore(
+            repository: database.assistantMessages, tasks: database.assistantTasks,
+            conversations: database.assistantConversations, logs: database.logs))
+    let agent = try FixtureNativeAgent(
+        inputDecision: service, fullDuplex: true, chat: main, conversations: store, context: context)
+    _ = try await bindSpeechRequests(agent)
+    let pump = Task { for try await _ in FixtureGenerationOutputs(agent: agent) {} }
+    await agent.bindInputInterruption { session in
+        try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
+    }
+    try await agent.start()
+    try await agent.receive(.init(id: "original", sessionID: "s", payload: .text("Tell a long story")))
+    for _ in 0..<1000 {
+        if await main.requests == 1 { break }
+        try await Task.sleep(for: .milliseconds(2))
+    }
+    try await agent.receive(.init(id: "stop", sessionID: "s", payload: .text("Stop")))
+    var turns: [AssistantRecord] = []
+    for _ in 0..<1000 {
+        turns = try await store.readCurrent().current.turns
+        if turns.first(where: { $0.id == "original" })?.state == .interrupted, await main.requests == 2 { break }
+        try await Task.sleep(for: .milliseconds(2))
+    }
+    #expect(turns.first { $0.id == "original" }?.state == .interrupted)
+    #expect(turns.first { $0.id == "stop" }?.coordination?.interrupt == true)
+    await agent.stop()
+    pump.cancel()
+    _ = await pump.result
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func replyFinishedGeneratingButStillPlayingIsRecordedAsInterrupted() async throws {
+    let main = DecisionCloudFixture(events: [.text("A long story"), .finished(.stop)])
+    let context = try AgentContextRepository(
+        agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
+    let database = try SQLiteRepositories.temporary()
+    let store = AssistantHistoryStore(
+        records: try AssistantRecordStore(
+            repository: database.assistantMessages, tasks: database.assistantTasks,
+            conversations: database.assistantConversations, logs: database.logs))
+    let agent = try FixtureNativeAgent(fullDuplex: true, chat: main, conversations: store, context: context)
+    let speech = try await bindSpeechRequests(agent)
+    await speech.setPlaying(true)
+    let pump = Task { for try await _ in FixtureGenerationOutputs(agent: agent) {} }
+    await agent.bindInputInterruption { session in
+        try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
+    }
+    try await agent.start()
+    try await agent.receive(.init(id: "story", sessionID: "s", payload: .text("Tell a story")))
+    for _ in 0..<1000 {
+        if try await store.readCurrent().current.turns.first?.state == .completed { break }
+        try await Task.sleep(for: .milliseconds(2))
+    }
+    #expect(try await agent.requestInterrupt(AssistantInterrupt(), sessionID: "s") == .interrupted)
+    let turns = try await store.readCurrent().current.turns
+    #expect(turns.first { $0.id == "story" }?.state == .interrupted)
     await agent.stop()
     pump.cancel()
     _ = await pump.result
@@ -611,6 +714,142 @@ func unifiedInterruptLocksTargetAndPreservesQueuedInput() async throws {
     _ = await pump.result
 }
 
+@Test(
+    .actionCatalog, .timeLimit(.minutes(1)),
+    arguments: [
+        "noSpeech", "candidate", "candidateClears", "final", "duringCleanup", "twoTurns", "empty",
+        "deliveryFailure", "captureClosed",
+    ])
+func interruptedSpeechWaitsForWindowAndFinalAdmission(scenario: String) async throws {
+    let main = DeferredBooleanChat(blocksFirst: true)
+    let context = try AgentContextRepository(
+        agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
+    let agent = try FixtureNativeAgent(fullDuplex: true, speechSessionID: "s", chat: main, context: context)
+    _ = try await bindSpeechRequests(agent)
+    let pump = Task { for try await _ in FixtureGenerationOutputs(agent: agent) {} }
+    let generation = UUID()
+    await agent.speechCaptureStarted(generation)
+    await agent.bindInputInterruption { session in
+        if scenario == "duringCleanup" { try await agent.speechStarted("new-turn") }
+        try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
+        await agent.speechWindow(generation: generation, capturedAt: .now, samples: 40 * 512, onsetCandidate: false)
+    }
+    try await agent.start()
+    try await agent.receive(.init(id: "original", sessionID: "s", payload: .text("original")))
+    for _ in 0..<1000 {
+        if await main.requests.count == 1 { break }
+        try await Task.sleep(for: .milliseconds(2))
+    }
+    try #require(await main.requests.count == 1)
+    try await agent.receive(.init(id: "queued", sessionID: "s", payload: .text("stop")))
+    if ["final", "twoTurns", "empty", "deliveryFailure"].contains(scenario) {
+        try await agent.speechStarted("new-turn")
+    }
+    func finalInput(id: String, turn: String, text: String) -> AgentInput {
+        let payload = InputPayload.observation(.transcript(text, final: true))
+        return AgentInput(
+            id: id, sessionID: "s", payload: payload,
+            metadata: .init(payload: payload, source: "speechPerception", origin: .agent, rootID: id),
+            turn: .init(id: turn, ordinal: 1))
+    }
+    if scenario == "twoTurns" { try await agent.speechStarted("next-turn") }
+    #expect(try await agent.requestInterrupt(AssistantInterrupt(), sessionID: "s") == .interrupted)
+    #expect(await main.requests.count == 1)
+    let releaseStarted = ContinuousClock.now
+    if scenario == "captureClosed" { await agent.speechCaptureStopped(generation) }
+    if scenario == "empty" { await agent.speechEnded("new-turn") }
+    if scenario == "twoTurns" {
+        try await agent.receive(finalInput(id: "early", turn: "new-turn", text: "first addition"))
+    }
+    if ["noSpeech", "candidate", "candidateClears"].contains(scenario) {
+        await agent.speechWindow(
+            generation: generation, capturedAt: .now.advanced(by: .seconds(-2)), samples: 40 * 512,
+            onsetCandidate: false)
+        await agent.speechWindow(generation: UUID(), capturedAt: .now, samples: 40 * 512, onsetCandidate: false)
+        #expect(await main.requests.count == 1)
+        await agent.speechWindow(generation: generation, capturedAt: .now, samples: 39 * 512, onsetCandidate: false)
+        #expect(await main.requests.count == 1)
+        await agent.speechWindow(
+            generation: generation, capturedAt: .now, samples: 512, onsetCandidate: scenario != "noSpeech")
+        if scenario == "candidate" {
+            #expect(await main.requests.count == 1)
+            try await agent.speechStarted("new-turn")
+            try await agent.receive(finalInput(id: "final", turn: "new-turn", text: "continue speaking"))
+        }
+        if scenario == "candidateClears" {
+            #expect(await main.requests.count == 1)
+            await agent.speechWindow(generation: generation, capturedAt: .now, samples: 512, onsetCandidate: false)
+        }
+    }
+    if ["final", "duringCleanup", "deliveryFailure", "twoTurns"].contains(scenario) {
+        await agent.speechEnded("stale-turn")
+        let turn = scenario == "twoTurns" ? "next-turn" : "new-turn"
+        let input = finalInput(id: "final", turn: turn, text: "continue speaking")
+        if scenario != "deliveryFailure" {
+            try await agent.receive(input)
+        } else {
+            await agent.speechPublicationFailed(input, reason: "rejected")
+        }
+    }
+    for _ in 0..<1000 {
+        if await main.requests.count == 2 { break }
+        try await Task.sleep(for: .milliseconds(2))
+    }
+    #expect(await main.requests.count == 2)
+    let dispatched = try #require(await main.requestInstants.dropFirst().first)
+    #expect(releaseStarted.duration(to: dispatched) < .seconds(1))
+    let text = await main.requests.last?.messages.map(\.content).joined(separator: "\n") ?? ""
+    #expect(text.contains("stop"))
+    if ["candidate", "final", "duringCleanup", "twoTurns"].contains(scenario) {
+        #expect(text.contains("continue speaking"))
+    }
+    if scenario == "twoTurns" { #expect(text.contains("first addition")) }
+    await agent.stop()
+    pump.cancel()
+    _ = await pump.result
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
+func interruptedSpeechCleanupCannotRearmRetiredWait(stop: Bool) async throws {
+    let main = DeferredBooleanChat(blocksFirst: true)
+    let context = try AgentContextRepository(
+        agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
+    let agent = try FixtureNativeAgent(fullDuplex: true, speechSessionID: "s", chat: main, context: context)
+    _ = try await bindSpeechRequests(agent)
+    let pump = Task { for try await _ in FixtureGenerationOutputs(agent: agent) {} }
+    let entered = AsyncStream<Void>.makeStream()
+    let release = AsyncStream<Void>.makeStream()
+    await agent.bindInputInterruption { session in
+        try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
+        entered.continuation.yield(())
+        var iterator = release.stream.makeAsyncIterator()
+        _ = await iterator.next()
+    }
+    try await agent.start()
+    try await agent.receive(.init(id: "original", sessionID: "s", payload: .text("original")))
+    for _ in 0..<1000 {
+        if await main.requests.count == 1 { break }
+        try await Task.sleep(for: .milliseconds(2))
+    }
+    try #require(await main.requests.count == 1)
+    try await agent.receive(.init(id: "queued", sessionID: "s", payload: .text("stop")))
+    let interruption = Task { try await agent.requestInterrupt(AssistantInterrupt(), sessionID: "s") }
+    var iterator = entered.stream.makeAsyncIterator()
+    _ = await iterator.next()
+    if stop {
+        await agent.stop()
+    } else {
+        try await agent.pause()
+    }
+    release.continuation.yield(())
+    #expect(try await interruption.value == .interrupted)
+    #expect(await agent.interruptionWait == nil)
+    #expect(await main.requests.count == 1)
+    await agent.stop()
+    pump.cancel()
+    _ = await pump.result
+}
+
 @Test(.actionCatalog)
 func unifiedInterruptProtocolRejectsUntrustedLocalInputAndAcceptsHost() async throws {
     let model = DecisionCloudFixture(events: [.text("ok"), .finished(.stop)])
@@ -640,6 +879,7 @@ func independentDecisionQueueBoundsAndJoinsCancellation() async throws {
         timeout: .seconds(30), localTimeout: .seconds(5))
     let queue = AssistantDecisionQueue()
     let completions = InterruptProbe()
+    let settlement = DecisionSettlementGate()
     for index in 0..<32 {
         let input = AgentInput(id: "q\(index)", sessionID: "s", payload: .text("hello"))
         try await queue.submit(
@@ -649,7 +889,10 @@ func independentDecisionQueueBoundsAndJoinsCancellation() async throws {
                     Issue.record("Unexpected signal")
                     return .noTarget
                 },
-                complete: { _, _, _ in await completions.record() }, updated: {}), using: service)
+                complete: { _, _, _ in
+                    await settlement.wait()
+                    await completions.record()
+                }, updated: {}), using: service)
     }
     #expect(await queue.count == 32)
     let extra = AgentInput(id: "overflow", sessionID: "s", payload: .text("hello"))
@@ -663,15 +906,197 @@ func independentDecisionQueueBoundsAndJoinsCancellation() async throws {
                 },
                 complete: { _, _, _ in await completions.record() }, updated: {}), using: service)
     }
+    let cancellation = Task { await queue.cancelAndWait() }
+    await settlement.release()
+    await cancellation.value
+    #expect(await queue.count == 0)
+    #expect(await classifier.requests.count <= 1)
+    await service.stop()
+}
+
+private actor DecisionSettlementGate {
+    private var released = false
+    private var waiter: CheckedContinuation<Void, Never>?
+    func wait() async {
+        guard !released else { return }
+        await withCheckedContinuation { waiter = $0 }
+    }
+    func release() {
+        released = true
+        waiter?.resume()
+        waiter = nil
+    }
+}
+
+private actor SlowCleanupDecision: ModelDecisionProviding {
+    var availability: CapabilityAvailability { .available }
+    private(set) var requests: [String] = []
+    private(set) var cleaning = false
+    private var cleanupWaiter: CheckedContinuation<Void, Never>?
+    private var enteredWaiter: CheckedContinuation<Void, Never>?
+    private var cancellationWaiter: CheckedContinuation<Void, Never>?
+    private var cancelled = false
+    func load() {}
+    func warmup() {}
+    func warmup(reportLoading: @escaping @Sendable (Bool) async -> Void) {}
+    func unload() {}
+    func status() -> ModelState { .ready }
+    func choice(_ request: DecisionRequest) throws -> InferenceSession<DecisionResult> {
+        throw CapabilityError.invalidRequest("Expected noul")
+    }
+    func noul(_ request: NoulRequest) throws -> InferenceSession<NoulResult> {
+        #expect(!cleaning, "Native Decision requests must not overlap cleanup")
+        requests.append(request.context.requestID)
+        let first = requests.count == 1
+        let pair = InferenceSession<NoulResult>.make(
+            context: request.context, limits: try StreamLimits(), estimatedBytes: { _ in 16 },
+            waitForCompletion: { if first { await self.cleanup() } })
+        try pair.emitter.yield(.init(value: true))
+        pair.emitter.finish()
+        return pair.session
+    }
+    private func cleanup() async {
+        cleaning = true
+        enteredWaiter?.resume()
+        enteredWaiter = nil
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { cleanupWaiter = $0 }
+        } onCancel: {
+            Task { await self.recordCancellation() }
+        }
+        cleaning = false
+    }
+    private func recordCancellation() {
+        cancelled = true
+        cancellationWaiter?.resume()
+        cancellationWaiter = nil
+    }
+    func waitForCleanup() async {
+        if !cleaning { await withCheckedContinuation { enteredWaiter = $0 } }
+    }
+    func waitForCancellation() async {
+        if !cancelled { await withCheckedContinuation { cancellationWaiter = $0 } }
+    }
+    func release() {
+        cleanupWaiter?.resume()
+        cleanupWaiter = nil
+    }
+}
+
+private actor LatestDecisionProbe {
+    var results: [String: InputDecisionOutcome] = [:]
+    var signals = 0
+    func complete(_ snapshot: InputDecisionSnapshot, _ result: InputDecisionOutcome) {
+        results[snapshot.input.id] = result
+    }
+    func interrupt() -> AssistantInterruptResult {
+        signals += 1
+        return .interrupted
+    }
+}
+
+@Test(.timeLimit(.minutes(1)))
+func latestDecisionCancelsOldRequestWaitsForCleanupAndSkipsIntermediateInput() async throws {
+    let native = SlowCleanupDecision()
+    let service = AssistantInputDecision(
+        local: native, configuration: { (true, nil) }, timeout: .seconds(30), localTimeout: .seconds(15))
+    let queue = AssistantDecisionQueue()
+    let probe = LatestDecisionProbe()
+    func submit(_ id: String) async throws {
+        let input = AgentInput(id: id, sessionID: "s", payload: .text(id))
+        try await queue.submit(
+            .init(
+                snapshot: .init(input: input, text: id), target: UUID(),
+                interrupt: { _, _ in await probe.interrupt() },
+                complete: { snapshot, result, _ in await probe.complete(snapshot, result) },
+                updated: {}), using: service)
+    }
+    try await submit("old")
+    await native.waitForCleanup()
+    try await submit("middle")
+    await native.waitForCancellation()
+    try await submit("latest")
+    #expect(await native.requests == ["old.decision"])
+    await native.release()
     for _ in 0..<1000 {
-        if await classifier.requests.count == 1 { break }
+        if await queue.count == 0 { break }
         try await Task.sleep(for: .milliseconds(2))
     }
-    await queue.cancelAndWait()
     #expect(await queue.count == 0)
-    #expect(await completions.count == 0)
-    #expect(await classifier.requests.count == 1)
+    #expect(await native.requests == ["old.decision", "latest.decision"])
+    #expect(await probe.signals == 1)
+    let results = await probe.results
+    #expect(results.count == 3)
+    for id in ["old", "middle"] {
+        #expect(results[id]?.signalStatus == "superseded")
+        #expect(results[id]?.modelResult == nil)
+        #expect(results[id]?.failure == nil)
+    }
+    #expect(results["latest"]?.modelResult == true)
+    await queue.cancelAndWait()
     await service.stop()
+}
+
+@Test(.timeLimit(.minutes(1)))
+func latestDecisionRetiresSupersededAttemptAndCancelsClosedSession() async throws {
+    let native = SlowCleanupDecision()
+    let service = AssistantInputDecision(
+        local: native, configuration: { (true, nil) }, timeout: .seconds(30), localTimeout: .seconds(15))
+    func snapshot(_ id: String) -> InputDecisionSnapshot {
+        .init(input: .init(id: id, sessionID: "s", payload: .text(id)), text: id)
+    }
+    let old = Task { await service.classify(snapshot("old")) }
+    await native.waitForCleanup()
+    let replacement = Task { await service.classify(snapshot("replacement")) }
+    await native.waitForCancellation()
+    #expect(await old.value.signalStatus == "superseded")
+    replacement.cancel()
+    #expect(await replacement.value.modelResult == nil)
+
+    let queue = AssistantDecisionQueue()
+    let probe = LatestDecisionProbe()
+    try await queue.submit(
+        .init(
+            snapshot: snapshot("closed"), target: UUID(),
+            interrupt: { _, _ in await probe.interrupt() },
+            complete: { snapshot, result, _ in await probe.complete(snapshot, result) },
+            updated: {}), using: service)
+    await queue.remove(sessionID: "s")
+    await native.release()
+    await queue.cancelAndWait()
+    #expect(await probe.results.isEmpty)
+    #expect(await probe.signals == 0)
+    let latest = await service.classify(snapshot("latest"))
+    #expect(latest.modelResult == true)
+    #expect(await native.requests == ["old.decision", "latest.decision"])
+    await service.stop()
+}
+
+extension LiveRuntimeTests {
+    @Test
+    func latestDecisionCleanupWaitTimesOutWithoutReentryAndRecoversAfterExit() async throws {
+        let native = SlowCleanupDecision()
+        let service = AssistantInputDecision(
+            local: native, configuration: { (true, nil) }, timeout: .seconds(5),
+            localTimeout: .milliseconds(100))
+        func snapshot(_ id: String) -> InputDecisionSnapshot {
+            .init(input: .init(id: id, sessionID: "s", payload: .text(id)), text: id)
+        }
+        let first = Task { await service.classify(snapshot("old")) }
+        await native.waitForCleanup()
+        #expect(await first.value.failure == .timedOut)
+        let waiting = await service.classify(snapshot("waiting"))
+        #expect(waiting.failure == .timedOut)
+        #expect(waiting.requests.isEmpty)
+        #expect(await native.requests == ["old.decision"])
+        let latest = Task { await service.classify(snapshot("latest")) }
+        await native.release()
+        let recovered = await latest.value
+        #expect(recovered.modelResult == true)
+        #expect(recovered.failure == nil)
+        #expect(await native.requests == ["old.decision", "latest.decision"])
+        await service.stop()
+    }
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)))

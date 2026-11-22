@@ -73,7 +73,12 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
     private let recognition: any SpeechRecognitionCapability
     private let vad: any VoiceActivityCapability
-    private let speechEndpointActivity: @Sendable (UUID?) async -> (replyActive: Bool, interruptionID: UUID?)
+    private let speechEndpointActivity: @Sendable () async -> Bool
+    private let speechStarted: @Sendable (String) async throws -> Void
+    private let speechEnded: @Sendable (String?) async -> Void
+    let speechCaptureStarted: @Sendable (UUID) async -> Void
+    let speechCaptureStopped: @Sendable (UUID) async -> Void
+    private let speechWindow: @Sendable (UUID, ContinuousClock.Instant, Int, Bool) async -> Void
     private let speechDetection: @Sendable () async throws -> (windows: Int, threshold: Double)
     private var detectionSettings = (windows: 8, threshold: 0.65)
     private let speechPlayback: @Sendable () async -> SpeechPlaybackSnapshot
@@ -121,9 +126,12 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         uiHome: UIHomeContainer? = nil, microphoneInput: (any AudioCaptureObserving)? = nil,
         microphoneSpectrum: (any SpectrumPresenting)? = nil,
         microphoneObservation: (@MainActor @Sendable (MicrophoneObservation) -> Void)? = nil,
-        speechEndpointActivity: @escaping @Sendable (UUID?) async -> (replyActive: Bool, interruptionID: UUID?) = {
-            _ in (false, nil)
-        },
+        speechEndpointActivity: @escaping @Sendable () async -> Bool = { false },
+        speechStarted: @escaping @Sendable (String) async throws -> Void = { _ in },
+        speechEnded: @escaping @Sendable (String?) async -> Void = { _ in },
+        speechCaptureStarted: @escaping @Sendable (UUID) async -> Void = { _ in },
+        speechCaptureStopped: @escaping @Sendable (UUID) async -> Void = { _ in },
+        speechWindow: @escaping @Sendable (UUID, ContinuousClock.Instant, Int, Bool) async -> Void = { _, _, _, _ in },
         speechPlayback: @escaping @Sendable () async -> SpeechPlaybackSnapshot = { .init() },
         speechDetection: @escaping @Sendable () async throws -> (windows: Int, threshold: Double) = { (8, 0.65) },
         context: AgentContextRepository<SpeechPerceptionContextState>
@@ -147,6 +155,11 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         self.speechDetection = speechDetection
         self.speechPlayback = speechPlayback
         self.speechEndpointActivity = speechEndpointActivity
+        self.speechStarted = speechStarted
+        self.speechEnded = speechEnded
+        self.speechCaptureStarted = speechCaptureStarted
+        self.speechCaptureStopped = speechCaptureStopped
+        self.speechWindow = speechWindow
         self.sessionID = sessionID
         self.interactionSessionID = interactionSessionID
         self.mode = mode
@@ -206,6 +219,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         lifecycle = .paused
         await refreshIsland()
         if microphoneInput != nil { await closeCapture() }
+        await speechEnded(nil)
         pendingSound = nil
         soundPublisher?.cancel()
         soundEstimator.reset()
@@ -277,6 +291,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         await recognitionTurn?.cancel()
         await segmenter?.cancel()
         await stopInput()
+        await speechEnded(nil)
         soundPublisher?.cancel()
         await soundPublisher?.value
         pendingSound = nil
@@ -318,6 +333,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         await recognitionTurn?.cancel()
         await segmenter?.cancel()
         await stopInput()
+        await speechEnded(nil)
         soundPublisher?.cancel()
         await soundPublisher?.value
         soundPublisher = nil
@@ -646,6 +662,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
                 throw CancellationError()
             }
             segmenter = VoiceActivitySegmenter(session: session)
+            if let epoch = nativeInputEpoch { await speechCaptureStarted(epoch) }
         }
         let samples = audio.samples
         try Task.checkCancellation()
@@ -702,7 +719,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
                     let latestPlayback = await speechPlayback()
                     try await processFrame(
                         frame, input: input, segmenter: segmenter, recognitionTurn: recognitionTurn,
-                        playing: latestPlayback.state(at: start).playing)
+                        playing: latestPlayback.state(at: start).playing, capturedAt: start)
                 }
             }
         }
@@ -710,16 +727,16 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
 
     private func processFrame(
         _ frame: AudioFrame, input acceptedInput: AgentInput, segmenter: VoiceActivitySegmenter,
-        recognitionTurn: SpeechRecognitionTurn, playing: Bool
+        recognitionTurn: SpeechRecognitionTurn, playing: Bool, capturedAt: ContinuousClock.Instant
     ) async throws {
         activeInput = acceptedInput.assigning(turn: currentTurn)
-        let activity = await speechEndpointActivity(nil)
+        let activity = await speechEndpointActivity()
         try Task.checkCancellation()
         let onset = SpeechOnsetPolicy(
             windows: detectionSettings.windows, threshold: detectionSettings.threshold, playing: playing)
         let result = try await segmenter.process(
             frame, threshold: onset.threshold, onsetWindows: onset.onsetWindows,
-            useShortEndpoint: activity.replyActive && activity.interruptionID == nil,
+            useShortEndpoint: activity,
             onsetThreshold: onset.onsetThreshold)
         try Task.checkCancellation()
         let beganTurn =
@@ -732,7 +749,15 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         if beganTurn {
             turnOrdinal += 1
             currentTurn = AgentTurn(id: UUID().uuidString, ordinal: turnOrdinal)
+            if let currentTurn { try await speechStarted(currentTurn.id) }
             traceOnset(onset, playing: playing, probability: result.probability, level: frame.rmsDecibels)
+        }
+        if let generation = nativeInputEpoch {
+            for window in result.windows {
+                await speechWindow(
+                    generation, capturedAt.advanced(by: .seconds(Double(window.offset) / 16000)),
+                    window.sampleCount, window.onsetCandidate)
+            }
         }
         let input = acceptedInput.assigning(turn: currentTurn)
         activeInput = input
@@ -755,12 +780,11 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             if case .end(let reason) = $0 { return reason != .maximumDuration }
             return false
         }) {
-            try await finishUtterance(
-                input: input, recognitionTurn: recognitionTurn, interruptionID: activity.interruptionID)
+            try await finishUtterance(input: input, recognitionTurn: recognitionTurn)
         }
     }
     private func finishUtterance(
-        input: AgentInput, recognitionTurn: SpeechRecognitionTurn, interruptionID: UUID?
+        input: AgentInput, recognitionTurn: SpeechRecognitionTurn
     ) async throws {
         recognitionSuspended = true
         phase = .processing
@@ -783,7 +807,8 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         try emit(.control("agent.finished"), input: input)
         if !text.isEmpty {
             try await communicate(.transcript(text, final: true), parent: input)
-            if let interruptionID { _ = await speechEndpointActivity(interruptionID) }
+        } else if let turn = input.turn {
+            await speechEnded(turn.id)
         }
         try await resetListening(after: input)
         try await transition(to: text.isEmpty ? .empty : .listening, input: input, present: !recognitionSuspended)
@@ -797,9 +822,16 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
                 taskScope: input.taskScope))
     }
 
+    func speechPublicationFailed(turn: AgentTurn?) async {
+        if turn == nil, let epoch = nativeInputEpoch { await speechCaptureStopped(epoch) }
+        await speechEnded(turn?.id)
+    }
+
     /// A failed utterance does not close the resident Agent, microphone or output stream.
     private func recoverRecognition(_ error: any Error) async {
+        if let epoch = nativeInputEpoch { await speechCaptureStopped(epoch) }
         let failedInput = activeInput
+        if let turn = currentTurn { await speechEnded(turn.id) }
         let failedSession = sessionID
         let failedGeneration = nativeCaptureGeneration
         let failedRecognition = recognitionTurn

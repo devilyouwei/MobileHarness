@@ -191,6 +191,8 @@ extension AssistantChatWorker {
             let snapshot = try await contextRepository.snapshot()
             try Task.checkCancellation()
             guard lifecycle == .running, snapshot.state.history.current.id == notice.originDialog else { return }
+            // `quiet` is set by the host; it silences every unsolicited announcement, including peer reports.
+            guard snapshot.state.variables.value("quiet") != "true" else { return }
             if notice.kind == .userInput || notice.kind?.isMilestone == true {
                 let view = snapshot.state.taskViews?[notice.scopeID]
                 guard view?.terminal == false else { return }

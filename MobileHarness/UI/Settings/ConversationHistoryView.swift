@@ -52,7 +52,7 @@ import Foundation
                 Section {
                     if let current = state.archive?.current {
                         if (current.turnCount ?? current.turns.count) == 0 {
-                            Text("No conversations yet.").foregroundStyle(.secondary)
+                            Text(appCopy.text("No conversations yet.")).foregroundStyle(.secondary)
                         } else {
                             NavigationLink {
                                 ConversationHistoryDetail(conversation: current, controls: controls).id(current.id)
@@ -68,18 +68,18 @@ import Foundation
                         .disabled(state.isBusy || (current.turnCount ?? current.turns.count) == 0)
                         .accessibilityIdentifier("history.new")
                     } else if state.status == nil {
-                        ProgressView("Loading conversations…")
+                        ProgressView(appCopy.text("Loading conversations…"))
                     } else {
                         Button(appCopy.text("Retry")) { Task { await reload() } }
                     }
                 } header: {
-                    Text("Current Conversation")
+                    Text(appCopy.text("Current Conversation"))
                 } footer: {
-                    Text("Starting a new conversation archives the current one.")
+                    Text(appCopy.text("Starting a new conversation archives the current one."))
                 }
                 Section {
                     if state.archive?.past.isEmpty == true {
-                        Text("No past conversations.").foregroundStyle(.secondary)
+                        Text(appCopy.text("No past conversations.")).foregroundStyle(.secondary)
                     }
                     ForEach(state.archive?.past ?? []) { conversation in
                         NavigationLink {
@@ -93,9 +93,11 @@ import Foundation
                             Button(appCopy.text("Delete"), role: .destructive) { deleting = conversation }
                         }
                         if conversation.summaryTitle == nil {
-                            Button("Regenerate Title") { controls.summarize(conversation.id) }.disabled(state.isBusy)
+                            Button(appCopy.text("Regenerate Title")) { controls.summarize(conversation.id) }.disabled(
+                                state.isBusy)
                             if let error = conversation.titleError {
-                                Text("Title generation failed: \(error)").font(.caption).foregroundStyle(.secondary)
+                                Text(appCopy.format("Title generation failed: %@", error)).font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
                         }
                     }
@@ -159,7 +161,7 @@ import Foundation
                     deleting = nil
                 }
             } message: {
-                Text("This cannot be undone.")
+                Text(appCopy.text("This cannot be undone."))
             }
         }
 
@@ -174,12 +176,13 @@ import Foundation
             ) {
                 ViewThatFits(in: .horizontal) {
                     HStack {
-                        Text("\(conversation.turnCount ?? conversation.turns.count) turns").fixedSize()
+                        Text(appCopy.format("%ld turns", conversation.turnCount ?? conversation.turns.count))
+                            .fixedSize()
                         Spacer(minLength: 8)
                         conversationDate(conversation)
                     }
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("\(conversation.turnCount ?? conversation.turns.count) turns")
+                        Text(appCopy.format("%ld turns", conversation.turnCount ?? conversation.turns.count))
                         conversationDate(conversation).frame(maxWidth: .infinity, alignment: .trailing)
                     }
                 }
@@ -394,7 +397,7 @@ import Foundation
                                     String(describing: sourceCount))
                             )
                             .font(.caption).foregroundStyle(.secondary)
-                            typeBadge("Task", color: .blue)
+                            typeBadge(appCopy.text("Task"), color: .blue)
                         }
                         if !compression.text.isEmpty {
                             Text(verbatim: compression.text).font(.subheadline).textSelection(.enabled)
@@ -427,13 +430,14 @@ import Foundation
                     VStack(alignment: .leading, spacing: 6) {
                         Text(verbatim: turn.displayInput).lineLimit(2)
                             .foregroundStyle(turn.isReACT == true ? Color.orange : Color.primary)
-                        Text(verbatim: turn.outputSummary).font(.subheadline).lineLimit(2)
+                        Text(verbatim: turn.outputSummary(appCopy)).font(.subheadline).lineLimit(2)
                             .foregroundStyle(.secondary)
                         HStack(spacing: 6) {
-                            Text([turn.dateReport, turn.stateReport].filter { !$0.isEmpty }.joined(separator: " · "))
-                                .font(.caption).foregroundStyle(.secondary)
-                            if turn.coordination?.decision != nil {
-                                typeBadge(turn.decisionReport, color: .blue)
+                            (Text(verbatim: turn.dateReport + " · ").foregroundStyle(.secondary)
+                                + Text(verbatim: turn.stateReport(appCopy)).foregroundStyle(turn.state.color))
+                                .font(.caption)
+                            if turn.coordination?.interrupt == true {
+                                typeBadge(appCopy.text("Interrupt decision"), color: .red)
                             }
                             if turn.isReACT == true {
                                 typeBadge("ReACT", color: .orange)
@@ -638,30 +642,32 @@ import Foundation
 
         var body: some View {
             Form {
-                Section("User Request") {
+                Section(appCopy.text("User Request")) {
                     if turn.isReACT == true {
-                        Text("ReACT · Execution observations").font(.caption).foregroundStyle(.orange)
+                        Text(appCopy.text("ReACT · Execution observations")).font(.caption).foregroundStyle(.orange)
                     }
                     selectable(turn.displayInput)
                 }
-                Section("Assistant Response") {
+                Section(appCopy.text("Assistant Response")) {
                     if !turn.raw.isEmpty {
                         selectable(turn.raw)
                     } else if (turn.toolCalls ?? []).isEmpty {
-                        Text(turn.responseStatus).foregroundStyle(.secondary)
+                        Text(turn.responseStatus(appCopy)).foregroundStyle(.secondary)
                     }
-                    ForEach(turn.toolCalls ?? []) { call in selectable(call.responseReport) }
+                    ForEach(turn.toolCalls ?? []) { call in selectable(call.responseReport(appCopy)) }
                 }
                 if let evidence = turn.coordination {
-                    Section(appCopy.text("Input decision")) {
-                        Text(appCopy.text("Decision: ") + turn.decisionReport)
+                    Section(appCopy.text(evidence.interrupt == nil ? "Input source" : "Interrupt decision")) {
+                        if let interrupt = evidence.interrupt {
+                            Text(appCopy.format("Interrupt: %@", interruptReport(interrupt)))
+                            if interrupt {
+                                Text(appCopy.text("This input interrupted the reply in progress."))
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
                         selectable(appCopy.text("Source: ") + evidence.source)
                         selectable(appCopy.text("Capture timestamp: ") + evidence.capturedAt)
                         if let route = evidence.route { selectable(appCopy.text("Decision route: ") + route) }
-                        if evidence.decision == "interrupt" {
-                            Text(appCopy.text("An interrupt decision can precede execution stopping."))
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
                         if let batch = evidence.batchID { selectable(appCopy.text("Primary input: ") + batch) }
                         if let members = evidence.memberIDs, !members.isEmpty {
                             DisclosureGroup(appCopy.format("Batch members · %@", String(describing: members.count))) {
@@ -672,37 +678,39 @@ import Foundation
                 }
                 Section {
                     VStack(alignment: .leading, spacing: 12) {
-                        Label("Tasks", systemImage: "checklist").foregroundStyle(.blue)
+                        Label(appCopy.text("Tasks"), systemImage: "checklist").foregroundStyle(.blue)
                             .font(.subheadline.weight(.semibold))
                         taskInformation
                     }
                     VStack(alignment: .leading, spacing: 12) {
-                        Label("Skills", systemImage: "square.stack.3d.up").foregroundStyle(.purple)
+                        Label(appCopy.text("Skills"), systemImage: "square.stack.3d.up").foregroundStyle(.purple)
                             .font(.subheadline.weight(.semibold))
                         skillsInformation
                     }
                     VStack(alignment: .leading, spacing: 12) {
-                        Label("States", systemImage: "square.stack.3d.down.right").foregroundStyle(.orange)
-                            .font(.subheadline.weight(.semibold))
+                        Label(appCopy.text("States"), systemImage: "square.stack.3d.down.right").foregroundStyle(
+                            .orange
+                        )
+                        .font(.subheadline.weight(.semibold))
                         statesInformation
                     }
                     VStack(alignment: .leading, spacing: 12) {
-                        Label("Function Catalog", systemImage: "function").foregroundStyle(.green)
+                        Label(appCopy.text("Function Catalog"), systemImage: "function").foregroundStyle(.green)
                             .font(.subheadline.weight(.semibold))
                         if turn.decisionMetadata != nil {
                             functionCatalog
                         } else {
-                            Text("Not recorded").foregroundStyle(.secondary)
+                            Text(appCopy.text("Not recorded")).foregroundStyle(.secondary)
                         }
                     }
                 }.accessibilityIdentifier("history.business.context")
                 if turn.logsCleared == true {
                     Section {
-                        Text("Logs cleared").foregroundStyle(.secondary)
+                        Text(appCopy.text("Logs cleared")).foregroundStyle(.secondary)
                             .accessibilityIdentifier("history.prompts.cleared")
                     }
                 } else {
-                    Section("Prompts") {
+                    Section(appCopy.text("Prompts")) {
                         if !turn.attachedImages.isEmpty {
                             ScrollView(.horizontal) {
                                 HStack(spacing: 12) {
@@ -714,27 +722,30 @@ import Foundation
                             }
                         }
                         if turn.request.isEmpty {
-                            Text("Prompt messages unavailable").foregroundStyle(.secondary)
+                            Text(appCopy.text("Prompt messages unavailable")).foregroundStyle(.secondary)
                         }
                         HistoryPromptItems(messages: turn.request)
                         if !turn.effectiveToolDefinitions.isEmpty {
-                            DisclosureGroup("Functions") {
+                            DisclosureGroup(appCopy.text("Functions")) {
                                 ForEach(Array(turn.effectiveToolDefinitions.enumerated()), id: \.offset) {
                                     index, definition in
-                                    DisclosureGroup("Tool \(index + 1)") { selectable(definition) }
+                                    DisclosureGroup(appCopy.format("Tool %ld", index + 1)) { selectable(definition) }
                                 }
                             }
                         }
                     }
-                    Section("Generation Meta") {
-                        if let error = turn.error { selectable("Generation Error: " + error) }
-                        Text("Request ID: \(turn.id)").font(.caption).textSelection(.enabled)
-                        Text("Input ID: \(turn.ownerInputID ?? "")").font(.caption).textSelection(.enabled)
-                        Text("Model: \(turn.model)")
-                        Text(turn.firstTokenReport)
-                        Text("State: \(turn.stateReport); Finish Reason: \(turn.finishReason ?? "")")
-                        Text("Temperature: \(turn.temperature)")
-                        Text(turn.tokenReport)
+                    Section(appCopy.text("Generation Meta")) {
+                        if let error = turn.error { selectable(appCopy.text("Generation Error: ") + error) }
+                        Text(appCopy.format("Request ID: %@", turn.id)).font(.caption).textSelection(.enabled)
+                        Text(appCopy.format("Input ID: %@", turn.ownerInputID ?? "")).font(.caption).textSelection(
+                            .enabled)
+                        Text(appCopy.format("Model: %@", turn.model))
+                        Text(turn.firstTokenReport(appCopy))
+                        Text(
+                            appCopy.format(
+                                "State: %@; Finish Reason: %@", turn.stateReport(appCopy), turn.finishReason ?? ""))
+                        Text(appCopy.format("Temperature: %@", String(describing: turn.temperature)))
+                        Text(turn.tokenReport(appCopy))
                     }
                     Section {
                         if let clearFailure { Text(clearFailure).foregroundStyle(.red) }
@@ -790,12 +801,13 @@ import Foundation
         private var taskInformation: some View {
             VStack(alignment: .leading, spacing: 10) {
                 if turn.decisionMetadata == nil && turn.historyTaskID == nil {
-                    Text("Not recorded").foregroundStyle(.secondary)
+                    Text(appCopy.text("Not recorded")).foregroundStyle(.secondary)
                 }
                 if let metadata = turn.decisionMetadata {
                     Text(
-                        metadata.execution.map { $0 == "foreground" ? "Foreground task" : "Background task" }
-                            ?? "Default conversation at request"
+                        metadata.execution.map {
+                            $0 == "foreground" ? appCopy.text("Foreground task") : appCopy.text("Background task")
+                        } ?? appCopy.text("Default conversation at request")
                     ).font(.caption).foregroundStyle(.secondary)
                     if let goal = metadata.taskGoal, !goal.isEmpty {
                         Text(verbatim: goal).font(.subheadline).textSelection(.enabled)
@@ -805,8 +817,9 @@ import Foundation
                     VStack(alignment: .leading, spacing: 4) {
                         Text(
                             reference.isHistoryOwner
-                                ? (reference.wasActiveAtRequest ? "Task ID · Active at request" : "Task ID")
-                                : "Active task ID at request"
+                                ? (reference.wasActiveAtRequest
+                                    ? appCopy.text("Task ID · Active at request") : appCopy.text("Task ID"))
+                                : appCopy.text("Active task ID at request")
                         ).font(.caption).foregroundStyle(.secondary)
                         selectable(reference.id)
                     }
@@ -818,22 +831,22 @@ import Foundation
         @ViewBuilder private var functionCatalog: some View {
             HistoryCatalogToggle(isExpanded: $catalogExpanded) {
                 HStack {
-                    Text("Actions and Tools")
+                    Text(appCopy.text("Actions and Tools"))
                     Spacer()
                     if let catalog {
-                        Text("\(catalog.actions.count) Actions · \(catalog.tools.count) Tools")
+                        Text(appCopy.format("%ld Actions · %ld Tools", catalog.actions.count, catalog.tools.count))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
             if catalogExpanded {
                 if let catalog {
-                    catalogGroup("Actions", entries: catalog.actions, color: .blue)
-                    catalogGroup("Tools", entries: catalog.tools, color: .purple)
+                    catalogGroup(appCopy.text("Actions"), entries: catalog.actions, color: .blue)
+                    catalogGroup(appCopy.text("Tools"), entries: catalog.tools, color: .purple)
                 } else if let catalogError {
-                    Text("Unable to read Function Catalog").foregroundStyle(.orange)
+                    Text(appCopy.text("Unable to read Function Catalog")).foregroundStyle(.orange)
                     selectable(catalogError)
-                    HistoryCatalogToggle(isExpanded: $catalogRawExpanded) { Text("Raw JSON") }
+                    HistoryCatalogToggle(isExpanded: $catalogRawExpanded) { Text(appCopy.text("Raw JSON")) }
                     if catalogRawExpanded {
                         selectable(turn.decisionMetadata?.catalogJSON ?? "")
                     }
@@ -844,7 +857,7 @@ import Foundation
         @ViewBuilder private func catalogGroup(
             _ title: String, entries: [HistoryFunctionRegistration], color: Color
         ) -> some View {
-            Text("\(title) · \(entries.count)").font(.subheadline.weight(.semibold)).foregroundStyle(color)
+            Text(verbatim: "\(title) · \(entries.count)").font(.subheadline.weight(.semibold)).foregroundStyle(color)
             ForEach(Array(entries.sorted { ($0.alias, $0.path) < ($1.alias, $1.path) }.enumerated()), id: \.offset) {
                 _, entry in
                 HistoryCatalogEntryRow(entry: entry)
@@ -866,7 +879,7 @@ import Foundation
                     }
                 }
             } else {
-                Text("Not recorded").foregroundStyle(.secondary)
+                Text(appCopy.text("Not recorded")).foregroundStyle(.secondary)
             }
         }
 
@@ -885,8 +898,12 @@ import Foundation
                     }
                 }
             } else {
-                Text("Not recorded").foregroundStyle(.secondary)
+                Text(appCopy.text("Not recorded")).foregroundStyle(.secondary)
             }
+        }
+
+        private func interruptReport(_ interrupt: Bool) -> String {
+            appCopy.text(interrupt ? "Yes" : "No")
         }
 
         private func selectable(_ text: String) -> some View {
@@ -898,6 +915,8 @@ import Foundation
 
     /// Each toggle is a separate Form row; no ancestor row contains child buttons.
     private struct HistoryCatalogToggle<Label: View>: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         @Binding var isExpanded: Bool
         @ViewBuilder var label: () -> Label
 
@@ -916,11 +935,13 @@ import Foundation
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+            .accessibilityValue(isExpanded ? appCopy.text("Expanded") : appCopy.text("Collapsed"))
         }
     }
 
     struct HistoryCatalogEntryRow: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let entry: HistoryFunctionRegistration
         @State private var isExpanded = false
         @State private var definitionExpanded = false
@@ -936,21 +957,21 @@ import Foundation
                 .padding(.leading, 16)
                 if isExpanded {
                     VStack(alignment: .leading, spacing: 8) {
-                        if let channel = entry.channel { Text(verbatim: "Channel: " + channel) }
+                        if let channel = entry.channel { Text(verbatim: appCopy.text("Channel: ") + channel) }
                         if !entry.required.isEmpty {
-                            Text(verbatim: "Required: " + entry.required.sorted().joined(separator: ", "))
+                            Text(verbatim: appCopy.text("Required: ") + entry.required.sorted().joined(separator: ", "))
                         }
                         if !entry.optional.isEmpty {
-                            Text(verbatim: "Optional: " + entry.optional.sorted().joined(separator: ", "))
+                            Text(verbatim: appCopy.text("Optional: ") + entry.optional.sorted().joined(separator: ", "))
                         }
                         if entry.required.isEmpty && entry.optional.isEmpty {
-                            Text("No parameters").foregroundStyle(.secondary)
+                            Text(appCopy.text("No parameters")).foregroundStyle(.secondary)
                         }
                     }
                     .font(.system(.caption, design: .monospaced)).textSelection(.enabled)
                     .padding(.leading, 32)
                     if let definition = entry.definitionJSON, !definition.isEmpty {
-                        HistoryCatalogToggle(isExpanded: $definitionExpanded) { Text("Definition") }
+                        HistoryCatalogToggle(isExpanded: $definitionExpanded) { Text(appCopy.text("Definition")) }
                             .padding(.leading, 32)
                         if definitionExpanded {
                             Text(verbatim: definition).font(.system(.caption, design: .monospaced))
@@ -1127,14 +1148,16 @@ import Foundation
 
     /// Protocol message rows shared by Assistant and Writer record details.
     struct HistoryPromptItems: View {
+        @Environment(\.locale) private var appCopyLocale
+        private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         let messages: [HistoryMessage]
         var body: some View {
             ForEach(Array(messages.enumerated()), id: \.offset) { _, message in
                 DisclosureGroup(message.role.rawValue) {
                     selectable(message.displayContent)
-                    if let id = message.toolCallID { selectable("Tool Call ID: " + id) }
+                    if let id = message.toolCallID { selectable(appCopy.text("Tool Call ID: ") + id) }
                     ForEach(Array((message.toolCalls ?? []).enumerated()), id: \.offset) { _, call in
-                        selectable("Tool Call: \(call.name) · \(call.id)\n\(call.argumentsJSON)")
+                        selectable(appCopy.format("Tool Call: %@ · %@", call.name, call.id) + "\n" + call.argumentsJSON)
                     }
                 }
             }

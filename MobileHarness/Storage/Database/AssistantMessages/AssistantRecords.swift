@@ -78,21 +78,41 @@ public struct AssistantInputCoordination: Codable, Sendable {
         public let id: String
         public let source: String
         public let capturedAt: String
-        public let decision: String?
+        public let interrupt: Bool?
         public let route: String?
 
         public init(id: String, evidence: AssistantInputCoordination) {
             self.id = id
             source = evidence.source
             capturedAt = evidence.capturedAt
-            decision = evidence.decision
+            interrupt = evidence.interrupt
             route = evidence.route
         }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: AssistantInputCoordination.CodingKeys.self)
+            id = try container.decode(String.self, forKey: .id)
+            source = try container.decode(String.self, forKey: .source)
+            capturedAt = try container.decode(String.self, forKey: .capturedAt)
+            interrupt = try AssistantInputCoordination.decodeInterrupt(container)
+            route = try container.decodeIfPresent(String.self, forKey: .route)
+        }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, source, capturedAt, interrupt, decision, route, batchID, memberIDs, members
+    }
+
+    /// Records written before `interrupt` stored the model result as the string `decision`.
+    static func decodeInterrupt(_ container: KeyedDecodingContainer<CodingKeys>) throws -> Bool? {
+        if let value = try container.decodeIfPresent(Bool.self, forKey: .interrupt) { return value }
+        return try container.decodeIfPresent(String.self, forKey: .decision).map { $0 == "true" || $0 == "interrupt" }
     }
 
     public let source: String
     public let capturedAt: String
-    public var decision: String?
+    /// Whether this input interrupted the reply in progress; nil when no valid decision was made.
+    public var interrupt: Bool?
     public var route: String?
     public var batchID: String?
     public var memberIDs: [String]?
@@ -100,6 +120,28 @@ public struct AssistantInputCoordination: Codable, Sendable {
     public init(source: String, capturedAt: String) {
         self.source = source
         self.capturedAt = capturedAt
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        source = try container.decode(String.self, forKey: .source)
+        capturedAt = try container.decode(String.self, forKey: .capturedAt)
+        interrupt = try Self.decodeInterrupt(container)
+        route = try container.decodeIfPresent(String.self, forKey: .route)
+        batchID = try container.decodeIfPresent(String.self, forKey: .batchID)
+        memberIDs = try container.decodeIfPresent([String].self, forKey: .memberIDs)
+        members = try container.decodeIfPresent([Member].self, forKey: .members)
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(source, forKey: .source)
+        try container.encode(capturedAt, forKey: .capturedAt)
+        try container.encodeIfPresent(interrupt, forKey: .interrupt)
+        try container.encodeIfPresent(route, forKey: .route)
+        try container.encodeIfPresent(batchID, forKey: .batchID)
+        try container.encodeIfPresent(memberIDs, forKey: .memberIDs)
+        try container.encodeIfPresent(members, forKey: .members)
     }
 }
 

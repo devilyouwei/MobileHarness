@@ -21,22 +21,6 @@ public enum AssistantStateBindings {
         let business: [String: AgentStateSnapshot.Value]
         let readFailure: String?
     }
-    private struct Unknown: Encodable {
-        let availability = "unknown"
-        let value: String? = nil
-        let diagnostic: Diagnostic
-        struct Diagnostic: Encodable {
-            let path: String
-            let code: String
-        }
-        enum CodingKeys: String, CodingKey { case availability, value, diagnostic }
-        func encode(to encoder: any Encoder) throws {
-            var fields = encoder.container(keyedBy: CodingKeys.self)
-            try fields.encode(availability, forKey: .availability)
-            try fields.encodeNil(forKey: .value)
-            try fields.encode(diagnostic, forKey: .diagnostic)
-        }
-    }
     private static func snapshot(_ name: String, read: ReadState) async throws -> Data {
         guard !name.isEmpty, name.utf8.count <= 256, name.split(separator: ".").count >= 2,
             !name.hasPrefix("."), !name.hasSuffix("."), !name.contains(".."),
@@ -51,9 +35,7 @@ public enum AssistantStateBindings {
             try Task.checkCancellation()
             guard node.path == name, node.readFailure == nil else { throw ContainerContextError.invalidSnapshot }
             return try JSONEncoder().encode(
-                ContainerContextValue(
-                    node.business,
-                    availability: node.business.values.contains { $0 != .unknown } ? .available : .unknown))
+                ContainerContextValue(node.business.values.contains { $0 != .unknown } ? node.business : nil))
         } catch {
             try Task.checkCancellation()
             if error is CancellationError { throw error }
@@ -62,7 +44,7 @@ public enum AssistantStateBindings {
             {
                 throw failure
             }
-            return try JSONEncoder().encode(Unknown(diagnostic: .init(path: name, code: "stateUnavailable")))
+            return Data("null".utf8)
         }
     }
 }

@@ -1,39 +1,11 @@
 import Foundation
+import Synchronization
 import Testing
 
 @testable import UI
 
-@Test @MainActor func executionLogTaskAndRuntimeRetentionIsBounded() {
-    let state = RuntimeLogState()
-    let taskID = UUID().uuidString
-    var value = TaskLogItem(
-        id: taskID, parentID: nil, requester: "assistant", executor: "photographer", title: "拍照", phase: .running)
-    value.execution = "background"
-    for _ in 0..<40 {
-        state.updateTask(value, event: .init(id: UUID().uuidString, time: .now, title: "进度", detail: ""))
-    }
-    #expect(state.tasks.first?.events.count == 32 && state.tasks.first?.evictedEvents == 8)
-    for _ in 0..<110 {
-        state.updateTask(
-            .init(
-                id: UUID().uuidString, parentID: nil, requester: "assistant", executor: "memory",
-                title: "历史", phase: .succeeded),
-            event: .init(id: UUID().uuidString, time: .now, title: "完成", detail: ""))
-        state.recordAgentEvent(.init(source: "assistant", status: "running", isFailure: false))
-    }
-    #expect(state.tasks.count == 100 && state.taskEvictions == 11)
-    #expect(state.agentEvents.count == 100 && state.agentEventEvictions == 10)
-    state.selectedSource = "photographer"
-    #expect(state.visibleTasks.map(\.id) == [taskID])
-    state.selectedSource = "memory"
-    state.selectedFilter = .succeeded
-    #expect(state.visibleTasks.count == 99)
-    state.selectedFilter = .failed
-    #expect(state.visibleTasks.isEmpty)
-}
-
 @Test @MainActor func executionLogHasFourTabsAndPreservesAgentFailuresWithoutSignalRows() {
-    #expect(ExecutionLogTab.allCases.map(\.rawValue) == ["Action", "Task", "Agent", "Decision"])
+    #expect(ExecutionLogTab.allCases.map(\.rawValue) == ["Action", "Agent", "Decision", "State"])
     let state = RuntimeLogState()
     let id = UUID().uuidString
     state.record(.issue(.init(title: "Output", source: "assistant", message: "input rejected: queueFull", inputID: id)))
@@ -46,36 +18,10 @@ import Testing
     #expect(state.sources == ["assistant"])
 }
 
-@Test @MainActor func taskActionFilteringUsesRetainedTimelineInputIdentity() {
+@Test @MainActor func agentEventRetentionIsBounded() {
     let state = RuntimeLogState()
-    let taskID = UUID().uuidString
-    let inputID = UUID().uuidString
-    state.updateTask(
-        .init(
-            id: taskID, parentID: nil, requester: "assistant", executor: "photographer", title: "拍照", phase: .running),
-        event: .init(id: inputID, time: .now, title: "接纳", detail: ""))
-    let action = ActionActivityItem(
-        id: UUID().uuidString, title: "拍摄", channel: "Camera", status: "运行", issueDescriptions: [],
-        execution: .init(phase: .running, admittedAt: .now, startedAt: .now, endedAt: nil),
-        source: "photographer", inputID: inputID)
-    state.replace(revision: 1, records: [action], evictedCount: 0)
-    state.selectedTaskID = taskID
-    #expect(state.visibleActions.map(\.id) == [action.id])
-    state.selectedTaskID = UUID().uuidString
-    #expect(state.visibleActions.isEmpty)
-}
-
-@Test @MainActor func taskLogRetainsFailureAndOriginalTimestamp() {
-    let state = RuntimeLogState()
-    let original = Date(timeIntervalSince1970: 100)
-    var task = TaskLogItem(
-        id: UUID().uuidString, parentID: nil, requester: "", executor: "assistant", title: "拍照",
-        phase: .failed)
-    state.updateTask(task, event: .init(id: UUID().uuidString, time: original, title: "running", detail: ""))
-    task.failure = "Capture denied by device"
-    state.updateTask(task, event: .init(id: UUID().uuidString, time: original, title: "failed", detail: ""))
-    #expect(state.tasks.first?.failure == task.failure)
-    #expect(state.tasks.first?.events.first?.time == original)
+    for _ in 0..<110 { state.recordAgentEvent(.init(source: "assistant", status: "running", isFailure: false)) }
+    #expect(state.agentEvents.count == 100 && state.agentEventEvictions == 10)
 }
 
 @Test @MainActor func homeCameraStartsOffWithoutPreviewOrPose() {
@@ -204,6 +150,24 @@ func homeCaptionsKeepFixedDisjointRoleRegions(viewportHeight: CGFloat) {
     #expect(state.runtimeIssues.first?.failureCode == "agent.model.tool.invalidArguments")
 }
 
+@Test @MainActor func supersededDecisionIsNeitherModelSuccessNorFailure() {
+    let state = RuntimeLogState()
+    for (id, route) in [("old", DecisionLogItem.Route.superseded), ("timeout", .failed)] {
+        state.record(
+            .decision(
+                .init(
+                    id: id, source: "assistant", inputText: id, duration: .zero, route: route,
+                    modelResult: nil, adoptedResult: .enqueue,
+                    signalStatus: id == "old" ? "superseded" : "decision_failed",
+                    requests: [])))
+    }
+    #expect(state.visibleDecisions.count == 2)
+    state.selectedFilter = .failed
+    #expect(state.visibleDecisions.map(\.id) == ["timeout"])
+    state.selectedFilter = .succeeded
+    #expect(state.visibleDecisions.isEmpty)
+}
+
 @Test @MainActor func runtimeLogDecisionRetentionSortingAndFiltering() {
     let state = RuntimeLogState()
     for index in 0..<101 {
@@ -264,4 +228,25 @@ func homeCaptionsKeepFixedDisjointRoleRegions(viewportHeight: CGFloat) {
     state.replace(revision: 2, records: [camera, custom], evictedCount: 2)
     #expect(state.selectedChannel == nil)
     #expect(state.visibleActions.map(\.id) == ["custom"])
+}
+
+@Test @MainActor func stateVariablesSortByRecentChangeWithEmptyOnesLast() async {
+    let state = RuntimeLogState()
+    let box = Mutex<[StateVariableItem]>([])
+    state.provideStateVariables { box.withLock { $0 } }
+    let early = Date(timeIntervalSince1970: 100)
+    box.withLock {
+        $0 = [
+            .init(path: "agents.assistant.empty", category: .readWrite, value: nil),
+            .init(path: "agents.assistant.mood", category: .semantic, value: "calm", writtenAt: early),
+            .init(path: "ui.camera", category: .container, value: "{\"on\":false}"),
+        ]
+    }
+    await state.refreshStateVariables(now: Date(timeIntervalSince1970: 200))
+    #expect(state.stateVariables.map(\.path) == ["agents.assistant.mood", "ui.camera", "agents.assistant.empty"])
+    box.withLock {
+        $0[2] = .init(path: "ui.camera", category: .container, value: "{\"on\":true}")
+    }
+    await state.refreshStateVariables(now: Date(timeIntervalSince1970: 300))
+    #expect(state.stateVariables.map(\.path) == ["ui.camera", "agents.assistant.mood", "agents.assistant.empty"])
 }

@@ -174,9 +174,9 @@ private struct FailingContext: Encodable, Sendable {
     }
     try context.open(session: "assistant")
     let unknown = try await context.snapshot(session: "assistant", names: ["ui.home.expression"])
-    #expect(unknown.contains("\"availability\":\"unknown\""))
+    #expect(!unknown.contains("ui.home.expression") && !unknown.contains("availability"))
     #expect(!unknown.contains("cleanupFailure") && !unknown.contains("closed") && !unknown.contains("diagnosticOnly"))
-    #expect(try await context.snapshot(session: "assistant", names: ["system.health"]).contains("unknown"))
+    #expect(try await context.snapshot(session: "assistant", names: ["system.health"]) == "{}")
 }
 
 @Test func assistantStateBindingsSelectParentAndChildIndependently() async throws {
@@ -201,7 +201,7 @@ private struct FailingContext: Encodable, Sendable {
     try AssistantStateBindings.register(in: context) { _ in throw ContextFixtureFailure.encoding }
     try context.open(session: "assistant")
     #expect(try await context.snapshot(session: "assistant", names: []) == "{}")
-    #expect(try await context.snapshot(session: "assistant", names: ["actions.robot"]).contains("stateUnavailable"))
+    #expect(try await context.snapshot(session: "assistant", names: ["actions.robot"]) == "{}")
 }
 
 @Test @MainActor func reflexivityRuntimeCountersRemainAvailableWithoutBusinessClassification() async throws {
@@ -348,7 +348,7 @@ private actor ContextReadBarrier {
             == (FixedPlatformState.sourceNames + [
                 "agents.applicationcontrol", "agents.writer", "ui.home.expression", "ui.navigation", "ui.windows",
             ]).sorted())
-    _ = try skills.control("loadSkills", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
+    _ = try skills.control("skill.load", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
     let names = try AgentSkillLoader.useStates(skills.loaded)
     #expect(
         names
@@ -358,7 +358,7 @@ private actor ContextReadBarrier {
                 "ui.camera", "ui.home.expression",
                 "ui.navigation", "ui.windows", "ui.island",
             ]).sorted())
-    _ = try skills.control("releaseSkills", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
+    _ = try skills.control("skill.unload", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
     owner.camera.update { $0.running = true }
     #expect(
         try AgentSkillLoader.useStates(skills.loaded)
@@ -372,14 +372,14 @@ private actor ContextReadBarrier {
     var skills = AgentTaskSkillState()
     let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
     try skills.initialize(fixed: fixed, baseSkills: ["basic-interaction"])
-    _ = try skills.control(
-        "task.start", arguments: ["description": "拍照"], inputID: "input", fixed: fixed,
-        sessionID: "one", taskID: try fixtureTaskID())
+    try skills.beginTask(goal: "拍照", taskID: try fixtureTaskID(), sessionID: "one", inputID: "input")
+    var context = AssistantContextState()
+    context.skillState = skills
+    #expect(context.visibleVariables(session: "one").value("task") == "拍照")
+    #expect(context.visibleVariables(session: "two").value("task") == nil)
     let snapshot = skills.contextSnapshot(session: "one")
-    #expect(snapshot.task?.goal == "拍照" && snapshot.task?.status == "running")
-    #expect(skills.contextSnapshot(session: "two").task == nil)
     let json = String(decoding: try JSONEncoder().encode(snapshot), as: UTF8.self)
-    #expect(!json.contains("inputIDs") && !json.contains("executor") && !json.contains("taskSkillRoots"))
+    #expect(!json.contains("inputIDs") && !json.contains("executor") && !json.contains("拍照"))
 }
 
 @Test func skillInstructionsRequireExplicitCurrentPaths() throws {
@@ -516,10 +516,10 @@ private actor ContextReadBarrier {
         basic.contains("ui.home.expression") && !basic.contains("actions.robot")
             && !basic.contains("system.diagnostics"))
     _ = try skills.control(
-        "loadSkills", arguments: ["skills": "[\"robot-interaction\"]"], inputID: "input", fixed: fixed)
+        "skill.load", arguments: ["skills": "[\"robot-interaction\"]"], inputID: "input", fixed: fixed)
     #expect(try AgentSkillLoader.useStates(skills.loaded).contains("actions.robot"))
     _ = try skills.control(
-        "releaseSkills", arguments: ["skills": "[\"robot-interaction\"]"], inputID: "input", fixed: fixed)
+        "skill.unload", arguments: ["skills": "[\"robot-interaction\"]"], inputID: "input", fixed: fixed)
     #expect(!((try AgentSkillLoader.useStates(skills.loaded)).contains("actions.robot")))
 }
 
@@ -678,18 +678,18 @@ private func bundledStateSkillIDs() throws -> [String] {
     for id in shared where !base.contains(id) {
         var skills = AgentTaskSkillState()
         try skills.initialize(fixed: fixed, baseSkills: base)
-        _ = try skills.control("loadSkills", arguments: ["skills": "[\"\(id)\"]"], inputID: "input", fixed: fixed)
+        _ = try skills.control("skill.load", arguments: ["skills": "[\"\(id)\"]"], inputID: "input", fixed: fixed)
         let names = try AgentSkillLoader.useStates(skills.loaded)
         let snapshot = try await context.snapshot(session: "web-regression", names: names)
         let fields = try #require(JSONSerialization.jsonObject(with: Data(snapshot.utf8)) as? [String: Any])
-        #expect(Set(fields.keys) == Set(names))
-        #expect(!snapshot.contains("stateUnavailable"))
+        #expect(Set(fields.keys).isSubset(of: Set(names)))
+        #expect(!snapshot.contains("stateUnavailable") && !snapshot.contains("null"))
         if id == "web-browsing" {
             #expect(names.contains("ui.web") && names.contains("ui.windows"))
             #expect(snapshot.contains("empty"))
             #expect(!snapshot.contains("file://"))
         }
-        _ = try skills.control("releaseSkills", arguments: ["skills": "[\"\(id)\"]"], inputID: "input", fixed: fixed)
+        _ = try skills.control("skill.unload", arguments: ["skills": "[\"\(id)\"]"], inputID: "input", fixed: fixed)
         let released = try AgentSkillLoader.useStates(skills.loaded)
         #expect(!released.contains("ui.web"))
         _ = try await context.snapshot(session: "web-regression", names: released)
@@ -710,9 +710,8 @@ private func bundledStateSkillIDs() throws -> [String] {
     }
     try context.open(session: "test")
     let result = try await context.snapshot(session: "test", names: ["fixture.new", "fixture.missing"])
-    #expect(result.contains("kept") && result.contains("stateUnavailable"))
-    #expect(
-        result.contains("\"value\":null") && !result.contains("not-observable") && !result.contains("fixture.child"))
+    #expect(result.contains("kept") && !result.contains("fixture.missing") && !result.contains("null"))
+    #expect(!result.contains("not-observable") && !result.contains("fixture.child"))
     #expect(reads.read() == ["fixture.missing", "fixture.new"])
     context.close()
     await #expect(throws: ContainerContextError.closed) { try await context.snapshot(session: "test", names: []) }
@@ -747,7 +746,7 @@ private func bundledStateSkillIDs() throws -> [String] {
     #expect(
         !state.contains(id.uuidString) && state.contains("window_1") && state.contains("Writer shared canvas")
             && state.contains("artifact"))
-    _ = try skills.control("loadSkills", arguments: ["skills": "[\"web-browsing\"]"], inputID: "inspect", fixed: fixed)
+    _ = try skills.control("skill.load", arguments: ["skills": "[\"web-browsing\"]"], inputID: "inspect", fixed: fixed)
     let directory = try skills.registry(fixed: fixed)
     let query = try directory.resolveAction("Web.inspect", parameters: ["windowID": "window_1"])
     #expect(query.parameters["windowID"] == "window_1")

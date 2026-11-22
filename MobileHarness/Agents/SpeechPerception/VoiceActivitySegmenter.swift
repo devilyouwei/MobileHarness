@@ -2,9 +2,15 @@ import Foundation
 import ModelKit
 
 public struct VoiceSegmentation: Sendable {
+    public struct Window: Sendable {
+        public let offset: Int
+        public let sampleCount: Int
+        public let onsetCandidate: Bool
+    }
     public let streamEvents: [VoiceStreamEvent]
     public let isSpeaking: Bool
     public let probability: Float
+    public let windows: [Window]
 }
 
 /// Bounded input policy around an abstract VAD session. Never imports a concrete model or audio hardware.
@@ -34,12 +40,14 @@ public actor VoiceActivitySegmenter {
         do {
             let samples = frame.floatSamples
             guard samples.allSatisfy(\.isFinite) else { throw CapabilityError.invalidRequest("Non-finite PCM") }
+            let frameStart = position + Int64(pending.count)
             pending.append(contentsOf: samples)
             let scores = try await session.process(frame)
             try Task.checkCancellation()
             guard !closed else { throw CancellationError() }
             guard scores.count <= 64 else { throw CapabilityError.bufferOverflow }
             var streamEvents: [VoiceStreamEvent] = []
+            var windows: [VoiceSegmentation.Window] = []
             var consumed = 0
             for score in scores {
                 guard score.startSample == position, score.sampleCount <= pending.count - consumed else {
@@ -52,6 +60,10 @@ public actor VoiceActivitySegmenter {
                 _ = policy.consume(
                     window, probability: score.probability, threshold: threshold, onsetWindows: onsetWindows,
                     useShortEndpoint: useShortEndpoint, onsetThreshold: onsetThreshold)
+                windows.append(
+                    .init(
+                        offset: Int(score.startSample - frameStart), sampleCount: score.sampleCount,
+                        onsetCandidate: policy.hasOnsetCandidate))
                 streamEvents += policy.streamEvents
                 consumed += score.sampleCount
                 position += Int64(score.sampleCount)
@@ -59,7 +71,7 @@ public actor VoiceActivitySegmenter {
             }
             pending.removeFirst(consumed)
             return VoiceSegmentation(
-                streamEvents: streamEvents, isSpeaking: policy.isSpeaking, probability: probability
+                streamEvents: streamEvents, isSpeaking: policy.isSpeaking, probability: probability, windows: windows
             )
         } catch {
             closed = true

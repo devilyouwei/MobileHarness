@@ -17,7 +17,7 @@ extension SQLiteAssistantTaskRepository {
             }
             try db.execute(
                 sql: """
-                    UPDATE assistant_tasks SET state='completed',end_reason='task.end',summary=?,ended_at=?,
+                    UPDATE assistant_tasks SET state='completed',end_reason='state.clear',summary=?,ended_at=?,
                       summary_revision=source_revision WHERE id=? AND conversation_id=? AND state='running'
                     """,
                 arguments: [summary, completion.finishedAt.timeIntervalSince1970, task, conversation])
@@ -78,7 +78,7 @@ extension SQLiteAssistantTaskRepository {
                     taskID: "task_\(key)", goal: row["description"], status: state, reportedSummary: row["summary"],
                     failure: failure, completedAt: Date(timeIntervalSince1970: ended),
                     sources: sources.map { .init(inputID: $0.inputID, requestID: $0.requestID) },
-                    closedAtAction: (row["end_reason"] as String?) == "task.end" ? true : nil)
+                    closedAtAction: (row["end_reason"] as String?) == "state.clear" ? true : nil)
                 return try JSONEncoder().encode(value)
             }
         }
@@ -93,7 +93,7 @@ extension SQLiteAssistantTaskRepository {
 
     // An explicit close freezes membership; subsequent output and execution evidence still update those same rows.
     private static let advanceSourceEvidence = """
-        summary_revision=CASE WHEN end_reason='task.end' AND summary_revision=source_revision
+        summary_revision=CASE WHEN end_reason='state.clear' AND summary_revision=source_revision
           THEN source_revision+1 ELSE summary_revision END,source_revision=source_revision+1
         """
 

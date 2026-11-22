@@ -1,9 +1,10 @@
 {
-  "version": 11,
+  "version": 12,
   "category": "perception",
   "id": "visionPerception",
   "description": "I interpret authorized camera frames, produce pose observations and maintain visual inference state. Observing a frame does not grant device-control authority.",
-  "baseSkills": [],
+  "skills": [],
+  "states": [],
   "signals": {
     "requests": [],
     "feedback": [

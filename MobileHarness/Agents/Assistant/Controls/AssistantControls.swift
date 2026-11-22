@@ -4,15 +4,16 @@ import FunctionContracts
 
 /// Operations of the Assistant's built-in control functions.
 public enum AgentControlOperation: String, Codable, Sendable, Equatable {
-    case startTask = "task.start"
-    case finishTask = "task.end"
-    case sendMessage = "task.send"
-    case loadSkills
-    case releaseSkills
+    case stateSet = "state.set"
+    case stateClear = "state.clear"
+    case stateGet = "state.get"
+    case loadSkills = "skill.load"
+    case releaseSkills = "skill.unload"
+    case sendMessage = "send"
 }
 
-/// One built-in control function, run by the Assistant: `own` changes its Task, Skill and round state; `peer` reaches
-/// another Agent. Controls never reach Actions and are not configured by Skills.
+/// One built-in control function, run by the Assistant: `own` changes its variables, Skill and round state; `peer`
+/// reaches another Agent. Controls never reach Actions and are not configured by Skills.
 public struct AssistantControl: Codable, Sendable, Equatable {
     public let alias: String
     public let operation: AgentControlOperation

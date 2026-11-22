@@ -51,14 +51,30 @@ import asyncio
 from workflow_scoring import parse_actions, score_turn, apply_actions
 
 
+def agent_state_block(state, configuration):
+    """The independent system block the App places before the user message; empty when nothing is set."""
+    variables = state.get('variables', {})
+    if not variables:return ''
+    lines = []
+    for name, value in variables.items():
+        lines.append(f"{name} (written {configuration['time']}): {json.dumps(value, ensure_ascii=False)}")
+    return configuration['stateBlock'].replace('{{variables}}', '\n'.join(lines))
+
+
 async def evaluate_case(case, model, configuration, request_limit):
     state = {k: v for k, v in case.items() if k not in ('turns', 'id', 'category')}
-    state['loaded'] = list(case.get('skills', [])); state['task'] = bool(case.get('taskGoal'))
+    state['loaded'] = list(case.get('skills', []))
+    state['variables'] = dict(case.get('variables', {}))
+    if case.get('taskGoal'):state['variables']['task'] = case['taskGoal']
+    state['task'] = 'task' in state['variables']
     messages = [dict(role='system', content=configuration['system'] + '\nAvailable action aliases:\n' +
-                     json.dumps(configuration['actions']) + '\nAction attribute names:\n' + json.dumps(configuration.get('parameters', {})) + '\nInitial synthetic state:\n' + json.dumps({k:v for k,v in state.items() if k != 'failure'}))]
+                     json.dumps(configuration['actions']) + '\nAction attribute names:\n' + json.dumps(configuration.get('parameters', {})) + '\nInitial synthetic state:\n' + json.dumps({k:v for k,v in state.items() if k not in ('failure', 'variables')}))]
     turns = []; requests = 0
     for expected in case['turns']:
+        block = agent_state_block(state, configuration)
+        if block:messages.append(dict(role='system', content=block))
         messages.append(dict(role='user', content=expected['user']))
+        state['rejections'] = []
         calls = []; trace = []; parse_issues = []
         for round_index in range(request_limit):
             if requests >= request_limit:raise ValueError('Case request limit exceeded')
@@ -70,7 +86,8 @@ async def evaluate_case(case, model, configuration, request_limit):
                 parse_issues.append('invalidActionOutput:' + type(error).__name__); break
             calls.extend(batch)
             if not any(c['alias'] != 'speak' for c in batch):break
-            feedback = apply_actions(batch, state)
+            feedback = [f for f in apply_actions(batch, state) if not f.get('void')]
+            if not feedback:break
             messages.append(dict(role='user', content='Synthetic action feedback: ' + json.dumps(feedback, ensure_ascii=False)))
         else:raise ValueError('Case request limit exceeded')
         issues = parse_issues + score_turn(expected, calls, state)

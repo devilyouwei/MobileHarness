@@ -215,49 +215,6 @@ extension RuntimeLogState {
     #expect(state.visibleActions.map(\.id) == [internalFailure.id])
 }
 
-@Test @MainActor func executionLogTaskReceiptIsNotCompletionAndLateProgressCannotReopen() async throws {
-    let state = RuntimeLogState()
-    let workflow = AgentRuntimeLogWorkflow(log: state)
-    let pair = AsyncStream<SignalTraceSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
-    workflow.startTasks(
-        observe: { pair.stream }, taskContent: { signal in ("task report", signal.kind == .progress) })
-    let scope = AgentTaskScope(
-        id: UUID().uuidString, requester: .assistant, executor: .photographer,
-        sessionID: UUID().uuidString)
-    func record(
-        _ kind: AgentTaskSignal.Kind, status: AgentTaskSignal.Status? = nil, businessContract: String = "fixture"
-    ) throws -> SignalTraceRecord {
-        let signal = try AgentTaskSignal(
-            kind: kind, scope: scope, businessContract: businessContract, data: Data(), status: status)
-        let input = AgentInput(
-            id: UUID().uuidString,
-            sessionID: scope.sessionID, payload: .observation(try signal.message()), taskScope: scope)
-        var value = SignalTraceRecord(input: input, mode: .send, targets: [.photographer], summary: "")
-        value.phase = .accepted
-        return value
-    }
-    let accepted = try record(.request)
-    pair.continuation.yield(.init(revision: 1, records: [accepted]))
-    let end = ContinuousClock.now.advanced(by: .seconds(3))
-    while state.tasks.isEmpty && ContinuousClock.now < end { await Task.yield() }
-    #expect(state.tasks.first?.phase == .accepted)
-    #expect(state.tasks.first?.isTerminal == false)
-    let question = try record(.progress)
-    pair.continuation.yield(.init(revision: 2, records: [accepted, question]))
-    while state.tasks.first?.phase != .waitingUser && ContinuousClock.now < end { await Task.yield() }
-    #expect(state.tasks.first?.phase == .waitingUser)
-    let result = try record(.result, status: .succeeded)
-    pair.continuation.yield(.init(revision: 3, records: [accepted, question, result]))
-    while state.tasks.first?.phase != .succeeded && ContinuousClock.now < end { await Task.yield() }
-    #expect(state.tasks.first?.phase == .succeeded)
-    let progress = try record(.progress)
-    pair.continuation.yield(.init(revision: 4, records: [accepted, question, result, progress]))
-    while state.tasks.first?.events.count != 4 && ContinuousClock.now < end { await Task.yield() }
-    #expect(state.tasks.first?.phase == .succeeded)
-    #expect(state.tasks.first?.events.count == 4)
-    pair.continuation.finish()
-}
-
 @Test @MainActor func actionActivityLocalizesCopyWithoutTranslatingExecutionEvidence() throws {
     let completed = activityRecord(phase: .succeeded, completion: .completed)
     let translated = ActionActivityItem(execution: completed, language: .simplifiedChinese)
@@ -278,28 +235,4 @@ extension RuntimeLogState {
     var evidence = activityRecord(phase: .failed)
     evidence.failureDescription = "Producer-owned diagnostic"
     #expect(ActionActivityItem(execution: evidence, language: .simplifiedChinese).status == evidence.failureDescription)
-}
-
-@Test @MainActor func taskLogUsesInjectedPresentationLanguage() async throws {
-    let state = RuntimeLogState()
-    let workflow = AgentRuntimeLogWorkflow(log: state, language: { .simplifiedChinese })
-    let pair = AsyncStream<SignalTraceSnapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
-    workflow.startTasks(observe: { pair.stream })
-    let scope = AgentTaskScope(
-        id: UUID().uuidString, requester: .assistant, executor: .photographer,
-        sessionID: UUID().uuidString)
-    let signal = try AgentTaskSignal(kind: .request, scope: scope, businessContract: "fixture", data: Data())
-    let input = AgentInput(
-        id: UUID().uuidString, sessionID: scope.sessionID,
-        payload: .observation(try signal.message()), taskScope: scope)
-    var record = SignalTraceRecord(input: input, mode: .send, targets: [.photographer], summary: "")
-    record.phase = .accepted
-    pair.continuation.yield(.init(revision: 1, records: [record]))
-    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
-    while state.tasks.isEmpty && ContinuousClock.now < deadline { await Task.yield() }
-    #expect(state.tasks.first?.events.first?.title == "任务委派 · 已接纳")
-    #expect(state.tasks.first?.phase == .accepted)
-    #expect(state.tasks.first?.executor == AgentID.photographer.rawValue)
-    pair.continuation.finish()
-    await workflow.shutdown()
 }

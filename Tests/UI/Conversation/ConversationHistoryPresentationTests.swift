@@ -254,16 +254,16 @@ private func conversation(archived: Bool = false, title: String? = nil, user: St
     let rows = ConversationHistoryPresentation.turns(conversation)
     #expect(rows.count == 2 && rows.map(\.id) == [firstID, secondID])
     #expect(rows[0].user == "question" && rows[0].isReACT == false)
-    #expect(rows[0].raw.isEmpty && rows[0].outputSummary == "Tool Call：inspect")
+    #expect(rows[0].raw.isEmpty && rows[0].outputSummary() == "Tool Call: inspect")
     #expect(
-        rows[0].toolCalls?.first?.responseReport
+        rows[0].toolCalls?.first?.responseReport()
             == "Tool Call · inspect · completed\n\nArguments:\n{}\n\nResult:\nactual-result")
-    #expect(rows[0].firstTokenReport == "Time to first token: ")
+    #expect(rows[0].firstTokenReport() == "Time to first token: ")
     #expect(rows[1].user == "[tool]\nactual-result" && rows[1].isReACT == true)
     #expect(rows[1].raw == "observed" && rows[1].toolCalls?.isEmpty == true)
     #expect(rows[1].request.last?.role == .tool && rows[1].request.last?.toolCallID == "provider-call")
     #expect(rows[1].request[2].toolCalls?.first?.name == "inspect")
-    #expect(rows[1].firstTokenReport == "Time to first token: 0.025 sec")
+    #expect(rows[1].firstTokenReport() == "Time to first token: 0.025 sec")
     #expect(rows[1].toolDefinitions == ["definition"])
     let secondExport = try JSONDecoder().decode(
         HistoryTurn.self, from: ConversationHistoryPresentation.jsonData(rows[1]))
@@ -300,13 +300,13 @@ private func conversation(archived: Bool = false, title: String? = nil, user: St
         ]
     ])
     let turn = try #require(ConversationHistoryPresentation.turns(page).first)
-    let reports = try #require(turn.toolCalls).map(\.responseReport)
+    let reports = try #require(turn.toolCalls).map { $0.responseReport() }
     #expect(turn.raw == "checking" && reports.count == 3)
     #expect(reports[0].hasSuffix("Result:\n"))
     #expect(reports[1].contains(#"{"id":"dialog_1"}"#))
     #expect(reports[1].hasSuffix("Error:\nmissingConversation") && !reports[1].contains("Result:"))
     #expect(!reports[2].contains("Result:") && !reports[2].contains("Error:"))
-    #expect(turn.firstTokenReport == "Time to first token: 0.125 sec")
+    #expect(turn.firstTokenReport() == "Time to first token: 0.125 sec")
     let exported = try JSONDecoder().decode(HistoryTurn.self, from: ConversationHistoryPresentation.jsonData(turn))
     #expect(exported.response == "checking" && exported.toolCalls?.count == 3)
 }
@@ -413,8 +413,8 @@ private func historyFixture(extra: [String: Any]) throws -> HistoryConversation 
         ]
     ])
     let row = try #require(ConversationHistoryPresentation.turns(conversation).first)
-    #expect(row.firstTokenReport == "Time to first token: ")
-    #expect(!row.firstTokenReport.contains("3.000"))
+    #expect(row.firstTokenReport() == "Time to first token: ")
+    #expect(!row.firstTokenReport().contains("3.000"))
 }
 
 @Test func historyJSONExportRoundTripsFullConversation() throws {
@@ -526,12 +526,12 @@ func historyFunctionCatalogRejectsCorruptSnapshotsRatherThanInventingEmptyGroups
         "tokenUsage": ["input": 12, "generated": 2, "total": 14, "cachedInput": 0, "cacheWriteInput": 4]
     ])
     let turn = try #require(snapshot.turns.first)
-    #expect(turn.tokenReport.contains("Cache read: 0 tokens"))
-    #expect(turn.tokenReport.contains("Cache write: 4 tokens"))
+    #expect(turn.tokenReport().contains("Cache read: 0 tokens"))
+    #expect(turn.tokenReport().contains("Cache write: 4 tokens"))
     let exported = try JSONDecoder().decode(HistoryTurn.self, from: ConversationHistoryPresentation.jsonData(turn))
     #expect(exported.tokenUsage?.cachedInput == 0 && exported.tokenUsage?.cacheWriteInput == 4)
     let older = try historyFixture(extra: ["tokenUsage": ["input": 12, "generated": 2, "total": 14]])
-    #expect(older.turns.first?.tokenReport.contains("缓存") == false)
+    #expect(older.turns.first?.tokenReport().contains("缓存") == false)
 }
 
 @MainActor private func awaitHistoryRead(_ ready: () -> Bool) async throws {
@@ -842,4 +842,17 @@ private struct WriterPageFixture: Identifiable, Sendable {
     #expect(pages.items[12].title == "updated" && pages.items[13].title == "original")
     try pages.apply((1...20).reversed().map { .init(id: $0) }, next: nil, reset: false)
     #expect(pages.items.map(\.id) == Array((1...43).reversed()) && pages.next == nil)
+}
+
+@Test func historyCoordinationReadsLegacyDecisionAndLocalizesState() throws {
+    func decode(_ extra: String) throws -> HistoryInputCoordination {
+        try JSONDecoder().decode(
+            HistoryInputCoordination.self, from: Data(#"{"source":"speech","capturedAt":"1"\#(extra)}"#.utf8))
+    }
+    #expect(try decode(#","decision":"true""#).interrupt == true)
+    #expect(try decode(#","decision":"false""#).interrupt == false)
+    #expect(try decode(#","interrupt":true"#).interrupt == true)
+    #expect(try decode("").interrupt == nil)
+    #expect(AppLanguage.simplifiedChinese.text("Interrupted") == "已中断")
+    #expect(AppLanguage.simplifiedChinese.text("Interrupt decision") == "打断决策")
 }

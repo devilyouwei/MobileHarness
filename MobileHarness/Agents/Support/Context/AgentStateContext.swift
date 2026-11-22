@@ -34,6 +34,8 @@ public final class AgentStateContext: Sendable {
             value.sources[name] = source
         }
     }
+    /// Image sources are read only to build a prompt; passive displays skip them.
+    public func isMedia(_ name: String) -> Bool { registry.withLock { $0.media[name] != nil } }
     public func open(session: String) throws {
         try registry.withLock { value in
             guard !value.closed else { throw ContainerContextError.closed }
@@ -71,6 +73,22 @@ public final class AgentStateContext: Sendable {
         }
         for reset in callbacks { await reset(session) }
     }
+    /// Drops null recursively. Empty strings and genuinely empty containers are real values and stay; a container
+    /// emptied only by dropping nulls carries nothing, so nil means nothing meaningful remains.
+    private static func pruned(_ value: Any) -> Any? {
+        if value is NSNull { return nil }
+        if let object = value as? [String: Any] {
+            if object.isEmpty { return object }
+            let kept = object.compactMapValues { pruned($0) }
+            return kept.isEmpty ? nil : kept
+        }
+        if let array = value as? [Any] {
+            if array.isEmpty { return array }
+            let kept = array.compactMap { pruned($0) }
+            return kept.isEmpty ? nil : kept
+        }
+        return value
+    }
     public func snapshot(session: String, names: [String]) async throws -> String {
         String(decoding: try await multimodalSnapshot(session: session, names: names).facts, as: UTF8.self)
     }
@@ -98,7 +116,9 @@ public final class AgentStateContext: Sendable {
             let snapshot = try await read(session)
             bindings[name] = snapshot.resourceScope
             guard snapshot.facts.count <= 8192 else { throw ContainerContextError.capacityExceeded }
-            fields[name] = try JSONSerialization.jsonObject(with: snapshot.facts, options: [.fragmentsAllowed])
+            let value = try JSONSerialization.jsonObject(with: snapshot.facts, options: [.fragmentsAllowed])
+            // A source without a meaningful value is left out of the model context entirely.
+            if let meaningful = Self.pruned(value) { fields[name] = meaningful }
             for image in snapshot.images where !images.contains(where: { $0.id == image.id }) {
                 guard !image.data.isEmpty, image.data.count <= 4 * 1024 * 1024 else {
                     throw ContainerContextError.capacityExceeded

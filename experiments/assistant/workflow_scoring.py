@@ -27,20 +27,56 @@ def parse_actions(text, round_index, allowed):
     return calls
 
 
+READ_ONLY_VARIABLES = {'quiet'}
+NAME = re.compile(r'[a-z][a-z0-9_]{0,31}')
+SYNTHETIC_STATE = {'ui.windows': dict(windows=[dict(id='window_1', title='Synthetic window')])}
+
+
+def control_state(name, args, state):
+    """Mirror the App's state controls: writes and send return nothing on success and an error otherwise."""
+    if name not in ('state.set', 'state.clear', 'state.get', 'send'):return None
+    variables = state.setdefault('variables', {})
+    def reject(reason):
+        state.setdefault('rejections', []).append(name + ':' + reason)
+        return dict(error=reason)
+    if name == 'send':
+        return dict(void=True) if args.get('agent_id') and args.get('text') else reject('invalidParameters')
+    if name == 'state.get':
+        path = args.get('path', '')
+        if not path:return reject('invalidParameters')
+        if '.' in path:return dict(result=dict(path=path, value=SYNTHETIC_STATE.get(path)))
+        return dict(result=dict(name=path, value=variables.get(path)))
+    target, setting = args.get('name', ''), name == 'state.set'
+    if not NAME.fullmatch(target):return reject('invalidName')
+    if target in READ_ONLY_VARIABLES:return reject('readOnly')
+    value, note = args.get('value', ''), (args.get('note') or '').strip()
+    if setting and (not value or len(value.encode()) > 1024):return reject('invalidValue')
+    if target == 'task' and variables.get('task') and not note:return reject('noteRequired')
+    if setting:
+        variables.pop(target, None); variables[target] = value
+    else:variables.pop(target, None)
+    state['task'] = 'task' in variables
+    return dict(void=True)
+
+
 def apply_actions(calls, state):
     feedback = []
     for call in calls:
         name, args = call['alias'], call['parameters']
         if name == 'speak':continue
-        if name in ('loadSkills', 'releaseSkills'):
-            raw = args.get('ids', args.get('skills', args.get('id', '')))
+        if name in ('skill.load', 'skill.unload'):
+            raw = args.get('skills', args.get('ids', args.get('id', '')))
             ids = json.loads(raw) if raw.startswith('[') else raw.replace(',', ' ').split()
             if not isinstance(ids, list) or not all(isinstance(x, str) for x in ids):raise ValueError('Invalid skill list')
             loaded = set(state['loaded'])
-            loaded = loaded.union(ids) if name == 'loadSkills' else loaded.difference(ids)
+            loaded = loaded.union(ids) if name == 'skill.load' else loaded.difference(ids)
             state['loaded'] = sorted(loaded)
-        if name == 'task.start':state.update(task=True, status='running')
-        if name in ('task.finish','task.cancel'):state.update(task=False, status='completed' if name.endswith('finish') else 'cancelled')
+        control = control_state(name, args, state)
+        if control is not None:
+            if control.get('void') or control.get('error'):
+                entry = dict(action=name, synthetic=True, status='failed' if control.get('error') else 'completed', **control)
+                feedback.append(entry); continue
+            feedback.append(dict(action=name, synthetic=True, status='completed', result=control['result'])); continue
         failure = state.get('failure')
         failed = ((failure == 'cameraPermission' and name in ('openCamera','takePhoto'))
                   or (failure == 'saveFailure' and name == 'savePhoto')
@@ -70,7 +106,9 @@ def apply_actions(calls, state):
 
 def score_turn(expected, calls, state):
     issues = []; counts = Counter(c['alias'] for c in calls)
-    matches = lambda call, values: all(str(call['parameters'].get(k)) == str(v) for k, v in values.items())
+    matches = lambda call, values: all(
+        bool(str(call['parameters'].get(k, '')).strip()) if v == '*' else str(call['parameters'].get(k)) == str(v)
+        for k, v in values.items())
     for alias in expected.get('required', []):
         if not counts[alias]:issues.append('missing:' + alias)
     for alias in expected.get('forbidden', []):
@@ -91,6 +129,12 @@ def score_turn(expected, calls, state):
         if first and second and first['round'] == second['round']:issues.append('dependentCallsInSameRound')
     business = [c for c in calls if c['alias'] != 'speak']
     if 'first' in expected and (not business or business[0]['alias'] != expected['first']):issues.append('first')
+    if state.get('rejections') and not expected.get('allowRejections'):issues.append('rejected:' + state['rejections'][0])
+    variables = state.get('variables', {})
+    for key, want in expected.get('variables', {}).items():
+        have = variables.get(key)
+        if want is None and have is not None or want == '*' and not have or want not in (None, '*') and have != want:issues.append('variable:' + key)
+    if expected.get('freeVariable') and not any(k not in ('task', 'quiet') for k in variables):issues.append('noFreeVariable')
     for key in ('task','status'):
         if key in expected and state.get(key) != expected[key]:issues.append(key)
     for key in expected.get('loaded', []):

@@ -253,3 +253,5 @@ refactor, Agent-only model recording, current-file recovery and automated/build/
 - [纯 Python 实验验证](Python-Experiments.md)：Research 与 Swift 工程测试解耦及运行证据。
 
 - [Tests / experiments 独立验证](Independent-Research-Tests.md)：仅共享模型制品，源码、数据和验证入口独立。
+
+- [State 泛化后的控制提示词评估](State-Controls-Prompt-Evaluation.md)：state/skill/send 控制库的 qwen3.8-flash 实验结果与对照。

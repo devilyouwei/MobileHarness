@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "cases": [
     {
       "id": "plain-chat",
@@ -8,11 +8,15 @@
         {
           "user": "你好，今天心情不错。",
           "forbidden": [
-            "task.start",
-            "loadSkills",
+            "skill.load",
             "takePhoto",
             "Bluetooth.control"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ]
     },
@@ -23,16 +27,20 @@
         {
           "user": "打开摄像头。",
           "required": [
-            "loadSkills",
+            "skill.load",
             "openCamera"
           ],
           "forbidden": [
-            "task.start",
             "takePhoto"
           ],
           "loaded": [
             "photography"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ]
     },
@@ -43,15 +51,18 @@
         {
           "user": "关闭摄像头。",
           "required": [
-            "loadSkills",
+            "skill.load",
             "closeCamera"
           ],
-          "forbidden": [
-            "task.start"
-          ],
+          "forbidden": [],
           "loaded": [
             "photography"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ],
       "cameraEnabled": true
@@ -66,9 +77,13 @@
             "closeCamera"
           ],
           "forbidden": [
-            "loadSkills",
-            "task.start"
-          ]
+            "skill.load"
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ],
       "skills": [
@@ -103,9 +118,13 @@
             "closeCamera"
           ],
           "forbidden": [
-            "loadSkills",
-            "task.start"
-          ]
+            "skill.load"
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ],
       "skills": [
@@ -119,17 +138,23 @@
         {
           "user": "帮我拍一张照片，不需要后续操作，不用保存也不用问我。",
           "required": [
-            "loadSkills",
+            "skill.load",
             "takePhoto"
           ],
           "forbidden": [
-            "task.start",
-            "task.end",
             "savePhoto"
           ],
           "task": false,
           "counts": {
             "takePhoto": 1
+          },
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            },
+            "state.clear": {
+              "name": "task"
+            }
           }
         }
       ]
@@ -144,13 +169,19 @@
             "takePhoto"
           ],
           "forbidden": [
-            "task.start",
             "openCamera",
-            "task.end",
             "savePhoto"
           ],
           "counts": {
             "takePhoto": 1
+          },
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            },
+            "state.clear": {
+              "name": "task"
+            }
           }
         }
       ],
@@ -166,25 +197,33 @@
         {
           "user": "帮我拍张照片，拍好后让我选择保存还是关闭。",
           "required": [
-            "task.start",
+            "state.set",
             "takePhoto"
           ],
           "task": true,
-          "status": "waitingUser",
-          "first": "task.start",
+          "first": "state.set",
           "counts": {
             "takePhoto": 1
+          },
+          "parameters": {
+            "state.set": {
+              "name": "task"
+            }
           }
         },
         {
           "user": "保存这张。",
           "required": [
             "savePhoto",
-            "task.end"
+            "state.clear"
           ],
           "parameters": {
             "savePhoto": {
               "mediaID": "media_1"
+            },
+            "state.clear": {
+              "name": "task",
+              "note": "*"
             }
           },
           "task": false,
@@ -201,22 +240,33 @@
         {
           "user": "拍张照片，等我决定是否保存。",
           "required": [
-            "task.start",
+            "state.set",
             "takePhoto"
           ],
-          "task": true
+          "task": true,
+          "parameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         },
         {
           "user": "不保存照片了，关闭相机。",
           "required": [
             "closeCamera",
-            "task.end"
+            "state.clear"
           ],
           "forbidden": [
             "savePhoto",
             "takePhoto"
           ],
-          "task": false
+          "task": false,
+          "parameters": {
+            "state.clear": {
+              "name": "task",
+              "note": "*"
+            }
+          }
         }
       ],
       "cameraEnabled": true
@@ -230,27 +280,36 @@
           "required": [
             "takePhoto"
           ],
-          "forbidden": [
-            "task.start",
-            "task.end"
-          ],
+          "forbidden": [],
           "ordered": [
             "takePhoto"
           ],
           "task": true,
           "counts": {
             "takePhoto": 1
+          },
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            },
+            "state.clear": {
+              "name": "task"
+            }
           }
         },
         {
           "user": "保存新的。",
           "required": [
             "savePhoto",
-            "task.end"
+            "state.clear"
           ],
           "parameters": {
             "savePhoto": {
               "mediaID": "media_1"
+            },
+            "state.clear": {
+              "name": "task",
+              "note": "*"
             }
           },
           "task": false
@@ -278,11 +337,17 @@
             }
           },
           "forbidden": [
-            "task.start",
-            "task.end",
             "takePhoto"
           ],
-          "task": false
+          "task": false,
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            },
+            "state.clear": {
+              "name": "task"
+            }
+          }
         }
       ],
       "skills": [
@@ -302,10 +367,16 @@
           ],
           "parameters": {},
           "forbidden": [
-            "task.start",
-            "task.end",
             "takePhoto"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            },
+            "state.clear": {
+              "name": "task"
+            }
+          }
         }
       ],
       "skills": [
@@ -322,9 +393,13 @@
           "user": "保存这张照片。",
           "forbidden": [
             "savePhoto",
-            "takePhoto",
-            "task.start"
-          ]
+            "takePhoto"
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ],
       "skills": [
@@ -357,11 +432,14 @@
               "takePhoto"
             ]
           ],
-          "forbidden": [
-            "task.start"
-          ],
+          "forbidden": [],
           "counts": {
             "takePhoto": 1
+          },
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
           }
         }
       ],
@@ -449,10 +527,14 @@
             "savePhoto": 1
           },
           "forbidden": [
-            "task.end",
             "takePhoto"
           ],
-          "task": true
+          "task": true,
+          "forbiddenParameters": {
+            "state.clear": {
+              "name": "task"
+            }
+          }
         }
       ],
       "skills": [
@@ -493,15 +575,18 @@
         {
           "user": "顺便问一下，你叫什么名字？",
           "forbidden": [
-            "task.end",
-            "releaseSkills",
+            "skill.unload",
             "takePhoto"
           ],
           "task": true,
-          "status": "waitingUser",
           "loaded": [
             "photography"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.clear": {
+              "name": "task"
+            }
+          }
         }
       ],
       "skills": [
@@ -518,11 +603,17 @@
         {
           "user": "昨天的聊天记录呢？",
           "forbidden": [
-            "task.end",
-            "releaseSkills",
-            "task.start"
+            "skill.unload"
           ],
-          "task": true
+          "task": true,
+          "forbiddenParameters": {
+            "state.clear": {
+              "name": "task"
+            },
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ],
       "skills": [
@@ -539,16 +630,17 @@
         {
           "user": "不拍了，结束这个拍照任务，改查昨天的聊天记录。",
           "required": [
-            "task.end",
+            "state.clear",
             "History.list"
           ],
           "parameters": {
-            "task.end": {
-              "continueDecision": "true"
+            "state.clear": {
+              "name": "task",
+              "note": "*"
             }
           },
           "ordered": [
-            "task.end",
+            "state.clear",
             "History.list"
           ],
           "forbidden": [
@@ -571,14 +663,24 @@
         {
           "user": "取消当前任务。",
           "required": [
-            "task.end"
+            "state.clear"
           ],
           "forbidden": [
-            "task.start",
             "savePhoto",
             "takePhoto"
           ],
-          "task": false
+          "task": false,
+          "parameters": {
+            "state.clear": {
+              "name": "task",
+              "note": "*"
+            }
+          },
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ],
       "skills": [
@@ -596,13 +698,23 @@
           "user": "继续刚才的任务，保存这张照片。",
           "required": [
             "savePhoto",
-            "task.end"
+            "state.clear"
           ],
           "forbidden": [
-            "task.start",
             "takePhoto"
           ],
-          "task": false
+          "task": false,
+          "parameters": {
+            "state.clear": {
+              "name": "task",
+              "note": "*"
+            }
+          },
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ],
       "skills": [
@@ -620,20 +732,31 @@
           "user": "保存这张。",
           "required": [
             "savePhoto",
-            "task.end"
+            "state.clear"
           ],
-          "task": false
+          "task": false,
+          "parameters": {
+            "state.clear": {
+              "name": "task",
+              "note": "*"
+            }
+          }
         },
         {
           "user": "再帮我拍一张，拍好后我再决定保存还是关闭。",
           "required": [
-            "task.start",
+            "state.set",
             "takePhoto"
           ],
           "counts": {
             "takePhoto": 1
           },
-          "task": true
+          "task": true,
+          "parameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ],
       "skills": [
@@ -650,7 +773,7 @@
         {
           "user": "把 photography 技能卸载，保留摄像头和照片。",
           "required": [
-            "releaseSkills"
+            "skill.unload"
           ],
           "forbidden": [
             "closeCamera",
@@ -674,12 +797,15 @@
         {
           "user": "请使用 photography 技能把摄像头关了。",
           "required": [
-            "loadSkills",
+            "skill.load",
             "closeCamera"
           ],
-          "forbidden": [
-            "task.start"
-          ]
+          "forbidden": [],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ],
       "cameraEnabled": true
@@ -746,7 +872,7 @@
         {
           "user": "创建一个持续的连接任务：扫描周围蓝牙设备并连接名为“机械币”的设备，确认连接成功再结束；遇到需要选择时等待我决定。",
           "required": [
-            "task.start",
+            "state.set",
             "Bluetooth.control",
             "Bluetooth.readStatus"
           ],
@@ -765,7 +891,12 @@
             "openPage",
             "nodHead",
             "waveWrist"
-          ]
+          ],
+          "parameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ]
     },
@@ -845,9 +976,13 @@
             }
           },
           "forbidden": [
-            "History.list",
-            "task.start"
-          ]
+            "History.list"
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ],
       "skills": [
@@ -864,9 +999,13 @@
             "History.list"
           ],
           "forbidden": [
-            "openPage",
-            "task.start"
-          ]
+            "openPage"
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ],
       "skills": [
@@ -924,9 +1063,13 @@
           "user": "删除手机相册里所有照片。",
           "forbidden": [
             "savePhoto",
-            "takePhoto",
-            "task.start"
-          ]
+            "takePhoto"
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ],
       "skills": [
@@ -940,9 +1083,13 @@
         {
           "user": "给我下载那个模型。",
           "forbidden": [
-            "ModelResources.download",
-            "task.start"
-          ]
+            "ModelResources.download"
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ],
       "skills": [
@@ -1003,7 +1150,7 @@
         {
           "user": "点一次头。",
           "required": [
-            "loadSkills",
+            "skill.load",
             "nodHead"
           ],
           "parameters": {
@@ -1012,14 +1159,18 @@
             }
           },
           "forbidden": [
-            "task.start",
             "moveMotor",
             "resetArm"
           ],
-          "first": "loadSkills",
+          "first": "skill.load",
           "loaded": [
             "robot-interaction"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ]
     },
@@ -1074,7 +1225,7 @@
         {
           "user": "点一次头。",
           "required": [
-            "loadSkills",
+            "skill.load",
             "nodHead"
           ],
           "counts": {
@@ -1085,7 +1236,7 @@
             "resetMotor",
             "moveMotor"
           ],
-          "first": "loadSkills",
+          "first": "skill.load",
           "loaded": [
             "robot-interaction"
           ]
@@ -1108,9 +1259,12 @@
           "required": [
             "takePhoto"
           ],
-          "forbidden": [
-            "task.start"
-          ]
+          "forbidden": [],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ],
       "skills": [
@@ -1150,65 +1304,88 @@
         {
           "user": "谢谢。",
           "forbidden": [
-            "task.start",
-            "releaseSkills",
+            "skill.unload",
             "closeCamera",
             "openCamera",
             "takePhoto"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         },
         {
           "user": "今天心情很好。",
           "forbidden": [
-            "task.start",
-            "releaseSkills",
+            "skill.unload",
             "closeCamera",
             "openCamera",
             "takePhoto"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         },
         {
           "user": "给我讲个短笑话。",
           "forbidden": [
-            "task.start",
-            "releaseSkills",
+            "skill.unload",
             "closeCamera",
             "openCamera",
             "takePhoto"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         },
         {
           "user": "你叫什么名字？",
           "forbidden": [
-            "task.start",
-            "releaseSkills",
+            "skill.unload",
             "closeCamera",
             "openCamera",
             "takePhoto"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         },
         {
           "user": "北京是中国的首都吗？",
           "forbidden": [
-            "task.start",
-            "releaseSkills",
+            "skill.unload",
             "closeCamera",
             "openCamera",
             "takePhoto"
           ],
           "unloaded": [
             "photography"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         },
         {
           "user": "关闭摄像头。",
           "required": [
-            "loadSkills",
+            "skill.load",
             "closeCamera"
           ],
-          "forbidden": [
-            "task.start"
-          ]
+          "forbidden": [],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ]
     },
@@ -1223,29 +1400,41 @@
         {
           "user": "谢谢。",
           "forbidden": [
-            "task.start",
-            "releaseSkills",
+            "skill.unload",
             "closeCamera",
             "takePhoto"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         },
         {
           "user": "今天心情很好。",
           "forbidden": [
-            "task.start",
-            "releaseSkills",
+            "skill.unload",
             "closeCamera",
             "takePhoto"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         },
         {
           "user": "给我讲个短笑话。",
           "forbidden": [
-            "task.start",
-            "releaseSkills",
+            "skill.unload",
             "closeCamera",
             "takePhoto"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         },
         {
           "user": "关闭摄像头。",
@@ -1253,35 +1442,47 @@
             "closeCamera"
           ],
           "forbidden": [
-            "loadSkills"
+            "skill.load"
           ]
         },
         {
           "user": "谢谢。",
           "forbidden": [
-            "task.start",
-            "releaseSkills",
+            "skill.unload",
             "openCamera",
             "takePhoto"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         },
         {
           "user": "今天心情很好。",
           "forbidden": [
-            "task.start",
-            "releaseSkills",
+            "skill.unload",
             "openCamera",
             "takePhoto"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         },
         {
           "user": "给我讲个短笑话。",
           "forbidden": [
-            "task.start",
-            "releaseSkills",
+            "skill.unload",
             "openCamera",
             "takePhoto"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         },
         {
           "user": "打开摄像头。",
@@ -1289,9 +1490,13 @@
             "openCamera"
           ],
           "forbidden": [
-            "loadSkills",
-            "task.start"
-          ]
+            "skill.load"
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ]
     },
@@ -1312,11 +1517,15 @@
             "photography"
           ],
           "forbidden": [
-            "task.end",
-            "releaseSkills",
+            "skill.unload",
             "takePhoto",
             "savePhoto"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.clear": {
+              "name": "task"
+            }
+          }
         },
         {
           "user": "暂时保留照片，顺便问一下：今天心情很好。",
@@ -1325,11 +1534,15 @@
             "photography"
           ],
           "forbidden": [
-            "task.end",
-            "releaseSkills",
+            "skill.unload",
             "takePhoto",
             "savePhoto"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.clear": {
+              "name": "task"
+            }
+          }
         },
         {
           "user": "暂时保留照片，顺便问一下：给我讲个短笑话。",
@@ -1338,11 +1551,15 @@
             "photography"
           ],
           "forbidden": [
-            "task.end",
-            "releaseSkills",
+            "skill.unload",
             "takePhoto",
             "savePhoto"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.clear": {
+              "name": "task"
+            }
+          }
         },
         {
           "user": "暂时保留照片，顺便问一下：你叫什么名字？",
@@ -1351,11 +1568,15 @@
             "photography"
           ],
           "forbidden": [
-            "task.end",
-            "releaseSkills",
+            "skill.unload",
             "takePhoto",
             "savePhoto"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.clear": {
+              "name": "task"
+            }
+          }
         },
         {
           "user": "暂时保留照片，顺便问一下：北京是中国的首都吗？",
@@ -1364,23 +1585,37 @@
             "photography"
           ],
           "forbidden": [
-            "task.end",
-            "releaseSkills",
+            "skill.unload",
             "takePhoto",
             "savePhoto"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.clear": {
+              "name": "task"
+            }
+          }
         },
         {
           "user": "继续拍照任务，保存这张。",
           "required": [
             "savePhoto",
-            "task.end"
+            "state.clear"
           ],
           "forbidden": [
-            "loadSkills",
-            "task.start"
+            "skill.load"
           ],
-          "task": false
+          "task": false,
+          "parameters": {
+            "state.clear": {
+              "name": "task",
+              "note": "*"
+            }
+          },
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ]
     },
@@ -1410,11 +1645,15 @@
             "closeCamera"
           ],
           "forbidden": [
-            "loadSkills",
-            "task.start",
+            "skill.load",
             "Provider.readSettings",
             "openPage"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ]
     },
@@ -1435,13 +1674,19 @@
             "photography"
           ],
           "forbidden": [
-            "task.end",
-            "releaseSkills",
+            "skill.unload",
             "History.list",
-            "task.start",
             "savePhoto",
             "takePhoto"
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.clear": {
+              "name": "task"
+            },
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ]
     },
@@ -1456,10 +1701,8 @@
           ],
           "forbidden": [
             "setExpression",
-            "task.start",
-            "loadSkills",
-            "releaseSkills",
-            "task.end"
+            "skill.load",
+            "skill.unload"
           ],
           "counts": {
             "express": 4
@@ -1472,7 +1715,15 @@
             "smile"
           ],
           "expressionSpeech": false,
-          "unorderedExpressions": false
+          "unorderedExpressions": false,
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            },
+            "state.clear": {
+              "name": "task"
+            }
+          }
         }
       ]
     },
@@ -1487,10 +1738,8 @@
           ],
           "forbidden": [
             "setExpression",
-            "task.start",
-            "loadSkills",
-            "releaseSkills",
-            "task.end"
+            "skill.load",
+            "skill.unload"
           ],
           "counts": {
             "express": 11
@@ -1510,7 +1759,15 @@
             "playful"
           ],
           "expressionSpeech": false,
-          "unorderedExpressions": true
+          "unorderedExpressions": true,
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            },
+            "state.clear": {
+              "name": "task"
+            }
+          }
         }
       ]
     },
@@ -1525,10 +1782,8 @@
           ],
           "forbidden": [
             "setExpression",
-            "task.start",
-            "loadSkills",
-            "releaseSkills",
-            "task.end"
+            "skill.load",
+            "skill.unload"
           ],
           "counts": {
             "express": 3
@@ -1540,7 +1795,15 @@
             "surprised"
           ],
           "expressionSpeech": true,
-          "unorderedExpressions": false
+          "unorderedExpressions": false,
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            },
+            "state.clear": {
+              "name": "task"
+            }
+          }
         }
       ]
     },
@@ -1555,10 +1818,8 @@
           ],
           "forbidden": [
             "setExpression",
-            "task.start",
-            "loadSkills",
-            "releaseSkills",
-            "task.end"
+            "skill.load",
+            "skill.unload"
           ],
           "counts": {
             "express": 11
@@ -1578,7 +1839,15 @@
             "playful"
           ],
           "expressionSpeech": true,
-          "unorderedExpressions": true
+          "unorderedExpressions": true,
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            },
+            "state.clear": {
+              "name": "task"
+            }
+          }
         }
       ]
     },
@@ -1593,10 +1862,8 @@
           ],
           "forbidden": [
             "setExpression",
-            "task.start",
-            "loadSkills",
-            "releaseSkills",
-            "task.end"
+            "skill.load",
+            "skill.unload"
           ],
           "counts": {
             "express": 4
@@ -1609,7 +1876,15 @@
             "smile"
           ],
           "expressionSpeech": true,
-          "unorderedExpressions": false
+          "unorderedExpressions": false,
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            },
+            "state.clear": {
+              "name": "task"
+            }
+          }
         },
         {
           "user": "现在反过来，微笑、生气、害怕、调皮，这一轮不要说话，只挨个做表情。",
@@ -1618,10 +1893,8 @@
           ],
           "forbidden": [
             "setExpression",
-            "task.start",
-            "loadSkills",
-            "releaseSkills",
-            "task.end"
+            "skill.load",
+            "skill.unload"
           ],
           "counts": {
             "express": 4
@@ -1634,7 +1907,15 @@
             "playful"
           ],
           "expressionSpeech": false,
-          "unorderedExpressions": false
+          "unorderedExpressions": false,
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            },
+            "state.clear": {
+              "name": "task"
+            }
+          }
         }
       ]
     },
@@ -1649,10 +1930,8 @@
           ],
           "forbidden": [
             "setExpression",
-            "task.start",
-            "loadSkills",
-            "releaseSkills",
-            "task.end"
+            "skill.load",
+            "skill.unload"
           ],
           "counts": {
             "express": 3
@@ -1664,7 +1943,15 @@
             "laugh"
           ],
           "expressionSpeech": true,
-          "unorderedExpressions": false
+          "unorderedExpressions": false,
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            },
+            "state.clear": {
+              "name": "task"
+            }
+          }
         }
       ],
       "skills": [
@@ -2058,7 +2345,7 @@
         {
           "user": "看看Writer画的那个窗口里写了什么文字。",
           "required": [
-            "loadSkills",
+            "skill.load",
             "Web.inspect"
           ],
           "parameters": {
@@ -2067,14 +2354,18 @@
             }
           },
           "forbidden": [
-            "task.start",
             "Web.browse"
           ],
-          "first": "loadSkills",
+          "first": "skill.load",
           "loaded": [
             "web-browsing"
           ],
-          "task": false
+          "task": false,
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ]
     },
@@ -2086,7 +2377,7 @@
         {
           "user": "把Writer的流程图窗口放大。",
           "required": [
-            "loadSkills",
+            "skill.load",
             "Window.maximize"
           ],
           "parameters": {
@@ -2095,14 +2386,18 @@
             }
           },
           "forbidden": [
-            "task.start",
             "Web.browse"
           ],
-          "first": "loadSkills",
+          "first": "skill.load",
           "loaded": [
             "application-control"
           ],
-          "task": false
+          "task": false,
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ]
     },
@@ -2113,20 +2408,19 @@
         {
           "user": "浏览b站",
           "required": [
-            "loadSkills",
+            "skill.load",
             "Web.browse"
           ],
           "forbidden": [
-            "task.start",
-            "task.send",
+            "send",
             "openPage",
             "Web.snapshot",
             "Web.inspect"
           ],
-          "first": "loadSkills",
+          "first": "skill.load",
           "counts": {
             "Web.browse": 1,
-            "loadSkills": 1
+            "skill.load": 1
           },
           "loaded": [
             "web-browsing"
@@ -2134,10 +2428,15 @@
           "task": false,
           "separateRounds": [
             [
-              "loadSkills",
+              "skill.load",
               "Web.browse"
             ]
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ]
     },
@@ -2148,20 +2447,19 @@
         {
           "user": "打开 https://example.com",
           "required": [
-            "loadSkills",
+            "skill.load",
             "Web.browse"
           ],
           "forbidden": [
-            "task.start",
-            "task.send",
+            "send",
             "openPage",
             "Web.snapshot",
             "Web.inspect"
           ],
-          "first": "loadSkills",
+          "first": "skill.load",
           "counts": {
             "Web.browse": 1,
-            "loadSkills": 1
+            "skill.load": 1
           },
           "loaded": [
             "web-browsing"
@@ -2174,10 +2472,15 @@
           },
           "separateRounds": [
             [
-              "loadSkills",
+              "skill.load",
               "Web.browse"
             ]
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ]
     },
@@ -2191,12 +2494,11 @@
             "Web.browse"
           ],
           "forbidden": [
-            "task.start",
-            "task.send",
+            "send",
             "openPage",
             "Web.snapshot",
             "Web.inspect",
-            "loadSkills"
+            "skill.load"
           ],
           "first": "Web.browse",
           "counts": {
@@ -2205,7 +2507,12 @@
           "loaded": [
             "web-browsing"
           ],
-          "task": false
+          "task": false,
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ],
       "skills": [
@@ -2219,20 +2526,19 @@
         {
           "user": "打开B站",
           "required": [
-            "loadSkills",
+            "skill.load",
             "Web.browse"
           ],
           "forbidden": [
-            "task.start",
-            "task.send",
+            "send",
             "openPage",
             "Web.snapshot",
             "Web.inspect"
           ],
-          "first": "loadSkills",
+          "first": "skill.load",
           "counts": {
             "Web.browse": 1,
-            "loadSkills": 1
+            "skill.load": 1
           },
           "loaded": [
             "web-browsing"
@@ -2240,10 +2546,15 @@
           "task": false,
           "separateRounds": [
             [
-              "loadSkills",
+              "skill.load",
               "Web.browse"
             ]
-          ]
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ],
       "failure": "webLoad"
@@ -2255,12 +2566,16 @@
         {
           "user": "B站这个名字是什么意思？不用联网。",
           "forbidden": [
-            "loadSkills",
-            "task.start",
-            "task.send",
+            "skill.load",
+            "send",
             "Web.browse"
           ],
-          "task": false
+          "task": false,
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ]
     },
@@ -2274,15 +2589,19 @@
         {
           "user": "不要打开网页，只说你能不能直接控制网页里的视频播放、暂停和进度。",
           "forbidden": [
-            "loadSkills",
-            "task.start",
-            "task.send",
+            "skill.load",
+            "send",
             "Web.browse",
             "Web.navigate",
             "Web.snapshot",
             "Web.inspect"
           ],
-          "task": false
+          "task": false,
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
         }
       ]
     },
@@ -2294,18 +2613,241 @@
         {
           "user": "我选方案一，这个选择任务完成了。",
           "required": [
-            "task.end"
+            "state.clear"
           ],
           "forbidden": [
-            "task.start",
-            "task.send",
-            "loadSkills",
-            "releaseSkills"
+            "send",
+            "skill.load",
+            "skill.unload"
           ],
           "task": false,
           "counts": {
-            "task.end": 1
+            "state.clear": 1
+          },
+          "parameters": {
+            "state.clear": {
+              "name": "task",
+              "note": "*"
+            }
+          },
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
           }
+        }
+      ]
+    },
+    {
+      "id": "state-mood-set",
+      "category": "state",
+      "turns": [
+        {
+          "user": "接下来请表现得很生气，用生气的语气跟我说话。",
+          "required": [
+            "state.set"
+          ],
+          "freeVariable": true,
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          },
+          "forbidden": [
+            "skill.load"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "state-style-set",
+      "category": "state",
+      "turns": [
+        {
+          "user": "以后回答都尽量简短，一句话就行。",
+          "required": [
+            "state.set"
+          ],
+          "freeVariable": true,
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          },
+          "forbidden": [
+            "skill.load"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "state-mood-visible-no-get",
+      "category": "state",
+      "variables": {
+        "mood": "You are in a cheerful mood and speak briefly"
+      },
+      "turns": [
+        {
+          "user": "你现在心情怎么样？",
+          "forbidden": [
+            "state.get",
+            "skill.load"
+          ],
+          "variables": {
+            "mood": "*"
+          },
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "state-get-other-source",
+      "category": "state",
+      "turns": [
+        {
+          "user": "现在屏幕上打开了哪些窗口？先查一下再回答。",
+          "required": [
+            "state.get"
+          ],
+          "forbidden": [
+            "skill.load"
+          ],
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "state-readonly-quiet-rejected",
+      "category": "state",
+      "variables": {
+        "quiet": "true"
+      },
+      "turns": [
+        {
+          "user": "你现在可以说话了，把安静模式关掉。",
+          "allowRejections": true,
+          "variables": {
+            "quiet": "true"
+          },
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "state-namespace-denied",
+      "category": "state",
+      "turns": [
+        {
+          "user": "把 agent.writer.task 这个状态设置成“偷偷写文章”。",
+          "allowRejections": true,
+          "forbiddenParameters": {
+            "state.set": {
+              "name": "task"
+            }
+          },
+          "forbidden": [
+            "send"
+          ],
+          "task": false
+        }
+      ]
+    },
+    {
+      "id": "state-quiet-no-unprompted-set",
+      "category": "state",
+      "variables": {
+        "quiet": "true"
+      },
+      "turns": [
+        {
+          "user": "今天天气不错。",
+          "forbidden": [
+            "state.set",
+            "state.clear",
+            "skill.load"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "task-clear-requires-note-recovers",
+      "category": "task",
+      "taskGoal": "拍照并等待保存决定",
+      "skills": [
+        "photography"
+      ],
+      "cameraEnabled": true,
+      "preview": "media_41",
+      "turns": [
+        {
+          "user": "这个拍照任务不用继续了，结束吧。",
+          "required": [
+            "state.clear"
+          ],
+          "parameters": {
+            "state.clear": {
+              "name": "task",
+              "note": "*"
+            }
+          },
+          "task": false,
+          "forbidden": [
+            "takePhoto",
+            "savePhoto"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "task-set-then-aside-then-clear",
+      "category": "task",
+      "turns": [
+        {
+          "user": "我们一起慢慢商量一下周末旅行的计划，你帮我跟进这个目标。",
+          "required": [
+            "state.set"
+          ],
+          "parameters": {
+            "state.set": {
+              "name": "task",
+              "value": "*"
+            }
+          },
+          "task": true
+        },
+        {
+          "user": "先不聊旅行，你叫什么名字？",
+          "task": true,
+          "forbiddenParameters": {
+            "state.clear": {
+              "name": "task"
+            }
+          }
+        },
+        {
+          "user": "旅行的事不用管了，就这样吧。",
+          "required": [
+            "state.clear"
+          ],
+          "parameters": {
+            "state.clear": {
+              "name": "task",
+              "note": "*"
+            }
+          },
+          "task": false
         }
       ]
     }

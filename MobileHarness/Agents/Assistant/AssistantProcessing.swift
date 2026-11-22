@@ -63,6 +63,7 @@ public struct AssistantContextState: AssistantChatState {
             try AgentConfigurations.identityInstructions(named: configurationName),
             try AgentPrompts.text(
                 "Assistant/Prompts", "outputLanguage", ["default": AgentPrompts.defaultOutputLanguage]),
+            try AgentStatePrompt.declarations(AgentConfigurations.stateSchema(named: configurationName)),
             try AgentPrompts.skillCatalog().render("availableHeading"), try AgentConfigurations.skillOverview(),
             try AgentPrompts.agentCatalog().render("heading"), delegates,
             skillInstructions,
@@ -73,13 +74,22 @@ public struct AssistantContextState: AssistantChatState {
         return result
     }
     public var skillState: AgentTaskSkillState?
+    public var variables = AgentStateVariables()
     public var taskViews: [String: AgentTaskView]?
     public var history = AssistantArchive()
     public var admissionSequence: UInt64 = 0
     public init() {}
+    /// The variables as the model sees them: stored ones plus `task`, which the active goal record owns.
+    public func visibleVariables(session: String? = nil) -> AgentStateVariables {
+        let active = skillState?.tasks.first {
+            $0.id == skillState?.activeTaskID && (session == nil || $0.sessionID == session)
+        }
+        return variables.showing("task", value: active?.goal, writtenAt: active?.date ?? Date())
+    }
     public func validateContextState() throws {
         try validateChatState()
         try skillState?.validate()
+        try variables.validate(schema: AgentConfigurations.stateSchema(named: Self.configurationName))
     }
     public mutating func recoverInterruptedWork() {
         recoverChatState()

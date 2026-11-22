@@ -139,7 +139,7 @@ Control 是 Assistant 自己执行、不进入 Actions Shell 的内置函数（�
 | `waitingUser/running` 状态 | 取消；“等用户答复”用语义变量 `waiting`；中断/失败仅记录反馈。 |
 | `task.start` 的 `skills` | 取消；Skill 与目标无关。 |
 | 结束摘要与 `continueDecision` | `state.clear("task", note, continueDecision)`；`note` 作为摘要写入变更日志，是历史压缩的来源。 |
-| `assistant_tasks` 表 | 替换为 `agent_state_changes`（变量名、新旧值、note、来源、会话/对话 ID、写入时间、revision）。Storage 沿用“版本不同即重建，不迁移”。 |
+| `assistant_tasks` 表 | 保留：它只服务 `task` 变量的目标区间（摘要、来源、压缩），不泛化为所有状态变化的存储；其他变量的变更只进内存日志。表结构可按需改动，Storage 沿用“版本不同即重建，不迁移”。`end_reason` 取值由 `task.end` 改为 `state.clear`。 |
 | 历史压缩 / 设置页 Tasks | 以 `task` 的 set→clear 区间为单元，数据来自变更日志；UI 标签随之调整。 |
 | 重启 | 内存状态随进程丢失；重启时记录一条 host 变更（等价现“记录旧执行中断”）。 |
 | 并发约束 | 仅 `skill.load/unload` 保持“独占整个响应”；`state.*` 与 `send` 不占整个响应。 |
@@ -159,7 +159,7 @@ Control 是 Assistant 自己执行、不进入 Actions Shell 的内置函数（�
 4. **`state.get`**：读自身及 Container State，结果只在本轮 ReACT 可见。
 5. **教学**：`Controls.md`（中英）重写，Task 概念迁入 BasicSkill 对状态的教学；`BasicSkill-Control-Teaching`、Assistant Instructions 同步；`Controls.json` ≤16 条限制与 alias/operation 唯一性校验保持。
 6. **并发与批量**：一次响应允许多个 `state.set`（不同键）但最多 4 个，保持有界。
-7. **观测**：UI 新增只读“状态变更”可视化日志 tab（来自 `agent_state_changes`，用户不可编辑），取代 RuntimeLog 的 Task 页；`UIStateSnapshot` / `ApplicationStateInspection` 暴露状态表，供诊断。
+7. **观测**：UI 新增只读“状态变更”可视化日志 tab（来自 Assistant 的内存日志，不持久化，用户不可编辑，含被拒绝的写入），取代 RuntimeLog 的 Task 页；`UIStateSnapshot` / `ApplicationStateInspection` 暴露状态表，供诊断。
 8. **术语**：`docs/Concepts.md` 删除 Task 行，加入 State 与 Delegation；总体设计第 5 节“Skill composition, Task and model context”、Assistant delegation 章节同步；新增 ADR 记录该决定并与 [ADR 0028](../../adr/0028-inter-agent-communication.md) 的 task 术语建立关系。
 9. 不新增目录与第三方依赖；新文件放入既有 `Agents/Support/Context/`（状态表与变更日志端口）与 `Storage/Database/`（`AssistantTasks` 目录改为承载 `agent_state_changes`，目录名同步评估，改名需另行批准）。
 
@@ -182,11 +182,47 @@ Control 是 Assistant 自己执行、不进入 Actions Shell 的内置函数（�
 3. 语义变量超限自动淘汰最早写入者；每次写入记录时间，按时间排序并进入提示词。
 4. 内存存储，不持久化；用户不可编辑，UI 增加只读日志 tab。
 5. 固定模板转换函数，输出到用户输入前的独立 system 块。
-6. Trigger 入口本期实现两个内置处理器：`task` 变化→压缩历史上下文，`quiet`→抑制语音（含 Writer 播报）；闹钟等不做。
+6. Trigger 入口本期只有 `task`：变化→目标记录开闭与历史压缩；`quiet`（含 Writer 播报）由执行点直接读取；闹钟等不做。
 9. 时间为自然语言绝对时间；语义变量数量上限 32。
 7. `state.get` 无授权；`useStates` 只是随 Skill 注入。
 8. Skill 与目标无关；Control 库重整为 state.set/clear/get、skill.load/unload、send。
 
 ## 待确认
 
-1. 语义变量字节上限的具体数值，实施时在 Context README 定值。
+1. ~~语义变量字节上限~~：已定为自由变量名称与值合计 ≤ 8 KiB、单值 ≤ 1 KiB（见 Context README）。
+
+## 实施记录与剩余工作
+
+**已实现并同步技术 README（本轮）**：`Agent.json` v12（`baseSkills`→`skills`、新增 `states`）；`AgentStateVariables` / `AgentStatePrompt`（变量表、写入权限、类型解析、容量淘汰、自然语言时间、AGENT STATE 块与变量说明）；控制库重整为 `state.set/clear/get`、`skill.load/unload`、`send`（Controls 资源与中英教学重写）；Skill 状态机去除 Task 持有、暂停计数与回收（schema v5）；`task` 变量由目标记录唯一持有，Trigger 驱动目标记录开闭与历史压缩；`quiet` 由宿主写入并在输出点静默主动播报；`AGENT CONTEXT` 只保留 skills；边界检查脚本与 Xcode 引用同步。
+
+**与上文设计的差异（以代码为准）**：
+- `quiet` 没有 Trigger 处理器：它是只读变量，执行点（Writer 播报）直接读取它。目前只有 `task` 绑定 Trigger。
+- `task` 的值不在变量表中，由当前目标记录派生（避免两份状态）；`state.set` 增加可选 `note`（替换旧目标时的摘要）；替换仅在全双工或宿主模式可用，否则返回 `replacementUnavailable`。
+- `continueDecision` 取消：清除 `task` 总是结束当前决策。
+- 宿主写入入口为 `AssistantAgent.setHostState`，尚未接入任何 UI/设置。
+
+**仍待完成**：
+1. `assistant_tasks` 保留，仅承载 `task` 变量；不引入 `agent_state_changes`。`waitingUser` 属于 Writer/委派 stage，不在此表中，随 Writer 单独优化处理。
+2. （已完成）RuntimeLog 新增只读 State 标签，只显示当前变量（见 2.1），不持久化。
+2.1 （已完成，说明见 RuntimeLog README）State 标签只显示当前状态，不显示变化历史与被拒绝的写入，分两个列表：
+   - “Agent 状态”：Agent 自有变量（Agent.json 声明的只读/可读写变量与模型设置的语义变量），行标题为 `agents.assistant.<name>`，展开显示当前值与更新时间。
+   - “Skill 状态”：已加载 Skill 的 `useStates` 容器路径（图像类仅标注），数量随 `skill.load/unload` 变化；没有写入时间则不显示。
+   - 两个列表内：有值的按最近变化倒序，无值的灰色、不可展开、排在最后。数据由 `AssistantAgent.stateVariables()` 提供，标签可见时每 2 秒刷新。
+   - 移除 `StateLogItem` 与 `.state` 日志事件：写入被拒绝时仍向模型返回错误，不再进入日志。
+3. P3：Writer 内部仍把一次 `send` 理解为一次 task delegation，Writer 内部命名（`task_state` 等）暂不改动，待 Writer 单独优化；其余 `AgentTask*`、`agent.task*` 通道、`taskQuestion` 提示词键、`AssistantChatTaskCommunication` 的重命名另行决定。
+4. `Event.taskID`（Skill 事件日志）与 `AgentTaskSkillState` 类型名中的 Task 残留，随上项清理。
+5. （已完成）`experiments/assistant` 数据集、评分与提示词已迁移，qwen3.8-flash 评估见 [State-Controls-Prompt-Evaluation](../../validation/State-Controls-Prompt-Evaluation.md)；其他实验脚本（prompts、protocols、wait）的旧名称未检查。
+6. （已完成）ADR 0220 已补写。
+7. 真实模型对新教学的遵循（state.set/clear、替换目标、`state.get`）、全双工与非全双工路径的真机验收均未执行。
+
+## 真机反馈修复（第三轮）
+
+- `Camera.Capture.close` 改为无返回值 Action：成功不回传，不产生新一轮；仅失败才触发 react。Photography Skill 指令同步。
+- `Controls`（中英）与 `task` 声明的 `meaning`：只有用户本人明确提出带目的的多步指令才设置 `task`；Action 结果、无返回值成功、同伴报告、含糊话语均不得设置；任务完成后只 `state.clear`，不自行重开。实验冻结提示词（`assistant-evaluation.json`）与哈希同步。
+- 对话记录的橙色 ReACT 标记：运行时来源且有父输入（Action 结果回传）的输入，其首个请求记为 observation，并持久化为 `observation` 行，使列表重载后仍显示。
+
+## Skill `useStates` 来源去除 availability 包装（已实现）
+
+- `ContainerContextValue` 只编码 `value`，不再输出 `availability` 包装（`ContextAvailability` 删除）；来源自身的业务字段（如 `actions.robot` 的 `availability`）不受影响。
+- 无意义值只指 null（读取失败、未观测的 `Value.unknown` 编码为 null）：递归剔除；字符串 `"unknown"`、空字符串、本就为空的容器均是有意义的值，予以保留。来源整体为 null 或仅因剔除 null 而为空时，`AgentStateContext` 组装 CURRENT STATE 时直接省略，不注入占位或诊断。
+- 影响：`ContainerContextValue.swift`、`AssistantStateBindings.swift`、`AgentStateContext.swift`、`AssistantChatStatus.swift`（State 标签按有无来源判断为空）、Context README、RobotInteraction 指令、相关测试。

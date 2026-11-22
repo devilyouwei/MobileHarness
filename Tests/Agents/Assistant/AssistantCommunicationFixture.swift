@@ -251,7 +251,7 @@ actor QwenEffects {
                     $0.enabled = false
                     $0.running = false
                 }
-                return .value(#"{"operation":"close","enabled":false,"running":false}"#)
+                return .completed
             case "flip":
                 try facts.change { $0.selectedFacing = args["facing"] ?? "front" }
                 return .value(#"{"operation":"flip","enabled":true}"#)
@@ -477,14 +477,11 @@ func qwenRun(_ scenario: QwenCase, provider: OpenAIChat, requestLimit: Int = 32)
     try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
     if let ids = scenario.skills, !ids.isEmpty {
         let encoded = String(decoding: try JSONEncoder().encode(ids), as: UTF8.self)
-        _ = try skills.control("loadSkills", arguments: ["skills": encoded], inputID: "setup", fixed: fixed)
+        _ = try skills.control("skill.load", arguments: ["skills": encoded], inputID: "setup", fixed: fixed)
     }
     if let goal = scenario.taskGoal {
-        let encoded = String(decoding: try JSONEncoder().encode(scenario.skills ?? []), as: UTF8.self)
         let taskID = try await history.tasks.createTask(dialog: nil, agent: "assistant", goal: goal)
-        _ = try skills.control(
-            "task.start", arguments: ["description": goal, "skills": encoded], inputID: "setup", fixed: fixed,
-            taskID: taskID)
+        try skills.beginTask(goal: goal, taskID: taskID, sessionID: nil, inputID: "setup")
         skills.tasks[skills.tasks.count - 1].sessionID = session
         try skills.decisionCompleted()
     }
@@ -587,7 +584,7 @@ func qwenRun(_ scenario: QwenCase, provider: OpenAIChat, requestLimit: Int = 32)
     await pump.value
     let archive = try await history.snapshot()
     for request in archive.current.turns.flatMap({ $0.modelRequests ?? [] }) {
-        for alias in ["task.start", "loadSkills", "releaseSkills"] where request.response.contains("<\(alias)") {
+        for alias in ["skill.load", "skill.unload"] where request.response.contains("<\(alias)") {
             let text = request.response.trimmingCharacters(in: .whitespacesAndNewlines)
             if text.range(of: "^<\(alias)\\b[^<>]*/>$", options: .regularExpression) == nil {
                 await effects.fail("controlMustBeOnlyOutput:\(alias)")

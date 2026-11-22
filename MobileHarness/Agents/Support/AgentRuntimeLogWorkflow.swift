@@ -7,7 +7,6 @@ import UI
 public final class AgentRuntimeLogWorkflow: ExecutionFailureReporting {
     private let language: @Sendable () -> AppLanguage
     private let log: (any RuntimeLogWriting)?
-    private var taskObservation: Task<Void, Never>?
     private var agentObservation: Task<Void, Never>?
     private var failureObservation: Task<Void, Never>?
     private let failureEvents = AsyncStream<RuntimeFailureEvent>.makeStream(bufferingPolicy: .bufferingOldest(100))
@@ -20,7 +19,6 @@ public final class AgentRuntimeLogWorkflow: ExecutionFailureReporting {
         self.language = language
     }
     deinit {
-        taskObservation?.cancel()
         agentObservation?.cancel()
         failureObservation?.cancel()
         failureEvents.continuation.finish()
@@ -48,10 +46,9 @@ public final class AgentRuntimeLogWorkflow: ExecutionFailureReporting {
     }
     public func shutdown() async {
         await stopFailureObservations()
-        let tasks = [taskObservation, agentObservation]
+        let tasks = [agentObservation]
         for task in tasks { task?.cancel() }
         for task in tasks { await task?.value }
-        taskObservation = nil
         agentObservation = nil
     }
     private func forwardFailure(_ event: RuntimeFailureEvent) {
@@ -83,7 +80,6 @@ public final class AgentRuntimeLogWorkflow: ExecutionFailureReporting {
                 category: diagnostic?.category.rawValue, workerID: context?.workerID, callID: context?.callID))
     }
 
-    public func updateTask(_ item: TaskLogItem, event: TaskLogEvent) { log?.record(.task(item, event)) }
     public func startFailures(observe: @escaping @Sendable () async throws -> AsyncStream<OutputFailureSnapshot>) {
         guard failureObservation == nil else { return }
         let log = log
@@ -109,79 +105,6 @@ public final class AgentRuntimeLogWorkflow: ExecutionFailureReporting {
         }
     }
 
-    public func startTasks(
-        observe: @escaping @Sendable () async throws -> AsyncStream<SignalTraceSnapshot>,
-        taskContent: @escaping @Sendable (AgentTaskSignal) -> (String, Bool) = { _ in ("", false) }
-    ) {
-        guard taskObservation == nil, let log else { return }
-        taskObservation = Task { [weak self] in
-            do {
-                let stream = try await observe()
-                var previousRevision: UInt64?
-                var projected: [String: String] = [:]
-                for await snapshot in stream {
-                    guard !Task.isCancelled else { return }
-                    guard previousRevision == nil || snapshot.revision > previousRevision! else { continue }
-                    previousRevision = snapshot.revision
-                    let retained = Set(snapshot.records.map(\.id))
-                    projected = projected.filter { retained.contains($0.key) }
-                    for record in snapshot.records {
-                        guard let signal = record.task else {
-                            continue
-                        }
-                        let key = record.phase.rawValue
-                        guard projected[record.id] != key else { continue }
-                        projected[record.id] = key
-                        let (text, waiting) = taskContent(signal)
-                        let phase: TaskLogItem.Phase
-                        if record.phase == .rejected || record.phase == .dropped {
-                            // A rejected progress/input/result is not proof the underlying task failed.
-                            guard signal.kind == .request else { continue }
-                            phase = .failed
-                        } else if record.phase != .accepted {
-                            phase = .requested
-                        } else {
-                            switch signal.kind {
-                            case .request: phase = .accepted
-                            case .input: phase = .running
-                            case .progress: phase = waiting ? .waitingUser : .running
-                            case .cancel: phase = .cancelling
-                            case .result:
-                                switch signal.status {
-                                case .succeeded: phase = .succeeded
-                                case .cancelled: phase = .cancelled
-                                default: phase = .failed
-                                }
-                            }
-                        }
-                        // Unaccepted non-request reports cannot change task progress.
-                        guard signal.kind == .request || record.phase == .accepted else { continue }
-                        var value = TaskLogItem(
-                            id: signal.scope.id, parentID: signal.scope.parentID,
-                            requester: signal.scope.requester.rawValue, executor: signal.scope.executor.rawValue,
-                            title: signal.kind == .request ? (signal.goal ?? text) : "", phase: phase)
-                        value.execution = signal.scope.execution.rawValue
-                        value.skills = signal.requestedSkills ?? []
-                        let selectedLanguage = self?.language() ?? .english
-                        log.record(
-                            .task(
-                                value,
-                                .init(
-                                    id: record.id, time: record.time,
-                                    title: signal.kind.logTitle(language: selectedLanguage) + " · "
-                                        + record.phase.displayTitle(language: selectedLanguage),
-                                    detail: text)))
-                    }
-                }
-            } catch {
-                if !Task.isCancelled {
-                    self?.recordFailure(
-                        title: self?.language().text("Task records unavailable") ?? "Task records unavailable",
-                        source: "runtime", message: String(describing: error))
-                }
-            }
-        }
-    }
     public func startAgents(statuses: @escaping @Sendable () async -> [(String, AgentLifecycle)]) {
         guard agentObservation == nil, let log else { return }
         let language = language
