@@ -185,6 +185,16 @@ private func writerDefinitions() throws -> [ChatToolDefinition] {
     #expect(rendered.diagnostics.isEmpty)
 }
 
+@Test @MainActor func artifactMarkdownEmbedsWorkspaceSVGImages() async throws {
+    let svg = #"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><rect width="4" height="4"/></svg>"#
+    let rendered = try await ArtifactTextRendering.document(
+        "![控制图](figures/a.svg)\n\n![越界](../secret.svg)\n\n[打开](figures/a.svg)",
+        markdown: true, path: "doc.md", files: ["figures/a.svg": svg, "../secret.svg": svg])
+    #expect(rendered.html.contains(#"<img alt="控制图""#) && rendered.html.contains("data:image/svg+xml;base64,"))
+    #expect(rendered.html.contains("越界") && !rendered.html.contains(#"alt="越界""#))
+    #expect(!rendered.html.contains("<a "))
+}
+
 @Test @MainActor func artifactMarkdownRendersMultipleMermaidImagesAndKeepsInvalidSource() async throws {
     let rendered = try await ArtifactTextRendering.document(
         """

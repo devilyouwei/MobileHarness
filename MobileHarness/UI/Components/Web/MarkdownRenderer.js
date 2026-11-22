@@ -3,32 +3,58 @@
 (() => {
   const markdown = globalThis.markdownit({ html: false });
   const remote = /^https?:\/\//i;
-  // Relative SVG targets are accepted for images only; links to them are unwrapped below.
+  // Relative SVG targets are accepted; links to workspace files are replaced by text plus the embedded image.
   markdown.validateLink = (url) => remote.test(url) || /^(?![a-z][a-z0-9+.-]*:|\/)[^?#]*\.svg(?:[?#].*)?$/i.test(url);
   markdown.core.ruler.push("local_links", (state) => {
     for (const block of state.tokens) {
-      let unwrap = [];
+      const hrefs = [];
       for (const token of block.children ?? []) {
         if (token.type === "link_open") {
-          const local = !remote.test(token.attrGet("href") ?? "");
-          unwrap.push(local);
+          const href = token.attrGet("href") ?? "";
+          const local = !remote.test(href);
+          hrefs.push(local ? href : null);
           if (local) {
             token.type = "text";
             token.content = "";
             token.attrs = null;
           }
-        } else if (token.type === "link_close" && unwrap.pop()) {
-          token.type = "text";
-          token.content = "";
+        } else if (token.type === "link_close") {
+          const href = hrefs.pop();
+          if (href != null) {
+            token.type = "svg_link";
+            token.content = href;
+          }
         }
       }
     }
   });
+  markdown.renderer.rules.svg_link = (tokens, index, options, env) => {
+    const image = env.embed?.file(tokens[index].content, "SVG");
+    return image ? `<br>${image}` : "";
+  };
   markdown.renderer.rules.image = (tokens, index, options, env) => {
     const token = tokens[index];
-    const embedded = env.embed?.(token.attrGet("src") ?? "", token.content);
+    const embedded = env.embed?.file(token.attrGet("src") ?? "", token.content);
     return embedded ?? markdown.utils.escapeHtml(token.content);
   };
+  // A block that starts with <svg and ends at </svg> becomes an image; other raw HTML stays escaped text.
+  markdown.block.ruler.before("fence", "svg_block", (state, startLine, endLine, silent) => {
+    if (state.sCount[startLine] - state.blkIndent >= 4) return false;
+    const line = (n) => state.src.slice(state.bMarks[n] + state.tShift[n], state.eMarks[n]);
+    if (!/^<svg[\s>]/i.test(line(startLine))) return false;
+    let last = startLine;
+    while (last < endLine && !/<\/svg\s*>/i.test(line(last))) last += 1;
+    if (!/<\/svg\s*>/i.test(line(last))) return false;
+    if (silent) return true;
+    const token = state.push("svg_block", "", 0);
+    token.content = state.getLines(startLine, last + 1, state.blkIndent, false);
+    token.map = [startLine, last + 1];
+    state.line = last + 1;
+    return true;
+  });
+  markdown.renderer.rules.svg_block = (tokens, index, options, env) =>
+    env.embed?.inline(tokens[index].content, "SVG")
+    ?? `<pre><code>${markdown.utils.escapeHtml(tokens[index].content)}</code></pre>`;
   const renderFence = markdown.renderer.rules.fence;
   markdown.renderer.rules.fence = (tokens, index, options, env, renderer) =>
     env.diagrams.get(tokens[index]) ?? renderFence(tokens, index, options, env, renderer);
@@ -89,16 +115,16 @@
     return parts.join("/");
   }
 
-  // Embeds workspace SVG files as isolated data-URI images; anything else keeps alt text.
+  // Embeds SVG sources as isolated data-URI images; invalid or oversized SVG returns null.
   function embedder(base, assets) {
     let total = 0;
-    return (src, alt) => {
-      const path = resolve(base, src);
-      const svg = path === null || !path.toLowerCase().endsWith(".svg") ? undefined : assets[path];
-      if (typeof svg !== "string") return null;
-      const bytes = utf8.encode(svg);
+    function inline(svg, alt) {
+      if (!/^\s*<svg[\s>]/i.test(svg)) return null;
+      const source = /^\s*<svg[^>]*\sxmlns\s*=/i.test(svg)
+        ? svg : svg.replace(/^(\s*)<svg/i, '$1<svg xmlns="http://www.w3.org/2000/svg"');
+      const bytes = utf8.encode(source);
       if (total + bytes.length > maxSVGBytes) return null;
-      const root = new DOMParser().parseFromString(svg, "image/svg+xml").documentElement;
+      const root = new DOMParser().parseFromString(source, "image/svg+xml").documentElement;
       if (root.localName !== "svg") return null;
       total += bytes.length;
       let binary = "";
@@ -107,6 +133,14 @@
       }
       return `<img alt="${markdown.utils.escapeHtml(alt)}" style="max-width:100%;height:auto" `
         + `src="data:image/svg+xml;base64,${btoa(binary)}">`;
+    }
+    return {
+      file(src, alt) {
+        const path = resolve(base, src);
+        const svg = path === null || !path.toLowerCase().endsWith(".svg") ? undefined : assets[path];
+        return typeof svg === "string" ? inline(svg, alt) : null;
+      },
+      inline,
     };
   }
 

@@ -68,7 +68,7 @@
       }
     },
     "open": {
-      "description": "打开已保存作品供查看，不切换编辑目标。",
+      "description": "打开已保存作品仅供查看，不能编辑也不切换编辑目标；需要修改作品请用 workspace.enter。",
       "parameters": {
         "workspaceID": {
           "description": "真实工作区 ID。"

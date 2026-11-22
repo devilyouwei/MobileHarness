@@ -237,7 +237,8 @@ public enum ArtifactArchive {
                         entry = path
                     } else {
                         entry = "export-" + UUID().uuidString + ".html"
-                        let html = try await previewHTML(source, ext: ext)
+                        let html = try await previewHTML(
+                            source, ext: ext, path: path, files: files.map { .init(path: $0.key, content: $0.value) })
                         try await disk.putIfAbsent(Data(html.utf8), key: prefix + "/source/" + entry)
                     }
                     let url = try await disk.fileURL(prefix + "/source/" + entry, maximumBytes: Int.max)

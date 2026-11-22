@@ -20,7 +20,7 @@
       }
     },
     "enter": {
-      "description": "进入已经确认的工作区。切换时保留旧草稿，独立回合调用。",
+      "description": "进入已经确认的工作区以编辑（修改已有作品必须先调用）。切换时保留旧草稿，独立回合调用。",
       "parameters": {
         "workspaceID": {
           "description": "真实工作区 ID。"
