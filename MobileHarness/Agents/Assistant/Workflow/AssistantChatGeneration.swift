@@ -369,15 +369,11 @@ extension AssistantChatWorker {
                     snapshot.images, to: stateMessages, user: userIntent, supportsImages: await chat.supportsImages)
                 stateMessages = imageProjection.messages
                 ephemeralImageIDs = imageProjection.ephemeralIDs
-                let agentData = try JSONEncoder().encode(
-                    decisionContext.state.skillState?.contextSnapshot(session: input.sessionID))
-                let contextTemplates = try AgentPrompts.requestContext()
-                var block = try contextTemplates.render(
-                    "facts",
-                    variables: [
-                        "agent": String(decoding: agentData, as: UTF8.self),
-                        "state": String(decoding: snapshot.facts, as: UTF8.self),
-                    ])
+                let contextTemplates = try AgentPrompts.stateContext()
+                var block =
+                    try contextTemplates.render("frame")
+                    + contextTemplates.render(
+                        "skillState", variables: ["state": String(decoding: snapshot.facts, as: UTF8.self)])
                 if let manifest = imageProjection.manifest {
                     block += try contextTemplates.render("images", variables: ["manifest": manifest])
                 }

@@ -683,8 +683,8 @@ flowchart TB
         Skills --> Names
     end
     subgraph Assembly["AGENTS · REQUEST"]
-        Prefix["System prefix<br/>Role / protocol / Skill teaching / catalog"]:::agent
-        Dynamic["Fresh system data<br/>AGENT CONTEXT + CURRENT STATE + AGENT STATE"]:::agent
+        Prefix["System prefix<br/>Role / protocol / controls / state variables / catalog / Skill teaching"]:::agent
+        Dynamic["Fresh system data<br/>CURRENT STATE + AGENT STATE"]:::agent
         History["Selected history / actual feedback<br/>Latest input / observation"]:::agent
         Request["Bounded ChatRequest<br/>Preserve native call / result groups"]:::agent
         Prefix --> Request
@@ -695,7 +695,6 @@ flowchart TB
     Names -->|"select read capabilities"| Facts
     Facts -.->|"CURRENT STATE"| Dynamic
     Task -->|"AGENT STATE"| Dynamic
-    Skills -->|"AGENT CONTEXT.skills"| Dynamic
     Catalog --> Prefix
     Teaching --> Prefix
     Request -->|"messages / native Tool definitions"| Model["ModelKit · ChatCapability"]:::model
@@ -721,12 +720,11 @@ The request combines a system prefix, fresh system data and conversation evidenc
 | Request content                    | Source and meaning                                                                                                                                                                                                                                            |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Instruction/catalog prefix         | Role identity and protocol, available Skill overview, loaded Skill teaching and effective function metadata. Available Skills describe choices; only the effective catalog permits current calls. The prefix changes when its selected Skills/catalog change. |
-| AGENT CONTEXT                      | The same private snapshot's current loaded Skill IDs. It is not a dump of task records, grants, input bindings or retention counters.                                        |
 | AGENT STATE                        | The Agent's own variables from the same snapshot: name, natural-language write time and quoted value, earliest written first, rendered by one function. The current goal is the `task` variable; moods and styles are free variables. The values are data; they grant no authority. |
 | CURRENT STATE                      | Fresh owner-defined facts selected by the loaded Skills' `useStates`, sampled separately through read-only capabilities. These are data, not instructions or execution permits.                                                                               |
 | History, feedback and latest input | Bounded conversation evidence, real Action/Tool outcomes and current user input or continuation observation. Current Task evidence remains in the history window; terminal Task history can be projected as a summary.                                        |
 
-The ordinary request order is **instruction/catalog system → selected history → dynamic system data (AGENT CONTEXT, then CURRENT STATE, then AGENT STATE) → latest user input/observation**. If the request ends in native Tool results, the dynamic system message follows the complete call/result group. Previous dynamic system messages are removed before fresh facts are inserted. Native Tool definitions are a separate ChatRequest field. ModelKit receives the finished request; it does not discover containers or assemble Agent Task/Skill state.
+The ordinary request order is **instruction/catalog system → selected history → dynamic system data (CURRENT STATE, then AGENT STATE) → latest user input/observation**. If the request ends in native Tool results, the dynamic system message follows the complete call/result group. Previous dynamic system messages are removed before fresh facts are inserted. Native Tool definitions are a separate ChatRequest field. ModelKit receives the finished request; it does not discover containers or assemble Agent Task/Skill state.
 
 Each actual model request, including an internal ReACT continuation, samples again. The private snapshot and the business reads are not a single atomic transaction. Model-visible own State and Skill data is private to the responsible Agent; the production conversational owner is Assistant with one foreground continuing goal (the `task` variable). Generic task registries and delegated-role views support runtime correlation, but are not serialized wholesale into AGENT CONTEXT and do not imply an exposed background-work Skill. Detailed message selection, budgets and continuation rules belong in [Assistant](Agents/Assistant/README.md#request-state-assembly); private transitions belong in [Context](Agents/Support/Context/README.md#container-context-read-path).
 

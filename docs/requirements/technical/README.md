@@ -18,6 +18,7 @@
 已完成：[删除 Channel 覆盖与照片忽略](../../completed/Remove-Channel-Override-And-Photo-Ignore.md)，包括配置、教学、UI和专用音效清理，以及固定路由、重拍保留与完整检查。
 
 - [状态机泛化与 Task 的去处](State-Generalization-Task-Removal.md)：以 `state.set/clear` 取代 `task.start/end`，状态每轮注入模型；`task.send` 独立为 `send`，同伴委托重命名为 Delegation。
+- [聆听模式 `listening` 状态变量](Listening-Mode-State.md)：以 `listening`（half/full/quiet）取代 `quiet`，Trigger 切换聆听行为；quiet 为唤醒模式，由独立轻量通道判定退出并写入新表。
 
 - [BasicSkill 控制教学](BasicSkill-Control-Teaching.md)：Task / Skill 概念、上下文、动作效果、生效时机和失败语义的通用教学重组。
 

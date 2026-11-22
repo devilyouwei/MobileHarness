@@ -358,9 +358,10 @@ public enum AgentConfigurations {
             where error.code == .fileReadNoSuchFile
         { return source } catch PromptTemplateError.missingTemplate(_) { return source }
     }
-    public static func identityInstructions(named name: String) throws -> String {
+    public static func identityInstructions(named name: String, variables: [String: String] = [:]) throws -> String {
         guard let path = try catalog().agents[name] else { throw AgentConfigurationError.resourceMissing(name) }
-        return try AgentPrompts.shared.render(String(path.dropLast("Agent.json".count)) + "Instructions.md")
+        return try AgentPrompts.shared.render(
+            String(path.dropLast("Agent.json".count)) + "Instructions.md", variables: variables)
     }
     static func promptPath(named name: String) throws -> String {
         guard let path = try catalog().agents[name] else { throw AgentConfigurationError.resourceMissing(name) }

@@ -2,8 +2,33 @@
 
 (() => {
   const markdown = globalThis.markdownit({ html: false });
-  markdown.validateLink = (url) => /^https?:\/\//i.test(url);
-  markdown.renderer.rules.image = (tokens, index) => markdown.utils.escapeHtml(tokens[index].content);
+  const remote = /^https?:\/\//i;
+  // Relative SVG targets are accepted for images only; links to them are unwrapped below.
+  markdown.validateLink = (url) => remote.test(url) || /^(?![a-z][a-z0-9+.-]*:|\/)[^?#]*\.svg(?:[?#].*)?$/i.test(url);
+  markdown.core.ruler.push("local_links", (state) => {
+    for (const block of state.tokens) {
+      let unwrap = [];
+      for (const token of block.children ?? []) {
+        if (token.type === "link_open") {
+          const local = !remote.test(token.attrGet("href") ?? "");
+          unwrap.push(local);
+          if (local) {
+            token.type = "text";
+            token.content = "";
+            token.attrs = null;
+          }
+        } else if (token.type === "link_close" && unwrap.pop()) {
+          token.type = "text";
+          token.content = "";
+        }
+      }
+    }
+  });
+  markdown.renderer.rules.image = (tokens, index, options, env) => {
+    const token = tokens[index];
+    const embedded = env.embed?.(token.attrGet("src") ?? "", token.content);
+    return embedded ?? markdown.utils.escapeHtml(token.content);
+  };
   const renderFence = markdown.renderer.rules.fence;
   markdown.renderer.rules.fence = (tokens, index, options, env, renderer) =>
     env.diagrams.get(tokens[index]) ?? renderFence(tokens, index, options, env, renderer);
@@ -47,8 +72,46 @@
       + `width="${width}" height="${height}" src="data:image/svg+xml;base64,${btoa(binary)}"></figure>`;
   }
 
-  globalThis.renderMobileHarnessMarkdown = async (source, labels) => {
-    const env = { diagrams: new Map() };
+  function resolve(base, target) {
+    let decoded;
+    try { decoded = decodeURIComponent(target.split(/[?#]/, 1)[0]); } catch { return null; }
+    if (!decoded || decoded.startsWith("/") || /^[a-z][a-z0-9+.-]*:/i.test(decoded)) return null;
+    const parts = base.split("/").slice(0, -1);
+    for (const part of decoded.split("/")) {
+      if (part === "" || part === ".") continue;
+      if (part === "..") {
+        if (!parts.length) return null;
+        parts.pop();
+      } else {
+        parts.push(part);
+      }
+    }
+    return parts.join("/");
+  }
+
+  // Embeds workspace SVG files as isolated data-URI images; anything else keeps alt text.
+  function embedder(base, assets) {
+    let total = 0;
+    return (src, alt) => {
+      const path = resolve(base, src);
+      const svg = path === null || !path.toLowerCase().endsWith(".svg") ? undefined : assets[path];
+      if (typeof svg !== "string") return null;
+      const bytes = utf8.encode(svg);
+      if (total + bytes.length > maxSVGBytes) return null;
+      const root = new DOMParser().parseFromString(svg, "image/svg+xml").documentElement;
+      if (root.localName !== "svg") return null;
+      total += bytes.length;
+      let binary = "";
+      for (let offset = 0; offset < bytes.length; offset += 8192) {
+        binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
+      }
+      return `<img alt="${markdown.utils.escapeHtml(alt)}" style="max-width:100%;height:auto" `
+        + `src="data:image/svg+xml;base64,${btoa(binary)}">`;
+    };
+  }
+
+  globalThis.renderMobileHarnessMarkdown = async (source, labels, base = "", assets = {}) => {
+    const env = { diagrams: new Map(), embed: embedder(base, assets) };
     const tokens = markdown.parse(source, env);
     const diagnostics = [];
     let number = 0;

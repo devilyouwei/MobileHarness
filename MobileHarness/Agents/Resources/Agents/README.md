@@ -15,10 +15,11 @@ Use the unsuffixed resource for English and a `.zh-Hans` sibling for Simplified 
 | 文件 | 作用与要求 |
 | --- | --- |
 | `../Catalog.json` | 唯一显式资源索引。`version` 为 1；`agents` 的键为代码使用的配置名，如 `Assistant`，值为相对 Resources 的 `Agents/Assistant/Agent.json`；`skills` 由 [Skill 规范](../Skills/README.md) 定义。不得靠目录扫描或第二套配置生效。 |
-| `Assistant/InputProtocol.json` | Assistant 主模型的输入规则、连续 ASR 片段读法、时间线标签和排版、历史格式识别。 |
+| `Assistant/Input/InputProtocol.json` | Assistant 主模型的输入规则（`# INPUT FORMAT`）、时间线标签和排版、历史格式识别，以及 `## User (ASR)` 语音转写处理规则。 |
 | `Shared/OutputProtocol.md` | 跨角色通用输出协议。 |
-| `Shared/SkillCatalog.json`、`Shared/AgentCatalog.json`、`Shared/ActionCatalog.json` | 目录标题及条目排版。Swift 填入公开 Skill、获准委派的 Agent 和本轮有效 Action。 |
-| `Shared/RequestContext.json` | Skill／State 快照、角色自身变量（AGENT STATE）和图片清单在独立 system 消息中的事实框架。 |
+| `Shared/SkillCatalog.json`、`Shared/AgentCatalog.json`、`Shared/ActionCatalog.json` | 目录标题及条目排版。Swift 填入公开 Skill、获准委派的 Agent 和本轮有效 Action（`ActionCatalog` 只含 Action；参数行不含类型）。 |
+| `Shared/ControlCatalog.json` | `# AGENT CONTROLS` 段：control 声明排版加所有者使用指南。仅有 control 的 Agent 渲染。 |
+| `Shared/StateContext.json` | 状态 system 消息（`# STATE`）的模板：`frame`、`## CURRENT STATE`、`## CURRENT STATE IMAGES`、`## AGENT STATE`，以及系统提示中 `# STATE VARIABLES` 的声明排版。 |
 | `<AgentName>/Agent.json` | 必需。v11 身份、角色自有公开 description、通信权限和基础 Skill。 |
 | `Assistant/Instructions.md` | Assistant 自身的身份、用户沟通和如实汇报责任。业务流程归 Skill，共用协议提示词归 `Shared/`。 |
 | `Assistant/Prompts.json` | Assistant 主请求的执行证据、任务历史摘要及 Writer 协作事实模板。 |
@@ -88,7 +89,7 @@ Skill.json 声明 path、callType、alias，以及 Action 的 channel。具体�
 
 `Instructions.md` 是 UTF-8 的可信静态指令，说明自身身份、职责与交互约束。其他角色用途读取各自的 Agent.json.description。用户目标、历史任务、设备状态和执行结果由 Context Builder 作为数据组装。共用协议和业务流程分别引用 Shared 与 Skill 的指令。
 
-`Shared/OutputProtocol.md` 固定描述 XML Action、Channel 调度和 Skill 加载后的目录更新时机。`Shared/ActionCatalog.json` 定义有效目录中的 Channel 标题、Action 别名、参数行排版，以及拥有者控制指南的标题。`Assistant/InputProtocol.json` 将模型读取规则与时间线的标签、排版及历史格式识别放在同一资源中。共享提示词随 Agents Bundle 分发。Agents 加载资源，AgentCore 读取输出协议并渲染当前 Action 目录。`Assistant/Instructions.md` 维护角色职责、回应风格与语音、字幕、表情呈现。Task、Skill 控制和执行反馈由 Assistant 目录的 `Controls.md`（与 `Controls.json` 同级，可有 `Controls.<language>.md`）维护；表情、聆听与窗口规则由 BasicInteraction 维护。每个 Agent 可自配 control 声明与指南，目前只有 Assistant。Photography 维护自己的业务流程与分轮示例。
+`Shared/OutputProtocol.md` 固定描述 XML Action、Channel 调度和 Skill 加载后的目录更新时机。`Shared/ActionCatalog.json` 定义有效目录中的 Channel 标题、Action 别名与参数行排版；`Shared/ControlCatalog.json` 定义 control 声明和拥有者指南的排版。`Assistant/Input/InputProtocol.json` 将模型读取规则与时间线的标签、排版及历史格式识别放在同一资源中。共享提示词随 Agents Bundle 分发。Agents 加载资源，AgentCore 读取输出协议并渲染当前 Action 目录。`Assistant/Instructions.md` 维护角色职责、回应风格与语音、字幕、表情呈现。Task、Skill 控制和执行反馈由 Assistant 目录的 `Controls.md`（与 `Controls.json` 同级，可有 `Controls.<language>.md`）维护；表情、聆听与窗口规则由 BasicInteraction 维护。每个 Agent 可自配 control 声明与指南，目前只有 Assistant。Photography 维护自己的业务流程与分轮示例。
 
 单段提示词使用 UTF-8 Markdown 或 TXT，加载为 `body`。多个具名模板共用一个 JSON 文件，包含 `version` 和 `templates`，版本为 1，最多 64 项，每项最多 16 KiB。三种格式都使用 `{{name}}` 插入变量，变量集合须与该模板完全一致。插入值按字面输出。资源、单段正文、单次渲染和 Assistant system 输出均最多 64 KiB。加载与卸载见 [AgentPrompts](../../Support/Chat/README.md#templates-and-localization)。
 
@@ -101,7 +102,7 @@ Assistant 当前模板契约：
 | `toolFailure` | 真实执行错误及输出 | `error`、`output` |
 | `taskHistory` | 已结算任务摘要的历史数据前缀 | 无 |
 
-Assistant 先拼接 Shared 的输出协议和 Assistant 的输入协议，再读取带角色标题的 `Instructions.md`。三个目录模板提供标题与排版。Swift 从索引、当前授权及本轮 Skill 快照取值，并按本轮有效 Action 生成目录。独立 system 消息由 `RequestContext.json` 提供事实框架，`Assistant/Prompts.json` 提供 Writer 追问、近期事件与请求中的执行证据模板。Memory 模板 `title.system`、`title.excerpt` 和 `title.user` 供标题事务读取。
+Assistant 系统提示依次为：`Instructions.md`（角色，含回复语言）、输入协议、输出协议、`# AGENT CONTROLS`、`# STATE VARIABLES`、可用 Skill、可委派 Agent、有效 Action 目录、已加载 Skill 指令（先讲可用 Action，再讲用法）。Swift 从索引、当前授权及本轮 Skill 快照取值，并按本轮有效 Action 生成目录。独立 system 消息 `# STATE` 由 `StateContext.json` 提供，包含 CURRENT STATE、图片、同伴问题与事件、AGENT STATE，`Assistant/Prompts.json` 提供 Writer 追问、近期事件与请求中的执行证据模板。Memory 模板 `title.system`、`title.excerpt` 和 `title.user` 供标题事务读取。
 
 ## 新增与修改 Agent 的开发标准
 
@@ -194,6 +195,6 @@ BasicInteraction 的 Windows and baseline State 独占通用窗口生命周期�
 
 [`Shared/`](Shared/)
 
-[OutputProtocol.md](Shared/OutputProtocol.md) 定义固定 Action 输出协议。[ActionCatalog.json](Shared/ActionCatalog.json)、[SkillCatalog.json](Shared/SkillCatalog.json) 和 [AgentCatalog.json](Shared/AgentCatalog.json) 定义目录排版。[RequestContext.json](Shared/RequestContext.json) 提供请求事实框架，[ExecutionFeedback.json](Shared/ExecutionFeedback.json) 和 [CommunicationContext.json](Shared/CommunicationContext.json) 定义回馈及通信模板。加载器按本轮协议、权限及实际数据选择资源。角色身份、输入策略和任务流程由各自配置拥有。
+[OutputProtocol.md](Shared/OutputProtocol.md) 定义固定 Action 输出协议。[ActionCatalog.json](Shared/ActionCatalog.json)、[SkillCatalog.json](Shared/SkillCatalog.json) 和 [AgentCatalog.json](Shared/AgentCatalog.json) 定义目录排版。[StateContext.json](Shared/StateContext.json) 提供状态消息模板，[ControlCatalog.json](Shared/ControlCatalog.json) 提供 control 段，[ExecutionFeedback.json](Shared/ExecutionFeedback.json) 和 [CommunicationContext.json](Shared/CommunicationContext.json) 定义回馈及通信模板。加载器按本轮协议、权限及实际数据选择资源。角色身份、输入策略和任务流程由各自配置拥有。
 
 Assistant/InputDecision 的 `jevQuestion` 与 `jev_interrupt`、`jev_discard`、`jev_enqueue`、`jev_continue_listening` 保存JEV话语状态模板，两种语言资源保持相同英文规则；用户原文不翻译。其余模板用于本地化Chat Tool/Text分类。候选顺序、语音/键盘许可及动作映射由Assistant拥有。

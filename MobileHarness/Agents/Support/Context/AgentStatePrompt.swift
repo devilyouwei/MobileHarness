@@ -17,7 +17,7 @@ public enum AgentStatePrompt {
     /// Empty when nothing is set.
     static func block(_ variables: AgentStateVariables, timeZone: TimeZone = .current) throws -> String {
         guard !variables.entries.isEmpty else { return "" }
-        let templates = try AgentPrompts.requestContext()
+        let templates = try AgentPrompts.stateContext()
         let lines = try variables.ordered.map { item in
             try templates.render(
                 "stateLine",
@@ -27,14 +27,14 @@ public enum AgentStatePrompt {
                     "value": String(decoding: try JSONEncoder().encode(item.entry.value), as: UTF8.self),
                 ])
         }
-        return try templates.render("state", variables: ["variables": lines.joined(separator: "\n")])
+        return try templates.render("agentState", variables: ["variables": lines.joined(separator: "\n")])
     }
 
     /// The stable system-prompt section: declared variables, their meaning and allowed values.
     /// Access is deliberately not stated; a write to a read-only variable is rejected instead.
     static func declarations(_ schema: AgentStateSchema) throws -> String {
         guard !schema.declarations.isEmpty else { return "" }
-        let templates = try AgentPrompts.requestContext()
+        let templates = try AgentPrompts.stateContext()
         let lines = try schema.declarations.values.sorted { $0.name < $1.name }.map { declaration in
             try templates.render(
                 "stateDeclaration",

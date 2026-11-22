@@ -4,9 +4,6 @@
     "section": "# 当前 ACTION 目录\n{{entries}}",
     "channel": "通道 {{name}}",
     "action": "操作 {{alias}}：",
-    "controls": "Agent 控制（由本 Agent 执行，不是操作；self：本 Agent 状态，peer：另一个 Agent；无通道，不得写在 <wait> 内）",
-    "control": "控制 {{alias}}（{{destination}}）：",
-    "parameter": "  {{name}}：{{type}}，{{presence}}。{{description}} {{constraints}}",
-    "guidance": "控制指南：\n{{text}}"
+    "parameter": "  {{name}}：{{presence}}。{{description}} {{constraints}}"
   }
 }

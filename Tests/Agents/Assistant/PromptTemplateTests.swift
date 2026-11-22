@@ -125,7 +125,7 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
         #expect(!(try AgentConfigurations.skillInstructions(skill)).contains(windowRule))
     }
     let output = try AgentPrompts.capabilityContext()
-    #expect(system.hasPrefix(try output.protocolRules()))
+    #expect(system.contains(try output.protocolRules()))
     #expect(system.contains(try output.catalog(registry)))
     #expect(system.contains("<wait>Hello.</wait><express emotion=\"happy\"/>"))
     #expect(!system.contains("Action takePhoto:"))
@@ -153,8 +153,8 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
     let registry = try AssistantAgent.runtimeCapabilities(config.capabilities)
     let prompt = try AssistantContextState.systemPrompt(registry)
     let headings = [
-        "# OUTPUT FORMAT", "# INPUT FORMAT", "# ASSISTANT ROLE", "# AVAILABLE SKILLS", "# DELEGATABLE AGENTS",
-        "# LOADED SKILL INSTRUCTIONS", "# EFFECTIVE ACTION CATALOG",
+        "# ASSISTANT ROLE", "# INPUT FORMAT", "# OUTPUT FORMAT", "# AGENT CONTROLS", "# STATE VARIABLES",
+        "# AVAILABLE SKILLS", "# DELEGATABLE AGENTS", "# EFFECTIVE ACTION CATALOG", "# LOADED SKILL INSTRUCTIONS",
     ]
     let positions = try headings.map { try #require(prompt.range(of: $0)).lowerBound }
     #expect(positions == positions.sorted())
@@ -166,7 +166,7 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
     #expect(output.names == ["body"])
     #expect(
         catalog.names == [
-            "section", "channel", "action", "controls", "control", "guidance", "parameter",
+            "section", "channel", "action", "parameter",
         ])
     let skills = try AgentPrompts.skillCatalog()
     #expect(prompt.contains(try skills.render("availableHeading") + "\n" + AgentConfigurations.skillOverview()))
@@ -176,7 +176,7 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
     let writer = try agents.render("entry", variables: ["id": "writer", "description": description])
     #expect(prompt.contains(try agents.render("heading") + "\n" + writer))
     #expect(!(try AgentPrompts.load(named: "Assistant")).names.contains("inputProtocol"))
-    let role = try AgentConfigurations.identityInstructions(named: "Assistant")
+    let role = try AgentConfigurations.identityInstructions(named: "Assistant", variables: ["default": AgentPrompts.defaultOutputLanguage])
     let basic = try controlGuide()
     #expect(role.contains("is converted to speech and displayed as captions"))
     #expect(!basic.contains("is converted to speech and displayed as captions"))
@@ -380,8 +380,6 @@ private func controlGuide() throws -> String { try AssistantControls.guidance.te
     let registered = (try AssistantControls.all).map(\.alias)
     #expect(Set(documented) == Set(registered))
     #expect(documented.count == registered.count)
-    #expect(instructions.contains("instructions, callable functions, selected State sources"))
-    #expect(instructions.contains("several model/action/feedback rounds without a goal"))
     #expect(instructions.contains("setting or clearing `task` never loads or unloads a Skill"))
     #expect(instructions.contains("pass note with a truthful summary of the old goal"))
     #expect(!instructions.contains("Never invent IDs or release Task-owned Skills this way"))
@@ -448,7 +446,7 @@ private func controlGuide() throws -> String { try AssistantControls.guidance.te
     var state = AgentTaskSkillState()
     try state.initialize(fixed: config.assistantFixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
     let basic = try controlGuide()
-    let identity = try AgentConfigurations.identityInstructions(named: "Assistant")
+    let identity = try AgentConfigurations.identityInstructions(named: "Assistant", variables: ["default": AgentPrompts.defaultOutputLanguage])
     let capabilityContext = try AgentPrompts.capabilityContext()
     let output = try capabilityContext.protocolRules()
     #expect(output.contains("additional Actions may appear in the next request's catalog"))
@@ -462,20 +460,19 @@ private func controlGuide() throws -> String { try AssistantControls.guidance.te
         }
         let catalog = try state.registry(fixed: config.assistantFixed)
         let prompt = try AssistantContextState.systemPrompt(catalog, skills: state)
-        #expect(prompt.hasPrefix(output + "\n# INPUT FORMAT"))
+        #expect(prompt.contains(output) && prompt.contains("# INPUT FORMAT"))
         #expect(try capabilityContext.catalog(catalog).contains("Channel Camera\n") == loaded)
         #expect(prompt.contains(basic) && prompt.contains(identity))
         #expect(prompt.contains("skill.load and skill.unload each occupy the ENTIRE response"))
-        #expect(prompt.contains("Use AVAILABLE SKILLS and DELEGATABLE AGENTS descriptions"))
-        #expect(prompt.contains("Load a missing Skill only for work this Agent itself performs"))
-        #expect(prompt.contains("Recent Skills expire or are evicted"))
+        #expect(prompt.contains("consult AVAILABLE SKILLS before answering that you cannot perform the request"))
+        #expect(prompt.contains("never load Skills for peer-owned work"))
         #expect(prompt.contains("pass note with a truthful summary of the old goal"))
         #expect(prompt.contains("when the conversation clearly moves on"))
-        #expect(prompt.contains("Asides keep it set"))
+        #expect(prompt.contains("asides keep it set"))
         #expect(prompt.contains("it is unclear whether the user still wants it, ask"))
-        #expect(prompt.contains("do not retry an unchanged failure"))
-        #expect(prompt.contains("always pass note with a truthful summary of the actual work and outcome"))
-        #expect(prompt.contains("A spoken confirmation alone leaves the goal set"))
+        #expect(prompt.contains("retry effects only on a new user request"))
+        #expect(prompt.contains("always pass note with a truthful summary of the work and outcome"))
+        #expect(prompt.contains("A spoken confirmation alone leaves it set"))
         #expect(prompt.contains("including wait text"))
         #expect(prompt.contains("Say useful new information once"))
         if loaded {
@@ -576,7 +573,7 @@ func businessSkillTeachingCannotFinishAnAbsentOrUnrelatedTask(skill: String) thr
     #expect(base.contains("Take a photo.\nUser (ASR) ｜ 13:06:35"))
     #expect(base.contains("Apply their latest correction in entry order"))
     #expect(base.contains("state and images as evidence") && base.contains("Prefer relevant, current, verified facts"))
-    #expect(base.contains("Correct obvious ASR errors") && base.contains("ask one focused question before acting"))
+    #expect(base.contains("Recoverable transcription errors") && base.contains("ask a brief clarification"))
     #expect(base.contains("Lead with the answer, awaited result or blocker"))
     #expect(base.contains("Include what changes the answer or next step"))
     #expect(!base.contains("assistant.input_batch.v1"))
@@ -778,8 +775,8 @@ func webSkillExamplesParseAgainstTheirEffectiveCatalogAndStayWithinBudget(skill:
         #expect(!prompt.contains("Agent ID=" + role + ";"))
     }
     #expect(prompt.contains("send it directly with send"))
-    #expect(prompt.contains("Send a concise, self-contained account of what the user wants in the user's language"))
-    #expect(prompt.contains("send(agent_id,text)"))
+    #expect(prompt.contains("Write a concise, self-contained account of what the user wants in the user's language"))
+    #expect(prompt.contains("Control send (peer):"))
     #expect(!prompt.contains("two distinct call protocols"))
 }
 
@@ -819,7 +816,7 @@ func webSkillExamplesParseAgainstTheirEffectiveCatalogAndStayWithinBudget(skill:
     let privateInstructions = try AgentConfigurations.identityInstructions(named: "Writer")
     #expect(!privateInstructions.isEmpty && !allowedPrompt.contains(privateInstructions))
     #expect(!allowedPrompt.contains("Your private workflow uses tools, never XML scheduling"))
-    let identity = try AgentConfigurations.identityInstructions(named: "Assistant")
+    let identity = try AgentConfigurations.identityInstructions(named: "Assistant", variables: ["default": AgentPrompts.defaultOutputLanguage])
     let basic = try AgentConfigurations.skillInstructions("basic-interaction")
     #expect(!identity.contains("Writer") && !identity.contains("task.delegate") && !identity.contains("state.set"))
     #expect(!basic.contains("Writer") && !basic.contains("writer"))
@@ -934,18 +931,19 @@ extension AgentConfiguration {
     let catalog = try AgentPrompts.capabilityContext().catalog(registry)
     // Actions expose declarations only; ordering instructions belong to the registering Skill.
     #expect(!catalog.contains("Action wait") && !catalog.contains("paired tags"))
-    let controls = try #require(catalog.range(of: "Agent controls (run by this Agent"))
-    let guide = try #require(catalog.range(of: try controlGuide()))
+    let section = try AgentPrompts.capabilityContext().controlsSection(registry)
+    let controls = try #require(section.range(of: "# AGENT CONTROLS"))
+    let guide = try #require(section.range(of: try controlGuide()))
     #expect(controls.lowerBound < guide.lowerBound)
     let teaching = try AgentConfigurations.skillInstructions("basic-interaction")
     #expect(teaching.contains("32 waits") && teaching.contains("<wait time=\"2\"/>"))
     #expect(teaching.contains("Prefer whole seconds"))
     let empty = try AgentPrompts.capabilityContext().catalog(CapabilityRegistry())
-    #expect(!empty.contains("Action wait") && !empty.contains("Agent controls"))
+    #expect(!empty.contains("Action wait") && !empty.contains("AGENT CONTROLS"))
     #expect(throws: GenerationError.self) { try CapabilityRegistry(controlGuidance: fixed.controlGuidance) }
     try AgentPrompts.$language.withValue("zh-Hans") {
         let localized = try AgentSkillLoader.registry(["basic-interaction"], fixed: fixed)
-        #expect(try #require(localized.controlGuidance).text.contains("控制函数"))
+        #expect(try #require(localized.controlGuidance).text.contains("控制"))
         #expect(!(try AgentPrompts.capabilityContext().catalog(localized)).contains("操作 wait"))
         let zh = try AgentConfigurations.skillInstructions("basic-interaction")
         #expect(zh.contains("32 个") && zh.contains("优先写整秒"))

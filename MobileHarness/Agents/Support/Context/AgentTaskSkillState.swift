@@ -352,7 +352,7 @@ public struct AgentTaskSkillState: Codable, Sendable {
 }
 
 extension AgentTaskSkillState {
-    /// The model-visible AGENT CONTEXT: the loaded Skills. Goals and moods are variables, not part of this block.
+    /// The effective loaded Skill IDs; goals and moods are variables, not part of this snapshot.
     public struct ContextSnapshot: Encodable, Sendable, Equatable {
         public let skills: [String]
     }

@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "templates": {
+    "section": "# AGENT CONTROLS\nFunctions this Agent runs itself, in the order emitted. They are not Actions: no Channel, never scheduled, never inside <wait>. Destination self changes your own state or Skills; peer reaches another Agent.\n{{entries}}\n\n{{guide}}",
+    "control": "Control {{alias}} ({{destination}}):",
+    "parameter": "  {{name}}: {{presence}}. {{description}} {{constraints}}"
+  }
+}

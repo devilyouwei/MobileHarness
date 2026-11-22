@@ -211,7 +211,7 @@ import UI
                 var rendered = files
                 if ext != "html" {
                     let document = try await ArtifactTextRendering.document(
-                        files[entry] ?? "", markdown: ext == "md", language: language())
+                        files[entry] ?? "", markdown: ext == "md", language: language(), path: entry, files: files)
                     rendered[target] = document.html
                     markupDiagnostics = document.diagnostics
                 } else if rendered[entry] == nil {
@@ -367,13 +367,15 @@ import UI
 
 /// Shared document output for a work window, history preview and PDF export.
 public enum ArtifactTextRendering {
-    @MainActor public static func document(_ text: String, markdown: Bool, language: AppLanguage = .english)
-        async throws
+    @MainActor public static func document(
+        _ text: String, markdown: Bool, language: AppLanguage = .english, path: String = "",
+        files: [String: String] = [:]
+    ) async throws
         -> (html: String, diagnostics: String)
     {
         let fragment: (html: String, diagnostics: String)
         if markdown {
-            fragment = try await WebPageContainer.renderMarkdown(text, language: language)
+            fragment = try await WebPageContainer.renderMarkdown(text, language: language, path: path, files: files)
         } else {
             let escaped = text.replacingOccurrences(of: "&", with: "&amp;")
                 .replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")

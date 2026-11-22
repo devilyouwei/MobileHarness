@@ -403,7 +403,9 @@ public enum WebPagePolicy {
         }
         /// Renders untrusted Markdown in a temporary, package-only document.
         /// The returned fragment contains static HTML and diagram images.
-        public static func renderMarkdown(_ source: String, language: AppLanguage = .english) async throws
+        public static func renderMarkdown(
+            _ source: String, language: AppLanguage = .english, path: String = "", files: [String: String] = [:]
+        ) async throws
             -> (html: String, diagnostics: String)
         {
             struct Document: Decodable {
@@ -419,10 +421,11 @@ public enum WebPagePolicy {
             defer { page.close() }
             _ = try await page.loadLocal(entry, executesScripts: true)
             page.webView.frame = CGRect(x: 0, y: 0, width: 768, height: 1024)
+            let assets = files.filter { $0.key.lowercased().hasSuffix(".svg") }
             let result = try await page.clientScript(
-                "return await globalThis.renderMobileHarnessMarkdown(source, labels)",
+                "return await globalThis.renderMobileHarnessMarkdown(source, labels, path, assets)",
                 arguments: [
-                    "source": source,
+                    "source": source, "path": path, "assets": assets,
                     "labels": [
                         "diagram": language.text("Mermaid diagram"),
                         "renderFailed": language.text("Could not render diagram"),

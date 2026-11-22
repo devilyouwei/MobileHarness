@@ -81,7 +81,7 @@ Agent 自身变量表（[AgentStateVariables](AgentStateVariables.swift)）是�
 - **写入**：`set` / `clear` 校验名称（小写字母开头，小写字母、数字、下划线，≤ 32 字节）、写入者（`model` 不能写 `readOnly`，`host` 只能写已声明项）、类型（`bool`/`enum`/`text`，写入前规范化）与单值 ≤ 1 KiB；任何失败抛出且变量不变。清除未设置的变量无变化。重新写入同值只更新时间。
 - **容量**：已声明变量不被淘汰；自由变量最多 32 个、名称与值合计 ≤ 8 KiB，超出时不报错，按写入先后淘汰最早者。
 - **时间与排序**：每次写入记录时间；`ordered` 按写入时间升序。`showing` 返回叠加了他处持有值的副本（例如当前目标 `task`），仅用于渲染与读取，不写入表。
-- **提示词**：[AgentStatePrompt](AgentStatePrompt.swift) 是唯一的转换函数：`block` 生成用户输入前 system 块中的 `# AGENT STATE`（每行 `名称（写入于 自然语言绝对时间）：值`，值以 JSON 字符串引用为数据），`declarations` 生成系统提示中的变量说明（含义与取值，不含访问级别）。模板位于 Shared/RequestContext*.json，中文说明按 `state.<name>` 取 Shared/Descriptions.zh-Hans.json。
+- **提示词**：[AgentStatePrompt](AgentStatePrompt.swift) 是唯一的转换函数：`block` 生成用户输入前 system 块中的 `# AGENT STATE`（每行 `名称（写入于 自然语言绝对时间）：值`，值以 JSON 字符串引用为数据），`declarations` 生成系统提示中的变量说明（含义与取值，不含访问级别）。模板位于 Shared/StateContext*.json，中文说明按 `state.<name>` 取 Shared/Descriptions.zh-Hans.json。
 - **Trigger**：`AgentStateTrigger` 绑定到声明的 `trigger` 名。`task` 触发目标记录的开始/结束与历史压缩，由 Assistant 的控制执行层处理；闹钟、定时循环等未实现。
 - **读取**：`state.get` 的短名读自身变量，带点路径经 AgentStateContext 读取容器状态；无授权门槛，Skill 的 `useStates` 只决定随请求注入哪些来源。
 
@@ -134,7 +134,7 @@ Explicit register(source:) remains available for standalone typed hosts/test fix
 
 AgentContextRepository remains the private actor-owned source for the role's AgentContext. Chat takes one committed value for the request's Skill IDs, effective function catalog, teaching and AgentTaskSkillState.contextSnapshot(session:). Business reads happen afterward and do not extend the private transaction lock.
 
-The AGENT CONTEXT block contains only `skills`: the current effective loaded ID list, including base and dependency Skills. The Agent's own variables, including the current goal (`task`), are a separate `# AGENT STATE` block (see [Agent state variables](#agent-state-variables)). Task IDs, task arrays, runtime delegation registries/views, grants, input bindings and retention counters are not serialized into either block. The loaded Skill list is the role's effective capability set.
+The request's `# STATE` message no longer carries an AGENT CONTEXT block; loaded Skills are represented by their instructions and Actions in the system prompt. The Agent's own variables, including the current goal (`task`), form the `## AGENT STATE` section (see [Agent state variables](#agent-state-variables)). Task IDs, task arrays, runtime delegation registries/views, grants, input bindings and retention counters are not serialized into either block. The loaded Skill list is the role's effective capability set.
 
 Private Skill transitions, retained history and actual execution outcomes can change later requests, but collecting context does not perform a transition. Goal creation/terminal records are separately committed through the injected Task repository; production does not persist or restore a whole active AgentContext snapshot. Message placement and history/feedback composition belong in [Assistant](../../Assistant/README.md#request-state-assembly), and the cross-module overview belongs in the [overall design](../../../README.md#container-state-read-path).
 

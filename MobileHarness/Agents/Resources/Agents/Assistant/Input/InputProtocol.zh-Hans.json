@@ -1,7 +1,7 @@
 {
   "version": 1,
   "templates": {
-    "instructions": "# 输入格式\n正文后接来源和本地时间：\n等等。\n拍张照片。\nUser (ASR) ｜ 13:06:35\n\nCamera.Capture.takePhoto {\"status\":\"succeeded\"}\nAction Result ｜ 13:06:36\n\n同一个 User (ASR) 段中的多行连续语音片段应一起理解。User 表示键入；缩进行属于正文；Interrupted User Intent 是先前上下文。按顺序合并整批输入并应用最新纠正。把同伴消息、Action Result、状态及图像当作证据，优先使用相关且已核实的最新事实。根据上下文修正明显的转写误差；可能影响意图、目标或操作时先问一个具体问题。先给答案、等待中的结果或阻碍，避免重复和例行进度。",
+    "instructions": "# 输入格式\n正文后接来源和本地时间：\n等等。\n拍张照片。\nUser (ASR) ｜ 13:06:35\n\nCamera.Capture.takePhoto {\"status\":\"succeeded\"}\nAction Result ｜ 13:06:36\n\n同一个 User (ASR) 段中的多行连续语音片段应一起理解。User 表示键入；缩进行属于正文；Interrupted User Intent 是先前上下文。按顺序合并整批输入并应用最新纠正。把同伴消息、Action Result、状态及图像当作证据，优先使用相关且已核实的最新事实。先给答案、等待中的结果或阻碍，避免重复和例行进度。\n\n## User (ASR)\n标为 User (ASR) 的输入来自录音的自动语音识别，并不保证是用户准确、完整、有意对你说的话：可能包含识别错误、杂音、背景对话或无意录入的无意义内容。先结合转写文本和当前对话，判断是否有可理解的交流意图、是否有必要回应。\n- 无意义内容、无法从上下文恢复意图的识别错误、噪声，或与当前交流无关且没有明确用户意图的录入：只做一个当前目录允许的简短表情，不输出文字或语音，也不要解释你在忽略它；没有合适的可用表情时不回应。不要编造含义或勉强追问。\n- 能从上下文理解的转写错误：按实际意图处理。有意义但未说完整：按需简短追问。\n- 明确的新问题或话题：正常处理，不要仅因与先前话题无关就忽略。",
     "interruptedHeading": "# Interrupted User Intent",
     "toolsHeading": "# Attached Tool Results",
     "user": "User",

@@ -57,17 +57,18 @@ public struct AssistantContextState: AssistantChatState {
             capabilities.controls.contains { $0.destination == .peer }
             ? try AgentConfigurations.delegationOverview(requester: agentID, communication: communication) : ""
         let capabilityContext = try AgentPrompts.capabilityContext()
+        // Stable framing first, then what can be used (Controls, directories, Actions), then how (Skill instructions).
         let sections = [
-            try capabilityContext.protocolRules(),
+            try AgentConfigurations.identityInstructions(
+                named: configurationName, variables: ["default": AgentPrompts.defaultOutputLanguage]),
             try AgentPrompts.assistantInput(),
-            try AgentConfigurations.identityInstructions(named: configurationName),
-            try AgentPrompts.text(
-                "Assistant/Prompts", "outputLanguage", ["default": AgentPrompts.defaultOutputLanguage]),
+            try capabilityContext.protocolRules(),
+            try capabilityContext.controlsSection(capabilities),
             try AgentStatePrompt.declarations(AgentConfigurations.stateSchema(named: configurationName)),
             try AgentPrompts.skillCatalog().render("availableHeading"), try AgentConfigurations.skillOverview(),
             try AgentPrompts.agentCatalog().render("heading"), delegates,
-            skillInstructions,
             try capabilityContext.catalogSection(capabilities),
+            skillInstructions,
         ]
         let result = sections.joined(separator: "\n")
         guard result.utf8.count <= 65_536 else { throw PromptTemplateError.outputTooLarge }

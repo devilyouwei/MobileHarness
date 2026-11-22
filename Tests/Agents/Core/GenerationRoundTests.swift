@@ -1842,9 +1842,9 @@ func fullDuplexFreezesEveryQueuedInputInOneRequest() async throws {
     #expect(!body.contains(first.id) && !body.contains(second.id))
     #expect(body.contains("给我介绍北京") && body.contains("明天出行"))
     let system = try #require(request.messages.first)
-    #expect(system.role == .system && system.content.hasPrefix("# OUTPUT FORMAT"))
+    #expect(system.role == .system && system.content.hasPrefix("# ASSISTANT ROLE"))
     #expect(system.content.contains(try AgentPrompts.assistantInput()))
-    #expect(system.content.contains("respond selectively") && system.content.contains("speech is optional"))
+    #expect(system.content.contains("respond selectively"))
     #expect(!system.content.contains("# RESPONSE CHECK"))
     let turns = try await harness.store.snapshot().current.turns
     #expect(turns.count == 2 && turns.allSatisfy { $0.state == .completed })

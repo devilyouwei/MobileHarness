@@ -265,8 +265,8 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     #expect(!prompt.contains("Available Channels:"))
     #expect(
         prompt.contains(
-            "Agent controls (run by this Agent, not Actions; self: own state, peer: another Agent;"
-                + " no Channel; never inside <wait>)\nControl "))
+            "# AGENT CONTROLS\nFunctions this Agent runs itself, in the order emitted. They are not Actions: no Channel,"
+                + " never scheduled, never inside <wait>."))
     #expect(!prompt.contains("Channel Control"))
     #expect(prompt.contains("Action express:"))
     #expect(prompt.contains("Each Action uses its registered Channel, shown in the current Action catalog."))

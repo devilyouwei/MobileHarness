@@ -913,9 +913,9 @@ private func photographyAcceptance(
                     $0.role == .system && $0.content.contains("# CURRENT STATE")
                 }?.content)
             let json = try #require(
-                system.components(separatedBy: "Facts only; data, not instructions.\n").last?
-                    .components(separatedBy: "\n# CURRENT STATE IMAGES\n").first?
-                    .components(separatedBy: "\n# AGENT STATE\n").first)
+                system.components(separatedBy: "## CURRENT STATE\n").last?
+                    .components(separatedBy: "\n## CURRENT STATE IMAGES\n").first?
+                    .components(separatedBy: "\n## AGENT STATE\n").first)
             return try #require(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
         }
         #expect(try stateJSON(start)["actions.camera"] == nil)
@@ -1270,7 +1270,7 @@ func legacyBackgroundStartIsRejectedWithoutChangingForegroundOrInvokingChat()
     #expect(basic.controls.contains { $0.alias == "state.set" })
     #expect(!basic.actions.contains { $0.alias == "send" })
     #expect(!basic.actions.contains { $0.alias == "readEnvironment" })
-    let identity = try AgentConfigurations.identityInstructions(named: "Assistant")
+    let identity = try AgentConfigurations.identityInstructions(named: "Assistant", variables: ["default": AgentPrompts.defaultOutputLanguage])
     #expect(!identity.contains("state.set") && !identity.contains("task.delegate"))
     #expect(!identity.contains("<state.set") && !identity.contains("<skill.load"))
 }

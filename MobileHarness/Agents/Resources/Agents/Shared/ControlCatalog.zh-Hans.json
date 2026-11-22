@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "templates": {
+    "section": "# AGENT CONTROLS\n由本 Agent 自己执行的函数，按输出顺序运行。它们不是 Action：没有通道，不参与调度，不得写在 <wait> 内。目标 self 改变自己的状态或 Skill，peer 联系另一个 Agent。\n{{entries}}\n\n{{guide}}",
+    "control": "控制 {{alias}}（{{destination}}）：",
+    "parameter": "  {{name}}：{{presence}}。{{description}} {{constraints}}"
+  }
+}

@@ -145,7 +145,7 @@ public enum ArtifactArchive {
                     entry = path
                 } else {
                     entry = "preview-" + UUID().uuidString + ".html"
-                    let html = try await previewHTML(selected.content, ext: ext)
+                    let html = try await previewHTML(selected.content, ext: ext, path: path, files: snapshot.files)
                     try await disk.putIfAbsent(Data(html.utf8), key: prefix + "/" + entry)
                 }
                 let url = try await disk.fileURL(prefix + "/" + entry, maximumBytes: Int.max)
@@ -162,9 +162,14 @@ public enum ArtifactArchive {
                 throw primary
             }
         }
-        private func previewHTML(_ source: String, ext: String) async throws -> String {
+        private func previewHTML(_ source: String, ext: String, path: String, files: [WriterArtifactFile]) async throws
+            -> String
+        {
             if ext == "svg" { return "<!doctype html><meta charset=utf-8>" + source }
-            return try await ArtifactTextRendering.document(source, markdown: ext == "md", language: language()).html
+            return try await ArtifactTextRendering.document(
+                source, markdown: ext == "md", language: language(), path: path,
+                files: Dictionary(uniqueKeysWithValues: files.map { ($0.path, $0.content) })
+            ).html
         }
         public func closePreview() async throws {
             if let previewWorker {

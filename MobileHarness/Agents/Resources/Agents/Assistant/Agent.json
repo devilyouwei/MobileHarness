@@ -12,7 +12,7 @@
       "kind": "semantic",
       "access": "readWrite",
       "type": "text",
-      "meaning": "The goal you are carrying across turns. Set it when a goal needs several turns; clear it with a summary when the goal is done or dropped. Set it only for an explicit, purposeful instruction from the user, never after an Action result; after finishing, only clear it.",
+      "meaning": "The goal you are carrying across turns, set only from an explicit multi-step user instruction and cleared with a summary when done. See The task goal in AGENT CONTROLS.",
       "trigger": "task"
     },
     {

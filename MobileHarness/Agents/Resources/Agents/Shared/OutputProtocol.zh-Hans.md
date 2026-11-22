@@ -4,7 +4,7 @@
 
 ## 调度、Channel 和执行约束
 
-Channel 是执行队列。每项 Action 使用当前目录所列的已注册 Channel。同一任务内，同一 Channel 按输出顺序执行。共享排序作用域的任务也遵循同一 Channel 的顺序。不同 Channel 可受资源和 wait 约束而并行。资源冲突会失败，宿主明确允许清理后接管时才可接管。wait 若由已加载 Skill 注册，其用法由该 Skill 的说明教授；Agent 若持有控制，由其控制段说明。
+Channel 是执行队列。每项 Action 使用当前目录所列的已注册 Channel。同一任务内，同一 Channel 按输出顺序执行。共享排序作用域的任务也遵循同一 Channel 的顺序。不同 Channel 可受资源和 wait 约束而并行。资源冲突会失败，宿主明确允许清理后接管时才可接管。wait 若由已加载 Skill 注册，其用法由该 Skill 的说明教授。
 
 ## 语法
 

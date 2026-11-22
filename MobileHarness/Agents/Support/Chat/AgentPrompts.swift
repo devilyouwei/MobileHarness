@@ -67,7 +67,8 @@ public final class AgentPrompts: @unchecked Sendable {
     static func capabilityContext() throws -> CapabilityContextBuilder {
         let output = try shared.load("Agents/Shared/OutputProtocol.md")
         let catalog = try shared.load("Agents/Shared/ActionCatalog.json")
-        return CapabilityContextBuilder(outputProtocol: output, actionCatalog: catalog)
+        let controls = try shared.load("Agents/Shared/ControlCatalog.json")
+        return CapabilityContextBuilder(outputProtocol: output, actionCatalog: catalog, controlCatalog: controls)
     }
 
     static func skillCatalog() throws -> PromptTemplates {
@@ -78,8 +79,8 @@ public final class AgentPrompts: @unchecked Sendable {
         try shared.load("Agents/Shared/AgentCatalog.json")
     }
 
-    static func requestContext() throws -> PromptTemplates {
-        try shared.load("Agents/Shared/RequestContext.json")
+    static func stateContext() throws -> PromptTemplates {
+        try shared.load("Agents/Shared/StateContext.json")
     }
 
     static func roleTemplates(named role: String) throws -> PromptTemplates {

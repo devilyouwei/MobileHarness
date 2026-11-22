@@ -351,7 +351,8 @@
 		53B5BD92CBCB2A203E5B8748 /* MobileHarness/Agents/Support/Core/Runtime/AgentContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Core/Runtime/AgentContext.swift; sourceTree = SOURCE_ROOT; };
 		5426FFF6F0D85D8D88521856 /* MobileHarness/Actions/System/SystemActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/System/SystemActions.swift; sourceTree = SOURCE_ROOT; };
 		54DECDE82F751C0F1306C22F /* MobileHarness/ModelKit/Speech/VAD/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/ModelKit/Speech/VAD/README.md; sourceTree = SOURCE_ROOT; };
-		553229D85A24487B8F56918B /* MobileHarness/Agents/Resources/Agents/Shared/RequestContext.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Shared/RequestContext.json; sourceTree = SOURCE_ROOT; };
+		553229D85A24487B8F56918B /* MobileHarness/Agents/Resources/Agents/Shared/StateContext.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Shared/StateContext.json; sourceTree = SOURCE_ROOT; };
+		7802CD64AE7764A28640CC1A /* MobileHarness/Agents/Resources/Agents/Shared/ControlCatalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Shared/ControlCatalog.json; sourceTree = SOURCE_ROOT; };
 		558451651E99AF7F005E80A4 /* MobileHarness/Agents/Support/Core/Communication/AgentMessaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Core/Communication/AgentMessaging.swift; sourceTree = SOURCE_ROOT; };
 		5588DDB0CC2A63CD21D79636 /* MobileHarness/Actions/UI/Navigation/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/Actions/UI/Navigation/README.md; sourceTree = SOURCE_ROOT; };
 		56A323A514902D24DA2A9D95 /* MobileHarness/Agents/Assistant/Workflow/AssistantChatContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Assistant/Workflow/AssistantChatContext.swift; sourceTree = SOURCE_ROOT; };
@@ -1372,7 +1373,8 @@
 		F484BDC9F98BA95C4E46C885 /* MobileHarness/Agents/Resources/Agents/Shared/Descriptions.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Shared/Descriptions.zh-Hans.json; sourceTree = SOURCE_ROOT; };
 		891CAF902A2F884577F86542 /* MobileHarness/Agents/Resources/Agents/Shared/ExecutionFeedback.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Shared/ExecutionFeedback.zh-Hans.json; sourceTree = SOURCE_ROOT; };
 		E664F3244F0580922218709F /* MobileHarness/Agents/Resources/Agents/Shared/OutputProtocol.zh-Hans.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/Agents/Resources/Agents/Shared/OutputProtocol.zh-Hans.md; sourceTree = SOURCE_ROOT; };
-		69FEF80249E2B564B7373245 /* MobileHarness/Agents/Resources/Agents/Shared/RequestContext.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Shared/RequestContext.zh-Hans.json; sourceTree = SOURCE_ROOT; };
+		69FEF80249E2B564B7373245 /* MobileHarness/Agents/Resources/Agents/Shared/StateContext.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Shared/StateContext.zh-Hans.json; sourceTree = SOURCE_ROOT; };
+		926869B4436919F692C1A450 /* MobileHarness/Agents/Resources/Agents/Shared/ControlCatalog.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Shared/ControlCatalog.zh-Hans.json; sourceTree = SOURCE_ROOT; };
 		1F2C46353C79722C4F58ABA2 /* MobileHarness/Agents/Resources/Agents/Shared/SkillCatalog.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Shared/SkillCatalog.zh-Hans.json; sourceTree = SOURCE_ROOT; };
 		DB5081F7407D90399C9D859C /* MobileHarness/Agents/Resources/Agents/Writer/ContentPrompts.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Writer/ContentPrompts.zh-Hans.json; sourceTree = SOURCE_ROOT; };
 		68E8B83A718AD8E1EF90D49E /* MobileHarness/Agents/Resources/Agents/Writer/Instructions.zh-Hans.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/Agents/Resources/Agents/Writer/Instructions.zh-Hans.md; sourceTree = SOURCE_ROOT; };
@@ -4470,8 +4472,10 @@
 				891CAF902A2F884577F86542 /* MobileHarness/Agents/Resources/Agents/Shared/ExecutionFeedback.zh-Hans.json */,
 				E6C824E20E6C9D2BD1776CD0 /* MobileHarness/Agents/Resources/Agents/Shared/OutputProtocol.md */,
 				E664F3244F0580922218709F /* MobileHarness/Agents/Resources/Agents/Shared/OutputProtocol.zh-Hans.md */,
-				553229D85A24487B8F56918B /* MobileHarness/Agents/Resources/Agents/Shared/RequestContext.json */,
-				69FEF80249E2B564B7373245 /* MobileHarness/Agents/Resources/Agents/Shared/RequestContext.zh-Hans.json */,
+				553229D85A24487B8F56918B /* MobileHarness/Agents/Resources/Agents/Shared/StateContext.json */,
+				7802CD64AE7764A28640CC1A /* MobileHarness/Agents/Resources/Agents/Shared/ControlCatalog.json */,
+				69FEF80249E2B564B7373245 /* MobileHarness/Agents/Resources/Agents/Shared/StateContext.zh-Hans.json */,
+				926869B4436919F692C1A450 /* MobileHarness/Agents/Resources/Agents/Shared/ControlCatalog.zh-Hans.json */,
 				3797DCB7E5634A7DA9A774FC /* MobileHarness/Agents/Resources/Agents/Shared/SkillCatalog.json */,
 				1F2C46353C79722C4F58ABA2 /* MobileHarness/Agents/Resources/Agents/Shared/SkillCatalog.zh-Hans.json */,
 			);

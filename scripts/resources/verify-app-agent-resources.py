@@ -28,7 +28,7 @@ if pathlib.Path(lookup).resolve() != (bundle / 'Catalog.json').resolve():
 expected = {pathlib.Path('Catalog.json'): source / 'Catalog.json'}
 for group in ('Agents', 'Skills'):
     expected.update({p.relative_to(source): p for p in (source / group).rglob('*') if p.is_file()})
-for name in ('OutputProtocol.md', 'ActionCatalog.json', 'SkillCatalog.json', 'AgentCatalog.json', 'RequestContext.json'):
+for name in ('OutputProtocol.md', 'ActionCatalog.json', 'SkillCatalog.json', 'AgentCatalog.json', 'StateContext.json', 'ControlCatalog.json'):
     path = pathlib.Path('Agents/Shared') / name
     if path not in expected:
         raise SystemExit(f'Missing Shared prompt source: {path}')
