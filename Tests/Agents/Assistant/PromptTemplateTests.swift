@@ -866,7 +866,7 @@ func writerContentResourcesPreserveFormatAndRetryRules(path: String, rule: Strin
 @Test(.actionCatalog) func allOwnedPromptResourcesArePackagedAndCompile() throws {
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent(
-            "MobileHarness/Resources/Agents")
+            "MobileHarness/Agents/Resources/Agents")
     let paths = try #require(FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil))
     for case let file as URL in paths where file.pathExtension == "json" {
         let data = try Data(contentsOf: file)

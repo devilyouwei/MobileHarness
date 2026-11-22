@@ -7,18 +7,17 @@ public enum ActionLocalizationError: Error, Equatable {
     case unknownParameter(function: String, parameter: String)
 }
 
-/// Translations of Action declarations, loaded from `<resourceRoot>/Localization/<Domain>/<Module>.<language>.json`
-/// (the packaged copy of `Resources/Actions`).
+/// Translations of Action declarations, loaded from the `Localization/<Domain>/<Module>.<language>.json` files in `Actions/Resources`.
 /// The `@Action` text is the default language; a missing file, function or parameter keeps that text.
 public enum ActionLocalization {
     private struct File: Decodable { let entries: [String: ActionTranslation] }
 
     /// Translations by language and `Domain.Module.title`, validated against `declarations`.
     public static func translations(
-        for declarations: [ActionDeclaration], resourceRoot: URL
+        for declarations: [ActionDeclaration]
     ) throws -> [String: [String: ActionTranslation]] {
-        let root = resourceRoot.appendingPathComponent("Localization", isDirectory: true)
-        guard let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)
+        guard let root = Bundle.module.resourceURL?.appendingPathComponent("Localization", isDirectory: true),
+            let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)
         else { return [:] }
         let known = Dictionary(uniqueKeysWithValues: declarations.map { ($0.path.description, $0) })
         var result: [String: [String: ActionTranslation]] = [:]

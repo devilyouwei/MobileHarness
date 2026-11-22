@@ -41,7 +41,7 @@ import Gateway
                     let preparation = try services.agents.prepareExecutionBindings(
                         declarations: CapabilityModules.declarations,
                         translations: try ActionLocalization.translations(
-                            for: CapabilityModules.declarations, resourceRoot: AgentConfigurations.actionResourceRoot())
+                            for: CapabilityModules.declarations)
                     )
                     let business = try services.actionAssembly.prepare(preparation.request, actions: services.actions)
                     let binding = try preparation.validate(business)

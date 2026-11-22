@@ -27,7 +27,7 @@
 | [verify-app-island-resources.py](resources/verify-app-island-resources.py) | Live Activity 扩展、版本、返回 URL 与打包契约 |
 | [verify-app-localizations.py](resources/verify-app-localizations.py) | App、UI 包与扩展的已编译本地化资源 |
 
-三个 verify 脚本各接收一个 App 路径，由 build-ios.sh 统一调用。构建脚本依赖 Xcode 环境变量，不独立执行 stage/clean。资源设计见 [Resources](../MobileHarness/Resources/README.md)。
+三个 verify 脚本各接收一个 App 路径，由 build-ios.sh 统一调用。构建脚本依赖 Xcode 环境变量，不独立执行 stage/clean。资源设计见 [Agents/Resources](../MobileHarness/Agents/Resources/README.md) 与 [Actions/Resources](../MobileHarness/Actions/Resources/README.md)。
 
 ## models：制品与原生适配检查
 

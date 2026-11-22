@@ -12,7 +12,7 @@ Shared.xcconfig 通过可选 include 加载 Local.xcconfig。DEVELOPMENT_TEAM �
 - 实机请求 increased-memory-limit，不能据此推断可用内存；Simulator 不请求此 entitlement。
 - 相机用途说明覆盖本地预览、用户拍摄及请求的模型图像观察；Photos 仅请求添加显式保存照片，不请求相册读取/枚举。
 - Config/AppInfo.plist 向 App 目标提供 CADisableMinimumFrameDurationOnPhone；签名包中的最终 plist 是平台元数据事实源。
-- Xcode 导航与 Agents/Support、Resources/Agents/Skills 源位置一致；SwiftPM 拥有框架编译与资源复制，不重复加入 App target membership。
+- Xcode 导航与 Agents/Support、Agents/Resources 源位置一致；SwiftPM 拥有框架编译与资源复制，不重复加入 App target membership。
 
 [Model management](../MobileHarness/ModelKit/Support/Management/README.md) 拥有制品安装与资源选择，[Resources](../MobileHarness/Resources/README.md) 拥有包内容。
 

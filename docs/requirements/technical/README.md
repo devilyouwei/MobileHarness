@@ -1,7 +1,8 @@
 # 技术需求
 
-- [Action 多语言说明内聚](Action-Localization.md)：默认文案留在 `@Action`，翻译放入 `Resources/Actions` 镜像目录并由 Actions 暴露本地化接口，替换 Agents 的 FunctionCopy。
+- [Action 多语言说明内聚](Action-Localization.md)：默认文案留在 `@Action`，翻译放入 `Actions/Resources` 镜像目录并由 Actions 暴露本地化接口，替换 Agents 的 FunctionCopy。
 - [Actions 目录整理](Actions-Directory-Cleanup.md)：模块根只保留入口与契约，装配文件归入 Composition，平铺域按能力分子目录，合并微型文件，补齐内部 Action 英文说明与 Skill 绑定翻译覆盖测试。
+- [资源跟随所属模块](Module-Owned-Resources.md)：Actions 翻译与 Agent/Skill 资源搬入各自模块的 `Resources/` 子目录，由各自 target 的 `Bundle.module` 读取，根 `Resources/` 只留 App 资源。
 
 - [Action 多轨道调度与 Wait](Action-Multi-Channel-Wait.md)：主轨道有序分发、Channel 子轨道并行/串行、嵌套屏障及全局 wait 的自闭定时形式。
 - [Assistant 内部函数标记](Assistant-Internal-Function-Tokens.md)：非 Action 函数标记的定义、解析、调度与执行链路，函数库内聚于 Assistant；`task.send` 归属待定。
@@ -100,6 +101,8 @@ Completed scope: [可读预览编号与合并图片输入](../../completed/Reada
 - [Agents Support responsibility audit and consolidation](Agents-Support-Cleanup.md): file ownership, adjacent-contract consolidation, obsolete error cleanup and localized runtime-log presentation; validation evidence tracks toolchain limitations separately.
 
 - [Agents responsibility boundaries](Agents-Responsibility-Boundaries.md): Assistant orchestration ownership, injected local-tool declarations and module-level host/Gateway contracts.
+
+- [Agents root contract placement](Agents-Root-Contracts.md): root file audit, state snapshot extraction and relocation of reusable catalog/implementation types to Support.
 
 - [模型下载源交互](Model-Download-Source.md)：统一即时选择与系统语言默认源。
 

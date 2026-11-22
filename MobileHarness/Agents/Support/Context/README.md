@@ -76,7 +76,7 @@ recordSignal 只保存有界中立 Data 证据到内存，非 Signal 传输或�
 
 ## Agent state variables
 
-Agent 自身变量表（[AgentStateVariables](AgentStateVariables.swift)）是角色私有 Context 的一部分，字符串值，内存存储，随 Context 事务提交，重启丢弃。声明来自 Agent.json 的 `states`（见 [Resources/Agents](../../../Resources/Agents/README.md)），由 `AgentStateSchema` 在配置加载时校验；Swift 侧只提供按类型的解析与按名绑定的 Trigger（目前仅 `task`）。
+Agent 自身变量表（[AgentStateVariables](AgentStateVariables.swift)）是角色私有 Context 的一部分，字符串值，内存存储，随 Context 事务提交，重启丢弃。声明来自 Agent.json 的 `states`（见 [Agents/Resources/Agents](../../Resources/Agents/README.md)），由 `AgentStateSchema` 在配置加载时校验；Swift 侧只提供按类型的解析与按名绑定的 Trigger（目前仅 `task`）。
 
 - **写入**：`set` / `clear` 校验名称（小写字母开头，小写字母、数字、下划线，≤ 32 字节）、写入者（`model` 不能写 `readOnly`，`host` 只能写已声明项）、类型（`bool`/`enum`/`text`，写入前规范化）与单值 ≤ 1 KiB；任何失败抛出且变量不变。清除未设置的变量无变化。重新写入同值只更新时间。
 - **容量**：已声明变量不被淘汰；自由变量最多 32 个、名称与值合计 ≤ 8 KiB，超出时不报错，按写入先后淘汰最早者。

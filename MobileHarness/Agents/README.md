@@ -13,7 +13,7 @@ flowchart LR
     App["App"] -.->|lifecycle and injected host ports| Agents["Agents"]
     UI["UI"] -->|typed requests| Agents
     Platform["PlatformKit"] -->|native observations| Agents
-    Resources["Packaged Agent / Skill declarations"] --> Agents
+    Resources["Agents/Resources · packaged Agent / Skill declarations"] -->|Bundle.module| Agents
     Agents -->|inference requests| Model["ModelKit"]
     Model -->|events / failures| Agents
     Agents <-->|repositories / cache| Storage["Storage"]
@@ -40,11 +40,12 @@ cognition 表示认知职责；perception 包括感知预处理、快速响应�
 
 | File | Module-level responsibility |
 | --- | --- |
-| [AgentContainer.swift](AgentContainer.swift) | Public module root, role capability ownership, lifecycle and root state. |
+| [AgentContainer.swift](AgentContainer.swift) | Public module root, role capability ownership and lifecycle. |
 | [AgentRuntime.swift](AgentRuntime.swift) | Concrete role composition, single-use preparation/binding and runtime joins. |
-| [AgentContracts.swift](AgentContracts.swift) | Production identities, communication assembly and immutable external/local function catalog contracts. |
+| [AgentContracts.swift](AgentContracts.swift) | Production identities, communication schema assembly and concrete per-role request/event registrations with startup protocol validation. |
 | [AgentRepositories.swift](AgentRepositories.swift) | Explicit repository dependencies supplied at composition. |
 | [AgentFailure.swift](AgentFailure.swift) | Module-level structured failure and admission errors. |
+| [AgentState.swift](AgentState.swift) | Module-local state snapshot, descriptor and weak-owner reader contract. |
 | [AgentHostBindings.swift](AgentHostBindings.swift) | App-bound host request/binding contracts spanning role coordination. |
 | [AgentGatewayPorts.swift](AgentGatewayPorts.swift) | Public cognitive Gateway configuration, capability and scoped observation contracts. |
 
@@ -170,7 +171,7 @@ Assistant 通过 task.start/task.end 管理前台任务，通过 task.send 向 W
 
 The App supplies the default prompt language through the existing Agent root. The chat worker retains it in suspended and continued rounds, Writer retains it for the delegation, and Decision and title generation capture it when starting their requests. Request assembly selects matching natural-language instructions, examples and function descriptions. Assistant JEV Decision uses fixed English speech-state rules and semantic candidates in both languages; user facts retain their original language. The model uses explicit requests and trusted user text to determine output language, with the application language as its fallback. Assistant recording and restoration share canonical source markers across both languages.
 
-Each role owns its public description in Resources/Agents/<Role>/Agent.json and its private model instructions in its own resource directory. Support validates resource schema v11 and projects the v8 compiled contract. Assistant assembles System protocols, its own identity, Skill instructions and a public peer directory filtered by the actual instance communication policy and the shared executable delegation adapter. AgentCore renders the supplied output templates. Writer owns its content-format templates. See [resource contracts](../Resources/Agents/README.md).
+Each role owns its public description in [Resources/Agents/<Role>/Agent.json](Resources/Agents/README.md) and its private model instructions in its own resource directory. Support validates resource schema v11 and projects the v8 compiled contract. Assistant assembles System protocols, its own identity, Skill instructions and a public peer directory filtered by the actual instance communication policy and the shared executable delegation adapter. AgentCore renders the supplied output templates. Writer owns its content-format templates. See [resource contracts](Resources/Agents/README.md).
 
 Writer 运行以委托入口为身份，workspace 是可选编辑目标；前序与 workspace 消息保持同一请求链，界面分别查询。
 

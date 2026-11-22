@@ -12,6 +12,7 @@
 | [PoseObservation.swift](PoseObservation.swift) | COCO-17 姿态、几何／置信度与观测新鲜度 |
 | [SoundSourceObservation.swift](SoundSourceObservation.swift) | 声源方向、质量、格式及有效状态 |
 | [AgentTasks.swift](AgentTasks.swift) | Task 内容／视图、用户回复、公开委派许可、固定任务准入和通信函数声明 |
+| [AgentImplementations.swift](AgentImplementations.swift) | 通用的请求／事件实现注册包装，按角色类型擦除处理器；具体角色注册表与启动校验留在根级 AgentContracts |
 
 ```mermaid
 flowchart LR

@@ -1,6 +1,6 @@
-# Resources/Actions — Action resources
+# Actions/Resources — Action resources
 
-Resources owned by the [Actions](../../Actions/README.md) module. Actions code stays Swift-only; resources that Action functions need ship here as static files, copied into the Agents resource bundle as `Localization/` (the Agents SwiftPM target covers `Resources`). This directory contains no Swift; only `ActionLocalization` reads it.
+Static resources owned by the [Actions](../README.md) module. Actions code stays Swift-only; resources that Action functions need ship here, mirroring the Actions directory layout where applicable. The Actions SwiftPM target copies `Resources/Localization` with `.copy("Resources/Localization")` into `HarnessKit_Actions.bundle` as `Localization/`; only `ActionLocalization` reads it, through `Bundle.module`. This README is excluded from the bundle and the directory contains no Swift.
 
 ## Localization
 

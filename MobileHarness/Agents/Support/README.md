@@ -20,7 +20,7 @@ Module-wide [host bindings](../AgentHostBindings.swift) and [Gateway ports](../A
 | [GatewayProjections.swift](GatewayProjections.swift) | Cognitive-to-neutral invocation/envelope and neutral-to-cognitive outcome conversion. |
 | [AgentGatewayAssembly.swift](AgentGatewayAssembly.swift) | Gateway assembly, scoped observation lifecycle and Action feedback adapters. |
 | [CapabilityCoverage.swift](CapabilityCoverage.swift) | Startup implementation coverage using explicitly supplied local-tool paths. |
-| [AgentConfigurations.swift](AgentConfigurations.swift) | Validated packaged role declarations, public descriptions and function catalogs. |
+| [AgentConfigurations.swift](AgentConfigurations.swift) | Validated packaged role declarations, public descriptions and the immutable external/local function catalog (AgentLocalTool, AgentFunctionCatalog). |
 | [AgentSkillLoader.swift](AgentSkillLoader.swift) | Skill dependency expansion, owner checks, function binding and teaching. |
 | [AgentContainerLifecycle.swift](AgentContainerLifecycle.swift) | Coalesced startup/transition/cleanup/shutdown, revision fencing and retained failure. |
 | [AgentUIRequests.swift](AgentUIRequests.swift) | Long-lived ordinary/control consumers, cancellation/deadlines and original reply completion. |

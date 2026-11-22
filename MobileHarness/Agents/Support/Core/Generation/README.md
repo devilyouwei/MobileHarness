@@ -94,7 +94,7 @@ GenerationTrace retains exact raw fragments up to 256 KiB/8192 fragments, includ
 
 ## Prompt resources and rendering
 
-PromptTemplates compiles and renders caller-supplied bytes. A JSON document provides named templates, while UTF-8 Markdown and plain text compile as one `body` template. Placeholders use `{{name}}`. Substitution is single-pass and treats inserted values as literal text. Agents owns file loading and caching. See [System prompt resources](../../../../Resources/Agents/README.md#提示词与模板字段).
+PromptTemplates compiles and renders caller-supplied bytes. A JSON document provides named templates, while UTF-8 Markdown and plain text compile as one `body` template. Placeholders use `{{name}}`. Substitution is single-pass and treats inserted values as literal text. Agents owns file loading and caching. See [System prompt resources](../../../Resources/Agents/README.md#提示词与模板字段).
 
 Names are 1–64 ASCII bytes from letters, digits, `_` and `.`. A JSON document has exactly `version` and `templates`, version 1 and 1–64 entries, with at most 16384 UTF-8 bytes per named template. Documents, single text bodies and rendered output are limited to 65536 UTF-8 bytes. Compilation rejects stray closing delimiters, missing delimiters and invalid names. Rendering requires exactly the referenced variable keys.
 

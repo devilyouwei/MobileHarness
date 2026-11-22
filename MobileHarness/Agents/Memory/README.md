@@ -108,7 +108,7 @@ flowchart TB
 
 输出 256；接纳等待 32；证据／批次滚动窗口 4096。Context 保持在内存，持久化事实由 Actions 使用领域仓库提交。提交失败阻止依赖步骤，取消加入实际工作；pause/stop 关闭并加入 UI 消费，resume 加入旧消费者后重订阅。重启不重放已发出的操作。
 
-通信声明见 [Agent.json](../../Resources/Agents/Memory/Agent.json)，效果契约见 [History Actions](../../Actions/History/README.md)。
+通信声明见 [Agent.json](../Resources/Agents/Memory/Agent.json)，效果契约见 [History Actions](../../Actions/History/README.md)。
 
 本角色通过 [固定任务准入](../Support/Communication/README.md#固定任务准入) 接收 Assistant 委派。MemoryHistoryIntent.taskMessage 只解释 history.intent，拒绝将角色私有 cancel 意图作为 Task 业务载荷。
 

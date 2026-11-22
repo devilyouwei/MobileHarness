@@ -6,7 +6,7 @@ Built-in camera, device, voice and settings notices carry English source copy th
 
 ActionsContainer is the single App-scoped execution root. It owns compiled function registration, immutable catalog metadata, effect-free input preparation, budgets/resources, actual execution, output validation and joined business/native cleanup. It also owns the [execution Shell](Support/Shell/README.md): Channel scheduling, direct Tool calls, resource arbitration and the result ledger. App constructs and manages it; Gateway carries Agent → Action invocations to the Shell and the Shell's feedback back to Agents as internal Signals. Agents owns authorization and supplies cognitive host callbacks through App-bound neutral interfaces.
 
-Domains, modules and individual actions remain extensible declarations and function composition. They have no container, lifecycle node or App registration. Stateful execution services are retained by the module root and composed through narrow interfaces. Registration establishes implementation availability, not Skill permission or device readiness. Actions manages Actions and their scheduling only: it owns no model prompts, Skill instructions or Action usage examples (the scheduling `wait` is registered and taught by Basic Interaction). It does own each function's contract prose: the default-language text lives in `@Action`, and translations are [Resources/Actions](../Resources/Actions/README.md) files that `ActionLocalization` validates against the declarations; App passes them to Agents with the declarations, and missing entries keep the `@Action` text. Actions imports neither AgentCore, Agents, Gateway nor App.
+Domains, modules and individual actions remain extensible declarations and function composition. They have no container, lifecycle node or App registration. Stateful execution services are retained by the module root and composed through narrow interfaces. Registration establishes implementation availability, not Skill permission or device readiness. Actions manages Actions and their scheduling only: it owns no model prompts, Skill instructions or Action usage examples (the scheduling `wait` is registered and taught by Basic Interaction). It does own each function's contract prose: the default-language text lives in `@Action`, and translations are [Actions/Resources](Resources/README.md) files that `ActionLocalization` validates against the declarations; App passes them to Agents with the declarations, and missing entries keep the `@Action` text. Actions imports neither AgentCore, Agents, Gateway nor App.
 
 ## Direct relationships
 
@@ -18,6 +18,7 @@ flowchart LR
     X -->|immutable function metadata| C["Agents · authorization"]
     X <-->|injected Task / perception / model-maintenance ports| C
     X <-->|public capabilities and real outcomes| F["UI · PlatformKit · ModelKit · Storage"]
+    R["Actions/Resources · translations"] -->|Bundle.module · ActionLocalization| X
     linkStyle default stroke:#64748b,stroke-width:1.5px
 ```
 
@@ -25,7 +26,7 @@ Cognitive collaboration uses neutral host ports bound by App. The execution root
 
 ## Directory layout
 
-The module root keeps the execution root (ActionsContainer, ActionsFailure), the compiled catalog (CapabilityModules). [Composition](Composition/) holds the application-assembly files below; each domain directory keeps its Module, Actions namespace and domain-wide contracts at its root with capabilities in subdirectories; reusable mechanisms live in [Support](Support/README.md).
+The module root keeps the execution root (ActionsContainer, ActionsFailure), the compiled catalog (CapabilityModules). [Composition](Composition/) holds the application-assembly files below; each domain directory keeps its Module, Actions namespace and domain-wide contracts at its root with capabilities in subdirectories; reusable mechanisms live in [Support](Support/README.md); static resources (translations) live in [Resources](Resources/README.md) and are packaged by the Actions target.
 
 ## Source and target ownership
 
@@ -34,7 +35,7 @@ The module root keeps the execution root (ActionsContainer, ActionsFailure), the
 | ActionsContainer / ActionsFailure | Unique root, admission state, preparation credentials, execution workers, execution Shell and structured lifecycle errors. |
 | Composition: ActionsBusinessAssembly / ActionsBusinessBindings / ActionsUIFacades | Actions-owned service construction and narrow public binding ports; helper objects retained by the root, not peer containers. |
 | CapabilityModules (root) / Composition: BehaviorProtocolBindings / BehaviorAssembly | Explicit compiled declarations, protocol policies and canonical function assembly. Unknown domains can use default bindings; builtin policies remain explicit. |
-| [ActionLocalization](Support/Localization/ActionLocalization.swift) | Loads and validates per-language translations of declared function prose from the packaged `Resources/Actions/Localization` directory. |
+| [ActionLocalization](Support/Localization/ActionLocalization.swift) | Loads and validates per-language translations of declared function prose from the `Localization` directory of [Resources](Resources/README.md), packaged in the Actions resource bundle. |
 | Composition: ActionEndpoints | Instance-level composition of presentation, speech, camera and Task ports; no capability lookup/downcast. |
 | [Camera](Camera/README.md) | Capture, camera control and private photo/album operations. |
 | [History](History/README.md) | Queries, full reads, mutations, title jobs and history presentation. |

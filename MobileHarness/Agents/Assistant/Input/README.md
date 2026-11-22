@@ -1,6 +1,6 @@
 # Assistant input
 
-Everything entering the Assistant: input admission, batch text, the independent interruption Decision and interruption contracts. Input prompt resources are under [Resources/Agents/Assistant/Input](../../../Resources/Agents/Assistant/Input).
+Everything entering the Assistant: input admission, batch text, the independent interruption Decision and interruption contracts. Input prompt resources are under [Resources/Agents/Assistant/Input](../../Resources/Agents/Assistant/Input).
 
 | File | Responsibility |
 | --- | --- |

@@ -109,7 +109,7 @@ Assistant 的 photography Skill 可以直接调用 Camera Actions，不必须委
 
 pause/stop 关闭接纳、取消并加入订阅／事务／跟踪；resume 加入旧消费者后重新订阅。旧 token、会话、代际或调用反馈不能更新新请求。事实源非取消意外结束报告 `consumerEnded`；正常暂停和停止不生成故障。Context 提交失败显式传播，不重放不确定设备效果。
 
-通信以 [Agent.json](../../Resources/Agents/Photographer/Agent.json) 为准，函数契约见 [Camera](../../Actions/Camera/README.md)、[NexArm](../../Actions/NexArm/README.md)。
+通信以 [Agent.json](../Resources/Agents/Photographer/Agent.json) 为准，函数契约见 [Camera](../../Actions/Camera/README.md)、[NexArm](../../Actions/NexArm/README.md)。
 
 本角色通过 [固定任务准入](../Support/Communication/README.md#固定任务准入) 接收 Assistant 委派。PhotographerCameraIntent.taskMessage 只解释 photography.camera；PhotographerCameraWorkflow 要求私有 cancel 来自本地 runtime 且匹配根会话与请求身份，远程业务载荷不能获得清理权。Task 取消通过 agent.task.v1 cancel 操作进入协调器。
 

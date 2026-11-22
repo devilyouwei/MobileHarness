@@ -1,6 +1,6 @@
 # Assistant controls
 
-Control library and execution. Declarations load from [Resources/Agents/Assistant/Controls](../../../Resources/Agents/Assistant/Controls) (`Controls*.json` declarations, `Controls*.md` usage guide); see [Agent controls](../../Support/Core/Capability/README.md#agent-controls) for the shared mechanism.
+Control library and execution. Declarations load from [Agents/Resources/Agents/Assistant/Controls](../../Resources/Agents/Assistant/Controls) (`Controls*.json` declarations, `Controls*.md` usage guide); see [Agent controls](../../Support/Core/Capability/README.md#agent-controls) for the shared mechanism.
 
 | File | Responsibility |
 | --- | --- |
@@ -23,7 +23,7 @@ A thrown error becomes a `controlFailed` tool result and a value result is busin
 
 ## State writes
 
-The model supplies only a short name; the variable always lives in the Assistant's own table, so Container State and other Agents are unreachable. Declared variables come from `states` in Agent.json (see [Resources/Agents](../../../Resources/Agents/README.md)); every other lowercase name is a free note. The model cannot write a `readOnly` variable, and nothing about access appears in the prompt: the write is rejected with `readOnly` and the decision continues. The host writes through `setHostState` (source `host`), which ignores `access` but accepts only declared names and never the `task` variable.
+The model supplies only a short name; the variable always lives in the Assistant's own table, so Container State and other Agents are unreachable. Declared variables come from `states` in Agent.json (see [Resources/Agents](../../Resources/Agents/README.md)); every other lowercase name is a free note. The model cannot write a `readOnly` variable, and nothing about access appears in the prompt: the write is rejected with `readOnly` and the decision continues. The host writes through `setHostState` (source `host`), which ignores `access` but accepts only declared names and never the `task` variable.
 
 `task` is the variable bound to the `task` trigger. Its value is owned by the foreground goal record, not by the variable table, so exactly one copy exists:
 

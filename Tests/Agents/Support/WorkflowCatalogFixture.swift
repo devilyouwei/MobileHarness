@@ -8,7 +8,7 @@ struct WorkflowCatalogFixture: TestTrait, TestScoping {
         try AgentConfigurations.installDeclarations(
             CapabilityModules.declarations, localTools: AgentContracts.localTools,
             translations: ActionLocalization.translations(
-                for: CapabilityModules.declarations, resourceRoot: AgentConfigurations.actionResourceRoot()))
+                for: CapabilityModules.declarations))
     }
     func provideScope(for test: Test, testCase: Test.Case?, performing function: @Sendable () async throws -> Void)
         async throws

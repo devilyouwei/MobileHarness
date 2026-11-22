@@ -2,6 +2,60 @@ import AgentCore
 import Foundation
 import FunctionContracts
 
+/// A native function implemented inside its owning role, outside Gateway execution.
+public struct AgentLocalTool: Equatable, Sendable {
+    public let owner: AgentID
+    public let declaration: ActionDeclaration
+    public init(owner: AgentID, declaration: ActionDeclaration) {
+        self.owner = owner
+        self.declaration = declaration
+    }
+}
+
+/// Immutable module-level schema contract; local declarations confer no execution permission.
+public struct AgentFunctionCatalog: Equatable, Sendable {
+    public let declarations: [ActionDeclaration]
+    public let localTools: [AgentLocalTool]
+    /// Translations by language and function path; absent entries keep the declaration's default-language text.
+    public let translations: [String: [String: ActionTranslation]]
+    public init(
+        declarations: [ActionDeclaration], localTools: [AgentLocalTool] = [],
+        translations: [String: [String: ActionTranslation]] = [:]
+    ) throws {
+        let controls = Set(try AssistantControls.all.map(\.declaration.path))
+        guard !declarations.isEmpty, declarations.count <= 256, localTools.count <= 128,
+            Set(declarations.map(\.path)).count == declarations.count,
+            Set(localTools.map { $0.declaration.path }).count == localTools.count,
+            Set(declarations.map(\.path)).isDisjoint(with: localTools.map { $0.declaration.path }),
+            controls.isDisjoint(with: declarations.map(\.path)),
+            controls.isDisjoint(with: localTools.map { $0.declaration.path }),
+            localTools.allSatisfy({ ActionIdentifier.validName($0.owner.rawValue) })
+        else { throw AgentConfigurationError.invalidField("function declarations") }
+        for declaration in declarations { try declaration.validate() }
+        for tool in localTools { try tool.declaration.validate() }
+        self.declarations = declarations.sorted { $0.path.description < $1.path.description }
+        self.localTools = localTools.sorted { $0.declaration.path.description < $1.declaration.path.description }
+        self.translations = translations
+    }
+
+    func localized(_ declaration: ActionDeclaration, language: String) -> ActionDeclaration {
+        translations[language]?[declaration.path.description].map(declaration.localized) ?? declaration
+    }
+
+    func validateLocalTool(path: String, callType: String, owner: AgentID?) throws {
+        guard let local = localTools.first(where: { $0.declaration.path.description == path }) else { return }
+        guard callType == "tool", local.owner == owner else {
+            throw AgentConfigurationError.invalidField("local tool ownership: " + path)
+        }
+    }
+
+    func declaration(path: String, callType: String, owner: AgentID?) throws -> ActionDeclaration? {
+        try validateLocalTool(path: path, callType: callType, owner: owner)
+        return declarations.first { $0.path.description == path }
+            ?? localTools.first { $0.declaration.path.description == path }?.declaration
+    }
+}
+
 /// Confined, versioned pure assets. Canonical function schemas come from FunctionContracts.
 public enum AgentConfigurations {
     private final class Cache: @unchecked Sendable {
@@ -205,10 +259,6 @@ public enum AgentConfigurations {
             throw AgentConfigurationError.invalidFormat
         }
         return value
-    }
-    /// Resource bundle root; it holds the packaged `Resources/Actions/Localization` that Actions localization reads.
-    public static func actionResourceRoot() throws -> URL {
-        try resourceRoot(in: Bundle.module)
     }
     static func resourceRoot(in bundle: Bundle) throws -> URL {
         guard let catalog = bundle.url(forResource: "Catalog", withExtension: "json") else {

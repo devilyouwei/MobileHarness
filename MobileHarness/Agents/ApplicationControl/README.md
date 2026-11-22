@@ -1,6 +1,6 @@
 # ApplicationControl
 
-ApplicationControl is a deterministic Agent for application settings, model resources, device administration, window commands, and diagnostic presentation. Its [role descriptor](../../Resources/Agents/ApplicationControl/Agent.json) classifies it as a perception Agent. It applies policy and correlates requests with execution results. Actions owns configuration transactions, device operations, and presentation writes. UI owns local interaction state such as drafts, focus, scrolling, and navigation gestures.
+ApplicationControl is a deterministic Agent for application settings, model resources, device administration, window commands, and diagnostic presentation. Its [role descriptor](../Resources/Agents/ApplicationControl/Agent.json) classifies it as a perception Agent. It applies policy and correlates requests with execution results. Actions owns configuration transactions, device operations, and presentation writes. UI owns local interaction state such as drafts, focus, scrolling, and navigation gestures.
 
 [AgentContainer](../README.md#lifetime-inputs-and-failures) owns the role's lifetime. ApplicationControl subscribes to UI requests and observes typed facts through injected interfaces. Its decision path runs in code and makes no Chat requests.
 
@@ -32,7 +32,7 @@ flowchart LR
 
 Gateway is the role's execution boundary for registered Actions functions, including Provider, ModelResources, Device, Speech Detection, and UI presentation and window functions. App binds the neutral staging and maintenance ports at composition time. Agents owns role authorization, and the role uses fixed tool permissions declared in code.
 
-Assistant's `application-control` Skill calls registered Actions through Assistant's own Gateway scope. ApplicationControl's descriptor declares fixed-task inputs and permission to send `agent.task.events.v1` to Assistant. Its handler validates and decodes authorized fixed-task envelopes, tracks them by scope, handles cancellation, and reports the outcome. The [Assistant descriptor](../../Resources/Agents/Assistant/Agent.json) exposes Writer through its enabled text task adapter. The interaction between Assistant and this role in normal operation is a passive State read through the Agents catalog. See [fixed-task admission](../Support/Communication/README.md#固定任务准入) for the shared envelope contract.
+Assistant's `application-control` Skill calls registered Actions through Assistant's own Gateway scope. ApplicationControl's descriptor declares fixed-task inputs and permission to send `agent.task.events.v1` to Assistant. Its handler validates and decodes authorized fixed-task envelopes, tracks them by scope, handles cancellation, and reports the outcome. The [Assistant descriptor](../Resources/Agents/Assistant/Agent.json) exposes Writer through its enabled text task adapter. The interaction between Assistant and this role in normal operation is a passive State read through the Agents catalog. See [fixed-task admission](../Support/Communication/README.md#固定任务准入) for the shared envelope contract.
 
 ## Internal execution flow
 

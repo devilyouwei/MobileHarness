@@ -99,81 +99,6 @@ public enum AgentContracts {
     }
 }
 
-/// A native function implemented inside its owning role, outside Gateway execution.
-public struct AgentLocalTool: Equatable, Sendable {
-    public let owner: AgentID
-    public let declaration: ActionDeclaration
-    public init(owner: AgentID, declaration: ActionDeclaration) {
-        self.owner = owner
-        self.declaration = declaration
-    }
-}
-
-/// Immutable module-level schema contract; local declarations confer no execution permission.
-public struct AgentFunctionCatalog: Equatable, Sendable {
-    public let declarations: [ActionDeclaration]
-    public let localTools: [AgentLocalTool]
-    /// Translations by language and function path; absent entries keep the declaration's default-language text.
-    public let translations: [String: [String: ActionTranslation]]
-    public init(
-        declarations: [ActionDeclaration], localTools: [AgentLocalTool] = [],
-        translations: [String: [String: ActionTranslation]] = [:]
-    ) throws {
-        let controls = Set(try AssistantControls.all.map(\.declaration.path))
-        guard !declarations.isEmpty, declarations.count <= 256, localTools.count <= 128,
-            Set(declarations.map(\.path)).count == declarations.count,
-            Set(localTools.map { $0.declaration.path }).count == localTools.count,
-            Set(declarations.map(\.path)).isDisjoint(with: localTools.map { $0.declaration.path }),
-            controls.isDisjoint(with: declarations.map(\.path)),
-            controls.isDisjoint(with: localTools.map { $0.declaration.path }),
-            localTools.allSatisfy({ ActionIdentifier.validName($0.owner.rawValue) })
-        else { throw AgentConfigurationError.invalidField("function declarations") }
-        for declaration in declarations { try declaration.validate() }
-        for tool in localTools { try tool.declaration.validate() }
-        self.declarations = declarations.sorted { $0.path.description < $1.path.description }
-        self.localTools = localTools.sorted { $0.declaration.path.description < $1.declaration.path.description }
-        self.translations = translations
-    }
-
-    func localized(_ declaration: ActionDeclaration, language: String) -> ActionDeclaration {
-        translations[language]?[declaration.path.description].map(declaration.localized) ?? declaration
-    }
-
-    func validateLocalTool(path: String, callType: String, owner: AgentID?) throws {
-        guard let local = localTools.first(where: { $0.declaration.path.description == path }) else { return }
-        guard callType == "tool", local.owner == owner else {
-            throw AgentConfigurationError.invalidField("local tool ownership: " + path)
-        }
-    }
-
-    func declaration(path: String, callType: String, owner: AgentID?) throws -> ActionDeclaration? {
-        try validateLocalTool(path: path, callType: callType, owner: owner)
-        return declarations.first { $0.path.description == path }
-            ?? localTools.first { $0.declaration.path.description == path }?.declaration
-    }
-}
-
-/// Static implementation registrations are validated before on-demand role instances or models are started.
-public struct AgentRequestImplementation: Sendable {
-    public let protocolID: String
-    public let operations: Set<AgentRequestOperation>
-    public let acceptsTextSubmission: Bool
-    let handle: @Sendable (any Agent, AgentProtocolRequest) async throws -> AgentRequestReply
-    public init<Role: Agent>(
-        protocolID: String, role: Role.Type, operations: Set<AgentRequestOperation>,
-        acceptsTextSubmission: Bool = false,
-        handler: @escaping @Sendable (Role, AgentProtocolRequest) async throws -> AgentRequestReply
-    ) {
-        self.protocolID = protocolID
-        self.operations = operations
-        self.acceptsTextSubmission = acceptsTextSubmission
-        handle = { agent, request in
-            guard let role = agent as? Role else { throw CommunicationError.invalidPayload }
-            return try await handler(role, request)
-        }
-    }
-}
-
 extension AgentContracts {
     public static var requestImplementations: [AgentID: [AgentRequestImplementation]] {
         let operations = Set(AgentRequestOperation.allCases)
@@ -235,25 +160,6 @@ extension AgentContracts {
     }
 }
 
-/// Code-owned event adapters. Declarations select a subset of implemented variants.
-public struct AgentEventImplementation: Sendable {
-    public let channel: String
-    public let protocolID: String
-    public let variants: Set<String>
-    let handle: @Sendable (any Agent, AgentInput) async throws -> Void
-    public init<Role: Agent>(
-        channel: String, protocolID: String, variants: Set<String> = [], role: Role.Type,
-        handler: @escaping @Sendable (Role, AgentInput) async throws -> Void
-    ) {
-        self.channel = channel
-        self.protocolID = protocolID
-        self.variants = variants
-        handle = { agent, input in
-            guard let role = agent as? Role else { throw CommunicationError.invalidPayload }
-            try await handler(role, input)
-        }
-    }
-}
 extension AgentContracts {
     public static var eventImplementations: [AgentID: [AgentEventImplementation]] {
         [

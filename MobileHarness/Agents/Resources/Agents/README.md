@@ -2,7 +2,7 @@
 
 ## 职责与边界
 
-本目录保存随 App 打包的 Agent 身份、基础 Skill、通信声明及必要的运行时提示词。加载与组合由 [AgentConfigurations](../../Agents/Support/AgentConfigurations.swift)、[AgentSkillLoader](../../Agents/Support/AgentSkillLoader.swift) 负责，业务实现与生命周期由 [Agents](../../Agents/README.md) 负责。
+本目录保存随 App 打包的 Agent 身份、基础 Skill、通信声明及必要的运行时提示词。加载与组合由 [AgentConfigurations](../../Support/AgentConfigurations.swift)、[AgentSkillLoader](../../Support/AgentSkillLoader.swift) 负责，业务实现与生命周期由 [Agents](../../README.md) 负责。
 
 Assistant 是唯一面向用户的对话 Agent；摄影、历史查询、应用控制的对话流程通过 Skill 执行。Photographer、Memory、ApplicationControl 保留确定性事务，Memory 可在独立标题事务中调用模型。感知 Agent 不因此变成对话 Agent。
 
@@ -10,7 +10,7 @@ Assistant 是唯一面向用户的对话 Agent；摄影、历史查询、应用�
 
 ## 文件组织
 
-Use the unsuffixed resource for English and a `.zh-Hans` sibling for Simplified Chinese. Localized prose uses the same template keys, variables and protocol identifiers. `Descriptions.zh-Hans.json` supplements the canonical Agent and Skill declarations, and `Writer/Tools.zh-Hans.json` the Writer-owned native tools, with translated model-facing descriptions. Action translations belong to [Resources/Actions](../Actions/README.md).
+Use the unsuffixed resource for English and a `.zh-Hans` sibling for Simplified Chinese. Localized prose uses the same template keys, variables and protocol identifiers. `Descriptions.zh-Hans.json` supplements the canonical Agent and Skill declarations, and `Writer/Tools.zh-Hans.json` the Writer-owned native tools, with translated model-facing descriptions. Action translations belong to [Actions/Resources](../../../Actions/Resources/README.md).
 
 | 文件 | 作用与要求 |
 | --- | --- |
@@ -59,7 +59,7 @@ Use the unsuffixed resource for English and a `.zh-Hans` sibling for Simplified 
 | `meaning` | 进入系统提示的英文说明，≤ 1 KiB；中文说明按 `state.<name>` 写入 Shared/Descriptions.zh-Hans.json，缺失回退英文。 |
 | `trigger` | 可选，绑定的 Swift Trigger 名，目前只有 `task`；未知名称拒绝加载。 |
 
-同名声明、未知字段、缺失必填字段拒绝加载。Assistant 要求存在绑定 `task` Trigger 的声明，否则启动失败。Assistant 当前声明 `task`（semantic、readWrite、绑定 `task`）与 `quiet`（typed bool、readOnly，由宿主写入，静默主动播报）。语义与实现见 [Assistant controls](../../Agents/Assistant/Controls/README.md#state-writes) 和 [Context](../../Agents/Support/Context/README.md#agent-state-variables)。
+同名声明、未知字段、缺失必填字段拒绝加载。Assistant 要求存在绑定 `task` Trigger 的声明，否则启动失败。Assistant 当前声明 `task`（semantic、readWrite、绑定 `task`）与 `quiet`（typed bool、readOnly，由宿主写入，静默主动播报）。语义与实现见 [Assistant controls](../../Assistant/Controls/README.md#state-writes) 和 [Context](../../Support/Context/README.md#agent-state-variables)。
 
 ### signals 字段
 
@@ -90,7 +90,7 @@ Skill.json 声明 path、callType、alias，以及 Action 的 channel。具体�
 
 `Shared/OutputProtocol.md` 固定描述 XML Action、Channel 调度和 Skill 加载后的目录更新时机。`Shared/ActionCatalog.json` 定义有效目录中的 Channel 标题、Action 别名、参数行排版，以及拥有者控制指南的标题。`Assistant/InputProtocol.json` 将模型读取规则与时间线的标签、排版及历史格式识别放在同一资源中。共享提示词随 Agents Bundle 分发。Agents 加载资源，AgentCore 读取输出协议并渲染当前 Action 目录。`Assistant/Instructions.md` 维护角色职责、回应风格与语音、字幕、表情呈现。Task、Skill 控制和执行反馈由 Assistant 目录的 `Controls.md`（与 `Controls.json` 同级，可有 `Controls.<language>.md`）维护；表情、聆听与窗口规则由 BasicInteraction 维护。每个 Agent 可自配 control 声明与指南，目前只有 Assistant。Photography 维护自己的业务流程与分轮示例。
 
-单段提示词使用 UTF-8 Markdown 或 TXT，加载为 `body`。多个具名模板共用一个 JSON 文件，包含 `version` 和 `templates`，版本为 1，最多 64 项，每项最多 16 KiB。三种格式都使用 `{{name}}` 插入变量，变量集合须与该模板完全一致。插入值按字面输出。资源、单段正文、单次渲染和 Assistant system 输出均最多 64 KiB。加载与卸载见 [AgentPrompts](../../Agents/Support/Chat/README.md#templates-and-localization)。
+单段提示词使用 UTF-8 Markdown 或 TXT，加载为 `body`。多个具名模板共用一个 JSON 文件，包含 `version` 和 `templates`，版本为 1，最多 64 项，每项最多 16 KiB。三种格式都使用 `{{name}}` 插入变量，变量集合须与该模板完全一致。插入值按字面输出。资源、单段正文、单次渲染和 Assistant system 输出均最多 64 KiB。加载与卸载见 [AgentPrompts](../../Support/Chat/README.md#templates-and-localization)。
 
 Assistant 当前模板契约：
 
@@ -117,7 +117,7 @@ Assistant 先拼接 Shared 的输出协议和 Assistant 的输入协议，再读
 
 Catalog 最多 32 个 Agent / 64 个 Skill；单资源最多 64 KiB；资产缓存最多 256 项。无远程下载或热更新，错误明确传播，不以空配置兜底。Skill / 目录快照与任务历史由 Agent Context 保存，资源文件不保存运行时状态。
 
-[Resources 总览](../README.md) · [Skill 规范](../Skills/README.md) · [Support](../../Agents/Support/README.md) · [Task / Context](../../Agents/Support/Context/README.md)
+[Resources 总览](../README.md) · [Skill 规范](../Skills/README.md) · [Support](../../Support/README.md) · [Task / Context](../../Support/Context/README.md)
 
 ## Action-owned documentation and Skill instruction contract
 
@@ -166,7 +166,7 @@ Writer 的公开 description 说明独立执行、委托生命周期和回馈。
 
 Writer 在明确创建工作区时分配 workspace_N。发送端生成消息 UUID，Writer 接纳新目标时使用该身份申请内部执行授权。追问关联由运行时附带。
 
-Controls.md 统一教 start/send 平级与按目标所有者选择，不维护具体角色用途。Writer 自己的公开 description 拥有作品职责与委派条件。Catalog 不注册 writing，Assistant 无法加载作品库技能。Writer 工具与私有循环由 [Writer](../../Agents/Writer/README.md) 实现。
+Controls.md 统一教 start/send 平级与按目标所有者选择，不维护具体角色用途。Writer 自己的公开 description 拥有作品职责与委派条件。Catalog 不注册 writing，Assistant 无法加载作品库技能。Writer 工具与私有循环由 [Writer](../../Writer/README.md) 实现。
 
 ## 公开目录装配与失败
 

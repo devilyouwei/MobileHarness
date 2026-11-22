@@ -102,14 +102,14 @@ A first-level source directory identifies an architectural owner. A logical modu
 ```text
 MobileHarness/
 ├── App/           # Lifecycle host and application composition
-├── Agents/        # Cognition and role coordination
+├── Agents/        # Cognition and role coordination (Resources/: Agent, Skill, Catalog assets)
 ├── Gateway/       # Internal Signal communication and admission
-├── Actions/       # Business operations and actual execution
+├── Actions/       # Business operations and actual execution (Resources/: Action translations)
 ├── UI/            # Independent interaction and presentation capability
 ├── PlatformKit/   # Independent native and device capability
 ├── ModelKit/      # Independent inference and model-resource capability
 ├── Storage/       # Independent cache, file and database capability
-└── Resources/     # Packaged declarations, configuration and assets
+└── Resources/     # App-level assets and privacy declarations
 ```
 
 | Logical group                         | Owning directory                     | Module responsibility                                                                                                            | Direct relationships                                                                                                                                                       |
@@ -122,9 +122,9 @@ MobileHarness/
 | Foundation                            | [PlatformKit](PlatformKit/README.md) | Own native I/O, platform permissions, device transport and native observations.                                                  | Exposes native operations and factual observations through its own interfaces.                                                                                             |
 | Foundation                            | [ModelKit](ModelKit/README.md)       | Own inference, provider integration and model/artifact lifecycle.                                                                | Exposes typed model capabilities and SDK-owned integration ports.                                                                                                          |
 | Foundation                            | [Storage](Storage/README.md)         | Own bounded temporary data, controlled files and durable domain repositories.                                                    | Exposes storage contracts and commit results without interpreting application policy.                                                                                      |
-| Packaged definitions                  | [Resources](Resources/README.md)     | Organize declarative Agent/Skill configuration, model metadata, privacy declarations and assets.                                 | Build tooling packages declarations; owning runtime modules validate and interpret them.                                                                                   |
+| Packaged definitions                  | [Resources](Resources/README.md)     | Own App-level assets and privacy declarations; modules own their packaged resources.                                          | Build tooling packages declarations; owning runtime modules validate and interpret them.                                                                                   |
 
-Resources is a packaging owner rather than an executable service. Shared opt-in development model artifacts are owned by repository [Models](../Models/README.md), grouped by model and consumed explicitly by tests and experiments; production resource deployment stays with Resources and ModelKit. At repository level, [Package.swift](../Package.swift) and the Xcode project define build units; `Config/`, `Tests/`, `experiments/` and `scripts/` own build configuration, application and SDK regression/acceptance coverage, case/prompt evaluations and performance experiments, and developer checks respectively. [docs](../docs/README.md) owns requirements and evidence. Internal directory maps remain in the linked READMEs.
+Resources holds only App-level assets and privacy declarations. Each module owns the static resources it reads and packages them through its own SwiftPM target: [Agents/Resources](Agents/Resources/README.md) (Agent, Skill and Catalog declarations) and [Actions/Resources](Actions/Resources/README.md) (Action translations). Shared opt-in development model artifacts are owned by repository [Models](../Models/README.md), grouped by model and consumed explicitly by tests and experiments; production resource deployment stays with Resources and ModelKit. At repository level, [Package.swift](../Package.swift) and the Xcode project define build units; `Config/`, `Tests/`, `experiments/` and `scripts/` own build configuration, application and SDK regression/acceptance coverage, case/prompt evaluations and performance experiments, and developer checks respectively. [docs](../docs/README.md) owns requirements and evidence. Internal directory maps remain in the linked READMEs.
 
 ### 2. Dependency model
 
@@ -293,7 +293,7 @@ Agents uses Gateway Signal ports; Gateway forwards invocations to the neutral `A
 | Coordination | Gateway validates bound identity and scope and owns Signal delivery and feedback routing; Actions owns scheduling, resource arbitration and result retention. |
 | Business effects | Actions resolves the canonical handler, validates business conditions and returns actual completion or failure. |
 | Native and durable facts | UI owns presentation, PlatformKit owns platform and device facts, ModelKit owns inference, and Storage owns commit and recovery evidence. |
-| Packaged declarations | Resources owns source declarations and asset layout. Agents and ModelKit interpret the declarations they consume. |
+| Packaged declarations | Each module owns the declarations it packages and interprets (Agents: Agent/Skill/Catalog; Actions: translations); Resources owns only App-level assets. |
 
 The individual module designs above identify their public interfaces, direct relationships and internal data flow.
 
@@ -732,7 +732,7 @@ Each actual model request, including an internal ReACT continuation, samples aga
 
 #### Prompt ownership and public discovery
 
-Agents combines the shared output protocol, role instructions, effective Skill teaching and the Action catalog. Assistant reads its role-owned input protocol for instructions and timeline formatting. The independent Decision classifier reads its own action definitions and four-section prompt template. AgentCore renders the output protocol supplied by Agents. Agent and Skill assets supply descriptions, while the executable delegation adapter and the requester's communication policy determine which roles appear in the delegation catalog. See [Agent resource contracts](Resources/Agents/README.md).
+Agents combines the shared output protocol, role instructions, effective Skill teaching and the Action catalog. Assistant reads its role-owned input protocol for instructions and timeline formatting. The independent Decision classifier reads its own action definitions and four-section prompt template. AgentCore renders the output protocol supplied by Agents. Agent and Skill assets supply descriptions, while the executable delegation adapter and the requester's communication policy determine which roles appear in the delegation catalog. See [Agent resource contracts](Agents/Resources/Agents/README.md).
 
 ### 6. State ownership, state machines and model observations
 
@@ -958,7 +958,7 @@ The Actions Shell owns Channel FIFO, wait trees and resource arbitration, and Ac
 
 Different Channels may run concurrently subject to live resource permits. A wait group first joins preceding work in its parent phase, then runs its own Channel lanes. The parent continuation becomes eligible once the group is closed and all its work settles. Handler failures retain their outcomes and allow eligible work to advance. Decisions requiring real outcomes wait for feedback. ToolCall direct execution uses the same resource mechanism while remaining outside Channel/wait ordering. ActionCall remains Channel-scheduled even when its catalog descriptor declares direct execution.
 
-A Channel is a concurrency concept, not a module or page name: Actions share one only when they are mutually exclusive or occupy the same surface, device or session, and independent work uses different Channels so it can overlap. Skill resources follow this: `Camera` (capture/recording session), `CameraCancel` (cancelCapture, which must not queue behind the countdown it cancels), `Vision`, `Window`, `Island`, `Web`, `Device`, `ModelResources`, `History`, `Provider`, `Robot` and `ListeningControl`, alongside the runtime-fixed `Speech`, `Display` and `Listening`. See [Skills](Resources/Skills/README.md).
+A Channel is a concurrency concept, not a module or page name: Actions share one only when they are mutually exclusive or occupy the same surface, device or session, and independent work uses different Channels so it can overlap. Skill resources follow this: `Camera` (capture/recording session), `CameraCancel` (cancelCapture, which must not queue behind the countdown it cancels), `Vision`, `Window`, `Island`, `Web`, `Device`, `ModelResources`, `History`, `Provider`, `Robot` and `ListeningControl`, alongside the runtime-fixed `Speech`, `Display` and `Listening`. See [Skills](Agents/Resources/Skills/README.md).
 
 Owners, leases and revocable permits fence writes. Unconfigured conflicts fail busy without an implicit resource queue. Configured takeover blocks new writes, stops and joins the old owner, then grants authority. A timeout is not completed cleanup; late cleanup cannot grant a revoked request or replay an effect. Occupancy does not become a replacement device-health state. See [Scheduling](Actions/Support/Shell/README.md#scheduling) and [Resources](Actions/Support/Shell/README.md#resources).
 

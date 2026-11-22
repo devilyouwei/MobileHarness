@@ -43,6 +43,9 @@ for module in ('Actions', 'Agents', 'App', 'Gateway', 'ModelKit', 'PlatformKit',
         path = Path(folder)
         if 'README.md' in files:
             continue
+        # Static resource trees are documented by their Resources README, not per leaf directory.
+        if module in ('Actions', 'Agents') and (module_root / 'Resources') in (path, *path.parents):
+            continue
         parent_readme = path.parent / 'README.md'
         if path != module_root and not directories and parent_readme.is_file():
             directory_link = rf'\]\((?:\./)?{re.escape(path.name)}/\)'
@@ -278,7 +281,7 @@ for path in ('Actions/Support/Function/ActionDeadline.swift', 'Actions/Support/C
         errors.append(f'Execution lifetime must use the shared ActionRuntime mechanism: {path}')
 if targets['AgentCore'].get('path') != 'MobileHarness/Agents/Support/Core':
     errors.append('AgentCore must compile Agents/Support/Core')
-if 'Agents/Support/Core' not in targets['Agents'].get('exclude', []):
+if 'Support/Core' not in targets['Agents'].get('exclude', []):
     errors.append('Agents must exclude the separately compiled Core directory')
 if not (ROOT / 'MobileHarness/Actions/Support/README.md').is_file():
     errors.append('Missing consolidated execution Runtime')
@@ -564,7 +567,7 @@ if 'ToolHandler' in macro_implementation or 'ToolCompletionHandler' in macro_imp
 if (actions_root / 'ToolMacro.swift').exists():
     errors.append('Retired @Tool macro must not be recreated')
 expected_domains = {'UI', 'Speech', 'Camera', 'History', 'System', 'NexArm', 'Web', 'Artifacts'}
-domains = {p.name for p in actions_root.iterdir() if p.is_dir()} - {'Support', 'Composition'}
+domains = {p.name for p in actions_root.iterdir() if p.is_dir()} - {'Support', 'Composition', 'Resources'}
 if domains != expected_domains:
     errors.append(f'Executable business domains must be classified explicitly: {domains}')
 # Layout follows capability ownership, independently of call protocol or directory depth.
@@ -1175,9 +1178,9 @@ for source in actions_root.glob('*/Support/*Module.swift'):
 for registry in ('ActionRegistry.swift', 'ToolRegistry.swift'):
     if 'definition.validate()' not in (ROOT / 'MobileHarness/Actions/Support/Call' / registry).read_text():
         errors.append(f'Registry must use shared executable metadata validation: {registry}')
-if targets['Agents'].get('path') != 'MobileHarness' or targets['Agents'].get('sources') != ['Agents']:
-    errors.append('Agents must compile only Agents sources while packaging shared assets')
-asset_root = ROOT / 'MobileHarness/Resources'
+if targets['Agents'].get('path') != 'MobileHarness/Agents':
+    errors.append('Agents must own its sources and packaged assets under MobileHarness/Agents')
+asset_root = ROOT / 'MobileHarness/Agents/Resources'
 asset_catalog = json.loads((asset_root / 'Catalog.json').read_text())
 for group, version in [('agents', 12), ('skills', 3)]:
     for name, relative in asset_catalog[group].items():
@@ -1454,7 +1457,7 @@ if 'ContextDocumentAdapter' in context_repository or 'AssistantConversationRecov
 print('Runtime memory-state and database record lifecycle boundaries pass.')
 
 # Technical logs are a direct presentation path.
-application_control_config = json.loads((ROOT / 'MobileHarness/Resources/Agents/ApplicationControl/Agent.json').read_text())
+application_control_config = json.loads((ROOT / 'MobileHarness/Agents/Resources/Agents/ApplicationControl/Agent.json').read_text())
 if any('runtime' in value['sources'] for value in application_control_config['signals']['subscriptions']):
     raise SystemExit('Native diagnostics must be observed directly, not subscribed through Gateway.')
 application_control = (ROOT / 'MobileHarness/Agents/ApplicationControl/ApplicationControlAgent.swift').read_text()
@@ -1671,7 +1674,7 @@ for source in (ROOT / 'MobileHarness/Agents').rglob('*.swift'):
     text = source.read_text()
     if re.search(r'\b(?:input|requests|runtime\.input)\.(?:publish|send)\(', text):
         raise SystemExit(f'Local input routed through Gateway: {source}')
-for path in (ROOT / 'MobileHarness/Resources/Agents').glob('*/Agent.json'):
+for path in (ROOT / 'MobileHarness/Agents/Resources/Agents').glob('*/Agent.json'):
     data = json.loads(path.read_text())
     for subscription in data['signals']['subscriptions']:
         if set(subscription['sources']) & {'user', 'runtime', 'phone.camera', 'phone.microphone', 'model.resources', 'app.resources', 'app.environment'}:

@@ -10,7 +10,7 @@ root = pathlib.Path(__file__).resolve().parents[2]
 app = pathlib.Path(sys.argv[1])
 
 
-source = root / 'MobileHarness/Resources'
+source = root / 'MobileHarness/Agents/Resources'
 bundle = app / 'HarnessKit_Agents.bundle'
 # Exercise Foundation Bundle lookup, not just filesystem presence: iOS resourceURL
 # may already select a Resources directory inside a resource bundle.
@@ -28,8 +28,6 @@ if pathlib.Path(lookup).resolve() != (bundle / 'Catalog.json').resolve():
 expected = {pathlib.Path('Catalog.json'): source / 'Catalog.json'}
 for group in ('Agents', 'Skills'):
     expected.update({p.relative_to(source): p for p in (source / group).rglob('*') if p.is_file()})
-# Action translations are copied to the bundle root as Localization/.
-expected.update({p.relative_to(source / 'Actions'): p for p in (source / 'Actions/Localization').rglob('*') if p.is_file()})
 for name in ('OutputProtocol.md', 'ActionCatalog.json', 'SkillCatalog.json', 'AgentCatalog.json', 'RequestContext.json'):
     path = pathlib.Path('Agents/Shared') / name
     if path not in expected:
@@ -90,7 +88,20 @@ for name in ('ControlContext.json', 'ContentContext.json', 'ContentInstructions.
         raise SystemExit(f'Retired Writer prompt remains packaged: {name}')
 if (bundle / 'Agents/System').exists():
     raise SystemExit('Retired System prompt directory remains packaged')
-for owner in ('Actions', 'ModelKit'):
+# Action translations are owned and packaged by the Actions target.
+action_source = root / 'MobileHarness/Actions/Resources/Localization'
+action_bundle = app / 'HarnessKit_Actions.bundle'
+action_expected = {p.relative_to(action_source): p for p in action_source.rglob('*') if p.is_file()}
+action_actual = {
+    p.relative_to(action_bundle / 'Localization'): p
+    for p in (action_bundle / 'Localization').rglob('*') if p.is_file()
+}
+if set(action_expected) != set(action_actual):
+    raise SystemExit(f'Action localization mismatch: missing={set(action_expected)-set(action_actual)}, stale={set(action_actual)-set(action_expected)}')
+for path, original in action_expected.items():
+    if original.read_bytes() != action_actual[path].read_bytes():
+        raise SystemExit(f'Stale Action localization: {path}')
+for owner in ('ModelKit',):
     if (app / f'HarnessKit_{owner}.bundle').exists():
         raise SystemExit(f'Retired {owner} prompt bundle remains packaged')
 if list(app.rglob('FunctionTokenPrompts.json')):

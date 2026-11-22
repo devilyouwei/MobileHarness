@@ -225,11 +225,11 @@ workspace.search(query,before?) 在 SQLite 内匹配标题、描述或明确工�
 
 workspace.create(title,entry) 直接处理明确新建请求。入口路径在分配前校验。该工具初始化工作区并在草稿中创建缺失的空入口文件，临时占位由窗口呈现层拥有。同一委托按标题和入口路径复用创建分配，已进入的重复创建返回工作区编号及纠正提示。编辑上下文携带进入时的真实 entryExists 和 entryEmpty。入口缺失的读取返回 edit 补写建议，重复误调用适用既有恢复预算。enter 打开已有编辑目标。两个动作成功后切到编辑域，下一请求自动使用文件编辑 Skill。open 返回实际窗口结果并保持当前阶段。模型根据用户意图选择 open 或 enter。编辑阶段可通过 enter 切换到另一件作品，也可按用户授权创建并切换。Writer 加入旧预览、释放会话、保留草稿，然后准备新目标并替换 SQLite 活动绑定。失败时恢复旧编辑会话并要求重新读取；取消或恢复失败进入委托清理。finish 以单独调用结束委托，发布当前作品。文件编辑使用 render 与 publish 校验。
 
-作品库域加载 [writer-workspace](../../Resources/Skills/WriterWorkspace/Skill.json)。编辑域加载 [writer-file-editing](../../Resources/Skills/WriterFileEditing/Skill.json)，通过 Skill 依赖保留作品库教学和工具。两份 Skill 经同一加载器声明本轮工具与简短调用示例。工作区操作使用 workspace. 前缀，文件操作使用短别名。Action 声明提供参数语义，共享注册表生成 native schema。enter、create、ask 和 finish 由 Writer 本地执行，其他工具经 Gateway 送达 Actions；执行前按当前域校验已声明的工具与参数。ask 使用 question，finish 使用 summary。原始文件内容使用独立的无工具请求。
+作品库域加载 [writer-workspace](../Resources/Skills/WriterWorkspace/Skill.json)。编辑域加载 [writer-file-editing](../Resources/Skills/WriterFileEditing/Skill.json)，通过 Skill 依赖保留作品库教学和工具。两份 Skill 经同一加载器声明本轮工具与简短调用示例。工作区操作使用 workspace. 前缀，文件操作使用短别名。Action 声明提供参数语义，共享注册表生成 native schema。enter、create、ask 和 finish 由 Writer 本地执行，其他工具经 Gateway 送达 Actions；执行前按当前域校验已声明的工具与参数。ask 使用 question，finish 使用 summary。原始文件内容使用独立的无工具请求。
 
 ## 私有指令与公开介绍
 
-Resources/Agents/Writer/Agent.json.description 提供公开用途。Instructions.md 保存私有控制身份及通用追问和完成规则。Prompts.json 的 control.library 和 control.workspace 管理作品库和编辑两个控制域。已加载 Skill 的教学标题由共用 [SkillCatalog.json](../../Resources/Agents/Shared/SkillCatalog.json) 提供。每个控制请求持久化域标识，恢复加载当前域的调用与结果配对。
+Agents/Resources/Agents/Writer/Agent.json.description 提供公开用途。Instructions.md 保存私有控制身份及通用追问和完成规则。Prompts.json 的 control.library 和 control.workspace 管理作品库和编辑两个控制域。已加载 Skill 的教学标题由共用 [SkillCatalog.json](../Resources/Agents/Shared/SkillCatalog.json) 提供。每个控制请求持久化域标识，恢复加载当前域的调用与结果配对。
 
 ## 请求与恢复模板
 

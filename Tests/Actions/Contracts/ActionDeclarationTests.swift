@@ -112,7 +112,7 @@ import Testing
     try AgentConfigurations.installDeclarations(
         CapabilityModules.declarations.reversed(), localTools: AgentContracts.localTools.reversed(),
         translations: ActionLocalization.translations(
-            for: CapabilityModules.declarations, resourceRoot: AgentConfigurations.actionResourceRoot()))
+            for: CapabilityModules.declarations))
     #expect(try AgentConfigurations.load(named: "Writer").capabilities.tools.map(\.path) == before)
     #expect(throws: AgentConfigurationError.self) {
         try AgentConfigurations.installDeclarations(CapabilityModules.declarations)
@@ -141,7 +141,7 @@ import Testing
 @Test func actionTranslationsOverlayDeclarationsAndKeepDefaultsForMissingEntries() throws {
     let declarations = CapabilityModules.declarations
     let translations = try ActionLocalization.translations(
-        for: declarations, resourceRoot: AgentConfigurations.actionResourceRoot())
+        for: declarations)
     let chinese = try #require(translations["zh-Hans"])
     #expect(translations.keys.sorted() == ["zh-Hans"])
     let declaration = try #require(declarations.first { $0.path.description == "UI.Island.setPresentation" })
@@ -157,8 +157,7 @@ import Testing
     let declarations = CapabilityModules.declarations
     #expect(throws: ActionLocalizationError.self) {
         try ActionLocalization.translations(
-            for: declarations.filter { $0.path.description != "UI.Island.setPresentation" },
-            resourceRoot: AgentConfigurations.actionResourceRoot())
+            for: declarations.filter { $0.path.description != "UI.Island.setPresentation" })
     }
 }
 
@@ -166,10 +165,10 @@ import Testing
     let declarations = CapabilityModules.declarations
     let chinese = try #require(
         try ActionLocalization.translations(
-            for: declarations, resourceRoot: AgentConfigurations.actionResourceRoot())["zh-Hans"])
+            for: declarations)["zh-Hans"])
     let skills = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent(
-            "MobileHarness/Resources/Skills")
+            "MobileHarness/Agents/Resources/Skills")
     let known = Set(declarations.map { $0.path.description })
     var bound: Set<String> = []
     for case let url as URL in try #require(FileManager.default.enumerator(at: skills, includingPropertiesForKeys: nil))
